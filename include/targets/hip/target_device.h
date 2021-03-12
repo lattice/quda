@@ -5,75 +5,82 @@
 
 namespace quda {
 
+  // Target device merge
+  namespace target {
+
+  // hip-clang: compile-time dispatch
+  template <template <bool, typename ...> class f, typename ...Args>
+    __host__ __device__ auto dispatch(Args &&... args)
+  {
+#ifdef __HIP_DEVICE_COMPILE__
+    return f<true>()(args...);
+#else
+    return f<false>()(args...);
+#endif
+  }
+
+  template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
+  template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
+
+  /**
+     @brief Helper function that returns if the current execution
+     region is on the device
+  */
+  __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
+
+
+  template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
+  template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
+
+  /**
+     @brief Helper function that returns if the current execution
+     region is on the host
+  */
+  __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
+
+
+  template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef __HIP__
+  template <> struct block_dim_impl<true> { __device__ dim3 operator()() { return dim3(blockDim.x, blockDim.y, blockDim.z); } };
+#endif
+
+  /**
+     @brief Helper function that returns the thread block
+     dimensions.  On CUDA this returns the intrinsic blockDim,
+     whereas on the host this returns (1, 1, 1).
+  */
+  __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+
+  template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef __HIP__
+  template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
+#endif
+
+  /**
+     @brief Helper function that returns the thread indices within a
+     thread block.  On CUDA this returns the intrinsic
+     blockIdx, whereas on the host this just returns (0, 0, 0).
+  */
+  __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+
+
+  template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef __HIP__
+  template <> struct thread_idx_impl<true> { __device__ dim3 operator()() { return dim3(threadIdx.x, threadIdx.y, threadIdx.z); } };
+#endif
+
+  /**
+     @brief Helper function that returns the thread indices within a
+     thread block.  On CUDA this returns the intrinsic
+     threadIdx, whereas on the host this just returns (0, 0, 0).
+  */
+  __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
+
+}
+
+
   namespace device {
-
-    /**
-       @brief Helper function that returns if the current execution
-       region is on the device
-    */
-    constexpr bool is_device()
-    {
-#if defined(__HIP_DEVICE_COMPILE__)
-      return true;
-#else
-      return false;
-#endif
-    }
-
-    /**
-       @brief Helper function that returns if the current execution
-       region is on the host
-    */
-    constexpr bool is_host()
-    {
-#if defined(__HIP_DEVICE_COMPILE__)
-      return false;
-#else
-      return true;
-#endif
-    }
-
-    /**
-       @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim,
-       whereas on the host this returns (1, 1, 1).
-    */
-    __device__ __host__ inline dim3 block_dim()
-    {
-#if defined(__HIP_DEVICE_COMPILE__)
-      return dim3(blockDim.x, blockDim.y, blockDim.z);
-#else
-      return dim3(1, 1, 1);
-#endif
-    }
-
-    /**
-       @brief Helper function that returns the thread indices within a
-       thread block.  On CUDA this returns the intrinsic
-       blockIdx, whereas on the host this just returns (0, 0, 0).
-    */
-    __device__ __host__ inline dim3 block_idx()
-    {
-#if defined(__HIP_DEVICE_COMPILE__)
-      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-    }
-
-    /**
-       @brief Helper function that returns the thread indices within a
-       thread block.  On CUDA this returns the intrinsic
-       threadIdx, whereas on the host this just returns (0, 0, 0).
-    */
-    __device__ __host__ inline dim3 thread_idx()
-    {
-#if defined(__HIP_DEVICE_COMPILE__)
-      return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-    }
 
     /**
        @brief Helper function that returns the warp-size of the

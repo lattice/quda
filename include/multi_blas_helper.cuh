@@ -21,7 +21,7 @@ namespace quda
     static char *Bmatrix_h;
     static char *Cmatrix_h;
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
@@ -36,7 +36,7 @@ namespace quda
       for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
     }
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<!multi_1d, void>
     set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
     {
       constant_param_t param;
@@ -70,6 +70,39 @@ namespace quda
 
       params.push_back(param);
     }
+
+    template <typename coeff_t>
+    struct MultiBlasParam {
+      const int NXZ;
+      const int NYW;
+      MultiBlasParam(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+
+      template <bool is_device, typename dummy = void> struct get_matrix {
+        constexpr coeff_t* operator()(char select) const {
+          switch (select) {
+          case 'a': return reinterpret_cast<coeff_t *>(Amatrix_h); break;
+          case 'b': return reinterpret_cast<coeff_t *>(Bmatrix_h); break;
+          case 'c': return reinterpret_cast<coeff_t *>(Cmatrix_h); break;
+          }
+          return nullptr;
+        }
+      };
+
+      template <typename dummy> struct get_matrix<true, dummy> {
+        constexpr coeff_t* operator()(char select) const {
+          switch (select) {
+          case 'a': return reinterpret_cast<coeff_t *>(Amatrix_d); break;
+          case 'b': return reinterpret_cast<coeff_t *>(Bmatrix_d); break;
+          case 'c': return reinterpret_cast<coeff_t *>(Cmatrix_d); break;
+          }
+          return nullptr;
+        }
+      };
+
+      __device__ __host__ inline coeff_t a(int i, int j) const { return target::dispatch<get_matrix>('a')[i * NYW + j]; }
+      __device__ __host__ inline coeff_t b(int i, int j) const { return target::dispatch<get_matrix>('b')[i * NYW + j]; }
+      __device__ __host__ inline coeff_t c(int i, int j) const { return target::dispatch<get_matrix>('c')[i * NYW + j]; }
+    };
 
     /**
        @param[in] x Value we are testing

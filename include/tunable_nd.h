@@ -78,9 +78,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
@@ -90,9 +89,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg, param);
@@ -187,9 +185,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
@@ -200,9 +197,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
@@ -353,9 +349,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
@@ -367,9 +362,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;

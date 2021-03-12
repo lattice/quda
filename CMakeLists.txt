@@ -142,11 +142,12 @@ message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 ####################################################################################
 
 
-####################################################################################
-# START 2. QUDA Physics options
-####################################################################################
-# This default allows the user to turn OFF all dirac types, then manually switch ON
-# a desired subset
+
+set(QUDA_GPU_ARCH
+    ${QUDA_DEFAULT_GPU_ARCH}
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+# build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
 if(QUDA_DIRAC_DEFAULT_OFF)
@@ -386,7 +387,7 @@ set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -411,8 +412,9 @@ set(CMAKE_C_FLAGS_DEBUG
   "-Wall -Wextra -g -fno-inline"
   CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-  "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
-  CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
+    CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
+
 
 enable_language(C)
 

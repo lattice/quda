@@ -21,7 +21,7 @@ namespace quda {
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
       block_idx = blockIdx.x;
-      if (block_idx < gridp) {
+      if (blockIdx.x < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
         const int j = blockIdx.x / arg.swizzle_factor;

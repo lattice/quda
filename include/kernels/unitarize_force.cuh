@@ -228,12 +228,8 @@ namespace quda {
 	  if (fabs(gprod - determinant) > arg.max_det_error) {
 	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
 	    printLink(q);
-
-#if defined( __CUDA_ARCH__ ) ||  defined(__HIP_DEVICE_COMPILE__)
-	    atomicAdd(arg.fails, 1);
-#else
-	    (*arg.fails)++;
-#endif
+	
+    	atomic_fetch_add(arg.fails, 1);
 	  }
 	} // perform_svd?
 

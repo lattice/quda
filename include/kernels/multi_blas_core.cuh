@@ -122,42 +122,14 @@ namespace quda
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-      const int NXZ;
-      const int NYW;
-      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
 
-      __device__ __host__ inline coeff_t a(int i, int j) const
-      {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const
-      {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const
-      {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-#endif
-      }
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
     };
 
     /**

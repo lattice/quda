@@ -51,7 +51,7 @@ namespace quda {
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size<block_size_y>(); }
 
     template <int block_size_x, template <typename> class Transformer, typename Arg>
-    typename std::enable_if<block_size_x != device::warp_size(), qudaError_t>::type
+    std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x)
@@ -61,7 +61,7 @@ namespace quda {
     }
 
     template <int block_size_x, template <typename> class Transformer, typename Arg>
-    typename std::enable_if<block_size_x == device::warp_size(), qudaError_t>::type
+    std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x)
@@ -143,7 +143,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
+    std::enable_if_t<!enable_host, void>
       launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
@@ -155,7 +155,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
-    typename std::enable_if<enable_host, void>::type
+    std::enable_if_t<enable_host, void>
       launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
              const std::vector<constant_param_t> &param = dummy_param)
     {
@@ -190,6 +190,9 @@ namespace quda {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
       strcat(aux, field.AuxString());
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, ",fast_compile");
+#endif
     }
 
     TunableReduction2D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
@@ -264,7 +267,7 @@ namespace quda {
     unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size(); }
 
     template <int block_size_x, template <typename> class Transformer, typename Arg>
-    typename std::enable_if<block_size_x != device::warp_size(), qudaError_t>::type
+    std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x)
@@ -274,7 +277,7 @@ namespace quda {
     }
 
     template <int block_size_x, template <typename> class Transformer, typename Arg>
-    typename std::enable_if<block_size_x == device::warp_size(), qudaError_t>::type
+    std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
       if (tp.block.x == block_size_x)
@@ -346,7 +349,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
+    std::enable_if_t<!enable_host, void>
     launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
            const std::vector<constant_param_t> &param = dummy_param)
     {
@@ -358,7 +361,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, bool enable_host, typename T, typename Arg>
-    typename std::enable_if<enable_host, void>::type
+    std::enable_if_t<enable_host, void>
     launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
            const std::vector<constant_param_t> &param = dummy_param)
     {
