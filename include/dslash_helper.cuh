@@ -284,7 +284,7 @@ namespace quda
 #else 
     int shmem;
     dslash::shmem_sync_t counter;
-    volatile dslash::shmem_sync_t *sync_arr;
+    dslash::shmem_sync_t *sync_arr;
     dslash::shmem_interior_done_t &interior_done;
     dslash::shmem_interior_count_t &interior_count;
     dslash::shmem_retcount_intra_t *retcount_intra;
@@ -576,7 +576,7 @@ namespace quda
 
         if (getNeighborRank(threadIdx.x, arg) >= 0) {
           if (spin) {
-            while (arg.counter > *(arg.sync_arr + threadIdx.x)) { __nanosleep(10); };
+            nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter);
           }
         }
       }

@@ -60,7 +60,7 @@ namespace quda {
     cudaEvent_t dslashStart[2];
 
     // for shmem lightweight sync
-    shmem_sync_t sync_counter = 1;
+    shmem_sync_t sync_counter = 10;
     shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
     shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
     shmem_sync_t inc_shmem_sync_counter() { return sync_counter++; }
@@ -127,8 +127,10 @@ namespace quda {
     }
 #ifdef NVSHMEM_COMMS
     sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
-    qudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
-    sync_counter = 1;
+     /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
+    by using smaller values */
+    qudaMemset(sync_arr, 9, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
+    sync_counter = 10;
 
     TuneParam tp;
     tp.grid = dim3(1, 1, 1);

@@ -143,7 +143,8 @@ namespace quda
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::get_shmem_sync_counter();
+        // if we are doing tuning we should not wait on the sync_arr to be set.
+        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == INTERIOR_KERNEL) {
         arg.counter = activeTuning() ?

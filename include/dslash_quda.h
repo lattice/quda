@@ -44,8 +44,8 @@ namespace quda {
     /**
      * @brief type used for shmem signaling
      */
-    using shmem_sync_t = long;
-   
+    using shmem_sync_t = uint64_t;
+
     /**
      * @brief Get the shmem sync counter 
      *
