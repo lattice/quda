@@ -76,9 +76,12 @@ namespace quda
       if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) {
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
-
+#if defined(QUDA_TARGET_CUDA)
       if (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
       else launch<ComputeYhat, true>(tp, stream, arg);
+#else
+      launch<ComputeYhat,true>(tp,stream,arg);
+#endif
 
       if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);

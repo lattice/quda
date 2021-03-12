@@ -64,9 +64,9 @@ namespace quda {
   	}
   };
   
-  template<> struct rsqrtf_impl { 
+  template<> struct rsqrtf_impl<true> { 
     __device__ inline float operator()(const float& a) { 
-    	return __rsqrtf(a);
+    	return rsqrtf(a);
     }
    };
 

@@ -368,14 +368,20 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 
 # define CXX FLAGS
+if(QUDA_TARGET_CUDA)
+  set(QUDA_DEF_OPT_LEVEL "-O3")
+elseif( QUDA_TARGET_HIP )
+  set(QUDA_DEF_OPT_LEVEL "-O1")
+endif()
+
 set(CMAKE_CXX_FLAGS_DEVEL
-  "-g -O3 -Wall -Wextra"
+  "-g ${QUDA_DEF_OPT_LEVEL} -Wall -Wextra"
   CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-  "-O3 -Werror -Wall -Wextra"
+  "${QUDA_DEF_OPT_LEVEL} -Werror -Wall -Wextra"
   CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-  "-O3 -w ${CXX_OPT} "
+  "${QUDA_DEF_OPT_LEVEL} -w ${CXX_OPT} "
   CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"

@@ -73,10 +73,10 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-#if defned(__CUDA_ARCH__)
+#if defined(QUDA_TARGET_CUDA)
         extern __shared__ atom_t cache_[];
-#elif defined(__HIP_DEVICE_COMPILE__)
-		HIP_DYNAMIC_SHARED( atom_t, cache_ );
+#elif defined(QUDA_TARGET_HIP)
+	HIP_DYNAMIC_SHARED( atom_t, cache_ );
 #endif
         return reinterpret_cast<atom_t*>(cache_);
       }

@@ -35,7 +35,7 @@ namespace quda {
   */
   template <typename T, int block_size_x, int batch_size = 1> struct BlockReduce
   {
-    using block_reduce_t = QudaCub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
+    using block_reduce_t = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS>;
     const int batch;
 
     __device__ __host__ inline BlockReduce(int batch = 0) : batch(batch) {}

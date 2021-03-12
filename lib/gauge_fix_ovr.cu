@@ -89,6 +89,10 @@ namespace quda {
       }
     }
 
+#if defined(QUDA_TARGET_HIP)
+    int blockStep() const { return device::warp_size() / 2; }
+    int blockMin() const { return device::warp_size() / 2; }
+#endif
     bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return threads; }
 

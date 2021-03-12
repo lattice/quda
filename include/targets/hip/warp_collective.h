@@ -8,7 +8,7 @@ namespace quda {
 
 	template<> struct warp_combine_impl<true> {
 
-		template <typename T> __device__ inline T operator(T &x, int warp_split)
+		template <typename T> __device__ inline T operator()(T &x, int warp_split)
 		{
 			constexpr int warp_size = device::warp_size();
 			if (warp_split > 1) {
