@@ -410,7 +410,9 @@ namespace quda
 
     void setShmem(int shmem)
     {
+#ifdef NVSHMEM_COMMS
       arg.shmem = shmem;
+#endif
       setUberTuning(arg.shmem & 64);
     }
 

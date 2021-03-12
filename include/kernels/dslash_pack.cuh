@@ -62,12 +62,15 @@ namespace quda
     // 3 - pack P2P + IB
     // 8 - barrier part I (just the put part)
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
-    int shmem;
     dslash::shmem_sync_t counter;
-#ifdef NVSHMEM_COMMS
+    #ifdef NVSHMEM_COMMS
+    int shmem;
+
     volatile dslash::shmem_sync_t *sync_arr;
     dslash::shmem_retcount_intra_t *retcount_intra;
     dslash::shmem_retcount_inter_t *retcount_inter;
+#else
+    static constexpr int shmem =0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :
@@ -82,10 +85,9 @@ namespace quda
       twist_a(a),
       twist_b(b),
       twist_c(c),
-      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0),
-#ifndef NVSHMEM_COMMS
-      shmem(0)
-#else
+      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0)
+#ifdef NVSHMEM_COMMS
+      ,
       shmem(shmem_),
       counter(dslash::get_shmem_sync_counter()),
       sync_arr(dslash::get_shmem_sync_arr()),

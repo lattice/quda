@@ -278,9 +278,12 @@ namespace quda
     void *packBuffer[4 * QUDA_MAX_DIM];
     int neighbor_ranks[2 * QUDA_MAX_DIM];
     int bytes[2 * QUDA_MAX_DIM];
+#ifndef NVSHMEM_COMMS
+    static constexpr int shmem =0;
+    dslash::shmem_sync_t counter =0;
+#else 
     int shmem;
     dslash::shmem_sync_t counter;
-#ifdef NVSHMEM_COMMS
     volatile dslash::shmem_sync_t *sync_arr;
     dslash::shmem_interior_done_t &interior_done;
     dslash::shmem_interior_count_t &interior_count;
@@ -316,8 +319,7 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
-#ifndef NVSHMEM_COMMS
-      shmem(0),
+#ifndef NVSHMEM_COMMS 
       counter(0)
 #else
       shmem(shmem_),
@@ -467,7 +469,7 @@ namespace quda
   /**
    * @brief helper function for nvshmem uber kernel to signal that the interior kernel has completed
    */
-  template <KernelType kernel_type, typename Arg> void __device__ shmem_signalinterior(const Arg &arg)
+  template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
     if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
       __syncthreads();
@@ -482,7 +484,7 @@ namespace quda
     }
   }
 
-  template <class D, typename Arg, int nParity> void __device__ shmem_exterior(D &dslash, Arg &arg, int s)
+  template <class D, typename Arg, int nParity> void __device__ inline shmem_exterior(D &dslash, Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
@@ -532,7 +534,7 @@ namespace quda
     if (shmembarrier) {
 
       if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
-        long tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
+        auto tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
         while (tst_val < arg.counter - 1) {
           arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
                                                     cuda::std::memory_order_relaxed);
