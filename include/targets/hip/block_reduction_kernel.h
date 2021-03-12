@@ -19,7 +19,7 @@ namespace quda {
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
-      
+
       block_idx = blockIdx.x;
       if (blockIdx.x < gridp) {
         // this is the portion of the block that we are going to transpose
