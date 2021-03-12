@@ -178,19 +178,9 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh * spinor_site_size;
-          void *out0 = spinorCheck;
-          void *out1 = (char *)out0 + tm_offset * cpu_prec;
-
-          void *tmp0 = spinorTmp;
-          void *tmp1 = (char *)tmp0 + tm_offset * cpu_prec;
-
-          void *in0 = spinorOutMulti[i];
-          void *in1 = (char *)in0 + tm_offset * cpu_prec;
-
-          tm_ndeg_matpc(tmp0, tmp1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tm_ndeg_matpc(out0, out1, gauge, tmp0, tmp1, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
           tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -257,14 +247,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
           tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
                  inv_param.cpu_prec, gauge_param);
         } else {
-          int tm_offset = V * spinor_site_size;
-          void *evenOut = spinorCheck;
-          void *oddOut = (char *)evenOut + tm_offset * cpu_prec;
-
-          void *evenIn = spinorOut;
-          void *oddIn = (char *)evenIn + tm_offset * cpu_prec;
-
-          tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0,
+          tm_ndeg_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0,
                       inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -290,14 +273,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh * spinor_site_size;
-          void *out0 = spinorCheck;
-          void *out1 = (char *)out0 + tm_offset * cpu_prec;
-
-          void *in0 = spinorOut;
-          void *in1 = (char *)in0 + tm_offset * cpu_prec;
-
-          tm_ndeg_matpc(out0, out1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         } else {
           tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
@@ -329,19 +305,9 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh * spinor_site_size;
-          void *out0 = spinorCheck;
-          void *out1 = (char *)out0 + tm_offset * cpu_prec;
-
-          void *tmp0 = spinorTmp;
-          void *tmp1 = (char *)tmp0 + tm_offset * cpu_prec;
-
-          void *in0 = spinorOut;
-          void *in1 = (char *)in0 + tm_offset * cpu_prec;
-
-          tm_ndeg_matpc(tmp0, tmp1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tm_ndeg_matpc(out0, out1, gauge, tmp0, tmp1, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
           tm_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,

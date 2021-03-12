@@ -44,11 +44,12 @@ extern "C" {
   void tm_ndeg_dslash(void *res1, void *res2, void **gaugeFull, void *spinorField1, void *spinorField2,
 		      double kappa, double mu,  double epsilon, int oddBit, int daggerBit, QudaMatPCType matpc_type,
 		      QudaPrecision precision, QudaGaugeParam &gauge_param);
-  void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, void *inEven2, double kappa, double mu, double epsilon,
+
+  void tm_ndeg_matpc(void *out, void **gauge, void *in, double kappa, double mu, double epsilon,
 		     QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
-  void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *oddIn,
-		   double kappa, double mu, double epsilon, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param);
+  void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon,
+                   int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
   void apply_clover(void *out, void *clover, void *in, int parity, QudaPrecision precision);
 
