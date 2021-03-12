@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <limits>
 
 #include <register_traits.h>
 #include <math_helper.cuh>
@@ -16,11 +17,10 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <type_traits>
-#include <limits>
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
@@ -359,30 +359,17 @@ namespace quda {
 
       template<typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
-                                                 const complex<theirFloat> &val) const {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-	using vec2 = typename vector<storeFloat,2>::type;
-	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
-	} else {
-	  atomicAdd(u2, (vec2&)val);
-	}
-#else
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += val_.x;
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += val_.y;
-	} else {
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[dim][ parity*cb_offset + (x_cb*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
-	}
-#endif
+                                                 const complex<theirFloat> &val) const
+      {
+        using vec2 = vector_type<storeFloat, 2>;
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
+
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>
@@ -499,30 +486,17 @@ namespace quda {
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
 
       template <typename theirFloat>
-      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-	using vec2 = typename vector<storeFloat,2>::type;
-	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
-	} else {
-	  atomicAdd(u2, (vec2&)val);
-	}
-#else
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += val_.x;
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += val_.y;
-	} else {
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[(((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col].y += static_cast<storeFloat>(val.y);
-	}
-#endif
+      __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
+      {
+        using vec2 = vector_type<storeFloat, 2>;
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
+
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>
@@ -654,30 +628,17 @@ namespace quda {
       }
 
       template <typename theirFloat>
-      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-	using vec2 = typename vector<storeFloat,2>::type;
-	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomicAdd(u2, (vec2&)val_);
-	} else {
-	  atomicAdd(u2, (vec2&)val);
-	}
-#else
-        if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += val_.x;
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += val_.y;
-	  } else {
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].x += static_cast<storeFloat>(val.x);
-#pragma omp atomic update
-	  u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb].y += static_cast<storeFloat>(val.y);
-	}
-#endif
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
+      {
+        using vec2 = vector_type<storeFloat, 2>;
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>

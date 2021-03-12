@@ -2,7 +2,7 @@
 
 #include <color_spinor_field.h>
 #include <reduce_helper.h>
-#include <math_helper.cuh>
+#include <load_store.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -127,7 +127,7 @@ namespace quda
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm[x + parity * cb_norm_offset] = scale;
 
-        return fdivide(fixedMaxValue<store_t>::value, scale);
+        return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
       norm_t *Norm() { return norm; }
@@ -316,8 +316,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<!mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x,
-                                                                      Args &&... args)
+    constexpr std::enable_if_t<!mixed, void> instantiate(const T &a, const T &b, const T &c, V &x,
+                                                         Args &&... args)
     {
       return instantiate<Functor, Blas, T, store_t, store_t>(a, b, c, x, args...);
     }
@@ -325,8 +325,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename x_store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x, V &y,
-                                                                     Args &&... args)
+    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, V &x, V &y,
+                                                        Args &&... args)
     {
       if (y.Precision() < x.Precision()) errorQuda("Y precision %d not supported", y.Precision());
 

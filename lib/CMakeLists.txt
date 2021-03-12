@@ -172,11 +172,6 @@ target_compile_definitions(
   quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
                $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
-# set host compiler-specific options
-target_compile_options(quda PRIVATE -Wall -Wextra
-                            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>: -Wno-unknown-pragmas>
-                            $<$<CXX_COMPILER_ID:NVHPC>:>)
-
 target_compile_options(
   quda
   PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
@@ -246,11 +241,8 @@ endif()
 
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-
-if (QUDA_TARGET_CUDA)
-  target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-  target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-endif()
+target_include_directories(quda SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
 
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
@@ -278,6 +270,7 @@ if(QUDA_TARGET_HIP)
 endif()
 
 add_subdirectory(targets/generic)
+target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
 
 # propagate CXX flags to CUDA host compiler
@@ -311,15 +304,18 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
+                            $<$<CXX_COMPILER_ID:Clang>: -Xcompiler=-Wno-unused-function -Xcompiler=-Wno-unknown-pragmas>
+                            $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined -lineinfo>
+                            $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+                            -Wall -Wextra -Wno-unknown-pragmas
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
-                            $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
+                            $<$<CONFIG:SANITIZE>:-fsanitize=address -fsanitize=undefined>
                             >)
 
 # some clang warnings should be warning even when turning warnings into errors

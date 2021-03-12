@@ -147,24 +147,24 @@ namespace quda {
         }
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiateLinear<n-1>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiatePow2<n/2>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }

@@ -12,7 +12,6 @@
 // QUDA headers
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
-#include <dslash_quda.h>
 
 // External headers
 #include <llfat_utils.h>
