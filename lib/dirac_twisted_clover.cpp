@@ -77,7 +77,9 @@ namespace quda {
       flops += (1320ll + 552ll) * in.Volume();
 
     } else {
-      errorQuda("Non-degenerate operator is not implemented");
+      ApplyNdegTwistedClover(
+          out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
+      flops += (1440ll + 552ll) * in.Volume();
     }
   }
 

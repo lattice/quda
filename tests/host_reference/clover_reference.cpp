@@ -395,20 +395,23 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
   free(tmp1);
 }
 
-void tmc_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *clover, void *evenIn, void *oddIn,  double kappa, double mu, double epsilon, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+
+// apply the full non-degenerate twisted-clover operator
+void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon, 
+                  QudaTwistFlavorType flavor, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
 {
-  //V-4d volume and Vh=V/2
-  void *inEven1   = evenIn;
-  void *inEven2 = (char *)evenIn + precision * Vh * spinor_site_size;
+  //V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
+  void *inEven1   = in;
+  void *inOdd1    = (char *) inEven1 + precision * Vh * spinor_site_size;
 
-  void *inOdd1    = oddIn;
-  void *inOdd2 = (char *)oddIn + precision * Vh * spinor_site_size;
+  void *inEven2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
+  void *inOdd2 = (char*)inEven2 + precision * Vh * spinor_site_size;
 
-  void *outEven1  = evenOut;
-  void *outEven2 = (char *)evenOut + precision * Vh * spinor_site_size;
+  void *outEven1  = out;
+  void *outOdd1 = (char *)outEven1 + precision * Vh * spinor_site_size;
 
-  void *outOdd1   = oddOut;
-  void *outOdd2 = (char *)oddOut + precision * Vh * spinor_site_size;
+  void *outEven2   = (char*)outOdd1 + precision * Vh * spinor_site_size;
+  void *outOdd2 = (char *)outEven2 + precision * Vh * spinor_site_size;
 
   void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
   void *tmpEven2 = malloc(Vh * spinor_site_size * precision);

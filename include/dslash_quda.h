@@ -421,6 +421,38 @@ namespace quda {
   void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
       const int *comm_override, TimeProfile &profile);
+  
+  /**
+     @brief Driver for applying the non-degenerate twisted-clover
+     stencil
+
+     out = a * D * in + (C + i*b*gamma_5*tau_3 + c*tau_1) * x
+
+     where D is the gauged Wilson linear operator. The quark fields
+     out, in and x are five dimensional, with the fifth dimension
+     corresponding to the flavor dimension.  The convention is that
+     the first 4-d slice (s=0) corresponds to the positive twist and
+     the second slice (s=1) corresponds to the negative twist.
+
+     This operator can be applied to both single parity
+     (4d checker-boarded) fields, or to full fields.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] C The clover field used for the operator
+     @param[in] a Scale factor applied to Wilson term (typically -kappa)
+     @param[in] b Chiral twist factor applied (typically 2*mu*kappa)
+     @param[in] c Flavor twist factor applied (typically -2*epsilon*kappa)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+      const CloverField &C, double a, double b,
+      double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Domain-wall 5-d stencil to a
