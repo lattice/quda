@@ -200,8 +200,10 @@ namespace quda {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
 
     // delayed allocating this temporary until we need it
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
-
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+      createTmp(QUDA_CUDA_FIELD_LOCATION);
+    }
+    
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;

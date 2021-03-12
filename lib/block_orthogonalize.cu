@@ -242,9 +242,9 @@ namespace quda {
         } else if (Nvec == 32) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
                                                                                geo_bs, n_block_ortho);
-	  //} else if (Nvec == 128) {
-          //BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 128>(V, B, fine_to_coarse, coarse_to_fine,
-	  //geo_bs, n_block_ortho);
+	} else if (Nvec == 40) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 40>(V, B, fine_to_coarse, coarse_to_fine,
+									       geo_bs, n_block_ortho);
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
         }

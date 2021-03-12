@@ -93,6 +93,8 @@ namespace quda {
 #ifdef NSPIN4
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 40) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,40>(out, in, v, fine_to_coarse, parity);
 #endif // NSPIN4
 #ifdef NSPIN1
       } else if (nVec == 64) {
