@@ -63,6 +63,7 @@ protected:
     bool compress; /** indicates that we wish to perform a fine, then compressed solve */
     std::vector<ColorSpinorField *> fine_vector; /** Current decompressed vector(s) */
     std::vector<ColorSpinorField *> compressed_space; /** Compressed vector(s) */
+    std::vector<ColorSpinorField *> fine_space; /** fine vector(s) */
     
     /** This is the transfer operator that defines the prolongation and restriction 
 	operators */

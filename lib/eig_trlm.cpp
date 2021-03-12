@@ -66,11 +66,13 @@ namespace quda
     // If using the compression, we first perform the fine computation. Set the
     // eig_param values to the fine problem values, then switch to the
     // full problem when the fine problem is complete.
+    //std::vector<ColorSpinorField *> kSpace_fine_ptr;
     if(compress) {
       n_ev = fine_n_ev;
       n_kr = fine_n_kr;
       n_conv = fine_n_conv;
       max_restarts = fine_max_restarts;
+      fine_space.reserve(fine_n_ev);	    
     }
     
     // Increase the size of kSpace passed to the function, will be trimmed to
@@ -92,14 +94,17 @@ namespace quda
     // Switch to the full problem parameters and continue in compressed mode
     if(compress && converged) {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-	printfQuda("FINE PROBLEM: TRLM  computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv, restart_iter, iter);
+	printfQuda("FINE PROBLEM: TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv, restart_iter, iter);
       }
       n_ev = eig_param->n_ev;
       n_kr = eig_param->n_kr;
       n_conv = eig_param->n_conv;
       max_restarts = eig_param->max_restarts;
       
-      createTransferBasis(kSpace);
+      // The fine Krylov space may now be trimmed to the desired size
+      for(int i=0; i<fine_n_ev; i++) fine_space.push_back(kSpace[i]);
+      createTransferBasis(fine_space);
+      
       prepareCompressedKrylovSpace(kSpace, evals);
       compressed_mode = true;
       
@@ -131,7 +136,8 @@ namespace quda
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals);
+      if(compressed_mode) computeEvals(mat, compressed_space, evals);
+      else computeEvals(mat, kSpace, evals);
     }
 
     // Local clean-up
@@ -212,17 +218,17 @@ namespace quda
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      //if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
-        printfQuda("iter Lock = %d\n", iter_locked);
+	printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("num_converged = %d\n", num_converged);
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
         for (int i = 0; i < n_kr; i++) {
-          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          //printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
 	}
-      }
+	//}
       
       // Check for convergence
       if (num_converged >= n_conv) {
@@ -241,6 +247,7 @@ namespace quda
     std::vector<ColorSpinorField *> v_j;
     if(compressed_mode) {
       promoteVectors(fine_vector, v, j);
+      //int size_orig = fine_vector.size();
       v_j.reserve(fine_vector.size());      
       for (unsigned int i = 0; i < fine_vector.size(); i++) {
 	//printfQuda("Wrapping vector %d\n", i);
@@ -264,6 +271,9 @@ namespace quda
     //printfQuda("axpy op pre\n");
     blas::axpy(-alpha[j], *v_j[0], *r[0]);
     //printfQuda("axpy op post\n");
+
+    // Done with vector v_j for now.
+    if(compressed_mode) compressVectors(fine_vector, v, j);
     
     int start = (j > num_keep) ? j - 1 : 0;
 
@@ -276,36 +286,42 @@ namespace quda
 	int iterations = (j - start)/iter_size;	
 	int remainder = (j - start)%iter_size;
 
-	beta_.reserve(iter_size);
-	v_.reserve(iter_size);
+	//beta_.reserve(iter_size);
+	//v_.reserve(iter_size);
+	//for(int k=0; k<iter_size; k++) {
+	//beta_.push_back(0.0);
+	//v_.push_back(fine_vector[k]);
+	//}
 	
-	// We promote a block of vectors of size `iter_size` 
+	// We promote the v_idx vector. No need to compress as
+	// we read only.
 	for (int iter = 0; iter < iterations; iter++) {
 	  int idx = start + iter*iter_size;
 	  promoteVectors(fine_vector, v, idx);
 	  // Allocate beta values as assign pointers for this iteration
-	  for(int k=0; k<iter_size; k++) {
-	    beta_.push_back(-beta[idx]);
-	    v_.push_back(fine_vector[k]);
-	  }
+	  //for(int k=0; k<iter_size; k++) {
+	  //beta_[k] = -beta[idx];
+	  //*v_[0] = *fine_vector[k];
+	  //}
 	  // r = r - b_{j-1} * v_{j-1}
 	  //printfQuda("axpy CM op pre\n");
-	  blas::axpy(beta_.data(), v_, r_);
+	  //blas::axpy(beta_.data(), fine_vector, r_);
+	  blas::axpy(-beta[idx], *fine_vector[0], *r[0]);
 	  //printfQuda("axpy CM op post\n");
 	}
-	if(remainder > 0) {
-	  int idx = start + iterations*iter_size;
-	  promoteVectors(fine_vector, v, idx);
-	  // Allocate beta values as assign pointers for this iteration
-	  for(int k=0; k<iter_size; k++) {
-	    beta_.push_back(-beta[idx]);
-	    v_.push_back(fine_vector[k]);
-	  }
-	  // r = r - b_{j-1} * v_{j-1}
-	  blas::axpy(beta_.data(), v_, r_);
-	}
+	//if(remainder > 0) {
+	//int idx = start + iterations*iter_size;
+	//promoteVectors(fine_vector, v, idx);
+	// Allocate beta values as assign pointers for this iteration
+	//for(int k=0; k<iter_size; k++) {
+	//beta_.push_back(-beta[idx]);
+	//v_.push_back(fine_vector[k]);
+	//}
+	// r = r - b_{j-1} * v_{j-1}
+	//blas::axpy(beta_.data(), v_, r_);
+	
 	// We may now compress v_j
-	compressVectors(fine_vector, v, j);
+	//compressVectors(fine_vector, v, j);
       } else {
 	beta_.reserve(j - start);
 	v_.reserve(j - start);	
@@ -457,14 +473,48 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    if(compressed_mode) {
+      // For now (to test the compresed Lanczos step) promote the full krylov space and 
+      // compress after rotation
+      ColorSpinorParam csParamFine(*r[0]);      
+      std::vector<ColorSpinorField *> kSpace_fine;
+      kSpace_fine.reserve(kSpace.size());
+      unsigned int size_orig = kSpace.size();
+      for (unsigned int i = 0; i < size_orig; i++) {
+	//printfQuda("Allocating kSpace_fine vector %d of %d\n", (int)i, size_orig);
+	kSpace_fine.push_back(ColorSpinorField::Create(csParamFine));
+      }
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      promoteVectors(kSpace_fine, kSpace, 0);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      rotateVecs(kSpace_fine, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+      saveTuneCache();
+      // Update residual vector
+      std::swap(kSpace_fine[num_locked + iter_keep], kSpace_fine[n_kr]);
+      
 
-    // Update residual vector
-    std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);
-
+      ColorSpinorParam csParamCoarse(*kSpace[0]);
+      kSpace.reserve(kSpace_fine.size());
+      for (unsigned int i = size_orig; i < kSpace_fine.size(); i++) {
+	//printfQuda("Allocating kSpace vector %d of %d\n", (int)i, (int)kSpace_fine.size());
+	kSpace.push_back(ColorSpinorField::Create(csParamCoarse));
+      }
+      // Compress the vector space
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      compressVectors(kSpace_fine, kSpace, 0);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      
+      for (unsigned int i = 0; i < kSpace_fine.size(); i++) delete kSpace_fine[i];      
+    } else {
+      rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+      
+      // Update residual vector
+      std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);
+    }
+    
     // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[n_kr - 1] * ritz_mat[dim * (i + 1) - 1];
-
+    
     host_free(ritz_mat_keep);
   }
 } // namespace quda
