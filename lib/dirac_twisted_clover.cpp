@@ -74,15 +74,18 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
       ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
-      flops += (1320ll + 552ll) * in.Volume();
+      // FIXME check flops
+      flops += (1416ll + 552ll) * in.Volume();
 
     } else {
       ApplyNdegTwistedClover(
           out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
-      flops += (1440ll + 552ll) * in.Volume();
+      // FIXME check flops
+      flops += (1464ll + 552ll) * in.Volume();
     }
   }
 
+  // apply full operator  / (-kappa * D + (1 + A + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1)) * in
   void DiracTwistedClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
@@ -90,12 +93,20 @@ namespace quda {
       errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID) {
-      errorQuda("Twist flavor not set %d", in.TwistFlavor());
+      errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
     }
 
-    ApplyTwistedClover(
-        out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += (1320ll + 552ll) * in.Volume();
+    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      ApplyTwistedClover(
+          out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      // FIXME check flops
+      flops += (1416ll + 552ll) * in.Volume();
+    } else {
+      ApplyNdegTwistedClover(
+          out, in, *gauge, *clover, -kappa, 2 * mu * kappa, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      // FIXME check flops
+      flops += (1464ll + 552ll) * in.Volume();
+    }
   }
 
   void DiracTwistedClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

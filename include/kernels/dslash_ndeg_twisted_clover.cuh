@@ -56,6 +56,9 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+
+      // we need two sets of coords as the clover field has no flavor index
+      auto clover_coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
       auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
       
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -79,7 +82,7 @@ namespace quda
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
           constexpr int n = Arg::nColor * Arg::nSpin / 2;
-          HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
+          HMatrix<real, n> A = arg.A(clover_coord.x_cb, parity, chirality);
           HalfVector x_chi = x.chiral_project(chirality);
           HalfVector Ax_chi = A * x_chi;
           // i * mu * gamma_5 * tau_3
