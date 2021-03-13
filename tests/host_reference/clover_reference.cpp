@@ -404,15 +404,15 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
 {
   //V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
   void *inEven1 = in;
-  void *inEven2 = (char *) inEven1 + precision * Vh * spinor_site_size;
+  void *inEven2 = (char *)inEven1 + precision * Vh * spinor_site_size;
 
   void *inOdd1 = (char *)inEven2 + precision * Vh * spinor_site_size;
-  void *inOdd2 = (char*)inOdd1 + precision * Vh * spinor_site_size;
+  void *inOdd2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
 
   void *outEven1 = out;
   void *outEven2 = (char *)outEven1 + precision * Vh * spinor_site_size;
 
-  void *outOdd1 = (char*)outEven2 + precision * Vh * spinor_site_size;
+  void *outOdd1 = (char *)outEven2 + precision * Vh * spinor_site_size;
   void *outOdd2 = (char *)outOdd1 + precision * Vh * spinor_site_size;
 
   void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
