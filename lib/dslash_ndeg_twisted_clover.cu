@@ -77,11 +77,11 @@ namespace quda
       constexpr int nDim = 4;
       NdegTwistedCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, c, x, parity, dagger, comm_override);
       NdegTwistedClover<decltype(arg)> twisted(arg, out, in);
-      // why not in.VolumeCB() and in. GhostFaceCB() ??
+      // in.VolumeCB() and in.GhostFaceCB() are inappropriate for a two-flavour operator
+      // (since we abuse the fifth dimension for the flavour dof)
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-        in.VolumeCB(), in.GhostFaceCB(), profile);
-      //      policy.apply(0);
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     }
   };
   
