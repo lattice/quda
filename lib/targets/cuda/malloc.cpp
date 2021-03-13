@@ -612,16 +612,6 @@ namespace quda
         in the cache). */
     static std::map<void *, size_t> deviceSize;
 
-    /** Cache of inactive shmem-memory allocations.  We cache pinned
-  memory allocations so that fields can reuse these with minimal
-  overhead.*/
-    static std::multimap<size_t, void *> shmemCache;
-
-    /** Sizes of active shmem-memory allocations.  For convenience,
-  we keep track of the sizes of active allocations (i.e., those not
-  in the cache). */
-    static std::map<void *, size_t> shmemSize;
-
     static bool pool_init = false;
 
     /** whether to use a memory pool allocator for device memory */
@@ -747,7 +737,7 @@ namespace quda
 
     void shmem_free_(const char *func, const char *file, int line, void *ptr)
     {
-        quda::shmem_free_(func, file, line, ptr);
+      quda::shmem_free_(func, file, line, ptr);
     }
 #endif
 

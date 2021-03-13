@@ -270,7 +270,7 @@ namespace quda
     int dim_map[4];
     int active_dims;
     int pack_blocks; // total number of blocks used for packing in the dslash
-    int exterior_dims;    // dimension to run in the exterior Dslash
+    int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
 
     // for shmem ...
@@ -279,9 +279,9 @@ namespace quda
     int neighbor_ranks[2 * QUDA_MAX_DIM];
     int bytes[2 * QUDA_MAX_DIM];
 #ifndef NVSHMEM_COMMS
-    static constexpr int shmem =0;
-    dslash::shmem_sync_t counter =0;
-#else 
+    static constexpr int shmem = 0;
+    dslash::shmem_sync_t counter = 0;
+#else
     int shmem;
     dslash::shmem_sync_t counter;
     dslash::shmem_sync_t *sync_arr;
@@ -319,7 +319,7 @@ namespace quda
       pack_blocks(0),
       exterior_dims(0),
       exterior_blocks(0),
-#ifndef NVSHMEM_COMMS 
+#ifndef NVSHMEM_COMMS
       counter(0)
 #else
       shmem(shmem_),
@@ -575,9 +575,7 @@ namespace quda
         }
 
         if (getNeighborRank(threadIdx.x, arg) >= 0) {
-          if (spin) {
-            nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter);
-          }
+          if (spin) { nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter); }
         }
       }
 

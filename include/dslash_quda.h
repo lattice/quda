@@ -47,12 +47,12 @@ namespace quda {
     using shmem_sync_t = uint64_t;
 
     /**
-     * @brief Get the shmem sync counter 
+     * @brief Get the shmem sync counter
      *
      * @return shmem_sync_t
      */
     shmem_sync_t get_shmem_sync_counter();
-   
+
     /**
      * @brief Set the shmem sync counter to count
      *
@@ -60,7 +60,7 @@ namespace quda {
      * @return shmem_sync_t
      */
     shmem_sync_t set_shmem_sync_counter(shmem_sync_t count);
-    
+
     /**
      * @brief increase the shmem sync counter for the next dslash application
      *
@@ -72,8 +72,8 @@ namespace quda {
     using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
     using shmem_interior_done_t = cuda::atomic<long, cuda::thread_scope_device>;
     using shmem_interior_count_t = cuda::atomic<long, cuda::thread_scope_block>;
-   
-   /**
+
+    /**
      * @brief Get the shmem sync arr which is used for signaling which exterior halos have arrived
      *
      * @return shmem_sync_t*
@@ -100,7 +100,7 @@ namespace quda {
      * @return shmem_interior_done_t*
      */
     shmem_interior_done_t *get_shmem_interior_done();
-    
+
     /**
      * @brief Get the atomic counter for tracking how many of the interior blocks have finished. See also above.
      *

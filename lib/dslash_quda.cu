@@ -127,8 +127,8 @@ namespace quda {
     }
 #ifdef NVSHMEM_COMMS
     sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
-     /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
-    by using smaller values */
+    /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
+   by using smaller values */
     qudaMemset(sync_arr, 9, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
     sync_counter = 10;
 

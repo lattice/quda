@@ -63,14 +63,14 @@ namespace quda
     // 8 - barrier part I (just the put part)
     // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
     dslash::shmem_sync_t counter;
-    #ifdef NVSHMEM_COMMS
+#ifdef NVSHMEM_COMMS
     int shmem;
 
     dslash::shmem_sync_t *sync_arr;
     dslash::shmem_retcount_intra_t *retcount_intra;
     dslash::shmem_retcount_inter_t *retcount_inter;
 #else
-    static constexpr int shmem =0;
+    static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
             double b, double c, int shmem_ = 0) :

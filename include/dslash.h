@@ -150,7 +150,9 @@ namespace quda
         arg.counter = activeTuning() ?
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
-        arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims >0 )? ((deviceProp.multiProcessorCount) / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :0 ;
+        arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
+          ((deviceProp.multiProcessorCount) / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
+          0;
         tp.grid.x += arg.exterior_blocks;
       }
     }
@@ -165,18 +167,19 @@ namespace quda
     virtual bool advanceAux(TuneParam &param) const
     {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
-        
+
         int max_threads_per_dir = 0;
         for (int i = 0; i < 4; ++i) {
-          max_threads_per_dir = std::max(max_threads_per_dir,(arg.threadDimMapUpper[i] - arg.threadDimMapLower[i])/2);
+          max_threads_per_dir = std::max(max_threads_per_dir, (arg.threadDimMapUpper[i] - arg.threadDimMapLower[i]) / 2);
         }
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
-        const int max_blocks_per_dir = std::max((deviceProp.multiProcessorCount)/(8 * nDimComms ),4);
-        if (param.aux.x + 1 <= max_blocks_per_dir && (param.aux.x + 1) * param.block.x < (max_threads_per_dir + param.block.x-1) ) {
+        const int max_blocks_per_dir = std::max((deviceProp.multiProcessorCount) / (8 * nDimComms), 4);
+        if (param.aux.x + 1 <= max_blocks_per_dir
+            && (param.aux.x + 1) * param.block.x < (max_threads_per_dir + param.block.x - 1)) {
           param.aux.x++;
           return true;
         } else {
@@ -186,7 +189,7 @@ namespace quda
              * exterior. We make sure to use multiple blocks per communication direction.
              */
             auto maxgridsize = TunableVectorYZ::maxGridSize();
-            if(param.aux.y < 4){
+            if (param.aux.y < 4) {
               param.aux.y++;
               return true;
             } else {
@@ -201,9 +204,9 @@ namespace quda
       }
     }
 
-        virtual bool advanceTuneParam(TuneParam &param) const
+    virtual bool advanceTuneParam(TuneParam &param) const
     {
-      return advanceAux(param) || advanceSharedBytes(param) ||  advanceBlockDim(param) || advanceGridDim(param);
+      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
     }
 
     virtual void initTuneParam(TuneParam &param) const
@@ -217,7 +220,7 @@ namespace quda
       }
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
     virtual void defaultTuneParam(TuneParam &param) const
@@ -231,7 +234,7 @@ namespace quda
       }
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
-      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1;     // exterior blocks
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
     /**
