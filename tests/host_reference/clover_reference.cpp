@@ -241,7 +241,8 @@ void twistCloverGamma5(void *out, void *in, void *clover, void *cInv, const int 
   free(tmp1);
 }
 
-// Apply (C + i*a*gamma_5)/(C^2 + a^2)
+// Apply (C + i*mu*gamma_5*tau3 - epsilon*tau1) for QUDA_TWIST_GAMMA5_DIRECT
+// and   (...)                                  for QUDA_TWIST_GAMMA5_INVERSE
 void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
                            void *clover, void *cInv, const int dagger,
                            const double kappa, const double mu,
@@ -258,15 +259,16 @@ void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
     d = 1.0;
     
     if (dagger) a *= -1.0;
-
+    
+    // apply_clover zeroes its output
     apply_clover(tmp1, clover, in1, parity, precision);
     apply_clover(tmp2, clover, in2, parity, precision);
-    // i * mu * gamma_5 * tau_3
+    // out = tmp + (i * mu * gamma_5 * tau_3) * in
     applyTwist(out1, in1, tmp1, a, precision);
     applyTwist(out2, in2, tmp2, -a, precision);
-    // epsilon * tau_1
-    xpay(out1, b, in2, Vh * spinor_site_size, precision);
-    xpay(out2, b, in1, Vh * spinor_site_size, precision);
+    // out += (epsilon * tau_1) * in 
+    axpy(b, in2, out1, Vh * spinor_site_size, precision);
+    axpy(b, in1, out2, Vh * spinor_site_size, precision);
   //}
   //else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
   //  a = -2.0 * kappa * mu * flavor;
@@ -401,17 +403,17 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
                   QudaTwistFlavorType flavor, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
 {
   //V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
-  void *inEven1   = in;
-  void *inOdd1    = (char *) inEven1 + precision * Vh * spinor_site_size;
+  void *inEven1 = in;
+  void *inEven2 = (char *) inEven1 + precision * Vh * spinor_site_size;
 
-  void *inEven2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
-  void *inOdd2 = (char*)inEven2 + precision * Vh * spinor_site_size;
+  void *inOdd1 = (char *)inEven2 + precision * Vh * spinor_site_size;
+  void *inOdd2 = (char*)inOdd1 + precision * Vh * spinor_site_size;
 
-  void *outEven1  = out;
-  void *outOdd1 = (char *)outEven1 + precision * Vh * spinor_site_size;
+  void *outEven1 = out;
+  void *outEven2 = (char *)outEven1 + precision * Vh * spinor_site_size;
 
-  void *outEven2   = (char*)outOdd1 + precision * Vh * spinor_site_size;
-  void *outOdd2 = (char *)outEven2 + precision * Vh * spinor_site_size;
+  void *outOdd1 = (char*)outEven2 + precision * Vh * spinor_site_size;
+  void *outOdd2 = (char *)outOdd1 + precision * Vh * spinor_site_size;
 
   void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
   void *tmpEven2 = malloc(Vh * spinor_site_size * precision);
