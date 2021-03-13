@@ -242,7 +242,7 @@ void twistCloverGamma5(void *out, void *in, void *clover, void *cInv, const int 
 }
 
 // Apply (C + i*mu*gamma_5*tau3 - epsilon*tau1) for QUDA_TWIST_GAMMA5_DIRECT
-// and   (...)                                  for QUDA_TWIST_GAMMA5_INVERSE
+// and   (C - i*mu*gamma_5*tau3 + epsilon*tau1)/(C^2 + mu^2 - epsilon^2) for QUDA_TWIST_GAMMA5_INVERSE
 void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
                            void *clover, void *cInv, const int dagger,
                            const double kappa, const double mu,
