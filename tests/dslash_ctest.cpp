@@ -653,15 +653,7 @@ void dslashRef() {
         tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else {
-        int tm_offset = 12 * spinorRef->Volume();
-
-        void *ref1 = spinorRef->V();
-        void *ref2 = (char *)ref1 + tm_offset * cpu_prec;
-
-        void *flv1 = spinor->V();
-        void *flv2 = (char *)flv1 + tm_offset * cpu_prec;
-
-        tm_ndeg_matpc(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+        tm_ndeg_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
@@ -670,15 +662,7 @@ void dslashRef() {
         tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger,
                inv_param.cpu_prec, gauge_param);
       else {
-        int tm_offset = 12 * spinorRef->Volume();
-
-        void *evenOut = spinorRef->V();
-        void *oddOut = (char *)evenOut + tm_offset * cpu_prec;
-
-        void *evenIn = spinor->V();
-        void *oddIn = (char *)evenIn + tm_offset * cpu_prec;
-
-        tm_ndeg_mat(evenOut, oddOut, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
+        tm_ndeg_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
                     inv_param.cpu_prec, gauge_param);
       }
       break;
@@ -689,20 +673,9 @@ void dslashRef() {
         tm_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
       } else {
-        int tm_offset = 12 * spinorRef->Volume();
-
-        void *ref1 = spinorRef->V();
-        void *ref2 = (char *)ref1 + tm_offset * cpu_prec;
-
-        void *flv1 = spinor->V();
-        void *flv2 = (char *)flv1 + tm_offset * cpu_prec;
-
-        void *tmp1 = spinorTmp->V();
-        void *tmp2 = (char *)tmp1 + tm_offset * cpu_prec;
-
-        tm_ndeg_matpc(tmp1, tmp2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+        tm_ndeg_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                       inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
-        tm_ndeg_matpc(ref1, ref2, hostGauge, tmp1, tmp2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+        tm_ndeg_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                       inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
@@ -713,20 +686,9 @@ void dslashRef() {
         tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                not_dagger, inv_param.cpu_prec, gauge_param);
       } else {
-        int tm_offset = 12 * spinorRef->Volume();
-
-        void *evenOut = spinorRef->V();
-        void *oddOut = (char *)evenOut + tm_offset * cpu_prec;
-
-        void *evenIn = spinor->V();
-        void *oddIn = (char *)evenIn + tm_offset * cpu_prec;
-
-        void *evenTmp = spinorTmp->V();
-        void *oddTmp = (char *)evenTmp + tm_offset * cpu_prec;
-
-        tm_ndeg_mat(evenTmp, oddTmp, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
+        tm_ndeg_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
                     inv_param.cpu_prec, gauge_param);
-        tm_ndeg_mat(evenOut, oddOut, hostGauge, evenTmp, oddTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+        tm_ndeg_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                     not_dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
