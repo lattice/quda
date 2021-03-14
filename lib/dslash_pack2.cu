@@ -64,7 +64,11 @@ protected:
     const double b;
     const double c;
     int twist; // only has meaning for nSpin=4
-    int shmem;
+#ifdef NVSHMEM_COMMS
+    const int shmem;
+#else
+    static constexpr int shmem = 0;
+#endif
 
     bool tuneGridDim() const { return true; } // If striping, always tune grid dimension
 
@@ -155,7 +159,7 @@ protected:
       case Host | Remote: strcat(aux, ",host-remote"); break;
       case Device: strcat(aux, ",device-device"); break;
       case Host: strcat(aux, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
-      case Shmem: shmem & 32 ? strcat(aux, ",shmem=32") : strcat(aux, ",shmem=0"); break;
+      case Shmem: strcat(aux, ",shmem"); break;
       default: errorQuda("Unknown pack target location %d\n", location);
       }
     }
@@ -174,8 +178,11 @@ public:
     threads(0),
     a(a),
     b(b),
-    c(c),
+    c(c)
+#ifdef NVSHMEM_COMMS
+    ,
     shmem(shmem)
+#endif
   {
     fillAux();
 
@@ -305,9 +312,9 @@ public:
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
       // service for the packing kernel when running concurrently.
-      if (location & Host || location & Shmem) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
+      if (location & Host) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
 #ifndef STRIPED
-      if (location & Host || location & Shmem) param.grid.x = minGridSize();
+      if (location & Host) param.grid.x = minGridSize();
 #endif
     }
 
@@ -317,7 +324,7 @@ public:
       // if doing a zero-copy policy then ensure that each thread block
       // runs exclusively on a given SM - this is to ensure quality of
       // service for the packing kernel when running concurrently.
-      if (location & Host || location & Shmem) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
+      if (location & Host) param.shared_bytes = maxDynamicSharedBytesPerBlock() / 2 + 1;
 #ifndef STRIPED
       if (location & Host) param.grid.x = minGridSize();
 #endif

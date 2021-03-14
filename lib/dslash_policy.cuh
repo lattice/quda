@@ -1810,16 +1810,11 @@ public:
         first_active_policy = static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
-#ifndef QUDA_NVSHMEM
         if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
-#endif
-
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)]
               = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
-#ifndef QUDA_NVSHMEM
         }
-#endif
 
         if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)]
