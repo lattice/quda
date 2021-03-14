@@ -145,11 +145,11 @@ namespace quda
                               double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {
-#ifdef GPU_NDEG_TWISTED_CLOVER_PRECONDITIONED_DIRAC
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
     instantiate<NdegTwistedCloverPreconditionedApply>(out, in, U, A, a, b, c, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Non-degenerate preconditioned twisted-clover dslash has not been built");
-#endif // GPU_NDEG_TWISTED_CLOVER_PRECONDITIONED_DIRAC
+#endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
   }
   
 } // namespace quda
