@@ -9,7 +9,7 @@ namespace quda
 {
   
   template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_>
-    struct NdegTwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+    struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_;
@@ -22,7 +22,7 @@ namespace quda
     real b;          /** this is the chiral twist factor */
     real c;          /** this is the flavor twist factor */
     
-  NdegTwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
+  NdegTwistedCloverPreconditionedArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                        double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
                        const int *comm_override) :
     WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
@@ -41,7 +41,7 @@ namespace quda
      Note this routine only exists in xpay form.
   */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void ndegTwistedClover(Arg &arg, int idx, int flavor, int parity)
+  __device__ __host__ inline void ndegTwistedCloverPreconditioned(Arg &arg, int idx, int flavor, int parity)
   {
     using namespace linalg; // for Cholesky
     typedef typename mapper<Float>::type real;
@@ -95,7 +95,8 @@ namespace quda
           Cholesky<HMatrix, real, nColor * Arg::nSpin / 2> cholesky(A2);
           chi = cholesky.backward(cholesky.forward(A_chi));
           tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
-        } else {
+        }
+        else {
           HMat A2inv = arg.A2inv(x_cb, parity, chirality);
           chi = A2inv * A_chi;
           tmp += static_cast<real>(2.0) * chi.chiral_reconstruct(chirality);
