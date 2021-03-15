@@ -26,8 +26,11 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
+      ompwip("skip nonfunctioning RNG.");
+/*
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch_device<init_random>(tp, stream, rngArg(rng.State(), seed, meta));
+*/
     }
 
     long long flops() const { return 0; }

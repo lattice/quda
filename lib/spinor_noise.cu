@@ -24,6 +24,8 @@ namespace quda {
     }
 
     void apply(const qudaStream_t &stream) {
+      ompwip("skip nonfunctioning RNG.");
+/*
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       switch (type) {
       case QUDA_NOISE_GAUSS:
@@ -34,6 +36,7 @@ namespace quda {
         break;
       default: errorQuda("Noise type %d not implemented", type);
       }
+*/
     }
 
     long long flops() const { return 0; }

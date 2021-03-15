@@ -34,12 +34,15 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
+      ompwip("skip nonfunctioning RNG.");
+/*
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (group) {
         launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, true>(U, rng.State(), sigma));
       } else {
         launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, false>(U, rng.State(), sigma));
       }
+*/
     }
 
     long long flops() const { return 0; }
