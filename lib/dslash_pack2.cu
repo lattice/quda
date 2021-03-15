@@ -74,7 +74,7 @@ protected:
 
     unsigned int maxGridSize() const
     {
-      if (location & Host || location & Shmem) {
+      if (location & Host) {
 #ifdef STRIPED
         // if zero-copy policy then set a maximum number of blocks to be
         // the 3 * number of dimensions we are communicating
@@ -82,11 +82,11 @@ protected:
 #else
         // if zero-copy policy then assign exactly up to four thread blocks
         // per direction per dimension (effectively no grid-size tuning)
-        int max = ((shmem & 32) || (location & Host)) ? 4 : -1;
+        int max = 2 * 4;
 #endif
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
-        return max > 0 ? max * nDimComms : TunableVectorYZ::maxGridSize();
+        return max * nDimComms;
       } else {
         return TunableVectorYZ::maxGridSize();
       }
@@ -106,7 +106,7 @@ protected:
 #endif
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
-        return min > 0 ? min * nDimComms : TunableVectorYZ::minGridSize();
+        return min * nDimComms;
       } else {
         return TunableVectorYZ::minGridSize();
       }
@@ -114,6 +114,9 @@ protected:
 
     int gridStep() const
     {
+#ifdef STRIPED
+      return TunableVectorYZ::gridStep();
+#else
       if (location & Host || location & Shmem) {
         // the shmem kernel must ensure the grid size autotuner
         // increments in steps of 2 * number partitioned dimensions
@@ -124,6 +127,7 @@ protected:
       } else {
         return TunableVectorYZ::gridStep();
       }
+#endif
     }
 
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
