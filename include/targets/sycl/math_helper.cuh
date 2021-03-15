@@ -123,5 +123,13 @@ namespace quda {
 #endif
   }
 
+  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  {
+#ifdef __CUDA_ARCH__
+    return __fdividef(a, b);
+#else
+    return a / b;
+#endif
+  }
 
 }

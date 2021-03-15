@@ -39,6 +39,7 @@ namespace quda {
     warningQuda("launchReduction2D %s", grid_stride?"true":"false");
     warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
     warningQuda("%s", str(arg.threads).c_str());
+    //arg.debug();
     q.submit([&](sycl::handler& h) {
 	       h.parallel_for<class Reduction2D>(ndRange,
 					  [=](sycl::nd_item<3> ndi)
@@ -47,6 +48,8 @@ namespace quda {
 					  });
 	     });
     //managed_free(a);
+    //q.wait();
+    //arg.debug();
     warningQuda("end launchReduction2D");
     return QUDA_SUCCESS;
   }

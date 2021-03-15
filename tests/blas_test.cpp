@@ -599,6 +599,18 @@ double test(Kernel kernel)
 
   case Kernel::ax:
     *xD = *xH;
+    //{
+    //  *yH = *xH;
+    //  *zH = *xD;
+    //  auto nxH = blas::norm2(*xH);
+    //  auto nxD = blas::norm2(*xD);
+    //  auto nyH = blas::norm2(*yH);
+    //  auto nzH = blas::norm2(*zH);
+    //  printf("nxH: %g\n", nxH);
+    //  printf("nxD: %g\n", nxD);
+    //  printf("nyH: %g\n", nyH);
+    //  printf("nzH: %g\n", nzH);
+    //}
     blas::ax(a, *xD);
     blas::ax(a, *xH);
     error = ERROR(x);
