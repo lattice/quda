@@ -13,16 +13,16 @@ namespace quda {
    */
   template<typename T>
   inline __host__ __device__ void sincos(const T& a, T* s, T* c) {
-    // Hip Does not have ::sincos(a,s,c);
+        // Hip Does not have ::sincos(a,s,c);
 	// Just on device sincosf
 	// Need to do this as 2 stepper?
-	*s = sin(a);
-	*c = cos(a);
+	*s = ::sin(a);
+	*c = ::cos(a);
   }
 
   // Impl for float type host
   template <bool is_device> struct sincosf_impl {
-    inline void operator()(const float& a, float * s, float *c) { *s=std::sinf(a); *c=std::cosf(a); }
+    inline void operator()(const float& a, float * s, float *c) { *s=::sinf(a); *c=::cosf(a); }
   };
 
   // Impl for float device
@@ -54,13 +54,13 @@ namespace quda {
    */
   template<typename T>
   inline __host__ __device__ T rsqrt(const T& a) {
-    return 1.0/sqrt(a);
+    return 1.0/::sqrt(a);
    }
    
    // Impl for float type host
   template <bool is_device> struct rsqrtf_impl {
   	inline float operator()(const float& a) {
-  	   return 1.0/sqrtf(a);
+  	   return 1.0/::sqrtf(a);
   	}
   };
   
@@ -82,8 +82,8 @@ namespace quda {
     __device__ __host__ static T Sin( const T &a ) { return ::sin(a); }
     __device__ __host__ static T Cos( const T &a ) { return ::cos(a); }
     __device__ __host__ static void SinCos(const T &a, T *s, T *c) { 
-		*s = cos(a);
-        *c = cos(a);	
+	*s = ::sin(a);
+        *c = ::cos(a);	
     }
   };
   
@@ -110,12 +110,12 @@ template <>
     __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a*static_cast<float>(M_PI)); }
     __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a*static_cast<float>(M_PI)); }
     __device__ __host__ static void SinCos(const float &a, float *s, float *c) { 
-	    auto ampi = a * static_cast<float>(M_PI);
+        auto ampi = a * static_cast<float>(M_PI);
     	target::dispatch<sincosf_impl>(ampi,s,c); 
     }
   };
 
-  template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
+  template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return ::pow(a, b); } };
 
   template <> struct fpow_impl<true> {
     template <typename real> __device__ inline real operator()(real a, int b)
