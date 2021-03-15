@@ -27,10 +27,11 @@ namespace quda {
   /**
       Kernel argument struct
   */
-  template <typename vFloat, typename Rotator, typename Vector, int fineSpin_, int nColor_, int coarseSpin_, int nVec_>
+  template <bool is_device_, typename vFloat, typename Rotator, typename Vector, int fineSpin_, int nColor_, int coarseSpin_, int nVec_>
   struct BlockOrthoArg {
     using sum_t = double;
     using real = typename mapper<vFloat>::type;
+    static constexpr bool is_device = is_device_;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int coarseSpin = coarseSpin_;
@@ -88,10 +89,10 @@ namespace quda {
     static constexpr int nColor = Arg::nColor;
 
     // on the device we rely on thread parallelism, where as on the host we assign a vector of block_size to each thread
-    static constexpr int n_sites_per_thread = device::is_device() ? 1 : block_size;
+    static constexpr int n_sites_per_thread = Arg::is_device ? 1 : block_size;
 
     // on the device we expect number of active threads equal to block_size, and on the host just a single thread
-    static constexpr int n_threads_per_block = device::is_device() ? block_size : 1;
+    static constexpr int n_threads_per_block = Arg::is_device ? block_size : 1;
 
     static_assert(n_sites_per_thread * n_threads_per_block == block_size,
                   "Product of n_sites_per_thread and n_threads_per_block must equal block_size");

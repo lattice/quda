@@ -40,12 +40,13 @@ namespace quda
       use_mma(use_mma)
     {
       arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
-      if (Y.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
         arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       }
+      arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       strcat(aux, comm_dim_partitioned_string());
-      if (use_mma) { strcat(aux, ",mma"); }
+      if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());
@@ -59,21 +60,21 @@ namespace quda
 
     ~CalculateYhat()
     {
-      if (Y.Location() == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
+      if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
       pool_pinned_free(arg.max_h);
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (Arg::compute_max && !activeTuning()) {
+      if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) {
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
       if (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
-      else launch<ComputeYhat>(tp, stream, arg);
+      else launch<ComputeYhat, true>(tp, stream, arg);
 
-      if (Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
+      if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
         qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
       }
@@ -92,7 +93,7 @@ namespace quda
         }
         return false;
       } else {
-        if (Y.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
+        if (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
           return TunableKernel3D::advanceTuneParam(param);
         else
           return false;
@@ -278,6 +279,7 @@ namespace quda
 #ifdef GPU_MULTIGRID
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X, bool use_mma)
   {
+    if (use_mma && Y.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("MG-MMA cannot be used with CPU location fields");
     QudaPrecision precision = checkPrecision(Xinv, Y, X);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 

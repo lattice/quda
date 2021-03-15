@@ -152,30 +152,30 @@ namespace quda {
         }
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiateLinear<n-1>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiatePow2<n/2>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
       // instantiate the loop unrolling template
-      template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max!=1, void> instantiate(const qudaStream_t &stream)
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
         constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
@@ -187,7 +187,7 @@ namespace quda {
         else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
 
-      template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max==1, void> instantiate(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }

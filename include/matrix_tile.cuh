@@ -107,7 +107,7 @@ namespace quda {
     /**
      * @brief Load accessor for fields supporting ghost zones; we could avoid this with `if constexpr`
      */
-    template <typename Accessor> inline __device__ __host__ typename std::enable_if<Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
+    template <typename Accessor> inline __device__ __host__ std::enable_if_t<Accessor::supports_ghost_zone, void> load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
     {
 #pragma unroll
       for (int i=0; i<m; i++) {
@@ -124,7 +124,7 @@ namespace quda {
     /**
      * @brief Load accessor for fields without ghost zones (fine clover fields)
      */
-    template <typename Accessor> inline __device__ __host__ typename std::enable_if<!Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
+    template <typename Accessor> inline __device__ __host__ std::enable_if_t<!Accessor::supports_ghost_zone, void> load(const Accessor &a, int d, int parity, int x_cb, int i0, int j0)
     {
       static_assert(!ghost, "Cannot use ghost MatrixTile with field that doesn't support ghost zones");
 #pragma unroll
@@ -136,7 +136,7 @@ namespace quda {
       }
     }
 
-    template <typename Accessor> inline __device__ __host__ typename std::enable_if<Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
+    template <typename Accessor> inline __device__ __host__ std::enable_if_t<Accessor::supports_ghost_zone, void> load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
     {
 #pragma unroll
       for (int i=0; i<m; i++) {
@@ -150,7 +150,7 @@ namespace quda {
       }
     }
 
-    template <typename Accessor> inline __device__ __host__ typename std::enable_if<!Accessor::supports_ghost_zone, void>::type load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
+    template <typename Accessor> inline __device__ __host__ std::enable_if_t<!Accessor::supports_ghost_zone, void> load(const Accessor &a, int d, int parity, int x_cb, int si, int sj, int i0, int j0)
     {
       static_assert(!ghost, "Cannot use ghost MatrixTile with field that doesn't support ghost zones");
 #pragma unroll

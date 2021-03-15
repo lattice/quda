@@ -1,78 +1,108 @@
 #pragma once
 
 #include <algorithm>
+#ifdef __NVCOMPILER
+#include <nv/target>
+#endif
+
+#if defined(__CUDACC__) ||  defined(__NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
+#define QUDA_CUDA_CC
+#endif
 
 namespace quda {
 
-  namespace device {
+  namespace target {
+
+#ifdef __NVHPC_CUDA
+
+    // nvc++: run-time dispatch using if target
+    template <template <bool, typename ...> class f, typename ...Args>
+    __host__ __device__ auto dispatch(Args &&... args)
+    {
+      if target (nv::target::is_device) {
+          return f<true>()(args...);
+      } else if target (nv::target::is_host) {
+          return f<false>()(args...);
+      }
+    }
+
+#else
+
+    // nvcc or clang: compile-time dispatch
+    template <template <bool, typename ...> class f, typename ...Args>
+      __host__ __device__ auto dispatch(Args &&... args)
+    {
+#ifdef __CUDA_ARCH__
+      return f<true>()(args...);
+#else
+      return f<false>()(args...);
+#endif
+    }
+
+#endif
+
+    template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
+    template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the device
     */
-    constexpr bool is_device()
-    {
-#ifdef __CUDA_ARCH__
-      return true;
-#else
-      return false;
-#endif
-    }
+    __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
+
+
+    template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
+    template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the host
     */
-    constexpr bool is_host()
-    {
-#ifdef __CUDA_ARCH__
-      return false;
-#else
-      return true;
+    __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
+
+
+    template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct block_dim_impl<true> { __device__ dim3 operator()() { return dim3(blockDim.x, blockDim.y, blockDim.z); } };
 #endif
-    }
 
     /**
        @brief Helper function that returns the thread block
        dimensions.  On CUDA this returns the intrinsic blockDim,
        whereas on the host this returns (1, 1, 1).
     */
-    __device__ __host__ inline dim3 block_dim()
-    {
-#ifdef __CUDA_ARCH__
-      return dim3(blockDim.x, blockDim.y, blockDim.z);
-#else
-      return dim3(1, 1, 1);
+    __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+
+    template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
 #endif
-    }
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        blockIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 block_idx()
-    {
-#ifdef __CUDA_ARCH__
-      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
-#else
-      return dim3(0, 0, 0);
+    __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+
+
+    template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct thread_idx_impl<true> { __device__ dim3 operator()() { return dim3(threadIdx.x, threadIdx.y, threadIdx.z); } };
 #endif
-    }
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        threadIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 thread_idx()
-    {
-#ifdef __CUDA_ARCH__
-      return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-    }
+    __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
+
+  }
+
+
+  namespace device {
 
     /**
        @brief Helper function that returns the warp-size of the
@@ -147,3 +177,5 @@ namespace quda {
   }
 
 }
+
+#undef QUDA_CUDA_CC

@@ -41,8 +41,7 @@ namespace quda {
       apply(device::get_default_stream());
     }
 
-    template <int nSpin>
-    typename std::enable_if<nSpin != 4, void>::type Launch(TuneParam &tp, const qudaStream_t &stream)
+    template <int nSpin> std::enable_if_t<nSpin != 4, void> Launch(TuneParam &tp, const qudaStream_t &stream)
     {
       constexpr bool enable_host = true;
       if (out.GammaBasis()==in.GammaBasis()) {
@@ -52,8 +51,7 @@ namespace quda {
       }
     }
 
-    template <int nSpin>
-    typename std::enable_if<nSpin == 4, void>::type Launch(TuneParam &tp, const qudaStream_t &stream)
+    template <int nSpin> std::enable_if_t<nSpin == 4, void> Launch(TuneParam &tp, const qudaStream_t &stream)
     {
       constexpr bool enable_host = true;
       if (out.GammaBasis()==in.GammaBasis()) {
