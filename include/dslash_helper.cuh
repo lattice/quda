@@ -484,7 +484,7 @@ namespace quda
     }
   }
 
-  template <class D, typename Arg, int nParity> void __device__ inline shmem_exterior(D &dslash, Arg &arg, int s)
+  template <class D, typename Arg, int nParity> void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
