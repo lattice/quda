@@ -428,7 +428,7 @@ namespace quda
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
     out << "exterior_threads = " << arg.exterior_threads;
-    out << "exterior_blocks =" << arg.exterior_blocks;
+    out << "exterior_blocks = " << arg.exterior_blocks;
     return out;
   }
 
@@ -484,7 +484,8 @@ namespace quda
     }
   }
 
-  template <class D, typename Arg, int nParity> void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
+  template <class D, typename Arg, int nParity>
+  void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
