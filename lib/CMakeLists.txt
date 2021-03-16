@@ -87,6 +87,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu
+  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
@@ -101,7 +102,6 @@ set(QUDA_DSLASH_OBJS
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu laplace.cu covDev.cu)
 
 if(NOT QUDA_NVSHMEM)
