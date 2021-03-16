@@ -400,7 +400,7 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
 
 // apply the full non-degenerate twisted-clover operator
 void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon, 
-                  QudaTwistFlavorType flavor, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+                  int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
 {
   //V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
   void *inEven1 = in;
