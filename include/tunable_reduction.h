@@ -78,7 +78,27 @@ namespace quda {
 #else
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
+      ompwip("OFFLOADING...");
+#ifdef QUDA_BACKEND_OMPTARGET
+      const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
+      const int ld = tp.block.x*tp.block.y*tp.grid.z;
+      const int tx = arg.threads.x;
+      const int ty = arg.threads.y;
+      using reduce_t = typename Transformer<Arg>::reduce_t;
+      Transformer<Arg> t(arg);
+      reduce_t value = arg.init();
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(Transformer<Arg>::init_omp())
+
+#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld)
+      for (int j = 0; j < ty; j++) {
+        for (int i = 0; i < tx; i++) {
+          value = t(value, i, j);
+        }
+      }
+      arg.launch_error = QUDA_SUCCESS;
+#else
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer>(arg, tp, stream);
+#endif
 #endif
 
       if (!commAsyncReduction()) {
@@ -289,6 +309,7 @@ namespace quda {
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip("unimplemented multireduction");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg, param);
 #else

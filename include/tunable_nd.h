@@ -67,7 +67,19 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
+      ompwip("OFFLOADING...");
+#ifdef QUDA_BACKEND_OMPTARGET
+      const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
+      const int ld = tp.block.x*tp.block.y*tp.grid.z;
+      const int tx = arg.threads.x;
+      Functor<Arg> f(const_cast<Arg &>(arg));
+#pragma omp target teams distribute parallel for simd num_teams(gd) thread_limit(ld) num_threads(ld)
+      for (int i = 0; i < tx; i++) {
+        f(i);
+      }
+#else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
+#endif
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -191,7 +203,6 @@ namespace quda {
 #else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
 #endif
-      TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
     }
 
     template <template <typename> class Functor, typename Arg>
@@ -356,8 +367,33 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      ompwip();
+#if 1
+      ompwip("NOOOO...");
+#else
+/*
+InvalidArraySize: Array size must be at least 1:  [Src: /netbatch/donb884519_00/runDir/72/20210130_000000/llvm/llvm-spirv/lib/SPIRV/SPIRVWriter.cpp:399 T->getArrayNumElements() >= 1 ]
+clang-12: error: llvm-spirv command failed with exit code 7 (use -v to see invocation)
+*/
+      ompwip("OFFLOADING...");
+#ifdef QUDA_BACKEND_OMPTARGET
+      const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
+      const int ld = tp.block.x*tp.block.y*tp.grid.z;
+      const int tx = arg.threads.x;
+      const int ty = arg.threads.y;
+      const int tz = arg.threads.z;
+      Functor<Arg> f(const_cast<Arg &>(arg));
+#pragma omp target teams distribute parallel for simd collapse(3) num_teams(gd) thread_limit(ld) num_threads(ld)
+      for (int i = 0; i < tx; i++) {
+        for (int j = 0; j < ty; j++) {
+          for (int k = 0; k < tz; k++) {
+            f(i, j, k);
+          }
+        }
+      }
+#else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
+#endif
+#endif
     }
 
     template <template <typename> class Functor, typename Arg>
