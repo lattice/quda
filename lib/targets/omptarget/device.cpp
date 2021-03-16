@@ -31,8 +31,8 @@ struct cudaDeviceProp{
   int deviceOverlap;
 };
 
-static void cudaDriverGetVersion(int*v){*v=0;}
-static void cudaRuntimeGetVersion(int*v){*v=0;}
+static int cudaDriverGetVersion(int*v){*v=0;return 0;}
+static int cudaRuntimeGetVersion(int*v){*v=0;return 0;}
 static int cudaGetDeviceCount(int*c){*c=omp_get_num_devices();return 0;}
 static int cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
 {
@@ -108,11 +108,11 @@ namespace quda
       initialized = true;
 
       int driver_version;
-      cudaDriverGetVersion(&driver_version);
+      CHECK_CUDA_ERROR(cudaDriverGetVersion(&driver_version));
       printfQuda("CUDA Driver version = %d\n", driver_version);
 
       int runtime_version;
-      cudaRuntimeGetVersion(&runtime_version);
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
       printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -128,7 +128,7 @@ namespace quda
 #endif
 
       for (int i = 0; i < get_device_count(); i++) {
-        cudaGetDeviceProperties(&deviceProp, i);
+        CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("Found device %d: %s\n", i, deviceProp.name);
         }
@@ -201,7 +201,6 @@ namespace quda
 
     void print_device_properties()
     {
-
       for (int device = 0; device < get_device_count(); device++) {
 
         // cudaDeviceProp deviceProp;
@@ -238,6 +237,7 @@ namespace quda
         case 3: printfQuda("%d - computeMode              3: cudaComputeModeExclusiveProcess\n", device); break;
         default: errorQuda("Unknown deviceProp.computeMode.");
         }
+
         printfQuda("%d - surfaceAlignment         %lu\n", device, deviceProp.surfaceAlignment);
         printfQuda("%d - concurrentKernels        %s\n", device, (deviceProp.concurrentKernels ? "true" : "false"));
         printfQuda("%d - ECCEnabled               %s\n", device, (deviceProp.ECCEnabled ? "true" : "false"));

@@ -11,12 +11,39 @@
  */
 
 #ifdef QUDA_BACKEND_OMPTARGET
+static inline unsigned int
+__float_as_uint(float x)
+{
+  return reinterpret_cast<unsigned int &>(x);  // FIXME UB?
+}
+static inline unsigned int
+__uint_as_float(unsigned int x)
+{
+  return reinterpret_cast<float &>(x);  // FIXME UB?
+}
+
 template<typename T>
 static inline T atomicAdd(T*x,T v)
 {
   T z;
 #pragma omp atomic capture
   {z=*x; *x+=v;}
+  return z;
+}
+template<typename T>
+static inline T atomicCAS(T*x,T c,T v)
+{
+  T z;
+#pragma omp atomic capture
+  {z=*x; *x=z==c?v:z;}
+  return z;
+}
+template<typename T>
+static inline T atomicMax(T*x,T v)
+{
+  T z;
+#pragma omp atomic capture
+  {z=*x; *x=z<v?v:z;}
   return z;
 }
 #endif
@@ -90,7 +117,7 @@ static inline __device__ short2 atomicAdd(short2 *addr, short2 val){
   return old.s;
 }
 
-union uint32_char2 { unsigned short i; char2 s; };
+union uint32_char2 { unsigned int i; char2 s; };
 
 /**
    @brief Implementation of char2 atomic addition using compare
@@ -179,8 +206,9 @@ template <typename T, int n> __device__ __host__ void atomic_fetch_add(vector_ty
 template <bool is_device> struct atomic_fetch_abs_max_impl {
   template <typename T> inline void operator()(T *addr, T val)
   {
-#pragma omp atomic update
-    *addr = std::max(*addr, val);
+    T z;
+#pragma omp atomic capture
+    {z=*addr; *addr=z<val?val:z;}
   }
 };
 

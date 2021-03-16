@@ -75,9 +75,12 @@ namespace quda {
     template <typename dummy> struct sum<true, dummy> {
       __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all_sum)
       {
+        QUDA_RT_CONSTS;
         static __shared__ typename block_reduce_t::TempStorage storage[batch_size];
         block_reduce_t block_reduce(storage[batch]);
-        if (!pipeline) __syncthreads(); // only synchronize if we are not pipelining
+        if (!pipeline) {
+          __syncthreads(); // only synchronize if we are not pipelining
+        }
         T value = block_reduce.Sum(value_);
 
         if (all_sum) {

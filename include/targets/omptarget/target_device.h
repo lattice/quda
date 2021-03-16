@@ -2,31 +2,41 @@
 
 namespace quda {
 
-  namespace device {
+  namespace target {
+
+#pragma omp begin declare variant match(device={kind(host)})
+    template <template <bool, typename ...> class f, typename ...Args>
+      __host__ __device__ auto dispatch(Args &&... args)
+    {
+      return f<false>()(args...);
+    }
+#pragma omp end declare variant
+#pragma omp begin declare variant match(device={kind(nohost)})
+    template <template <bool, typename ...> class f, typename ...Args>
+      __host__ __device__ auto dispatch(Args &&... args)
+    {
+      return f<true>()(args...);
+    }
+#pragma omp end declare variant
+
+    template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
+    template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the device
     */
-#pragma omp begin declare variant match(device={kind(host)})
-    constexpr bool is_device() {return false;}
-#pragma omp end declare variant
-#pragma omp begin declare variant match(device={kind(nohost)})
-    constexpr bool is_device() {return true;}
-#pragma omp end declare variant
-    constexpr bool is_device() {return false;}
+    __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
+
+
+    template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
+    template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the host
     */
-#pragma omp begin declare variant match(device={kind(host)})
-    constexpr bool is_host() {return true;}
-#pragma omp end declare variant
-#pragma omp begin declare variant match(device={kind(nohost)})
-    constexpr bool is_host() {return false;}
-#pragma omp end declare variant
-    constexpr bool is_host() {return true;}
+    __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
 
     /**
        @brief Helper function that returns the thread block
@@ -78,6 +88,10 @@ namespace quda {
 #endif
 */
     }
+
+  }
+
+  namespace device {
 
     /**
        @brief Helper function that returns the warp-size of the

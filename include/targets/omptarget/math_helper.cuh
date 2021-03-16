@@ -1,16 +1,15 @@
 #pragma once
 
 #include <cmath>
+#include <target_device.h>
 
 namespace quda {
 
-  
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE  
-   * @param a the angle 
+   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
-   *
    */
   template<typename T>
   inline __host__ __device__ void sincos(const T& a, T* s, T* c)
@@ -30,7 +29,7 @@ namespace quda {
    * Specialization to float arguments. Device function calls CUDA intrinsic
    *
   template<>
-  inline  __host__ __device__ void sincos(const float& a, float * s, float *c)
+  inline __host__ __device__ void sincos(const float& a, float * s, float *c)
   {
 #ifdef __CUDA_ARCH__
     __sincosf(a,s,c);
@@ -119,7 +118,7 @@ namespace quda {
     return std::pow(a, b);
   }
 
-  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  template <typename real> __device__ __host__ inline real fdividef(real a, real b)
   {
     return a / b;
   }
