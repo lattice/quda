@@ -397,7 +397,7 @@ set(CMAKE_CXX_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
-
+find_package(Threads REQUIRED)
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
   "-g -O3 -Wall -Wextra"
