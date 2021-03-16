@@ -612,16 +612,8 @@ void dslashRef()
             inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
       {
-        int tm_offset = 12*spinorRef->Volume();
-
-	void *ref1 = spinorRef->V();
-	void *ref2 = (char*)ref1 + tm_offset*cpu_prec;
-    
-	void *flv1 = spinor->V();
-	void *flv2 = (char*)flv1 + tm_offset*cpu_prec;
-    
-	tm_ndeg_dslash(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, 
-	               parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);	
+        tm_ndeg_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, 
+	                     parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);
       }
       break;
     case dslash_test_type::MatPC:

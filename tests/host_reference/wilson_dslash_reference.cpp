@@ -468,18 +468,24 @@ void ndeg_twist_gamma5(void *outf1, void *outf2, void *inf1, void *inf2, const i
   }
 }
 
-void tm_ndeg_dslash(void *res1, void *res2, void **gauge, void *spinorField1, void *spinorField2, double kappa, double mu, 
-	           double epsilon, int oddBit, int daggerBit, QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon,
+                    int oddBit, int daggerBit, QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param) 
 {
+  void *out1 = out;
+  void *out2 = (char*)out1 + Vh * spinor_site_size * precision;
+
+  void *in1 = in;
+  void *in2 = (char*)in1 + Vh * spinor_site_size * precision;
+
   if (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
-    ndeg_twist_gamma5(spinorField1, spinorField2, spinorField1, spinorField2, daggerBit, kappa, mu, epsilon, Vh,
+    ndeg_twist_gamma5(in1, in2, in1, in2, daggerBit, kappa, mu, epsilon, Vh,
         QUDA_TWIST_GAMMA5_INVERSE, precision);
 
-  wil_dslash(res1, gauge, spinorField1, oddBit, daggerBit, precision, gauge_param);
-  wil_dslash(res2, gauge, spinorField2, oddBit, daggerBit, precision, gauge_param);
+  wil_dslash(out1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
+  wil_dslash(out2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
   
   if (!daggerBit || (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC)) {
-    ndeg_twist_gamma5(res1, res2, res1, res2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+    ndeg_twist_gamma5(out1, out2, out1, out2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
 }
 
