@@ -689,10 +689,9 @@ void dslashRef()
       break;
     case dslash_test_type::Mat:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
-	tmc_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
+        tmc_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
       else
-        tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
-          inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
+        tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case dslash_test_type::MatPCDagMatPC:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {

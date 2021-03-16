@@ -103,7 +103,7 @@ namespace quda {
       flops += (1416ll + 552ll) * in.Volume();
     } else {
       ApplyNdegTwistedClover(
-          out, in, *gauge, *clover, -kappa, 2 * mu * kappa, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+          out, in, *gauge, *clover, -kappa, 2 * kappa * mu, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       // FIXME check flops
       flops += (1464ll + 552ll) * in.Volume();
     }

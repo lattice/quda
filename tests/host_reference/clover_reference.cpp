@@ -266,7 +266,7 @@ void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
     // out = tmp + (i * mu * gamma_5 * tau_3) * in
     applyTwist(out1, in1, tmp1, a, precision);
     applyTwist(out2, in2, tmp2, -a, precision);
-    // out += (epsilon * tau_1) * in 
+    // out += (-epsilon * tau_1) * in 
     axpy(b, in2, out1, Vh * spinor_site_size, precision);
     axpy(b, in1, out2, Vh * spinor_site_size, precision);
   //}
