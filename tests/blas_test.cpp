@@ -670,6 +670,7 @@ double test(Kernel kernel)
     break;
 
   case Kernel::norm2:
+    ompwip("*xD = *xH");
     *xD = *xH;
     error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;

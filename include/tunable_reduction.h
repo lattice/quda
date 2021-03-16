@@ -73,13 +73,10 @@ namespace quda {
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
                        const std::vector<constant_param_t> &param = dummy_param)
     {
-#ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg, param);
-#else
+#ifdef QUDA_BACKEND_OMPTARGET
       for (unsigned int i = 0; i < param.size(); i++)
         qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       ompwip("OFFLOADING...");
-#ifdef QUDA_BACKEND_OMPTARGET
       const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
       const int ld = tp.block.x*tp.block.y*tp.grid.z;
       const int tx = arg.threads.x;
@@ -89,16 +86,34 @@ namespace quda {
       reduce_t value = arg.init();
 #pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(Transformer<Arg>::init_omp())
 
-#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld)
+#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
       for (int j = 0; j < ty; j++) {
         for (int i = 0; i < tx; i++) {
           value = t(value, i, j);
         }
       }
-      arg.launch_error = QUDA_SUCCESS;
+      int input_size = vec_length<reduce_t>::value;
+      int output_size = result.size() * vec_length<T>::value;
+      if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
+
+      // copy element by element to output vector
+      for (int i = 0; i < output_size; i++) {
+        std::cerr << "launch_device: reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[" << i << "]: " << reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i] << std::endl;
+        reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
+          reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
+      }
+
+      if (!activeTuning() && commGlobalReduction()) {
+        // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
+        comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
+      }
 #else
+#ifdef JITIFY
+      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg, param);
+#else
+      for (unsigned int i = 0; i < param.size(); i++)
+        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer>(arg, tp, stream);
-#endif
 #endif
 
       if (!commAsyncReduction()) {
@@ -109,6 +124,7 @@ namespace quda {
           comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
         }
       }
+#endif
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
@@ -141,6 +157,7 @@ namespace quda {
 
       // copy element by element to output vector
       for (int i = 0; i < output_size; i++) {
+        std::cerr << "launch_host: reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[" << i << "]: " << reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i] << std::endl;
         reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
           reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
       }

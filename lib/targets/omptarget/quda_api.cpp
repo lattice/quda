@@ -17,12 +17,12 @@ static char FIXME[]="OMP FIXME";
 #define cudaGetErrorString(a) "OMP FIXME"
 #define cuGetErrorName(a,b) ompwip([&](){(*(b))=FIXME;})
 
-#define cudaMemcpy(a,b,c,d) ompwip([&](){printfQuda("memcpy %p <- %p\n",a,b);ompwipMemcpy(a,(void*)b,c,d);})
-#define cudaMemcpyAsync(a,b,c,d,e) ompwip([&](){printfQuda("memcpy %p <- %p\n",a,b);ompwipMemcpy(a,(void*)b,c,d);})
+#define cudaMemcpy(a,b,c,d) ompwip([&](){printfQuda("memcpy %p <- %p %ld\n",a,b,c);ompwipMemcpy(a,(void*)b,c,d);})
+#define cudaMemcpyAsync(a,b,c,d,e) ompwip([&](){printfQuda("memcpy %p <- %p %ld\n",a,b,c);ompwipMemcpy(a,(void*)b,c,d);})
 #define cudaMemcpy2D(a,b,c,d,e,f,g) ompwip("unimplemented")
 #define cudaMemcpy2DAsync(a,b,c,d,e,f,g,h) ompwip("unimplemented")
-#define cudaMemset(a,b,c) ompwip([&](){printfQuda("memset %p\n",a);ompwipMemset(a,b,c);})
-#define cudaMemsetAsync(a,b,c,d) ompwip([&](){printfQuda("memset %p\n",a);ompwipMemset(a,b,c);})
+#define cudaMemset(a,b,c) ompwip([&](){printfQuda("memset %p %d %ld\n",a,b,c);ompwipMemset(a,b,c);})
+#define cudaMemsetAsync(a,b,c,d) ompwip([&](){printfQuda("memset %p %d %ld\n",a,b,c);ompwipMemset(a,b,c);})
 #define cudaMemset2D(a,b,c,d,e) ompwip("unimplemented")
 #define cudaMemset2DAsync(a,b,c,d,e,f) ompwip("unimplemented")
 
@@ -40,17 +40,19 @@ ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
   case cudaMemcpyHostToHost: memcpy(d,s,c); break;
   case cudaMemcpyHostToDevice:
     if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
-    else warningQuda("cudaMemcpyHostToDevice without a device");
+    else{ warningQuda("cudaMemcpyHostToDevice without a device, calling memcpy"); memcpy(d,s,c); }
     break;
   case cudaMemcpyDeviceToHost:
     if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_initial_device(),omp_get_default_device());
-    else warningQuda("cudaMemcpyDeviceToHost without a device");
+    else{ warningQuda("cudaMemcpyDeviceToHost without a device, calling memcpy"); memcpy(d,s,c); }
     break;
   case cudaMemcpyDeviceToDevice:
     warningQuda("unimplemented for cudaMemcpyDeviceToDevice");
     break;
   case cudaMemcpyDefault:
-    warningQuda("unimplemented for cudaMemcpyDefault");
+    warningQuda("cudaMemcpyDefault calling host to device");
+    if(0<omp_get_num_devices()) omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
+    else{ warningQuda("cudaMemcpyDefault without a device, calling memcpy"); memcpy(d,s,c); }
     break;
   default: errorQuda("Unsupported cudaMemcpyType %d", k);
   }

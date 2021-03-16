@@ -146,4 +146,8 @@ namespace quda {
     for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
     return c;
   }
+
+  template <int n> struct scalar<vector_type<double,n>> {
+    typedef double type;
+  };
 }
