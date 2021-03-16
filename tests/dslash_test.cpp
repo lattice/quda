@@ -706,8 +706,8 @@ void dslashRef()
         tmc_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
         tmc_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, not_dagger, inv_param.cpu_prec, gauge_param);
       } else {
-        tmc_ndeg_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
-        tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, not_dagger, inv_param.cpu_prec, gauge_param);
+        tmc_ndeg_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);
+        tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, not_dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
     default:
