@@ -7,7 +7,6 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>

@@ -616,18 +616,3 @@ static inline __device__ void faceIndexFromCoords(int &face_idx, I * const x, in
 
   return;
 }
-
-/*
-  @brief Fast power function that works for negative "a" argument
-  @param a argument we want to raise to some power
-  @param b power that we want to raise a to
-  @return pow(a,b)
-*/
-__device__ inline float __fast_pow(float a, int b) {
-  float sign = signbit(a) ? -1.0f : 1.0f;
-  float power = __powf(fabsf(a), b);
-  return b&1 ? sign * power : power;
-}
-
-
- 

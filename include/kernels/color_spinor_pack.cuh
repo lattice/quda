@@ -112,8 +112,8 @@ namespace quda {
       // on the host we require that both spin and color are fully thread local
       constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
-      static_assert(Ms == Arg::nSpin);
-      static_assert(Mc == Arg::nColor);
+      static_assert(Ms == Arg::nSpin, "on host spins per thread must match total spins");
+      static_assert(Mc == Arg::nColor,  "on host colors per thread must match total colors");
       return thread_max;
     }
   };

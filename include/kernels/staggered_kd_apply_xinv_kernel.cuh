@@ -117,12 +117,12 @@ namespace quda {
       constexpr int fullTileSize = 16 * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
 
       // Which unit of spinor work am I within this block?
-      const int unit_of_work = device::thread_idx().x / 256;
+      const int unit_of_work = target::thread_idx().x / 256;
       complex* in_buffer = arg.cs_buffer.data() + (2 * unit_of_work) * buffer_size;
       complex* out_buffer = arg.cs_buffer.data() + (2 * unit_of_work + 1) * buffer_size;
 
       // Which unit of Xinv tile am I?
-      complex* xinv_buffer = arg.cs_buffer.data() + 2 * (device::block_dim().x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
+      complex* xinv_buffer = arg.cs_buffer.data() + 2 * (target::block_dim().x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
 
       ////////////////////////
       // Load a ColorVector //

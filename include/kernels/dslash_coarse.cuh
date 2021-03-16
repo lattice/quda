@@ -116,7 +116,7 @@ namespace quda {
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
 
-    SharedMemoryCache<V> cache(device::block_dim());
+    SharedMemoryCache<V> cache(target::block_dim());
 
     if (!thread_dir || target::is_host()) {
 
@@ -240,12 +240,12 @@ namespace quda {
       for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward fathers (if any)
 	// 4-way 1,2,3  (stride = 4)
 	// 2-way 1      (stride = 2)
-        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
+        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
       }
 
 #pragma unroll
       for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
-        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
+        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
       }
 
       out *= -arg.kappa;
@@ -333,11 +333,11 @@ namespace quda {
       int color_offset = 0;
 
       if (target::is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
-        const int lane_id = device::thread_idx().x % device::warp_size();
-        const int warp_id = device::thread_idx().x / device::warp_size();
+        const int lane_id = target::thread_idx().x % device::warp_size();
+        const int warp_id = target::thread_idx().x / device::warp_size();
         const int vector_site_width = device::warp_size() / Arg::color_stride; // number of sites per warp
 
-        x_cb = device::block_idx().x * (device::block_dim().x / Arg::color_stride) + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
+        x_cb = target::block_idx().x * (target::block_dim().x / Arg::color_stride) + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
         color_offset = lane_id / vector_site_width;
       }
 
