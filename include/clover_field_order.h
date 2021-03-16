@@ -13,6 +13,7 @@
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
@@ -632,7 +633,7 @@ namespace quda {
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;
 
-            real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
+            real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
             for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
           } else {

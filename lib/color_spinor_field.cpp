@@ -1,7 +1,9 @@
-#include <color_spinor_field.h>
 #include <string.h>
 #include <iostream>
 #include <typeinfo>
+
+#include <color_spinor_field.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -15,7 +17,7 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ),
+      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
@@ -28,7 +30,7 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ),
+      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
@@ -81,62 +83,63 @@ namespace quda {
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
     { // compute temporaries needed by dslash and packing kernels
-      auto &X = dslash_constant.X;
+      auto &dc = *dslash_constant;
+      auto &X = dc.X;
       for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
       for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
 
-      for (int i=0; i<nDim; i++) dslash_constant.Xh[i] = X[i]/2;
+      for (int i=0; i<nDim; i++) dc.Xh[i] = X[i]/2;
 
-      dslash_constant.Ls = X[4];
-      dslash_constant.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
-      dslash_constant.volume_4d = 2 * dslash_constant.volume_4d_cb;
+      dc.Ls = X[4];
+      dc.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
+      dc.volume_4d = 2 * dc.volume_4d_cb;
 
       int face[4];
       for (int dim=0; dim<4; dim++) {
         for (int j=0; j<4; j++) face[j] = X[j];
         face[dim] = nFace;
-        dslash_constant.face_X[dim] = face[0];
-        dslash_constant.face_Y[dim] = face[1];
-        dslash_constant.face_Z[dim] = face[2];
-        dslash_constant.face_T[dim] = face[3];
-        dslash_constant.face_XY[dim] = dslash_constant.face_X[dim] * face[1];
-        dslash_constant.face_XYZ[dim] = dslash_constant.face_XY[dim] * face[2];
-        dslash_constant.face_XYZT[dim] = dslash_constant.face_XYZ[dim] * face[3];
+        dc.face_X[dim] = face[0];
+        dc.face_Y[dim] = face[1];
+        dc.face_Z[dim] = face[2];
+        dc.face_T[dim] = face[3];
+        dc.face_XY[dim] = dc.face_X[dim] * face[1];
+        dc.face_XYZ[dim] = dc.face_XY[dim] * face[2];
+        dc.face_XYZT[dim] = dc.face_XYZ[dim] * face[3];
       }
 
-      dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFace[0] = X[1] * X[2] * X[3];
-      dslash_constant.ghostFace[1] = X[0] * X[2] * X[3];
-      dslash_constant.ghostFace[2] = X[0] * X[1] * X[3];
-      dslash_constant.ghostFace[3] = X[0] * X[1] * X[2];
-      for (int d = 0; d < 4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d] / 2;
+      dc.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dc.ghostFace[0] = X[1] * X[2] * X[3];
+      dc.ghostFace[1] = X[0] * X[2] * X[3];
+      dc.ghostFace[2] = X[0] * X[1] * X[3];
+      dc.ghostFace[3] = X[0] * X[1] * X[2];
+      for (int d = 0; d < 4; d++) dc.ghostFaceCB[d] = dc.ghostFace[d] / 2;
 
-      dslash_constant.X2X1 = X[1]*X[0];
-      dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
-      dslash_constant.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
-      dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
-      dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
-      dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
-      dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
+      dc.X2X1 = X[1]*X[0];
+      dc.X3X2X1 = X[2]*X[1]*X[0];
+      dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
+      dc.X2X1mX1 = (X[1]-1)*X[0];
+      dc.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+      dc.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
+      dc.X4X3X2X1hmX3X2X1h = dc.X4X3X2X1mX3X2X1/2;
 
       // used by indexFromFaceIndexStaggered
-      dslash_constant.dims[0][0]=X[1];
-      dslash_constant.dims[0][1]=X[2];
-      dslash_constant.dims[0][2]=X[3];
+      dc.dims[0][0]=X[1];
+      dc.dims[0][1]=X[2];
+      dc.dims[0][2]=X[3];
 
-      dslash_constant.dims[1][0]=X[0];
-      dslash_constant.dims[1][1]=X[2];
-      dslash_constant.dims[1][2]=X[3];
+      dc.dims[1][0]=X[0];
+      dc.dims[1][1]=X[2];
+      dc.dims[1][2]=X[3];
 
-      dslash_constant.dims[2][0]=X[0];
-      dslash_constant.dims[2][1]=X[1];
-      dslash_constant.dims[2][2]=X[3];
+      dc.dims[2][0]=X[0];
+      dc.dims[2][1]=X[1];
+      dc.dims[2][2]=X[3];
 
-      dslash_constant.dims[3][0]=X[0];
-      dslash_constant.dims[3][1]=X[1];
-      dslash_constant.dims[3][2]=X[2];
+      dc.dims[3][0]=X[0];
+      dc.dims[3][1]=X[1];
+      dc.dims[3][2]=X[2];
     }
     ghost_precision_allocated = ghost_precision;
 

@@ -21,37 +21,6 @@ static inline T atomicAdd(T*x,T v)
 }
 #endif
 
-#if defined(__CUDA_ARCH__) 
-
-#if __COMPUTE_CAPABILITY__ < 600
-/**
-   @brief Implementation of double-precision atomic addition using compare
-   and swap. Taken from the CUDA programming guide.
-
-   @param addr Address that stores the atomic variable to be updated
-   @param val Value to be added to the atomic
-*/
-static inline __device__ double atomicAdd(double* address, double val)
-{
-  unsigned long long int* address_as_ull =
-                            (unsigned long long int*)address;
-  unsigned long long int old = *address_as_ull, assumed;
-
-  do {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed,
-                    __double_as_longlong(val +
-                           __longlong_as_double(assumed)));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-  } while (assumed != old);
-
-  return __longlong_as_double(old);
-}
-#endif
-
-#endif
-
 /**
    @brief Implementation of double2 atomic addition using two
    double-precision additions.
@@ -109,7 +78,6 @@ union uint32_short2 { unsigned int i; short2 s; };
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-#ifndef QUDA_BACKEND_OMPTARGET
 static inline __device__ short2 atomicAdd(short2 *addr, short2 val){
   uint32_short2 old, assumed, incremented;
   old.s = *addr;
@@ -179,14 +147,55 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
   return atomicMax(addr_, val_);
 }
-#endif
 
-template <typename T> __device__ __host__ void atomic_update(T *addr, T val)
-{
-#ifdef __CUDA_ARCH__
-  atomicAdd(addr, val);
-#else
+template <bool is_device> struct atomic_fetch_add_impl {
+  template <typename T> inline void operator()(T *addr, T val)
+  {
 #pragma omp atomic update
-  *addr += val;
-#endif
+    *addr += val;
+  }
+};
+
+template <> struct atomic_fetch_add_impl<true> {
+  template <typename T> __device__ inline void operator()(T *addr, T val) { atomicAdd(addr, val); }
+};
+
+/**
+   @brief atomic_fetch_add function performs similarly as atomic_ref::fetch_add
+   @param[in,out] addr The memory address of the variable we are
+   updating atomically
+   @param[in] val The value we summing to the value at addr
+ */
+template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, T val)
+{
+  target::dispatch<atomic_fetch_add_impl>(addr, val);
+}
+
+template <typename T, int n> __device__ __host__ void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
+{
+  for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
+}
+
+template <bool is_device> struct atomic_fetch_abs_max_impl {
+  template <typename T> inline void operator()(T *addr, T val)
+  {
+#pragma omp atomic update
+    *addr = std::max(*addr, val);
+  }
+};
+
+template <> struct atomic_fetch_abs_max_impl<true> {
+  template <typename T> __device__ inline void operator()(T *addr, T val) { atomicAbsMax(addr, val); }
+};
+
+/**
+   @brief atomic_fetch_max function that does an atomic max.
+   @param[in,out] addr The memory address of the variable we are
+   updating atomically
+   @param[in] val The value we are comparing against.  Must be
+   positive valued else result is undefined.
+ */
+template <typename T> __device__ __host__ inline void atomic_fetch_abs_max(T *addr, T val)
+{
+  target::dispatch<atomic_fetch_abs_max_impl>(addr, val);
 }

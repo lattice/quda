@@ -14,8 +14,9 @@
  *  limitations under the License.
  */
 
-#ifndef _INT_FASTDIV_KJGIUHFG
-#define _INT_FASTDIV_KJGIUHFG
+#pragma once
+
+#include <target_device.h>
 
 class int_fastdiv
 {
@@ -111,24 +112,28 @@ class int_fastdiv
   }
 
   __host__ __device__ __forceinline__
-  friend int operator/(const int n, const int_fastdiv& divisor)
-  {
-    int q;
-  #ifdef __CUDA_ARCH__
-    asm("mul.hi.s32 %0, %1, %2;" : "=r"(q) : "r"(divisor.M), "r"(n));
-  #else
-    q = (((unsigned long long)((long long)divisor.M * (long long)n)) >> 32);
-  #endif
-    q += n * divisor.n_add_sign;
-    if (divisor.s >= 0)
-      {
-        q >>= divisor.s; // we rely on this to be implemented as arithmetic shift
-        q += (((unsigned int)q) >> 31);
-      }
-    return q;
-  }
-
+    friend int operator/(const int n, const int_fastdiv& divisor);
 };
+
+template <bool is_device> struct mul_hi {
+  __device__ __host__ inline int operator()(const int n, const int m)
+  {
+    return (((unsigned long long)((long long)m * (long long)n)) >> 32);
+  }
+};
+
+__host__ __device__ __forceinline__
+int operator/(const int n, const int_fastdiv& divisor)
+{
+  int q = target::dispatch<mul_hi>(n, divisor.M);
+  q += n * divisor.n_add_sign;
+  if (divisor.s >= 0)
+    {
+      q >>= divisor.s; // we rely on this to be implemented as arithmetic shift
+      q += (((unsigned int)q) >> 31);
+    }
+  return q;
+}
 
 __host__ __device__ __forceinline__ static
 int operator%(const int n, const int_fastdiv& divisor)
@@ -197,5 +202,3 @@ int operator%(const unsigned char n, const int_fastdiv& divisor)
 {
   return ((int)n) % divisor;
 }
-
-#endif

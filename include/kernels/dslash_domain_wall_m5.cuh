@@ -258,7 +258,7 @@ namespace quda
     const auto inv = arg.c;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    SharedMemoryCache<Vector> cache(device::block_dim());
+    SharedMemoryCache<Vector> cache(target::block_dim());
     if (shared()) {
       cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       cache.sync();
@@ -272,14 +272,14 @@ namespace quda
 
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
-        real factorR = inv * __fast_pow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
+        real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = Arg::dagger ? -1 : +1;
         out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
-        real factorL = inv * __fast_pow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
         constexpr int proj_dir = Arg::dagger ? +1 : -1;
         out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
@@ -316,7 +316,7 @@ namespace quda
     Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
-    SharedMemoryCache<HalfVector> cache(device::block_dim());
+    SharedMemoryCache<HalfVector> cache(target::block_dim());
 
     { // first do R
       constexpr int proj_dir = Arg::dagger ? -1 : +1;

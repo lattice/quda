@@ -18,6 +18,7 @@
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <color_spinor_field.h>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
@@ -687,17 +688,6 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-        if (!fixed) {
-          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
-          return complex<Float>(v_.x, v_.y);
-        } else {
-          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
-          complex<storeFloat> tmp(v_.x, v_.y);
-          Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
-          return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        }
-#else
         if (!fixed) {
           return complex<Float>( v[accessor.index(parity,x_cb,s,c,n)] );
 	} else {
@@ -705,7 +695,6 @@ namespace quda {
 	  Float norm_ = block_float ? norm[parity*norm_offset+x_cb] : scale_inv;
 	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
-#endif
       }
 
       /**
@@ -745,19 +734,6 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-        if (!ghost_fixed) {
-          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, parity, x_cb, s, c, n));
-          return complex<Float>(v_.x, v_.y);
-        } else {
-          Float scale = ghost_scale_inv;
-          if (block_float_ghost)
-            scale *= __ldg(ghost_norm[2 * dim + dir] + parity * ghostAccessor.faceVolumeCB[dim] + x_cb);
-          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, parity, x_cb, s, c, n));
-          complex<ghostFloat> tmp(v_.x, v_.y);
-          return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        }
-#else
         if (!ghost_fixed) {
           return complex<Float>( ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)] );
         } else {
@@ -766,7 +742,6 @@ namespace quda {
           complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)];
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
-#endif
       }
 
       /**
@@ -1023,7 +998,7 @@ namespace quda {
       for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
-      real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
+      real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
       for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
     }
@@ -1106,7 +1081,7 @@ namespace quda {
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
-      real scale_inv = fdivide(fixedMaxValue<Float>::value, scale);
+      real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
       for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
     }

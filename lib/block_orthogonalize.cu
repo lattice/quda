@@ -57,7 +57,7 @@ namespace quda {
     // we only support block-format on fine grid where Ncolor=3
     static constexpr int nColor = isFixed<bFloat>::value ? 3 : nColor_;
     static constexpr int chiral_blocks = nSpin == 1 ? 2 : nSpin / spinBlockSize;
-    template <typename Rotator, typename Vector> using Arg = BlockOrthoArg<vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
+    template <bool is_device, typename Rotator, typename Vector> using Arg = BlockOrthoArg<is_device, vFloat, Rotator, Vector, nSpin, nColor, coarseSpin, nVec>;
 
     ColorSpinorField &V;
     const std::vector<ColorSpinorField*> B;
@@ -109,7 +109,7 @@ namespace quda {
     void CPU(const TuneParam &tp, const qudaStream_t &stream,
              const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
-      Arg<Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
     }
 
@@ -117,7 +117,7 @@ namespace quda {
     void GPU(const TuneParam &tp, const qudaStream_t &stream,
              const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
-      Arg<Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
+      Arg<true, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle_factor = tp.aux.x;
       launch_device<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
     }

@@ -81,9 +81,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -94,9 +93,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -209,9 +207,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
@@ -223,9 +220,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
@@ -379,9 +375,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                                const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
@@ -394,9 +389,8 @@ namespace quda {
     }
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
+                                               const std::vector<constant_param_t> &param = dummy_param)
     {
       ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;

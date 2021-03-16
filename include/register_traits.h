@@ -9,9 +9,7 @@
 
 #include <quda_internal.h>
 #include <complex_quda.h>
-#ifndef QUDA_BACKEND_OMPTARGET
-#include <inline_ptx.h>
-#endif
+#include <target_device.h>
 
 namespace quda {
 
@@ -396,119 +394,6 @@ namespace quda {
   template <> struct VectorType<int8_t, 8> {
     typedef char8 type;
   };
-
-  template <typename VectorType>
-    __device__ __host__ inline VectorType vector_load(const void *ptr, int idx)
-  {
-#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
-    return __ldg(reinterpret_cast< const VectorType* >(ptr) + idx);
-#else
-    return reinterpret_cast< const VectorType * >(ptr)[idx];
-#endif
-  }
-
-  template <> __device__ __host__ inline short8 vector_load(const void *ptr, int idx)
-  {
-    float4 tmp = vector_load<float4>(ptr, idx);
-    short8 recast;
-    memcpy(&recast, &tmp, sizeof(float4));
-    return recast;
-  }
-
-  template <> __device__ __host__ inline char8 vector_load(const void *ptr, int idx)
-  {
-    float2 tmp = vector_load<float2>(ptr, idx);
-    char8 recast;
-    memcpy(&recast, &tmp, sizeof(float2));
-    return recast;
-  }
-
-  template <typename VectorType>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
-    reinterpret_cast< VectorType* >(ptr)[idx] = value;
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const double2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<double2*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const float4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-#else
-    reinterpret_cast<float4*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const float2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<float2*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const short4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
-#else
-    reinterpret_cast<short4*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const short2 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
-#else
-    reinterpret_cast<short2*>(ptr)[idx] = value;
-#endif
-  }
-
-  // A char4 is the same size as a short2
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
-#if defined(__CUDA_ARCH__)
-    store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
-#else
-    reinterpret_cast<char4*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const char2 &value) {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const short*>(&value));
-#else
-    reinterpret_cast<char2*>(ptr)[idx] = value;
-#endif
-  }
-
-  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const short8 &value)
-  {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float4 *>(&value));
-#else
-    reinterpret_cast<short8 *>(ptr)[idx] = value;
-#endif
-  }
-
-  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const char8 &value)
-  {
-#if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float2 *>(&value));
-#else
-    reinterpret_cast<char8 *>(ptr)[idx] = value;
-#endif
-  }
 
   template<bool large_alloc> struct AllocType { };
   template<> struct AllocType<true> { typedef size_t type; };
