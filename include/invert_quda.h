@@ -564,6 +564,13 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
+       @brief Returns the epsilon tolerance for a given precision, by default returns
+       the solver precision.
+       @param[in] prec Input precision, default value is solver precision
+    */
+    double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION) const;
+
+    /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver

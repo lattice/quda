@@ -198,27 +198,27 @@ public:
     }
   }
 
-    virtual ~Pack() {}
+  virtual ~Pack() { }
 
-    template <typename T, typename Arg>
-    inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
-    {
-      qudaLaunchKernel(f, tp, stream, arg);
-    }
+  template <typename T, typename Arg>
+  inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
+  {
+    qudaLaunchKernel(f, tp, stream, arg);
+  }
 
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      // enable max shared memory mode on GPUs that support it
-      if (deviceProp.major >= 7) tp.set_max_shared_bytes = true;
+  void apply(const qudaStream_t &stream)
+  {
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    // enable max shared memory mode on GPUs that support it
+    if (deviceProp.major >= 7) tp.set_max_shared_bytes = true;
 
-      if (in.Nspin() == 4) {
-        using Arg = PackArg<Float, nColor, 4, spin_project>;
-        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c, shmem);
-        arg.counter = dslash::get_shmem_sync_counter();
-        arg.swizzle = tp.aux.x;
-        arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
-        arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
+    if (in.Nspin() == 4) {
+      using Arg = PackArg<Float, nColor, 4, spin_project>;
+      Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c, shmem);
+      arg.counter = dslash::get_shmem_sync_counter();
+      arg.swizzle = tp.aux.x;
+      arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
+      arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
 
 #ifdef STRIPED
         if (in.PCType() == QUDA_4D_PC) {

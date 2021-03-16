@@ -46,7 +46,8 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, Arg &arg, Coord &coord, int parity, int idx,
+                                                         int thread_dim, bool &active)
   {
     static_assert(twist == 1 || twist == 2, "twist template must equal 1 or 2"); // ensure singlet or doublet
     typedef typename mapper<typename Arg::Float>::type real;
