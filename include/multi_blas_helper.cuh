@@ -13,9 +13,15 @@ namespace quda
   {
 
     // storage for matrix coefficients
+#ifdef _NVHPC_CUDA // temporary workaround
+    static __constant__ char Amatrix_d[device::max_constant_param_size()];
+    static __constant__ char Bmatrix_d[device::max_constant_param_size()];
+    static __constant__ char Cmatrix_d[device::max_constant_param_size()];
+#else
     __constant__ char Amatrix_d[device::max_constant_param_size()];
     __constant__ char Bmatrix_d[device::max_constant_param_size()];
     __constant__ char Cmatrix_d[device::max_constant_param_size()];
+#endif
 
     static char *Amatrix_h;
     static char *Bmatrix_h;
