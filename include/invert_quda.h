@@ -541,6 +541,13 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
+       @brief Returns the epsilon tolerance for a given precision, by default returns
+       the solver precision.
+       @param[in] prec Input precision, default value is solver precision
+    */
+    double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION) const;
+
+    /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver
@@ -1343,15 +1350,15 @@ public:
      */
     int m;
 
-    std::shared_ptr<ColorSpinorField> ep; // full precision accumulator
-    std::shared_ptr<ColorSpinorField> ep_sloppy;
-    std::shared_ptr<ColorSpinorField> rp; // full precision residual
-    std::shared_ptr<ColorSpinorField> rp_sloppy;
+    ColorSpinorField* ep; // full precision accumulator
+    ColorSpinorField* ep_sloppy;
+    ColorSpinorField* rp; // full precision residual
+    ColorSpinorField* rp_sloppy;
 
-    std::shared_ptr<ColorSpinorFieldSet> work_space; // a workspace to keep the solver temporary fields
+    ColorSpinorFieldSet* work_space; // a workspace to keep the solver temporary fields
 
-    std::shared_ptr<ColorSpinorField> r_pre; // residual passed to preconditioner
-    std::shared_ptr<ColorSpinorField> p_pre; // preconditioner result
+    ColorSpinorField* r_pre; // residual passed to preconditioner
+    ColorSpinorField* p_pre; // preconditioner result
 
     std::shared_ptr<EigCGArgs> local_eigcg_args;
 
@@ -1410,15 +1417,15 @@ public:
 
     std::shared_ptr<GMResDRArgs> gmresdr_args;
 
-    std::shared_ptr<ColorSpinorFieldSet> Vm; // arnoldi basis vectors, size (m+1)
-    std::shared_ptr<ColorSpinorFieldSet> Zm; // arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Vm; // arnoldi basis vectors, size (m+1)
+    ColorSpinorFieldSet *Zm; // arnoldi basis vectors, size (m+1)
 
-    std::shared_ptr<ColorSpinorField> rp;       //! residual vector
-    std::shared_ptr<ColorSpinorField> yp;       //! high precision accumulator
-    std::shared_ptr<ColorSpinorField> tmpp;     //! temporary for mat-vec
-    std::shared_ptr<ColorSpinorField> r_sloppy; //! sloppy residual vector
-    std::shared_ptr<ColorSpinorField> r_pre;    //! residual passed to preconditioner
-    std::shared_ptr<ColorSpinorField> p_pre;    //! preconditioner result
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
 
     TimeProfile &profile; // time profile for initCG solver
 

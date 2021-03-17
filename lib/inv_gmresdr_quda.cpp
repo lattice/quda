@@ -64,7 +64,7 @@ namespace quda {
        int k;
        int restarts;
 
-       std::shared_ptr<ColorSpinorFieldSet> Vkp1; // high-precision accumulation array
+       ColorSpinorFieldSet* Vkp1; // high-precision accumulation array
 
        GMResDRArgs(ColorSpinorField &meta, int m, int nev) :
          ritzVecs(VectorSet::Zero(m + 1, nev + 1)),
@@ -83,7 +83,7 @@ namespace quda {
          csParam.composite_dim = (k + 1);
          csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-         Vkp1 = MakeSharedPtr2(csParam);
+         Vkp1 = ColorSpinorField::Create(csParam);
 
          printfQuda("GMResDR parameters nKrylov = %d, nDefl = %d\n", m, k);
        }
@@ -97,12 +97,14 @@ namespace quda {
          sn.setZero();
        }
 
-       ~GMResDRArgs() {}
+       ~GMResDRArgs() {
+         delete Vkp1;
+       }
 
        void Givens(const int j)
        {
-         Ref<VectorXcd> c = ritzVecs.col(k);       
-         
+         Ref<VectorXcd> c = ritzVecs.col(k);
+
          Complex h0 = H(0, j - 1);
 
          for (int i = 1; i < j; i++) {
@@ -191,7 +193,7 @@ namespace quda {
 
       std::vector<std::pair<double, Complex*>> sort_ev(args.m);
 
-      for(int i = 0; i < args.m; i++) sort_ev[i] = std::make_pair(abs(harVals.data()[i]), harVecs.col(i).data()); 
+      for(int i = 0; i < args.m; i++) sort_ev[i] = std::make_pair(abs(harVals.data()[i]), harVecs.col(i).data());
 
       std::sort(sort_ev.begin(), sort_ev.end(),
                        [](const std::pair<double, Complex *> &x1, const std::pair<double, Complex *> &x2) {
@@ -526,7 +528,7 @@ namespace quda {
 #endif
    Ref<VectorXcd> c = args.ritzVecs.col(args.k);
    Complex c0 = c(0);
-   
+
    args.LeastSquaresSolve(c0, *r_sloppy, *Vm, do_givens);
 
    return (j-start_idx);
@@ -539,192 +541,202 @@ namespace quda {
    const double tol_threshold = 1.2;
    const double det_max_deviation = 0.4;
 
-   std::shared_ptr<ColorSpinorField> ep = nullptr;
-
    if (!init) {
 
      ColorSpinorParam csParam(b);
      csParam.create = QUDA_ZERO_FIELD_CREATE;
-     rp = MakeSharedPtr2(csParam);
-     yp = MakeSharedPtr2(csParam);
-     ep = MakeSharedPtr2(csParam);
+     rp = ColorSpinorField::Create(csParam);
+     yp = ColorSpinorField::Create(csParam);
+     ep = ColorSpinorField::Create(csParam);
 
      csParam.setPrecision(param.precision_sloppy);
 
-     tmpp = MakeSharedPtr2(csParam);
-     r_sloppy = MakeSharedPtr2(csParam);
+     tmpp     = ColorSpinorField::Create(csParam);
+     r_sloppy = ColorSpinorField::Create(csParam);
 
      if (K && (param.precision_precondition != param.precision_sloppy)) {
 
        csParam.setPrecision(param.precision_precondition);
-       p_pre = MakeSharedPtr2(csParam);
-       r_pre = MakeSharedPtr2(csParam);
+       p_pre = ColorSpinorField::Create(csParam);
+       r_pre = ColorSpinorField::Create(csParam);
      }
 
      csParam.setPrecision(param.precision_sloppy);
      csParam.is_composite = true;
      csParam.composite_dim = nKrylov + 1;
 
-     Vm = MakeSharedPtr2(csParam);
+     Vm = ColorSpinorField::Create(csParam);
 
      csParam.composite_dim = nKrylov;
 
-     Zm = K ? MakeSharedPtr2(csParam) : Vm;
+     Zm = K ? ColorSpinorField::Create(csParam) : Vm;
 
      csParam.composite_dim = (param.eig_param.n_ev + 1);
 
      csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
      gmresdr_args = std::make_shared<GMResDRArgs>(*Vm, nKrylov, param.eig_param.n_ev);
-     // gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
      init = true;
-    }
+   }
 
-    GMResDRArgs &args = *gmresdr_args;
-    Ref<VectorXcd> c  = args.ritzVecs.col(args.k);
+   GMResDRArgs &args = *gmresdr_args;
+   Ref<VectorXcd> c  = args.ritzVecs.col(args.k);
 
-    ColorSpinorField &r   = *rp;
-    ColorSpinorField &y   = *yp;
-    ColorSpinorField &e   = *ep;
+   ColorSpinorField &r   = *rp;
+   ColorSpinorField &y   = *yp;
+   ColorSpinorField &e   = *ep;
 
-    ColorSpinorField &rSloppy = *r_sloppy;
-
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-    }
-
-    int tot_iters = 0;
-
-    double normb = norm2( b );
-    double stop = param.tol * param.tol * normb;
-
-    mat(r, x);
-
-    double r2 = xmyNorm(b, r);
-    double b2 = r2;
-    c(0) = Complex(sqrt(r2), 0.0);
-
-    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
-
-    rSloppy = r;
-
-    if(param.precision_sloppy != param.precision) {
-      blas::axpy(1.0 / c(0).real(), r, y);
-      Vm->Component(0) = y;
-      blas::zero(y);
-    } else {
-      blas::axpy(1.0 / c(0).real(), r, Vm->Component(0));
-    }
-
-    if (!param.is_preconditioner) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      blas::flops = 0;
-    }
-
-    const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-
-    double heavy_quark_res = 0.0;
-    if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
-
-    int restart_idx = 0, j = 0, check_interval = 8;
-
-    DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.n_ev + 1, param.eig_param.n_ev + 1);
-
-    while (restart_idx < param.max_restart_num
-           && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop))) {
-      tot_iters += FlexArnoldiProcedure(j, (j == 0));
-      UpdateSolution(e, rSloppy, !(j == 0));
-
-      r2 = norm2(rSloppy);
-
-      bool   do_clean_restart = false;
-      double ext_r2 = 1.0;
-
-      if ((restart_idx + 1) % check_interval == 0) {
-        mat(y, e);
-        ext_r2 = xmyNorm(r, y);
-
-	// can this be done as a single 2-d reduction?
-        for (int l = 0; l < param.eig_param.n_ev + 1; l++) {
-
-          Complex *col = Gm.col(l).data();
-
-          std::vector<ColorSpinorField *> v1_(Vm->Components().begin(),
-                                              Vm->Components().begin() + param.eig_param.n_ev + 1);
-          std::vector<ColorSpinorField*> v2_;
-	  v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
-
-	  blas::cDotProduct(col, v1_, v2_);
-
-        } // end l-loop
-
-        Complex detGm = Gm.determinant();
-
-	PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
-	printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
-
-	Gm.setZero();
-
-	do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
-      }
-
-      if ((param.max_restart_num != 1) && ((restart_idx != param.max_restart_num - 1) && !do_clean_restart)) {
-
-        RestartVZH();
-	j = args.k;
-
-      } else {
-
-        printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
-        args.ResetArgs();
-
-        // update solution:
-        xpy(e, x);
-        r = y;
-        zero(e);
-
-        c(0) = Complex(sqrt(ext_r2), 0.0);
-        blas::zero(Vm->Component(0));
-        blas::axpy(1.0 / c(0).real(), rSloppy, Vm->Component(0));
-
-        j = 0;
-      }
-
-     restart_idx += 1;
-    }
-
-   //final solution:
-   xpy(e, x);
+   ColorSpinorField &rSloppy = *r_sloppy;
 
    if (!param.is_preconditioner) {
-     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-
-     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-     double gflops = (blas::flops + mat.flops()) * 1e-9;
-     param.gflops = gflops;
-     param.iter += tot_iters;
+     profile.TPSTOP(QUDA_PROFILE_INIT);
+     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
    }
+
+   int tot_iters = 0;
+
+   double normb = norm2( b );
+   double stop = param.tol * param.tol * normb;
 
    mat(r, x);
 
-   param.true_res = sqrt(xmyNorm(b, r) / b2);
+   double r2 = xmyNorm(b, r);
+   double b2 = r2;
+   c(0) = Complex(sqrt(r2), 0.0);
 
-   PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
+   printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", r2, sqrt(normb), param.tol);
 
-   printfQuda("Done with %d cycles..", restart_idx);
+   rSloppy = r;
 
-   blas::flops = 0;
-   mat.flops();
+   if(param.precision_sloppy != param.precision) {
+     blas::axpy(1.0 / c(0).real(), r, y);
+     Vm->Component(0) = y;
+     blas::zero(y);
+   } else {
+     blas::axpy(1.0 / c(0).real(), r, Vm->Component(0));
+   }
 
-   if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+   if (!param.is_preconditioner) {
+     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+     profile.TPSTART(QUDA_PROFILE_COMPUTE);
+     blas::flops = 0;
+   }
 
-   param.rhs_idx += 1;
+   const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+
+   double heavy_quark_res = 0.0;
+   if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
+
+   int restart_idx = 0, j = 0, check_interval = 8;
+
+   DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.n_ev + 1, param.eig_param.n_ev + 1);
+
+   while (restart_idx < param.max_restart_num
+           && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop))) {
+     tot_iters += FlexArnoldiProcedure(j, (j == 0));
+     UpdateSolution(e, rSloppy, !(j == 0));
+
+     r2 = norm2(rSloppy);
+
+     bool   do_clean_restart = false;
+     double ext_r2 = 1.0;
+
+     if ((restart_idx + 1) % check_interval == 0) {
+       mat(y, e);
+       ext_r2 = xmyNorm(r, y);
+
+	// can this be done as a single 2-d reduction?
+       for (int l = 0; l < param.eig_param.n_ev + 1; l++) {
+         Complex *col = Gm.col(l).data();
+         std::vector<ColorSpinorField *> v1_(Vm->Components().begin(),
+                                              Vm->Components().begin() + param.eig_param.n_ev + 1);
+         std::vector<ColorSpinorField*> v2_;
+	       v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
+
+	       blas::cDotProduct(col, v1_, v2_);
+       } // end l-loop
+
+       Complex detGm = Gm.determinant();
+
+	     PrintStats("FGMResDR:", tot_iters, r2, b2, heavy_quark_res);
+	     printfQuda("\nCheck cycle %d, true residual squared %1.15e, Gramm det : (%le, %le)\n", restart_idx, ext_r2, detGm.real(), detGm.imag());
+
+	     Gm.setZero();
+
+	     do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
+     }
+
+     if ((param.max_restart_num != 1) && ((restart_idx != param.max_restart_num - 1) && !do_clean_restart)) {
+
+       RestartVZH();
+	     j = args.k;
+
+     } else {
+
+       printfQuda("\nClean restart for cycle %d, true residual squared %1.15e\n", restart_idx, ext_r2);
+       args.ResetArgs();
+
+       // update solution:
+       xpy(e, x);
+       r = y;
+       zero(e);
+
+       c(0) = Complex(sqrt(ext_r2), 0.0);
+       blas::zero(Vm->Component(0));
+       blas::axpy(1.0 / c(0).real(), rSloppy, Vm->Component(0));
+
+       j = 0;
+     }
+
+    restart_idx += 1;
+  }
+
+  //final solution:
+  xpy(e, x);
+
+  if (!param.is_preconditioner) {
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    double gflops = (blas::flops + mat.flops()) * 1e-9;
+    param.gflops = gflops;
+    param.iter += tot_iters;
+  }
+
+  mat(r, x);
+
+  param.true_res = sqrt(xmyNorm(b, r) / b2);
+
+  PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
+
+  printfQuda("Done with %d cycles..", restart_idx);
+
+  blas::flops = 0;
+  mat.flops();
+
+  if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+
+  param.rhs_idx += 1;
+
+  if(init) {
+    delete rp;
+    delete yp;
+    delete ep;
+
+    delete tmpp;
+    delete r_sloppy;
+
+    delete Vm;
+    if(K) {
+      if(p_pre) delete p_pre;
+      if(r_pre) delete r_pre;
+      delete Zm; 
+    }
+  }
 
    return;
- }
+}
 
 } // namespace quda

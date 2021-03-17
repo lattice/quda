@@ -211,7 +211,6 @@ int main(int argc, char **argv)
   setDims(gauge_param.X);
   // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing
   dw_setDims(gauge_param.X, 1);
-  setSpinorSiteSize(6);
 
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------

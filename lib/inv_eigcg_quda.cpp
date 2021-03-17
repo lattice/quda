@@ -48,19 +48,6 @@ namespace quda {
 
    static int init_k = 0;
 
-   // helper for a smart pointer creation
-
-   std::shared_ptr<ColorSpinorField> MakeSharedPtr(const ColorSpinorParam &param)
-   {
-     if (param.location == QUDA_CPU_FIELD_LOCATION) {
-       auto cpu_sptr = std::make_shared<cpuColorSpinorField>(param);
-       return cpu_sptr;
-     } else {
-       auto gpu_sptr = std::make_shared<cudaColorSpinorField>(param);
-       return gpu_sptr;
-     }
-   }
-
    int Lm = 0;
    int L2kE = 0;
    int L2kO = 0;
@@ -104,16 +91,16 @@ namespace quda {
      // C++ task-based object for the (asynchron.) RayleighRitz computations
      std::future<void> rr_task;
 
-     ColorSpinorField *Az;     // mat * conjugate vector from the previous iteration
+     ColorSpinorField    *Az;     // mat * conjugate vector from the previous iteration
      ColorSpinorFieldSet *Vm;  // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
      ColorSpinorFieldSet *V2k; // temp vector set
 
-     ColorSpinorField *hAz;    // mat * conjugate vector from the previous iteration
+     ColorSpinorField    *hAz;    // mat * conjugate vector from the previous iteration
      ColorSpinorFieldSet *hVm; // eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
      SolverParam &solver_param;
 
-     int logical_rhs_id; //current eigcg cycle 
+     int logical_rhs_id; //current eigcg cycle
 
      EigCGArgs(ColorSpinorField &meta, SolverParam &solver_param, const bool is_host_location = false) :
        Tm(RealMatrix::Zero(solver_param.eig_param.n_kr, solver_param.eig_param.n_kr)),
@@ -136,7 +123,7 @@ namespace quda {
        hAz(nullptr),
        hVm(nullptr),
        solver_param(solver_param),
-       logical_rhs_id(0)	
+       logical_rhs_id(0)
      {
        const int m = solver_param.eig_param.n_kr;
        const int k = solver_param.eig_param.nLockedMax;
@@ -596,9 +583,9 @@ namespace quda {
 
     return;
   }
-  
+
   IncEigCG::~IncEigCG() { }
-  
+
   void IncEigCG::EigenSolve() { eigcg_args->RayleighRitz(); }
 
   void IncEigCG::LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &beta,
@@ -756,13 +743,13 @@ namespace quda {
 	//printfQuda("i = %d\n", i);
 	std::vector<Complex> alpha(i);// = new Complex[i];
 	unsigned int offset = 0;
-	
+
 	while (offset < i) {
 	  const unsigned int local_length = (i - offset) > cdot_pipeline_length ? cdot_pipeline_length : (i - offset);
-	  
+
 	  std::vector<ColorSpinorField *> vj_(evecs.begin() + offset, evecs.begin() + offset + local_length);
 	  std::vector<ColorSpinorField *> vi_ {evecs[i]};
-	  
+
 	  //blas::cDotProduct(alpha.get(), vj_, vi_);
 	  blas::cDotProduct(alpha.data(), vj_, vi_);
 	  for (unsigned int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
@@ -770,17 +757,17 @@ namespace quda {
 	  blas::caxpy(alpha.data(), vj_, vi_);
 	  offset += cdot_pipeline_length;
 	}
-	
+
 	alpha[0].real(blas::norm2(*evecs[i]));
 	alpha[0].imag(0.0);
-	
+
 	if (alpha[0].real() > 1e-16)
 	  blas::ax(1.0 / sqrt(alpha[0].real()), *evecs[i]);
 	else
 	  errorQuda("\nCannot orthogonalize %dth vector\n", i);
       }
     }
-    
+
 #endif
     printfQuda("\nConstruct projection matrix..\n");
 
@@ -793,11 +780,11 @@ namespace quda {
       std::vector<ColorSpinorField *> vj_(evecs.begin(), evecs.begin() + i + 1);
       // std::vector<ColorSpinorField*> av_(vk(0));
       std::vector<ColorSpinorField *> av_(ws(0));
-      
+
       swp = *evecs[i];
       matDefl(vk0, swp);
       *evecs[i] = swp;
-      
+
       blas::cDotProduct(alpha.get(), vj_, av_);
 
       args.projMat[i * param.eig_param.n_ev + i] = alpha[i]; //!
@@ -928,9 +915,9 @@ namespace quda {
     // reset current dimension:
     param.eig_param.n_conv = idx;
     param.eig_param.n_ev_deflate = param.eig_param.n_conv;
-    
+
     printfQuda("\nReserved eigenvectors: %d\n", param.eig_param.n_conv);
-    
+
     deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
     reserved_space->evals.resize(param.eig_param.n_conv);
@@ -982,7 +969,7 @@ namespace quda {
 
     std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
 
-    csParam.setPrecision(param.precision_sloppy); 
+    csParam.setPrecision(param.precision_sloppy);
     if (csParam.location == QUDA_CUDA_FIELD_LOCATION && param.precision_sloppy != QUDA_DOUBLE_PRECISION)
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
@@ -1449,7 +1436,7 @@ namespace quda {
         K = std::make_shared<CG>(mat, matPrecon, matPrecon, matPrecon, Kparam, profile);
       else
         K.reset(new CG(mat, matPrecon, matPrecon, matPrecon, Kparam, profile));
-      
+
       (*K)(x, b);
 
       mat(r, x, tmp2);
@@ -1499,13 +1486,13 @@ namespace quda {
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-      ep = MakeSharedPtr(csParam); // full precision accumulator
-      rp = MakeSharedPtr(csParam); // full precision residual
+      ep = ColorSpinorField::Create(csParam); // full precision accumulator
+      rp = ColorSpinorField::Create(csParam); // full precision residual
 
       csParam.setPrecision(param.precision_sloppy);
 
-      ep_sloppy = (mixed_prec) ? MakeSharedPtr(csParam) : ep;
-      rp_sloppy = (mixed_prec) ? MakeSharedPtr(csParam) : rp;
+      ep_sloppy = (mixed_prec) ? ColorSpinorField::Create(csParam) : ep;
+      rp_sloppy = (mixed_prec) ? ColorSpinorField::Create(csParam) : rp;
 
       csParam.is_composite = true;
       csParam.composite_dim
@@ -1514,13 +1501,13 @@ namespace quda {
       if (!matSloppy.isStaggered()) csParam.composite_dim += 1; // add an extra tmp field for the wilson-like dslash
 
       // A work space to keep CG fields
-      work_space = MakeSharedPtr(csParam);
+      work_space = ColorSpinorField::Create(csParam);
 
       if (K) {
         csParam.is_composite = false;
         csParam.setPrecision(param.precision_precondition);
-        p_pre = MakeSharedPtr(csParam);
-        r_pre = MakeSharedPtr(csParam);
+        p_pre = ColorSpinorField::Create(csParam);
+        r_pre = ColorSpinorField::Create(csParam);
       }
 
       const bool host_computing = param.pipeline == 0 ? false : host_flag;
@@ -1551,7 +1538,14 @@ namespace quda {
     bool dcg_cycle = false;
 
     do {
-printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, %d \n", eigcg_args->logical_rhs_id, search_space_restarts[0], search_space_restarts[1], search_space_restarts[2], search_space_restarts[3] );	    
+      if (getVerbosity() >= QUDA_VERBOSE) {	    
+        printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, %d \n", eigcg_args->logical_rhs_id, 
+												search_space_restarts[0], 
+												search_space_restarts[1], 
+												search_space_restarts[2], 
+												search_space_restarts[3] );
+      }
+
       blas::zero(e);
       Deflate(e, r);
       //
@@ -1623,10 +1617,25 @@ printfQuda("Running logical RHS : %d with min search space restarts %d, %d, %d, 
       destroyDeflationSpace();
 
       if(param.eig_param.n_conv == 0) param.eig_param.preserve_deflation = QUDA_BOOLEAN_FALSE; // No eigenvectors found!
-           
 
-      delete eigcg_args; 
+
+      delete eigcg_args;
       eigcg_args = nullptr;
+    }
+
+    delete ep;
+    delete rp;
+
+    delete work_space;
+
+    if(mixed_prec){
+      delete ep_sloppy;
+      delete rp_sloppy;
+    }
+
+    if(K) {
+      delete p_pre;
+      delete r_pre;
     }
 
     return;

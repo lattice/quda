@@ -87,8 +87,6 @@ int main(int argc, char **argv)
     setDims(gauge_param.X);
   }
 
-  setSpinorSiteSize(24);
-
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];

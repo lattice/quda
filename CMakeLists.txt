@@ -651,8 +651,8 @@ if(QUDA_QIO)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
-                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
+                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering --enable-dml-bufsize=33554432
       BUILD_COMMAND make
       INSTALL_COMMAND make install
       DEPENDS QMP

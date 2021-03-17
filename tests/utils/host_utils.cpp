@@ -49,8 +49,6 @@ int V5;
 int V5h;
 double kappa5;
 
-int my_spinor_site_size;
-
 extern float fat_link_max;
 
 // Set some local QUDA precision variables
@@ -369,8 +367,6 @@ void dw_setDims(int *X, const int L5)
   Vs_t = Z[0]*Z[1]*Z[2]*Ls;//?
   Vsh_t = Vs_t/2;  //?
 }
-
-void setSpinorSiteSize(int n) { my_spinor_site_size = n; }
 
 int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }
 
