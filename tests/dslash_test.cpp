@@ -667,9 +667,9 @@ void dslashRef()
     switch (dtest_type) {
     case dslash_test_type::Dslash:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)
-	tmc_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+        tmc_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       else
-        errorQuda("Not supported\n");
+        tmc_ndeg_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu, inv_param.epsilon, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
       break;
     case dslash_test_type::MatPC:
       if(inv_param.twist_flavor == QUDA_TWIST_SINGLET)      
