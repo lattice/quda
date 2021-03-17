@@ -12,7 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
-#include <target_device.h> // for device::warp_size
+#include <target_device.h>
 
 #include <deque>
 #include <queue>

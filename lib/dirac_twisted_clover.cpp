@@ -1,9 +1,8 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <iostream>
 #include <multigrid.h>
-
-#define NEW_DSLASH
 
 namespace quda {
 
@@ -74,18 +73,19 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
       ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
-      // FIXME check flops
-      flops += (1416ll + 552ll) * in.Volume();
+      // wilson + chiral twist + clover
+      flops += (1320ll + 96ll + 552ll) * in.Volume();
 
     } else {
+      // k * D * in + (A + i*2*mu*kappa*gamma_5 * tau_3 - 2 * kappa * epsilon * tau_1 ) * x  
       ApplyNdegTwistedClover(
           out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
-      // FIXME check flops
-      flops += (1464ll + 552ll) * in.Volume();
+      // wilson + chiral twist + flavour twist + clover
+      flops += (1320ll + 96ll + 48ll + 552ll) * in.Volume();
     }
   }
 
-  // apply full operator  / (-kappa * D + (1 + A + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1)) * in
+  // apply full operator
   void DiracTwistedClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
@@ -97,15 +97,17 @@ namespace quda {
     }
 
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+      // (-kappa * D + A + i*2*mu*kappa*gamma_5 ) * in
       ApplyTwistedClover(
           out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      // FIXME check flops
-      flops += (1416ll + 552ll) * in.Volume();
+      // wilson + chiral twist + clover
+      flops += (1320ll + 96ll + 552ll) * in.Volume();
     } else {
+      // (-kappa * D + A + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * in
       ApplyNdegTwistedClover(
-          out, in, *gauge, *clover, -kappa, 2 * mu * kappa, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      // FIXME check flops
-      flops += (1464ll + 552ll) * in.Volume();
+          out, in, *gauge, *clover, -kappa, 2 * kappa * mu, -2 * kappa * epsilon, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      // wilson + chiral twist + flavor twist + clover
+      flops += (1320ll + 96ll + 48ll + 552ll) * in.Volume();
     }
   }
 

@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <limits>
 
 #include <register_traits.h>
 #include <math_helper.cuh>
@@ -16,11 +17,10 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <type_traits>
-#include <limits>
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 

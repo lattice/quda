@@ -13,6 +13,7 @@
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 

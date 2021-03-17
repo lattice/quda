@@ -266,7 +266,7 @@ void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
     // out = tmp + (i * mu * gamma_5 * tau_3) * in
     applyTwist(out1, in1, tmp1, a, precision);
     applyTwist(out2, in2, tmp2, -a, precision);
-    // out += (epsilon * tau_1) * in 
+    // out += (-epsilon * tau_1) * in 
     axpy(b, in2, out1, Vh * spinor_site_size, precision);
     axpy(b, in1, out2, Vh * spinor_site_size, precision);
   //}
@@ -400,7 +400,7 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
 
 // apply the full non-degenerate twisted-clover operator
 void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon, 
-                  QudaTwistFlavorType flavor, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+                  int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
 {
   //V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
   void *inEven1 = in;

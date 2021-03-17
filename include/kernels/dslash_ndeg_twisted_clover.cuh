@@ -44,7 +44,7 @@ namespace quda
     
     /**
        @brief Apply the non-degenerate twisted-clover dslash
-       out(x) = M*in = A(x)*in(x) + a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1)*in
+       out(x) = M*in = a * D * in + (A(x) + i*b*gamma_5*tau_3 + c*tau_1)*x
        Note this routine only exists in xpay form.
     */
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
@@ -57,19 +57,14 @@ namespace quda
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
 
-      // FIXME: do we actually need two of these?
-      // checking getCoords, the 's' parameter (where we pass flavor) simply sets coord.s
-      // such that we likely don't need to do this, as the 4D coords are unchanged
-      auto clover_coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
       auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
       
       const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
       Vector out;
       
       // defined in dslash_wilson.cuh
       applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
-
-      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (kernel_type == INTERIOR_KERNEL) {
         // apply the chiral and flavor twists
@@ -84,7 +79,7 @@ namespace quda
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
           constexpr int n = Arg::nColor * Arg::nSpin / 2;
-          HMatrix<real, n> A = arg.A(clover_coord.x_cb, parity, chirality);
+          HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);
           HalfVector x_chi = x.chiral_project(chirality);
           HalfVector Ax_chi = A * x_chi;
           // i * mu * gamma_5 * tau_3
@@ -94,10 +89,10 @@ namespace quda
         }
 
         tmp.toNonRel();
-        // c * tau_1
+        // tmp += (c * tau_1) * x
         tmp += (flavor == 0 ? arg.c * x1 : arg.c * x0);
 
-        // The Wilson part with normalisation
+        // add the Wilson part with normalisation
         out = tmp + arg.a * out;
 
       } else if (active) {
