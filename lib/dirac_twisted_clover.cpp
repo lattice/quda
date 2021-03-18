@@ -39,8 +39,14 @@ namespace quda {
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.Volume() != clover->VolumeCB())
-      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+    if( out.TwistFlavor() == QUDA_TWIST_SINGLET ){
+      if (out.Volume() != clover->VolumeCB())
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+    } else {
+      // 
+      if (out.Volume()/2 != clover->VolumeCB())
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+    }
   }
 
   // Protected method for applying twist
@@ -204,9 +210,16 @@ namespace quda {
       DiracWilson::Dslash(out, *tmp2, parity);
       deleteTmp(&tmp2, reset);
     } else {
-      ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
-                                       commDim, profile);
-      flops += (1320ll + 552ll) * in.Volume();
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET){
+        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
+                                         commDim, profile);
+        flops += (1320ll + 552ll) * in.Volume();
+      } else {
+        ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
+                                             false, in, parity, dagger, commDim, profile);
+        // FIXME check flops
+        flops += (1320ll + 96ll + 48ll + 552ll) * in.Volume();
+      } 
     }
   }
 
