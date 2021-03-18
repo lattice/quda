@@ -253,13 +253,11 @@ namespace quda
     if (comms_test) {
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
 
-#if defined(QUDA_ENABLE_P2P)
        // now we are receive centric
       int dir2 = 1-dir;
       if (comm_peer2peer_enabled(dir2,dim)) {
 	PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
-#endif
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
 
         if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
@@ -268,10 +266,7 @@ namespace quda
           // direction) so here just use dir not dir2
           PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
 	}
-#if defined(QUDA_ENABLE_P2P)
       }
-#endif
-
     }
     return comms_test;
   }

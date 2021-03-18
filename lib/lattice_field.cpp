@@ -8,9 +8,7 @@
 
 namespace quda {
 
-#if defined(QUDA_ENABLE_P2P) 
   bool LatticeField::initIPCComms = false;
-#endif
   int LatticeField::buffer_send_p2p_fwd[2][QUDA_MAX_DIM] { };
   int LatticeField::buffer_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
   int LatticeField::buffer_send_p2p_back[2][QUDA_MAX_DIM] { };
@@ -273,9 +271,7 @@ namespace quda {
 
   void LatticeField::freeGhostBuffer(void)
   {
-#ifdef QUDA_ENABLE_P2P
     destroyIPCComms();
-#endif
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
@@ -406,7 +402,6 @@ namespace quda {
 
   }
 
-#if defined(QUDA_ENABLE_P2P)
   void LatticeField::createIPCComms()
   {
     if ( initIPCComms && !ghost_field_reset ) return;
@@ -504,8 +499,6 @@ namespace quda {
   const qudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }
-
-#endif //QUDA_ENABLE_P2P
 
   void* LatticeField::myFace_h(int dir, int dim) const
   {

@@ -63,8 +63,6 @@
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@
 
-#cmakedefine QUDA_ENABLE_P2P @QUDA_ENABLE_P2P@
-
 #if defined(QUDA_TARGET_CUDA) && defined(QUDA_TARGET_HIP)
 #error "Cannot define both QUDA_TARGET_CUDA and QUDA_TARGET_HIP at the same time"
 #endif

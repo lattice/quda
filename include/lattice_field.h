@@ -387,11 +387,8 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
-
-#if defined(QUDA_ENABLE_P2P) 
     /** Whether we have initialized peer-to-peer communication */
     static bool initIPCComms;
-#endif
 
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
@@ -463,7 +460,6 @@ namespace quda {
     */
     void destroyComms();
 
-#if defined(QUDA_ENABLE_P2P)
     /**
        Create the inter-process communication handlers
     */
@@ -493,8 +489,6 @@ namespace quda {
        Handle to remote copy event used for peer-to-peer synchronization
     */
     const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
-
-#endif //QUDA_ENABLE_P2P
 
     /**
        Static variable that is determined which ghost buffer we are using

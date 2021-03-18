@@ -305,10 +305,8 @@ namespace quda {
 
     if (!initComms || comms_reset) LatticeField::createComms(no_comms_fill);
 
-#if defined(QUDA_ENABLE_P2P)
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
-#endif
 
   }
 
