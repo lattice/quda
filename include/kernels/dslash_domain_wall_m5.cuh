@@ -250,7 +250,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector constantInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
     const auto k = arg.b;
@@ -259,7 +259,8 @@ namespace quda
     // if using shared-memory caching then load spinor field for my site into cache
     SharedMemoryCache<Vector> cache(target::block_dim());
     if (shared()) {
-      cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
+      // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
+      cache.save(in);
       cache.sync();
     }
 
@@ -305,13 +306,13 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
     coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
-    Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
+    // Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
     SharedMemoryCache<HalfVector> cache(target::block_dim());
@@ -398,11 +399,12 @@ namespace quda
       typedef ColorSpinor<real, Arg::nColor, nSpin> Vector;
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
 
+      Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
       Vector out;
       if (var_inverse()) { // zMobius, must call variableInv
-        out = variableInv<Vector>(arg, parity, x_cb, s);
+        out = variableInv(arg, in, parity, x_cb, s);
       } else {
-        out = constantInv<Vector>(arg, parity, x_cb, s);
+        out = constantInv(arg, in, parity, x_cb, s);
       }
 
       if (Arg::xpay) {

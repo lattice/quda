@@ -46,7 +46,7 @@
  * @def   QUDA_MAX_DWF_LS
  * @brief Maximum length of the Ls dimension for domain-wall fermions
  */
-#define QUDA_MAX_DWF_LS 32
+#define QUDA_MAX_DWF_LS 16
 
 /**
  * @def QUDA_MAX_MG_LEVEL

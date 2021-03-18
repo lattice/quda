@@ -242,13 +242,21 @@ namespace quda {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
+    printfQuda("symmetric = %s, dagger = %s\n", symmetric ? "y" : "n", dagger ? "y" : "n");
+
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     // QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
+#if 0
       Dslash4(out, *tmp1, parity[0]);
       M5inv(*tmp1, out);
       Dslash4pre(out, *tmp1);
+#else
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, profile);
+      *tmp1 = out;
+      Dslash4pre(out, *tmp1);
+#endif
       Dslash4(*tmp1, out, parity[1]);
       M5invXpay(out, *tmp1, in, -1.0);
     } else if (symmetric && dagger) {
