@@ -82,7 +82,7 @@ namespace quda
 
       if (isComplete<kernel_type>(arg, coord) && active) {
 
-        VectorCache<real, HalfVector> cache; // used for flavor twist
+        SharedMemoryCache<Vector> cache(target::block_dim());
         Vector tmp;
 
 #pragma unroll
