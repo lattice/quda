@@ -6,10 +6,6 @@
 #include <kernel_helper.h>
 #include <kernel.h>
 
-#ifdef JITIFY
-#include <jitify_helper2.cuh>
-#endif
-
 namespace quda {
 
   class TunableKernel : public Tunable
@@ -33,17 +29,15 @@ namespace quda {
     bool tuneGridDim() const final { return grid_stride; }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream,
+		       const Arg &arg)
     {
-      //warningQuda("launch_device 1D: %s", tp.comment.c_str());
-      for(int i = 0; i < param.size(); i++)
-	qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       TunableKernel::launch_error =
 	launchKernel1D<Functor, Arg, grid_stride>(tp, stream, arg);
     }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
+    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -53,11 +47,10 @@ namespace quda {
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg, param);
+        launch_device<Functor, Arg>(tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -65,13 +58,12 @@ namespace quda {
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg, param);
+        launch_device<Functor, Arg>(tp, stream, arg);
       } else {
-	launch_host<Functor, Arg>(tp, stream, arg, param);
+	launch_host<Functor, Arg>(tp, stream, arg);
       }
     }
 
@@ -144,17 +136,15 @@ namespace quda {
     bool tune_block_x;
 
     template <template <typename> class Functor, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream,
+		       const Arg &arg)
     {
-      //TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
-      for (unsigned int i = 0; i < param.size(); i++)
-	qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       TunableKernel::launch_error =
 	launchKernel2D<Functor, Arg, grid_stride>(tp, stream, arg);
     }
 
     template <template <typename> class Functor, typename Arg>
-    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg, const std::vector<constant_param_t> & = dummy_param)
+    void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
     {
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -164,17 +154,17 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Functor, bool enable_host = false, typename Arg>
+    template <template <typename> class Functor, bool enable_host = false,
+	      typename Arg>
     typename std::enable_if<!enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("TunableKernel2D_base launch_device\n");
 	}
-        launch_device<Functor, Arg>(tp, stream, arg, param);
+        launch_device<Functor, Arg>(tp, stream, arg);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("end TunableKernel2D_base launch_device\n");
 	}
@@ -185,14 +175,13 @@ namespace quda {
 
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     typename std::enable_if<enable_host, void>::type
-      launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+    launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, Arg>(tp, stream, arg, param);
+        launch_device<Functor, Arg>(tp, stream, arg);
       } else {
-        launch_host<Functor, Arg>(tp, stream, arg, param);
+        launch_host<Functor, Arg>(tp, stream, arg);
       }
     }
 
@@ -318,12 +307,24 @@ namespace quda {
     bool tune_block_y;
 
     template <template <typename> class Functor, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      //TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
-      for (unsigned int i = 0; i < param.size(); i++)
-	qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       launchKernel3D<Functor, Arg, grid_stride>(tp, stream, arg);
+    }
+
+    template <template <typename> class Functor, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg, const std::vector<constant_param_t> &param)
+    {
+      switch(param.size()) {
+      case 0:
+	launchKernel3D<Functor, Arg, grid_stride>(tp, stream, arg);
+	break;
+      case 1:
+	launchKernel3D1<Functor, grid_stride>(tp, stream, arg, param[0]);
+	break;
+      default:
+	errorQuda("more than one const param (%zu) passed to TunableKernel3D launch_device", param.size());
+      }
     }
 
     template <template <typename> class Functor, typename Arg>

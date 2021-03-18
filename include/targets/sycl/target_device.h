@@ -2,77 +2,81 @@
 
 namespace quda {
 
-  namespace device {
+  namespace target {
+
+    // compile-time dispatch
+    template <template <bool, typename ...> class f, typename ...Args>
+    auto dispatch(Args &&... args)
+    {
+#ifdef __SYCL_DEVICE_ONLY__
+      return f<true>()(args...);
+#else
+      return f<false>()(args...);
+#endif
+    }
+
+    template <bool is_device> struct is_device_impl { constexpr bool operator()() { return false; } };
+    template <> struct is_device_impl<true> { constexpr bool operator()() { return true; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the device
     */
-    constexpr bool is_device()
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return true;
-#else
-      return false;
-#endif
-    }
+    __device__ __host__ inline bool is_device() { return dispatch<is_device_impl>(); }
+
+
+    template <bool is_device> struct is_host_impl { constexpr bool operator()() { return true; } };
+    template <> struct is_host_impl<true> { constexpr bool operator()() { return false; } };
 
     /**
        @brief Helper function that returns if the current execution
        region is on the host
     */
-    constexpr bool is_host()
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return false;
-#else
-      return true;
+    __device__ __host__ inline bool is_host() { return dispatch<is_host_impl>(); }
+
+
+    template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct block_dim_impl<true> { __device__ dim3 operator()() { return dim3(blockDim.x, blockDim.y, blockDim.z); } };
 #endif
-    }
 
     /**
        @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim.
-       @param[in] arg Kernel argument struct
+       dimensions.  On CUDA this returns the intrinsic blockDim,
+       whereas on the host this returns (1, 1, 1).
     */
-    inline dim3 block_dim()
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return dim3(blockDim.x, blockDim.y, blockDim.z);
-#else
-      return dim3(0, 0, 0);
+    __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+
+    template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
 #endif
-    }
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        blockIdx, whereas on the host this just returns (0, 0, 0).
     */
-    inline dim3 block_idx()
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
-#else
-      return dim3(0, 0, 0);
+    __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+
+
+    template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct thread_idx_impl<true> { __device__ dim3 operator()() { return dim3(threadIdx.x, threadIdx.y, threadIdx.z); } };
 #endif
-    }
 
     /**
-       @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim,
-       whereas on the host this grabs the dimensions from the kernel
-       argument struct
-       @param[in] arg Kernel argument struct
+       @brief Helper function that returns the thread indices within a
+       thread block.  On CUDA this returns the intrinsic
+       threadIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 thread_idx()
-    {
-#ifdef __SYCL_DEVICE_ONLY__
-      return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-    }
+    __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
+
+  }
+
+
+  namespace device {
 
     /**
        @brief Helper function that returns the warp-size of the
@@ -145,6 +149,31 @@ namespace quda {
     constexpr int shared_memory_bank_width() { return 32; }
 
   }
+
+  /**
+     @brief This is a convenience wrapper that allows us to perform
+     reductions at the warp or sub-warp level
+  */
+  template <typename T, int width> struct WarpReduce
+  {
+    static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
+    //using warp_reduce_t = cub::WarpReduce<T, width>;
+
+    __device__ __host__ inline WarpReduce() {}
+
+    template <bool is_device, typename dummy = void> struct sum { T operator()(const T &value) { return value; } };
+
+    template <typename dummy> struct sum<true, dummy> {
+      __device__ inline T operator()(const T &value) {
+        //typename warp_reduce_t::TempStorage dummy_storage;
+        //warp_reduce_t warp_reduce(dummy_storage);
+        //return warp_reduce.Sum(value);
+	return value;
+      }
+    };
+
+    __device__ __host__ inline T Sum(const T &value) { return target::dispatch<sum>(value); }
+  };
 
 }
 

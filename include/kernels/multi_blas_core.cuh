@@ -58,6 +58,9 @@ namespace quda
           if (Functor::use_w) this->W[i].set(*w[i]);
         }
       }
+      inline void setConstPtr(const int i, const char *const cptr) {
+	f.setConstPtr(i, cptr);
+      }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise

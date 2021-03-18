@@ -162,6 +162,12 @@ inline dim3 getThreadIdx()
   return r;
 }
 
+inline void __syncthreads(void)
+{
+  auto ndi = getNdItem();
+  ndi.barrier();
+}
+
 #define gridDim getGridDim()
 #define blockIdx getBlockIdx()
 #define blockDim getBlockDim()
@@ -178,3 +184,4 @@ namespace quda
 
 #define qudaLaunchKernel(a,b,c,...) \
   qudaLaunchKernel_(__FILE__,__LINE__,__func__,#a)
+

@@ -259,39 +259,149 @@ namespace quda
     }
 
 #else
-  inline double toGroupReduceType(double in) {
+
+  inline float toGroupReduceType(const float in) {
     return in;
   }
-  inline sycl::double2 toGroupReduceType(vec2<double> in) {
+
+  inline double toGroupReduceType(const double in) {
+    return in;
+  }
+  inline sycl::double2 toGroupReduceType(const vec2<double> in) {
     return sycl::double2{in.x, in.y};
   }
-  inline sycl::double3 toGroupReduceType(vec3<double> in) {
+  inline sycl::double3 toGroupReduceType(const vec3<double> in) {
     return sycl::double3{in.x, in.y, in.z};
   }
-  inline sycl::double4 toGroupReduceType(vec4<double> in) {
+  inline sycl::double4 toGroupReduceType(const vec4<double> in) {
     return sycl::double4{in.x, in.y, in.z, in.w};
   }
-  inline sycl::double2 toGroupReduceType(quda::vector_type<double, 2> in) {
+  inline double toGroupReduceType(const quda::vector_type<double, 1> in) {
+    return in[0];
+  }
+  inline sycl::double2
+  toGroupReduceType(const quda::vector_type<double,2> in) {
     return sycl::double2{in[0], in[1]};
   }
-  inline sycl::double3 toGroupReduceType(quda::vector_type<double, 3> in) {
+  inline sycl::double3
+  toGroupReduceType(const quda::vector_type<double, 3> in) {
     return sycl::double3{in[0], in[1], in[2]};
   }
-  inline sycl::double4 toGroupReduceType(quda::vector_type<double, 4> in) {
+  inline sycl::double4
+  toGroupReduceType(const quda::vector_type<double, 4> in) {
     return sycl::double4{in[0], in[1], in[2], in[3]};
+  }
+  inline auto toGroupReduceType(const quda::vector_type<double, 8> in) {
+    return sycl::vec{in[0],in[1],in[2],in[3],in[4],in[5],in[6],in[7]};
+  }
+  inline auto toGroupReduceType(const quda::vector_type<double, 16> &in) {
+    return *reinterpret_cast<const sycl::vec<double,16>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 1> &in) {
+    //return sycl::vec{toGroupReduceType(in[0]),toGroupReduceTypein([1])};
+    return *reinterpret_cast<const sycl::vec<double,2>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 2> &in) {
+    //return sycl::vec{toGroupReduceType(in[0]),toGroupReduceTypein([1])};
+    return *reinterpret_cast<const sycl::vec<double,4>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 3> &in) {
+    //return sycl::vec{in[0],in[1],in[2]};
+    return *reinterpret_cast<const sycl::vec<double,8>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 4> &in) {
+    //return sycl::vec{in[0],in[1],in[2],in[3]};
+    return *reinterpret_cast<const sycl::vec<double,8>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 8> &in) {
+    //return sycl::vec{in[0],in[1],in[2],in[3],in[4],in[5],in[6],in[7]};
+    return *reinterpret_cast<const sycl::vec<double,16>*>(&in);
+  }
+  inline auto toGroupReduceType(const quda::vector_type<vec2<double>,16> &in) {
+    //auto a = sycl::double4{in[0], in[1], in[2], in[3]};
+    //auto b = sycl::double4{in[4], in[5], in[6], in[7]};
+    //auto c = sycl::double4{in[8], in[9], in[10], in[11]};
+    //auto d = sycl::double4{in[12], in[13], in[14], in[15]};
+    //return sycl::vec{a,b,c,d};
+    return reinterpret_cast<const sycl::vec<double,16>*>(&in);
+  }
+  template<typename T> inline T fromGroupReduceType(float in) {
+    return T{in};
   }
   template<typename T> inline T fromGroupReduceType(double in) {
     return T{in};
   }
-  template<typename T> inline T fromGroupReduceType(sycl::double2 in) {
-    return T{in.x(), in.y()};
+  template<typename T> inline T fromGroupReduceType(sycl::double2 &in) {
+    //return T{in.x(), in.y()};
+    return *reinterpret_cast<T*>(&in);
   }
-  template<typename T> inline T fromGroupReduceType(sycl::double3 in) {
-    return T{in.x(), in.y(), in.z()};
+  template<typename T> inline T fromGroupReduceType(sycl::double3 &in) {
+    //return T{in.x(), in.y(), in.z()};
+    return *reinterpret_cast<T*>(&in);
   }
-  template<typename T> inline T fromGroupReduceType(sycl::double4 in) {
-    return T{in.x(), in.y(), in.z(), in.w()};
+  template<typename T> inline T fromGroupReduceType(sycl::double4 &in) {
+    //return T{in.x(), in.y(), in.z(), in.w()};
+    return *reinterpret_cast<T*>(&in);
   }
+  template<typename T> inline T fromGroupReduceType(sycl::vec<double,8> &in) {
+    //return T{in.x(), in.y(), in.z(), in.w()};
+    return *reinterpret_cast<T*>(&in);
+  }
+  template<typename T> inline T fromGroupReduceType(sycl::vec<double,16> &in) {
+    //return T{in.x(), in.y(), in.z(), in.w()};
+    return *reinterpret_cast<T*>(&in);
+  }
+
+
+  template <typename T, typename U>
+  void blockReduceSum(sycl::group<3> grp, T &agg, U &in)
+  {
+    auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
+    agg = fromGroupReduceType<T>(t);
+  }
+
+  template <typename T>
+  void blockReduceSum(sycl::group<3> grp, T &agg,
+		      const sycl::vec<double,16> *in)
+  {
+    auto t0 = sycl::ONEAPI::reduce(grp, in[0], sycl::ONEAPI::plus<>());
+    auto t1 = sycl::ONEAPI::reduce(grp, in[1], sycl::ONEAPI::plus<>());
+    sycl::vec<double,16> x[2] = {t0,t1};
+    agg = *reinterpret_cast<T*>(x);
+  }
+
+  template <typename T, typename R>
+  void blockReduce(sycl::group<3> grp, T &agg, const T &in, R &r)
+  {
+    auto inX = toGroupReduceType(in);
+    blockReduceSum(grp, agg, inX);
+  }
+
+  template <typename T, typename U>
+  void blockReduceMax(sycl::group<3> grp, T &agg, U &in)
+  {
+    auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::maximum<>());
+    agg = fromGroupReduceType<T>(t);
+  }
+
+  template <typename T>
+  void blockReduce(sycl::group<3> grp, T &agg, const T &in,
+		   quda::maximum<T> &r)
+  {
+    auto inX = toGroupReduceType(in);
+    blockReduceMax(grp, agg, inX, r);
+  }
+
+  //template <typename T, typename U>
+  //void blockReduce(sycl::group<3> grp, T agg, T in, quda::blas::MultiReduce_<U,U> r)
+  //{
+    //auto inX = toGroupReduceType(in);
+    //blockReduceMax(grp, agg, inX, r);
+  //}
+
+  //template<typename T, typename U> inline T fromGroupReduceType(sycl::vec<U,2> in) {
+  //return T{fromGroupReduceType(in[0]), fromGroupReduceType(in[1])};
+  //}
     /**
        @brief Generic reduction function that reduces block-distributed
        data "in" per thread to a single value.  This is the legacy
@@ -309,10 +419,12 @@ namespace quda
       auto ndi = getNdItem();
       auto grp = getGroup();
       //T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
-      auto inX = toGroupReduceType(in);
-      auto aggregateX = Reducer::do_sum ? sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>());  // FIXME non sum
-      T aggregate = fromGroupReduceType<T>(aggregateX);
+      //auto inX = toGroupReduceType(in);
+      //auto aggregateX = Reducer::do_sum ? sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>());  // FIXME non sum
+      //T aggregate = fromGroupReduceType<T>(aggregateX);
       //T aggregate;
+      T aggregate;
+      blockReduce(grp, aggregate, in, r);
 
       auto llid = ndi.get_local_linear_id();
       auto grpRg = ndi.get_group_range(0);
@@ -344,9 +456,10 @@ namespace quda
 	  i += block_size_x*block_size_y;
 	}
         //sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
-	auto sumX = toGroupReduceType(sum);
-        sumX = (Reducer::do_sum ? sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()));  // FIXME non sum
-        sum = fromGroupReduceType<T>(sumX);
+	//auto sumX = toGroupReduceType(sum);
+        //sumX = (Reducer::do_sum ? sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()));  // FIXME non sum
+        //sum = fromGroupReduceType<T>(sumX);
+	blockReduce(grp, sum, sum, r);
 
 	// write out the final reduced value
 	if (llid == 0) {

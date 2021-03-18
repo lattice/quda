@@ -92,13 +92,9 @@ namespace quda {
 #endif
     }
 
-    __device__ __host__ static void SinCos(const float &a, float *s, float *c)
+    static void SinCos(const float &a, float *s, float *c)
     {
-#ifdef __CUDA_ARCH__
-      __sincosf(a * static_cast<float>(M_PI), s, c);
-#else
-      ::sincosf(a * static_cast<float>(M_PI), s, c);
-#endif
+      *s = sycl::sincos(a * static_cast<float>(M_PI), c);
     }
   };
 
@@ -123,13 +119,14 @@ namespace quda {
 #endif
   }
 
-  template <typename real> __device__ __host__ inline real fdivide(real a, real b)
+  template <typename real> inline real fdivide(real a, real b)
   {
-#ifdef __CUDA_ARCH__
-    return __fdividef(a, b);
-#else
     return a / b;
-#endif
+  }
+
+  template <typename real> inline real fdividef(real a, real b)
+  {
+    return a / b;
   }
 
 }

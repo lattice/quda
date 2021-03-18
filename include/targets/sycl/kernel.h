@@ -1,5 +1,6 @@
 #pragma once
 #include <device.h>
+#include <utility>
 
 namespace quda {
 
@@ -83,48 +84,115 @@ namespace quda {
     return QUDA_SUCCESS;
   }
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  void Kernel3D(Arg arg, sycl::nd_item<3> ndi)
-  {
-    Functor<Arg> f(arg);
+  using Cacc = sycl::accessor<const char,1,sycl::access_mode::read,
+			      sycl::target::constant_buffer>;
 
-    auto i = threadIdx.x + blockIdx.x * blockDim.x;
-    auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    auto k = threadIdx.z + blockIdx.z * blockDim.z;
+#if 0
+  template <typename T>
+  inline void checkSetConstPtr(T &x, int y) {
+    x.setConstPtr(0, (const char *)0);
+  }
+  template <typename T, typename U>
+  inline void checkSetConstPtr(T &x, U y) {
+    errorQuda("setConstPtr %s not available but const parameters were passed", typeid(x).name());
+  }
+#endif
+
+  template <typename T>
+  inline void setptrs(T &x) {}
+
+  template <typename T>
+  inline void setptrs(T &x, Cacc acc) {
+    auto p = acc.get_pointer();
+    x.setConstPtr(0, p);
+  }
+  //template <typename T, typename U>
+  //inline void setptrs(T &x, U y) { }
+
+  template <template <typename> class Functor, typename Arg, bool grid_stride, typename... Cnst>
+  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, const char *const cptrs[3])
+  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, const int clocs[3], const Cacc caccs[3])
+  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, Cacc *caccs)
+  void Kernel3D(Arg arg, sycl::nd_item<3> ndi, Cnst... cnsts)
+  {
+    setptrs(arg, cnsts...);
+    Functor<Arg> f(arg);
+    //setptrs(f, accs);
+
+    //auto i = threadIdx.x + blockIdx.x * blockDim.x;
+    //auto j = threadIdx.y + blockIdx.y * blockDim.y;
+    //auto k = threadIdx.z + blockIdx.z * blockDim.z;
+    auto j = ndi.get_global_id(1);
     if (j >= arg.threads.y) return;
+    auto k = ndi.get_global_id(2);
     if (k >= arg.threads.z) return;
 
+    auto i = ndi.get_global_id(0);
     while (i < arg.threads.x) {
       f(i, j, k);
-      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      //if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      if (grid_stride) i += ndi.get_global_range(0); else break;
     }
   }
-  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+
+  template <template <typename> class Functor, typename Arg,
+	    bool grid_stride = false>
   qudaError_t
   launchKernel3D(const TuneParam &tp, const qudaStream_t &stream, Arg arg)
   {
-    auto a = (Arg *)managed_malloc(sizeof(Arg));
-    memcpy((void*)a, &arg, sizeof(Arg));
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
+    warningQuda("launchKernel3D %s", grid_stride?"true":"false");
+    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+    warningQuda("%s", str(arg.threads).c_str());
     q.submit([&](sycl::handler& h) {
-	       h.parallel_for<class Kernel3D>(ndRange,
-					      [=](sycl::nd_item<3> ndi)
-				  {
-				    quda::Kernel3D<Functor, Arg, grid_stride>(*a, ndi);
-				  });
+	       h.parallel_for<class Kernel3D>
+		 (ndRange,
+		  [=](sycl::nd_item<3> ndi) {
+		    quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi);
+		  });
 	     });
-    managed_free(a);
+    warningQuda("end launchKernel3D");
     return QUDA_SUCCESS;
   }
 
-  template <template <typename> class Functor, typename Arg>
-  void raw_kernel(Arg arg)
+  template <template <typename> class Functor, bool grid_stride, typename Arg>
+  qudaError_t
+  launchKernel3D1(const TuneParam &tp, const qudaStream_t &stream, Arg arg,...)
   {
-    Functor<Arg> f(arg);
-    f();
+    errorQuda("setConstPtr %s not available but const parameters were passed", typeid(arg).name());
+    return QUDA_ERROR;
+  }
+
+  template <template <typename> class Functor, bool grid_stride, typename Arg,
+	    typename=decltype(std::declval<Arg>().setConstPtr(0,nullptr))>
+  qudaError_t
+  launchKernel3D1(const TuneParam &tp, const qudaStream_t &stream, Arg arg,
+		  constant_param_t param)
+  {
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    auto q = device::get_target_stream(stream);
+    warningQuda("launchKernel3D %s", grid_stride?"true":"false");
+    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+    warningQuda("%s", str(arg.threads).c_str());
+    sycl::buffer<const char,1> buf{param.host, sycl::range(param.bytes)};
+    q.submit([&](sycl::handler& h) {
+	       auto acc = buf.get_access<sycl::access_mode::read,sycl::target::constant_buffer>(h);
+	       //auto p = acc0.get_pointer();
+	       //auto p = (const char *)device_malloc(100);
+	       //arg.setConstPtr(0, p);
+	       h.parallel_for<class Kernel3D>
+		 (ndRange,
+		  [=](sycl::nd_item<3> ndi) {
+		    quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi, acc);
+		  });
+	     });
+    warningQuda("end launchKernel3D");
+    return QUDA_SUCCESS;
   }
 
 }

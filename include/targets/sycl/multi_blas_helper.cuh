@@ -13,15 +13,15 @@ namespace quda
   {
 
     // storage for matrix coefficients
-    __constant__ char Amatrix_d[device::max_constant_param_size()];
-    __constant__ char Bmatrix_d[device::max_constant_param_size()];
-    __constant__ char Cmatrix_d[device::max_constant_param_size()];
+    //__constant__ char Amatrix_d[device::max_constant_param_size()];
+    //__constant__ char Bmatrix_d[device::max_constant_param_size()];
+    //__constant__ char Cmatrix_d[device::max_constant_param_size()];
 
     static char *Amatrix_h;
     static char *Bmatrix_h;
     static char *Cmatrix_h;
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
@@ -36,7 +36,7 @@ namespace quda
       for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
     }
 
-    template <bool multi_1d = false, typename Arg, typename T> typename std::enable_if<!multi_1d, void>::type
+    template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<!multi_1d, void>
     set_param(std::vector<constant_param_t> &params, Arg &arg, char select, const T &h)
     {
       constant_param_t param;
@@ -49,16 +49,19 @@ namespace quda
       case 'a':
         strcpy(param.device_name, "quda::blas::Amatrix_d");
         //param.device_ptr = qudaGetSymbolAddress(Amatrix_d);
+	param.device_ptr = reinterpret_cast<char *>(0);
         Amatrix_h = param.host;
         break;
       case 'b':
         strcpy(param.device_name, "quda::blas::Bmatrix_d");
         //param.device_ptr = qudaGetSymbolAddress(Bmatrix_d);
+	param.device_ptr = reinterpret_cast<char *>(1);
         Bmatrix_h = param.host;
         break;
       case 'c':
         strcpy(param.device_name, "quda::blas::Cmatrix_d");
         //param.device_ptr = qudaGetSymbolAddress(Cmatrix_d);
+	param.device_ptr = reinterpret_cast<char *>(2);
         Cmatrix_h = param.host;
         break;
       default: errorQuda("Unknown buffer %c", select);
@@ -70,6 +73,65 @@ namespace quda
 
       params.push_back(param);
     }
+
+    template <typename coeff_t>
+    struct MultiBlasParam {
+      const int NXZ;
+      const int NYW;
+      const char *Amatrix_d;
+      //const char *Bmatrix_d;
+      //const char *Cmatrix_d;
+      MultiBlasParam(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+
+      inline void setConstPtr(const int i, const char *const cptr) {
+	switch(i) {
+	case 0: Amatrix_d = cptr; break;
+	  //case 1: Bmatrix_d = cptr; break;
+	  //case 2: Cmatrix_d = cptr; break;
+	}
+      }
+      inline const char *getConstPtr(const int i) {
+	const char *cptr = nullptr;
+	switch(i) {
+	case 0: cptr = Amatrix_d; break;
+	  //case 1: cptr = Bmatrix_d; break;
+	  //case 2: cptr = Cmatrix_d; break;
+	}
+	return cptr;
+      }
+
+      constexpr const coeff_t* getA(void) const {
+#ifdef __SYCL_DEVICE_ONLY__
+	return reinterpret_cast<const coeff_t *>(Amatrix_d);
+#else
+	return reinterpret_cast<const coeff_t *>(Amatrix_h);
+#endif
+      }
+#if 0
+      constexpr const coeff_t* getB(void) const {
+#ifdef __SYCL_DEVICE_ONLY__
+	return reinterpret_cast<const coeff_t *>(Bmatrix_d);
+#else
+	return reinterpret_cast<const coeff_t *>(Bmatrix_h);
+#endif
+      }
+      constexpr const coeff_t* getC(void) const {
+#ifdef __SYCL_DEVICE_ONLY__
+	return reinterpret_cast<const coeff_t *>(Cmatrix_d);
+#else
+	return reinterpret_cast<const coeff_t *>(Cmatrix_h);
+#endif
+      }
+#endif
+
+      inline coeff_t a(int i, int j) const { return getA()[i * NYW + j]; }
+      //inline coeff_t b(int i, int j) const { return getB()[i * NYW + j]; }
+      //inline coeff_t c(int i, int j) const { return getC()[i * NYW + j]; }
+      //inline coeff_t a(int i, int j) const { return 0; }
+      //inline coeff_t a(int i, int j) const { return getA()[0]; }
+      //inline coeff_t b(int i, int j) const { return 0; }
+      //inline coeff_t c(int i, int j) const { return 0; }
+    };
 
     /**
        @param[in] x Value we are testing
@@ -190,6 +252,7 @@ namespace quda
                              - NXZ * spinor_x_size                            // SpinorX array
                              - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
                              - 2 * sizeof(int)                                // functor NXZ/NYW members
+			     - 1 * sizeof(char *) // device pointers
                              - (multi_1d ? scalar_size * 3 * max_N_multi_1d() : 0) // multi_1d coefficient arrays
                              - sizeof(int)                                    // length parameter
                              - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
@@ -214,7 +277,7 @@ namespace quda
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       constexpr int scalar_width = Functor::coeff_mul ? sizeof(typename Functor::coeff_t) / sizeof(real) : 0;
       const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, f.reducer, f.multi_1d);
-      
+
       if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);

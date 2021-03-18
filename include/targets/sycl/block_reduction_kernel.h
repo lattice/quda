@@ -16,7 +16,6 @@ namespace quda {
   template <typename Arg> constexpr int virtual_block_idx(const Arg &arg)
   {
     int block_idx = blockIdx.x;
-#if 0
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       const int gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
@@ -31,7 +30,6 @@ namespace quda {
         block_idx = i * (gridp / arg.swizzle_factor) + j;
       }
     }
-#endif
     return block_idx;
   }
 
@@ -43,9 +41,8 @@ namespace quda {
      thread dimension is a trivial vectorizable dimension.
   */
   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  void BlockKernel2D(Arg arg)
+  void BlockKernel2D(Arg arg, sycl::nd_item<3> ndi)
   {
-#if 0
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
     const int j = blockDim.y*blockIdx.y + threadIdx.y;
@@ -53,7 +50,27 @@ namespace quda {
 
     Transformer<block_size, Arg> t(arg);
     t(block_idx, thread_idx);
-#endif
+  }
+
+  template <int block_size, template <int, typename> class Transformer, typename Arg>
+  qudaError_t launchBlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg arg)
+  {
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    auto q = device::get_target_stream(stream);
+    warningQuda("launchBlockKernel2D");
+    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+    warningQuda("%s", str(arg.threads).c_str());
+    q.submit([&](sycl::handler& h) {
+	       h.parallel_for<class BlockKernel2D>
+		 (ndRange,
+		  [=](sycl::nd_item<3> ndi) {
+		    quda::BlockKernel2D<block_size, Transformer, Arg>(arg, ndi);
+		  });
+	     });
+    warningQuda("end launchBlockKernel2D");
+    return QUDA_SUCCESS;
   }
 
 }

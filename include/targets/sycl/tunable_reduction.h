@@ -68,11 +68,11 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                       const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream,
+		       Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
     {
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
+      //for (unsigned int i = 0; i < param.size(); i++)
+      //qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
