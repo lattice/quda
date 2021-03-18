@@ -353,7 +353,7 @@ namespace quda {
     }
     if (V.Precision() == QUDA_DOUBLE_PRECISION && B[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
-      BlockOrthogonalize<double>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho);
+      BlockOrthogonalize<double, double>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, spin_bs, n_block_ortho);
 #else
       errorQuda("Double precision multigrid has not been enabled");
 #endif

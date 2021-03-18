@@ -137,6 +137,10 @@ static inline __device__ float atomicAbsMax(float *addr, float val){
   return atomicMax(addr_, val_);
 }
 
+//static inline __device__ double atomicAbsMax(double *addr, double val){  
+//return atomicMax(abs(*addr), abs(val));
+//}
+
 template <bool is_device> struct atomic_fetch_add_impl {
   template <typename T> inline void operator()(T *addr, T val)
   {

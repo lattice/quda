@@ -6,7 +6,7 @@
 #include <complex_quda.h>
 
 // at the moment double-precision multigrid is only enabled when debugging
-#ifdef HOST_DEBUG
+#if defined(HOST_DEBUG) && !defined(GPU_MULTIGRID_DOUBLE)
 #define GPU_MULTIGRID_DOUBLE
 #endif
 

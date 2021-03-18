@@ -332,6 +332,10 @@ if(QUDA_MULTIGRID)
   target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
+if(QUDA_MULTIGRID_DOUBLE)
+  target_compile_definitions(quda PRIVATE GPU_MULTIGRID_DOUBLE)
+endif(QUDA_MULTIGRID_DOUBLE)
+
 if(QUDA_GAUGE_ALG)
   target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
   target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})

@@ -262,6 +262,7 @@ option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
+option(QUDA_MULTIGRID_DOUBLE "build multigrid solvers with double precicion enabled" OFF)
 option(QUDA_BLOCKSOLVER "build block solvers" OFF)
 option(QUDA_USE_EIGEN "use EIGEN library (where optional)" ON)
 option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
