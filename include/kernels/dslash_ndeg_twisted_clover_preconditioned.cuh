@@ -8,11 +8,11 @@
 namespace quda
 {
   
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_, bool asymmetric_>
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool asymmetric_>
     struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_;
+    static constexpr bool dynamic_clover = dynamic_clover_inverse();
     static constexpr bool asymmetric = asymmetric_;
     
     typedef typename mapper<Float>::type real;
@@ -63,14 +63,13 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-      auto clover_coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
       auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
-
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+      // defined in dslash_wilson.cuh
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
@@ -82,12 +81,12 @@ namespace quda
 
       if (isComplete<kernel_type>(arg, coord) && active) {
 
-        SharedMemoryCache<Vector> cache(target::block_dim());
+        SharedMemoryCache<HalfVector> cache(target::block_dim());
         Vector tmp;
 
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
-          HMat A = arg.A(clover_coord.x_cb, parity, chirality);
+          HMat A = arg.A(coord.x_cb, parity, chirality);
           
           HalfVector chi = out.chiral_project(chirality);
           cache.save(chi); // put "chi" in shared memory so the other flavor can access it
@@ -103,12 +102,12 @@ namespace quda
             HMat A2 = A.square();
             A2 += b.imag() * b.imag();
             A2 += (-arg.c * arg.c);
-            Cholesky<HMatrix, real, nColor * Arg::nSpin / 2> cholesky(A2);
+            Cholesky<HMatrix, real, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
             chi = cholesky.backward(cholesky.forward(A_chi));
             tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
           }
           else {
-            HMat A2inv = arg.A2inv(clover_coord.x_cb, parity, chirality);
+            HMat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
             chi = A2inv * A_chi;
             tmp += static_cast<real>(2.0) * chi.chiral_reconstruct(chirality);
           }
@@ -125,7 +124,8 @@ namespace quda
         }
       }
 
-      if (x_cb == 0) {
+      // FIXME remove debug output
+      if (coord.x_cb == 0) {
         out.print();
       }
 

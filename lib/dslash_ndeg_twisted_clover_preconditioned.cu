@@ -15,15 +15,12 @@
 namespace quda
 {
   // trait to ensure we don't instantiate asymmetric & xpay
-  // defined dslash_ndeg_twisted_mass_preconditioned.cu
-  template <bool symmetric> constexpr bool xpay_();
-  template <> constexpr bool xpay_<true>();
+  template <bool symmetric> constexpr bool xpay_() { return true; }
+  template <> constexpr bool xpay_<true>() { return false; }
 
   // trait to ensure we don't instantiate asymmetric & !dagger
-  // defined dslash_ndeg_twisted_mass_preconditioned.cu
-  template <bool symmetric> constexpr bool not_dagger_();
-  template <> constexpr bool not_dagger_<true>();
-
+  template <bool symmetric> constexpr bool not_dagger_() { return false; }
+  template <> constexpr bool not_dagger_<true>() { return true; }
   
   template <typename Arg> class NdegTwistedCloverPreconditioned : public Dslash<nDegTwistedCloverPreconditioned, Arg>
     {
@@ -120,16 +117,24 @@ namespace quda
                                                 const GaugeField &U, const CloverField &A,
                                                 double a, double b, double c,
                                                 const ColorSpinorField &x, int parity, bool dagger,
-                                                
-                                                const int *comm_override, TimeProfile &profile)
+                                                bool asymmetric, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, c, x, parity, dagger, comm_override);
-      NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
-        
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-                                                         const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-                                                         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      if (asymmetric) {
+        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, c, x, parity, dagger, comm_override);
+        NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
+          
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      } else {
+        NdegTwistedCloverPreconditionedArg<Float, nColor, nDim, recon, false> arg(out, in, U, A, a, b, c, x, parity, dagger, comm_override);
+        NdegTwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
+          
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      }
     }
   };
   
@@ -137,11 +142,11 @@ namespace quda
                                             const GaugeField &U, const CloverField &A,
                                             double a, double b, double c,
                                             const ColorSpinorField &x, int parity, bool dagger,
-                                            const int *comm_override,
+                                            bool asymmetric, const int *comm_override,
                               TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
-    instantiate<NdegTwistedCloverPreconditionedApply>(out, in, U, A, a, b, c, x, parity, dagger, comm_override, profile);
+    instantiate<NdegTwistedCloverPreconditionedApply>(out, in, U, A, a, b, c, x, parity, dagger, asymmetric, comm_override, profile);
 #else
     errorQuda("Non-degenerate preconditioned twisted-clover dslash has not been built");
 #endif // GPU_NDEG_TWISTED_CLOVER_DIRAC

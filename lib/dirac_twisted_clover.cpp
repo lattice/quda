@@ -216,7 +216,7 @@ namespace quda {
         flops += (1320ll + 552ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
-                                             false, in, parity, dagger, commDim, profile);
+                                             false, in, parity, dagger, !symmetric, commDim, profile);
         // FIXME check flops
         flops += (1320ll + 96ll + 48ll + 552ll) * in.Volume();
       } 
