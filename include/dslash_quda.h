@@ -422,7 +422,7 @@ namespace quda {
      @brief Driver for applying the preconditioned twisted-clover stencil
 
      out = a * (C + i*b*gamma_5)^{-1} * D * in + x
-         = a * C^{-2} (C - i*b*gamma_5) * D * in + x
+         = a * (C - i*b*gamma_5)/(C^2 + b^2) * D * in + x
          = A^{-1} * D * in + x
 
      where D is the gauged Wilson linear operator and C is the clover
@@ -490,6 +490,48 @@ namespace quda {
   void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       const CloverField &C, double a, double b, double c, 
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+  
+  /**
+     @brief Driver for applying the non-degenerate preconditioned twisted-clover stencil
+
+     out = a * (C + i*b*gamma_5*tau_3 - c*tau_1)^{-1} * D * in + x
+         = a * (C - i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2) * D * in + x
+         = A^{-1} * D * in + x
+
+     where D is the gauged Wilson linear operator and C is the clover
+     field.  This operator can (at present) be applied to only single
+     parity (checker-boarded) fields.  When the dagger operator is
+     requested, we do not transpose the order of operations, e.g.
+
+     out = A^{-\dagger} D^\dagger  (no xpay term)
+
+     Although not a conjugate transpose of the regular operator, this
+     variant is used to enable kernel fusion between the application
+     of D and the subsequent application of A, e.g., in the symmetric
+     dagger operator we need to apply
+
+     M = (1 - kappa^2 D^{\dagger} A^{-\dagger} D{^\dagger} A^{-\dagger} )
+
+     and since cannot fuse D{^\dagger} A^{-\dagger}, we instead fused
+     A^{-\dagger} D{^\dagger}.
+
+     @param[out] out The output result field
+     @param[in] in The input field
+     @param[in] U The gauge field used for the operator
+     @param[in] C The clover field used for the operator
+     @param[in] a Scale factor applied to Wilson term ( typically 1.0)
+     @param[in] b chiral twist factor applied (typically -2*kappa*mu)
+     @param[in] c flavor twist factor applied (typically 2*kappa*epsilon)
+     @param[in] xpay Whether to do xpay or not
+     @param[in] x Vector field we accumulate onto to when xpay is true
+     @param[in] parity Destination parity
+     @param[in] dagger Whether this is for the dagger operator
+     @param[in] comm_override Override for which dimensions are partitioned
+     @param[in] profile The TimeProfile used for profiling the dslash
+  */
+  void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+      const CloverField &C, double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+      const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Domain-wall 5-d stencil to a
