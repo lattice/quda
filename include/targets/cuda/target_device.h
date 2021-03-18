@@ -1,11 +1,11 @@
 #pragma once
 
 #include <algorithm>
-#ifdef __NVCOMPILER
+#ifdef _NVHPC_CUDA
 #include <nv/target>
 #endif
 
-#if defined(__CUDACC__) ||  defined(__NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
+#if defined(__CUDACC__) ||  defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
 #endif
 
@@ -13,7 +13,7 @@ namespace quda {
 
   namespace target {
 
-#ifdef __NVHPC_CUDA
+#ifdef _NVHPC_CUDA
 
     // nvc++: run-time dispatch using if target
     template <template <bool, typename ...> class f, typename ...Args>
