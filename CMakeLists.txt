@@ -36,7 +36,6 @@ set(VALID_BUILD_TYPES
     STRICT
     DEBUG
     HOSTDEBUG
-    DEVICEDEBUG
     SANITIZE)
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
@@ -342,9 +341,6 @@ set(CMAKE_CXX_FLAGS_RELEASE
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
@@ -367,9 +363,6 @@ set(CMAKE_C_FLAGS_RELEASE
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra"
-    CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
@@ -428,9 +421,6 @@ set(CMAKE_CUDA_FLAGS_RELEASE
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
@@ -836,7 +826,6 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
@@ -844,7 +833,6 @@ mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
@@ -852,7 +840,6 @@ mark_as_advanced(CMAKE_C_FLAGS_STRICT)
 mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
 
