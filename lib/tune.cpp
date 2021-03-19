@@ -12,7 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
-#include <target_device.h> // for device::warp_size
+#include <target_device.h>
 
 #include <deque>
 #include <queue>
@@ -795,11 +795,7 @@ namespace quda
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-              if (tunable.launchError() == QUDA_SUCCESS) { // must be regular error
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
-              } else { // else must be a manually thrown error
-                printfQuda("    %s gives thrown error\n", tunable.paramString(param).c_str());
-              }
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
           }
           tuning = tunable.advanceTuneParam(param);

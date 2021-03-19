@@ -245,7 +245,7 @@ namespace quda {
       v = tmp;
       unitarizeLinkMILC<double>(result, v, arg);
       if (arg.check_unitarization) {
-        if (result.isUnitary(arg.max_error) == false) atomicAdd(arg.fails, 1);
+        if (result.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
       }
       tmp = result;
       arg.out(mu, x_cb, parity) = tmp;
@@ -283,7 +283,8 @@ namespace quda {
       polarSUN<typename Arg::real>(u, arg.tol);
 
       // count number of failures
-      if (u.isUnitary(arg.tol) == false) atomicAdd(arg.fails, 1);      
+      if (u.isUnitary(arg.tol) == false) atomic_fetch_add(arg.fails, 1);
+
       arg.u(mu, x_cb, parity) = u;
     }
   };

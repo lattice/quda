@@ -764,9 +764,9 @@ namespace quda {
     if (gauge::fixed_point<Float,storeType>()) {
       Float scale = A.accessor.scale;
       complex<storeType> a(round(scale * vuv.real()), round(scale * vuv.imag()));
-      atomicAdd(Y,a);
+      atomic_fetch_add(Y, a);
     } else {
-      atomicAdd(Y,reinterpret_cast<const complex<storeType>&>(vuv));
+      atomic_fetch_add(Y, reinterpret_cast<const complex<storeType>&>(vuv));
     }
   }
 

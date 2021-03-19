@@ -1,7 +1,7 @@
 #include <blas_quda.h>
 #include <color_spinor_field.h>
-#include <tunable_nd.h>
 #include <kernels/multi_blas_core.cuh>
+#include <tunable_nd.h>
 
 namespace quda {
 
@@ -63,10 +63,6 @@ namespace quda {
         }
         max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        Amatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(a.data));
-        Bmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(b.data));
-        Cmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(c.data));
-
         strcpy(aux, x[0]->AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
@@ -95,11 +91,10 @@ namespace quda {
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
         constexpr bool multi_1d = Arg::Functor::multi_1d;
-        std::vector<constant_param_t> param;
-        if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
-        if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
-        if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
-        launch<MultiBlas_>(tp, stream, arg, param);
+        if (a.data) { set_param<multi_1d>(arg, 'a', a); }
+        if (b.data) { set_param<multi_1d>(arg, 'b', b); }
+        if (c.data) { set_param<multi_1d>(arg, 'c', c); }
+        launch<MultiBlas_>(tp, stream, arg);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -152,30 +147,30 @@ namespace quda {
         }
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiateLinear<n-1>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiatePow2<n/2>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
       // instantiate the loop unrolling template
-      template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max!=1, void> instantiate(const qudaStream_t &stream)
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
         constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
@@ -187,7 +182,7 @@ namespace quda {
         else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
 
-      template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max==1, void> instantiate(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }

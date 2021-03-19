@@ -10,7 +10,6 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include "momentum.h"
-#include <dslash_quda.h> 
 #include <sys/time.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))

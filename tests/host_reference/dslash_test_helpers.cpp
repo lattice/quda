@@ -1,7 +1,6 @@
 #include "dslash_test_helpers.h"
 #include <quda.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <quda_internal.h>
 
@@ -145,11 +144,8 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
 void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity,
                             dslash_test_type test_type)
 {
-  if (inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-    setKernelPackT(true);
-  } else {
+  if (inv_param->dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH)
     errorQuda("This type of dslashQuda operator is defined for QUDA_MOBIUS_DWF_EOFA_DSLASH ONLY");
-  }
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field not allocated");
 
