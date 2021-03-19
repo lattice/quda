@@ -383,7 +383,7 @@ namespace quda {
      @param[in] x Vector field we accumulate onto to
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
-     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5) * D^dagger * in)
+     @param[in] asymmetric Whether this is for the asymmetric preconditioned dagger operator (a*(1 - i*b*gamma_5*tau3 + c*tau1) * D^dagger * in)
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
@@ -526,12 +526,14 @@ namespace quda {
      @param[in] x Vector field we accumulate onto to when xpay is true
      @param[in] parity Destination parity
      @param[in] dagger Whether this is for the dagger operator
+     @param[in] asymmetric Whether this is for the asymmetric preconditioned daggered operator
+      out = a * (C - i*b*gamma_5*tau_3 + c*tau_1)^{-1} * D^\dagger * in
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       const CloverField &C, double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
-      const int *comm_override, TimeProfile &profile);
+      bool asymmetric, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Driver for applying the Domain-wall 5-d stencil to a
