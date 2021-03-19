@@ -156,10 +156,10 @@ namespace quda {
 
     /**
        @brief Helper function that returns the maximum size of a
-       constant_param_t buffer on the target architecture.  For CUDA,
-       this corresponds to the maximum __constant__ buffer size.
+       __constant__ buffer on the target architecture.  For CUDA,
+       this is set to the somewhat arbitrary limit of 32 KiB for now.
     */
-    constexpr size_t max_constant_param_size() { return 8192; }
+    constexpr size_t max_constant_size() { return 32768; }
 
     /**
        @brief Helper function that returns the maximum static size of
@@ -173,6 +173,31 @@ namespace quda {
        shared memory bank width on the target architecture.
     */
     constexpr int shared_memory_bank_width() { return 32; }
+
+    /**
+       @brief Helper function that returns true if we are to pass the
+       kernel parameter struct to the kernel as an explicit kernel
+       argument.  Otherwise the parameter struct is explicitly copied
+       to the device prior to kernel launch.
+    */
+    template <typename Arg> constexpr bool use_kernel_arg() { return sizeof(Arg) <= device::max_kernel_arg_size(); }
+
+    /**
+       @brief Helper function that returns kernel argument from
+       __constant__ memory.  Note this is the dummy implementation,
+       and is present only to keep the compiler happy in the
+       translation units where constant memory is not used.
+     */
+    template <typename Arg>
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+
+    /**
+       @brief Helper function that returns a pointer to the
+       __constant__ memory buffer.  Note this is the dummy
+       implementation, and is present only to keep the compiler happy
+       in the translation units where constant memory is not used.
+     */
+    template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
 
   }
 

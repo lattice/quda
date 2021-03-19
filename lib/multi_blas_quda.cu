@@ -1,7 +1,7 @@
 #include <blas_quda.h>
 #include <color_spinor_field.h>
-#include <tunable_nd.h>
 #include <kernels/multi_blas_core.cuh>
+#include <tunable_nd.h>
 
 namespace quda {
 
@@ -63,10 +63,6 @@ namespace quda {
         }
         max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        Amatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(a.data));
-        Bmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(b.data));
-        Cmatrix_h = reinterpret_cast<char *>(const_cast<typename T::type *>(c.data));
-
         strcpy(aux, x[0]->AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
@@ -95,11 +91,10 @@ namespace quda {
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
         constexpr bool multi_1d = Arg::Functor::multi_1d;
-        std::vector<constant_param_t> param;
-        if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
-        if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
-        if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
-        launch<MultiBlas_>(tp, stream, arg, param);
+        if (a.data) { set_param<multi_1d>(arg, 'a', a); }
+        if (b.data) { set_param<multi_1d>(arg, 'b', b); }
+        if (c.data) { set_param<multi_1d>(arg, 'c', c); }
+        launch<MultiBlas_>(tp, stream, arg);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)

@@ -70,14 +70,11 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                       const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg);
 #else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer>(arg, tp, stream);
 #endif
 
@@ -92,17 +89,15 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                       const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch_device<Transformer>(result_, tp, stream, arg, param);
+      launch_device<Transformer>(result_, tp, stream, arg);
       result = result_[0];
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg,
-                     const std::vector<constant_param_t> & = dummy_param)
+     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       Transformer<Arg> t(arg);
@@ -132,21 +127,19 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                     const std::vector<constant_param_t> &param = dummy_param)
+    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch_host<Transformer>(result_, tp, stream, arg, param);
+      launch_host<Transformer>(result_, tp, stream, arg);
       result = result_[0];
     }
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<!enable_host, void>
-      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg, param);
+        launch_device<Transformer>(result, tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -154,13 +147,12 @@ namespace quda {
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<enable_host, void>
-      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-             const std::vector<constant_param_t> &param = dummy_param)
+      launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg, param);
+        launch_device<Transformer>(result, tp, stream, arg);
       } else {
-        launch_host<Transformer>(result, tp, stream, arg, param);
+        launch_host<Transformer>(result, tp, stream, arg);
       }
     }
 
@@ -173,11 +165,10 @@ namespace quda {
        @param[in] param Constant kernel meta data
      */
     template <template <typename> class Transformer, typename T, typename Arg>
-    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                const std::vector<constant_param_t> &param = dummy_param)
+    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch<Transformer>(result_, tp, stream, arg, param);
+      launch<Transformer>(result_, tp, stream, arg);
       result = result_[0];
     }
 
@@ -286,14 +277,11 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-                       const std::vector<constant_param_t> &param = dummy_param)
+    void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg, param);
+      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg);
 #else
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       arg.launch_error = launch<device::max_multi_reduce_block_size(), Transformer>(arg, tp, stream);
 #endif
 
@@ -311,8 +299,7 @@ namespace quda {
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
-    void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg,
-                     const std::vector<constant_param_t> & = dummy_param)
+    void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       Transformer<Arg> t(arg);
@@ -348,11 +335,10 @@ namespace quda {
 
     template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<!enable_host, void>
-    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-           const std::vector<constant_param_t> &param = dummy_param)
+    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg, param);
+        launch_device<Transformer>(result, tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
@@ -360,13 +346,12 @@ namespace quda {
 
     template <template <typename> class Transformer, bool enable_host, typename T, typename Arg>
     std::enable_if_t<enable_host, void>
-    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg,
-           const std::vector<constant_param_t> &param = dummy_param)
+    launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg, param);
+        launch_device<Transformer>(result, tp, stream, arg);
       } else {
-	launch_host<Transformer>(result, tp, stream, arg, param);
+	launch_host<Transformer>(result, tp, stream, arg);
       }
     }
 
