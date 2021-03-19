@@ -5,7 +5,9 @@
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
 
+#ifndef QUDA_FAST_COMPILE_DSLASH
 #define QUDA_FAST_COMPILE_DSLASH
+#endif
 
 namespace quda {
 

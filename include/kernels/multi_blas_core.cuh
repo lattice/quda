@@ -3,6 +3,7 @@
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
+#include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
 
@@ -120,14 +121,13 @@ namespace quda
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor : MultiBlasParam<coeff_t_> {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_, false, multi_1d_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-
-      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**

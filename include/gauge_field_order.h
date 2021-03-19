@@ -2163,14 +2163,14 @@ namespace quda {
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       // get base pointer
-      auto in = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      auto in = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length * sizeof(Float));
       block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
     {
       // get base pointer
-      auto out = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      auto out = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length * sizeof(Float));
       block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
     }
 

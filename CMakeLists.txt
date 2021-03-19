@@ -46,13 +46,12 @@ else()
 endif()
 
 set(VALID_BUILD_TYPES
-  DEVEL
-  RELEASE
-  STRICT
-  DEBUG
-  HOSTDEBUG
-  DEVICEDEBUG
-  SANITIZE)
+    DEVEL
+    RELEASE
+    STRICT
+    DEBUG
+    HOSTDEBUG
+    SANITIZE)
 set(CMAKE_BUILD_TYPE
   "${DEFBUILD}"
   CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
@@ -284,6 +283,9 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+# QIO legacy support
+option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
+
 # NVTX options
 option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
@@ -319,6 +321,8 @@ mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
+
+mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -386,9 +390,6 @@ set(CMAKE_CXX_FLAGS_RELEASE
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
@@ -411,9 +412,6 @@ set(CMAKE_C_FLAGS_RELEASE
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG
-  "-Wall -Wextra"
-  CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
   "-Wall -Wextra -g -fno-inline"
   CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
@@ -478,10 +476,8 @@ if( QUDA_TARGET_CUDA )
   set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-  set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
-  set(CMAKE_CUDA_FLAGS_DEBUG
+
+set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
   set(CMAKE_CUDA_FLAGS_SANITIZE
@@ -649,7 +645,7 @@ if(QUDA_QMP)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-      --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       BUILD_COMMAND ${MAKE_EXE}
       INSTALL_COMMAND ${MAKE_EXE} install
       LOG_INSTALL ON
@@ -701,14 +697,21 @@ if(QUDA_QIO)
   mark_as_advanced(QIO_FOUND)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    set(QIO_BRANCH
+        "extended")
+    if(QUDA_DOWNLOAD_QIO_LEGACY)
+      set(QIO_BRANCH
+          "qio2-5-0")
+    endif()
     ExternalProject_Add(
       QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-      GIT_TAG qio2-5-0
+      GIT_TAG "${QIO_BRANCH}"
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-      --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install
       DEPENDS QMP
@@ -899,24 +902,22 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
-# Make the compiler flags an advanced option for all user defined build types
-# (cmake defined build types are advanced by default )
-if ( QUDA_TARGET_CUDA ) 
-  mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
-  mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
-endif(QUDA_TARGET_CUDA)
+
+# make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
+# default )
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
+
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
@@ -924,7 +925,6 @@ mark_as_advanced(CMAKE_C_FLAGS_STRICT)
 mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
 
