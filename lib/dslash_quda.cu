@@ -110,6 +110,11 @@ namespace quda {
   {
     for (int i = 0; i < max; i++) new (counter + i) T {0};
   }
+  // need to use placement new constructor to initialize the atomic counters
+  template <typename T> __global__ void init_sync_arr(T *arr, T val, int max)
+  {
+    for (int i = 0; i < max; i++) *(arr + i) = val;
+  }
 
   void createDslashEvents()
   {
@@ -127,14 +132,15 @@ namespace quda {
     }
 #ifdef NVSHMEM_COMMS
     sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
-    /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
-   by using smaller values */
-    qudaMemset(sync_arr, 9, 2 * QUDA_MAX_DIM * sizeof(shmem_sync_t));
-    sync_counter = 10;
-
     TuneParam tp;
     tp.grid = dim3(1, 1, 1);
     tp.block = dim3(1, 1, 1);
+
+    /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
+    by using smaller values */
+    qudaLaunchKernel(init_sync_arr<shmem_sync_t>, tp, 0, sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    sync_counter = 10;
+
     // atomic for controlling signaling in nvshmem packing
     _retcount_intra
       = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
