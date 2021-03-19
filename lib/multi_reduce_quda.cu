@@ -129,10 +129,9 @@ namespace quda {
           std::vector<host_reduce_t> result_(NXZ * arg.NYW);
 
           constexpr bool multi_1d = false;
-          std::vector<constant_param_t> param;
-          if (a.data) { set_param<multi_1d>(param, arg, 'a', a); }
-          if (b.data) { set_param<multi_1d>(param, arg, 'b', b); }
-          if (c.data) { set_param<multi_1d>(param, arg, 'c', c); }
+          if (a.data) { set_param<multi_1d>(arg, 'a', a); }
+          if (b.data) { set_param<multi_1d>(arg, 'b', b); }
+          if (c.data) { set_param<multi_1d>(arg, 'c', c); }
           launch<MultiReduce_>(result_, tp, stream, arg);
 
           // need to transpose for same order with vector thread reduction
@@ -147,24 +146,24 @@ namespace quda {
         }
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiateLinear<n-1>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiatePow2<n/2>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }

@@ -20,8 +20,10 @@
 
 using namespace quda;
 
+#ifdef MULTI_GPU
 static int Vs[4];
 static int Vsh[4];
+#endif
 
 template <typename su3_matrix, typename Real>
 void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matrix *mulink, su3_matrix **sitelink,
@@ -193,16 +195,6 @@ void llfat_cpu(void **fatlink, su3_matrix **sitelink, Float *act_path_coeff)
 
 void llfat_reference(void **fatlink, void **sitelink, QudaPrecision prec, void *act_path_coeff)
 {
-  Vs[0] = Vs_x;
-  Vs[1] = Vs_y;
-  Vs[2] = Vs_z;
-  Vs[3] = Vs_t;
-
-  Vsh[0] = Vsh_x;
-  Vsh[1] = Vsh_y;
-  Vsh[2] = Vsh_z;
-  Vsh[3] = Vsh_t;
-
   switch (prec) {
   case QUDA_DOUBLE_PRECISION:
     llfat_cpu((void **)fatlink, (su3_matrix<double> **)sitelink, (double *)act_path_coeff);

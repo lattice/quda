@@ -5,6 +5,10 @@
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
 
+#ifndef QUDA_FAST_COMPILE_DSLASH
+#define QUDA_FAST_COMPILE_DSLASH
+#endif
+
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger, DslashType type>
