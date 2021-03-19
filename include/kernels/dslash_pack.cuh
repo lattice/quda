@@ -39,7 +39,7 @@ namespace quda
     real twist_a; // preconditioned twisted-mass scaling parameter
     real twist_b; // preconditioned twisted-mass chiral twist factor
     real twist_c; // preconditioned twisted-mass flavor twist factor
-    int twist; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
+    int twist;    // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
 
     int_fastdiv threads;
     int threadDimMapLower[4];
@@ -394,11 +394,13 @@ namespace quda
 
   // shmem bitfield encodes
   // 0 - no shmem
-  // 1 - pack P2P
-  // 2 - pack IB
-  // 3 - pack P2P + IB
-  // 8 - barrier part I (just the put part)
-  // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
+  // 1 - pack P2P (merged in interior)
+  // 2 - pack IB (merged in interior)
+  // 3 - pack P2P + IB (merged in interior)
+  // 8 - barrier part I (packing) (merged in interior, only useful if packing) -- currently required
+  // 16 - barrier part II (spin exterior) (merged in exterior) -- currently required
+  // 32 - use packstream -- not used
+  // 64 - use uber kernel (merge exterior)
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
     template <int twist> __device__ __forceinline__ void operator()(Arg &arg, int s, int parity)

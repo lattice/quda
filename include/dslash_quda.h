@@ -70,8 +70,8 @@ namespace quda {
 #ifdef NVSHMEM_COMMS
     using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
     using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
-    using shmem_interior_done_t = cuda::atomic<long, cuda::thread_scope_device>;
-    using shmem_interior_count_t = cuda::atomic<long, cuda::thread_scope_block>;
+    using shmem_interior_done_t = cuda::atomic<shmem_sync_t, cuda::thread_scope_device>;
+    using shmem_interior_count_t = cuda::atomic<int, cuda::thread_scope_block>;
 
     /**
      * @brief Get the shmem sync arr which is used for signaling which exterior halos have arrived

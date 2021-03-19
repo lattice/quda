@@ -447,7 +447,7 @@ namespace quda
       // 2 - pack IB (merged in interior)
       // 3 - pack P2P + IB (merged in interior)
       // 8 - barrier part I (packing) (merged in interior, only useful if packing) -- currently required
-      // 16 - barrier part II (spin exterior) (merged in exterior) -- currently requiores
+      // 16 - barrier part II (spin exterior) (merged in exterior) -- currently required
       // 32 - use packstream -- not used
       // 64 - use uber kernel (merge exterior)
   */
