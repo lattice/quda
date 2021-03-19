@@ -201,6 +201,13 @@ namespace quda {
      */
     template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
 
+   /**
+      @brief Return CUDA stream from QUDA stream.  This is a
+      temporary addition until all kernels have been made generic.
+      @param stream QUDA stream we which to convert to CUDA stream
+      @return CUDA stream
+    */
+    cudaStream_t get_cuda_stream(const qudaStream_t& stream);
 
   }
 

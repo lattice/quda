@@ -185,7 +185,7 @@ namespace quda {
       @param stream QUDA stream we which to convert to CUDA stream
       @return CUDA stream
     */
-//    hipStream_t get_cuda_stream(const qudaStream_t& stream);
+    hipStream_t get_cuda_stream(const qudaStream_t& stream);
   }
 
 }

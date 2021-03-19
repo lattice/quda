@@ -46,7 +46,7 @@ namespace quda {
 
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    forceinline__ __device__ void Kernel3D_impl(Arg& arg)
+    __forceinline__ __device__ void Kernel3D_impl(Arg& arg)
   {
     Functor<Arg> f(arg);
 
