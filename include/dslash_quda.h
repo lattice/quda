@@ -532,7 +532,7 @@ namespace quda {
      @param[in] profile The TimeProfile used for profiling the dslash
   */
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-      const CloverField &C, double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+      const CloverField &C, double a, double b, double c, const ColorSpinorField &x, int parity, bool dagger,
       bool asymmetric, const int *comm_override, TimeProfile &profile);
 
   /**
