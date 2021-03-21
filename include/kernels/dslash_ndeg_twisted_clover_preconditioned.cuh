@@ -25,7 +25,7 @@ namespace quda
     
   NdegTwistedCloverPreconditionedArg(ColorSpinorField &out, const ColorSpinorField &in,
                                      const GaugeField &U, const CloverField &A,
-                                     double a, double b, double c,
+                                     double a, double b, double c, bool xpay,
                                      const ColorSpinorField &x, int parity, bool dagger,
                                      const int *comm_override) :
     WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
