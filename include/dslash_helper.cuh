@@ -549,7 +549,8 @@ namespace quda
            block actually needs to wait
         */
 
-        bool spin = threadIdx.x == dimdir ? true : false;
+        // for now we can only spin per dimdir for 4d indexing as it ensure unique block->dimdir assignment
+        bool spin = (dslash.pc_type() == QUDA_5D_PC) || (threadIdx.x == dimdir);
         // figure out which other directions also to spin for (to make corners work)
         switch (dim) {
         case 3:
