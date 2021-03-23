@@ -58,18 +58,15 @@ namespace quda
       param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
-    void defaultTuneParam(TuneParam &param) const
-    {
-      initTuneParam(param);
-    }
-
+    void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                             double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity,
-                             bool dagger, const int *comm_override, double m_f, bool fused_m5inv_m5pre, TimeProfile &profile)
+                                    double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                    int parity, bool dagger, const int *comm_override, double m_f,
+                                    bool fused_m5inv_m5pre, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       // TODO: add m5, variableInv, etc
@@ -101,12 +98,14 @@ namespace quda
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  void ApplyDomainWall4DFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, double m_f, bool fused_m5inv_m5pre, TimeProfile &profile)
+  void ApplyDomainWall4DFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                int parity, bool dagger, const int *comm_override, double m_f, bool fused_m5inv_m5pre,
+                                TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, fused_m5inv_m5pre, profile);
+    instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f,
+                                          fused_m5inv_m5pre, profile);
 #else
     errorQuda("Domain-wall dslash has not been built");
 #endif // GPU_DOMAIN_WALL_DIRAC

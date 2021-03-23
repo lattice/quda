@@ -23,7 +23,7 @@ namespace quda
      @brief Structure containing zMobius / Zolotarev coefficients
   */
   template <typename real> struct coeff_5 {
-    complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
+    complex<real> a[QUDA_MAX_DWF_LS];     // xpay coefficients
     complex<real> alpha[QUDA_MAX_DWF_LS]; // alpha * D5 + beta
     complex<real> beta[QUDA_MAX_DWF_LS];
     complex<real> kappa[QUDA_MAX_DWF_LS];
@@ -48,10 +48,9 @@ namespace quda
      @brief Helper class for grabbing the constant struct, whether
      we are on the GPU or CPU.
   */
-  template <typename real, bool is_variable, typename Arg> struct coeff_type
-  {
+  template <typename real, bool is_variable, typename Arg> struct coeff_type {
     const Arg &arg;
-    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
+    __device__ __host__ coeff_type(const Arg &arg) : arg(arg) { }
     __device__ __host__ real a(int) { return arg.a; }
     __device__ __host__ real alpha(int) { return arg.alpha; }
     __device__ __host__ real beta(int) { return arg.beta; }
@@ -62,10 +61,9 @@ namespace quda
   /**
      @brief Specialization for variable complex coefficients
   */
-  template <typename real, typename Arg> struct coeff_type<real, true, Arg>
-  {
+  template <typename real, typename Arg> struct coeff_type<real, true, Arg> {
     const Arg &arg;
-    __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
+    __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) { }
     __device__ __host__ complex<real> a(int s) { return arg.coeff.a[s]; }
     __device__ __host__ complex<real> alpha(int s) { return arg.coeff.alpha[s]; }
     __device__ __host__ complex<real> beta(int s) { return arg.coeff.beta[s]; }
@@ -100,7 +98,7 @@ namespace quda
     real alpha; // out = alpha * op(in) + beta * in
     real beta;
     real kappa; // kappa = kappa_b / kappa_c
-    real inv;   // The denominator for the M5inv 
+    real inv;   // The denominator for the M5inv
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
@@ -108,17 +106,17 @@ namespace quda
 
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
                const Complex *b_5_, const Complex *c_5_, double a_) :
-        out(out),
-        in(in),
-        x(x),
-        nParity(in.SiteSubset()),
-        volume_cb(in.VolumeCB()),
-        volume_4d_cb(volume_cb / in.X(4)),
-        Ls(in.X(4)),
-        m_f(m_f),
-        m_5(m_5),
-        a(a_),
-        threads(volume_4d_cb, Ls, nParity)
+      out(out),
+      in(in),
+      x(x),
+      nParity(in.SiteSubset()),
+      volume_cb(in.VolumeCB()),
+      volume_4d_cb(volume_cb / in.X(4)),
+      Ls(in.X(4)),
+      m_f(m_f),
+      m_5(m_5),
+      a(a_),
+      threads(volume_4d_cb, Ls, nParity)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
@@ -161,9 +159,10 @@ namespace quda
         break;
       case M5_INV_MOBIUS:
         // out = (1 + kappa * D5)^-1 * in = M5inv * in
-        kappa = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
-        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f); // 0.5 from gamma matrices
-        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2); // kappa_b * kappa_b * a
+        kappa
+          = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                               // 0.5 from gamma matrices
+        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);                          // kappa_b * kappa_b * a
         break;
       case M5_INV_ZMOBIUS: {
         // out = (1 + kappa * D5)^-1 * in = M5inv * in
@@ -187,7 +186,7 @@ namespace quda
 
   template <typename Arg> struct dslash5 {
     Arg &arg;
-    constexpr dslash5(Arg &arg) : arg(arg) {}
+    constexpr dslash5(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -399,7 +398,7 @@ namespace quda
   */
   template <typename Arg> struct dslash5inv {
     Arg &arg;
-    constexpr dslash5inv(Arg &arg) : arg(arg) {}
+    constexpr dslash5inv(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
