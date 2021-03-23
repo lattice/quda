@@ -24,8 +24,10 @@ namespace quda
   */
   template <typename real> struct coeff_5 {
     complex<real> a[QUDA_MAX_DWF_LS]; // xpay coefficients
-    complex<real> b[QUDA_MAX_DWF_LS];
-    complex<real> c[QUDA_MAX_DWF_LS];
+    complex<real> alpha[QUDA_MAX_DWF_LS]; // alpha * D5 + beta
+    complex<real> beta[QUDA_MAX_DWF_LS];
+    complex<real> kappa[QUDA_MAX_DWF_LS];
+    complex<real> inv;
   };
 
   // helper trait for determining if we are using variable coefficients
@@ -51,8 +53,10 @@ namespace quda
     const Arg &arg;
     __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
     __device__ __host__ real a(int) { return arg.a; }
-    __device__ __host__ real b(int) { return arg.b; }
-    __device__ __host__ real c(int) { return arg.c; }
+    __device__ __host__ real alpha(int) { return arg.alpha; }
+    __device__ __host__ real beta(int) { return arg.beta; }
+    __device__ __host__ real kappa(int) { return arg.kappa; }
+    __device__ __host__ real inv() { return arg.inv; }
   };
 
   /**
@@ -63,8 +67,10 @@ namespace quda
     const Arg &arg;
     __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
     __device__ __host__ complex<real> a(int s) { return arg.coeff.a[s]; }
-    __device__ __host__ complex<real> b(int s) { return arg.coeff.b[s]; }
-    __device__ __host__ complex<real> c(int s) { return arg.coeff.c[s]; }
+    __device__ __host__ complex<real> alpha(int s) { return arg.coeff.alpha[s]; }
+    __device__ __host__ complex<real> beta(int s) { return arg.coeff.beta[s]; }
+    __device__ __host__ complex<real> kappa(int s) { return arg.coeff.kappa[s]; }
+    __device__ __host__ complex<real> inv() { return arg.coeff.inv; }
   };
 
   /**
@@ -89,9 +95,12 @@ namespace quda
     const real m_f; // fermion mass parameter
     const real m_5; // Wilson mass shift
 
-    real b; // real constant Mobius coefficient
-    real c; // real constant Mobius coefficient
-    real a; // real xpay coefficient
+    // real constant Mobius coefficient - there are the zMobius counterparts in the `coeff_5` struct
+    real a;     // real xpay coefficient
+    real alpha; // out = alpha * op(in) + beta * in
+    real beta;
+    real kappa; // kappa = kappa_b / kappa_c
+    real inv;   // The denominator for the M5inv 
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
@@ -115,48 +124,56 @@ namespace quda
       if (!in.isNative() || !out.isNative())
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
+      // Get pointers for zMobius coefficients.
       auto *a_5 = coeff.a;
-      auto *b_5 = coeff.b;
-      auto *c_5 = coeff.c;
+      auto *alpha_5 = coeff.alpha;
+      auto *beta_5 = coeff.beta;
+      auto *kappa_5 = coeff.kappa;
+      auto &inv_z = coeff.inv;
 
       switch (type) {
       case DSLASH5_DWF: break;
       case DSLASH5_MOBIUS_PRE:
+        // out = (b + c * D5) * in
         for (int s = 0; s < Ls; s++) {
-          b_5[s] = b_5_[s];
-          c_5[s] = 0.5 * c_5_[s];
+          beta_5[s] = b_5_[s];
+          alpha_5[s] = 0.5 * c_5_[s]; // 0.5 from gamma matrices
 
           // xpay
           a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
+          a_5[s] *= a_5[s] * static_cast<real>(a); // kappa_b * kappa_b * a
         }
         break;
       case DSLASH5_MOBIUS:
+        // out = (1 + kappa * D5) * in
         for (int s = 0; s < Ls; s++) {
-          b_5[s] = 1.0;
-          c_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0);
+          // beta[s] = 1.0;
+          alpha_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
 
           // axpy
           a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
+          a_5[s] *= a_5[s] * static_cast<real>(a); // kappa_b * kappa_b * a
         }
         break;
       case M5_INV_DWF:
-        b = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
-        c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
+        kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
+        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
         break;
       case M5_INV_MOBIUS:
-        b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
-        c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
-        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
+        // out = (1 + kappa * D5)^-1 * in = M5inv * in
+        kappa = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f); // 0.5 from gamma matrices
+        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2); // kappa_b * kappa_b * a
         break;
       case M5_INV_ZMOBIUS: {
+        // out = (1 + kappa * D5)^-1 * in = M5inv * in
+        // Similar to above convention, but variadic across 5th dim
         complex<double> k = 1.0;
         for (int s = 0; s < Ls; s++) {
-          b_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
-          k *= b_5[s];
+          kappa_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
+          k *= kappa_5[s];
         }
-        c_5[0] = 0.5 / (1.0 + k * m_f);
+        inv_z = 0.5 / (1.0 + k * m_f);
 
         for (int s = 0; s < Ls; s++) { // axpy coefficients
           a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
@@ -214,7 +231,7 @@ namespace quda
         out = x + arg.a * out;
       } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
         Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.c(s) * out + coeff.b(s) * diagonal;
+        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
 
         if (Arg::xpay) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
@@ -222,7 +239,7 @@ namespace quda
         }
       } else if (Arg::type == DSLASH5_MOBIUS) {
         Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.c(s) * out + diagonal;
+        out = coeff.alpha(s) * out + diagonal;
 
         if (Arg::xpay) { // really axpy
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
@@ -249,12 +266,12 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename Vector, typename Arg>
+  template <bool dagger, typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
-    const auto k = arg.b;
-    const auto inv = arg.c;
+    const auto k = arg.kappa;
+    const auto inv = arg.inv;
 
     // if using shared-memory caching then load spinor field for my site into cache
     SharedMemoryCache<Vector> cache(target::block_dim());
@@ -273,14 +290,14 @@ namespace quda
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
         real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = Arg::dagger ? -1 : +1;
+        constexpr int proj_dir = dagger ? -1 : +1;
         out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
         real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = Arg::dagger ? +1 : -1;
+        constexpr int proj_dir = dagger ? +1 : -1;
         out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
     }
@@ -305,7 +322,7 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename Vector, typename Arg>
+  template <bool dagger, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
@@ -318,7 +335,7 @@ namespace quda
     SharedMemoryCache<HalfVector> cache(target::block_dim());
 
     { // first do R
-      constexpr int proj_dir = Arg::dagger ? -1 : +1;
+      constexpr int proj_dir = dagger ? -1 : +1;
 
       if (shared()) {
         cache.save(in.project(4, proj_dir));
@@ -326,7 +343,7 @@ namespace quda
       }
 
       int s = s_;
-      auto R = coeff.c(0);
+      auto R = coeff.inv();
       HalfVector r;
       for (int s_count = 0; s_count < arg.Ls; s_count++) {
         auto factorR = (s_ < s ? -arg.m_f * R : R);
@@ -338,7 +355,7 @@ namespace quda
           r += factorR * in.project(4, proj_dir);
         }
 
-        R *= coeff.b(s);
+        R *= coeff.kappa(s);
         s = (s + arg.Ls - 1) % arg.Ls;
       }
 
@@ -346,7 +363,7 @@ namespace quda
     }
 
     { // second do L
-      constexpr int proj_dir = Arg::dagger ? +1 : -1;
+      constexpr int proj_dir = dagger ? +1 : -1;
       if (shared()) {
         cache.sync(); // ensure we finish R before overwriting cache
         cache.save(in.project(4, proj_dir));
@@ -354,7 +371,7 @@ namespace quda
       }
 
       int s = s_;
-      auto L = coeff.c(0);
+      auto L = coeff.inv();
       HalfVector l;
       for (int s_count = 0; s_count < arg.Ls; s_count++) {
         auto factorL = (s_ > s ? -arg.m_f * L : L);
@@ -366,7 +383,7 @@ namespace quda
           l += factorL * in.project(4, proj_dir);
         }
 
-        L *= coeff.b(s);
+        L *= coeff.kappa(s);
         s = (s + 1) % arg.Ls;
       }
 
@@ -402,9 +419,9 @@ namespace quda
       Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
       Vector out;
       if (var_inverse()) { // zMobius, must call variableInv
-        out = variableInv(arg, in, parity, x_cb, s);
+        out = variableInv<Arg::dagger>(arg, in, parity, x_cb, s);
       } else {
-        out = constantInv(arg, in, parity, x_cb, s);
+        out = constantInv<Arg::dagger>(arg, in, parity, x_cb, s);
       }
 
       if (Arg::xpay) {

@@ -8,6 +8,7 @@ namespace quda {
     DSLASH5_MOBIUS,
     M5_INV_DWF,
     M5_INV_MOBIUS,
+    M5_INV_MOBIUS_M5_PRE,
     M5_INV_ZMOBIUS,
     M5_EOFA,
     M5INV_EOFA

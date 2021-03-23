@@ -6,13 +6,14 @@
 namespace quda
 {
 
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, Dslash5Type dslash5_type>
-  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, reconstruct_>, Dslash5Arg<Float, nColor_, false, false, dslash5_type> {
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_, Dslash5Type dslash5_type_>
+  struct DomainWall4DFusedM5Arg : DomainWall4DArg<Float, nColor_, nDim, reconstruct_>, Dslash5Arg<Float, nColor_, false, false, dslash5_type_ == M5_INV_MOBIUS_M5_PRE ? M5_INV_MOBIUS : dslash5_type_> {
+    // ^^^ Note that for Dslash5Arg we have xpay == dagger == false. This is because the xpay and dagger are determined by
+    // fused kernel, not the dslash5, so the false, false here are simply dummy instantiations.
 
     static constexpr int nColor = nColor_;
 
     using DomainWall4DArg = DomainWall4DArg<Float, nColor, nDim, reconstruct_>;
-    using DomainWall4DArg::real;
     using DomainWall4DArg::out;
     using DomainWall4DArg::in;
     using DomainWall4DArg::x;
@@ -20,9 +21,18 @@ namespace quda
     using DomainWall4DArg::xpay;
     using DomainWall4DArg::dagger;
     using DomainWall4DArg::threads;
+    using DomainWall4DArg::a_5;
 
-    using Dslash5Arg = Dslash5Arg<Float, nColor, false, false, dslash5_type>;
+    static constexpr Dslash5Type dslash5_type = dslash5_type_;
+
+    using Dslash5Arg = Dslash5Arg<Float, nColor, false, false, dslash5_type == M5_INV_MOBIUS_M5_PRE ? M5_INV_MOBIUS : dslash5_type>;
     using Dslash5Arg::Ls;
+
+    using real = typename mapper<Float>::type;
+    complex<real> alpha;
+    complex<real> beta;
+
+    bool fuse_m5inv_m5pre;
 
     DomainWall4DFusedM5Arg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
                     const Complex *b_5, const Complex *c_5, bool xpay, const ColorSpinorField &x, int parity,
@@ -30,6 +40,14 @@ namespace quda
     DomainWall4DArg(out, in, U, a, m_5, b_5, c_5, xpay, x, parity, dagger, comm_override),
     Dslash5Arg(out, in, x, m_f, m_5, b_5, c_5, a)
     {
+      for (int s = 0; s < Ls; s++) {
+        auto kappa_b_s = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
+        auto kappa_s = kappa_b_s / kappa_c_s;
+        a_5[s] = a * kappa_b_s * kappa_b_s;
+        alpha = b_5[s] - c_5[s] / kappa_s;
+        beta = c_5[s] / kappa_s;
+      }; // 4-d Mobius
     }
   };
 
@@ -58,7 +76,8 @@ namespace quda
       applyWilson<nParity, dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active);
 
       // Apply the m5inv.
-      Vector out = constantInv<Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s); // x_cb = 0 here, since it will not be used if shared = true
+      Vector out = constantInv<dagger, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s); // x_cb = 0 here, since it will not be used if shared = true
+      if (Arg::dslash5_type == M5_INV_MOBIUS_M5_PRE) { out = arg.alpha * out + arg.beta * stencil_out; }
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
