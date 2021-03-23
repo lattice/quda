@@ -514,6 +514,7 @@ namespace quda {
 
   class TunableVectorYZ : public TunableVectorY {
 
+  protected:
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;
@@ -609,6 +610,21 @@ namespace quda {
    * @brief Enable / disable whether are tuning a policy
    */
   void setPolicyTuning(bool);
+
+  /**
+   * @brief Query whether we are currently tuning a policy
+   */
+  bool policyTuning();
+
+  /**
+   * @brief Enable / disable whether we are tuning an uber kernel
+   */
+  void setUberTuning(bool);
+
+  /**
+   * @brief Query whether we are tuning an uber kernel
+   */
+  bool uberTuning();
 
 } // namespace quda
 

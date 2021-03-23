@@ -5,6 +5,8 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
+#include <shmem_helper.cuh>
+
 namespace quda {
 
   bool LatticeField::initIPCComms = false;
@@ -236,33 +238,37 @@ namespace quda {
           qudaDeviceSynchronize();
           comm_barrier();
           for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_send_buffer_h[b]);
-	    host_free(ghost_pinned_recv_buffer_h[b]);
-	  }
+            device_comms_pinned_free(ghost_recv_buffer_d[b]);
+            device_comms_pinned_free(ghost_send_buffer_d[b]);
+            host_free(ghost_pinned_send_buffer_h[b]);
+            host_free(ghost_pinned_recv_buffer_h[b]);
+          }
         }
       }
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
-	  // pinned buffer used for sending
-	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for sending
+          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
+          // set the matching device-mapped pointer
+          ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
-	  // pinned buffer used for receiving
-	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for receiving
+          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
+          // set the matching device-mapped pointer
+          ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
         }
 
         initGhostFaceBuffer = true;
@@ -282,11 +288,11 @@ namespace quda {
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned send memory buffer
@@ -455,17 +461,25 @@ namespace quda {
       checkCudaError();
 
       // open the remote memory handles and set the send ghost pointers
-      for (int dim=0; dim<4; ++dim) {
-	if (comm_dim(dim)==1) continue;
+      for (int dim = 0; dim < 4; ++dim) {
+#ifndef NVSHMEM_COMMS
+        // TODO: We maybe can force loopback comms to use the IB path here
+        if (comm_dim(dim) == 1) continue;
+#endif
         // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-        const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-	for (int dir=0; dir<num_dir; ++dir) {
-	  if (!comm_peer2peer_enabled(dir,dim)) continue;
-	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
-	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-			       cudaIpcMemLazyEnablePeerAccess);
-	}
-	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
+        const int num_dir
+          = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
+        for (int dir = 0; dir < num_dir; ++dir) {
+#ifndef NVSHMEM_COMMS
+          if (!comm_peer2peer_enabled(dir, dim)) continue;
+          void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
+          cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], cudaIpcMemLazyEnablePeerAccess);
+#else
+          ghost_remote_send_buffer_d[b][dim][dir]
+            = nvshmem_ptr(static_cast<char *>(ghost_recv_buffer_d[b]), comm_neighbor_rank(dir, dim));
+#endif
+        }
+        if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
 
@@ -565,15 +579,19 @@ namespace quda {
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
+#ifndef NVSHMEM_COMMS
       const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-
+#endif
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
 	    // only close this handle if it doesn't alias the back ghost
-	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
-	  }
+
+#ifndef NVSHMEM_COMMS
+            if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+#endif
+          }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
           if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
         }
@@ -581,8 +599,11 @@ namespace quda {
 	if (comm_peer2peer_enabled(0,dim)) {
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
-	  }
+
+#ifndef NVSHMEM_COMMS
+            cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+#endif
+          }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
         }

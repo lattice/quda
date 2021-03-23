@@ -520,6 +520,23 @@ struct Communicator {
     return blacklist;
   }
 
+  bool comm_nvshmem_enabled()
+  {
+#if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)
+    static bool nvshmem_enabled = true;
+    static bool nvshmem_init = false;
+    if (!nvshmem_init) {
+      char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "1") == 0) { nvshmem_enabled = true; }
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
+      nvshmem_init = true;
+    }
+#else
+    static bool nvshmem_enabled = false;
+#endif
+    return nvshmem_enabled;
+  }
+
   bool use_deterministic_reduce = false;
 
   void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -607,6 +624,8 @@ struct Communicator {
       }
       strcat(config_string, ",gdr=");
       strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+      strcat(config_string, ",nvshmem=");
+      strcat(config_string, std::to_string(comm_nvshmem_enabled()).c_str());
       config_init = true;
     }
 

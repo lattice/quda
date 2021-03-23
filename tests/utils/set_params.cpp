@@ -818,7 +818,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.mass = mass;
   inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator

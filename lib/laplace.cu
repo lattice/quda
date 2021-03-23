@@ -153,7 +153,7 @@ namespace quda
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
@@ -164,10 +164,10 @@ namespace quda
           in.GhostFaceCB(), profile);
         policy.apply(0);
 #else
-        errorQuda("nSpin=1 Laplace operator required staggered dslash to be enabled");
+        errorQuda("nSpin=1 Laplace operator required staggered dslash and laplace to be enabled");
 #endif
       } else if (in.Nspin() == 4) {
-#ifdef GPU_WILSON_DIRAC
+#if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
@@ -178,7 +178,7 @@ namespace quda
           in.GhostFaceCB(), profile);
         policy.apply(0);
 #else
-        errorQuda("nSpin=4 Laplace operator required wilson dslash to be enabled");
+        errorQuda("nSpin=4 Laplace operator required wilson dslash and laplace to be enabled");
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());

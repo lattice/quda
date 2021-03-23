@@ -23,6 +23,10 @@ if(QUDA_QMP
   add_dependencies(quda_test QMP)
 endif()
 
+if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
+  add_dependencies(quda_test NVSHMEM)
+endif()
+
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
