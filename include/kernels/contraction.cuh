@@ -8,8 +8,17 @@
 
 namespace quda
 {
-
-    using spinor_array = vector_type<double2, 16>;
+  /*
+    Compile-time constants max_contract_mom_modes and max_contract_results affect the maximum
+    number of Fourier momentum modes that are possible per contraction kernel. Setting
+    max_contract_results = 16 is sufficient space for:
+     - one momentum mode in DegrandRossiContractFT
+     - 16 modes in StaggeredContractFT
+    The setting max_contract_mom_modes = 16 allows for the max in StaggeredContractFT.
+  */
+  static constexpr int max_contract_mom_modes = 16;
+  static constexpr int max_contract_results = 16;
+  using contract_array = vector_type<double2, max_contract_results>;
   
   template <typename real> class DRGammaMatrix
   {
@@ -244,23 +253,24 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
    
-  template <typename Float, int nColor_, int reduction_dim_ = 3>
-  struct ContractionSummedArg :  public ReduceArg<spinor_array>
+  template <typename Float, int nSpin_, int nColor_, bool spin_project_, int reduction_dim_ = 3>
+  struct ContractionSummedArg :  public ReduceArg<contract_array>
   {
     // This the direction we are performing reduction on. default to 3.
     static constexpr int reduction_dim = reduction_dim_; 
 
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 4;
-    static constexpr bool spin_project = true;
+    static constexpr int nSpin = nSpin_;
+    static constexpr bool spin_project = spin_project_;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F x;
     F y;
     int s1, b1;
-    int mom_mode[4];
+    int nmom_modes;
+    int mom_mode[max_contract_mom_modes][4];
     int source_position[4];
     int NxNyNzNt[4];
     DRGammaMatrix<real> Gamma;
@@ -271,9 +281,10 @@ namespace quda
     int_fastdiv X[4]; // grid dimensions
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
-			 const int source_position_in[4], const int mom_mode_in[4],
+			 const int source_position_in[4],
+			 const std::vector<int[4]> &mom_mode_in,
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(x.X()[reduction_dim]),
+      ReduceArg<contract_array>(x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
@@ -284,18 +295,21 @@ namespace quda
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
-	mom_mode[i] = mom_mode_in[i];
         source_position[i] = source_position_in[i];
         offsets[i] = comm_coord(i) * x.X()[i];
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
+      nmom_modes = mom_mode_in.size();
+      for(int m=0; m<nmom_modes;++m)
+	for(int dir=0; dir<4; ++dir)
+	  mom_mode[m][dir] = mom_mode_in[m][dir];
     }
-    __device__ __host__ spinor_array init() const { return spinor_array(); }
+    __device__ __host__ contract_array init() const { return contract_array(); }
   };
 
   
-  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
-    using reduce_t = spinor_array;
+  template <typename Arg> struct DegrandRossiContractFT : plus<contract_array> {
+    using reduce_t = contract_array;
     using plus<reduce_t>::operator();    
     Arg &arg;
     constexpr DegrandRossiContractFT(Arg &arg) : arg(arg) {}
@@ -309,9 +323,10 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      reduce_t result_all_channels = spinor_array();
+      reduce_t result_all_channels = contract_array();
       int s1 = arg.s1;
       int b1 = arg.b1;
+      //int nmom_modes = 1;
       int mom_mode[4];
       int source_position[4];
       int offsets[4];
@@ -319,7 +334,7 @@ namespace quda
       for(int i=0; i<4; i++) {
 	source_position[i] = arg.source_position[i];
 	offsets[i] = arg.offsets[i];
-	mom_mode[i] = arg.mom_mode[i];
+	mom_mode[i] = arg.mom_mode[0][i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
       
@@ -379,14 +394,102 @@ namespace quda
       return plus::operator()(result_all_channels, result);
     }
   };
+
+  template <typename Arg> struct StaggeredContractFT : plus<contract_array> {
+    using reduce_t = contract_array;
+    using plus<reduce_t>::operator();    
+    Arg &arg;
+    constexpr StaggeredContractFT(Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    
+    // Final param is unused in the MultiReduce functor in this use case.
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    {
+      constexpr int nSpin = Arg::nSpin;
+      constexpr int nColor = Arg::nColor;
+      using real = typename Arg::real;
+      using Vector = ColorSpinor<real, nColor, nSpin>;
+
+      reduce_t result_all_channels = contract_array();
+      int nmom_modes = arg.nmom_modes;
+      int mom_mode[max_contract_mom_modes][4];
+      int source_position[4];
+      int offsets[4];
+      int NxNyNzNt[4];
+      for(int i=0; i<4; i++) {
+	source_position[i] = arg.source_position[i];
+	offsets[i] = arg.offsets[i];
+	NxNyNzNt[i] = arg.NxNyNzNt[i];
+      }
+      for(int m=0; m<nmom_modes;++m)
+	for(int dir=0; dir<4; ++dir)
+	  mom_mode[m][dir] = arg.mom_mode[m][dir];
+      
+      //The coordinate of the sink
+      int *sink;
+      sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+
+      // Collect vector data
+      int parity = 0;
+      int idx = idx_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+      int idx_cb = getParityCBFromFull(parity, arg.X, idx);
+      Vector x = arg.x(idx_cb, parity);
+      Vector y = arg.y(idx_cb, parity);
+      
+      // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
+      complex<real> prop_prod = innerProduct(x, y, 0, 0);	
+
+      int mom_proj;
+      for(mom_proj = 0; mom_proj<nmom_modes; ++mom_proj)
+	{
+	  /* Calculate exp(-i * [x dot p]) phase factor
+	  double Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*mom_mode[0]*1./NxNyNzNt[0]+
+					   (source_position[1]-sink[1]-offsets[1])*mom_mode[1]*1./NxNyNzNt[1]+
+					   (source_position[2]-sink[2]-offsets[2])*mom_mode[2]*1./NxNyNzNt[2]+
+					   (source_position[3]-sink[3]-offsets[3])*mom_mode[3]*1./NxNyNzNt[3]);
+	  double phase_real =  cos(Sum_dXi_dot_Pi*2.*M_PI);
+	  double phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
+	  */
+	  double phase_real = 1.0;
+	  double phase_imag = 0.0;
+	  // Phase factor for each direction is either the cos, sin, or exp Fourier phase
+	  for(int dir=0; dir<4; ++dir)
+	    {
+	      if(mom_mode[mom_proj][dir] == 0) continue; // phase is one
+	      double dXi_dot_Pi = 1./NxNyNzNt[dir];
+	      dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[mom_proj][dir];
+	      double ph_real;
+	      double ph_imag;
+	      { // exp case
+		ph_real =  cos(dXi_dot_Pi*2.*M_PI);
+		ph_imag = -sin(dXi_dot_Pi*2.*M_PI);
+	      }
+	      // phase *= ph
+	      double tmp_real = phase_real;
+	      double tmp_imag = phase_imag;
+	      phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
+	      phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
+	    }
+      
+	  result_all_channels[mom_proj].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
+	  result_all_channels[mom_proj].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
+	}
+      for( ; mom_proj<max_contract_mom_modes; ++mom_proj) // zero fill any trailing unused result elements
+	{
+	  result_all_channels[mom_proj].x = 0.;
+	  result_all_channels[mom_proj].y = 0.;
+	}
+      return plus::operator()(result_all_channels, result);
+    }
+  };
   
-  template <typename Float, int nColor_> struct ContractionArg {
+  template <typename Float, int nSpin_, int nColor_, bool spin_project_> struct ContractionArg {
     using real = typename mapper<Float>::type;
     int X[4];    // grid dimensions
 
-    static constexpr int nSpin = 4;
+    static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
-    static constexpr bool spin_project = true;
+    static constexpr bool spin_project = spin_project_;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorField (F for fermion)
@@ -608,4 +711,28 @@ namespace quda
       arg.s.save(A_, x_cb, parity);
     }
   };
+
+  template <typename Arg> struct StaggeredContract {
+    Arg &arg;
+    constexpr StaggeredContract(Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      constexpr int nSpin = Arg::nSpin;
+      using real = typename Arg::real;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+
+      Vector x = arg.x(x_cb, parity);
+      Vector y = arg.y(x_cb, parity);
+
+      Matrix<complex<real>, nSpin> A;
+      // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
+      A(0, 0) = innerProduct(x, y, 0, 0);
+      //printf("%.7e %.7e\n",A(mu, nu).real(),A(mu, nu).imag());
+
+      arg.s.save(A, x_cb, parity);
+    }
+  };
+
 } // namespace quda

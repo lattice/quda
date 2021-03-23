@@ -5768,7 +5768,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   // temporal or spatial correlator?
   size_t corr_dim = 0, local_decay_dim_slices = 0;
   if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) corr_dim = 2;
-  else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T) corr_dim = 3;
+  else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T || cType == QUDA_CONTRACT_TYPE_STAGGERED_FT_T) corr_dim = 3;
   else errorQuda("Unsupported contraction type %d given", cType);
 
   // The number of slices in the decay dimension on this MPI rank.
@@ -5796,8 +5796,11 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
     for (int py = 0; py <= mom[1]; py++) {
       for (int pz = 0; pz <= mom[2]; pz++) {
         for (int pt = 0; pt <= mom[3]; pt++) {
-          const int mom_mode[4] = {px, py, pz, pt};
-	  
+	  std::vector<int[4]> mom_mode(1); // list has one momentum mode
+	  mom_mode[0][0] = px;
+	  mom_mode[0][1] = py;
+	  mom_mode[0][2] = pz;
+	  mom_mode[0][3] = pt;
 	  int mom_idx = (px +
 			 py*(mom[0]+1) +
 			 pz*(mom[0]+1)*(mom[1]+1) +
