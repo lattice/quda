@@ -39,8 +39,7 @@ namespace quda
     NdegTwistedCloverPreconditioned(Arg &arg, const ColorSpinorField &out,
                                     const ColorSpinorField &in) :
       Dslash(arg, out, in),
-        //        shared(arg.asymmetric || !arg.dagger)
-        shared(!arg.dagger)
+        shared(arg.asymmetric || !arg.dagger)
         {
           TunableVectorYZ::resizeVector(2, arg.nParity);
           // this will force flavor to be contained in the block
