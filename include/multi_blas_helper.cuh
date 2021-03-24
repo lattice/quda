@@ -229,7 +229,6 @@ namespace quda
     template <int NXZ, typename store_t, typename y_store_t, typename Functor>
     void staticCheck(const Functor &f, const std::vector<ColorSpinorField*> &x, const std::vector<ColorSpinorField*> &y)
     {
-      using real = typename mapper<y_store_t>::type;
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW_max_check = max_YW_size<Functor>(x.size(), x[0]->Precision(), y[0]->Precision());
 
