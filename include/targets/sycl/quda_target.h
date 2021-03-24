@@ -25,7 +25,8 @@ using cudaStream_t = int;
 #define __launch_bounds__(x)
 
 // FIXME
-#define __constant__ static
+//#define __constant__ static
+#define __shared__
 #define __shfl_down_sync(m, x, o) x
 
 //#define rsqrt(x) (1/sqrt(x))

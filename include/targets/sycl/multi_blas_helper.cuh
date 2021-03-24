@@ -12,17 +12,20 @@ namespace quda
   namespace blas
   {
 
-    // storage for matrix coefficients
-    //__constant__ char Amatrix_d[device::max_constant_param_size()];
-    //__constant__ char Bmatrix_d[device::max_constant_param_size()];
-    //__constant__ char Cmatrix_d[device::max_constant_param_size()];
+    /**
+       @brief Returns the maximum size of a coefficient array for 2-d multi-blas
+    */
+    constexpr size_t max_array_size() { return 8192; }
 
-    static char *Amatrix_h;
-    static char *Bmatrix_h;
-    static char *Cmatrix_h;
+    /**
+       @brief Returns the maximum size of the kernel argument
+       @tparam Functor reducer and multi_1d blas kernels use kernel arg, others use constant
+    */
+    template <typename Functor>
+    constexpr size_t max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
 
     template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
-    set_param(std::vector<constant_param_t> &, Arg &arg, char select, const T &h)
+    set_param(Arg &arg, char select, const T &h)
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       coeff_t *buf_arg = nullptr;

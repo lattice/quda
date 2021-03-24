@@ -84,10 +84,10 @@ namespace quda {
     return QUDA_SUCCESS;
   }
 
+#if 0
   using Cacc = sycl::accessor<const char,1,sycl::access_mode::read,
 			      sycl::target::constant_buffer>;
 
-#if 0
   template <typename T>
   inline void checkSetConstPtr(T &x, int y) {
     x.setConstPtr(0, (const char *)0);
@@ -96,7 +96,6 @@ namespace quda {
   inline void checkSetConstPtr(T &x, U y) {
     errorQuda("setConstPtr %s not available but const parameters were passed", typeid(x).name());
   }
-#endif
 
   template <typename T>
   inline void setptrs(T &x) {}
@@ -106,18 +105,13 @@ namespace quda {
     auto p = acc.get_pointer();
     x.setConstPtr(0, p);
   }
-  //template <typename T, typename U>
-  //inline void setptrs(T &x, U y) { }
+#endif
 
-  template <template <typename> class Functor, typename Arg, bool grid_stride, typename... Cnst>
-  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, const char *const cptrs[3])
-  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, const int clocs[3], const Cacc caccs[3])
-  //void Kernel3D(Arg arg, sycl::nd_item<3> ndi, Cacc *caccs)
-  void Kernel3D(Arg arg, sycl::nd_item<3> ndi, Cnst... cnsts)
+  template <template <typename> class Functor, typename Arg, bool grid_stride>
+  void Kernel3D(Arg arg, sycl::nd_item<3> ndi)
   {
-    setptrs(arg, cnsts...);
+    //setptrs(arg, cnsts...);
     Functor<Arg> f(arg);
-    //setptrs(f, accs);
 
     //auto i = threadIdx.x + blockIdx.x * blockDim.x;
     //auto j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -158,6 +152,7 @@ namespace quda {
     return QUDA_SUCCESS;
   }
 
+#if 0
   template <template <typename> class Functor, bool grid_stride, typename Arg>
   qudaError_t
   launchKernel3D1(const TuneParam &tp, const qudaStream_t &stream, Arg arg,...)
@@ -194,5 +189,6 @@ namespace quda {
     warningQuda("end launchKernel3D");
     return QUDA_SUCCESS;
   }
+#endif
 
 }
