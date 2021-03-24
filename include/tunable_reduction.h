@@ -52,6 +52,7 @@ namespace quda {
     std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == block_size_x)
         return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
       else
@@ -62,6 +63,7 @@ namespace quda {
     std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == block_size_x)
         return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
       else
@@ -259,6 +261,7 @@ namespace quda {
     std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == block_size_x)
         return qudaLaunchKernel(MultiReduction<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
       else
@@ -269,6 +272,7 @@ namespace quda {
     std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
       launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == block_size_x)
         return qudaLaunchKernel(MultiReduction<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
       else
