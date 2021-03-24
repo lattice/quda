@@ -18,9 +18,11 @@ namespace quda {
     inline void operator()(const float& a, float * s, float *c) { ::sincosf(a, s, c); }
   };
 
+#ifndef _NVHPC_CUDA
   template <> struct sincosf_impl<true> {
     __device__ inline void operator()(const float& a, float * s, float *c) { __sincosf(a, s, c); }
   };
+#endif
 
   /**
    * @brief Combined sin and cos colculation in QUDA NAMESPACE

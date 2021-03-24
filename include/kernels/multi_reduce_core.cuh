@@ -119,14 +119,15 @@ namespace quda
        @tparam reduce_t The fundamental reduction type
        @tparam coeff_t The type of any coefficients we multiply by
     */
-    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor : MultiBlasParam<coeff_t_> {
+    template <typename reduce_t_, typename coeff_t_>
+    struct MultiReduceFunctor : MultiBlasParam<coeff_t_, true, false> {
       using reduce_t = reduce_t_;
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
       static constexpr bool multi_1d = false;
 
-      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
+      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**
