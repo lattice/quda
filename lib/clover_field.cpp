@@ -21,8 +21,9 @@ namespace quda {
       cloverInv(NULL),
       invNorm(NULL),
       csw(a.Csw()),
-      twisted(a.Twisted()),
+      twist(a.Twist()),
       mu2(a.Mu2()),
+      epsilon2(a.Epsilon2()),
       rho(a.Rho()),
       order(a.Order()),
       create(QUDA_NULL_FIELD_CREATE)
@@ -53,9 +54,10 @@ namespace quda {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
       if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
-//for twisted mass only:
-    twisted = false;//param.twisted;
+    //for twisted mass only:
+    twist = QUDA_TWIST_NO;//param.twist;
     mu2 = 0.0; //param.mu2;
+    epsilon2 = 0.0;
 
     setTuningString();
   }
@@ -203,7 +205,7 @@ namespace quda {
       oddInvNorm = oddNorm;
     }
 
-    twisted = param.twisted;
+    twist = param.twist;
     mu2 = param.mu2;
   }
 
@@ -422,8 +424,9 @@ namespace quda {
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
     output << "csw = "       << param.csw << std::endl;
-    output << "twisted = "   << param.twisted << std::endl;
+    output << "twist = "     << param.twist << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
+    output << "epsilon2 = "  << param.epsilon2 << std::endl;
     output << "rho = "       << param.rho << std::endl;
     output << "order = "     << param.order << std::endl;
     output << "create = "    << param.create << std::endl;

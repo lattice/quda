@@ -920,13 +920,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     warningQuda("Uninverted clover term not loaded");
   }
 
-  bool twisted = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false;
+  QudaTwistFlavorType twist = inv_param->twist_flavor;
 
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   clover_param.csw = inv_param->clover_coeff;
-  clover_param.twisted = twisted;
-  clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.twist = twist;
+  clover_param.mu2 = twist != QUDA_TWIST_NO ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.epsilon2 = twist == QUDA_TWIST_NONDEG_DOUBLET ? 4.*inv_param->kappa*inv_param->kappa*inv_param->epsilon*inv_param->epsilon : 0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;

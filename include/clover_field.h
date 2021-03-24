@@ -37,8 +37,9 @@ namespace quda {
     void *cloverInv;
     void *invNorm;
     double csw;  //! Clover coefficient
-    bool twisted; // whether to create twisted mass clover
+    QudaTwistFlavorType twist;
     double mu2;
+    double epsilon2;
     double rho;
 
     QudaCloverFieldOrder order;
@@ -64,13 +65,13 @@ namespace quda {
 
     CloverFieldParam() :  LatticeFieldParam(),
       direct(true), inverse(true), clover(nullptr), norm(nullptr),
-      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0), rho(0.0) { }
+      cloverInv(nullptr), invNorm(nullptr), twist(QUDA_TWIST_NO), mu2(0.0), epsilon2(0.0), rho(0.0) { }
 
     CloverFieldParam(const CloverFieldParam &param) :  LatticeFieldParam(param),
       direct(param.direct), inverse(param.inverse),
       clover(param.clover), norm(param.norm),
       cloverInv(param.cloverInv), invNorm(param.invNorm),
-      twisted(param.twisted), mu2(param.mu2), rho(param.rho) { }
+      twist(param.twist), mu2(param.mu2), epsilon2(param.epsilon2), rho(param.rho) { }
 
     CloverFieldParam(const CloverField &field);
   };
@@ -93,9 +94,10 @@ namespace quda {
     void *invNorm;
 
     double csw;
-    bool twisted; 
-    double mu2;
+    double mu2; // chiral twisted mass squared
+    double epsilon2; // flavour twisted mass squared
     double rho;
+    QudaTwistFlavorType twist;
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
@@ -160,12 +162,17 @@ namespace quda {
     /**
        @return If the clover field is associated with twisted-clover fermions
     */
-    bool Twisted() const { return twisted; }
+    QudaTwistFlavorType Twist() const { return twist; }
 
     /**
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
     */
     double Mu2() const { return mu2; }
+    
+    /**
+       @return epsilon^2 factor baked into inverse clover field (for non-deg twisted-clover inverse)
+    */
+    double Epsilon2() const { return epsilon2; }
 
     /**
        @return rho factor backed into the clover field, (for real
