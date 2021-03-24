@@ -336,7 +336,10 @@ if(QUDA_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_MULTIGRID_DOUBLE)
-  target_compile_definitions(quda PRIVATE GPU_MULTIGRID_DOUBLE)
+  math(EXPR double_prec "${QUDA_PRECISION} & 8")
+  if(double_prec)
+    target_compile_definitions(quda PRIVATE GPU_MULTIGRID_DOUBLE)
+  endif()
 endif(QUDA_MULTIGRID_DOUBLE)
 
 if(QUDA_GAUGE_ALG)
