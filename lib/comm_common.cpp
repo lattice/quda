@@ -5,15 +5,7 @@
 #include <quda_internal.h>
 #include <communicator_quda.h>
 #include <comm_quda.h>
-#include <csignal>
 
-#ifdef QUDA_BACKWARDSCPP
-#include "backward.hpp"
-namespace backward
-{
-  static backward::SignalHandling sh;
-} // namespace backward
-#endif
 
 char *comm_hostname(void)
 {

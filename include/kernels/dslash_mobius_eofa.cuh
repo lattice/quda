@@ -2,6 +2,7 @@
 
 #include <shared_memory_cache_helper.cuh>
 #include <math_helper.cuh>
+#include <dslash_quda.h>
 
 namespace quda
 {

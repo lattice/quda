@@ -10,6 +10,9 @@
 #include <linalg.cuh>
 #include <dslash_policy.cuh>
 #include <instantiate.h>
+#ifdef NVSHMEM_COMMS
+#include <cuda/atomic>
+#endif
 
 namespace quda {
 
@@ -56,6 +59,24 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart[2];
 
+    // for shmem lightweight sync
+    shmem_sync_t sync_counter = 10;
+    shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
+    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
+    shmem_sync_t inc_shmem_sync_counter() { return sync_counter++; }
+#ifdef NVSHMEM_COMMS
+    shmem_sync_t *sync_arr = nullptr;
+    shmem_retcount_intra_t *_retcount_intra = nullptr;
+    shmem_retcount_inter_t *_retcount_inter = nullptr;
+    shmem_interior_done_t *_interior_done = nullptr;
+    shmem_interior_count_t *_interior_count = nullptr;
+    shmem_sync_t *get_shmem_sync_arr() { return sync_arr; }
+    shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
+    shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
+    shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
+    shmem_interior_count_t *get_shmem_interior_count() { return _interior_count; }
+#endif
+
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
     bool dslash_interior_compute;
@@ -84,6 +105,17 @@ namespace quda {
     Worker *aux_worker;
   }
 
+  // need to use placement new constructor to initialize the atomic counters
+  template <typename T> __global__ void init_dslash_atomic(T *counter, int max)
+  {
+    for (int i = 0; i < max; i++) new (counter + i) T {0};
+  }
+  // need to use placement new constructor to initialize the atomic counters
+  template <typename T> __global__ void init_sync_arr(T *arr, T val, int max)
+  {
+    for (int i = 0; i < max; i++) *(arr + i) = val;
+  }
+
   void createDslashEvents()
   {
     using namespace dslash;
@@ -98,6 +130,30 @@ namespace quda {
       cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
+#ifdef NVSHMEM_COMMS
+    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
+    TuneParam tp;
+    tp.grid = dim3(1, 1, 1);
+    tp.block = dim3(1, 1, 1);
+
+    /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
+    by using smaller values */
+    qudaLaunchKernel(init_sync_arr<shmem_sync_t>, tp, 0, sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    sync_counter = 10;
+
+    // atomic for controlling signaling in nvshmem packing
+    _retcount_intra
+      = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, 0, _retcount_intra, 2 * QUDA_MAX_DIM);
+    _retcount_inter
+      = static_cast<shmem_retcount_inter_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, 0, _retcount_inter, 2 * QUDA_MAX_DIM);
+    // workspace for interior done sync in uber kernel
+    _interior_done = static_cast<shmem_interior_done_t *>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_interior_done_t>, tp, 0, _interior_done, 1);
+    _interior_count = static_cast<shmem_interior_count_t *>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
+    qudaLaunchKernel(init_dslash_atomic<shmem_interior_count_t>, tp, 0, _interior_count, 1);
+#endif
 
     aux_worker = NULL;
 
@@ -140,7 +196,13 @@ namespace quda {
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(dslashStart[i]);
     }
-
+#ifdef NVSHMEM_COMMS
+    device_comms_pinned_free(sync_arr);
+    device_pinned_free(_retcount_intra);
+    device_pinned_free(_retcount_inter);
+    device_pinned_free(_interior_done);
+    device_pinned_free(_interior_count);
+#endif
     checkCudaError();
   }
 

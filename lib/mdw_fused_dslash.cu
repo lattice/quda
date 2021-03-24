@@ -1,6 +1,13 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <dslash.h>
+
+#include <typeinfo>
+
+#include <color_spinor_field.h>
+#include <tune_quda.h>
+#include <dslash_quda.h>
+#include <jitify_helper.cuh>
+#include <instantiate_dslash.h>
 
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mdw_dslash5_tensor_core.cuh>

@@ -157,6 +157,7 @@ option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
 option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
+option(QUDA_LAPLACE "build laplace operator" OFF)
 # Dynamic inversion saves memory but decreases the flops
 option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
@@ -240,6 +241,9 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
+set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
+
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
@@ -272,6 +276,10 @@ option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / Q
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
+option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
+set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
+set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
+
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -298,6 +306,9 @@ mark_as_advanced(QUDA_BACKWARDS)
 
 mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
+mark_as_advanced(QUDA_GDRCOPY_HOME)
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_INTERFACE_ALL)
@@ -317,6 +328,12 @@ if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
+message(
+  SEND_ERROR
+    "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -469,11 +486,15 @@ endif()
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
-if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
+if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
 endif()
 if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
+endif()
+
+if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
+  message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
 endif()
 
 
@@ -558,6 +579,41 @@ if(QUDA_DOWNLOAD_USQCD)
   find_program(INSTALL_EXE NAMES install)
   find_program(AUTORECONF_EXE NAMES autoreconf)
 endif()
+
+if(QUDA_NVSHMEM)
+  if(QUDA_DOWNLOAD_NVSHMEM)
+    ExternalProject_Add(NVSHMEM
+                        URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
+                        PREFIX nvshmem
+                        CONFIGURE_COMMAND ""
+                        BUILD_IN_SOURCE ON
+                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${QUDA_GDRCOPY_HOME} install
+                        INSTALL_COMMAND ""
+                        LOG_INSTALL ON
+                        LOG_BUILD ON
+                        LOG_DOWNLOAD ON
+                        )
+    ExternalProject_Get_Property(NVSHMEM INSTALL_DIR)
+    set(QUDA_NVSHMEM_HOME ${INSTALL_DIR} CACHE PATH "path to NVSHMEM" FORCE)
+    set(NVSHMEM_LIBS  ${INSTALL_DIR}/lib/libnvshmem.a)
+    set(NVSHMEM_INCLUDE ${INSTALL_DIR}/include/)   
+  else()
+    if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set" )
+    endif()
+      find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/"  )
+      find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" )
+  endif()
+    
+  mark_as_advanced(NVSHMEM_LIBS)
+  mark_as_advanced(NVSHMEM_INCLUDE)
+  add_library(nvshmem_lib STATIC IMPORTED)
+  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
+  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
+  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
+endif()
+
 
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
