@@ -45,6 +45,7 @@ namespace quda {
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
     std::enable_if_t<idx != 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
       else launch_device<idx - 1, Block, Transformer>(arg, tp, stream);
     }
@@ -52,6 +53,7 @@ namespace quda {
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
     std::enable_if_t<idx == 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
+      static_assert(sizeof(Arg) <= device::max_kernel_arg_size(), "Parameter struct is greater than max kernel arg size");
       if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }

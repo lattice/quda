@@ -20,9 +20,9 @@ namespace quda {
     __host__ __device__ auto dispatch(Args &&... args)
     {
       if target (nv::target::is_device) {
-          return f<true>()(args...);
+        return f<true>()(args...);
       } else if target (nv::target::is_host) {
-          return f<false>()(args...);
+        return f<false>()(args...);
       }
     }
 
