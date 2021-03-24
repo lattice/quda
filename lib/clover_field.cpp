@@ -207,6 +207,7 @@ namespace quda {
 
     twist = param.twist;
     mu2 = param.mu2;
+    epsilon2 = param.epsilon2;
   }
 
   cudaCloverField::~cudaCloverField()
