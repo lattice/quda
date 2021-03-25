@@ -6,6 +6,7 @@
 
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
+#include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduction_kernel.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
