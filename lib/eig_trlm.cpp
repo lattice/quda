@@ -481,7 +481,7 @@ namespace quda
       kSpace_fine.reserve(kSpace.size());
       unsigned int size_orig = kSpace.size();
       for (unsigned int i = 0; i < size_orig; i++) {
-	//printfQuda("Allocating kSpace_fine vector %d of %d\n", (int)i, size_orig);
+	printfQuda("Allocating kSpace_fine vector %d of %d\n", (int)i, size_orig);
 	kSpace_fine.push_back(ColorSpinorField::Create(csParamFine));
       }
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -492,11 +492,11 @@ namespace quda
       // Update residual vector
       std::swap(kSpace_fine[num_locked + iter_keep], kSpace_fine[n_kr]);
       
-
+      // kSpace may have changed size.
       ColorSpinorParam csParamCoarse(*kSpace[0]);
       kSpace.reserve(kSpace_fine.size());
       for (unsigned int i = size_orig; i < kSpace_fine.size(); i++) {
-	//printfQuda("Allocating kSpace vector %d of %d\n", (int)i, (int)kSpace_fine.size());
+	printfQuda("Allocating Extra kSpace vector %d of %d\n", (int)i, (int)kSpace_fine.size());
 	kSpace.push_back(ColorSpinorField::Create(csParamCoarse));
       }
       // Compress the vector space

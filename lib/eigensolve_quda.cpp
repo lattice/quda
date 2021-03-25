@@ -241,15 +241,14 @@ namespace quda
     // Create fine vectors
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    for (int b = f_size; b < (block_size > batched_rotate ? block_size : batched_rotate); b++) { fine_vector.push_back(ColorSpinorField::Create(csParamClone)); }
+    for (int b = f_size; b < block_size; b++) { fine_vector.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
     for (int i = e_size; i < n_kr; i++) evals.push_back(0.0);
 
     // Compress the existing fine Krylov space
-    compressVectors(kSpace, compressed_space, 0);
-    
-  }  
+    compressVectors(kSpace, compressed_space, 0);    
+  }
   
   void EigenSolver::printEigensolverSetup()
   {
@@ -1313,20 +1312,20 @@ namespace quda
     fine_vector.resize(0);    
   }
 
-  void EigenSolver::createTransferBasis(std::vector<ColorSpinorField *> &kSpace)
+  void EigenSolver::createTransferBasis(std::vector<ColorSpinorField *> &vec_space)
   {
     if(transfer) delete transfer;    
     // Create the transfer operator
-    QudaPrecision prec = kSpace[0]->Precision();
-    transfer = new Transfer(kSpace, kSpace.size(), n_block_ortho, geo_block_size,
+    QudaPrecision prec = vec_space[0]->Precision();
+    transfer = new Transfer(vec_space, vec_space.size(), n_block_ortho, geo_block_size,
 			    spin_block_size, prec, QUDA_TRANSFER_AGGREGATE, profile);
 
-    //verifyCompression(kSpace);
+    verifyCompression(vec_space);
   }
   
   void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
   {
-    createTransferBasis(kSpace);
+    if(!transfer) createTransferBasis(kSpace);
     QudaPrecision prec = kSpace[0]->Precision();
     QudaFieldLocation location = kSpace[0]->Location();
     ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
@@ -1341,8 +1340,10 @@ namespace quda
     
     for (unsigned int i = 0; i < kSpace.size(); i++) {      
       *tmp1 =  *kSpace[i];
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       transfer->R(*tmp_coarse, *tmp1);
       transfer->P(*tmp2, *tmp_coarse);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       double deviation = sqrt(blas::xmyNorm(*tmp1, *tmp2) / blas::norm2(*tmp1));
       
       if (getVerbosity() >= QUDA_VERBOSE)

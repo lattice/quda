@@ -91,10 +91,29 @@ namespace quda {
       if (nVec == 24) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
 #ifdef NSPIN4
+	// MG Lanczos additions
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 40) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,40>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 64) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 128) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 256) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,256>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 384) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,384>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 512) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,512>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 640) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,640>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 768) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,768>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 896) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,896>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 1016) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,1016>(out, in, v, fine_to_coarse, parity);
 #endif // NSPIN4
 #ifdef NSPIN1
       } else if (nVec == 64) {
