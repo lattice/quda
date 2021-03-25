@@ -104,8 +104,58 @@ namespace quda
 
     dim3 threads;
 
+    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5) {
+      // out = (b + c * D5) * in
+      for (int s = 0; s < Ls; s++) {
+        coeff.beta[s] = b_5[s];
+        coeff.alpha[s] = 0.5 * c_5[s]; // 0.5 from gamma matrices
+        // xpay
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
+      }
+    }
+
+    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5) {
+      // out = (1 + kappa * D5) * in
+      for (int s = 0; s < Ls; s++) {
+        coeff.alpha[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        // axpy
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
+      }
+    }
+
+    void compute_coeff_m5inv_dwf() {
+      kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
+      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
+    }
+
+    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5) {
+      // out = (1 + kappa * D5)^-1 * in = M5inv * in
+      kappa
+        = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                             // 0.5 from gamma matrices
+      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                         // kappa_b * kappa_b * a
+    }
+
+    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5) {
+      // out = (1 + kappa * D5)^-1 * in = M5inv * in
+      // Similar to mobius convention, but variadic across 5th dim
+      complex<real> k = 1.0;
+      for (int s = 0; s < Ls; s++) {
+        coeff.kappa[s] = -(c_5[s] * (4.0 + m_5) - 1.0) / (b_5[s] * (4.0 + m_5) + 1.0);
+        k *= coeff.kappa[s];
+      }
+      coeff.inv = static_cast<real>(0.5) / (static_cast<real>(1.0) + k * m_f);
+
+      for (int s = 0; s < Ls; s++) { // axpy coefficients
+        coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
+        coeff.a[s] *= coeff.a[s] * static_cast<real>(a);
+      }
+    }
+
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
-               const Complex *b_5_, const Complex *c_5_, double a_) :
+               const Complex *b_5, const Complex *c_5, double a_) :
       out(out),
       in(in),
       x(x),
@@ -122,67 +172,83 @@ namespace quda
       if (!in.isNative() || !out.isNative())
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
-      // Get pointers for zMobius coefficients.
-      auto *a_5 = coeff.a;
-      auto *alpha_5 = coeff.alpha;
-      auto *beta_5 = coeff.beta;
-      auto *kappa_5 = coeff.kappa;
-      auto &inv_z = coeff.inv;
-
       switch (type) {
       case DSLASH5_DWF: break;
       case DSLASH5_MOBIUS_PRE:
-        // out = (b + c * D5) * in
-        for (int s = 0; s < Ls; s++) {
-          beta_5[s] = b_5_[s];
-          alpha_5[s] = 0.5 * c_5_[s]; // 0.5 from gamma matrices
-
-          // xpay
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a); // kappa_b * kappa_b * a
-        }
+        compute_coeff_mobius_pre(b_5, c_5);
         break;
       case DSLASH5_MOBIUS:
-        // out = (1 + kappa * D5) * in
-        for (int s = 0; s < Ls; s++) {
-          // beta[s] = 1.0;
-          alpha_5[s] = 0.5 * (c_5_[s] * (m_5 + 4.0) - 1.0) / (b_5_[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
-
-          // axpy
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a); // kappa_b * kappa_b * a
-        }
+        compute_coeff_mobius(b_5, c_5);
         break;
       case M5_INV_DWF:
-        kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
-        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
+        compute_coeff_m5inv_dwf();
+        break;
+      case M5_INV_MOBIUS_M5_PRE:
+        compute_coeff_mobius_pre(b_5, c_5);
+        compute_coeff_m5inv_mobius(b_5, c_5);
         break;
       case M5_INV_MOBIUS:
-        // out = (1 + kappa * D5)^-1 * in = M5inv * in
-        kappa
-          = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
-        inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                               // 0.5 from gamma matrices
-        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);                          // kappa_b * kappa_b * a
+        compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case M5_INV_ZMOBIUS: {
-        // out = (1 + kappa * D5)^-1 * in = M5inv * in
-        // Similar to above convention, but variadic across 5th dim
-        complex<double> k = 1.0;
-        for (int s = 0; s < Ls; s++) {
-          kappa_5[s] = -(c_5_[s] * (4.0 + m_5) - 1.0) / (b_5_[s] * (4.0 + m_5) + 1.0);
-          k *= kappa_5[s];
-        }
-        inv_z = 0.5 / (1.0 + k * m_f);
-
-        for (int s = 0; s < Ls; s++) { // axpy coefficients
-          a_5[s] = 0.5 / (b_5_[s] * (m_5 + 4.0) + 1.0);
-          a_5[s] *= a_5[s] * static_cast<real>(a);
-        }
-      } break;
+      case M5_INV_ZMOBIUS:
+        compute_coeff_m5inv_zmobius(b_5, c_5);
+        break;
       default: errorQuda("Unknown Dslash5Type %d", type);
       }
     }
   };
+
+  template <bool dagger, bool shared, class Vector, class Arg>
+    __device__ __host__ inline Vector d5(Arg &arg, const Vector &in, int parity, int x_cb, int s) {
+
+      using real = typename Arg::real;
+      // coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
+      coeff_type<real, true, Arg> coeff(arg);
+
+      // if using shared-memory caching then load spinor field for my site into cache
+      SharedMemoryCache<Vector> cache(target::block_dim());
+      if (shared) {
+        cache.sync();
+        cache.save(in);
+        cache.sync();
+      }
+
+      Vector out;
+
+      { // forwards direction
+        const int fwd_s = (s + 1) % arg.Ls;
+        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+        const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (s == arg.Ls - 1) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
+      }
+
+      { // backwards direction
+        const int back_s = (s + arg.Ls - 1) % arg.Ls;
+        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+        const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
+        constexpr int proj_dir = dagger ? -1 : +1;
+        if (s == 0) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
+      }
+
+      if (Arg::type == DSLASH5_MOBIUS_PRE || Arg::type == M5_INV_MOBIUS_M5_PRE) {
+        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
+      } else if (Arg::type == DSLASH5_MOBIUS) {
+        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.alpha(s) * out + diagonal;
+      }
+
+      return out;
+    }
 
   template <typename Arg> struct dslash5 {
     Arg &arg;
@@ -201,46 +267,16 @@ namespace quda
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      Vector out;
+      Vector out = d5<Arg::dagger, false, Vector, Arg>(arg, Vector(), parity, x_cb, s);
 
-      { // forwards direction
-        const int fwd_idx = ((s + 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-        const Vector in = arg.in(fwd_idx, parity);
-        constexpr int proj_dir = Arg::dagger ? +1 : -1;
-        if (s == arg.Ls - 1) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
-        }
-      }
-
-      { // backwards direction
-        const int back_idx = ((s + arg.Ls - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-        const Vector in = arg.in(back_idx, parity);
-        constexpr int proj_dir = Arg::dagger ? -1 : +1;
-        if (s == 0) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
-        }
-      }
-
-      if (Arg::type == DSLASH5_DWF && Arg::xpay) {
-        Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = x + arg.a * out;
-      } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
-        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-
-        if (Arg::xpay) {
+      if (Arg::xpay) {
+        if (Arg::type == DSLASH5_DWF) {
+          Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+          out = x + arg.a * out;
+        } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = x + coeff.a(s) * out;
-        }
-      } else if (Arg::type == DSLASH5_MOBIUS) {
-        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.alpha(s) * out + diagonal;
-
-        if (Arg::xpay) { // really axpy
+        } else if (Arg::type == DSLASH5_MOBIUS) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = coeff.a(s) * x + out;
         }
