@@ -53,7 +53,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -68,7 +68,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -95,7 +95,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS_PRE);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -111,7 +111,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, Dslash5Type::DSLASH5_MOBIUS);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -133,14 +133,14 @@ namespace quda {
     bool reset = newTmp(&tmp, in);
 
     if (dagger == QUDA_DAG_NO) {
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(*tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
     } else {
       // the third term is added, not multiplied, so we only need to swap the first two in the dagger
       ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(*tmp, out, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+      ApplyDslash5(*tmp, out, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
     }
     blas::axpy(-mobius_kappa_b, *tmp, out);
 
@@ -213,7 +213,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
@@ -226,7 +226,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
@@ -255,8 +255,8 @@ namespace quda {
       Dslash4(*tmp1, out, parity[1]);
       M5invXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, M5_INV_MOBIUS, profile);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS, profile);
       out = *tmp1;
 #endif
     } else if (symmetric && dagger) {
@@ -268,8 +268,8 @@ namespace quda {
       Dslash4(*tmp1, out, parity[1]);
       Dslash4preXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, DSLASH5_MOBIUS_PRE, profile);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
       out = *tmp1;
 #endif
     } else if (!symmetric && !dagger) {
@@ -533,7 +533,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -554,7 +554,7 @@ namespace quda {
     a *= mobius_kappa_b * mobius_kappa_b; // a = a * kappa_b^2
     // The kernel will actually do (m5 * in - kappa_b^2 * x)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -578,15 +578,15 @@ namespace quda {
     bool reset = newTmp(&tmp, in);
 
     if (dagger == QUDA_DAG_NO) {
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(*tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     } else {
       ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(*tmp, out, out, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(*tmp, out, out, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     }
     blas::axpy(-mobius_kappa_b, *tmp, out);
 
@@ -641,7 +641,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5INV_EOFA);
 
     long long Ls = in.X(4);
     flops += (192LL * Ls + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
@@ -659,7 +659,7 @@ namespace quda {
     a *= mobius_kappa_b * mobius_kappa_b; // a = a * kappa_b^2
     // The kernel will actually do (x - kappa_b^2 * m5inv * in)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5INV_EOFA);
 
     long long Ls = in.X(4);
     flops += (192LL * Ls + 48LL + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);

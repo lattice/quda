@@ -86,14 +86,14 @@ namespace quda
     {
       // TODO: add m5, variableInv, etc
       switch (dslash5_type) {
-      case M5_INV_MOBIUS_M5_PRE:
-        instantiate_dslash5_type<M5_INV_MOBIUS_M5_PRE>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
+      case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+        instantiate_dslash5_type<Dslash5Type::M5_INV_MOBIUS_M5_PRE>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
         break;
-      case M5_INV_MOBIUS:
-        instantiate_dslash5_type<M5_INV_MOBIUS>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
+      case Dslash5Type::M5_INV_MOBIUS:
+        instantiate_dslash5_type<Dslash5Type::M5_INV_MOBIUS>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
         break;
-      case DSLASH5_MOBIUS_PRE:
-        instantiate_dslash5_type<DSLASH5_MOBIUS_PRE>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
+      case Dslash5Type::DSLASH5_MOBIUS_PRE:
+        instantiate_dslash5_type<Dslash5Type::DSLASH5_MOBIUS_PRE>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, m_f, profile);
         break;
       default:
         errorQuda("Unsupported dslash5_type of %d", (int)dslash5_type);

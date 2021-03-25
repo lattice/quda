@@ -34,13 +34,13 @@ namespace quda
   template <Dslash5Type type> struct is_variable {
     static constexpr bool value = false;
   };
-  template <> struct is_variable<DSLASH5_MOBIUS_PRE> {
+  template <> struct is_variable<Dslash5Type::DSLASH5_MOBIUS_PRE> {
     static constexpr bool value = true;
   };
-  template <> struct is_variable<DSLASH5_MOBIUS> {
+  template <> struct is_variable<Dslash5Type::DSLASH5_MOBIUS> {
     static constexpr bool value = true;
   };
-  template <> struct is_variable<M5_INV_ZMOBIUS> {
+  template <> struct is_variable<Dslash5Type::M5_INV_ZMOBIUS> {
     static constexpr bool value = true;
   };
 
@@ -173,24 +173,24 @@ namespace quda
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
       switch (type) {
-      case DSLASH5_DWF: break;
-      case DSLASH5_MOBIUS_PRE:
+      case Dslash5Type::DSLASH5_DWF: break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE:
         compute_coeff_mobius_pre(b_5, c_5);
         break;
-      case DSLASH5_MOBIUS:
+      case Dslash5Type::DSLASH5_MOBIUS:
         compute_coeff_mobius(b_5, c_5);
         break;
-      case M5_INV_DWF:
+      case Dslash5Type::M5_INV_DWF:
         compute_coeff_m5inv_dwf();
         break;
-      case M5_INV_MOBIUS_M5_PRE:
+      case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
         compute_coeff_mobius_pre(b_5, c_5);
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case M5_INV_MOBIUS:
+      case Dslash5Type::M5_INV_MOBIUS:
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case M5_INV_ZMOBIUS:
+      case Dslash5Type::M5_INV_ZMOBIUS:
         compute_coeff_m5inv_zmobius(b_5, c_5);
         break;
       default: errorQuda("Unknown Dslash5Type %d", type);
@@ -239,10 +239,10 @@ namespace quda
         }
       }
 
-      if (Arg::type == DSLASH5_MOBIUS_PRE || Arg::type == M5_INV_MOBIUS_M5_PRE) {
+      if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE || Arg::type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
         out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-      } else if (Arg::type == DSLASH5_MOBIUS) {
+      } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
         out = coeff.alpha(s) * out + diagonal;
       }
@@ -270,13 +270,13 @@ namespace quda
       Vector out = d5<Arg::dagger, false, Vector, Arg>(arg, Vector(), parity, x_cb, s);
 
       if (Arg::xpay) {
-        if (Arg::type == DSLASH5_DWF) {
+        if (Arg::type == Dslash5Type::DSLASH5_DWF) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = x + arg.a * out;
-        } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
+        } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = x + coeff.a(s) * out;
-        } else if (Arg::type == DSLASH5_MOBIUS) {
+        } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS) {
           Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
           out = coeff.a(s) * x + out;
         }

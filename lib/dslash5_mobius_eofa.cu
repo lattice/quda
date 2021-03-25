@@ -43,8 +43,8 @@ namespace quda
 
         long long flops_ = 0;
         switch (type) {
-        case M5_EOFA:
-        case M5INV_EOFA: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
+        case Dslash5Type::M5_EOFA:
+        case Dslash5Type::M5INV_EOFA: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
         default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
         }
 
@@ -54,8 +54,8 @@ namespace quda
       long long bytes() const
       {
         switch (type) {
-        case M5_EOFA:
-        case M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
+        case Dslash5Type::M5_EOFA:
+        case Dslash5Type::M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
         default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
         }
         return 0ll;
@@ -75,7 +75,7 @@ namespace quda
       // inverse
       unsigned int maxSharedBytesPerBlock() const
       {
-        if (shared && (type == M5_EOFA || type == M5INV_EOFA)) {
+        if (shared && (type == Dslash5Type::M5_EOFA || type == Dslash5Type::M5INV_EOFA)) {
           return maxDynamicSharedBytesPerBlock();
         } else {
           return TunableKernel3D::maxSharedBytesPerBlock();
@@ -117,8 +117,8 @@ namespace quda
           strcat(aux, ",eofa_minus");
         }
         switch (type) {
-        case M5_EOFA: strcat(aux, ",mobius_M5_EOFA"); break;
-        case M5INV_EOFA: strcat(aux, ",mobius_M5INV_EOFA"); break;
+        case Dslash5Type::M5_EOFA: strcat(aux, ",mobius_Dslash5Type::M5_EOFA"); break;
+        case Dslash5Type::M5INV_EOFA: strcat(aux, ",mobius_Dslash5Type::M5INV_EOFA"); break;
         default: errorQuda("Unknown Dslash5Type %d", type);
         }
 
@@ -154,14 +154,14 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        if (shared && (type == M5_EOFA || type == M5INV_EOFA)) {
+        if (shared && (type == Dslash5Type::M5_EOFA || type == Dslash5Type::M5INV_EOFA)) {
           // if inverse kernel uses shared memory then maximize total shared memory
           tp.set_max_shared_bytes = true;
         }
 
         switch (type) {
-        case M5_EOFA:    Launch<M5_EOFA, eofa_dslash5>(tp, stream); break;
-        case M5INV_EOFA: Launch<M5INV_EOFA, eofa_dslash5inv>(tp, stream); break;
+        case Dslash5Type::M5_EOFA:    Launch<Dslash5Type::M5_EOFA, eofa_dslash5>(tp, stream); break;
+        case Dslash5Type::M5INV_EOFA: Launch<Dslash5Type::M5INV_EOFA, eofa_dslash5inv>(tp, stream); break;
         default: errorQuda("Unknown Dslash5Type %d", type);
         }
       }

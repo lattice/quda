@@ -82,18 +82,18 @@ namespace quda
 
       Vector out;
       // In the following `x_cb` are all passed as `x_cb = 0`, since it will not be used if `shared = true`, and `shared = true`
-      if (Arg::dslash5_type == M5_INV_MOBIUS) {
+      if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
         // Apply the m5inv.
         out = variableInv<dagger, Vector, typename Arg::Dslash5Arg>(
           arg, stencil_out, my_spinor_parity, 0, s);
       }
 
-      if (Arg::dslash5_type == DSLASH5_MOBIUS_PRE) {
+      if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
         // TODO: there doesn't need to have a sync before caching.
         out = d5<dagger, true, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
       }
 
-      if (Arg::dslash5_type == M5_INV_MOBIUS_M5_PRE) {
+      if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
         // Apply the m5inv.
         out = variableInv<dagger, Vector, typename Arg::Dslash5Arg>(
           arg, stencil_out, my_spinor_parity, 0, s);
