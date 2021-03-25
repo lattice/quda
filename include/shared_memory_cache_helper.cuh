@@ -73,11 +73,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-#if defined(QUDA_TARGET_CUDA)
         extern __shared__ atom_t cache_[];
-#elif defined(QUDA_TARGET_HIP)
-	HIP_DYNAMIC_SHARED( atom_t, cache_ );
-#endif
         return reinterpret_cast<atom_t*>(cache_);
       }
     };
@@ -153,9 +149,6 @@ namespace quda
       block(block),
       stride(block.x * block.y * block.z) {}
 #endif
-    //constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
-    //block(block),
-    //stride(block.x * block.y * block.z) {}
 
     /**
        @brief Grab the raw base address to shared memory.

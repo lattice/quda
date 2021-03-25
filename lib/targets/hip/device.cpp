@@ -140,24 +140,15 @@ namespace quda
       return max_shared_bytes;
     }
 
-
     unsigned int max_threads_per_block() { 
-	// return deviceProp.maxThreadsPerBlock; 
-
-       return 256;
+	return deviceProp.maxThreadsPerBlock; 
     }
 
     unsigned int max_threads_per_processor() { return deviceProp.maxThreadsPerMultiProcessor; }
 
-#if 0
     unsigned int max_threads_per_block_dim(int i) { 
 	    return deviceProp.maxThreadsDim[i];
     }
-#else
-    unsigned int max_threads_per_block_dim(int)  {
-	   return 256;
-    }
-#endif
 
     unsigned int max_grid_size(int i) { return deviceProp.maxGridSize[i]; }
 

@@ -45,10 +45,6 @@ namespace quda {
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
 
-    // FIXME: understand why this leads to slower perf and variable correctness
-    //int blockStep() const { return device::warp_size()/4; }
-    //int blockMin() const { return device::warp_size()/4; }
-
 #ifndef QUDA_FAST_COMPILE_DSLASH
     bool advanceAux(TuneParam &param) const
     {
