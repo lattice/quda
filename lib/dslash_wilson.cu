@@ -20,7 +20,12 @@ namespace quda
     using Dslash = Dslash<wilson, Arg>;
 
   public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    {
+      if(in.Ndim() == 5) {
+        TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
+      }
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -52,7 +57,7 @@ namespace quda
 
         dslash::DslashPolicyTune<decltype(wilson)> policy(
           wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.VolumeCB(), in.GhostFaceCB(), profile);
+          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       }
     }
   };
