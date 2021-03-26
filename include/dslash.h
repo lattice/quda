@@ -220,7 +220,7 @@ namespace quda
         step_z = vector_length_z;
       }
       TunableVectorYZ::initTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
@@ -234,7 +234,7 @@ namespace quda
         step_z = vector_length_z;
       }
       TunableVectorYZ::defaultTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 

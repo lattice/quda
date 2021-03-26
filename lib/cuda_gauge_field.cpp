@@ -102,7 +102,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         if (ghost[i]) pool_device_free(ghost[i]);
-        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i+4]);
+        if (ghost[i + 4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i + 4]);
       }
     }
 
@@ -578,9 +578,9 @@ namespace quda {
             src.Order() == QUDA_BQCD_GAUGE_ORDER      ||
             src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
-	  void *src_d = get_mapped_device_pointer(src.Gauge_p());
+          void *src_d = get_mapped_device_pointer(src.Gauge_p());
 
-	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
+          if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
 	  } else {
 	    errorQuda("Ghost copy not supported here");
@@ -653,8 +653,8 @@ namespace quda {
           cpu.Order() == QUDA_BQCD_GAUGE_ORDER      ||
           cpu.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *cpu_d = get_mapped_device_pointer(cpu.Gauge_p());
-	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
+        void *cpu_d = get_mapped_device_pointer(cpu.Gauge_p());
+        if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
 	} else {
 	  errorQuda("Ghost copy not supported here");

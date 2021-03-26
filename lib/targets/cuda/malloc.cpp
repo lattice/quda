@@ -582,12 +582,11 @@ namespace quda
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
-
 
   namespace pool
   {

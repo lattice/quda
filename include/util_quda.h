@@ -140,14 +140,11 @@ namespace quda {
 
 #endif // MULTI_GPU
 
-
-#define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
-    ;\
-} while (0)
-
+#define checkCudaErrorNoSync()                                                                                         \
+  do {                                                                                                                 \
+    cudaError_t error = cudaGetLastError();                                                                            \
+    if (error != cudaSuccess) errorQuda("(CUDA) %s", cudaGetErrorString(error));                                       \
+  } while (0)
 
 #ifdef HOST_DEBUG
 

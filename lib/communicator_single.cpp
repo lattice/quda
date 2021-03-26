@@ -76,31 +76,31 @@ MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *buffer, co
   return nullptr;
 }
 
-void Communicator::comm_free(MsgHandle *&mh) { }
+void Communicator::comm_free(MsgHandle *&mh) {}
 
-void Communicator::comm_start(MsgHandle *mh) { }
+void Communicator::comm_start(MsgHandle *mh) {}
 
-void Communicator::comm_wait(MsgHandle *mh) { }
+void Communicator::comm_wait(MsgHandle *mh) {}
 
 int Communicator::comm_query(MsgHandle *mh) { return 1; }
 
-void Communicator::comm_allreduce(double *data) { }
+void Communicator::comm_allreduce(double *data) {}
 
-void Communicator::comm_allreduce_max(double *data) { }
+void Communicator::comm_allreduce_max(double *data) {}
 
-void Communicator::comm_allreduce_min(double *data) { }
+void Communicator::comm_allreduce_min(double *data) {}
 
-void Communicator::comm_allreduce_array(double *data, size_t size) { }
+void Communicator::comm_allreduce_array(double *data, size_t size) {}
 
-void Communicator::comm_allreduce_max_array(double *data, size_t size) { }
+void Communicator::comm_allreduce_max_array(double *data, size_t size) {}
 
-void Communicator::comm_allreduce_int(int *data) { }
+void Communicator::comm_allreduce_int(int *data) {}
 
-void Communicator::comm_allreduce_xor(uint64_t *data) { }
+void Communicator::comm_allreduce_xor(uint64_t *data) {}
 
-void Communicator::comm_broadcast(void *data, size_t nbytes) { }
+void Communicator::comm_broadcast(void *data, size_t nbytes) {}
 
-void Communicator::comm_barrier(void) { }
+void Communicator::comm_barrier(void) {}
 
 void Communicator::comm_abort_(int status) { exit(status); }
 
