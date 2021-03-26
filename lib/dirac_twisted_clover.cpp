@@ -53,7 +53,7 @@ namespace quda {
   void DiracTwistedClover::twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const QudaTwistGamma5Type twistType, const int parity) const
   {
     checkParitySpinor(out, in);
-    ApplyTwistClover(out, in, *clover, kappa, mu, 0.0, parity, dagger, twistType);
+    ApplyTwistClover(out, in, *clover, kappa, mu, epsilon, parity, dagger, twistType);
 
     if (twistType == QUDA_TWIST_GAMMA5_INVERSE) flops += 1056ll*in.Volume();
     else flops += 552ll*in.Volume();
