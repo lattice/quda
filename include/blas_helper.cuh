@@ -3,6 +3,7 @@
 #include <color_spinor_field.h>
 #include <reduce_helper.h>
 #include <load_store.h>
+#include <convert.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
