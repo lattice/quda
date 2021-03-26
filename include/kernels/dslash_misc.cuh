@@ -277,7 +277,8 @@ namespace quda {
   };
   
   // if (!inverse) apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1) to the input spinor
-  // else apply (Clover + i*a*gamma_5 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
+  // else apply (Clover + i*a*gamma_5*tau_3 + b*epsilon*tau_1)/(Clover^2 + a^2 - b^2) to the input spinor
+  // noting that appropriate signs are carried by a and b depending on inverse
   template <typename Arg> struct NdegTwistCloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
@@ -312,6 +313,7 @@ namespace quda {
         half_fermion in1_chi = in1.chiral_project(chirality);
         half_fermion in2_chi = in2.chiral_project(chirality);
 
+        // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
         half_fermion out1_chi = A*in1_chi + j*arg.a*in1_chi + static_cast<real>(0.5)*arg.b*in2_chi;
         half_fermion out2_chi = A*in2_chi - j*arg.a*in2_chi + static_cast<real>(0.5)*arg.b*in1_chi;
 
