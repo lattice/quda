@@ -282,7 +282,7 @@ void ndegTwistCloverGamma5(void *out1, void * out2, void *in1, void * in2,
     apply_clover(tmp2, clover, in2, parity, precision);
     // out = tmp - (i 2 kappa mu gamma_5 tau_3) * in
     applyTwist(tmptmp1, in1, tmp1, a, precision);
-    applyTwist(tmptmp2, in2, tmp2, a, precision);
+    applyTwist(tmptmp2, in2, tmp2, -a, precision);
     // tmptmp += +(epsilon * tau_1) * in
     axpy(b, in2, tmptmp1, Vh * spinor_site_size, precision);
     axpy(b, in1, tmptmp2, Vh * spinor_site_size, precision);
@@ -497,24 +497,42 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv
   if(daggerBit) {
     ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, daggerBit, kappa, mu, epsilon, 1-oddBit,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
+    printfQuda("\ntmp1[0]: (%f,%f) tmp2[0]: (%f,%f)\n",
+           ((double*)tmp1)[0], ((double*)tmp1)[1],
+           ((double*)tmp2)[0], ((double*)tmp2)[1]);
     if(matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC){
       void * tmptmp1 = malloc(Vh * spinor_site_size * precision);
       void * tmptmp2 = malloc(Vh * spinor_site_size * precision);
       wil_dslash(tmptmp1, gauge, tmp1, oddBit, daggerBit, precision, gauge_param);
       wil_dslash(tmptmp2, gauge, tmp2, oddBit, daggerBit, precision, gauge_param);
+      printfQuda("tmptmp1[0]: (%f,%f) tmptmp2[0]: (%f,%f)\n",
+             ((double*)tmptmp1)[0], ((double*)tmptmp1)[1],
+             ((double*)tmptmp2)[0], ((double*)tmptmp2)[1]);
       ndegTwistCloverGamma5(out1, out2, tmptmp1, tmptmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
                             QUDA_TWIST_GAMMA5_INVERSE, precision);
+      printfQuda("out1[0]: (%f,%f) out2[0]: (%f,%f)\n",
+             ((double*)out1)[0], ((double*)out1)[1],
+             ((double*)out2)[0], ((double*)out2)[1]);
       free(tmptmp1);
       free(tmptmp2);
     } else {
       wil_dslash(out1, gauge, tmp1, oddBit, daggerBit, precision, gauge_param);
       wil_dslash(out2, gauge, tmp2, oddBit, daggerBit, precision, gauge_param);
+      printfQuda("out1[0]: (%f,%f) out2[0]: (%f,%f)\n",
+             ((double*)out1)[0], ((double*)out1)[1],
+             ((double*)out2)[0], ((double*)out2)[1]);
     }
   } else {
     wil_dslash(tmp1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
     wil_dslash(tmp2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
+    printfQuda("tmp1[0]: (%f,%f) tmp2[0]: (%f,%f)\n",
+           ((double*)tmp1)[0], ((double*)tmp1)[1],
+           ((double*)tmp2)[0], ((double*)tmp2)[1]);
     ndegTwistCloverGamma5(out1, out2, tmp1, tmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
+    printfQuda("out1[0]: (%f,%f) out2[0]: (%f,%f)\n",
+           ((double*)out1)[0], ((double*)out1)[1],
+           ((double*)out2)[0], ((double*)out2)[1]);
   }
   free(tmp1);
   free(tmp2);
