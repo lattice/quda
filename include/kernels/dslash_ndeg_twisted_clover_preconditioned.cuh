@@ -80,6 +80,7 @@ namespace quda
       }
 
       if (isComplete<kernel_type>(arg, coord) && active) {
+        out.toRel();
 
         // single write and sync to shared memory instead of 
         // alternative of two writes and syncs (one for each chirality) 
@@ -124,11 +125,6 @@ namespace quda
           out = arg.a * tmp;
         }
       }
-
-      // FIXME remove debug output
-      //if (coord.x_cb == 0) {
-      //  out.print();
-      //}
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
