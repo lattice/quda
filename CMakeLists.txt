@@ -107,7 +107,7 @@ endif(GIT_FOUND)
 
 project(
   "QUDA"
-  VERSION 1.0.0
+  VERSION 1.1.0
   LANGUAGES)
 
 message(STATUS "")
