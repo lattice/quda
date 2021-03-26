@@ -28,7 +28,7 @@ namespace quda
                                      double a, double b, double c, bool xpay,
                                      const ColorSpinorField &x, int parity, bool dagger,
                                      const int *comm_override) :
-    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+    WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
@@ -47,8 +47,8 @@ namespace quda
 
   
   /**
-     @brief Apply the twisted-clover dslash
-       out(x) = M*in = a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1)*x
+     @brief Apply the preconditioned twisted-clover dslash
+       out(x) = M*in = x + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x
      Note this routine only exists in xpay form.
   */
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
@@ -81,7 +81,12 @@ namespace quda
 
       if (isComplete<kernel_type>(arg, coord) && active) {
 
-        SharedMemoryCache<HalfVector> cache(target::block_dim());
+        // single write and sync to shared memory instead of 
+        // alternative of two writes and syncs (one for each chirality) 
+        SharedMemoryCache<Vector> cache(target::block_dim());
+        cache.save(out);
+        cache.sync();
+
         Vector tmp;
 
 #pragma unroll
@@ -89,19 +94,15 @@ namespace quda
           HMat A = arg.A(coord.x_cb, parity, chirality);
           
           HalfVector chi = out.chiral_project(chirality);
-          cache.save(chi); // put "chi" in shared memory so the other flavor can access it
           
-          HalfVector A_chi = A * chi;
           const complex<real> b(0.0, (chirality^flavor) == 0 ? arg.b : -arg.b);
-          A_chi += b * chi;
-          
-          cache.sync(); // safe to sync in here since other threads will exit
-          A_chi += arg.c * cache.load(threadIdx.x, 1-flavor, threadIdx.z);
+          HalfVector A_chi = A * chi;
+          A_chi += b*chi;
+          A_chi += arg.c * cache.load(threadIdx.x, 1-flavor, threadIdx.z).chiral_project(chirality);
           
           if (arg.dynamic_clover) {
             HMat A2 = A.square();
-            A2 += b.imag() * b.imag();
-            A2 += (-arg.c * arg.c);
+            A2 += (b.imag()*b.imag() - arg.c*arg.c);
             Cholesky<HMatrix, real, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
             chi = cholesky.backward(cholesky.forward(A_chi));
             tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
@@ -125,9 +126,9 @@ namespace quda
       }
 
       // FIXME remove debug output
-      if (coord.x_cb == 0) {
-        out.print();
-      }
+      //if (coord.x_cb == 0) {
+      //  out.print();
+      //}
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }

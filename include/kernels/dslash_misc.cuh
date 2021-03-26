@@ -318,7 +318,7 @@ namespace quda {
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
-            A2 += arg.a*arg.a*static_cast<real>(0.25) - arg.b*arg.b*static_cast<real>(0.25);
+            A2 += (arg.a*arg.a*static_cast<real>(0.25) - arg.b*arg.b*static_cast<real>(0.25));
             Cholesky<HMatrix, real, N> cholesky(A2);
             out1_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out1_chi));
             out2_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out2_chi));

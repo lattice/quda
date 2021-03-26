@@ -514,7 +514,7 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv
     wil_dslash(tmp1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
     wil_dslash(tmp2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
     ndegTwistCloverGamma5(out1, out2, tmp1, tmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
-                          QUDA_TWIST_GAMMA5_DIRECT, precision);
+                          QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
   free(tmp1);
   free(tmp2);
