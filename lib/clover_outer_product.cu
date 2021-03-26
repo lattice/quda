@@ -12,8 +12,7 @@ namespace quda {
 
   enum OprodKernelType { OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL };
 
-  template<typename Float, int nColor_, QudaReconstructType recon>
-  struct CloverForceArg {
+  template <typename Float, int nColor_, QudaReconstructType recon> struct CloverForceArg {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -26,7 +25,7 @@ namespace quda {
     const F inB;
     const F inC;
     const F inD;
-    Gauge  gauge;
+    Gauge gauge;
     Force force;
     unsigned int length;
     int X[4];
@@ -38,7 +37,8 @@ namespace quda {
     Float coeff;
 
     CloverForceArg(GaugeField &force, const GaugeField &gauge, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                   const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity, const double coeff) :
+                   const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity,
+                   const double coeff) :
       inA(inA),
       inB(inB),
       inC(inC),
@@ -52,12 +52,12 @@ namespace quda {
       kernelType(OPROD_INTERIOR_KERNEL),
       coeff(coeff)
     {
-      for (int i=0; i<4; ++i) this->X[i] = gauge.X()[i];
-      for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
+      for (int i = 0; i < 4; ++i) this->X[i] = gauge.X()[i];
+      for (int i = 0; i < 4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
     }
   };
 
-  template<typename real, typename Arg> __global__ void interiorOprodKernel(Arg arg)
+  template <typename real, typename Arg> __global__ void interiorOprodKernel(Arg arg)
   {
     typedef complex<real> Complex;
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -65,21 +65,21 @@ namespace quda {
     ColorSpinor<real, Arg::nColor, 4> A, B_shift, C, D_shift;
     Matrix<Complex, Arg::nColor> U, result, temp;
 
-    while (idx<arg.length) {
+    while (idx < arg.length) {
       A = arg.inA(idx, 0);
       C = arg.inC(idx, 0);
 
 #pragma unroll
-      for (int dim=0; dim<4; ++dim) {
-	int shift[4] = {0,0,0,0};
+      for (int dim = 0; dim < 4; ++dim) {
+        int shift[4] = {0,0,0,0};
 	shift[dim] = 1;
 	const int nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
 
-	if (nbr_idx >= 0) {
-	  B_shift = arg.inB(nbr_idx, 0);
-	  D_shift = arg.inD(nbr_idx, 0);
+        if (nbr_idx >= 0) {
+          B_shift = arg.inB(nbr_idx, 0);
+          D_shift = arg.inD(nbr_idx, 0);
 
-	  B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
+          B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);
 	  result = outerProdSpinTrace(B_shift,A);
 
 	  D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
@@ -89,14 +89,14 @@ namespace quda {
 	  U = arg.gauge(dim, idx, arg.parity);
 	  result = temp + U*result*arg.coeff;
 	  arg.force(dim, idx, arg.parity) = result;
-	}
+        }
       } // dim
 
       idx += gridDim.x*blockDim.x;
     }
   } // interiorOprodKernel
 
-  template<int dim, typename real, typename Arg> __global__ void exteriorOprodKernel(Arg arg)
+  template <int dim, typename real, typename Arg> __global__ void exteriorOprodKernel(Arg arg)
   {
     typedef complex<real> Complex;
     int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -106,7 +106,7 @@ namespace quda {
     Matrix<Complex, Arg::nColor> U, result, temp;
 
     int x[4];
-    while (cb_idx<arg.length) {
+    while (cb_idx < arg.length) {
       coordsFromIndexExterior(x, cb_idx, arg.X, dim, arg.displacement, arg.parity);
       const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
       A = arg.inA(bulk_cb_idx, 0);
@@ -129,8 +129,8 @@ namespace quda {
     }
   } // exteriorOprodKernel
 
-  template<typename Float, typename Arg>
-  class CloverForce : public Tunable {
+  template <typename Float, typename Arg> class CloverForce : public Tunable
+  {
     Arg &arg;
     const GaugeField &meta;
 
@@ -141,40 +141,41 @@ namespace quda {
     bool tuneGridDim() const { return false; }
 
   public:
-    CloverForce(Arg &arg, GaugeField &meta) :
-      arg(arg), meta(meta) {
+    CloverForce(Arg &arg, GaugeField &meta) : arg(arg), meta(meta)
+    {
       writeAuxString(meta.AuxString());
       // this sets the communications pattern for the packing kernel
       int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
       setPackComms(comms);
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	// Disable tuning for the time being
+        // Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
 
-	if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	  qudaLaunchKernel(interiorOprodKernel<Float, Arg>, tp, stream, arg);
+        if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
+          qudaLaunchKernel(interiorOprodKernel<Float, Arg>, tp, stream, arg);
         } else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-          if (arg.dir == 0)      qudaLaunchKernel(exteriorOprodKernel<0,Float,Arg>, tp, stream, arg);
-	  else if (arg.dir == 1) qudaLaunchKernel(exteriorOprodKernel<1,Float,Arg>, tp, stream, arg);
-	  else if (arg.dir == 2) qudaLaunchKernel(exteriorOprodKernel<2,Float,Arg>, tp, stream, arg);
-          else if (arg.dir == 3) qudaLaunchKernel(exteriorOprodKernel<3,Float,Arg>, tp, stream, arg);
+          if (arg.dir == 0)
+            qudaLaunchKernel(exteriorOprodKernel<0, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 1)
+            qudaLaunchKernel(exteriorOprodKernel<1, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 2)
+            qudaLaunchKernel(exteriorOprodKernel<2, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 3)
+            qudaLaunchKernel(exteriorOprodKernel<3, Float, Arg>, tp, stream, arg);
         } else {
           errorQuda("Kernel type not supported\n");
         }
-      }else{ // run the CPU code
-	errorQuda("No CPU support for staggered outer-product calculation\n");
+      } else { // run the CPU code
+        errorQuda("No CPU support for staggered outer-product calculation\n");
       }
     } // apply
 
-    void preTune() {
-      this->arg.force.save();
-    }
-    void postTune() {
-      this->arg.force.load();
-    }
+    void preTune() { this->arg.force.save(); }
+    void postTune() { this->arg.force.load(); }
 
     long long flops() const {
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
@@ -185,9 +186,13 @@ namespace quda {
     }
     long long bytes() const {
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	return arg.length*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB.Bytes() + arg.inD.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes()));
+        return arg.length
+          * (arg.inA.Bytes() + arg.inC.Bytes()
+             + 4 * (arg.inB.Bytes() + arg.inD.Bytes() + 2 * arg.force.Bytes() + arg.gauge.Bytes()));
       } else {
-	return arg.length*(arg.inA.Bytes() + arg.inB.Bytes()/2 + arg.inC.Bytes() + arg.inD.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes());
+        return arg.length
+          * (arg.inA.Bytes() + arg.inB.Bytes() / 2 + arg.inC.Bytes() + arg.inD.Bytes() / 2 + 2 * arg.force.Bytes()
+             + arg.gauge.Bytes());
       }
     }
 
@@ -219,24 +224,22 @@ namespace quda {
 
     qudaDeviceSynchronize();
 
-    for (int i=3; i>=0; i--) {
+    for (int i = 3; i >= 0; i--) {
       if (commDimPartitioned(i)) {
-	// Initialize the host transfer from the source spinor
+        // Initialize the host transfer from the source spinor
 	a.gather(1, dag, 2*i);
       } // commDim(i)
-    } // i=3,..,0
+    }   // i=3,..,0
 
     qudaDeviceSynchronize(); comm_barrier();
 
     for (int i=3; i>=0; i--) {
-      if (commDimPartitioned(i)) {
-	a.commsStart(1, 2*i, dag);
-      }
+      if (commDimPartitioned(i)) { a.commsStart(1, 2 * i, dag); }
     }
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsWait(1, 2*i, dag);
+        a.commsWait(1, 2*i, dag);
 	a.scatter(1, dag, 2*i);
       }
     }
@@ -249,18 +252,19 @@ namespace quda {
   }
 
   template <typename Float, QudaReconstructType recon>
-  void computeCloverForce(GaugeField &force, const GaugeField &gauge, const ColorSpinorField& inA, const ColorSpinorField& inB,
-                          const ColorSpinorField& inC, const ColorSpinorField& inD, int parity, const double coeff)
+  void computeCloverForce(GaugeField &force, const GaugeField &gauge, const ColorSpinorField &inA,
+                          const ColorSpinorField &inB, const ColorSpinorField &inC, const ColorSpinorField &inD,
+                          int parity, const double coeff)
   {
     // Create the arguments for the interior kernel
     CloverForceArg<Float, 3, recon> arg(force, gauge, inA, inB, inC, inD, parity, coeff);
-    CloverForce<Float,decltype(arg)> oprod(arg, force);
+    CloverForce<Float, decltype(arg)> oprod(arg, force);
 
     arg.kernelType = OPROD_INTERIOR_KERNEL;
     arg.length = inA.VolumeCB();
     oprod.apply(0);
 
-    for (int i=3; i>=0; i--) {
+    for (int i = 3; i >= 0; i--) {
       if (commDimPartitioned(i)) {
         // update parameters for this exterior kernel
         arg.kernelType = OPROD_EXTERIOR_KERNEL;
@@ -270,7 +274,7 @@ namespace quda {
         oprod.apply(0);
       }
     } // i=3,..,0
-  } // computeCloverForce
+  }   // computeCloverForce
 
   void computeCloverForce(GaugeField &force, const GaugeField &U, std::vector<ColorSpinorField *> &x,
                           std::vector<ColorSpinorField *> &p, std::vector<double> &coeff)
@@ -299,10 +303,10 @@ namespace quda {
           exchangeGhost(static_cast<cudaColorSpinorField&>(inD), parity, 1-dag);
 
 	  if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	    computeCloverForce<double, QUDA_RECONSTRUCT_NO>(force, U, inA, inB, inC, inD, parity, coeff[i]);
-	  } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	    computeCloverForce<double, QUDA_RECONSTRUCT_12>(force, U, inA, inB, inC, inD, parity, coeff[i]);
-	  } else {
+            computeCloverForce<double, QUDA_RECONSTRUCT_NO>(force, U, inA, inB, inC, inD, parity, coeff[i]);
+          } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+            computeCloverForce<double, QUDA_RECONSTRUCT_12>(force, U, inA, inB, inC, inD, parity, coeff[i]);
+          } else {
 	    errorQuda("Unsupported recontruction type");
 	  }
 	} else {

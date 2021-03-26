@@ -43,7 +43,7 @@ namespace quda
     long mapped_bytes;
     long host_bytes;
 
-    TraceKey() {}
+    TraceKey() { }
 
     TraceKey(const TuneKey &key, float time) :
       key(key),

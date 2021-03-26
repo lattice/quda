@@ -61,7 +61,7 @@ public:
 #else
         switch (cType) {
         case QUDA_CONTRACT_TYPE_OPEN: qudaLaunchKernel(computeColorContraction<real, Arg>, tp, stream, arg); break;
-        case QUDA_CONTRACT_TYPE_DR:   qudaLaunchKernel(computeDegrandRossiContraction<real, Arg>, tp, stream, arg); break;
+        case QUDA_CONTRACT_TYPE_DR: qudaLaunchKernel(computeDegrandRossiContraction<real, Arg>, tp, stream, arg); break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 #endif

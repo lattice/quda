@@ -110,11 +110,13 @@ namespace quda {
   // this is the Worker pointer that the dslash uses to launch the shifted updates
   namespace dslash {
     extern Worker* aux_worker;
-  }  
+  }
 
   MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param,
-			     TimeProfile &profile) :
-    MultiShiftSolver(mat, matSloppy, param, profile) { }
+                             TimeProfile &profile) :
+    MultiShiftSolver(mat, matSloppy, param, profile)
+  {
+  }
 
   MultiShiftCG::~MultiShiftCG() { }
 

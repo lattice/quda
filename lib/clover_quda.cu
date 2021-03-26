@@ -8,8 +8,7 @@
 
 namespace quda {
 
-  template <typename store_t_>
-  struct CloverArg {
+  template <typename store_t_> struct CloverArg {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = 3;
@@ -21,16 +20,13 @@ namespace quda {
     Clover clover;
     const Fmunu f;
     int threads; // number of active threads required
-    int X[4]; // grid dimensions
+    int X[4];    // grid dimensions
     real coeff;
-    
+
     CloverArg(CloverField &clover, const GaugeField &f, double coeff) :
-      clover(clover, 0),
-      f(f),
-      threads(f.VolumeCB()),
-      coeff(coeff)
-    { 
-      for (int dir=0; dir<4; ++dir) X[dir] = f.X()[dir];
+      clover(clover, 0), f(f), threads(f.VolumeCB()), coeff(coeff)
+    {
+      for (int dir = 0; dir < 4; ++dir) X[dir] = f.X()[dir];
     }
   };
 
@@ -60,10 +56,9 @@ namespace quda {
        \                                                                  /
   */
   // Core routine for constructing clover term from field strength
-  template <typename Arg>
-  __device__ __host__ void cloverComputeCore(Arg &arg, int x_cb, int parity)
+  template <typename Arg> __device__ __host__ void cloverComputeCore(Arg &arg, int x_cb, int parity)
   {
-    constexpr int N = Arg::nColor*Arg::nSpin / 2;
+    constexpr int N = Arg::nColor * Arg::nSpin / 2;
     using real = typename Arg::real;
     using Complex = complex<real>;
     using Link = Matrix<Complex, Arg::nColor>;
@@ -76,20 +71,20 @@ namespace quda {
     Complex I(0.0,1.0);
     Complex coeff(0.0, arg.coeff);
     Link block1[2], block2[2];
-    block1[0] = coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
-    block1[1] = coeff*(F[0]+F[5]); // 72 floating-point ops
-    block2[0] = arg.coeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
-    block2[1] = arg.coeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
+    block1[0] = coeff * (F[0] - F[5]);                         // (18 + 6*9=) 72 floating-point ops
+    block1[1] = coeff * (F[0] + F[5]);                         // 72 floating-point ops
+    block2[0] = arg.coeff * (F[1] + F[4] - I * (F[2] - F[3])); // 126 floating-point ops
+    block2[1] = arg.coeff * (F[1] - F[4] - I * (F[2] + F[3])); // 126 floating-point ops
 
     // This uses lots of unnecessary memory
 #pragma unroll
     for (int ch=0; ch<2; ++ch) {
-      HMatrix<real,N> A;
+      HMatrix<real, N> A;
       // c = 0(1) => positive(negative) chiral block
       // Compute real diagonal elements
 #pragma unroll
-      for (int i=0; i<N/2; ++i) {
-	A(i+0,i+0) = 1.0 - block1[ch](i,i).real();
+      for (int i = 0; i < N / 2; ++i) {
+        A(i+0,i+0) = 1.0 - block1[ch](i,i).real();
 	A(i+3,i+3) = 1.0 + block1[ch](i,i).real();
       }
 
@@ -132,30 +127,26 @@ namespace quda {
   template <typename Arg> void cloverComputeCPU(Arg arg)
   {
     for (int parity = 0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.threads; x_cb++){
-	cloverComputeCore(arg, x_cb, parity);
-      }
+      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { cloverComputeCore(arg, x_cb, parity); }
     }
   }
 
-  template <typename store_t>
-  class CloverCompute : TunableVectorY {
+  template <typename store_t> class CloverCompute : TunableVectorY
+  {
     CloverArg<store_t> arg;
     const GaugeField &meta;
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneGridDim() const { return false; }     // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    CloverCompute(CloverField &clover, const GaugeField& f, double coeff) :
-      TunableVectorY(2),
-      arg(clover, f, coeff),
-      meta(f)
+    CloverCompute(CloverField &clover, const GaugeField &f, double coeff) :
+      TunableVectorY(2), arg(clover, f, coeff), meta(f)
     {
       checkNative(clover, f);
-      writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(store_t));
+      writeAuxString("threads=%d,stride=%d,prec=%lu", arg.threads, arg.clover.stride, sizeof(store_t));
 
       apply(0);
       qudaDeviceSynchronize();
@@ -172,11 +163,11 @@ namespace quda {
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-    long long flops() const { return 2*arg.threads*480ll; }
-    long long bytes() const { return 2*arg.threads*(6*arg.f.Bytes() + arg.clover.Bytes()); }
+    long long flops() const { return 2 * arg.threads * 480ll; }
+    long long bytes() const { return 2 * arg.threads * (6 * arg.f.Bytes() + arg.clover.Bytes()); }
   };
 
-  void computeClover(CloverField &clover, const GaugeField& f, double coeff)
+  void computeClover(CloverField &clover, const GaugeField &f, double coeff)
   {
 #ifdef GPU_CLOVER_DIRAC
     instantiate<CloverCompute>(clover, f, coeff);

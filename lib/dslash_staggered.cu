@@ -23,7 +23,7 @@ namespace quda
     using Dslash::arg;
 
   public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
 
     void apply(const qudaStream_t &stream)
     {

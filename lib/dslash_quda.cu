@@ -103,7 +103,7 @@ namespace quda {
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
-  }
+  } // namespace dslash
 
   // need to use placement new constructor to initialize the atomic counters
   template <typename T> __global__ void init_dslash_atomic(T *counter, int max)
@@ -293,8 +293,8 @@ namespace quda {
     arg.out(x_cb, parity) = in.gamma(d);
   }
 
-  template <typename Float, int nColor>
-  class Gamma : public TunableVectorY {
+  template <typename Float, int nColor> class Gamma : public TunableVectorY
+  {
 
     GammaArg<Float, nColor> arg;
     const ColorSpinorField &meta;
@@ -306,23 +306,22 @@ namespace quda {
 
   public:
     Gamma(ColorSpinorField &out, const ColorSpinorField &in, int d) :
-      TunableVectorY(in.SiteSubset()),
-      arg(out, in, d),
-      meta(in)
+      TunableVectorY(in.SiteSubset()), arg(out, in, d), meta(in)
     {
       strcpy(aux, meta.AuxString());
 
-      apply(streams[Nstream-1]);
+      apply(streams[Nstream - 1]);
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	gammaCPU<Float,nColor>(arg);
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	switch (arg.d) {
-	case 4: qudaLaunchKernel(gammaGPU<Float,nColor,4,decltype(arg)>, tp, stream, arg); break;
-	default: errorQuda("%d not instantiated", arg.d);
+        case 4: qudaLaunchKernel(gammaGPU<Float, nColor, 4, decltype(arg)>, tp, stream, arg); break;
+        default: errorQuda("%d not instantiated", arg.d);
 	}
       }
     }
@@ -335,10 +334,7 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
-  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
-  {
-    instantiate<Gamma>(out, in, d);
-  }
+  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d) { instantiate<Gamma>(out, in, d); }
 
   // CPU kernel for applying the gamma matrix to a colorspinor
   template <bool doublet, typename Float, int nColor, typename Arg>
@@ -381,8 +377,8 @@ namespace quda {
     }
   }
 
-  template <typename Float, int nColor>
-  class TwistGamma : public TunableVectorY {
+  template <typename Float, int nColor> class TwistGamma : public TunableVectorY
+  {
 
     GammaArg<Float, nColor> arg;
     const ColorSpinorField &meta;
@@ -393,17 +389,17 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    TwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon, int dagger, QudaTwistGamma5Type type) :
-      TunableVectorY(in.SiteSubset()),
-      arg(out, in, d, kappa, mu, epsilon, dagger, type),
-      meta(in)
+    TwistGamma(ColorSpinorField &out, const ColorSpinorField &in, int d, double kappa, double mu, double epsilon,
+               int dagger, QudaTwistGamma5Type type) :
+      TunableVectorY(in.SiteSubset()), arg(out, in, d, kappa, mu, epsilon, dagger, type), meta(in)
     {
       strcpy(aux, meta.AuxString());
 
-      apply(streams[Nstream-1]);
+      apply(streams[Nstream - 1]);
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.doublet) twistGammaCPU<true,Float,nColor>(arg);
 	twistGammaCPU<false,Float,nColor>(arg);
@@ -411,13 +407,13 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (arg.doublet)
 	  switch (arg.d) {
-	  case 4: qudaLaunchKernel(twistGammaGPU<true,Float,nColor,4,decltype(arg)>, tp, stream, arg); break;
-	  default: errorQuda("%d not instantiated", arg.d);
+          case 4: qudaLaunchKernel(twistGammaGPU<true, Float, nColor, 4, decltype(arg)>, tp, stream, arg); break;
+          default: errorQuda("%d not instantiated", arg.d);
 	  }
 	else
 	  switch (arg.d) {
-	  case 4: qudaLaunchKernel(twistGammaGPU<false,Float,nColor,4,decltype(arg)>, tp, stream, arg); break;
-	  default: errorQuda("%d not instantiated", arg.d);
+          case 4: qudaLaunchKernel(twistGammaGPU<false, Float, nColor, 4, decltype(arg)>, tp, stream, arg); break;
+          default: errorQuda("%d not instantiated", arg.d);
 	  }
       }
     }
@@ -448,8 +444,7 @@ namespace quda {
      @tparam nColor Number of colors
      @tparam dynamic_clover Whether we are inverting the clover field on the fly
   */
-  template <typename Float, int nSpin, int nColor>
-  struct CloverArg {
+  template <typename Float, int nSpin, int nColor> struct CloverArg {
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_inverse();
 
@@ -547,8 +542,8 @@ namespace quda {
     cloverApply<Float,nSpin,nColor>(arg, x_cb, parity);
   }
 
-  template <typename Float, int nColor>
-  class Clover : public TunableVectorY {
+  template <typename Float, int nColor> class Clover : public TunableVectorY
+  {
 
     static constexpr int nSpin = 4;
     CloverArg<Float, nSpin, nColor> arg;
@@ -561,15 +556,13 @@ namespace quda {
 
   public:
     Clover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity) :
-      TunableVectorY(in.SiteSubset()),
-      arg(out, in, clover, inverse, parity),
-      meta(in)
+      TunableVectorY(in.SiteSubset()), arg(out, in, clover, inverse, parity), meta(in)
     {
       if (in.Nspin() != 4 || out.Nspin() != 4) errorQuda("Unsupported nSpin=%d %d", out.Nspin(), in.Nspin());
       if (!inverse) errorQuda("Unsupported direct application");
       strcpy(aux, meta.AuxString());
 
-      apply(streams[Nstream-1]);
+      apply(streams[Nstream - 1]);
     }
 
     void apply(const qudaStream_t &stream)
@@ -578,7 +571,7 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	cloverCPU<Float,nSpin,nColor>(arg);
       } else {
-	qudaLaunchKernel(cloverGPU<Float,nSpin,nColor,decltype(arg)>, tp, stream, arg);
+        qudaLaunchKernel(cloverGPU<Float, nSpin, nColor, decltype(arg)>, tp, stream, arg);
       }
     }
 
@@ -587,8 +580,8 @@ namespace quda {
     void postTune() { if (arg.out.field == arg.in.field) arg.out.load(); } // Restore if the in and out fields alias
   };
 
-  //Apply the clover matrix field to a colorspinor field
-  //out(x) = clover*in
+  // Apply the clover matrix field to a colorspinor field
+  // out(x) = clover*in
   void ApplyClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity)
   {
 #ifdef GPU_CLOVER_DIRAC
@@ -660,11 +653,11 @@ namespace quda {
     twistCloverApply<inverse,Float,nSpin,nColor>(arg, x_cb, parity);
   }
 
-  template <typename Float, int nColor>
-  class TwistClover : public TunableVectorY {
+  template <typename Float, int nColor> class TwistClover : public TunableVectorY
+  {
 
     static constexpr int nSpin = 4;
-    CloverArg<Float,nSpin,nColor> arg;
+    CloverArg<Float, nSpin, nColor> arg;
     const ColorSpinorField &meta;
 
     long long flops() const { return (arg.inverse ? 1056ll : 552ll) * arg.nParity*arg.volumeCB; }
@@ -678,8 +671,8 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-                double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
+    TwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, double kappa, double mu,
+                double epsilon, int parity, int dagger, QudaTwistGamma5Type twist) :
       TunableVectorY(in.SiteSubset()),
       arg(out, in, clover, twist != QUDA_TWIST_GAMMA5_DIRECT, parity, kappa, mu, epsilon, dagger, twist),
       meta(in)
@@ -688,7 +681,7 @@ namespace quda {
       strcpy(aux, meta.AuxString());
       strcat(aux, arg.inverse ? ",inverse" : ",direct");
 
-      apply(streams[Nstream-1]);
+      apply(streams[Nstream - 1]);
     }
 
     void apply(const qudaStream_t &stream)
@@ -698,8 +691,10 @@ namespace quda {
 	if (arg.inverse) twistCloverCPU<true,Float,nSpin,nColor>(arg);
 	else twistCloverCPU<false,Float,nSpin,nColor>(arg);
       } else {
-	if (arg.inverse) qudaLaunchKernel(twistCloverGPU<true,Float,nSpin,nColor,decltype(arg)>, tp, stream, arg);
-	else qudaLaunchKernel(twistCloverGPU<false,Float,nSpin,nColor,decltype(arg)>, tp, stream, arg);
+        if (arg.inverse)
+          qudaLaunchKernel(twistCloverGPU<true, Float, nSpin, nColor, decltype(arg)>, tp, stream, arg);
+        else
+          qudaLaunchKernel(twistCloverGPU<false, Float, nSpin, nColor, decltype(arg)>, tp, stream, arg);
       }
     }
 

@@ -62,12 +62,14 @@ namespace quda {
       : out(out), in(in), meta(meta), location(location) { }
     virtual ~CopySpinor() { ; }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, meta.VolumeCB());
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	qudaLaunchKernel(packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>, tp, stream, out, in, meta.VolumeCB());
+        qudaLaunchKernel(packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder>, tp, stream, out, in,
+                         meta.VolumeCB());
       }
     }
 
@@ -211,46 +213,27 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 #ifdef GPU_STAGGERED_DIRAC
-#define INSTANTIATE_COLOR           \
-  switch(src.Ncolor()) {            \
-  case 6: CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 18: CopyGenericColorSpinor<18>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 24: CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 32: CopyGenericColorSpinor<32>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 36: CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 64: CopyGenericColorSpinor<64>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 72: CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 96: CopyGenericColorSpinor<96>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 192: CopyGenericColorSpinor<192>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 288: CopyGenericColorSpinor<288>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 576: CopyGenericColorSpinor<576>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 768: CopyGenericColorSpinor<768>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 1024: CopyGenericColorSpinor<1024>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 1536: CopyGenericColorSpinor<1536>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 2304: CopyGenericColorSpinor<2304>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 4096: CopyGenericColorSpinor<4096>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 6144: CopyGenericColorSpinor<6144>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 9216:CopyGenericColorSpinor<9216>(dst, src, location, dst_ptr, src_ptr); \
-  break;                \
-  default:                \
-    errorQuda("Ncolors=%d not supported", src.Ncolor());    \
+#define INSTANTIATE_COLOR                                                                                              \
+  switch (src.Ncolor()) {                                                                                              \
+  case 6: CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr); break;                                      \
+  case 18: CopyGenericColorSpinor<18>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 24: CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 32: CopyGenericColorSpinor<32>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 36: CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 64: CopyGenericColorSpinor<64>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 72: CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 96: CopyGenericColorSpinor<96>(dst, src, location, dst_ptr, src_ptr); break;                                    \
+  case 192: CopyGenericColorSpinor<192>(dst, src, location, dst_ptr, src_ptr); break;                                  \
+  case 288: CopyGenericColorSpinor<288>(dst, src, location, dst_ptr, src_ptr); break;                                  \
+  case 576: CopyGenericColorSpinor<576>(dst, src, location, dst_ptr, src_ptr); break;                                  \
+  case 768: CopyGenericColorSpinor<768>(dst, src, location, dst_ptr, src_ptr); break;                                  \
+  case 1024: CopyGenericColorSpinor<1024>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  case 1536: CopyGenericColorSpinor<1536>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  case 2304: CopyGenericColorSpinor<2304>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  case 4096: CopyGenericColorSpinor<4096>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  case 6144: CopyGenericColorSpinor<6144>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  case 9216: CopyGenericColorSpinor<9216>(dst, src, location, dst_ptr, src_ptr); break;                                \
+  default: errorQuda("Ncolors=%d not supported", src.Ncolor());                                                        \
   }
 #else // no staggered
 

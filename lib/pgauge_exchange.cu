@@ -9,8 +9,7 @@
 
 namespace quda {
 
-  template <typename Float, QudaReconstructType recon>
-  struct GaugeFixUnPackArg {
+  template <typename Float, QudaReconstructType recon> struct GaugeFixUnPackArg {
     int X[4]; // grid dimensions
     using Gauge = typename gauge_mapper<Float, recon>::type;
     Gauge dataOr;
@@ -20,23 +19,21 @@ namespace quda {
     int face;
     int dir;
     int borderid;
-    GaugeFixUnPackArg(GaugeField & data)
-      : dataOr(data)
+    GaugeFixUnPackArg(GaugeField &data) : dataOr(data)
     {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
     }
   };
 
-  template <int NElems, typename Float, bool pack, typename Arg>
-  __global__ void Kernel_UnPack(Arg arg)
+  template <int NElems, typename Float, bool pack, typename Arg> __global__ void Kernel_UnPack(Arg arg)
   {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( idx >= arg.size ) return;
+    if (idx >= arg.size) return;
     int X[4];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     int x[4];
     int za, xodd;
-    switch ( arg.face ) {
+    switch (arg.face) {
     case 0: //X FACE
       za = idx / ( X[1] / 2);
       x[3] = za / X[2];
@@ -50,7 +47,7 @@ namespace quda {
       x[3] = za / X[2];
       x[2] = za - x[3] * X[2];
       x[1] = arg.borderid;
-      xodd = (arg.borderid  + x[2] + x[3] + arg.parity) & 1;
+      xodd = (arg.borderid + x[2] + x[3] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     case 2: //Z FACE
@@ -58,7 +55,7 @@ namespace quda {
       x[3] = za / X[1];
       x[1] = za - x[3] * X[1];
       x[2] = arg.borderid;
-      xodd = (arg.borderid  + x[1] + x[3] + arg.parity) & 1;
+      xodd = (arg.borderid + x[1] + x[3] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     case 3: //T FACE
@@ -66,7 +63,7 @@ namespace quda {
       x[2] = za / X[1];
       x[1] = za - x[2] * X[1];
       x[3] = arg.borderid;
-      xodd = (arg.borderid  + x[1] + x[2] + arg.parity) & 1;
+      xodd = (arg.borderid + x[1] + x[2] + arg.parity) & 1;
       x[0] = (2 * idx + xodd)  - za * X[0];
       break;
     }
@@ -80,11 +77,11 @@ namespace quda {
     if (pack) {
       arg.dataOr.load(data, id, arg.dir, arg.parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) arg.array[idx + arg.size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
+      for (int i = 0; i < NElems / 2; ++i) arg.array[idx + arg.size * i] = Complex(tmp[2 * i + 0], tmp[2 * i + 1]);
     } else {
       for ( int i = 0; i < NElems / 2; ++i ) {
-        tmp[2*i+0] = arg.array[idx + arg.size * i].real();
-        tmp[2*i+1] = arg.array[idx + arg.size * i].imag();
+        tmp[2 * i + 0] = arg.array[idx + arg.size * i].real();
+        tmp[2 * i + 1] = arg.array[idx + arg.size * i].imag();
       }
       arg.dataOr.reconstruct.Unpack(data, tmp, id, arg.dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, arg.dir, arg.parity);
@@ -113,7 +110,7 @@ namespace quda {
       if (init) {
         cudaStreamDestroy(GFStream[0]);
         cudaStreamDestroy(GFStream[1]);
-        for (int d = 0; d < 4; d++ ) {
+        for (int d = 0; d < 4; d++) {
           if (commDimPartitioned(d)) {
             comm_free(mh_send_fwd[d]);
             comm_free(mh_send_back[d]);
@@ -132,8 +129,8 @@ namespace quda {
     }
   }
 
-  template<typename Float, int nColor, QudaReconstructType recon> struct PGaugeExchanger {
-    PGaugeExchanger(GaugeField& data, const int dir, const int parity)
+  template <typename Float, int nColor, QudaReconstructType recon> struct PGaugeExchanger {
+    PGaugeExchanger(GaugeField &data, const int dir, const int parity)
     {
       if (init) {
         for (int d = 0; d < 4; d++) {
@@ -152,41 +149,41 @@ namespace quda {
       void *recvg[4];
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
-        bytes[d] =  sizeof(Float) * data.SurfaceCB(d) * recon;
+        bytes[d] = sizeof(Float) * data.SurfaceCB(d) * recon;
       }
 
       if (!init) {
-        X = (int*)safe_malloc(4 * sizeof(int));
+        X = (int *)safe_malloc(4 * sizeof(int));
         for (int d = 0; d < 4; d++) X[d] = data.X()[d];
 
         cudaStreamCreate(&GFStream[0]);
         cudaStreamCreate(&GFStream[1]);
-        for (int d = 0; d < 4; d++ ) {
+        for (int d = 0; d < 4; d++) {
           if (!commDimPartitioned(d)) continue;
           // store both parities and directions in each
           send_d[d] = device_malloc(bytes[d]);
           recv_d[d] = device_malloc(bytes[d]);
           sendg_d[d] = device_malloc(bytes[d]);
           recvg_d[d] = device_malloc(bytes[d]);
-          hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
+          hostbuffer_h[d] = (void *)pinned_malloc(4 * bytes[d]);
           recv[d] = hostbuffer_h[d];
-          send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
-          recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
-          sendg[d] = static_cast<char*>(hostbuffer_h[d]) + 2 * bytes[d];
+          send[d] = static_cast<char *>(hostbuffer_h[d]) + bytes[d];
+          recvg[d] = static_cast<char *>(hostbuffer_h[d]) + 3 * bytes[d];
+          sendg[d] = static_cast<char *>(hostbuffer_h[d]) + 2 * bytes[d];
 
           mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-          mh_recv_fwd[d]  = comm_declare_receive_relative(recvg[d], d, +1, bytes[d]);
+          mh_recv_fwd[d] = comm_declare_receive_relative(recvg[d], d, +1, bytes[d]);
           mh_send_back[d] = comm_declare_send_relative(sendg[d], d, -1, bytes[d]);
-          mh_send_fwd[d]  = comm_declare_send_relative(send[d], d, +1, bytes[d]);
+          mh_send_fwd[d] = comm_declare_send_relative(send[d], d, +1, bytes[d]);
         }
         init = true;
       } else {
-        for (int d = 0; d < 4; d++ ) {
+        for (int d = 0; d < 4; d++) {
           if (!commDimPartitioned(d)) continue;
           recv[d] = hostbuffer_h[d];
-          send[d] = static_cast<char*>(hostbuffer_h[d]) + bytes[d];
-          recvg[d] = static_cast<char*>(hostbuffer_h[d]) + 3 * bytes[d];
-          sendg[d] = static_cast<char*>(hostbuffer_h[d]) + 2 * bytes[d];
+          send[d] = static_cast<char *>(hostbuffer_h[d]) + bytes[d];
+          recvg[d] = static_cast<char *>(hostbuffer_h[d]) + 3 * bytes[d];
+          sendg[d] = static_cast<char *>(hostbuffer_h[d]) + 2 * bytes[d];
         }
       }
 
@@ -194,7 +191,7 @@ namespace quda {
 
       qudaDeviceSynchronize();
       for (int d = 0; d < 4; d++) {
-        if ( !commDimPartitioned(d)) continue;
+        if (!commDimPartitioned(d)) continue;
         comm_start(mh_recv_back[d]);
         comm_start(mh_recv_fwd[d]);
 
@@ -207,13 +204,13 @@ namespace quda {
         arg.face = d;
         arg.dir = dir;
 
-        //extract top face
-        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]); 
+        // extract top face
+        arg.array = reinterpret_cast<complex<Float> *>(send_d[d]);
         arg.borderid = X[d] - data.R()[d] - 1;
         qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[0], arg);
 
-        //extract bottom
-        arg.array = reinterpret_cast<complex<Float>*>(sendg_d[d]);
+        // extract bottom
+        arg.array = reinterpret_cast<complex<Float> *>(sendg_d[d]);
         arg.borderid = data.R()[d];
         qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[1], arg);
 
@@ -229,14 +226,14 @@ namespace quda {
         comm_wait(mh_recv_back[d]);
         qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[0]);
 
-        arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
+        arg.array = reinterpret_cast<complex<Float> *>(recv_d[d]);
         arg.borderid = data.R()[d] - 1;
         qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[0], arg);
 
         comm_wait(mh_recv_fwd[d]);
         qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[1]);
 
-        arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
+        arg.array = reinterpret_cast<complex<Float> *>(recvg_d[d]);
         arg.borderid = X[d] - data.R()[d];
         qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[1], arg);
 
@@ -249,7 +246,7 @@ namespace quda {
     }
   };
 
-  void PGaugeExchange(GaugeField& data, const int dir, const int parity)
+  void PGaugeExchange(GaugeField &data, const int dir, const int parity)
   {
 #ifdef GPU_GAUGE_ALG
     if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {

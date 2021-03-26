@@ -644,7 +644,7 @@ namespace quda {
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
-    ColorSpinorField* CreateAlias(const ColorSpinorParam &param);
+    ColorSpinorField *CreateAlias(const ColorSpinorParam &param);
 
     /**
        @brief Create a coarse color-spinor field, using this field to set the meta data
@@ -1191,7 +1191,7 @@ namespace quda {
    */
   template <typename... Args>
   inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                               const ColorSpinorField &b, const Args &... args)
+                               const ColorSpinorField &b, const Args &...args)
   {
     return static_cast<QudaFieldOrder>(Order_(func, file, line, a, b) & Order_(func, file, line, a, args...));
   }
@@ -1223,7 +1223,7 @@ namespace quda {
    */
   template <typename... Args>
   inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
-                     const Args &... args)
+                     const Args &...args)
   {
     return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
   }

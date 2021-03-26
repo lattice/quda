@@ -152,7 +152,8 @@ namespace quda
      @param[in] Arg Dslash argument struct
      @return True if in boundary, else false
   */
-  template <int dim, typename Coord, typename Arg> inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
+  template <int dim, typename Coord, typename Arg>
+  inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
   {
     return ((coord[dim] >= arg.dim[dim] - arg.nFace) || (coord[dim] < arg.nFace));
   }
@@ -269,7 +270,7 @@ namespace quda
     int sites_per_block;
     int dim_map[4];
     int active_dims;
-    int pack_blocks; // total number of blocks used for packing in the dslash
+    int pack_blocks;   // total number of blocks used for packing in the dslash
     int exterior_dims; // dimension to run in the exterior Dslash
     int exterior_blocks;
 

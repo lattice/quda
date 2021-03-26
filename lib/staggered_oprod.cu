@@ -35,8 +35,8 @@ namespace quda {
     int X[4];
     bool partitioned[4];
 
-    StaggeredOprodArg(GaugeField &U, GaugeField &L, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                      int parity, int dir, int displacement, const OprodKernelType &kernelType, int nFace, const double coeff[2]) :
+    StaggeredOprodArg(GaugeField &U, GaugeField &L, const ColorSpinorField &inA, const ColorSpinorField &inB, int parity,
+                      int dir, int displacement, const OprodKernelType &kernelType, int nFace, const double coeff[2]) :
       inA(inA),
       inB(inB, nFace),
       U(U),
@@ -55,14 +55,14 @@ namespace quda {
     }
   };
 
-  template<typename real, typename Arg> __global__ void interiorOprodKernel(Arg arg)
+  template <typename real, typename Arg> __global__ void interiorOprodKernel(Arg arg)
   {
     using complex = complex<real>;
     using matrix = Matrix<complex, Arg::nColor>;
     using vector = ColorSpinor<real, Arg::nColor, 1>;
 
-    unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int gridSize = gridDim.x*blockDim.x;
+    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int gridSize = gridDim.x * blockDim.x;
 
     matrix result;
 
@@ -70,15 +70,15 @@ namespace quda {
       const vector x = arg.inA(idx, 0);
 
 #pragma unroll
-      for (int dim=0; dim<4; ++dim) {
-        int shift[4] = {0,0,0,0};
+      for (int dim = 0; dim < 4; ++dim) {
+        int shift[4] = {0, 0, 0, 0};
         shift[dim] = 1;
         const int first_nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
         if (first_nbr_idx >= 0) {
           const vector y = arg.inB(first_nbr_idx, 0);
           result = outerProduct(y, x);
           matrix tempA = arg.U(dim, idx, arg.parity);
-          result = tempA + result*arg.coeff[0];
+          result = tempA + result * arg.coeff[0];
 
           arg.U(dim, idx, arg.parity) = result;
 
@@ -89,7 +89,7 @@ namespace quda {
               const vector z = arg.inB(third_nbr_idx, 0);
               result = outerProduct(z, x);
               matrix tempB = arg.L(dim, idx, arg.parity);
-              result = tempB + result*arg.coeff[1];
+              result = tempB + result * arg.coeff[1];
               arg.L(dim, idx, arg.parity) = result;
             }
           }
@@ -100,14 +100,14 @@ namespace quda {
     }
   } // interiorOprodKernel
 
-  template<int dim, typename real, typename Arg> __global__ void exteriorOprodKernel(Arg arg)
+  template <int dim, typename real, typename Arg> __global__ void exteriorOprodKernel(Arg arg)
   {
     using complex = complex<real>;
     using matrix = Matrix<complex, Arg::nColor>;
     using vector = ColorSpinor<real, Arg::nColor, 1>;
 
-    unsigned int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int gridSize = gridDim.x*blockDim.x;
+    unsigned int cb_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int gridSize = gridDim.x * blockDim.x;
 
     matrix result;
 
@@ -117,22 +117,22 @@ namespace quda {
     int x[4];
     while (cb_idx < arg.length) {
       coordsFromIndexExterior(x, cb_idx, arg.X, arg.dir, arg.displacement, arg.parity);
-      const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
+      const unsigned int bulk_cb_idx = ((((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0]) >> 1);
 
       matrix inmatrix = out(arg.dir, bulk_cb_idx, arg.parity);
       const vector a = arg.inA(bulk_cb_idx, 0);
       const vector b = arg.inB.Ghost(arg.dir, 1, cb_idx, 0);
 
       result = outerProduct(b, a);
-      result = inmatrix + result*coeff;
+      result = inmatrix + result * coeff;
       out(arg.dir, bulk_cb_idx, arg.parity) = result;
 
       cb_idx += gridSize;
     }
   }
 
-  template<typename Float, typename Arg>
-  class StaggeredOprodField : public Tunable {
+  template <typename Float, typename Arg> class StaggeredOprodField : public Tunable
+  {
 
     Arg &arg;
     const GaugeField &meta;
@@ -144,23 +144,25 @@ namespace quda {
     bool tunedGridDim() const { return false; }
 
   public:
-    StaggeredOprodField(Arg &arg, const GaugeField &meta)
-      : arg(arg), meta(meta) {
-      writeAuxString(meta.AuxString());
-    }
+    StaggeredOprodField(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta) { writeAuxString(meta.AuxString()); }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	// Disable tuning for the time being
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	  qudaLaunchKernel(interiorOprodKernel<Float, Arg>, tp, stream, arg);
-	} else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-          if (arg.dir == 0) qudaLaunchKernel(exteriorOprodKernel<0,Float,Arg>, tp, stream, arg);
-          else if (arg.dir == 1) qudaLaunchKernel(exteriorOprodKernel<1,Float,Arg>, tp, stream, arg);
-          else if (arg.dir == 2) qudaLaunchKernel(exteriorOprodKernel<2,Float,Arg>, tp, stream, arg);
-          else if (arg.dir == 3) qudaLaunchKernel(exteriorOprodKernel<3,Float,Arg>, tp, stream, arg);
-	} else {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
+          qudaLaunchKernel(interiorOprodKernel<Float, Arg>, tp, stream, arg);
+        } else if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
+          if (arg.dir == 0)
+            qudaLaunchKernel(exteriorOprodKernel<0, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 1)
+            qudaLaunchKernel(exteriorOprodKernel<1, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 2)
+            qudaLaunchKernel(exteriorOprodKernel<2, Float, Arg>, tp, stream, arg);
+          else if (arg.dir == 3)
+            qudaLaunchKernel(exteriorOprodKernel<3, Float, Arg>, tp, stream, arg);
+        } else {
 	  errorQuda("Kernel type not supported\n");
 	}
       } else { // run the CPU code
@@ -168,12 +170,21 @@ namespace quda {
       }
     } // apply
 
-    void preTune() { arg.U.save(); arg.L.save(); }
-    void postTune() { arg.U.load(); arg.L.load(); }
+    void preTune()
+    {
+      arg.U.save();
+      arg.L.save();
+    }
+    void postTune()
+    {
+      arg.U.load();
+      arg.L.load();
+    }
 
     long long flops() const { return 0; } // FIXME
     long long bytes() const { return 0; } // FIXME
-    TuneKey tuneKey() const {
+    TuneKey tuneKey() const
+    {
       char aux[TuneKey::aux_n];
       strcpy(aux, this->aux);
       if (arg.kernelType == OPROD_EXTERIOR_KERNEL) {
@@ -190,7 +201,8 @@ namespace quda {
   }; // StaggeredOprodField
 
   template <typename Float>
-  void computeStaggeredOprod(GaugeField &U, GaugeField &L, ColorSpinorField &inA, ColorSpinorField &inB, int parity, const double coeff[2], int nFace)
+  void computeStaggeredOprod(GaugeField &U, GaugeField &L, ColorSpinorField &inA, ColorSpinorField &inB, int parity,
+                             const double coeff[2], int nFace)
   {
     // Create the arguments for the interior kernel
     StaggeredOprodArg<Float, 3> arg(U, L, inA, inB, parity, 0, 1, OPROD_INTERIOR_KERNEL, nFace, coeff);
@@ -233,7 +245,7 @@ namespace quda {
     ColorSpinorField &inA = (parity & 1) ? inOdd : inEven;
     ColorSpinorField &inB = (parity & 1) ? inEven : inOdd;
 
-    inB.exchangeGhost((QudaParity)(1-parity), nFace, 0);
+    inB.exchangeGhost((QudaParity)(1 - parity), nFace, 0);
 
     auto prec = checkPrecision(inEven, inOdd, U, L);
     if (prec == QUDA_DOUBLE_PRECISION) {

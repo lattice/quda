@@ -13,7 +13,7 @@
 #include <vector>
 #include <fstream>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
@@ -2151,7 +2151,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.solve_type = QUDA_DIRECT_SOLVE;
   invertParam.verbosity_precondition = QUDA_VERBOSE;
 
-  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     // req'd
+  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // req'd
   invertParam.cuda_prec_precondition = mg_pack->preconditioner_precision;
   invertParam.gcrNkrylov = 15;
   invertParam.pipeline = 16; // pipeline, get from file

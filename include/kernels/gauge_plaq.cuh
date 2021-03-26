@@ -6,55 +6,50 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<double2> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct GaugePlaqArg : public ReduceArg<double2> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     int threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
-    int border[4]; 
+    int border[4];
     Gauge U;
-    
-    GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<double2>(),
-      U(U_)
+
+    GaugePlaqArg(const GaugeField &U_) : ReduceArg<double2>(), U(U_)
     {
       int R = 0;
       for (int dir=0; dir<4; ++dir){
-	border[dir] = U_.R()[dir];
-	E[dir] = U_.X()[dir];
-	X[dir] = U_.X()[dir] - border[dir]*2;
-	R += border[dir];
+        border[dir] = U_.R()[dir];
+        E[dir] = U_.X()[dir];
+        X[dir] = U_.X()[dir] - border[dir] * 2;
+        R += border[dir];
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
-  template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  template <typename Arg> __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>,3>;
+    using Link = Matrix<complex<typename Arg::Float>, 3>;
 
     int dx[4] = {0, 0, 0, 0};
-    Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);
+    Link U1 = arg.U(mu, linkIndexShift(x, dx, arg.E), parity);
     dx[mu]++;
-    Link U2 = arg.U(nu, linkIndexShift(x,dx,arg.E), 1-parity);
+    Link U2 = arg.U(nu, linkIndexShift(x, dx, arg.E), 1 - parity);
     dx[mu]--;
     dx[nu]++;
-    Link U3 = arg.U(mu, linkIndexShift(x,dx,arg.E), 1-parity);
+    Link U3 = arg.U(mu, linkIndexShift(x, dx, arg.E), 1 - parity);
     dx[nu]--;
-    Link U4 = arg.U(nu, linkIndexShift(x,dx,arg.E), parity);
+    Link U4 = arg.U(nu, linkIndexShift(x, dx, arg.E), parity);
 
-    return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
+    return getTrace(U1 * U2 * conj(U3) * conj(U4)).real();
   }
 
-  template<int blockSize, typename Arg>
-  __global__ void computePlaq(Arg arg)
+  template <int blockSize, typename Arg> __global__ void computePlaq(Arg arg)
   {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
@@ -70,11 +65,11 @@ namespace quda {
 #pragma unroll
       for (int mu = 0; mu < 3; mu++) {
 #pragma unroll
-	for (int nu = 0; nu < 3; nu++) {
-	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
-	}
+        for (int nu = 0; nu < 3; nu++) {
+          if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
+        }
 
-	plaq.y += plaquette(arg, x, parity, mu, 3);
+        plaq.y += plaquette(arg, x, parity, mu, 3);
       }
 
       idx += blockDim.x*gridDim.x;

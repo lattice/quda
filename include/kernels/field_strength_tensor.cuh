@@ -5,14 +5,13 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_ > struct FmunuArg
-  {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct FmunuArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type G;
-    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
+    typedef typename gauge_mapper<Float, recon>::type G;
+    typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type F;
 
     G u;
     F f;
@@ -21,10 +20,7 @@ namespace quda
     int X[4];    // grid dimensions
     int border[4];
 
-    FmunuArg(GaugeField &f, const GaugeField &u) :
-      threads(f.VolumeCB()),
-      f(f),
-      u(u)
+    FmunuArg(GaugeField &f, const GaugeField &u) : threads(f.VolumeCB()), f(f), u(u)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];
@@ -167,7 +163,7 @@ namespace quda
       F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
       // 36 floating point operations here
     }
-    
+
     constexpr int munu_idx = (mu * (mu - 1)) / 2 + nu; // lower-triangular indexing
     arg.f(munu_idx, idx, parity) = F;
   }

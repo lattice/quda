@@ -140,7 +140,7 @@ namespace quda {
         ColorSpinor<typename Arg::realIn, Arg::nColor, Arg::nSpin> in = arg.in(x, (parity+arg.inParity)&1);
         ColorSpinor<typename Arg::realOut, Arg::nColor, Arg::nSpin> out;
         Basis<Arg> basis;
-	basis(out.data, in.data);
+        basis(out.data, in.data);
 	arg.out(x, (parity+arg.outParity)&1) = out;
       }
     }
@@ -181,12 +181,13 @@ namespace quda {
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	copyColorSpinor<Arg, PreserveBasis>(arg);
+        copyColorSpinor<Arg, PreserveBasis>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
+        qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
       }
     }
 
@@ -230,32 +231,33 @@ namespace quda {
       }
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if (out.GammaBasis()==in.GammaBasis()) {
           copyColorSpinor<Arg, PreserveBasis>(arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, NonRelBasis>(arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, RelBasis>(arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, ChiralToNonRelBasis>(arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, NonRelToChiralBasis>(arg);
-	}
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+          copyColorSpinor<Arg, NonRelBasis>(arg);
+        } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+          copyColorSpinor<Arg, RelBasis>(arg);
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
+          copyColorSpinor<Arg, ChiralToNonRelBasis>(arg);
+        } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
+          copyColorSpinor<Arg, NonRelToChiralBasis>(arg);
+        }
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (out.GammaBasis()==in.GammaBasis()) {
-	  qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+          qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
           qudaLaunchKernel(copyColorSpinorKernel<Arg, NonRelBasis>, tp, stream, arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
+        } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
           qudaLaunchKernel(copyColorSpinorKernel<Arg, RelBasis>, tp, stream, arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
+        } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
           qudaLaunchKernel(copyColorSpinorKernel<Arg, ChiralToNonRelBasis>, tp, stream, arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
+        } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
           qudaLaunchKernel(copyColorSpinorKernel<Arg, NonRelToChiralBasis>, tp, stream, arg);
-	}
+        }
       }
     }
 
@@ -277,9 +279,9 @@ namespace quda {
 
   /** Decide on the output order*/
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename InOrder>
-    void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out,
-				const ColorSpinorField &in, QudaFieldLocation location,
-				FloatOut *Out, float *outNorm) {
+  void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out, const ColorSpinorField &in,
+                              QudaFieldLocation location, FloatOut *Out, float *outNorm)
+  {
     const bool override = true;
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
@@ -322,14 +324,13 @@ namespace quda {
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
     }
-
   }
 
   /** Decide on the input order*/
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
-    void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in,
-				QudaFieldLocation location, FloatOut *Out, FloatIn *In,
-				float *outNorm, float *inNorm) {
+  void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, QudaFieldLocation location,
+                              FloatOut *Out, FloatIn *In, float *outNorm, float *inNorm)
+  {
     const bool override = true;
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
@@ -366,25 +367,21 @@ namespace quda {
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
-
   }
 
-
   template <int Ns, int Nc, typename dstFloat, typename srcFloat>
-    void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-				QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
-				float *dstNorm, float *srcNorm) {
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
+                              dstFloat *Dst, srcFloat *Src, float *dstNorm, float *srcNorm)
+  {
 
     if (dst.Ndim() != src.Ndim())
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
 
     if (dst.Volume() != src.Volume()) errorQuda("Volumes %lu %lu don't match", dst.Volume(), src.Volume());
 
-    if (!( dst.SiteOrder() == src.SiteOrder() ||
-	   (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER &&
-	    src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) ||
-	   (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER &&
-	    src.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER) ) ) {
+    if (!(dst.SiteOrder() == src.SiteOrder()
+          || (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER && src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER)
+          || (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER && src.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER))) {
       errorQuda("Subset orders %d %d don't match", dst.SiteOrder(), src.SiteOrder());
     }
 
@@ -401,13 +398,11 @@ namespace quda {
     }
 
     genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
-
   }
 
   template <int Nc, typename dstFloat, typename srcFloat>
-  void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
-			      float *dstNorm=0, float *srcNorm=0)
+  void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
+                              dstFloat *Dst, srcFloat *Src, float *dstNorm = 0, float *srcNorm = 0)
   {
     if (dst.Nspin() != src.Nspin())
       errorQuda("source and destination spins must match");

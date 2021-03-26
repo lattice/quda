@@ -116,10 +116,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
 
   public:
-    GaugeGauss(Arg &arg, GaugeField &meta) :
-      TunableVectorY(2),
-      arg(arg),
-      meta(meta) {}
+    GaugeGauss(Arg &arg, GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) { }
 
     void apply(const qudaStream_t &stream)
     {
@@ -136,8 +133,7 @@ namespace quda {
     void postTune() { arg.rngstate.restore(); }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  struct GenGaussGroup {
+  template <typename Float, int nColor, QudaReconstructType recon> struct GenGaussGroup {
     GenGaussGroup(GaugeField &U, RNG &rngstate, double sigma)
     {
       constexpr bool group = true;
@@ -147,8 +143,7 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  struct GenGaussAlgebra {
+  template <typename Float, int nColor, QudaReconstructType recon> struct GenGaussAlgebra {
     GenGaussAlgebra(GaugeField &U, RNG &rngstate, double sigma)
     {
       constexpr bool group = false;
@@ -170,8 +165,7 @@ namespace quda {
 
     } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) {
 
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Creating Gaussian distrbuted momentum field\n");
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating Gaussian distrbuted momentum field\n");
       instantiate<GenGaussAlgebra, ReconstructMom>(U, rng, sigma);
 
     } else {

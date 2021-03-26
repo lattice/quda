@@ -14,9 +14,7 @@ static bool zeroCopy = false;
 namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
-    ColorSpinorField(param),
-    alloc(false),
-    init(true)
+    ColorSpinorField(param), alloc(false), init(true)
   {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -36,9 +34,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+    ColorSpinorField(src), alloc(false), init(true)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -46,9 +42,7 @@ namespace quda {
 
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+    ColorSpinorField(src), alloc(false), init(true)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -95,9 +89,7 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+    ColorSpinorField(src), alloc(false), init(true)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -158,11 +150,11 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
 	v_h = mapped_malloc(bytes);
-	v = get_mapped_device_pointer(v_h);
-	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+        v = get_mapped_device_pointer(v_h);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  norm_h = mapped_malloc(norm_bytes);
-	  norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
-	}
+          norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
+        }
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -214,7 +206,8 @@ namespace quda {
         // check for special metadata wrapper (look at reference comments in
         // createTexObject() below)
         if (!((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
-              || (precision == QUDA_HALF_PRECISION && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()) )) {
+              || (precision == QUDA_HALF_PRECISION
+                  && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()))) {
           (dynamic_cast<cudaColorSpinorField *>(odd))->v = (void *)((char *)v + bytes / 2);
           if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
             (dynamic_cast<cudaColorSpinorField *>(odd))->norm = (void *)((char *)norm + norm_bytes / 2);
@@ -461,7 +454,7 @@ namespace quda {
 
       if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *dest_d = get_mapped_device_pointer(dest.V());
+        void *dest_d = get_mapped_device_pointer(dest.V());
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
         void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;

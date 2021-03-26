@@ -24,7 +24,9 @@ namespace quda
 
   public:
     WilsonCloverHasenbuschTwist(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in) {}
+      Dslash(arg, out, in)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -76,7 +78,8 @@ namespace quda
                                             int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, x, parity, dagger,
+                                                                     comm_override);
       WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(

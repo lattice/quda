@@ -462,4 +462,3 @@ namespace quda
   }
 
 } // namespace quda
-

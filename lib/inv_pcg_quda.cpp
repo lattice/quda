@@ -19,7 +19,7 @@ namespace quda
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
     inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20;                            // no reliable updates within the inner solver
+    inner.delta = 1e-20; // no reliable updates within the inner solver
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision

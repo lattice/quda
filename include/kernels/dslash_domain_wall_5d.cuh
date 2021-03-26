@@ -31,7 +31,7 @@ namespace quda
   struct domainWall5D : dslash_default {
 
     Arg &arg;
-    constexpr domainWall5D(Arg &arg) : arg(arg) {}
+    constexpr domainWall5D(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
@@ -42,7 +42,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       // we pass s=0, since x_cb is a 5-d index that includes s
       auto coord = getCoords<QUDA_5D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 

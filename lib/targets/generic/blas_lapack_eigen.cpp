@@ -16,9 +16,9 @@ namespace quda
     namespace generic
     {
 
-      void init() {}
+      void init() { }
 
-      void destroy() {}
+      void destroy() { }
 
       // Batched inversion ckecking
       //---------------------------------------------------

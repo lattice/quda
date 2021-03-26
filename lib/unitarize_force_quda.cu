@@ -8,7 +8,8 @@
 #include <instantiate.h>
 #include <color_spinor.h>
 
-namespace quda {
+namespace quda
+{
 
   namespace { // anonymous
 #include <svd_quda.h>
@@ -33,8 +34,10 @@ namespace quda {
       static constexpr int nColor = nColor_;
       static constexpr QudaReconstructType recon = recon_;
       // use long form here to allow specification of order
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type F;
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,2*nColor*nColor,QUDA_STAGGERED_PHASE_NO,gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID,false,order>::type G;
+      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO,
+                                    gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID, false, order>::type F;
+      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2 * nColor * nColor, QUDA_STAGGERED_PHASE_NO,
+                                    gauge::default_huge_alloc, QUDA_GHOST_EXCHANGE_INVALID, false, order>::type G;
       F force;
       const F force_old;
       const G u;
@@ -49,8 +52,8 @@ namespace quda {
       const double svd_abs_error;
 
       UnitarizeForceArg(GaugeField &force, const GaugeField &force_old, const GaugeField &u, int *fails,
-			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,
-			int svd_only, double svd_rel_error, double svd_abs_error) :
+                        double unitarize_eps, double force_filter, double max_det_error, int allow_svd, int svd_only,
+                        double svd_rel_error, double svd_abs_error) :
         force(force),
         force_old(force_old),
         u(u),
@@ -62,7 +65,9 @@ namespace quda {
         svd_only(svd_only),
         svd_rel_error(svd_rel_error),
         svd_abs_error(svd_abs_error),
-        threads(u.VolumeCB()) { }
+        threads(u.VolumeCB())
+      {
+      }
     };
 
     void setUnitarizeForceConstants(double unitarize_eps_, double force_filter_,
@@ -78,57 +83,60 @@ namespace quda {
       svd_abs_error = svd_abs_error_;
     }
 
-    template <class Real> class DerivativeCoefficients {
+    template <class Real> class DerivativeCoefficients
+    {
       Real b[6];
       constexpr Real computeC00(const Real &u, const Real &v, const Real &w)
       {
-        return -pow(w,3) * pow(u,6) + 3*v*pow(w,3)*pow(u,4) + 3*pow(v,4)*w*pow(u,4)
-          - pow(v,6)*pow(u,3) - 4*pow(w,4)*pow(u,3) - 12*pow(v,3)*pow(w,2)*pow(u,3)
-          + 16*pow(v,2)*pow(w,3)*pow(u,2) + 3*pow(v,5)*w*pow(u,2) - 8*v*pow(w,4)*u
-          - 3*pow(v,4)*pow(w,2)*u + pow(w,5) + pow(v,3)*pow(w,3);
+        return -pow(w, 3) * pow(u, 6) + 3 * v * pow(w, 3) * pow(u, 4) + 3 * pow(v, 4) * w * pow(u, 4)
+          - pow(v, 6) * pow(u, 3) - 4 * pow(w, 4) * pow(u, 3) - 12 * pow(v, 3) * pow(w, 2) * pow(u, 3)
+          + 16 * pow(v, 2) * pow(w, 3) * pow(u, 2) + 3 * pow(v, 5) * w * pow(u, 2) - 8 * v * pow(w, 4) * u
+          - 3 * pow(v, 4) * pow(w, 2) * u + pow(w, 5) + pow(v, 3) * pow(w, 3);
       }
 
-      constexpr Real computeC01(const Real & u, const Real & v, const Real & w)
+      constexpr Real computeC01(const Real &u, const Real &v, const Real &w)
       {
-        return -pow(w,2)*pow(u,7) - pow(v,2)*w*pow(u,6) + pow(v,4)*pow(u,5) + 6*v*pow(w,2)*pow(u,5)
-          - 5*pow(w,3)*pow(u,4) - pow(v,3)*w*pow(u,4)- 2*pow(v,5)*pow(u,3) - 6*pow(v,2)*pow(w,2)*pow(u,3)
-          + 10*v*pow(w,3)*pow(u,2) + 6*pow(v,4)*w*pow(u,2) - 3*pow(w,4)*u - 6*pow(v,3)*pow(w,2)*u + 2*pow(v,2)*pow(w,3);
+        return -pow(w, 2) * pow(u, 7) - pow(v, 2) * w * pow(u, 6) + pow(v, 4) * pow(u, 5) + 6 * v * pow(w, 2) * pow(u, 5)
+          - 5 * pow(w, 3) * pow(u, 4) - pow(v, 3) * w * pow(u, 4) - 2 * pow(v, 5) * pow(u, 3)
+          - 6 * pow(v, 2) * pow(w, 2) * pow(u, 3) + 10 * v * pow(w, 3) * pow(u, 2) + 6 * pow(v, 4) * w * pow(u, 2)
+          - 3 * pow(w, 4) * u - 6 * pow(v, 3) * pow(w, 2) * u + 2 * pow(v, 2) * pow(w, 3);
       }
 
-      constexpr Real computeC02(const Real & u, const Real & v, const Real & w)
+      constexpr Real computeC02(const Real &u, const Real &v, const Real &w)
       {
-        return pow(w,2)*pow(u,5) + pow(v,2)*w*pow(u,4)- pow(v,4)*pow(u,3)- 4*v*pow(w,2)*pow(u,3)
-          + 4*pow(w,3)*pow(u,2) + 3*pow(v,3)*w*pow(u,2) - 3*pow(v,2)*pow(w,2)*u + v*pow(w,3);
+        return pow(w, 2) * pow(u, 5) + pow(v, 2) * w * pow(u, 4) - pow(v, 4) * pow(u, 3) - 4 * v * pow(w, 2) * pow(u, 3)
+          + 4 * pow(w, 3) * pow(u, 2) + 3 * pow(v, 3) * w * pow(u, 2) - 3 * pow(v, 2) * pow(w, 2) * u + v * pow(w, 3);
       }
 
-      constexpr Real computeC11(const Real & u, const Real & v, const Real & w)
+      constexpr Real computeC11(const Real &u, const Real &v, const Real &w)
       {
-        return -w*pow(u,8) - pow(v,2)*pow(u,7) + 7*v*w*pow(u,6) + 4*pow(v,3)*pow(u,5)
-          - 5*pow(w,2)*pow(u,5) - 16*pow(v,2)*w*pow(u,4) - 4*pow(v,4)*pow(u,3) + 16*v*pow(w,2)*pow(u,3)
-          - 3*pow(w,3)*pow(u,2) + 12*pow(v,3)*w*pow(u,2) - 12*pow(v,2)*pow(w,2)*u + 3*v*pow(w,3);
+        return -w * pow(u, 8) - pow(v, 2) * pow(u, 7) + 7 * v * w * pow(u, 6) + 4 * pow(v, 3) * pow(u, 5)
+          - 5 * pow(w, 2) * pow(u, 5) - 16 * pow(v, 2) * w * pow(u, 4) - 4 * pow(v, 4) * pow(u, 3)
+          + 16 * v * pow(w, 2) * pow(u, 3) - 3 * pow(w, 3) * pow(u, 2) + 12 * pow(v, 3) * w * pow(u, 2)
+          - 12 * pow(v, 2) * pow(w, 2) * u + 3 * v * pow(w, 3);
       }
 
       constexpr Real computeC12(const Real &u, const Real &v, const Real &w)
       {
-        return w*pow(u,6) + pow(v,2)*pow(u,5) - 5*v*w*pow(u,4) - 2*pow(v,3)*pow(u,3)
-          + 4*pow(w,2)*pow(u,3) + 6*pow(v,2)*w*pow(u,2) - 6*v*pow(w,2)*u + pow(w,3);
+        return w * pow(u, 6) + pow(v, 2) * pow(u, 5) - 5 * v * w * pow(u, 4) - 2 * pow(v, 3) * pow(u, 3)
+          + 4 * pow(w, 2) * pow(u, 3) + 6 * pow(v, 2) * w * pow(u, 2) - 6 * v * pow(w, 2) * u + pow(w, 3);
       }
 
       constexpr Real computeC22(const Real &u, const Real &v, const Real &w)
       {
-        return -w*pow(u,4) - pow(v,2)*pow(u,3) + 3*v*w*pow(u,2) - 3*pow(w,2)*u;
+        return -w * pow(u, 4) - pow(v, 2) * pow(u, 3) + 3 * v * w * pow(u, 2) - 3 * pow(w, 2) * u;
       }
 
     public:
       constexpr void set(const Real &u, const Real &v, const Real &w)
       {
-        const Real denominator = 1.0 / (2.0*pow(w*(u*v-w),3));
-        b[0] = computeC00(u,v,w) * denominator;
-        b[1] = computeC01(u,v,w) * denominator;
-        b[2] = computeC02(u,v,w) * denominator;
-        b[3] = computeC11(u,v,w) * denominator;
-        b[4] = computeC12(u,v,w) * denominator;
-        b[5] = computeC22(u,v,w) * denominator;
+        const Real denominator = 1.0 / (2.0 * pow(w * (u * v - w), 3));
+        b[0] = computeC00(u, v, w) * denominator;
+        b[1] = computeC01(u, v, w) * denominator;
+        b[2] = computeC02(u, v, w) * denominator;
+        b[3] = computeC11(u, v, w) * denominator;
+        b[4] = computeC12(u, v, w) * denominator;
+        b[5] = computeC22(u, v, w) * denominator;
       }
 
       constexpr Real getB00() const { return b[0]; }
@@ -142,26 +150,22 @@ namespace quda {
     template <typename mat>
     __device__ __host__ void accumBothDerivatives(mat &result, const mat &left, const mat &right, const mat &outer_prod)
     {
-      auto temp = (2.0*getTrace(left*outer_prod)).real();
-      for (int k=0; k<3; ++k) {
-	for (int l=0; l<3; ++l) {
-          result(k,l) += temp*right(k,l);
-	}
+      auto temp = (2.0 * getTrace(left * outer_prod)).real();
+      for (int k = 0; k < 3; ++k) {
+        for (int l = 0; l < 3; ++l) { result(k, l) += temp * right(k, l); }
       }
     }
 
     template <class mat>
     __device__ __host__ void accumDerivatives(mat &result, const mat &left, const mat &right, const mat &outer_prod)
     {
-      auto temp = getTrace(left*outer_prod);
+      auto temp = getTrace(left * outer_prod);
       for(int k=0; k<3; ++k){
-	for(int l=0; l<3; ++l){
-	  result(k,l) = temp*right(k,l);
-	}
+        for (int l = 0; l < 3; ++l) { result(k, l) = temp * right(k, l); }
       }
     }
 
-    template<class T> constexpr T getAbsMin(const T* const array, int size)
+    template <class T> constexpr T getAbsMin(const T *const array, int size)
     {
       T min = fabs(array[0]);
       for (int i=1; i<size; ++i) {
@@ -171,14 +175,20 @@ namespace quda {
       return min;
     }
 
-    template<class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return fabs(a-b) < epsilon; }
-    template<class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon) { return fabs((a-b)/b) < epsilon; }
+    template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon)
+    {
+      return fabs(a - b) < epsilon;
+    }
+    template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon)
+    {
+      return fabs((a - b) / b) < epsilon;
+    }
 
     // Compute the reciprocal square root of the matrix q
     // Also modify q if the eigenvalues are dangerously small.
-    template<class Float, typename Arg>
-    __device__  __host__  void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
-                                              Float f[3], Matrix<complex<Float>,3> & q, Arg &arg)
+    template <class Float, typename Arg>
+    __device__ __host__ void reciprocalRoot(Matrix<complex<Float>, 3> *res, DerivativeCoefficients<Float> *deriv_coeffs,
+                                            Float f[3], Matrix<complex<Float>, 3> &q, Arg &arg)
     {
       Matrix<complex<Float>,3> qsq, tempq;
 
@@ -198,32 +208,30 @@ namespace quda {
 	s = c[1]/3. - c[0]*c[0]/18;
 	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
 
-	Float cosTheta = r*rsqrt(s*s*s);
-	if (fabs(s) < arg.unitarize_eps) {
+        Float cosTheta = r * rsqrt(s * s * s);
+        if (fabs(s) < arg.unitarize_eps) {
 	  cosTheta = 1.;
-	  s = 0.0;
-	}
+          s = 0.0;
+        }
 	if(fabs(cosTheta)>1.0){ r>0 ? theta=0.0 : theta=HISQ_UNITARIZE_PI/3.0; }
 	else{ theta = acos(cosTheta)/3.0; }
 
 	s = 2.0*sqrt(s);
-	for (int i=0; i<3; ++i) {
-	  g[i] += s*cos(theta + (i-1)*HISQ_UNITARIZE_PI23);
-	}
+        for (int i = 0; i < 3; ++i) { g[i] += s * cos(theta + (i - 1) * HISQ_UNITARIZE_PI23); }
 
       } // !REUNIT_SVD_ONLY?
 
-	//
-	// Compare the product of the eigenvalues computed thus far to the
-	// absolute value of the determinant.
-	// If the determinant is very small or the relative error is greater than some predefined value
-	// then recompute the eigenvalues using a singular-value decomposition.
-	// Note that this particular calculation contains multiple branches,
-	// so it doesn't appear to be particularly well-suited to the GPU
-	// programming model. However, the analytic calculation of the
-	// unitarization is extremely fast, and if the SVD routine is not called
-	// too often, we expect pretty good performance.
-	//
+      //
+      // Compare the product of the eigenvalues computed thus far to the
+      // absolute value of the determinant.
+      // If the determinant is very small or the relative error is greater than some predefined value
+      // then recompute the eigenvalues using a singular-value decomposition.
+      // Note that this particular calculation contains multiple branches,
+      // so it doesn't appear to be particularly well-suited to the GPU
+      // programming model. However, the analytic calculation of the
+      // unitarization is extremely fast, and if the SVD routine is not called
+      // too often, we expect pretty good performance.
+      //
 
       if (arg.allow_svd) {
 	bool perform_svd = true;
@@ -232,10 +240,10 @@ namespace quda {
 	  if( fabs(det) >= arg.svd_abs_error) {
 	    if( checkRelativeError(g[0]*g[1]*g[2],det,arg.svd_rel_error) ) perform_svd = false;
 	  }
-	}
+        }
 
-	if(perform_svd){
-	  Matrix<complex<Float>,3> tmp2;
+        if (perform_svd) {
+          Matrix<complex<Float>,3> tmp2;
 	  // compute the eigenvalues using the singular value decomposition
 	  computeSVD<Float>(q,tempq,tmp2,g);
 	  // The array g contains the eigenvalues of the matrix q
@@ -253,8 +261,8 @@ namespace quda {
 #else
 	    (*arg.fails)++;
 #endif
-	  }
-	} // perform_svd?
+          }
+        } // perform_svd?
 
       } // REUNIT_ALLOW_SVD?
 
@@ -266,7 +274,6 @@ namespace quda {
 	}
 	qsq = q*q; // recalculate Q^2
       }
-
 
       // At this point we have finished with the c's
       // use these to store sqrt(g)
@@ -300,8 +307,8 @@ namespace quda {
 
     // "v" denotes a "fattened" link variable
     template <class Float, typename Arg>
-    __device__ __host__ void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
-                                                   const Matrix<complex<Float>,3> & outer_prod, Arg &arg)
+    __device__ __host__ void getUnitarizeForceSite(Matrix<complex<Float>, 3> &result, const Matrix<complex<Float>, 3> &v,
+                                                   const Matrix<complex<Float>, 3> &outer_prod, Arg &arg)
     {
       typedef Matrix<complex<Float>,3> Link;
       Float f[3];
@@ -356,28 +363,29 @@ namespace quda {
     template <typename Arg> __global__ void getUnitarizeForceField(Arg arg)
     {
       using real = typename Arg::Float;
-      int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+      int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
-      int parity = blockIdx.y*blockDim.y + threadIdx.y;
+      int parity = blockIdx.y * blockDim.y + threadIdx.y;
 
       // This part of the calculation is always done in double precision
       Matrix<complex<double>,3> v, result, oprod;
-      Matrix<complex<real>,3> v_tmp, result_tmp, oprod_tmp;
+      Matrix<complex<real>, 3> v_tmp, result_tmp, oprod_tmp;
 
-      for (int dir=0; dir<4; ++dir) {
-	oprod_tmp = arg.force_old(dir, x_cb, parity);
-	v_tmp = arg.u(dir, x_cb, parity);
-	v = v_tmp;
+      for (int dir = 0; dir < 4; ++dir) {
+        oprod_tmp = arg.force_old(dir, x_cb, parity);
+        v_tmp = arg.u(dir, x_cb, parity);
+        v = v_tmp;
 	oprod = oprod_tmp;
 
 	getUnitarizeForceSite<double>(result, v, oprod, arg);
 	result_tmp = result;
 
-	arg.force(dir, x_cb, parity) = result_tmp;
+        arg.force(dir, x_cb, parity) = result_tmp;
       } // 4*4528 flops per site
     } // getUnitarizeForceField
 
-    template <typename Float, int nColor, QudaReconstructType recon> class UnitarizeForce : public TunableVectorY {
+    template <typename Float, int nColor, QudaReconstructType recon> class UnitarizeForce : public TunableVectorY
+    {
       UnitarizeForceArg<Float, nColor, recon> arg;
       const GaugeField &meta;
 
@@ -386,41 +394,43 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
     public:
-      UnitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u, int* fails) :
+      UnitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u, int *fails) :
         TunableVectorY(2),
-        arg(newForce, oldForce, u, fails, unitarize_eps, force_filter,
-            max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error),
+        arg(newForce, oldForce, u, fails, unitarize_eps, force_filter, max_det_error, allow_svd, svd_only,
+            svd_rel_error, svd_abs_error),
         meta(u)
       {
         apply(0);
         qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       }
 
-      void apply(const qudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	qudaLaunchKernel(getUnitarizeForceField<decltype(arg)>, tp, stream, arg);
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        qudaLaunchKernel(getUnitarizeForceField<decltype(arg)>, tp, stream, arg);
       }
 
       void preTune() { ; }
       void postTune() { qudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
 
       long long flops() const { return 4ll*4528*meta.Volume(); }
-      long long bytes() const { return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes()); }
+      long long bytes() const
+      {
+        return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes());
+      }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
     }; // UnitarizeForce
 
-    void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
-			int* fails)
+    void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u, int *fails)
     {
 #ifdef GPU_HISQ_FORCE
       checkReconstruct(u, oldForce, newForce);
       checkPrecision(u, oldForce, newForce);
 
-      if (!u.isNative() || !oldForce.isNative() || !newForce.isNative())
-        errorQuda("Only native order supported");
+      if (!u.isNative() || !oldForce.isNative() || !newForce.isNative()) errorQuda("Only native order supported");
 
-      instantiate<UnitarizeForce,ReconstructNone>(newForce, oldForce, u, fails);
+      instantiate<UnitarizeForce, ReconstructNone>(newForce, oldForce, u, fails);
 #else
       errorQuda("HISQ force has not been built");
 #endif

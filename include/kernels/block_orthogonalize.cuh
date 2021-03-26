@@ -116,9 +116,7 @@ namespace quda {
             int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
             int x_cb = x - parity * arg.fineVolumeCB;
             for (int s = 0; s < nSpin; s++) {
-              for (int c = 0; c < nColor; c++) {
-                arg.V(parity, x_cb, s, c, j) = arg.B[j](parity, x_cb, s, c);
-              }
+              for (int c = 0; c < nColor; c++) { arg.V(parity, x_cb, s, c, j) = arg.B[j](parity, x_cb, s, c); }
             }
           }
         }
@@ -270,18 +268,19 @@ namespace quda {
           complex<Float> v_[spinBlock * nColor];
           B[j].template load<spinBlock>(v_, parity, x_cb, (nSpin == 1) ? 0 : chirality);
 #pragma unroll
-          for (int s = 0; s < spinBlock; s++)
-          {
+          for (int s = 0; s < spinBlock; s++) {
             const int s_idx = (nSpin == 1) ? 0 : (s * nColor);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : v_[s_idx + c];
+            for (int c = 0; c < nColor; c++)
+              v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : v_[s_idx + c];
           }
         } else {
 #pragma unroll
           for (int s = 0; s < spinBlock; s++) {
             const int s_idx = (nSpin == 1) ? 0 : (chirality * spinBlock + s);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, j);
+            for (int c = 0; c < nColor; c++)
+              v[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, j);
           }
         }
 
@@ -295,7 +294,8 @@ namespace quda {
           for (int s = 0; s < spinBlock; s++) {
             const int s_idx = (nSpin == 1) ? 0 : (chirality * spinBlock + s);
 #pragma unroll
-            for (int c = 0; c < nColor; c++) vi[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, i);
+            for (int c = 0; c < nColor; c++)
+              vi[s][c] = (nSpin == 1 && parity != chirality) ? complex<Float>(0) : arg.V(parity, x_cb, s_idx, c, i);
           }
 
 #pragma unroll

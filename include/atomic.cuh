@@ -163,8 +163,9 @@ static inline __device__ float atomicMax(float *addr, float val){
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-static inline __device__ float atomicAbsMax(float *addr, float val){
+static inline __device__ float atomicAbsMax(float *addr, float val)
+{
   uint32_t val_ = __float_as_uint(val);
-  uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
+  uint32_t *addr_ = reinterpret_cast<uint32_t *>(addr);
   return atomicMax(addr_, val_);
 }

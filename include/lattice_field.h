@@ -808,7 +808,7 @@ namespace quda {
      @return true if all fields are in native order
    */
   template <typename... Args>
-  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a, const Args &... args)
+  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a, const Args &...args)
   {
     return (Native_(func, file, line, a) & Native_(func, file, line, args...));
   }

@@ -70,8 +70,8 @@ namespace quda
 
   */
   template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, Coord &coord, int parity,
-                                              int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, Coord &coord, int parity, int idx, int thread_dim,
+                                              bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -126,7 +126,7 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct covDev : dslash_default {
 
     Arg &arg;
-    constexpr covDev(Arg &arg) : arg(arg) {}
+    constexpr covDev(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

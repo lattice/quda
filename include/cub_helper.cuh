@@ -17,7 +17,8 @@ using namespace quda;
 
 #ifdef __CUDACC_RTC__
 // WAR for CUDA < 11 which prevents the use of cuda_fp16.h in cub with nvrtc
-struct __half { };
+struct __half {
+};
 #endif
 
 #include <cub/block/block_reduce.cuh>

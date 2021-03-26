@@ -16,14 +16,11 @@ namespace quda
     bool tuneGridDim() const { return false; }
 
 public:
-    Fmunu(const GaugeField &u, GaugeField &f) :
-      TunableVectorYZ(2, 6),
-      arg(f, u),
-      meta(u)
-    {
-      strcpy(aux, meta.AuxString());
-      strcat(aux, comm_dim_partitioned_string());
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+  Fmunu(const GaugeField &u, GaugeField &f) : TunableVectorYZ(2, 6), arg(f, u), meta(u)
+  {
+    strcpy(aux, meta.AuxString());
+    strcat(aux, comm_dim_partitioned_string());
+    if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/field_strength_tensor.cuh");
 #endif
@@ -37,8 +34,10 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeFmunuKernel").instantiate(Type<decltype(arg)>())
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+      jitify_error = program->kernel("quda::computeFmunuKernel")
+                       .instantiate(Type<decltype(arg)>())
+                       .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                       .launch(arg);
 #else
       qudaLaunchKernel(computeFmunuKernel<decltype(arg)>, tp, stream, arg);
 #endif
@@ -58,7 +57,7 @@ public:
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(f, u);
-    instantiate<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
+    instantiate<Fmunu, ReconstructWilson>(u, f); // u must be first here for correct template instantiation
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS

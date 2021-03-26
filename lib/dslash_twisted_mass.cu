@@ -20,7 +20,7 @@ namespace quda
     using Dslash::in;
 
   public:
-    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
 
     void apply(const qudaStream_t &stream)
     {

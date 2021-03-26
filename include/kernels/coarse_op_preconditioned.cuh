@@ -55,12 +55,12 @@ namespace quda {
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
 
-      auto yHat = make_tile_C<complex,true>(arg.tile);
+      auto yHat = make_tile_C<complex, true>(arg.tile);
 
 #pragma unroll
       for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, true>(arg.tile);
-        Y.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
+        Y.load(arg.Y, d, 1 - parity, ghost_idx, i0, k);
 
         auto X = make_tile_Bt<complex, false>(arg.tile);
         X.load(arg.Xinv, 0, parity, x_cb, j0, k);
@@ -77,12 +77,12 @@ namespace quda {
     } else {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-      auto yHat = make_tile_C<complex,false>(arg.tile);
+      auto yHat = make_tile_C<complex, false>(arg.tile);
 
 #pragma unroll
       for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, false>(arg.tile);
-        Y.load(arg.Y, d, 1-parity, back_idx, i0, k);
+        Y.load(arg.Y, d, 1 - parity, back_idx, i0, k);
 
         auto X = make_tile_Bt<complex, false>(arg.tile);
         X.load(arg.Xinv, 0, parity, x_cb, j0, k);

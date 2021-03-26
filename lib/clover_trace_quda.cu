@@ -185,10 +185,11 @@ namespace quda {
       }
       virtual ~CloverSigmaTrace() {;}
 
-      void apply(const qudaStream_t &stream){
+      void apply(const qudaStream_t &stream)
+      {
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          qudaLaunchKernel(cloverSigmaTraceKernel<Float,Arg>, tp, stream, arg);
+          qudaLaunchKernel(cloverSigmaTraceKernel<Float, Arg>, tp, stream, arg);
         } else {
           cloverSigmaTrace<Float,Arg>(arg);
         }

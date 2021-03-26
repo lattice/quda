@@ -81,8 +81,7 @@ namespace quda
     }
   }
 
-  template <int blockSize, typename Arg, bool compute_tr_log, bool twist>
-  __global__ void cloverInvertKernel(Arg arg)
+  template <int blockSize, typename Arg, bool compute_tr_log, bool twist> __global__ void cloverInvertKernel(Arg arg)
   {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = threadIdx.y;

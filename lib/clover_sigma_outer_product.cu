@@ -74,9 +74,10 @@ namespace quda {
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), "CloverSigmaOprod", aux); }
   }; // CloverSigmaOprod
 
-  template<typename Float>
-  void computeCloverSigmaOprod(GaugeField& oprod, const std::vector<ColorSpinorField*> &x,
-			       const std::vector<ColorSpinorField*> &p, const std::vector<std::vector<double> > &coeff, int nvector)
+  template <typename Float>
+  void computeCloverSigmaOprod(GaugeField &oprod, const std::vector<ColorSpinorField *> &x,
+                               const std::vector<ColorSpinorField *> &p, const std::vector<std::vector<double>> &coeff,
+                               int nvector)
   {
     // Create the arguments
     CloverSigmaOprodArg<Float, 3> arg(oprod, x, p, coeff, nvector);

@@ -1,7 +1,8 @@
 /**
    Generic reduce kernel with four loads and up to four stores.
   */
-template <typename reduce_t, typename Float, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+template <typename reduce_t, typename Float, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
+          typename SpinorV, typename Reducer>
 auto genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r)
 {
   using vec = vector_type<complex<Float>, 1>;
@@ -35,7 +36,8 @@ auto genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, R
 }
 
 template <typename reduce_t, typename Float, typename zFloat, int nSpin, int nColor, QudaFieldOrder order, typename R>
-auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
+auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                   ColorSpinorField &v, R r)
 {
   colorspinor::FieldOrderCB<Float, nSpin, nColor, 1, order> X(x), Y(y), W(w), V(v);
   colorspinor::FieldOrderCB<zFloat, nSpin, nColor, 1, order> Z(z);
@@ -43,9 +45,11 @@ auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z
 }
 
 template <typename reduce_t, typename Float, typename zFloat, int nSpin, QudaFieldOrder order, typename R>
-auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
+auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                   ColorSpinorField &v, R r)
 {
-  if (x.Ncolor() != 3 && x.Nspin() != 2) errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
+  if (x.Ncolor() != 3 && x.Nspin() != 2)
+    errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
   reduce_t value;
   if (x.Ncolor() == 3) {
     value = genericReduce<reduce_t, Float, zFloat, nSpin, 3, order, R>(x, y, z, w, v, r);
@@ -74,8 +78,9 @@ auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z
   return value;
 }
 
-template <typename reduce_t,typename Float, typename zFloat, QudaFieldOrder order, typename R>
-auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
+template <typename reduce_t, typename Float, typename zFloat, QudaFieldOrder order, typename R>
+auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                   ColorSpinorField &v, R r)
 {
   reduce_t value;
   ::quda::zero(value);
@@ -104,7 +109,8 @@ auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z
 }
 
 template <typename reduce_t, typename Float, typename zFloat, typename R>
-auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
+auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+                   ColorSpinorField &v, R r)
 {
   reduce_t value;
   ::quda::zero(value);

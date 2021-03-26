@@ -71,11 +71,12 @@ namespace quda
 
     public:
       Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
-              const double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
-              double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
-              double sherman_morrison, bool dagger, Dslash5Type type) :
+              const double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv, double kappa,
+              const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison, bool dagger,
+              Dslash5Type type) :
         TunableVectorYZ(in.X(4), in.SiteSubset()),
-        arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type),
+        arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger,
+            type),
         meta(in)
       {
         TunableVectorY::resizeStep(arg.Ls);

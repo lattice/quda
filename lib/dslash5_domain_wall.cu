@@ -86,26 +86,24 @@ namespace quda
     }
 
 public:
-    Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
-            double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type) :
-      TunableVectorYZ(in.X(4), in.SiteSubset()),
-      arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type),
-      meta(in)
-    {
-      strcpy(aux, meta.AuxString());
-      if (arg.dagger) strcat(aux, ",Dagger");
-      if (arg.xpay) strcat(aux, ",xpay");
-      switch (arg.type) {
-      case DSLASH5_DWF: strcat(aux, ",DSLASH5_DWF"); break;
-      case DSLASH5_MOBIUS_PRE: strcat(aux, ",DSLASH5_MOBIUS_PRE"); break;
-      case DSLASH5_MOBIUS: strcat(aux, ",DSLASH5_MOBIUS"); break;
-      case M5_INV_DWF: strcat(aux, ",M5_INV_DWF"); break;
-      case M5_INV_MOBIUS: strcat(aux, ",M5_INV_MOBIUS"); break;
-      case M5_INV_ZMOBIUS: strcat(aux, ",M5_INV_ZMOBIUS"); break;
-      default: errorQuda("Unknown Dslash5Type %d", arg.type);
-      }
+  Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
+          const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type) :
+    TunableVectorYZ(in.X(4), in.SiteSubset()), arg(out, in, x, m_f, m_5, b_5, c_5, a, dagger, type), meta(in)
+  {
+    strcpy(aux, meta.AuxString());
+    if (arg.dagger) strcat(aux, ",Dagger");
+    if (arg.xpay) strcat(aux, ",xpay");
+    switch (arg.type) {
+    case DSLASH5_DWF: strcat(aux, ",DSLASH5_DWF"); break;
+    case DSLASH5_MOBIUS_PRE: strcat(aux, ",DSLASH5_MOBIUS_PRE"); break;
+    case DSLASH5_MOBIUS: strcat(aux, ",DSLASH5_MOBIUS"); break;
+    case M5_INV_DWF: strcat(aux, ",M5_INV_DWF"); break;
+    case M5_INV_MOBIUS: strcat(aux, ",M5_INV_MOBIUS"); break;
+    case M5_INV_ZMOBIUS: strcat(aux, ",M5_INV_ZMOBIUS"); break;
+    default: errorQuda("Unknown Dslash5Type %d", arg.type);
+    }
 
-      apply(streams[Nstream - 1]);
+    apply(streams[Nstream - 1]);
     }
 
     template <typename T, typename Arg> inline void launch(T *f, TuneParam &tp, Arg &arg, const qudaStream_t &stream)

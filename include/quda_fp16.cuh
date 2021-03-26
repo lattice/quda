@@ -5,7 +5,8 @@
 namespace quda
 {
 
-  __device__ inline half2 habs2(half2 input) {
+  __device__ inline half2 habs2(half2 input)
+  {
 #if CUDA_VERSION >= 10020
     return __habs2(input);
 #else

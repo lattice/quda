@@ -21,7 +21,7 @@ namespace quda
     using Dslash::in;
 
   public:
-    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
 
     void apply(const qudaStream_t &stream)
     {

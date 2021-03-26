@@ -13,22 +13,21 @@ namespace quda
     WFLOW_STEP_VT,
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int wflow_dim_>
-  struct GaugeWFlowArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int wflow_dim_> struct GaugeWFlowArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
-    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
+    typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
 
     Gauge out;
     Matrix temp;
     const Gauge in;
 
-    int threads; // number of active threads required
-    int_fastdiv X[4];    // grid dimensions
+    int threads;      // number of active threads required
+    int_fastdiv X[4]; // grid dimensions
     int border[4];
     int_fastdiv E[4];
     const Float epsilon;
@@ -37,13 +36,14 @@ namespace quda
     const QudaWFlowType wflow_type;
     const WFlowStepType step_type;
 
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const Float epsilon, const QudaWFlowType wflow_type, const WFlowStepType step_type) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const Float epsilon,
+                  const QudaWFlowType wflow_type, const WFlowStepType step_type) :
       out(out),
       in(in),
       temp(temp),
       threads(1),
-      coeff1x1(5.0/3.0),
-      coeff2x1(-1.0/12.0),
+      coeff1x1(5.0 / 3.0),
+      coeff2x1(-1.0 / 12.0),
       epsilon(epsilon),
       wflow_type(wflow_type),
       step_type(step_type)
@@ -66,12 +66,12 @@ namespace quda
     Link Stap, Rect, Z;
     // Compute staples and Z factor
     switch (wflow_type) {
-    case QUDA_WFLOW_TYPE_WILSON :
+    case QUDA_WFLOW_TYPE_WILSON:
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z = Stap;
       break;
-    case QUDA_WFLOW_TYPE_SYMANZIK :
+    case QUDA_WFLOW_TYPE_SYMANZIK:
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
@@ -83,7 +83,8 @@ namespace quda
   }
 
   template <QudaWFlowType wflow_type, typename Link, typename Arg>
-  __host__ __device__ inline auto computeW1Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW1Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb,
+                                                const int dir)
   {
     // Compute staples and Z0
     Link Z0 = computeStaple<wflow_type>(arg, x, parity, dir);
@@ -95,10 +96,11 @@ namespace quda
   }
 
   template <QudaWFlowType wflow_type, typename Link, typename Arg>
-  __host__ __device__ inline auto computeW2Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW2Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb,
+                                                const int dir)
   {
     // Compute staples and Z1
-    Link Z1 = (8.0/9.0) * computeStaple<wflow_type>(arg, x, parity, dir);
+    Link Z1 = (8.0 / 9.0) * computeStaple<wflow_type>(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z1 *= conj(U);
 
@@ -112,10 +114,11 @@ namespace quda
   }
 
   template <QudaWFlowType wflow_type, typename Link, typename Arg>
-  __host__ __device__ inline auto computeVtStep(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeVtStep(Arg &arg, Link &U, const int *x, const int parity, const int x_cb,
+                                                const int dir)
   {
     // Compute staples and Z2
-    Link Z2 = (3.0/4.0) * computeStaple<wflow_type>(arg, x, parity, dir);
+    Link Z2 = (3.0 / 4.0) * computeStaple<wflow_type>(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z2 *= conj(U);
 
@@ -131,7 +134,7 @@ namespace quda
   {
     using real = typename Arg::Float;
     using Link = Matrix<complex<real>, Arg::nColor>;
-    complex<real> im(0.0,-1.0);
+    complex<real> im(0.0, -1.0);
 
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -139,7 +142,7 @@ namespace quda
     if (x_cb >= arg.threads) return;
     if (dir >= Arg::wflow_dim) return;
 
-    //Get stacetime and local coords
+    // Get stacetime and local coords
     int x[4];
     getCoords(x, x_cb, arg.X, parity);
     for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];

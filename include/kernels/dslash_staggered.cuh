@@ -85,8 +85,8 @@ namespace quda
      @param[in] x_cb The checkerboarded site index
   */
   template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord & coord, int parity,
-                                                 int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord &coord, int parity, int idx,
+                                                 int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -100,12 +100,14 @@ namespace quda
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) :
+                                        arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += (U * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
+          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) :
+                                        arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in);
         }
@@ -174,7 +176,7 @@ namespace quda
   struct staggered : dslash_default {
 
     Arg &arg;
-    constexpr staggered(Arg &arg) : arg(arg) {}
+    constexpr staggered(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -185,7 +187,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = arg.improved ? getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim) :
                                   getCoords<QUDA_4D_PC, mykernel_type, Arg, 1>(arg, idx, s, parity, thread_dim);
 

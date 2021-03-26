@@ -6,9 +6,10 @@ namespace quda {
 				QudaFieldLocation location, void *Dst, void *Src, 
 				void *dstNorm, void *srcNorm) {
 #if QUDA_PRECISION & 1
-    CopyGenericColorSpinor<3>(dst, src, location, (double*)Dst, (int8_t*)Src, 0, (float*)srcNorm);
+    CopyGenericColorSpinor<3>(dst, src, location, (double *)Dst, (int8_t *)Src, 0, (float *)srcNorm);
 #else
-    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(), src.Precision());
+    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(),
+              src.Precision());
 #endif
   }  
 

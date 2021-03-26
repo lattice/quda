@@ -10,7 +10,7 @@ namespace quda {
   template <typename Float> struct GhostExtract {
     GhostExtract(const GaugeField &u, void **Ghost_, bool extract, int offset)
     {
-      Float **Ghost = reinterpret_cast<Float**>(Ghost_);
+      Float **Ghost = reinterpret_cast<Float **>(Ghost_);
       const int length = 18;
 
       if (u.isNative()) {
@@ -19,22 +19,22 @@ namespace quda {
           extractGhost<Float, length>(G(u, 0, Ghost), u, extract, offset);
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 #if QUDA_RECONSTRUCT & 2
-          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-          extractGhost<Float,length>(G(u, 0, Ghost), u, extract, offset);
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_12>::type G;
+          extractGhost<Float, length>(G(u, 0, Ghost), u, extract, offset);
 #else
           errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
 #endif
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 #if QUDA_RECONSTRUCT & 1
-          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
-          extractGhost<Float,length>(G(u, 0, Ghost), u, extract, offset);
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_8>::type G;
+          extractGhost<Float, length>(G(u, 0, Ghost), u, extract, offset);
 #else
           errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
 #endif
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
 #if QUDA_RECONSTRUCT & 2
-          typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
-          extractGhost<Float,length>(G(u, 0, Ghost), u, extract, offset);
+          typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_13>::type G;
+          extractGhost<Float, length>(G(u, 0, Ghost), u, extract, offset);
 #else
           errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
 #endif
@@ -56,7 +56,7 @@ namespace quda {
       } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
-        extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(QDPOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("QDP interface has not been built\n");
 #endif
@@ -64,7 +64,7 @@ namespace quda {
       } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-        extractGhost<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(QDPJITOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -72,7 +72,7 @@ namespace quda {
       } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 
 #ifdef BUILD_CPS_INTERFACE
-        extractGhost<Float,length>(CPSOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(CPSOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("CPS interface has not been built\n");
 #endif
@@ -80,7 +80,7 @@ namespace quda {
       } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
-        extractGhost<Float,length>(MILCOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(MILCOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("MILC interface has not been built\n");
 #endif
@@ -88,7 +88,7 @@ namespace quda {
       } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
 
 #ifdef BUILD_BQCD_INTERFACE
-        extractGhost<Float,length>(BQCDOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(BQCDOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif
@@ -96,7 +96,7 @@ namespace quda {
       } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-        extractGhost<Float,length>(TIFROrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(TIFROrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("TIFR interface has not been built\n");
 #endif
@@ -104,7 +104,7 @@ namespace quda {
       } else if (u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-        extractGhost<Float,length>(TIFRPaddedOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(TIFRPaddedOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #else
         errorQuda("TIFR interface has not been built\n");
 #endif
@@ -112,7 +112,6 @@ namespace quda {
       } else {
         errorQuda("Gauge field %d order not supported", u.Order());
       }
-
     }
   };
 

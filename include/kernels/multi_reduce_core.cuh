@@ -23,11 +23,10 @@ namespace quda
        @tparam Reducer Functor used to operate on data
     */
     template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
-    struct MultiReduceArg :
-      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
-      SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
-      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
-    {
+    struct MultiReduceArg
+      : public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
+        SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
+        SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w> {
       using Reducer = Reducer_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
@@ -37,8 +36,8 @@ namespace quda
       const int_fastdiv gridSize;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
+                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, Reducer r, int NYW,
+                     int length, int nParity, TuneParam &tp) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
         NYW(NYW),
@@ -67,11 +66,10 @@ namespace quda
     template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
     constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
 
-    template <int block_size, typename real, int n, int NXZ, typename Arg>
-    __global__ void multiReduceKernel(Arg arg)
+    template <int block_size, typename real, int n, int NXZ, typename Arg> __global__ void multiReduceKernel(Arg arg)
     {
       // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
+      using vec = vector_type<complex<real>, n / 2>;
       unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int idx = tid % arg.gridSize;
       unsigned int parity = tid / arg.gridSize;
@@ -89,9 +87,9 @@ namespace quda
         if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
         if (arg.r.read.W) arg.W[k].load(w, idx, parity);
 
-        // Each NYW owns its own thread.
-        // The NXZ's are all in the same thread block,
-        // so they can share the same memory.
+          // Each NYW owns its own thread.
+          // The NXZ's are all in the same thread block,
+          // so they can share the same memory.
 #pragma unroll
         for (int l = 0; l < NXZ; l++) {
           if (arg.r.read.X) arg.X[l].load(x, idx, parity);
@@ -119,12 +117,12 @@ namespace quda
       using reduce_t = reduce_t_;
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
-      static constexpr bool coeff_mul  = false;
+      static constexpr bool coeff_mul = false;
       static constexpr bool multi_1d = false;
       const int NXZ;
       const int NYW;
 
-      MultiReduceFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+      MultiReduceFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) { }
 
       __device__ __host__ inline coeff_t a(int i, int j) const
       {
@@ -158,34 +156,36 @@ namespace quda
        Return the real dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void dot_(reduce_t &sum, const typename VectorType<T, 2>::type &a,
+                                  const typename VectorType<T, 2>::type &b)
     {
       sum += static_cast<reduce_t>(a.x) * static_cast<reduce_t>(b.x);
       sum += static_cast<reduce_t>(a.y) * static_cast<reduce_t>(b.y);
     }
 
-    template <typename reduce_t, typename real>
-    struct multiDot : public MultiReduceFunctor<reduce_t, real> {
-      static constexpr memory_access<1, 1> read { };
-      static constexpr memory_access< > write { };
+    template <typename reduce_t, typename real> struct multiDot : public MultiReduceFunctor<reduce_t, real> {
+      static constexpr memory_access<1, 1> read {};
+      static constexpr memory_access<> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T>
+      __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k = 0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int flops() const { return 2; }   //! flops per element
+      constexpr int flops() const { return 2; } //! flops per element
     };
 
     /**
        Returns complex-valued dot product of x and y
     */
     template <typename reduce_t, typename T>
-    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
+    __device__ __host__ void cdot_(reduce_t &sum, const typename VectorType<T, 2>::type &a,
+                                   const typename VectorType<T, 2>::type &b)
     {
       using scalar = typename scalar<reduce_t>::type;
       sum.x += static_cast<scalar>(a.x) * static_cast<scalar>(b.x);
@@ -197,31 +197,33 @@ namespace quda
     template <typename real_reduce_t, typename real>
     struct multiCdot : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr memory_access<1, 1> read { };
-      static constexpr memory_access< > write { };
+      static constexpr memory_access<1, 1> read {};
+      static constexpr memory_access<> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T>
+      __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
 #pragma unroll
-        for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
+        for (int k = 0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
-      constexpr int flops() const { return 4; }   //! flops per element
+      constexpr int flops() const { return 4; } //! flops per element
     };
 
     template <typename real_reduce_t, typename real>
     struct multiCdotCopy : public MultiReduceFunctor<typename VectorType<real_reduce_t, 2>::type, complex<real>> {
       using reduce_t = typename VectorType<real_reduce_t, 2>::type;
-      static constexpr memory_access<1, 1> read { };
-      static constexpr memory_access<0, 0, 0, 1> write { };
+      static constexpr memory_access<1, 1> read {};
+      static constexpr memory_access<0, 0, 0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T>
+      __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -230,7 +232,7 @@ namespace quda
         }
       }
 
-      constexpr int flops() const { return 4; }   //! flops per element
+      constexpr int flops() const { return 4; } //! flops per element
     };
 
   } // namespace blas

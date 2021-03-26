@@ -102,8 +102,7 @@ namespace quda {
           p(parity,x_cb,0,c2) = 0.0;
         }
         // except the corner and color we want
-        if (s == corner)
-          p(parity,x_cb,0,c) = (double)v;
+        if (s == corner) p(parity, x_cb, 0, c) = (double)v;
       }
     }
   }
@@ -145,9 +144,9 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 64) {
-      genericSource<Float,nSpin,64,order>(a,sourceType, x, s, c);
+      genericSource<Float, nSpin, 64, order>(a, sourceType, x, s, c);
     } else if (a.Ncolor() == 96) {
-      genericSource<Float,nSpin,96,order>(a,sourceType, x, s, c);
+      genericSource<Float, nSpin, 96, order>(a, sourceType, x, s, c);
 #endif // NSPIN1
 #endif // GPU_MULTIGRID
     } else {
@@ -366,43 +365,36 @@ namespace quda {
     else if (a.Ncolor() == 3 && a.Nspin() == 4)  {
       FieldOrderCB<Float,4,3,1,order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 3 && a.Nspin() == 1)  {
-      FieldOrderCB<Float,1,3,1,order> A(a);
+    } else if (a.Ncolor() == 3 && a.Nspin() == 1) {
+      FieldOrderCB<Float, 1, 3, 1, order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 2 && a.Nspin() == 2) {
+    } else if (a.Ncolor() == 2 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,2,1,order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 24 && a.Nspin() == 2) {
+    } else if (a.Ncolor() == 24 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,24,1,order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 6 && a.Nspin() == 4) {
+    } else if (a.Ncolor() == 6 && a.Nspin() == 4) {
       FieldOrderCB<Float,4,6,1,order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 72 && a.Nspin() == 4) {
+    } else if (a.Ncolor() == 72 && a.Nspin() == 4) {
       FieldOrderCB<Float,4,72,1,order> A(a);
       print_vector(A, x);
-    }
-    else if (a.Ncolor() == 576 && a.Nspin() == 2) {
+    } else if (a.Ncolor() == 576 && a.Nspin() == 2) {
       FieldOrderCB<Float,2,576,1,order> A(a);
       print_vector(A, x);
     }
 #ifdef GPU_STAGGERED_DIRAC
     else if (a.Ncolor() == 64 && a.Nspin() == 2) {
-      FieldOrderCB<Float,2,64,1,order> A(a);
+      FieldOrderCB<Float, 2, 64, 1, order> A(a);
       print_vector(A, x);
-    } 
-else if (a.Ncolor() == 96 && a.Nspin() == 2) {
-      FieldOrderCB<Float,2,96,1,order> A(a);
+    } else if (a.Ncolor() == 96 && a.Nspin() == 2) {
+      FieldOrderCB<Float, 2, 96, 1, order> A(a);
       print_vector(A, x);
-    } 
+    }
 #endif
     else {
-      errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());	 
+      errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());
     }
   }
 

@@ -8,10 +8,11 @@ namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
+    qudaStream_t *getStream();
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size != 32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp,
+                                                                        const qudaStream_t &stream)
     {
       if (tp.block.x == block_size)
         return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
@@ -20,7 +21,8 @@ namespace quda {
     }
 
     template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    typename std::enable_if<block_size == 32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp,
+                                                                        const qudaStream_t &stream)
     {
       if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
       return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
@@ -32,9 +34,9 @@ namespace quda {
     constexpr static unsigned int max_block_size() { return 1024; }
 #endif
 
-   /**
-       Generic reduction kernel launcher
-    */
+    /**
+        Generic reduction kernel launcher
+     */
     template <typename host_reduce_t, typename real, int len, typename Arg>
     auto reduceLaunch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
@@ -45,9 +47,9 @@ namespace quda {
 #ifdef JITIFY
       using namespace jitify::reflection;
       tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), len, Type<Arg>())
-                                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                  .launch(arg);
+                                .instantiate((int)tp.block.x, Type<real>(), len, Type<Arg>())
+                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                                .launch(arg);
       arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
       arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
@@ -59,8 +61,8 @@ namespace quda {
       return result;
     }
 
-    template <template <typename ReducerType, typename real> class Reducer,
-              typename store_t, typename y_store_t, int nSpin, typename coeff_t>
+    template <template <typename ReducerType, typename real> class Reducer, typename store_t, typename y_store_t,
+              int nSpin, typename coeff_t>
     class Reduce : public Tunable
     {
       using real = typename mapper<y_store_t>::type;
@@ -139,7 +141,8 @@ namespace quda {
 
       void apply(const qudaStream_t &stream)
       {
-        constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value || decltype(r)::site_unroll;
+        constexpr bool site_unroll_check
+          = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value || decltype(r)::site_unroll;
         if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
@@ -152,7 +155,8 @@ namespace quda {
           Reducer<device_reduce_t, device_real_t> r_(a, b);
 
           // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value || decltype(r)::site_unroll;
+          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value
+            || isFixed<device_store_t>::value || decltype(r)::site_unroll;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -172,7 +176,8 @@ namespace quda {
           Reducer<double, host_real_t> r_(a, b);
 
           // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values
-          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value || decltype(r)::site_unroll;
+          constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value
+            || isFixed<host_store_t>::value || decltype(r)::site_unroll;
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
@@ -220,15 +225,15 @@ namespace quda {
 
       long long bytes() const
       {
-        return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes() +
-          (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
+        return (r.read.X + r.write.X) * x.Bytes() + (r.read.Y + r.write.Y) * y.Bytes()
+          + (r.read.Z + r.write.Z) * z.Bytes() + (r.read.W + r.write.W) * w.Bytes() + (r.read.V + r.write.V) * v.Bytes();
       }
 
       int tuningIter() const { return 3; }
     };
 
     template <template <typename reduce_t, typename real> class Functor, bool mixed, typename... Args>
-    auto instantiateReduce(Args &&... args)
+    auto instantiateReduce(Args &&...args)
     {
       using host_reduce_t = typename Functor<double, double>::reduce_t;
       host_reduce_t value;
@@ -336,14 +341,14 @@ namespace quda {
       return instantiateReduce<quadrupleCGReduction_, false>(0.0, 0.0, 0.0, x, y, z, x, x);
     }
 
-    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y,
-                                ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+    double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                                ColorSpinorField &w, ColorSpinorField &v)
     {
       return instantiateReduce<quadrupleCG3InitNorm_, false>(a, 0.0, 0.0, x, y, z, w, v);
     }
 
-    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y,
-                                  ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
+    double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                                  ColorSpinorField &w, ColorSpinorField &v)
     {
       return instantiateReduce<quadrupleCG3UpdateNorm_, false>(a, b, 0.0, x, y, z, w, v);
     }

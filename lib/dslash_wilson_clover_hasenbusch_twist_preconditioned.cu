@@ -24,7 +24,9 @@ namespace quda
 
   public:
     WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in) {}
+      Dslash(arg, out, in)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -172,7 +174,9 @@ namespace quda
 
   public:
     WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in) {}
+      Dslash(arg, out, in)
+    {
+    }
 
     void apply(const qudaStream_t &stream)
     {

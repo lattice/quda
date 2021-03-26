@@ -26,7 +26,7 @@ namespace quda
   struct nDegTwistedMass : dslash_default {
 
     Arg &arg;
-    constexpr nDegTwistedMass(Arg &arg) : arg(arg) {}
+    constexpr nDegTwistedMass(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -43,7 +43,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;

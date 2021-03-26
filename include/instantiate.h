@@ -58,7 +58,7 @@ namespace quda
   template <bool enabled, template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply {
-    instantiateApply(G &U, Args &&... args) { Apply<Float, nColor, recon>(U, args...); }
+    instantiateApply(G &U, Args &&...args) { Apply<Float, nColor, recon>(U, args...); }
   };
 
   /**
@@ -68,7 +68,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &U, Args &&... args)
+    instantiateApply(G &U, Args &&...args)
     {
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
     }
@@ -81,7 +81,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             int i, typename G, typename... Args>
   struct instantiateReconstruct {
-    instantiateReconstruct(G &U, Args &&... args)
+    instantiateReconstruct(G &U, Args &&...args)
     {
       if (U.Reconstruct() == Recon::recon[i]) {
         instantiateApply<is_enabled<Recon::recon[i]>(), Apply, Float, nColor, Recon::recon[i], G, Args...>(U, args...);
@@ -97,7 +97,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             typename G, typename... Args>
   struct instantiateReconstruct<Apply, Float, nColor, Recon, 0, G, Args...> {
-    instantiateReconstruct(G &U, Args &&... args)
+    instantiateReconstruct(G &U, Args &&...args)
     {
       if (U.Reconstruct() == Recon::recon[0]) {
         instantiateApply<is_enabled<Recon::recon[0]>(), Apply, Float, nColor, Recon::recon[0], G, Args...>(U, args...);
@@ -114,7 +114,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
             typename... Args>
-  constexpr void instantiate(G &U, Args &&... args)
+  constexpr void instantiate(G &U, Args &&...args)
   {
     if (U.Ncolor() == 3) {
       constexpr int i = Recon::recon.size() - 1;
@@ -131,7 +131,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
-  constexpr void instantiate(G &U, Args &&... args)
+  constexpr void instantiate(G &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -160,7 +160,7 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename> class Apply, typename C, typename... Args>
-  constexpr void instantiate(C &c, Args &&... args)
+  constexpr void instantiate(C &c, Args &&...args)
   {
     if (c.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -196,9 +196,8 @@ namespace quda
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int> class Apply, typename store_t, typename F,
-            typename... Args>
-  constexpr void instantiate(F &field, Args &&... args)
+  template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
+  constexpr void instantiate(F &field, Args &&...args)
   {
     if (field.Ncolor() == 3) {
       Apply<store_t, 3>(field, args...);
@@ -219,7 +218,7 @@ namespace quda
      @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int> class Apply, typename F, typename... Args>
-  constexpr void instantiate(F &field, Args &&... args)
+  constexpr void instantiate(F &field, Args &&...args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8

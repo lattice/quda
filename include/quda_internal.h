@@ -35,8 +35,9 @@
 // this is a helper macro for stripping the path information from
 // __FILE__.  FIXME - convert this into a consexpr routine
 #define KERNEL_FILE                                                                                                    \
-  (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 :                                                               \
-                            strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+  (strrchr(__FILE__, '/')    ? strrchr(__FILE__, '/') + 1 :                                                            \
+     strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 :                                                           \
+                               __FILE__)
 
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
@@ -94,13 +95,17 @@ namespace quda {
   template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
+  template <> struct fixedMaxValue<short8> {
+    static constexpr float value = 32767.0f;
+  };
   template <> struct fixedMaxValue<int8_t> {
     static constexpr float value = 127.0f;
   };
   template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
-  template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };
+  template <> struct fixedMaxValue<char8> {
+    static constexpr float value = 127.0f;
+  };
 
   template <typename T> struct fixedInvMaxValue {
     static constexpr float value = 3.402823e+38f;

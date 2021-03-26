@@ -17,62 +17,62 @@ namespace quda {
 #define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)                                                   \
   if (tp.aux.x == 0) {                                                                                                 \
     switch (tp.block.x) {                                                                                              \
-    case 256: qudaLaunchKernel(kernel<0, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<0, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 768: qudaLaunchKernel(kernel<0, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 1024: qudaLaunchKernel(kernel<0, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<0, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<0, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 768: qudaLaunchKernel(kernel<0, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 1024: qudaLaunchKernel(kernel<0, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 1) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: qudaLaunchKernel(kernel<1, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<1, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 768: qudaLaunchKernel(kernel<1, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 1024: qudaLaunchKernel(kernel<1, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<1, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<1, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 768: qudaLaunchKernel(kernel<1, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 1024: qudaLaunchKernel(kernel<1, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 2) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: qudaLaunchKernel(kernel<2, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<2, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 768: qudaLaunchKernel(kernel<2, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 1024: qudaLaunchKernel(kernel<2, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<2, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<2, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 768: qudaLaunchKernel(kernel<2, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 1024: qudaLaunchKernel(kernel<2, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 3) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: qudaLaunchKernel(kernel<3, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 256: qudaLaunchKernel(kernel<3, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 384: qudaLaunchKernel(kernel<3, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<3, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 640: qudaLaunchKernel(kernel<3, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 768: qudaLaunchKernel(kernel<3, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 896: qudaLaunchKernel(kernel<3, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 1024: qudaLaunchKernel(kernel<3, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<3, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 256: qudaLaunchKernel(kernel<3, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 384: qudaLaunchKernel(kernel<3, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<3, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 640: qudaLaunchKernel(kernel<3, 160, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 768: qudaLaunchKernel(kernel<3, 192, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 896: qudaLaunchKernel(kernel<3, 224, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 1024: qudaLaunchKernel(kernel<3, 256, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 4) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: qudaLaunchKernel(kernel<4, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 256: qudaLaunchKernel(kernel<4, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 384: qudaLaunchKernel(kernel<4, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<4, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 640: qudaLaunchKernel(kernel<4, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 768: qudaLaunchKernel(kernel<4, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 896: qudaLaunchKernel(kernel<4, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 1024: qudaLaunchKernel(kernel<4, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<4, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 256: qudaLaunchKernel(kernel<4, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 384: qudaLaunchKernel(kernel<4, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<4, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 640: qudaLaunchKernel(kernel<4, 160, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 768: qudaLaunchKernel(kernel<4, 192, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 896: qudaLaunchKernel(kernel<4, 224, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 1024: qudaLaunchKernel(kernel<4, 256, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 5) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: qudaLaunchKernel(kernel<5, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 256: qudaLaunchKernel(kernel<5, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 384: qudaLaunchKernel(kernel<5, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
-    case 512: qudaLaunchKernel(kernel<5, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 640: qudaLaunchKernel(kernel<5, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 768: qudaLaunchKernel(kernel<5, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 896: qudaLaunchKernel(kernel<5, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
-    case 1024: qudaLaunchKernel(kernel<5, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<5, 32, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 256: qudaLaunchKernel(kernel<5, 64, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 384: qudaLaunchKernel(kernel<5, 96, __VA_ARGS__>, tp, stream, arg, parity); break;                            \
+    case 512: qudaLaunchKernel(kernel<5, 128, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 640: qudaLaunchKernel(kernel<5, 160, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 768: qudaLaunchKernel(kernel<5, 192, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 896: qudaLaunchKernel(kernel<5, 224, __VA_ARGS__>, tp, stream, arg, parity); break;                           \
+    case 1024: qudaLaunchKernel(kernel<5, 256, __VA_ARGS__>, tp, stream, arg, parity); break;                          \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else {                                                                                                             \
@@ -91,8 +91,8 @@ namespace quda {
 #endif
     Gauge dataOr;
     double2 result;
-    GaugeFixQualityArg(const Gauge &dataOr, const GaugeField &data)
-      : ReduceArg<double2>(), dataOr(dataOr) {
+    GaugeFixQualityArg(const Gauge &dataOr, const GaugeField &data) : ReduceArg<double2>(), dataOr(dataOr)
+    {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -102,8 +102,8 @@ namespace quda {
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
-    double getAction(){ return result.x; }
-    double getTheta(){ return result.y; }
+    double getAction() { return result.x; }
+    double getTheta() { return result.y; }
   };
 
   /**
@@ -157,22 +157,19 @@ namespace quda {
 
       idx_cb += blockDim.x * gridDim.x;
     }
-    argQ.template reduce2d<blockSize,2>(data);
+    argQ.template reduce2d<blockSize, 2>(data);
   }
 
   /**
    * @brief Tunable object for the gauge fixing quality kernel
    */
-  template<typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParityReduction {
+  template <typename Float, typename Gauge, int gauge_dir> class GaugeFixQuality : TunableLocalParityReduction
+  {
     GaugeFixQualityArg<Gauge> &arg;
     const GaugeField &meta;
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) :
-      arg(arg),
-      meta(meta)
-    { }
+    GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) : arg(arg), meta(meta) { }
 
     void apply(const qudaStream_t &stream)
     {
@@ -181,7 +178,7 @@ namespace quda {
       auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
       arg.complete(arg.result, stream, reset);
       if (!activeTuning()) {
-        comm_allreduce_array((double*)&arg.result, 2);
+        comm_allreduce_array((double *)&arg.result, 2);
         arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads * comm_size());
         arg.result.y /= (double)(3 * 2 * arg.threads * comm_size());
       }
@@ -189,7 +186,7 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
     long long flops() const { return (36LL * gauge_dir + 65LL) * meta.Volume(); }
-    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
+    // long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
     long long bytes() const { return 2LL * gauge_dir * meta.Volume() * meta.Reconstruct() * sizeof(Float); }
   };
 
@@ -207,8 +204,9 @@ namespace quda {
     GaugeField &data;
     const Float relax_boost;
 
-    GaugeFixArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
-      : dataOr(dataOr), data(data), relax_boost(relax_boost) {
+    GaugeFixArg(Gauge &dataOr, GaugeField &data, const Float relax_boost) :
+      dataOr(dataOr), data(data), relax_boost(relax_boost)
+    {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -224,7 +222,7 @@ namespace quda {
   /**
    * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU
    */
-  template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
+  template <int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity)
   {
     typedef complex<Float> Cmplx;
@@ -319,11 +317,11 @@ namespace quda {
     {
       unsigned int blockx = param.block.x / 8;
       if (param.aux.x > 2) blockx = param.block.x / 4;
-      unsigned int gx  = std::max((arg.threads + blockx - 1) / blockx, 1u);
+      unsigned int gx = std::max((arg.threads + blockx - 1) / blockx, 1u);
       return dim3(gx, 1, 1);
     }
 
-    bool advanceBlockDim (TuneParam &param) const
+    bool advanceBlockDim(TuneParam &param) const
     {
       // Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
@@ -396,15 +394,13 @@ namespace quda {
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-public:
-    GaugeFix(GaugeFixArg<Float, Gauge> &arg, const GaugeField &meta) :
-      arg(arg),
-      meta(meta),
-      parity(0) { }
+  public:
+    GaugeFix(GaugeFixArg<Float, Gauge> &arg, const GaugeField &meta) : arg(arg), meta(meta), parity(0) { }
 
     void setParity(const int par) { parity = par; }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -430,7 +426,7 @@ public:
     void preTune() { arg.data.backup(); }
     void postTune() { arg.data.restore(); }
     long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads; }
-    long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float);  }
+    long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
 #ifdef MULTI_GPU
@@ -444,8 +440,9 @@ public:
     Gauge dataOr;
     GaugeField &data;
     const Float relax_boost;
-    GaugeFixInteriorPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
-      : dataOr(dataOr), data(data), relax_boost(relax_boost) {
+    GaugeFixInteriorPointsArg(Gauge &dataOr, GaugeField &data, const Float relax_boost) :
+      dataOr(dataOr), data(data), relax_boost(relax_boost)
+    {
 
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
@@ -628,11 +625,11 @@ public:
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-public:
+  public:
     GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg, const GaugeField &meta) :
-      arg(arg),
-      meta(meta),
-      parity(0) {}
+      arg(arg), meta(meta), parity(0)
+    {
+    }
 
     void setParity(const int par) { parity = par; }
 
@@ -679,8 +676,9 @@ public:
     GaugeField &data;
     const Float relax_boost;
 
-    GaugeFixBorderPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost, size_t faceVolume_[4], size_t faceVolumeCB_[4])
-      : dataOr(dataOr), data(data), relax_boost(relax_boost)
+    GaugeFixBorderPointsArg(Gauge &dataOr, GaugeField &data, const Float relax_boost, size_t faceVolume_[4],
+                            size_t faceVolumeCB_[4]) :
+      dataOr(dataOr), data(data), relax_boost(relax_boost)
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -855,11 +853,11 @@ public:
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-public:
+  public:
     GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg, const GaugeField &meta) :
-      arg(arg),
-      meta(meta),
-      parity(0) { }
+      arg(arg), meta(meta), parity(0)
+    {
+    }
 
     ~GaugeFixBorderPoints () {
       if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
@@ -867,7 +865,8 @@ public:
 
     void setParity(const int par) { parity = par; }
 
-    void apply(const qudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -897,16 +896,15 @@ public:
     long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
-  template <int NElems_, typename Gauge>
-  struct GaugeFixUnPackArg {
+  template <int NElems_, typename Gauge> struct GaugeFixUnPackArg {
     static constexpr int NElems = NElems_;
     int X[4]; // grid dimensions
 #ifdef MULTI_GPU
     int border[4];
 #endif
     Gauge dataOr;
-    GaugeFixUnPackArg(Gauge & dataOr, GaugeField & data)
-      : dataOr(dataOr) {
+    GaugeFixUnPackArg(Gauge &dataOr, GaugeField &data) : dataOr(dataOr)
+    {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
       #ifdef MULTI_GPU
@@ -975,11 +973,9 @@ public:
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
-        array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
-      }
+      for (int i = 0; i < Arg::NElems / 2; ++i) { array[idx + size * i] = Cmplx(tmp[2 * i + 0], tmp[2 * i + 1]); }
     } else {
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
+      for (int i = 0; i < Arg::NElems / 2; ++i) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -1044,10 +1040,10 @@ public:
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
+      for (int i = 0; i < Arg::NElems / 2; ++i) array[idx + size * i] = Cmplx(tmp[2 * i + 0], tmp[2 * i + 1]);
     }
     else{
-      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
+      for (int i = 0; i < Arg::NElems / 2; ++i) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -1057,12 +1053,9 @@ public:
   }
 #endif
 
-
-  template<typename Float, typename Gauge, int NElems, int gauge_dir>
-  void gaugefixingOVR( Gauge dataOr, GaugeField& data,
-		       const int Nsteps, const int verbose_interval,
-		       const Float relax_boost, const double tolerance,
-		       const int reunit_interval, const int stopWtheta)
+  template <typename Float, typename Gauge, int NElems, int gauge_dir>
+  void gaugefixingOVR(Gauge dataOr, GaugeField &data, const int Nsteps, const int verbose_interval,
+                      const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
@@ -1092,10 +1085,10 @@ public:
     qudaMemset(num_failures_dev, 0, sizeof(int));
 
     GaugeFixQualityArg<Gauge> argQ(dataOr, data);
-    GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ, data);
+    GaugeFixQuality<Float, Gauge, gauge_dir> GaugeFixQuality(argQ, data);
 
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
-    GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg, data);
+    GaugeFix<Float, Gauge, gauge_dir> gaugeFix(arg, data);
 
 #ifdef MULTI_GPU
     void *send[4];
@@ -1124,7 +1117,7 @@ public:
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-        if ( !commDimPartitioned(dir) && data.R()[dir] != 0 ) errorQuda("Not supported!");
+        if (!commDimPartitioned(dir) && data.R()[dir] != 0) errorQuda("Not supported!");
       }
       for ( int i = 0; i < 4; i++ ) {
         faceVolume[i] = 1;
@@ -1171,12 +1164,12 @@ public:
         mh_send_fwd[d]  = comm_declare_send_relative(send[d], d, +1, bytes[d]);
       }
     }
-    GaugeFixUnPackArg<NElems,Gauge> dataexarg(dataOr, data);
+    GaugeFixUnPackArg<NElems, Gauge> dataexarg(dataOr, data);
     GaugeFixBorderPointsArg<Float, Gauge> argBorder(dataOr, data, relax_boost, faceVolume, faceVolumeCB);
-    GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
+    GaugeFixBorderPoints<Float, Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
-    GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt, data);
-  #endif
+    GaugeFixInteriorPoints<Float, Gauge, gauge_dir> gfixIntPoints(argInt, data);
+#endif
 
     GaugeFixQuality.apply(0);
     flop += (double)GaugeFixQuality.flops();
@@ -1226,11 +1219,11 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], GFStream[d],
-                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], GFStream[d], faceVolumeCB[d],
+                             dataexarg, reinterpret_cast<complex<Float> *>(send_d[d]), p, d, d);
             //extract bottom ghost
             qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
-                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float> *>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1277,8 +1270,8 @@ public:
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
-                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d], faceVolumeCB[d],
+                             dataexarg, reinterpret_cast<complex<Float> *>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
@@ -1286,7 +1279,7 @@ public:
             comm_wait(mh_recv_fwd[d]);
           #endif
             qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
-                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float> *>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
@@ -1373,16 +1366,18 @@ public:
   }
 
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
-    GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+    GaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                    const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       using Gauge = typename gauge_mapper<Float, recon>::type;
       if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
-        gaugefixingOVR<Float, Gauge, recon, 4>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugefixingOVR<Float, Gauge, recon, 4>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance,
+                                               reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugefixingOVR<Float, Gauge, recon, 3>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+        gaugefixingOVR<Float, Gauge, recon, 3>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance,
+                                               reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
@@ -1400,10 +1395,12 @@ public:
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta) {
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
+  {
 #ifdef GPU_GAUGE_ALG
-    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+                                stopWtheta);
 #else
     errorQuda("Gauge fixing has not been built");
 #endif // GPU_GAUGE_ALG

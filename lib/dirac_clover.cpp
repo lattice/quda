@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(param.clover) {}
+  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(param.clover) { }
 
   DiracClover::DiracClover(const DiracClover &dirac) : DiracWilson(dirac), clover(dirac.clover) {}
 

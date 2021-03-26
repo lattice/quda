@@ -5,9 +5,7 @@
 namespace quda {
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) :
-    Dirac(param),
-    fatGauge(param.fatGauge),
-    longGauge(param.longGauge)
+    Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge)
   {
   }
 

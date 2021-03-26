@@ -8,7 +8,8 @@ namespace quda {
 #if QUDA_PRECISION & 2
     CopyGenericColorSpinor<3>(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
 #else
-    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(), src.Precision());
+    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(),
+              src.Precision());
 #endif
   }  
 

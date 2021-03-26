@@ -15,8 +15,7 @@ namespace quda
   /**
      @brief Launcher for CPU instantiations of preconditioned coarse-link construction
   */
-  template <QudaFieldLocation location, typename Arg>
-  struct Launch {
+  template <QudaFieldLocation location, typename Arg> struct Launch {
     Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
     {
       if (compute_max_only)
@@ -29,14 +28,11 @@ namespace quda
   /**
      @brief Launcher for GPU instantiations of preconditioned coarse-link construction
   */
-  template <typename Arg>
-  struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
+  template <typename Arg> struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
     Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, bool use_mma, const qudaStream_t &stream)
     {
       if (compute_max_only) {
-        if (!activeTuning()) {
-          qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
-        }
+        if (!activeTuning()) { qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream); }
       }
 #ifdef JITIFY
       if (use_mma) {
@@ -66,14 +62,14 @@ namespace quda
       if (compute_max_only) {
         if (!activeTuning()) { // only do copy once tuning is done
           qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), cudaMemcpyDeviceToHost, stream);
-          qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
+          qudaStreamSynchronize(const_cast<qudaStream_t &>(stream));
         }
       }
     }
   };
 
-  template <QudaFieldLocation location, typename Arg>
-  class CalculateYhat : public TunableVectorYZ {
+  template <QudaFieldLocation location, typename Arg> class CalculateYhat : public TunableVectorYZ
+  {
 
     using Float = typename Arg::Float;
     Arg &arg;
@@ -84,8 +80,14 @@ namespace quda
 
     bool use_mma;
 
-    long long flops() const { return 2l * arg.Y.VolumeCB() * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + !compute_max_only * 8*arg.Yhat.Bytes()) * n; }
+    long long flops() const
+    {
+      return 2l * arg.Y.VolumeCB() * 8 * n * n * (8 * n - 2);
+    } // 8 from dir, 8 from complexity,
+    long long bytes() const
+    {
+      return 2l * (arg.Xinv.Bytes() + 8 * arg.Y.Bytes() + !compute_max_only * 8 * arg.Yhat.Bytes()) * n;
+    }
 
     unsigned int minThreads() const { return arg.Y.VolumeCB(); }
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
@@ -108,9 +110,9 @@ namespace quda
 #ifdef JITIFY
         create_jitify_program("kernels/coarse_op_preconditioned.cuh");
 #endif
-        arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+        arg.max_d = static_cast<Float *>(pool_device_malloc(sizeof(Float)));
       }
-      arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+      arg.max_h = static_cast<Float *>(pool_pinned_malloc(sizeof(Float)));
       strcpy(aux, compile_type_str(meta));
       strcat(aux, comm_dim_partitioned_string());
     }
@@ -225,7 +227,8 @@ namespace quda
     } else if (X.Location() == QUDA_CPU_FIELD_LOCATION && X.Order() == QUDA_QDP_GAUGE_ORDER) {
       const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(&X);
       cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += invert(*(void**)Xinv_h->Gauge_p(), *(void**)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
+      blas::flops
+        += invert(*(void **)Xinv_h->Gauge_p(), *(void **)X_h->Gauge_p(), n, X_h->Volume(), X.Precision(), X.Location());
     } else {
       errorQuda("Unsupported location=%d and order=%d", X.Location(), X.Order());
     }

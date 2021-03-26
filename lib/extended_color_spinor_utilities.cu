@@ -21,8 +21,8 @@
 namespace quda {
 
   using namespace colorspinor;
-  
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
+
+  void exchangeExtendedGhost(cudaColorSpinorField *spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -239,19 +239,21 @@ namespace quda {
 	writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
       }
 
-      void apply(const qudaStream_t &stream){
+      void apply(const qudaStream_t &stream)
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (location == QUDA_CPU_FIELD_LOCATION) {
-          copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);    
+          copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);
         } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-          qudaLaunchKernel(copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>, tp, stream, arg);
+          qudaLaunchKernel(copyInteriorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, extend>, tp, stream,
+                           arg);
         }
-      } 
+      }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
       long long flops() const { return 0; }
-      long long bytes() const { return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));  }
+      long long bytes() const { return arg.length * 2 * Nc * Ns * (sizeof(FloatIn) + sizeof(FloatOut)); }
     }; // CopySpinorEx
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>

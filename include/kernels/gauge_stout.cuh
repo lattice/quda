@@ -13,7 +13,7 @@ namespace quda
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
@@ -24,12 +24,8 @@ namespace quda
     const Float rho;
     const Float epsilon;
 
-    GaugeSTOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon=0) :
-      out(out),
-      in(in),
-      threads(1),
-      rho(rho),
-      epsilon(epsilon)
+    GaugeSTOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon = 0) :
+      out(out), in(in), threads(1), rho(rho), epsilon(epsilon)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -67,14 +63,14 @@ namespace quda
 
     // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
     computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
-    
+
     // Get link U
     U = arg.in(dir, linkIndexShift(x, dx, X), parity);
-    
+
     // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
     //--------------------------------------------------------------------
     // Compute \Omega = \rho * S * U^{\dagger}
-    Q = (arg.rho * Stap) * conj(U);    
+    Q = (arg.rho * Stap) * conj(U);
     // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
     //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
     makeHerm(Q);
@@ -99,11 +95,10 @@ namespace quda
     printf("expiQ test %d %d %.15e\n", idx, dir, error);
     //Test for expiQ*U unitarity:
     error = ErrorSU3(U);
-    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);    
+    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
 #endif
   }
-  
-  
+
   //------------------------//
   // Over-Improved routines //
   //------------------------//
@@ -136,12 +131,12 @@ namespace quda
     Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;
     Complex OmegaDiffTr;
     Complex i_2(0, 0.5);
-    
+
     // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
     // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
     // https://arxiv.org/abs/0801.1165
     computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
-    
+
     // Get link U
     U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
@@ -173,7 +168,7 @@ namespace quda
     printf("expiQ test %d %d %.15e\n", idx, dir, error);
     //Test for expiQ*U unitarity:
     error = ErrorSU3(U);
-    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);    
+    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
 #endif
   }
 } // namespace quda

@@ -37,8 +37,7 @@ namespace quda
 
   public:
     NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
-      shared(arg.asymmetric || !arg.dagger)
+      Dslash(arg, out, in), shared(arg.asymmetric || !arg.dagger)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
       if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
@@ -50,7 +49,8 @@ namespace quda
       Dslash::setParam(tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
-      if (arg.nParity != 1) errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
+      if (arg.nParity != 1)
+        errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
 
       if (arg.dagger) {
         if (arg.xpay)
@@ -59,7 +59,8 @@ namespace quda
           Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
       } else {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp,
+                                                                                                               stream);
         else
           Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), false>(tp, stream);
       }
@@ -99,19 +100,21 @@ namespace quda
     {
       constexpr int nDim = 4;
       if (asymmetric) {
-        NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger,
+                                                                 comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        dslash::DslashPolicyTune<decltype(twisted)> policy(
+          twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
         policy.apply(0);
       } else {
-        NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger,
+                                                                  comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        dslash::DslashPolicyTune<decltype(twisted)> policy(
+          twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
         policy.apply(0);
       }

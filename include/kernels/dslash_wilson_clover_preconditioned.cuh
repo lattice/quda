@@ -34,7 +34,7 @@ namespace quda
   struct wilsonCloverPreconditioned : dslash_default {
 
     Arg &arg;
-    constexpr wilsonCloverPreconditioned(Arg &arg) : arg(arg) {}
+    constexpr wilsonCloverPreconditioned(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -52,7 +52,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -76,7 +76,7 @@ namespace quda
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
 
-          HMatrix<real, Arg::nColor * Arg::nSpin / 2> A = arg.A(coord.x_cb, parity, chirality);
+          HMatrix<real, Arg::nColor *Arg::nSpin / 2> A = arg.A(coord.x_cb, parity, chirality);
           HalfVector chi = out.chiral_project(chirality);
 
           if (arg.dynamic_clover) {

@@ -7,8 +7,8 @@
 namespace quda
 {
 
-#define  DOUBLE_TOL	1e-15
-#define  SINGLE_TOL	2e-6
+#define DOUBLE_TOL 1e-15
+#define SINGLE_TOL 2e-6
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_> struct GaugeAPEArg {
     using Float = Float_;
@@ -16,7 +16,7 @@ namespace quda
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int apeDim = apeDim_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge out;
     const Gauge in;
@@ -42,7 +42,7 @@ namespace quda
       threads /= 2;
     }
   };
-  
+
   template <typename Arg> __global__ void computeAPEStep(Arg arg)
   {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -71,14 +71,14 @@ namespace quda
 
     // Get link U
     U = arg.in(dir, linkIndexShift(x, dx, X), parity);
-    
+
     Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.))));
     setIdentity(&I);
 
     TestU = I * (1. - arg.alpha) + Stap * conj(U);
     polarSu3<real>(TestU, arg.tolerance);
     U = TestU * U;
-    
+
     arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
 } // namespace quda

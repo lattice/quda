@@ -20,15 +20,9 @@ namespace quda
 
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 
-    constexpr int sm_m_pad_size(int m)
-    {
-      return quda::mma::pad_size(m);
-    }
+    constexpr int sm_m_pad_size(int m) { return quda::mma::pad_size(m); }
 
-    constexpr int sm_n_pad_size(int n)
-    {
-      return quda::mma::pad_size(n);
-    }
+    constexpr int sm_n_pad_size(int n) { return quda::mma::pad_size(n); }
 
     /**
       @brief Parameter structure for applying the Dslash

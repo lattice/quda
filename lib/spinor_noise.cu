@@ -101,7 +101,8 @@ namespace quda {
       strcat(aux, meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       qudaLaunchKernel(SpinorNoiseGPU<real, Ns, Nc, type, Arg>, tp, stream, arg);
     }
@@ -164,9 +165,9 @@ namespace quda {
     } else if (src.Ncolor() == 32) {
       spinorNoise<real,Ns,32>(src, randstates, type);
     } else if (src.Ncolor() == 64) {
-      spinorNoise<real,Ns,64>(src, randstates, type);
+      spinorNoise<real, Ns, 64>(src, randstates, type);
     } else if (src.Ncolor() == 96) {
-      spinorNoise<real,Ns,96>(src, randstates, type);
+      spinorNoise<real, Ns, 96>(src, randstates, type);
     } else {
       errorQuda("nColor = %d not implemented", src.Ncolor());
     }

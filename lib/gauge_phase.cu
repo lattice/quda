@@ -13,14 +13,13 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
-  struct GaugePhaseArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_> struct GaugePhaseArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaStaggeredPhase phase = phase_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
 
     Gauge u;
     int X[4];
@@ -28,17 +27,14 @@ namespace quda {
     Float tBoundary;
     Float i_mu;
     complex<Float> i_mu_phase;
-    GaugePhaseArg(GaugeField &u) :
-      u(u),
-      threads(u.VolumeCB()),
-      i_mu(u.iMu())
+    GaugePhaseArg(GaugeField &u) : u(u), threads(u.VolumeCB()), i_mu(u.iMu())
     {
       // if staggered phases are applied, then we are removing them
       // else we are applying them
       Float dir = u.StaggeredPhaseApplied() ? -1.0 : 1.0;
 
-      i_mu_phase = complex<Float>( cos(M_PI * u.iMu() / (u.X()[3]*comm_dim(3)) ),
-				   dir * sin(M_PI * u.iMu() / (u.X()[3]*comm_dim(3))) );
+      i_mu_phase = complex<Float>(cos(M_PI * u.iMu() / (u.X()[3] * comm_dim(3))),
+                                  dir * sin(M_PI * u.iMu() / (u.X()[3] * comm_dim(3))));
 
       for (int d=0; d<4; d++) X[d] = u.X()[d];
 
@@ -49,13 +45,14 @@ namespace quda {
   };
 
   // FIXME need to check this with odd local volumes
-  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, Arg &arg) {
+  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, Arg &arg)
+  {
     typename Arg::Float phase = 1.0;
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
-	phase = (1.0 - 2.0 * (t % 2) );
+        phase = (1.0 - 2.0 * (t % 2));
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((t + x) % 2) );
+        phase = (1.0 - 2.0 * ((t + x) % 2));
       } else if (dim == 2) {
 	phase = (1.0 - 2.0 * ((t + x + y) % 2) );
       } else if (dim == 3) { // also apply boundary condition
@@ -63,9 +60,9 @@ namespace quda {
       }
     } else if (Arg::phase == QUDA_STAGGERED_PHASE_TIFR) {
       if (dim==0) {
-	phase = (1.0 - 2.0 * ((3 + t + z + y) % 2) );
+        phase = (1.0 - 2.0 * ((3 + t + z + y) % 2));
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((2 + t + z) % 2) );
+        phase = (1.0 - 2.0 * ((2 + t + z) % 2));
       } else if (dim == 2) {
 	phase = (1.0 - 2.0 * ((1 + t) % 2) );
       } else if (dim == 3) { // also apply boundary condition
@@ -75,26 +72,25 @@ namespace quda {
       if (dim==0) {
 	phase = 1.0;
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((1 + x) % 2) );
+        phase = (1.0 - 2.0 * ((1 + x) % 2));
       } else if (dim == 2) {
-	phase = (1.0 - 2.0 * ((1 + x + y) % 2) );
+        phase = (1.0 - 2.0 * ((1 + x + y) % 2));
       } else if (dim == 3) { // also apply boundary condition
-	phase = ((t == arg.X[3]-1) ? arg.tBoundary : 1.0) *
-	  (1.0 - 2 * ((1 + x + y + z) % 2) );
+        phase = ((t == arg.X[3] - 1) ? arg.tBoundary : 1.0) * (1.0 - 2 * ((1 + x + y + z) % 2));
       }
     }
     return phase;
   }
 
-  template <int dim, typename Arg>
-  __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg) {
+  template <int dim, typename Arg> __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg)
+  {
     typedef typename mapper<typename Arg::Float>::type real;
 
     int x[4];
     getCoords(x, indexCB, arg.X, parity);
 
     real phase = getPhase<dim>(x[0], x[1], x[2], x[3], arg);
-    Matrix<complex<real>,Arg::nColor> u = arg.u(dim, indexCB, parity);
+    Matrix<complex<real>, Arg::nColor> u = arg.u(dim, indexCB, parity);
     u *= phase;
 
     // apply imaginary chemical potential if needed
@@ -106,8 +102,8 @@ namespace quda {
   /**
      Generic GPU staggered phase application
   */
-  template <typename Arg>
-  __global__ void gaugePhaseKernel(Arg arg) {
+  template <typename Arg> __global__ void gaugePhaseKernel(Arg arg)
+  {
     int indexCB = blockIdx.x * blockDim.x + threadIdx.x;
     if (indexCB >= arg.threads) return;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -117,8 +113,8 @@ namespace quda {
     gaugePhase<3>(indexCB, parity, arg);
   }
 
-  template <typename Arg>
-  class GaugePhase : TunableVectorY {
+  template <typename Arg> class GaugePhase : TunableVectorY
+  {
     Arg &arg;
     const GaugeField &meta; // used for meta data only
 
@@ -126,10 +122,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    GaugePhase(Arg &arg, const GaugeField &meta)
-      : TunableVectorY(2), arg(arg), meta(meta) { }
+    GaugePhase(Arg &arg, const GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) { }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       qudaLaunchKernel(gaugePhaseKernel<Arg>, tp, stream, arg);
     }
@@ -143,10 +139,9 @@ namespace quda {
     long long bytes() const { return 2 * meta.Bytes(); } // 2 from i/o
   };
 
-
-  template <typename Float, int nColor, QudaReconstructType recon>
-  struct GaugePhase_ {
-    GaugePhase_(GaugeField &u) {
+  template <typename Float, int nColor, QudaReconstructType recon> struct GaugePhase_ {
+    GaugePhase_(GaugeField &u)
+    {
       if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
         GaugePhaseArg<Float, nColor, recon, QUDA_STAGGERED_PHASE_MILC> arg(u);
         GaugePhase<decltype(arg)> phase(arg, u);

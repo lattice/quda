@@ -127,16 +127,18 @@ namespace quda {
     }
     virtual ~CopyGaugeEx() { ; }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	if (arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
-	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
+        if (arg.regularToextended)
+          copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
+        else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-	if (arg.regularToextended)
+        if (arg.regularToextended)
           qudaLaunchKernel(copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true>, tp, stream, arg);
-	else
+        else
           qudaLaunchKernel(copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false>, tp, stream, arg);
       }
     }

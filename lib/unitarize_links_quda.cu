@@ -11,11 +11,13 @@
 #include <instantiate.h>
 #include <color_spinor.h>
 
-namespace quda {
+namespace quda
+{
 
-namespace {
+  namespace
+  {
 #include <svd_quda.h>
-}
+  }
 
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
@@ -24,25 +26,23 @@ namespace {
 #define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*0.66666666666666666666
 #endif
 
-    
   // supress compiler warnings about unused variables when GPU_UNITARIZE is not set
   // when we switch to C++17 consider [[maybe_unused]]
   __attribute__((unused)) static const int max_iter_newton = 20;
-  __attribute__((unused))static const int max_iter = 20;
+  __attribute__((unused)) static const int max_iter = 20;
 
   __attribute__((unused)) static double unitarize_eps = 1e-14;
   __attribute__((unused)) static double max_error = 1e-10;
   __attribute__((unused)) static int reunit_allow_svd = 1;
-  __attribute__((unused)) static int reunit_svd_only  = 0;
+  __attribute__((unused)) static int reunit_svd_only = 0;
   __attribute__((unused)) static double svd_rel_error = 1e-6;
   __attribute__((unused)) static double svd_abs_error = 1e-6;
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct UnitarizeLinksArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct UnitarizeLinksArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
     Gauge out;
     const Gauge in;
 
@@ -58,9 +58,9 @@ namespace {
     const double svd_abs_error;
     const static bool check_unitarization = true;
 
-    UnitarizeLinksArg(GaugeField &out, const GaugeField &in, int* fails, int max_iter,
-                      double unitarize_eps, double max_error, int reunit_allow_svd,
-                      int reunit_svd_only, double svd_rel_error, double svd_abs_error) :
+    UnitarizeLinksArg(GaugeField &out, const GaugeField &in, int *fails, int max_iter, double unitarize_eps,
+                      double max_error, int reunit_allow_svd, int reunit_svd_only, double svd_rel_error,
+                      double svd_abs_error) :
       out(out),
       in(in),
       threads(in.VolumeCB()),
@@ -73,7 +73,7 @@ namespace {
       svd_rel_error(svd_rel_error),
       svd_abs_error(svd_abs_error)
     {
-      for (int dir=0; dir<4; ++dir) X[dir] = in.X()[dir];
+      for (int dir = 0; dir < 4; ++dir) X[dir] = in.X()[dir];
     }
   };
 
@@ -89,42 +89,45 @@ namespace {
   }
 
   template <typename mat>
-  __device__ __host__ bool isUnitarizedLinkConsistent(const mat &initial_matrix,
-                                                      const mat &unitary_matrix, double max_error)
+  __device__ __host__ bool isUnitarizedLinkConsistent(const mat &initial_matrix, const mat &unitary_matrix,
+                                                      double max_error)
   {
     auto n = initial_matrix.size();
-    mat temporary = conj(initial_matrix)*unitary_matrix;
+    mat temporary = conj(initial_matrix) * unitary_matrix;
     temporary = temporary*temporary - conj(initial_matrix)*initial_matrix;
 
-    for (int i=0; i<n; ++i) {
-      for (int j=0; j<n; ++j) {
-	if (fabs(temporary(i,j).x) > max_error || fabs(temporary(i,j).y) > max_error) {
-	  return false;
-	}
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        if (fabs(temporary(i, j).x) > max_error || fabs(temporary(i, j).y) > max_error) { return false; }
       }
     }
     return true;
   }
 
-
-  template <class T> constexpr T getAbsMin(const T* const array, int size)
+  template <class T> constexpr T getAbsMin(const T *const array, int size)
   {
     T min = fabs(array[0]);
     for(int i=1; i<size; ++i){
       T abs_val = fabs(array[i]);
-      if((abs_val) < min){ min = abs_val; }
+      if ((abs_val) < min) { min = abs_val; }
     }
     return min;
   }
 
-  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon) { return fabs(a-b) < epsilon; }
+  template <class Real> constexpr bool checkAbsoluteError(Real a, Real b, Real epsilon)
+  {
+    return fabs(a - b) < epsilon;
+  }
 
-  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon) { return fabs((a-b)/b) < epsilon; }
+  template <class Real> constexpr bool checkRelativeError(Real a, Real b, Real epsilon)
+  {
+    return fabs((a - b) / b) < epsilon;
+  }
 
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
   template <typename real, typename mat, typename Arg>
-  __device__  __host__ bool reciprocalRoot(mat &res, const mat& q, Arg &arg)
+  __device__ __host__ bool reciprocalRoot(mat &res, const mat &q, Arg &arg)
   {
     mat qsq, tempq;
 
@@ -143,7 +146,7 @@ namespace {
     c[2] = getTrace(tempq).x * one_third;;
 
     g[0] = g[1] = g[2] = c[0] * one_third;
-    real r,s,theta;
+    real r, s, theta;
     s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
 
     real cosTheta;
@@ -154,11 +157,11 @@ namespace {
 
       if(fabs(cosTheta) >= 1.0){
 	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
-      }else{
-	theta = acos(cosTheta); // this is the primary performance limiter
+      } else {
+        theta = acos(cosTheta); // this is the primary performance limiter
       }
 
-      const real sqrt_s = s*rsqrt_s;
+      const real sqrt_s = s * rsqrt_s;
 
 #if 0 // experimental version
       real as, ac;
@@ -179,7 +182,7 @@ namespace {
     // return false. Then call SVD instead.
     real det = getDeterminant(q).x;
     if (fabs(det) < arg.svd_abs_error) return false;
-    if (!checkRelativeError<double>(g[0]*g[1]*g[2], det, arg.svd_rel_error)) return false;
+    if (!checkRelativeError<double>(g[0] * g[1] * g[2], det, arg.svd_rel_error)) return false;
 
     // At this point we have finished with the c's
     // use these to store sqrt(g)
@@ -190,7 +193,7 @@ namespace {
     g[1] = c[0]*c[1] + c[0]*c[2] + c[1]*c[2];
     g[2] = c[0]*c[1]*c[2];
 
-    const real denominator = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) );
+    const real denominator = 1.0 / (g[2] * (g[0] * g[1] - g[2]));
     c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) * denominator;
     c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) * denominator;
     c[2] = g[0] * denominator;
@@ -211,9 +214,9 @@ namespace {
   {
     mat u;
     if (!arg.reunit_svd_only) {
-      if (reciprocalRoot<real>(u, conj(in)*in, arg) ) {
-	out = in * u;
-	return true;
+      if (reciprocalRoot<real>(u, conj(in) * in, arg)) {
+        out = in * u;
+        return true;
       }
     }
 
@@ -228,17 +231,16 @@ namespace {
     return true;
   } // unitarizeMILC
 
-  template <typename mat>
-  __host__ __device__ bool unitarizeLinkNewton(mat &out, const mat& in, int max_iter)
+  template <typename mat> __host__ __device__ bool unitarizeLinkNewton(mat &out, const mat &in, int max_iter)
   {
     mat u = in;
 
-    for (int i=0; i<max_iter; ++i) {
+    for (int i = 0; i < max_iter; ++i) {
       mat uinv = inverse(u);
       u = 0.5*(u + conj(uinv));
     }
 
-    if (isUnitarizedLinkConsistent(in,u,0.0000001)==false) {
+    if (isUnitarizedLinkConsistent(in, u, 0.0000001) == false) {
       printf("ERROR: Unitarized link is not consistent with incoming link\n");
       return false;
     }
@@ -247,7 +249,7 @@ namespace {
     return true;
   }
 
-  void unitarizeLinksCPU(GaugeField &outfield, const GaugeField& infield)
+  void unitarizeLinksCPU(GaugeField &outfield, const GaugeField &infield)
   {
 #ifdef GPU_UNITARIZE
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
@@ -258,15 +260,15 @@ namespace {
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
-	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
-	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
-	} // precision?
+        if (infield.Precision() == QUDA_SINGLE_PRECISION) {
+          copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+          if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false) num_failures++;
+          copyLinkToArray(((float *)(outfield.Gauge_p()) + (i * 4 + dir) * 18), outlink);
+        } else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+          if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false) num_failures++;
+          copyLinkToArray(((double *)(outfield.Gauge_p()) + (i * 4 + dir) * 18), outlink);
+        } // precision?
       } // dir
     }   // loop over volume
 #else
@@ -275,25 +277,25 @@ namespace {
   }
 
   // CPU function which checks that the gauge field is unitary
-  bool isUnitary(const GaugeField& field, double max_error)
+  bool isUnitary(const GaugeField &field, double max_error)
   {
 #ifdef GPU_UNITARIZE
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     Matrix<complex<double>,3> link, identity;
 
     for (unsigned int i = 0; i < field.Volume(); ++i) {
-      for (int dir=0; dir<4; ++dir) {
-	if (field.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	} else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	} else {
-	  errorQuda("Unsupported precision\n");
-	}
-	if (link.isUnitary(max_error) == false) {
+      for (int dir = 0; dir < 4; ++dir) {
+        if (field.Precision() == QUDA_SINGLE_PRECISION) {
+          copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+        } else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
+          copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+        } else {
+          errorQuda("Unsupported precision\n");
+        }
+        if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
-	  printf("site index = %u,\t direction = %d\n", i, dir);
-	  printLink(link);
+          printf("site index = %u,\t direction = %d\n", i, dir);
+          printLink(link);
 	  identity = conj(link)*link;
 	  printLink(identity);
 	  return false;
@@ -307,7 +309,6 @@ namespace {
 #endif
   } // is unitary
 
-
   template <typename Arg> __global__ void DoUnitarizedLink(Arg arg)
   {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -317,8 +318,8 @@ namespace {
     if (mu >= 4) return;
 
     // result is always in double precision
-    Matrix<complex<double>,Arg::nColor> v, result;
-    Matrix<complex<typename Arg::Float>,Arg::nColor> tmp = arg.in(mu, idx, parity);
+    Matrix<complex<double>, Arg::nColor> v, result;
+    Matrix<complex<typename Arg::Float>, Arg::nColor> tmp = arg.in(mu, idx, parity);
 
     v = tmp;
     unitarizeLinkMILC<double>(result, v, arg);
@@ -330,8 +331,8 @@ namespace {
     arg.out(mu, idx, parity) = tmp;
   }
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class UnitarizeLinks : TunableVectorYZ {
+  template <typename Float, int nColor, QudaReconstructType recon> class UnitarizeLinks : TunableVectorYZ
+  {
     UnitarizeLinksArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
@@ -339,28 +340,33 @@ namespace {
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    UnitarizeLinks(GaugeField &out, const GaugeField &in, int* fails) :
-      TunableVectorYZ(2,4),
-      arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd,
-          reunit_svd_only, svd_rel_error, svd_abs_error),
+    UnitarizeLinks(GaugeField &out, const GaugeField &in, int *fails) :
+      TunableVectorYZ(2, 4),
+      arg(out, in, fails, max_iter, unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error,
+          svd_abs_error),
       meta(in)
     {
       apply(0);
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       qudaLaunchKernel(DoUnitarizedLink<decltype(arg)>, tp, stream, arg);
     }
 
-    void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
+    void preTune()
+    {
+      if (arg.in.gauge == arg.out.gauge) arg.out.save();
+    }
     void postTune() {
       if (arg.in.gauge == arg.out.gauge) arg.out.load();
       qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
-    long long flops() const {
+    long long flops() const
+    {
       // Accounted only the minimum flops for the case reunitarize_svd_only=0
       return 4ll * 2 * arg.threads * 1147;
     }
@@ -369,7 +375,7 @@ namespace {
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
   };
 
-  void unitarizeLinks(GaugeField& out, const GaugeField &in, int* fails)
+  void unitarizeLinks(GaugeField &out, const GaugeField &in, int *fails)
   {
 #ifdef GPU_UNITARIZE
     checkPrecision(out, in);
@@ -379,28 +385,23 @@ namespace {
 #endif
   }
 
-  void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
+  void unitarizeLinks(GaugeField &links, int *fails) { unitarizeLinks(links, links, fails); }
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct ProjectSU3Arg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct ProjectSU3Arg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float, recon>::type Gauge;
     Gauge u;
 
     int threads; // number of active threads required
     Float tol;
     int *fails;
-    ProjectSU3Arg(GaugeField &u, Float tol, int *fails) :
-      threads(u.VolumeCB()),
-      u(u),
-      tol(tol),
-      fails(fails) { }
+    ProjectSU3Arg(GaugeField &u, Float tol, int *fails) : threads(u.VolumeCB()), u(u), tol(tol), fails(fails) { }
   };
 
-  template<typename Arg>
-  __global__ void ProjectSU3kernel(Arg arg){
+  template <typename Arg> __global__ void ProjectSU3kernel(Arg arg)
+  {
     using real = typename Arg::Float;
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y + blockIdx.y*blockDim.y;
@@ -420,8 +421,8 @@ namespace {
     arg.u(mu, idx, parity) = u;
   }
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class ProjectSU3 : TunableVectorYZ {
+  template <typename Float, int nColor, QudaReconstructType recon> class ProjectSU3 : TunableVectorYZ
+  {
     ProjectSU3Arg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
@@ -430,15 +431,14 @@ namespace {
 
   public:
     ProjectSU3(GaugeField &u, double tol, int *fails) :
-      arg(u, static_cast<Float>(tol), fails),
-      TunableVectorYZ(2, 4),
-      meta(u)
+      arg(u, static_cast<Float>(tol), fails), TunableVectorYZ(2, 4), meta(u)
     {
       apply(0);
       qudaDeviceSynchronize();
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       qudaLaunchKernel(ProjectSU3kernel<decltype(arg)>, tp, stream, arg);
     }
@@ -454,11 +454,11 @@ namespace {
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
   };
 
-  void projectSU3(GaugeField &u, double tol, int *fails) {
+  void projectSU3(GaugeField &u, double tol, int *fails)
+  {
 #ifdef GPU_GAUGE_TOOLS
     // check the the field doesn't have staggered phases applied
-    if (u.StaggeredPhaseApplied())
-      errorQuda("Cannot project gauge field with staggered phases applied");
+    if (u.StaggeredPhaseApplied()) errorQuda("Cannot project gauge field with staggered phases applied");
 
     instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
 #else

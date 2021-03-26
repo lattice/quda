@@ -109,15 +109,16 @@ namespace quda
      @param[in] stream Stream were the receive is being posted (effectively ignored)
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
-  template <typename Dslash>
-  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, qudaStream_t *stream, bool gdr)
-  {
-    for(int i=3; i>=0; i--){
-      if (!dslash.dslashParam.commDim[i]) continue;
-      for(int dir=1; dir>=0; dir--) {
-        PROFILE(if (dslash_comms) input.recvStart(dslash.Nface()/2, 2*i+dir, dslash.Dagger(), stream, gdr), profile, QUDA_PROFILE_COMMS_START);
+    template <typename Dslash>
+    inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, qudaStream_t *stream, bool gdr)
+    {
+      for (int i = 3; i >= 0; i--) {
+        if (!dslash.dslashParam.commDim[i]) continue;
+        for (int dir = 1; dir >= 0; dir--) {
+          PROFILE(if (dslash_comms) input.recvStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(), stream, gdr),
+                  profile, QUDA_PROFILE_COMMS_START);
+        }
       }
-    }
   }
 
   /**
@@ -265,9 +266,10 @@ namespace quda
           // note the ColorSpinorField::scatter transforms from
           // scatter centric to gather centric (e.g., flips
           // direction) so here just use dir not dir2
-          if (scatterIndex == -1) scatterIndex = 2*dim+dir;
-          PROFILE(if (dslash_copy) in.scatter(dslash.Nface()/2, dslash.Dagger(), 2*dim+dir, streams+scatterIndex), profile, QUDA_PROFILE_SCATTER);
-	}
+          if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
+          PROFILE(if (dslash_copy) in.scatter(dslash.Nface() / 2, dslash.Dagger(), 2 * dim + dir, streams + scatterIndex),
+                  profile, QUDA_PROFILE_SCATTER);
+        }
 
       }
 
@@ -936,7 +938,7 @@ namespace quda
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
-          QUDA_PROFILE_STREAM_WAIT_EVENT);
+              QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packIndex);
@@ -959,8 +961,9 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                          dslashParam.remote_write ? streams + packIndex : nullptr, false, dslashParam.remote_write),
-                  profile, QUDA_PROFILE_COMMS_START);
+                                                      dslashParam.remote_write ? streams + packIndex : nullptr, false,
+                                                      dslashParam.remote_write),
+                      profile, QUDA_PROFILE_COMMS_START);
             } // is p2p?
           }   // dir
         }     // i
@@ -1014,10 +1017,10 @@ namespace quda
     }
   };
 
-/**
-   Variation of multi-gpu dslash where the packing kernel writes
-   buffers directly to host memory with fused halo update kernel
-*/
+  /**
+     Variation of multi-gpu dslash where the packing kernel writes
+     buffers directly to host memory with fused halo update kernel
+  */
   template <typename Dslash> struct DslashFusedZeroCopyPack : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1036,7 +1039,7 @@ namespace quda
 
       const int packScatterIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile,
-          QUDA_PROFILE_STREAM_WAIT_EVENT);
+              QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packScatterIndex);
@@ -1060,10 +1063,10 @@ namespace quda
 
           for (int dir = 1; dir >= 0; dir--) {
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
-              PROFILE(
-                  if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                      dslashParam.remote_write ? streams + packScatterIndex : nullptr, false, dslashParam.remote_write),
-                  profile, QUDA_PROFILE_COMMS_START);
+              PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
+                                                      dslashParam.remote_write ? streams + packScatterIndex : nullptr,
+                                                      false, dslashParam.remote_write),
+                      profile, QUDA_PROFILE_COMMS_START);
             } // is p2p?
           }   // dir
         }     // i
@@ -1110,9 +1113,9 @@ namespace quda
     }
   };
 
-/**
-   Multi-GPU Dslash zero-copy for the send and GDR for the receive
- */
+  /**
+     Multi-GPU Dslash zero-copy for the send and GDR for the receive
+   */
   template <typename Dslash> struct DslashZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1200,10 +1203,10 @@ namespace quda
     }
   };
 
-/**
-   Multi-GPU Dslash zero-copy for the send and GDR for the receive,
-   with fused halo update kernel
- */
+  /**
+     Multi-GPU Dslash zero-copy for the send and GDR for the receive,
+     with fused halo update kernel
+   */
   template <typename Dslash> struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1222,7 +1225,7 @@ namespace quda
 
       const int packIndex = getStreamIndex(dslashParam);
       PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
-          QUDA_PROFILE_STREAM_WAIT_EVENT);
+              QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
                 packIndex);
@@ -1247,8 +1250,9 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
               PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                          dslashParam.remote_write ? streams + packIndex : nullptr, false, dslashParam.remote_write),
-                  profile, QUDA_PROFILE_COMMS_START);
+                                                      dslashParam.remote_write ? streams + packIndex : nullptr, false,
+                                                      dslashParam.remote_write),
+                      profile, QUDA_PROFILE_COMMS_START);
             } // is p2p?
           }   // dir
         }     // i
@@ -1285,10 +1289,10 @@ namespace quda
     }
   };
 
-/**
-   Variation of multi-gpu dslash where the packing kernel writes
-   buffers directly to host memory
-*/
+  /**
+     Variation of multi-gpu dslash where the packing kernel writes
+     buffers directly to host memory
+  */
   template <typename Dslash> struct DslashZeroCopy : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -1376,10 +1380,10 @@ namespace quda
     }
   };
 
-/**
-   Variation of multi-gpu dslash where the packing kernel writes
-   buffers directly to host memory with fused halo update kernel
-*/
+  /**
+     Variation of multi-gpu dslash where the packing kernel writes
+     buffers directly to host memory with fused halo update kernel
+  */
   template <typename Dslash> struct DslashFusedZeroCopy : DslashPolicyImp<Dslash> {
 
     void operator()(
@@ -2022,7 +2026,8 @@ public:
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const qudaStream_t &stream) {
+   void apply(const qudaStream_t &stream)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");

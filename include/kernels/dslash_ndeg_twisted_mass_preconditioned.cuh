@@ -41,7 +41,7 @@ namespace quda
   struct nDegTwistedMassPreconditioned : dslash_default {
 
     Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
+    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) { }
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -61,7 +61,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -111,7 +111,6 @@ namespace quda
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

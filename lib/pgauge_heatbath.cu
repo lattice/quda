@@ -54,13 +54,16 @@ namespace quda {
     @param p store the first index
     @param q store the second index
  */
-  template<int NCOLORS>
-  __host__ __device__ static inline void IndexBlock(int block, int &p, int &q){
+  template <int NCOLORS> __host__ __device__ static inline void IndexBlock(int block, int &p, int &q)
+  {
     if ( NCOLORS == 3 ) {
       if ( block == 0 ) { p = 0; q = 1; }
-      else if ( block == 1 ) { p = 1; q = 2; }
-      else { p = 0; q = 2; }
-    } else if ( NCOLORS > 3 ) {
+      else if ( block == 1 ) { p = 1; q = 2;
+      } else {
+        p = 0;
+        q = 2;
+      }
+    } else if (NCOLORS > 3) {
       int i1;
       int found = 0;
       int del_i = 0;
@@ -358,7 +361,7 @@ namespace quda {
         //FLOP_min = (NCOLORS * 64 + 19 + 28 + 28) * 3 = NCOLORS * 192 + 225
       }
       //////////////////////////////////////////////////////////////////
-    } else if ( NCOLORS > 3 ) {
+    } else if (NCOLORS > 3) {
       //////////////////////////////////////////////////////////////////
       //TESTED IN SU(4) SP THIS IS WORST
       Matrix<complex<Float>,NCOLORS> M = U * F;
@@ -416,7 +419,6 @@ namespace quda {
            U(id.x, j) = tmp0;
            } */
       // }
-
     }
     //////////////////////////////////////////////////////////////////
   }
@@ -573,8 +575,9 @@ namespace quda {
     GaugeField &data;
     Float BetaOverNc;
     RNG rngstate;
-    MonteArg(const Gauge &dataOr, GaugeField & data, Float Beta, RNG &rngstate)
-      : dataOr(dataOr), data(data), rngstate(rngstate) {
+    MonteArg(const Gauge &dataOr, GaugeField &data, Float Beta, RNG &rngstate) :
+      dataOr(dataOr), data(data), rngstate(rngstate)
+    {
       BetaOverNc = Beta / (Float)NCOLORS;
       for ( int dir = 0; dir < 4; ++dir ) {
         border[dir] = data.R()[dir];
@@ -738,9 +741,8 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  struct MonteAlg {
-    MonteAlg(GaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover)
+  template <typename Float, int nColor, QudaReconstructType recon> struct MonteAlg {
+    MonteAlg(GaugeField &data, RNG &rngstate, Float Beta, int nhb, int nover)
     {
       TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
       using Gauge = typename gauge_mapper<Float, recon>::type;
@@ -748,9 +750,9 @@ namespace quda {
       MonteArg<Gauge, Float, nColor> montearg(Gauge(data), data, Beta, rngstate);
       if (getVerbosity() >= QUDA_SUMMARIZE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
       GaugeHB<Float, Gauge, nColor, recon, true> hb(montearg);
-      for ( int step = 0; step < nhb; ++step ) {
-        for ( int parity = 0; parity < 2; ++parity ) {
-          for ( int mu = 0; mu < 4; ++mu ) {
+      for (int step = 0; step < nhb; ++step) {
+        for (int parity = 0; parity < 2; ++parity) {
+          for (int mu = 0; mu < 4; ++mu) {
             hb.SetParam(mu, parity);
             hb.apply(0);
             PGaugeExchange(data, mu, parity);
@@ -763,14 +765,15 @@ namespace quda {
         double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
         double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
         double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
-        printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+        printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(),
+                   gbytes * comm_size());
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
       GaugeHB<Float, Gauge, nColor, recon, false> relax(montearg);
-      for ( int step = 0; step < nover; ++step ) {
-        for ( int parity = 0; parity < 2; ++parity ) {
-          for ( int mu = 0; mu < 4; ++mu ) {
+      for (int step = 0; step < nover; ++step) {
+        for (int parity = 0; parity < 2; ++parity) {
+          for (int mu = 0; mu < 4; ++mu) {
             relax.SetParam(mu, parity);
             relax.apply(0);
             PGaugeExchange(data, mu, parity);
@@ -783,7 +786,8 @@ namespace quda {
         double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
         double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
         double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);
-        printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+        printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(),
+                   gbytes * comm_size());
       }
     }
   };
@@ -796,12 +800,12 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
+  void Monte(GaugeField &data, RNG &rngstate, double Beta, int nhb, int nover)
+  {
 #ifdef GPU_GAUGE_ALG
     instantiate<MonteAlg>(data, rngstate, (float)Beta, nhb, nover);
 #else
     errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
   }
-
 }

@@ -34,7 +34,7 @@ namespace quda
     backward::StackTrace st;
 #endif
 
-    MemAlloc() : line(-1), size(0), base_size(0) {}
+    MemAlloc() : line(-1), size(0), base_size(0) { }
 
     MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
     {
@@ -582,12 +582,11 @@ namespace quda
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
-
 
   namespace pool
   {

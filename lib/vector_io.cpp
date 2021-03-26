@@ -8,8 +8,7 @@ namespace quda
 
   VectorIO::VectorIO(const std::string &filename, bool parity_inflate) :
 #ifdef HAVE_QIO
-    filename(filename),
-    parity_inflate(parity_inflate)
+    filename(filename), parity_inflate(parity_inflate)
 #else
     filename(filename)
 #endif

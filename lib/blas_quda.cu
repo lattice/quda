@@ -12,11 +12,12 @@
 
 namespace quda {
 
-  namespace reducer {
+  namespace reducer
+  {
     void init();
     void destroy();
-  }
-  
+  } // namespace reducer
+
   namespace blas {
 
     unsigned long long flops;
@@ -24,8 +25,7 @@ namespace quda {
 
     static qudaStream_t *blasStream;
 
-    template <template <typename real> class Functor, typename store_t, typename y_store_t,
-              int nSpin, typename coeff_t>
+    template <template <typename real> class Functor, typename store_t, typename y_store_t, int nSpin, typename coeff_t>
     class Blas : public Tunable
     {
       using real = typename mapper<y_store_t>::type;
@@ -45,8 +45,8 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
-      Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x,
-           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) :
+      Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
+           ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) :
         f(a, b, c),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()),
         a(a),
@@ -101,8 +101,9 @@ namespace quda {
           using device_real_t = typename mapper<device_y_store_t>::type;
           Functor<device_real_t> f_(a, b, c);
 
-          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values 
-          constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
+          // redefine site_unroll with device_store types to ensure we have correct N/Ny/M values
+          constexpr bool site_unroll
+            = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
@@ -112,9 +113,9 @@ namespace quda {
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::blas::blasKernel")
-            .instantiate(Type<device_real_t>(), M, Type<decltype(arg)>())
-            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-            .launch(arg);
+                           .instantiate(Type<device_real_t>(), M, Type<decltype(arg)>())
+                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                           .launch(arg);
 #else
           qudaLaunchKernel(blasKernel<device_real_t, M, decltype(arg)>, tp, stream, arg);
 #endif
@@ -127,7 +128,7 @@ namespace quda {
           using host_real_t = typename mapper<host_y_store_t>::type;
           Functor<host_real_t> f_(a, b, c);
 
-          // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values 
+          // redefine site_unroll with host_store types to ensure we have correct N/Ny/M values
           constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value;
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
@@ -177,8 +178,8 @@ namespace quda {
       long long flops() const { return f.flops() * x.Length(); }
       long long bytes() const
       {
-        return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes() +
-          (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();
+        return (f.read.X + f.write.X) * x.Bytes() + (f.read.Y + f.write.Y) * y.Bytes()
+          + (f.read.Z + f.write.Z) * z.Bytes() + (f.read.W + f.write.W) * w.Bytes() + (f.read.V + f.write.V) * v.Bytes();
       }
       int tuningIter() const { return 3; }
     };
@@ -197,22 +198,16 @@ namespace quda {
       reducer::init();
     }
 
-    void destroy(void)
-    {
-      reducer::destroy();
-    }
+    void destroy(void) { reducer::destroy(); }
 
-    qudaStream_t* getStream() { return blasStream; }
+    qudaStream_t *getStream() { return blasStream; }
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
     {
       instantiate<axpbyz_, Blas, true>(a, b, 0.0, x, y, x, x, z);
     }
 
-    void ax(double a, ColorSpinorField &x)
-    {
-      instantiate<ax_, Blas, false>(a, 0.0, 0.0, x, x, x, x, x);
-    }
+    void ax(double a, ColorSpinorField &x) { instantiate<ax_, Blas, false>(a, 0.0, 0.0, x, x, x, x, x); }
 
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y)
     {
@@ -235,12 +230,12 @@ namespace quda {
       instantiate<caxpbypczw_, Blas, false>(Complex(1.0), a, b, x, y, z, z, y);
     }
 
-    void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, ColorSpinorField& z, double c)
+    void axpyBzpcx(double a, ColorSpinorField &x, ColorSpinorField &y, double b, ColorSpinorField &z, double c)
     {
       instantiate<axpyBzpcx_, Blas, true>(a, b, c, x, y, z, x, y);
     }
 
-    void axpyZpbx(double a, ColorSpinorField& x, ColorSpinorField& y, ColorSpinorField& z, double b)
+    void axpyZpbx(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, double b)
     {
       instantiate<axpyZpbx_, Blas, true>(a, b, 0.0, x, y, z, x, y);
     }
@@ -255,7 +250,8 @@ namespace quda {
       instantiate<caxpyBxpz_, Blas, true>(a, b, Complex(0.0), x, y, z, x, y);
     }
 
-    void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w)
+    void caxpbypzYmbw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, ColorSpinorField &z,
+                      ColorSpinorField &w)
     {
       instantiate<caxpbypzYmbw_, Blas, false>(a, b, Complex(0.0), x, y, z, w, y);
     }
@@ -279,7 +275,8 @@ namespace quda {
       instantiate<caxpyxmazMR_, Blas, false>(a, 0.0, 0.0, x, y, z, y, y);
     }
 
-    void tripleCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w)
+    void tripleCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z,
+                        ColorSpinorField &w)
     {
       instantiate<tripleCGUpdate_, Blas, true>(a, b, 0.0, x, y, z, w, y);
     }

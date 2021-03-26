@@ -27,9 +27,9 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct MultiBlasArg :
-      SpinorXZ<NXZ_, store_t, N, Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
+    struct MultiBlasArg
+      : SpinorXZ<NXZ_, store_t, N, Functor::use_z>,
+        SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
@@ -37,11 +37,9 @@ namespace quda
       const int length;
 
       MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                   Functor f, int NYW, int length) :
-        NYW(NYW),
-        f(f),
-        length(length)
+                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, Functor f, int NYW,
+                   int length) :
+        NYW(NYW), f(f), length(length)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -90,7 +88,7 @@ namespace quda
     template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
     {
       // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
+      using vec = vector_type<complex<real>, n / 2>;
       // use i to loop over elements in kernel
       const int k = blockIdx.y * blockDim.y + threadIdx.y;
       const int parity = blockIdx.z;
@@ -141,8 +139,7 @@ namespace quda
       }
     }
 
-    template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor {
+    template <typename coeff_t_, bool multi_1d_ = false> struct MultiBlasFunctor {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
@@ -150,7 +147,7 @@ namespace quda
 
       const int NXZ;
       const int NYW;
-      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
+      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) { }
 
       __device__ __host__ inline coeff_t a(int i, int j) const
       {
@@ -183,15 +180,14 @@ namespace quda
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]
     */
-    template <typename real>
-    struct multiaxpy_ : public MultiBlasFunctor<real> {
-      static constexpr memory_access<1, 1> read{ };
-      static constexpr memory_access<0, 1> write{ };
+    template <typename real> struct multiaxpy_ : public MultiBlasFunctor<real> {
+      static constexpr memory_access<1, 1> read {};
+      static constexpr memory_access<0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<real>::a;
-      multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+      multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -199,21 +195,20 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
       }
 
-      constexpr int flops() const { return 2; }         //! flops per real element
+      constexpr int flops() const { return 2; } //! flops per real element
     };
 
     /**
        Functor to perform the operation y += a * x  (complex-valued)
     */
-    template <typename real>
-    struct multicaxpy_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr memory_access<1, 1> read{ };
-      static constexpr memory_access<0, 1> write{ };
+    template <typename real> struct multicaxpy_ : public MultiBlasFunctor<complex<real>> {
+      static constexpr memory_access<1, 1> read {};
+      static constexpr memory_access<0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
       static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<complex<real>>::a;
-      multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
+      multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -221,21 +216,20 @@ namespace quda
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
       }
 
-      constexpr int flops() const { return 4; }         //! flops per real element
+      constexpr int flops() const { return 4; } //! flops per real element
     };
 
     /**
        Functor to perform the operation w = a * x + y  (complex-valued)
     */
-    template <typename real>
-    struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr memory_access<1, 0, 0, 1> read{ };
-      static constexpr memory_access<0, 0, 0, 1> write{ };
+    template <typename real> struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
+      static constexpr memory_access<1, 0, 0, 1> read {};
+      static constexpr memory_access<0, 0, 0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
       using MultiBlasFunctor<complex<real>>::a;
-      multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
+      multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -246,16 +240,15 @@ namespace quda
         }
       }
 
-      constexpr int flops() const { return 4; }         //! flops per real element
+      constexpr int flops() const { return 4; } //! flops per real element
     };
 
     /**
        Functor performing the operations: y[i] = a*w[i] + y[i]; w[i] = b*x[i] + c*w[i]
     */
-    template <typename real>
-    struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {
-      static constexpr memory_access<1, 1, 0, 1> read{ };
-      static constexpr memory_access<0, 1, 0, 1> write{ };
+    template <typename real> struct multi_axpyBzpcx_ : public MultiBlasFunctor<real, true> {
+      static constexpr memory_access<1, 1, 0, 1> read {};
+      static constexpr memory_access<0, 1, 0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 1; // we never have NXZ > 1 for this kernel
@@ -265,7 +258,7 @@ namespace quda
       real a[N];
       real b[N];
       real c[N];
-      multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) {}
+      multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) { }
 
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
       {
@@ -276,16 +269,15 @@ namespace quda
         }
       }
 
-      constexpr int flops() const { return 5; }   //! flops per real element
+      constexpr int flops() const { return 5; } //! flops per real element
     };
 
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and w[i] = b*x[i] + w[i]
     */
-    template <typename real>
-    struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>, true> {
-      static constexpr memory_access<1, 1, 0, 1> read{ };
-      static constexpr memory_access<0, 1, 0, 1> write{ };
+    template <typename real> struct multi_caxpyBxpz_ : public MultiBlasFunctor<complex<real>, true> {
+      static constexpr memory_access<1, 1, 0, 1> read {};
+      static constexpr memory_access<0, 1, 0, 1> write {};
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
@@ -293,7 +285,7 @@ namespace quda
       complex<real> a[N];
       complex<real> b[N];
       complex<real> c[N];
-      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
+      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) { }
 
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
@@ -305,7 +297,7 @@ namespace quda
         }
       }
 
-      constexpr int flops() const { return 8; }   //! flops per real element
+      constexpr int flops() const { return 8; } //! flops per real element
     };
 
   } // namespace blas

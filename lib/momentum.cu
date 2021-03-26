@@ -65,14 +65,12 @@ namespace quda {
     }
   }
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct BaseArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct BaseArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     int threads; // number of active threads required
-    BaseArg(const GaugeField &meta) :
-      threads(meta.VolumeCB()) {}
+    BaseArg(const GaugeField &meta) : threads(meta.VolumeCB()) { }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon>
@@ -80,16 +78,14 @@ namespace quda {
     typedef typename gauge_mapper<Float, recon>::type Mom;
     const Mom mom;
 
-    MomActionArg(const GaugeField &mom) :
-      BaseArg<Float, nColor, recon>(mom),
-      mom(mom) {}
+    MomActionArg(const GaugeField &mom) : BaseArg<Float, nColor, recon>(mom), mom(mom) { }
   };
 
   // calculate the momentum contribution to the action.  This uses the
   // MILC convention where we subtract 4.0 from each matrix norm in
   // order to increase stability
-  template <int blockSize, typename Arg>
-  __global__ void computeMomAction(Arg arg){
+  template <int blockSize, typename Arg> __global__ void computeMomAction(Arg arg)
+  {
     int x = threadIdx.x + blockIdx.x*blockDim.x;
     int parity = threadIdx.y;
     double action = 0.0;
@@ -98,39 +94,37 @@ namespace quda {
     while (x < arg.threads) {
       // loop over direction
       for (int mu=0; mu<4; mu++) {
-	const matrix mom = arg.mom(mu, x, parity);
+        const matrix mom = arg.mom(mu, x, parity);
 
         double local_sum = 0.0;
-        local_sum  = 0.5 * mom(0,0).imag() * mom(0,0).imag();
-        local_sum += 0.5 * mom(1,1).imag() * mom(1,1).imag();
-        local_sum += 0.5 * mom(2,2).imag() * mom(2,2).imag();
-        local_sum += mom(0,1).real() * mom(0,1).real();
-        local_sum += mom(0,1).imag() * mom(0,1).imag();
-        local_sum += mom(0,2).real() * mom(0,2).real();
-        local_sum += mom(0,2).imag() * mom(0,2).imag();
-        local_sum += mom(1,2).real() * mom(1,2).real();
-        local_sum += mom(1,2).imag() * mom(1,2).imag();
-	local_sum -= 4.0;
+        local_sum = 0.5 * mom(0, 0).imag() * mom(0, 0).imag();
+        local_sum += 0.5 * mom(1, 1).imag() * mom(1, 1).imag();
+        local_sum += 0.5 * mom(2, 2).imag() * mom(2, 2).imag();
+        local_sum += mom(0, 1).real() * mom(0, 1).real();
+        local_sum += mom(0, 1).imag() * mom(0, 1).imag();
+        local_sum += mom(0, 2).real() * mom(0, 2).real();
+        local_sum += mom(0, 2).imag() * mom(0, 2).imag();
+        local_sum += mom(1, 2).real() * mom(1, 2).real();
+        local_sum += mom(1, 2).imag() * mom(1, 2).imag();
+        local_sum -= 4.0;
 
-	action += local_sum;
+        action += local_sum;
       }
 
       x += blockDim.x*gridDim.x;
     }
 
     // perform final inter-block reduction and write out result
-    arg.template reduce2d<blockSize,2>(action);
+    arg.template reduce2d<blockSize, 2>(action);
   }
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class MomAction : TunableLocalParityReduction {
+  template <typename Float, int nColor, QudaReconstructType recon> class MomAction : TunableLocalParityReduction
+  {
     MomActionArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
   public:
-    MomAction(const GaugeField &mom, double &action) :
-      arg(mom),
-      meta(mom)
+    MomAction(const GaugeField &mom, double &action) : arg(mom), meta(mom)
     {
       apply(0);
       arg.complete(action);
@@ -159,9 +153,8 @@ namespace quda {
     return action;
   }
 
-  template<typename Float_, int nColor, QudaReconstructType recon>
-  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float_, nColor, recon>
-  {
+  template <typename Float_, int nColor, QudaReconstructType recon>
+  struct UpdateMomArg : ReduceArg<double2>, BaseArg<Float_, nColor, recon> {
     using Float = Float_;
     typename gauge_mapper<Float, QUDA_RECONSTRUCT_10>::type mom;
     typename gauge_mapper<Float, recon>::type force;
@@ -170,10 +163,8 @@ namespace quda {
     int E[4]; // grid dimensions on force (possibly extended)
     int border[4]; //
     UpdateMomArg(GaugeField &mom, const Float &coeff, GaugeField &force) :
-      BaseArg<Float, nColor, recon>(mom),
-      mom(mom),
-      coeff(coeff),
-      force(force) {
+      BaseArg<Float, nColor, recon>(mom), mom(mom), coeff(coeff), force(force)
+    {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];
         E[dir] = force.X()[dir];
@@ -188,13 +179,14 @@ namespace quda {
      is passed to the reduce helper.
    */
   struct max_reducer2 {
-    __device__ __host__ inline  double2 operator()(const double2 &a, const double2 &b) {
+    __device__ __host__ inline double2 operator()(const double2 &a, const double2 &b)
+    {
       return make_double2(a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y);
     }
   };
 
-  template <int blockSize, typename Arg>
-  __global__ void UpdateMomKernel(Arg arg) {
+  template <int blockSize, typename Arg> __global__ void UpdateMomKernel(Arg arg)
+  {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity = threadIdx.y;
     double2 norm2 = make_double2(0.0,0.0);
@@ -208,8 +200,8 @@ namespace quda {
 
 #pragma unroll
       for (int d=0; d<4; d++) {
-	Matrix<complex<typename Arg::Float>,3> m = arg.mom(d, x_cb, parity);
-        Matrix<complex<typename Arg::Float>,3> f = arg.force(d, e_cb, parity);
+        Matrix<complex<typename Arg::Float>, 3> m = arg.mom(d, x_cb, parity);
+        Matrix<complex<typename Arg::Float>, 3> f = arg.force(d, e_cb, parity);
 
         // project to traceless anti-hermitian prior to taking norm
 	makeAntiHerm(f);
@@ -230,18 +222,16 @@ namespace quda {
     }
 
     // perform final inter-block reduction and write out result
-    arg.template reduce2d<blockSize,2,false,max_reducer2>(norm2);
+    arg.template reduce2d<blockSize, 2, false, max_reducer2>(norm2);
   } // UpdateMom
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class UpdateMom : TunableLocalParityReduction {
+  template <typename Float, int nColor, QudaReconstructType recon> class UpdateMom : TunableLocalParityReduction
+  {
     UpdateMomArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
   public:
-    UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
-      arg(mom, coeff, force),
-      meta(force)
+    UpdateMom(GaugeField &force, GaugeField &mom, double coeff, const char *fname) : arg(mom, coeff, force), meta(force)
     {
       double2 force_max;
       apply(0);
@@ -281,32 +271,26 @@ namespace quda {
 #endif // GPU_GAUGE_TOOLS
   }
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  struct ApplyUArg : BaseArg<Float, nColor, recon>
-  {
-    typedef typename gauge_mapper<Float,recon>::type G;
-    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
+  template <typename Float, int nColor, QudaReconstructType recon> struct ApplyUArg : BaseArg<Float, nColor, recon> {
+    typedef typename gauge_mapper<Float, recon>::type G;
+    typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type F;
     F force;
     const G U;
     int X[4]; // grid dimensions
-    ApplyUArg(GaugeField &force, const GaugeField &U) :
-      BaseArg<Float, nColor, recon>(U),
-      force(force),
-      U(U)
+    ApplyUArg(GaugeField &force, const GaugeField &U) : BaseArg<Float, nColor, recon>(U), force(force), U(U)
     {
-      for (int dir=0; dir<4; ++dir) X[dir] = U.X()[dir];
+      for (int dir = 0; dir < 4; ++dir) X[dir] = U.X()[dir];
     }
   };
 
-  template <typename Arg>
-  __global__ void ApplyUKernel(Arg arg)
+  template <typename Arg> __global__ void ApplyUKernel(Arg arg)
   {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     if (x >= arg.threads) return;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
-    using mat = Matrix<complex<typename Arg::Float>,Arg::nColor>;
+    using mat = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
-    for (int d=0; d<4; d++) {
+    for (int d = 0; d < 4; d++) {
       mat f = arg.force(d, x, parity);
       mat u = arg.U(d, x, parity);
 
@@ -316,8 +300,8 @@ namespace quda {
     }
   } // ApplyU
 
-  template <typename Float, int nColor, QudaReconstructType recon>
-  class ApplyU : TunableVectorY {
+  template <typename Float, int nColor, QudaReconstructType recon> class ApplyU : TunableVectorY
+  {
     ApplyUArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
@@ -325,13 +309,7 @@ namespace quda {
     unsigned int minThreads() const { return arg.threads; }
 
   public:
-    ApplyU(const GaugeField &U, GaugeField &force) :
-      TunableVectorY(2),
-      arg(force, U),
-      meta(U)
-    {
-      apply(0);
-    }
+    ApplyU(const GaugeField &U, GaugeField &force) : TunableVectorY(2), arg(force, U), meta(U) { apply(0); }
 
     void apply(const qudaStream_t &stream)
     {

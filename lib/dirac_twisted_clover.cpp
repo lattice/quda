@@ -8,10 +8,7 @@
 namespace quda {
 
   DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim) :
-    DiracWilson(param, nDim),
-    mu(param.mu),
-    epsilon(param.epsilon),
-    clover(param.clover)
+    DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(param.clover)
   {
   }
 
@@ -91,8 +88,8 @@ namespace quda {
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
     }
 
-    ApplyTwistedClover(
-        out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    ApplyTwistedClover(out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim,
+                       profile);
     flops += (1320ll + 552ll) * in.Volume();
   }
 
@@ -213,8 +210,8 @@ namespace quda {
       DiracWilson::DslashXpay(out, *tmp2, parity, x, k);
       deleteTmp(&tmp2, reset);
     } else {
-      ApplyTwistedCloverPreconditioned(
-          out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
+      ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim,
+                                       profile);
       flops += (1320ll + 552ll) * in.Volume();
     }
   }

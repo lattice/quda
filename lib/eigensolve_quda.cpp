@@ -20,11 +20,7 @@ namespace quda
   // Eigensolver class
   //-----------------------------------------------------------------------------
   EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    mat(mat),
-    eig_param(eig_param),
-    profile(profile),
-    tmp1(nullptr),
-    tmp2(nullptr)
+    mat(mat), eig_param(eig_param), profile(profile), tmp1(nullptr), tmp2(nullptr)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -216,18 +212,10 @@ namespace quda
   {
     double eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      eps = DBL_EPSILON;
-      break;
-    case QUDA_SINGLE_PRECISION:
-      eps = FLT_EPSILON;
-      break;
-    case QUDA_HALF_PRECISION:
-      eps = 2e-3;
-      break;
-    case QUDA_QUARTER_PRECISION:
-      eps = 5e-2;
-      break;
+    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
+    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
+    case QUDA_HALF_PRECISION: eps = 2e-3; break;
+    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
     default: errorQuda("Invalid precision %d", prec);
     }
     return eps;
@@ -436,7 +424,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
-        auto cnorm = H[i*size + j];
+        auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
@@ -726,8 +714,10 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evecs.size())
+      errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;

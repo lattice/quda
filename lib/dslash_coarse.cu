@@ -4,21 +4,20 @@ namespace quda {
 
   // declaration for dagger wrapper - defined in dslash_coarse_dagger.cu
   void ApplyCoarseDagger(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-                         const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-                         bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision);
+                         const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover,
+                         const int *commDim, QudaPrecision halo_precision);
 
   // dagger = false wrapper
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-	           const GaugeField &Y, const GaugeField &X, double kappa, int parity,
-		   bool dslash, bool clover, const int *commDim, QudaPrecision halo_precision)
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB, const GaugeField &Y,
+                   const GaugeField &X, double kappa, int parity, bool dslash, bool clover, const int *commDim,
+                   QudaPrecision halo_precision)
   {
     constexpr bool dagger = false;
-    DslashCoarseLaunch<dagger> Dslash(out, inA, inB, Y, X, kappa, parity, dslash,
-                                      clover, commDim, halo_precision);
+    DslashCoarseLaunch<dagger> Dslash(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
 
-    DslashCoarsePolicyTune<decltype(Dslash)>  policy(Dslash);
+    DslashCoarsePolicyTune<decltype(Dslash)> policy(Dslash);
     policy.apply(0);
-  } //ApplyCoarse
+  } // ApplyCoarse
 
   //Apply the coarse Dirac matrix to a coarse grid vector
   //out(x) = M*in = X*in - kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
@@ -34,6 +33,6 @@ namespace quda {
     else
       ApplyCoarse(out, inA, inB, Y, X, kappa, parity, dslash, clover, commDim, halo_precision);
 
-  } //ApplyCoarse
+  } // ApplyCoarse
 
 } // namespace quda

@@ -406,14 +406,9 @@ namespace quda {
       }
 
       Accessor(const Accessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, storeFloat> &a) :
-        volumeCB(a.volumeCB),
-        geometry(a.geometry),
-        cb_offset(a.cb_offset),
-        scale(a.scale),
-        scale_inv(a.scale_inv)
+        volumeCB(a.volumeCB), geometry(a.geometry), cb_offset(a.cb_offset), scale(a.scale), scale_inv(a.scale_inv)
       {
-        for (int d=0; d<QUDA_MAX_GEOMETRY; d++)
-	  u[d] = a.u[d];
+        for (int d = 0; d < QUDA_MAX_GEOMETRY; d++) u[d] = a.u[d];
       }
 
       void resetScale(Float max) {
@@ -507,13 +502,12 @@ namespace quda {
       }
 
       GhostAccessor(const GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        scale(a.scale),
-        scale_inv(a.scale_inv)
+        scale(a.scale), scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
@@ -557,11 +551,7 @@ namespace quda {
       }
 
       Accessor(const Accessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, storeFloat> &a) :
-        u(a.u),
-        volumeCB(a.volumeCB),
-        geometry(a.geometry),
-        scale(a.scale),
-        scale_inv(a.scale_inv)
+        u(a.u), volumeCB(a.volumeCB), geometry(a.geometry), scale(a.scale), scale_inv(a.scale_inv)
       { }
 
       void resetScale(Float max) {
@@ -672,13 +662,12 @@ namespace quda {
       }
 
       GhostAccessor(const GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        scale(a.scale),
-        scale_inv(a.scale_inv)
+        scale(a.scale), scale_inv(a.scale_inv)
       {
-        for (int d=0; d<8; d++) {
-	  ghost[d] = a.ghost[d];
+        for (int d = 0; d < 8; d++) {
+          ghost[d] = a.ghost[d];
 	  ghostOffset[d] = a.ghostOffset[d];
-	}
+        }
       }
 
       void resetScale(Float max) {
@@ -841,9 +830,11 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
-      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
-	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
+      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_ = 0) :
+        volumeCB(U.VolumeCB()),
+        scale(static_cast<Float>(1.0)),
+        scale_inv(static_cast<Float>(1.0)),
+        accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
@@ -856,10 +847,7 @@ namespace quda {
       }
 
       GhostAccessor(const GhostAccessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, native_ghost, storeFloat> &a) :
-        volumeCB(a.volumeCB),
-        scale(a.scale),
-        scale_inv(a.scale_inv),
-        accessor(a.accessor)
+        volumeCB(a.volumeCB), scale(a.scale), scale_inv(a.scale_inv), accessor(a.accessor)
       {
 	for (int d=0; d<8; d++) {
 	  ghost[d] = a.ghost[d];
@@ -1201,11 +1189,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm squared of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return L2 norm squared
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return L2 norm squared
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
@@ -1213,11 +1201,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
@@ -1225,11 +1213,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
@@ -1237,7 +1225,7 @@ namespace quda {
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
     };
 
       /**
@@ -1255,8 +1243,7 @@ namespace quda {
         real scale;
         real scale_inv;
         Reconstruct(const GaugeField &u) :
-          scale(isFixed<Float>::value ? u.LinkMax() : 1.0),
-          scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+          scale(isFixed<Float>::value ? u.LinkMax() : 1.0), scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
         {
         }
 
@@ -1887,26 +1874,26 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
+        }
 
-      FloatNOrder(const FloatNOrder &order) :
-        reconstruct(order.reconstruct),
-        gauge(order.gauge),
-        offset(order.offset),
-        ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB),
-        stride(order.stride),
-        geometry(order.geometry),
-        phaseOffset(order.phaseOffset),
-        backup_h(nullptr),
-        bytes(order.bytes)
-      {
-	for (int i=0; i<4; i++) {
-	  X[i] = order.X[i];
-	  R[i] = order.R[i];
-	  ghost[i] = order.ghost[i];
-	  faceVolumeCB[i] = order.faceVolumeCB[i];
-	}
+        FloatNOrder(const FloatNOrder &order) :
+          reconstruct(order.reconstruct),
+          gauge(order.gauge),
+          offset(order.offset),
+          ghostExchange(order.ghostExchange),
+          volumeCB(order.volumeCB),
+          stride(order.stride),
+          geometry(order.geometry),
+          phaseOffset(order.phaseOffset),
+          backup_h(nullptr),
+          bytes(order.bytes)
+        {
+          for (int i = 0; i < 4; i++) {
+            X[i] = order.X[i];
+            R[i] = order.R[i];
+            ghost[i] = order.ghost[i];
+            faceVolumeCB[i] = order.faceVolumeCB[i];
+          }
       }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const

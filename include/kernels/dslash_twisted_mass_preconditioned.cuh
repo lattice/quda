@@ -15,8 +15,8 @@ namespace quda
     real a_inv;      /** inverse scaling factor - used to allow early xpay inclusion */
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
 
-    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b, bool xpay,
-                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+                   bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the twist
@@ -137,7 +137,7 @@ namespace quda
   struct twistedMassPreconditioned : dslash_default {
 
     Arg &arg;
-    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) {}
+    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 1 : 0; }
 
@@ -155,7 +155,7 @@ namespace quda
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
+      int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -186,7 +186,6 @@ namespace quda
 
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

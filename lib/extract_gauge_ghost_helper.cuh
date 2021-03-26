@@ -184,9 +184,11 @@ namespace quda {
   public:
     ExtractGhost(Arg &arg, const GaugeField &meta, bool extract)
 #ifndef FINE_GRAINED_ACCESS
-      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), extract(extract)
+      :
+      TunableVectorYZ(1, 2 * nDim), arg(arg), meta(meta), extract(extract)
 #else
-      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), extract(extract)
+      :
+      TunableVectorYZ(Arg::nColor, 2 * nDim), arg(arg), meta(meta), extract(extract)
 #endif
     {
       int faceMax = 0;
@@ -201,17 +203,18 @@ namespace quda {
 #endif
     }
 
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	if (extract) extractGhost<nDim,true>(arg);
+        if (extract) extractGhost<nDim,true>(arg);
 	else extractGhost<nDim,false>(arg);
       } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (extract) {
-	  qudaLaunchKernel(extractGhostKernel<nDim, true, Arg>, tp, stream, arg);
-	} else {
-	  qudaLaunchKernel(extractGhostKernel<nDim, false, Arg>, tp, stream, arg);
-	}
+          qudaLaunchKernel(extractGhostKernel<nDim, true, Arg>, tp, stream, arg);
+        } else {
+          qudaLaunchKernel(extractGhostKernel<nDim, false, Arg>, tp, stream, arg);
+        }
       }
     }
 
@@ -230,7 +233,8 @@ namespace quda {
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, typename Order>
-  void extractGhost(Order order, const GaugeField &u, bool extract, int offset) {
+  void extractGhost(Order order, const GaugeField &u, bool extract, int offset)
+  {
     const int *X = u.X();
     constexpr int nDim = 4;
     //loop variables: a, b, c with a the most signifcant and c the least significant

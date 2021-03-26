@@ -15,7 +15,7 @@
 namespace quda
 {
 
-  int* getPackComms() { return commDim; }
+  int *getPackComms() { return commDim; }
 
   void setPackComms(const int *comm_dim)
   {
@@ -283,24 +283,24 @@ public:
           }
         }
 #endif
-      } else if (in.Nspin() == 1) {
-        using Arg = PackArg<Float, nColor, 1, false>;
-        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
-        arg.counter = dslash::get_shmem_sync_counter();
-        arg.swizzle = tp.aux.x;
-        arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
-        arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
+    } else if (in.Nspin() == 1) {
+      using Arg = PackArg<Float, nColor, 1, false>;
+      Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
+      arg.counter = dslash::get_shmem_sync_counter();
+      arg.swizzle = tp.aux.x;
+      arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;
+      arg.blocks_per_dir = tp.grid.x / (2 * arg.active_dims); // set number of blocks per direction
 
 #ifdef STRIPED
         launch(packStaggeredKernel<Arg>, tp, arg, stream);
 #else
-        launch((location & Host || location & Shmem) ? packStaggeredShmemKernel<Arg> : packStaggeredKernel<Arg>, tp,
-               arg, stream);
+      launch((location & Host || location & Shmem) ? packStaggeredShmemKernel<Arg> : packStaggeredKernel<Arg>, tp, arg,
+             stream);
 #endif
-      } else {
-        errorQuda("Unsupported nSpin = %d\n", in.Nspin());
-      }
+    } else {
+      errorQuda("Unsupported nSpin = %d\n", in.Nspin());
     }
+  }
 
     bool tuneSharedBytes() const { return false; }
 

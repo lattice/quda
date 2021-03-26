@@ -699,11 +699,11 @@ struct Communicator {
 
 #if defined(QMP_COMMS)
   QMP_comm_t QMP_COMM_HANDLE;
-  
+
   /**
-  * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
-  * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
-  */
+   * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
+   * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
+   */
   bool is_qmp_handle_default;
 #endif
 

@@ -867,7 +867,7 @@ namespace quda {
    */
   template <typename... Args>
   inline QudaReconstructType Reconstruct_(const char *func, const char *file, int line, const GaugeField &a,
-                                          const GaugeField &b, const Args &... args)
+                                          const GaugeField &b, const Args &...args)
   {
     return static_cast<QudaReconstructType>(Reconstruct_(func, file, line, a, b)
                                             & Reconstruct_(func, file, line, a, args...));

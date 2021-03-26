@@ -25,7 +25,7 @@ namespace quda
     using Dslash::in;
 
   public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) { }
 
     void apply(const qudaStream_t &stream)
     {
@@ -100,7 +100,8 @@ namespace quda
     {
       int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in.Precision();
       int gauge_bytes_long = arg.reconstruct * in.Precision();
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
+      int spinor_bytes
+        = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
         + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
       int num_dir = 2 * 4;      // set to 4-d since we take care of 5-d fermions in derived classes where necessary

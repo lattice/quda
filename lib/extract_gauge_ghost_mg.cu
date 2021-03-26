@@ -22,10 +22,10 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 #ifdef FINE_GRAINED_ACCESS
 	typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_FLOAT2_GAUGE_ORDER,false,storeFloat> G;
-	extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, extract, offset);
+        extractGhost<Float, length>(G(const_cast<GaugeField &>(u), 0, (void **)Ghost), u, extract, offset);
 #else
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO,length>::type G;
-	extractGhost<Float,length>(G(u, 0, Ghost), u, extract, offset);
+        extractGhost<Float, length>(G(u, 0, Ghost), u, extract, offset);
 #endif
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
@@ -33,9 +33,9 @@ namespace quda {
 #ifdef BUILD_QDP_INTERFACE
 #ifdef FINE_GRAINED_ACCESS
       typedef typename gauge::FieldOrder<Float,Nc,1,QUDA_QDP_GAUGE_ORDER,true,storeFloat> G;
-      extractGhost<Float,length>(G(const_cast<GaugeField&>(u), 0, (void**)Ghost), u, extract, offset);
+      extractGhost<Float, length>(G(const_cast<GaugeField &>(u), 0, (void **)Ghost), u, extract, offset);
 #else
-      extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost), u, extract, offset);
+      extractGhost<Float, length>(QDPOrder<Float, length>(u, 0, Ghost), u, extract, offset);
 #endif
 #else
       errorQuda("QDP interface has not been built\n");
@@ -61,13 +61,11 @@ namespace quda {
   template <typename Float> struct GhostExtractMG {
     GhostExtractMG(const GaugeField &u, void **Ghost_, bool extract, int offset)
     {
-      Float **Ghost = reinterpret_cast<Float**>(Ghost_);
+      Float **Ghost = reinterpret_cast<Float **>(Ghost_);
 
-      if (u.Reconstruct() != QUDA_RECONSTRUCT_NO) 
-        errorQuda("Reconstruct %d not supported", u.Reconstruct());
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Reconstruct %d not supported", u.Reconstruct());
 
-      if (u.LinkType() != QUDA_COARSE_LINKS)
-        errorQuda("Link type %d not supported", u.LinkType());
+      if (u.LinkType() != QUDA_COARSE_LINKS) errorQuda("Link type %d not supported", u.LinkType());
 
       if (u.Ncolor() == 48) {
         extractGhostMG<Float, 48>(u, Ghost, extract, offset);

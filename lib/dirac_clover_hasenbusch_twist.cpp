@@ -2,17 +2,17 @@
 #include <blas_quda.h>
 #include <multigrid.h>
 
-namespace quda {
+namespace quda
+{
 
-  DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param) : DiracClover(param), mu(param.mu) {}
+  DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param) : DiracClover(param), mu(param.mu) { }
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac) :
-    DiracClover(dirac),
-    mu(dirac.mu)
+    DiracClover(dirac), mu(dirac.mu)
   {
   }
 
-  DiracCloverHasenbuschTwist::~DiracCloverHasenbuschTwist() {}
+  DiracCloverHasenbuschTwist::~DiracCloverHasenbuschTwist() { }
 
   DiracCloverHasenbuschTwist &DiracCloverHasenbuschTwist::operator=(const DiracCloverHasenbuschTwist &dirac)
   {
@@ -86,18 +86,16 @@ namespace quda {
    * ********************************************* */
 
   DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracParam &param) :
-    DiracCloverPC(param),
-    mu(param.mu)
+    DiracCloverPC(param), mu(param.mu)
   {
   }
 
   DiracCloverHasenbuschTwistPC::DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac) :
-    DiracCloverPC(dirac),
-    mu(dirac.mu)
+    DiracCloverPC(dirac), mu(dirac.mu)
   {
   }
 
-  DiracCloverHasenbuschTwistPC::~DiracCloverHasenbuschTwistPC() {}
+  DiracCloverHasenbuschTwistPC::~DiracCloverHasenbuschTwistPC() { }
 
   DiracCloverHasenbuschTwistPC &DiracCloverHasenbuschTwistPC::operator=(const DiracCloverHasenbuschTwistPC &dirac)
   {

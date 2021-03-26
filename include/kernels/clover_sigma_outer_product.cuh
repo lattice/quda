@@ -24,13 +24,10 @@ namespace quda
     unsigned int length;
     int nvector;
 
-    CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA, const std::vector<ColorSpinorField*> &inB,
-                        const std::vector<std::vector<double>> &coeff_, int nvector) :
-      oprod(oprod),
-      inA{*inA[0]},
-      inB{*inB[0]},
-      length(oprod.VolumeCB()),
-      nvector(nvector)
+    CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField *> &inA,
+                        const std::vector<ColorSpinorField *> &inB, const std::vector<std::vector<double>> &coeff_,
+                        int nvector) :
+      oprod(oprod), inA {*inA[0]}, inB {*inB[0]}, length(oprod.VolumeCB()), nvector(nvector)
     {
       for (int i = 0; i < nvector; i++) {
         coeff[i][0] = coeff_[i][0];

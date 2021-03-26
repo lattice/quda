@@ -43,12 +43,7 @@ namespace quda
     transformer h;
     reducer r;
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
-      ReduceArg<reduce_t>(v.size()),
-      n_items(n_items),
-      n_batch(v.size()),
-      init(init),
-      h(h),
-      r(r)
+      ReduceArg<reduce_t>(v.size()), n_items(n_items), n_batch(v.size()), init(init), h(h), r(r)
     {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
       for (size_t j = 0; j < v.size(); j++) this->v[j] = v[j];
