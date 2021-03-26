@@ -184,10 +184,12 @@ namespace quda
         compute_coeff_m5inv_dwf();
         break;
       case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+      case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
         compute_coeff_mobius_pre(b_5, c_5);
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
       case Dslash5Type::M5_INV_MOBIUS:
+      case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
       case Dslash5Type::M5_INV_ZMOBIUS:
@@ -198,7 +200,7 @@ namespace quda
     }
   };
 
-  template <bool dagger, bool shared, class Vector, class Arg>
+  template <bool sync, bool dagger, bool shared, class Vector, class Arg>
     __device__ __host__ inline Vector d5(Arg &arg, const Vector &in, int parity, int x_cb, int s) {
 
       using real = typename Arg::real;
@@ -208,7 +210,7 @@ namespace quda
       // if using shared-memory caching then load spinor field for my site into cache
       SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
-        cache.sync();
+        if (sync) { cache.sync(); }
         cache.save(in);
         cache.sync();
       }
@@ -239,7 +241,7 @@ namespace quda
         }
       }
 
-      if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE || Arg::type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
+      if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE || Arg::type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || Arg::type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
         out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
       } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS) {
@@ -267,7 +269,7 @@ namespace quda
       coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-      Vector out = d5<Arg::dagger, false, Vector, Arg>(arg, Vector(), parity, x_cb, s);
+      Vector out = d5<false, Arg::dagger, false, Vector, Arg>(arg, Vector(), parity, x_cb, s);
 
       if (Arg::xpay) {
         if (Arg::type == Dslash5Type::DSLASH5_DWF) {
@@ -301,7 +303,7 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool dagger, typename Vector, typename Arg>
+  template <bool sync, bool dagger, typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
@@ -312,6 +314,7 @@ namespace quda
     SharedMemoryCache<Vector> cache(target::block_dim());
     if (shared()) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
+      if (sync) { cache.sync(); }
       cache.save(in);
       cache.sync();
     }
@@ -357,7 +360,7 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool dagger, typename Vector, typename Arg>
+  template <bool sync, bool dagger, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
@@ -373,6 +376,7 @@ namespace quda
       constexpr int proj_dir = dagger ? -1 : +1;
 
       if (shared()) {
+        if (sync) { cache.sync(); }
         cache.save(in.project(4, proj_dir));
         cache.sync();
       }
@@ -454,9 +458,9 @@ namespace quda
       Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
       Vector out;
       if (var_inverse()) { // zMobius, must call variableInv
-        out = variableInv<Arg::dagger>(arg, in, parity, x_cb, s);
+        out = variableInv<false, Arg::dagger>(arg, in, parity, x_cb, s);
       } else {
-        out = constantInv<Arg::dagger>(arg, in, parity, x_cb, s);
+        out = constantInv<false, Arg::dagger>(arg, in, parity, x_cb, s);
       }
 
       if (Arg::xpay) {

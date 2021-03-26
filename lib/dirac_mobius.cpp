@@ -248,28 +248,28 @@ namespace quda {
     // QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
-#if 0
+#if 1
       Dslash4(out, *tmp1, parity[0]);
       M5inv(*tmp1, out);
       Dslash4pre(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
       M5invXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS, profile);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS, profile);
       out = *tmp1;
 #endif
     } else if (symmetric && dagger) {
       M5inv(*tmp1, in);
-#if 0
+#if 1
       Dslash4(out, *tmp1, parity[0]);
       Dslash4pre(*tmp1, out);
       M5inv(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
       Dslash4preXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, parity[1], dagger, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
       out = *tmp1;
 #endif
     } else if (!symmetric && !dagger) {
@@ -293,9 +293,28 @@ namespace quda {
 
   void DiracMobiusPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
+    if (symmetric) {
+#if 0 
+      M(*tmp2, in);
+      Mdag(out, *tmp2);
+#else
+      int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+      QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+      bool reset1 = newTmp(&tmp1, in);
+      Dslash4pre(*tmp1, in);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG, profile);
+      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, Dslash5Type::M5_PRE_MOBIUS_M5_INV, profile);
+      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
+      out = *tmp1;
+      deleteTmp(&tmp1, reset1);
+#endif
+    } else {
+      M(*tmp2, in);
+      Mdag(out, *tmp2);
+    }
     deleteTmp(&tmp2, reset);
   }
 

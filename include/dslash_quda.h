@@ -517,7 +517,7 @@ namespace quda {
                          const int *comm_override, TimeProfile &profile);
 
   void ApplyDomainWall4DFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
                          const int *comm_override, double m_f, Dslash5Type dslash5_type, TimeProfile &profile);
 
   /**
