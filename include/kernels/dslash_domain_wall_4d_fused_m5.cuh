@@ -49,8 +49,8 @@ namespace quda
     {
       for (int s = 0; s < Ls; s++) {
         auto kappa_b_s = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
-        auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
-        auto kappa_s = kappa_b_s / kappa_c_s;
+        // auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
+        // auto kappa_s = kappa_b_s / kappa_c_s;
         a_5[s] = a * kappa_b_s * kappa_b_s;
 #if 0
         alpha = b_5[s] - c_5[s] / kappa_s;

@@ -46,7 +46,11 @@ namespace quda
     unsigned int sharedBytesPerThread() const
     {
       // spin components in shared depend on inversion algorithm
+#if 1
+      return 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+#else
       return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+#endif
     }
 
     void initTuneParam(TuneParam &param) const
@@ -71,7 +75,7 @@ namespace quda
                                          ColorSpinorField &, int, bool, const int *,
                                          double, Dslash5Type dslash5_type, Dslash5TypeList<>, TimeProfile &)
     {
-      errorQuda("Unsupported dslash5_type of %d", (int)dslash5_type);
+      errorQuda("Unsupported dslash5_type of %d", static_cast<int>(dslash5_type));
     }
 
     template <Dslash5Type dslash5_type_impl, Dslash5Type... N>

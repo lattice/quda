@@ -195,7 +195,7 @@ namespace quda
       case Dslash5Type::M5_INV_ZMOBIUS:
         compute_coeff_m5inv_zmobius(b_5, c_5);
         break;
-      default: errorQuda("Unknown Dslash5Type %d", type);
+      default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
       }
     }
   };
@@ -207,6 +207,59 @@ namespace quda
       // coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
       coeff_type<real, true, Arg> coeff(arg);
 
+      Vector out;
+
+#if 1
+      // if using shared-memory caching then load spinor field for my site into cache
+      typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
+      SharedMemoryCache<HalfVector> cache(target::block_dim());
+
+      { // forwards direction
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (shared) {
+          if (sync) { cache.sync(); }
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+        const int fwd_s = (s + 1) % arg.Ls;
+        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+        HalfVector half_in;
+        if (shared) {
+          half_in = cache.load(threadIdx.x, fwd_s, parity);
+        } else {
+          Vector full_in = arg.in(fwd_idx, parity);
+          half_in = full_in.project(4, proj_dir);
+        }
+        if (s == arg.Ls - 1) {
+          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+        } else {
+          out += half_in.reconstruct(4, proj_dir);
+        }
+      }
+
+      { // backwards direction
+        constexpr int proj_dir = dagger ? -1 : +1;
+        if (shared) {
+          cache.sync();
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+        const int back_s = (s + arg.Ls - 1) % arg.Ls;
+        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+        HalfVector half_in;
+        if (shared) {
+          half_in = cache.load(threadIdx.x, back_s, parity);
+        } else {
+          Vector full_in = arg.in(back_idx, parity);
+          half_in = full_in.project(4, proj_dir);
+        }
+        if (s == 0) {
+          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+        } else {
+          out += half_in.reconstruct(4, proj_dir);
+        }
+      }
+#else
       // if using shared-memory caching then load spinor field for my site into cache
       SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
@@ -214,8 +267,6 @@ namespace quda
         cache.save(in);
         cache.sync();
       }
-
-      Vector out;
 
       { // forwards direction
         const int fwd_s = (s + 1) % arg.Ls;
@@ -240,7 +291,7 @@ namespace quda
           out += in.project(4, proj_dir).reconstruct(4, proj_dir);
         }
       }
-
+#endif
       if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE || Arg::type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || Arg::type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
         out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
@@ -367,9 +418,9 @@ namespace quda
     using real = typename Arg::real;
     typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
     coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
-    // Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
+#if 1
     SharedMemoryCache<HalfVector> cache(target::block_dim());
 
     { // first do R
@@ -428,6 +479,52 @@ namespace quda
 
       out += l.reconstruct(4, proj_dir);
     }
+#else
+    SharedMemoryCache<Vector> cache(target::block_dim());
+    if (shared()) {
+      if (sync) { cache.sync(); }
+      cache.save(in);
+      cache.sync();
+    }
+
+    { // first do R
+      constexpr int proj_dir = dagger ? -1 : +1;
+
+      int s = s_;
+      auto R = coeff.inv();
+      HalfVector r;
+      for (int s_count = 0; s_count < arg.Ls; s_count++) {
+        auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+        Vector in =  shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        r += factorR * in.project(4, proj_dir);
+
+        R *= coeff.kappa(s);
+        s = (s + arg.Ls - 1) % arg.Ls;
+      }
+
+      out += r.reconstruct(4, proj_dir);
+    }
+
+    { // second do L
+      constexpr int proj_dir = dagger ? +1 : -1;
+
+      int s = s_;
+      auto L = coeff.inv();
+      HalfVector l;
+      for (int s_count = 0; s_count < arg.Ls; s_count++) {
+        auto factorL = (s_ > s ? -arg.m_f * L : L);
+
+        Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        l += factorL * in.project(4, proj_dir);
+
+        L *= coeff.kappa(s);
+        s = (s + 1) % arg.Ls;
+      }
+
+      out += l.reconstruct(4, proj_dir);
+    }
+#endif
 
     return out;
   }

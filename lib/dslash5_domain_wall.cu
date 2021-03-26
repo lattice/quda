@@ -42,7 +42,7 @@ namespace quda
         flops_ = ((2 + 8 * n) * Ls + (xpay ? 4ll : 0)) * in.Volume();
         break;
       case Dslash5Type::M5_INV_ZMOBIUS: flops_ = ((12 + 16 * n) * Ls + (xpay ? 8ll : 0)) * in.Volume(); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
 
       return flops_;
@@ -58,7 +58,7 @@ namespace quda
       case Dslash5Type::M5_INV_DWF: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
       case Dslash5Type::M5_INV_MOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
       case Dslash5Type::M5_INV_ZMOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
       return 0ll;
     }
@@ -116,7 +116,7 @@ namespace quda
       case Dslash5Type::M5_INV_DWF: strcat(aux, ",Dslash5Type::M5_INV_DWF"); break;
       case Dslash5Type::M5_INV_MOBIUS: strcat(aux, ",Dslash5Type::M5_INV_MOBIUS"); break;
       case Dslash5Type::M5_INV_ZMOBIUS: strcat(aux, ",Dslash5Type::M5_INV_ZMOBIUS"); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
 
       apply(device::get_default_stream());
@@ -152,7 +152,7 @@ namespace quda
       case Dslash5Type::M5_INV_DWF:         Launch<Dslash5Type::M5_INV_DWF, dslash5inv>(tp, stream); break;
       case Dslash5Type::M5_INV_MOBIUS:      Launch<Dslash5Type::M5_INV_MOBIUS, dslash5inv>(tp, stream); break;
       case Dslash5Type::M5_INV_ZMOBIUS:     Launch<Dslash5Type::M5_INV_ZMOBIUS, dslash5inv>(tp, stream); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
     }
   };
