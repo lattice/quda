@@ -70,6 +70,10 @@ namespace quda {
       spinorNoise<real,Ns,64>(src, randstates, type);
     } else if (src.Ncolor() == 96) {
       spinorNoise<real,Ns,96>(src, randstates, type);
+    } else if (src.Ncolor() == 128) {
+      spinorNoise<real,Ns,128>(src, randstates, type);
+    } else if (src.Ncolor() == 256) {
+      spinorNoise<real,Ns,256>(src, randstates, type);
     } else {
       errorQuda("nColor = %d not implemented", src.Ncolor());
     }

@@ -249,6 +249,9 @@ namespace quda {
 	} else if (Nvec == 64) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 64>(V, B, fine_to_coarse, coarse_to_fine,
 									       geo_bs, n_block_ortho);
+	} else if (Nvec == 96) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 96>(V, B, fine_to_coarse, coarse_to_fine,
+									       geo_bs, n_block_ortho);
 	} else if (Nvec == 128) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 128>(V, B, fine_to_coarse, coarse_to_fine,
 									       geo_bs, n_block_ortho);
@@ -261,6 +264,7 @@ namespace quda {
 	} else if (Nvec == 512) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 512>(V, B, fine_to_coarse, coarse_to_fine,
 										geo_bs, n_block_ortho);
+          /*
 	} else if (Nvec == 640) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 640>(V, B, fine_to_coarse, coarse_to_fine,
 										geo_bs, n_block_ortho);
@@ -273,8 +277,8 @@ namespace quda {
 	  // Fall shy of 1024 to allow for compilation
 	} else if (Nvec == 1016) {
           BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 1016>(V, B, fine_to_coarse, coarse_to_fine,
-										 geo_bs, n_block_ortho);
-	  
+                                                                                 geo_bs, n_block_ortho);
+          */
         } else {
           errorQuda("Unsupported nVec %d\n", Nvec);
         }

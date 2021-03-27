@@ -60,6 +60,10 @@ namespace quda {
 #ifdef NSPIN4
     case 12: norm_ = norm<reg_t, store_t, 12>(u, d, type); break;
     case 64: norm_ = norm<reg_t, store_t, 64>(u, d, type); break;
+    case 128: norm_ = norm<reg_t, store_t, 128>(u, d, type); break;
+    case 192: norm_ = norm<reg_t, store_t, 192>(u, d, type); break;
+    case 256: norm_ = norm<reg_t, store_t, 256>(u, d, type); break;
+    case 512: norm_ = norm<reg_t, store_t, 512>(u, d, type); break;
 #endif // NSPIN4
 #ifdef NSPIN1
     case 128: norm_ = norm<reg_t, store_t, 128>(u, d, type); break;

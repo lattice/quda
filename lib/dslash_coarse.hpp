@@ -281,6 +281,14 @@ namespace quda {
 #ifdef NSPIN4
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+    } else if (inA.Ncolor() == 64) {
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+    } else if (inA.Ncolor() == 96) {
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+    } else if (inA.Ncolor() == 128) {
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,128,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+    } else if (inA.Ncolor() == 256) {
+      ApplyCoarse<Float,yFloat,ghostFloat,dagger,256,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (inA.Ncolor() == 64) {
@@ -289,7 +297,7 @@ namespace quda {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
 #endif // NSPIN1
     } else {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d\n", inA.Ncolor());
     }
   }
 

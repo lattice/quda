@@ -129,6 +129,10 @@ namespace quda {
 #ifdef NSPIN4
     case 12: copyGaugeMG<FloatOut,FloatIn,12>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 64: copyGaugeMG<FloatOut,FloatIn,64>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 128: copyGaugeMG<FloatOut,FloatIn,128>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 192: copyGaugeMG<FloatOut,FloatIn,192>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 256: copyGaugeMG<FloatOut,FloatIn,256>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 512: copyGaugeMG<FloatOut,FloatIn,512>(out, in, location, Out, In, outGhost, inGhost, type); break;
 #endif
 #ifdef NSPIN1
     case 128: copyGaugeMG<FloatOut,FloatIn,128>(out, in, location, Out, In, outGhost, inGhost, type); break;

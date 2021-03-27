@@ -150,8 +150,53 @@ namespace quda
       return -1;
     }
 
+    template <bool query_max = false, class Arg, typename Tunable>
+    typename std::enable_if<Arg::N == 256, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
+                                                                         Arg &arg, Tunable &tunable)
+      {
+      if (query_max) return 4;
+      // clang-format off
+      switch (tp.aux.x) {
+      case 0: launch_kernel<64,  64,  16,  16,  16,  2>(tp, stream, arg, tunable); break;
+      case 1: launch_kernel<64,  64,  64,  16,  16,  2>(tp, stream, arg, tunable); break;
+      case 2: launch_kernel<16, 192, 192,  24,  16    >(tp, stream, arg, tunable); break;
+      case 3: launch_kernel<64,  64,  32,  16,  16,  2>(tp, stream, arg, tunable); break;
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
+      case 4: launch_kernel<16, 192, 192,  96,   8    >(tp, stream, arg, tunable); break;
 #else
+      case 4: launch_kernel<16, 192, 192,  48,   8    >(tp, stream, arg, tunable); break;
+#endif
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 256", tp.aux.x);
+      }
+      // clang-format on
+      return -1;
+    }
 
+    template <bool query_max = false, class Arg, typename Tunable>
+    typename std::enable_if<Arg::N == 512, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
+                                                                         Arg &arg, Tunable &tunable)
+      {
+      if (query_max) return 4;
+      // clang-format off
+      switch (tp.aux.x) {
+      case 0: launch_kernel<64,  64,  16,  16,  16,  2>(tp, stream, arg, tunable); break;
+      case 1: launch_kernel<64,  64,  64,  16,  16,  2>(tp, stream, arg, tunable); break;
+      case 2: launch_kernel<16, 192, 192,  24,  16    >(tp, stream, arg, tunable); break;
+      case 3: launch_kernel<64,  64,  32,  16,  16,  2>(tp, stream, arg, tunable); break;
+#if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
+      case 4: launch_kernel<16, 192, 192,  96,   8    >(tp, stream, arg, tunable); break;
+#else
+      case 4: launch_kernel<16, 192, 192,  48,   8    >(tp, stream, arg, tunable); break;
+#endif
+      default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 512", tp.aux.x);
+      }
+      // clang-format on
+      return -1;
+    }
+
+    
+#else
+    
     template <bool query_max = false, class Arg, typename Tunable>
     int launch_yhat_kernel(TuneParam &, const qudaStream_t &, Arg &, Tunable &)
     {

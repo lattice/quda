@@ -55,6 +55,14 @@ namespace quda {
         extractGhostMG<Float, 12>(u, Ghost, extract, offset);
       } else if (u.Ncolor() == 64) {
         extractGhostMG<Float, 64>(u, Ghost, extract, offset);
+      } else if (u.Ncolor() == 128) {
+        extractGhostMG<Float, 128>(u, Ghost, extract, offset);
+      } else if (u.Ncolor() == 192) {
+        extractGhostMG<Float, 192>(u, Ghost, extract, offset);
+      } else if (u.Ncolor() == 256) {
+        extractGhostMG<Float, 256>(u, Ghost, extract, offset);
+      } else if (u.Ncolor() == 512) {
+        extractGhostMG<Float, 512>(u, Ghost, extract, offset);
 #endif // NSPIN4
 #ifdef NSPIN1
       } else if (u.Ncolor() == 128) {

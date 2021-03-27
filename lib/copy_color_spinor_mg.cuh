@@ -202,8 +202,11 @@ namespace quda {
     case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;
     case 32: CopyGenericColorSpinor<32, dst_t, src_t>(param); break;
     case 36: CopyGenericColorSpinor<36, dst_t, src_t>(param); break;
+    case 64: CopyGenericColorSpinor<64, dst_t, src_t>(param); break;
     case 72: CopyGenericColorSpinor<72, dst_t, src_t>(param); break;
     case 96: CopyGenericColorSpinor<96, dst_t, src_t>(param); break;
+    case 128: CopyGenericColorSpinor<128, dst_t, src_t>(param); break;
+    case 256: CopyGenericColorSpinor<256, dst_t, src_t>(param); break;
     case 576: CopyGenericColorSpinor<576, dst_t, src_t>(param); break;
     case 768: CopyGenericColorSpinor<768, dst_t, src_t>(param); break;
     case 1024: CopyGenericColorSpinor<1024, dst_t, src_t>(param); break;

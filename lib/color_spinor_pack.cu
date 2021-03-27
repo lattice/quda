@@ -199,6 +199,8 @@ namespace quda {
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
@@ -208,6 +210,16 @@ namespace quda {
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 128) { // MGLan
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,128>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 192) { // MGLan
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 256) { // MGLan
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,256>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 288) { // MGLan
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,288>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 384) { // MGLan
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,384>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1
     } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);

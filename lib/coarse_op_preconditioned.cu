@@ -266,6 +266,10 @@ namespace quda
 #ifdef NSPIN4
     case 12: calculateYhat<storeFloat, Float, 12>(Yhat, Xinv, Y, X, use_mma); break;
     case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X, use_mma); break;
+    case 128: calculateYhat<storeFloat, Float, 128>(Yhat, Xinv, Y, X, use_mma); break;
+    case 192: calculateYhat<storeFloat, Float, 192>(Yhat, Xinv, Y, X, use_mma); break;
+    case 256: calculateYhat<storeFloat, Float, 256>(Yhat, Xinv, Y, X, use_mma); break;
+    case 512: calculateYhat<storeFloat, Float, 512>(Yhat, Xinv, Y, X, use_mma); break;
 #endif // NSPIN4
 #ifdef NSPIN1
     case 128: calculateYhat<storeFloat, Float, 128>(Yhat, Xinv, Y, X, use_mma); break;

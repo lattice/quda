@@ -121,10 +121,20 @@ namespace quda {
       calculateY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
       calculateY<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 64) {
+      calculateY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 96) {
+      calculateY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 128) {
+      calculateY<Float,vFloat,fineColor,fineSpin,128,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 192) {
+      calculateY<Float,vFloat,fineColor,fineSpin,192,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 256) {
+      calculateY<Float,vFloat,fineColor,fineSpin,256,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else
 #endif
     {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d = (Ncolor() = %d / coarseSpin = %d)\n", coarseColor, Y.Ncolor(), coarseSpin);
     }
   }
 

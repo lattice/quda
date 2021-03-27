@@ -98,6 +98,8 @@ namespace quda {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,40>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 64) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 96) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 128) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 256) {
@@ -106,6 +108,7 @@ namespace quda {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,384>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 512) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,512>(out, in, v, fine_to_coarse, parity);
+        /*
       } else if (nVec == 640) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,640>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 768) {
@@ -114,6 +117,7 @@ namespace quda {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,896>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 1016) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,1016>(out, in, v, fine_to_coarse, parity);
+        */
 #endif // NSPIN4
 #ifdef NSPIN1
       } else if (nVec == 64) {

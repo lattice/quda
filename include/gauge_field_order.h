@@ -1555,9 +1555,14 @@ namespace quda {
          @brief Return the number of colors of the accessor based on the length of the field
          @param[in] length Number of real numbers per link
          @return Number of colors (=sqrt(length/2))
-       */
-      __host__ __device__ constexpr int Ncolor(int length) { return ct_sqrt(length / 2); }
-
+      */
+      __host__ __device__ constexpr unsigned int Ncolor(unsigned int length) 
+      { 
+        return (length == 2097152 ? 1024 : 
+                length == 1179648 ? 768 : 
+                length == 524288 ? 512 : ct_sqrt(length / 2)); 
+      }
+          
       // we default to huge allocations for gauge field (for now)
       constexpr bool default_huge_alloc = true;
 

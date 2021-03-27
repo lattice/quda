@@ -166,6 +166,8 @@ namespace quda {
 	  // MG Lanczos additions
 	} else if (nVec == 64) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+	} else if (nVec == 96) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	} else if (nVec == 128) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	} else if (nVec == 256) {
@@ -174,6 +176,7 @@ namespace quda {
           Restrict<Float,fineSpin,fineColor,coarseSpin,384>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	} else if (nVec == 512) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,512>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          /*
 	} else if (nVec == 640) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,640>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	} else if (nVec == 768) {
@@ -182,6 +185,7 @@ namespace quda {
           Restrict<Float,fineSpin,fineColor,coarseSpin,896>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 	} else if (nVec == 1016) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,1016>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+          */
         } else {
           errorQuda("Unsupported nVec %d", nVec);
         }
