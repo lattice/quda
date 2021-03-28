@@ -305,7 +305,7 @@ namespace quda
     {
       os << '(' << z.real() << ',' << z.imag() << ')';
       return os;
-    };
+    }
 
   template<typename ValueType, typename charT, class traits>
     std::basic_istream<charT, traits>&
