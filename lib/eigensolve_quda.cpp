@@ -1316,10 +1316,11 @@ namespace quda
   {
     if(transfer) delete transfer;    
     // Create the transfer operator
-    QudaPrecision prec = vec_space[0]->Precision();
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Transfer basis of size %lu with order %d\n", vec_space.size(), vec_space[0]->Order());
+    QudaPrecision prec = vec_space[0]->Precision();    
     transfer = new Transfer(vec_space, vec_space.size(), n_block_ortho, geo_block_size,
 			    spin_block_size, prec, QUDA_TRANSFER_AGGREGATE, profile);
-
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer basis created successfully\n");
     verifyCompression(vec_space);
   }
   
@@ -1332,14 +1333,22 @@ namespace quda
 							   spin_block_size,
 							   kSpace.size(), prec,
 							   location);
-    
+    printfQuda("tmp_coarse order = %d\n", tmp_coarse->Order());
     // may want to revisit this---these were relaxed for cases where
     // ghost_precision < precision these were set while hacking in tests of quarter
     // precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
+
+    if (!tmp1 || !tmp2) {
+      ColorSpinorParam param(*kSpace[0]);
+      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
+      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+    }
     
-    for (unsigned int i = 0; i < kSpace.size(); i++) {      
-      *tmp1 =  *kSpace[i];
+    bool error = false;
+    for (unsigned int i = 0; i < kSpace.size(); i++) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Verifying vector %d in eigensolver\n", i);
+      *tmp1 = *kSpace[i];
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       transfer->R(*tmp_coarse, *tmp1);
       transfer->P(*tmp2, *tmp_coarse);
@@ -1349,8 +1358,12 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda( "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
 		    i, blas::norm2(*tmp1), blas::norm2(*tmp_coarse), blas::norm2(*tmp2), deviation);
-      if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
+      if (deviation > tol) {
+	printfQuda("L2 relative deviation for k=%d failed, %e > %e\n", i, deviation, tol);
+	if(!error) error = true;	
+      }      
     }
+    if(error) errorQuda("verifyCompression failed");
     delete tmp_coarse;
   }
   

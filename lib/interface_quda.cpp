@@ -2432,6 +2432,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     // Copy data from the host array into the the kSpace. QUDA interprets this as a
     // user supplied initial guess.
     *kSpace[i] = *host_evecs_[i];
+    printfQuda("Field order %d = %d\n", i, kSpace[i]->Order());
   }
     
   // If you use polynomial acceleration on a non-symmetric matrix,
@@ -2596,7 +2597,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
     csParam.norm = (void *)std::numeric_limits<uint64_t>::max();
   }
 
-  for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField::Create(csParam); }
+  for (int i = 0; i < mg_param.n_vec[0]; i++) {
+    B[i] = ColorSpinorField::Create(csParam);
+    printfQuda("Field order %d = %d\n", i, B[i]->Order());
+  }
 
   // fill out the MG parameters for the fine level
   mgParam = new MGParam(mg_param, B, m, mSmooth, mSmoothSloppy);

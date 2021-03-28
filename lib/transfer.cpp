@@ -13,9 +13,9 @@
 
 
 namespace quda {
-
+  
   /*
-   * for the staggered case, there is no spin blocking, 
+   * for the staggered case, there is no spin blocking,
    * however we do even-odd to preserve chirality (that is straightforward)
    */
   Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
@@ -200,10 +200,8 @@ namespace quda {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
 
     // delayed allocating this temporary until we need it
-    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-      createTmp(QUDA_CUDA_FIELD_LOCATION);
-    }
-    
+    if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
+
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
@@ -247,6 +245,7 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
       }
     }
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: reset complete\n");
     postTrace();
   }
 
@@ -348,12 +347,17 @@ namespace quda {
     }
   }
 
+  // DMH temp, will remove at PR
+  bool super_v = false;
+  
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
+    if (super_v) printfQuda("input order = %d, output order = %d\n", input->Order(), output->Order());
+    
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
@@ -380,14 +384,16 @@ namespace quda {
 
       if (use_gpu) {
         if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-        if (out.Location() == QUDA_CPU_FIELD_LOCATION || out.GammaBasis() != V->GammaBasis() || in.Order() != out.Order()) {
-	  output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+        if (out.Location() == QUDA_CPU_FIELD_LOCATION || out.GammaBasis() != V->GammaBasis() || out.Order() != in.Order()) {	  
+          output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+	  if (super_v) printfQuda("Bool 1: input order = %d, output order = %d\n", input->Order(), output->Order());
 	}
-	
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
       } else {
-        if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
+        if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
           output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+	  if (super_v) printfQuda("Bool 2: input order = %d, output order = %d\n", input->Order(), output->Order());
+	}
       }
 
       *input = in; // copy result to input field (aliasing handled automatically)
@@ -400,6 +406,7 @@ namespace quda {
                   output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
       }
 
+      if (super_v) printfQuda("PRIOR TO PROLONGATE: input order = %d, output order = %d\n", input->Order(), output->Order());
       Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
       flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
@@ -419,6 +426,8 @@ namespace quda {
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
+    if (super_v) printfQuda("input order = %d, output order = %d\n", input->Order(), output->Order());
+    
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
@@ -448,22 +457,26 @@ namespace quda {
         if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
         if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis() || in.Order() != out.Order()) {
           input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
+	  if (super_v) printfQuda("Bool 1: input order = %d, output order = %d\n", input->Order(), output->Order());
 	}
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
       } else {
-        if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
+        if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
           input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
+	  if (super_v) printfQuda("Bool 2: input order = %d, output order = %d\n", input->Order(), output->Order());
+	}
       }
       
       *input = in;
-      
+
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
       if (V->Nspin() != 1 && (output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis()))
         errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
                   out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
-
+      
+      if (super_v) printfQuda("PRIOR TO RESTRICT: input order = %d, output order = %d\n", input->Order(), output->Order());
       Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
       flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
@@ -486,4 +499,4 @@ namespace quda {
     return rtn;
   }
 
-} // namespace quda
+} // namespace qud

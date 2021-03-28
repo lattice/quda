@@ -292,7 +292,8 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
   {
-    checkOrder(out, in, v);
+    checkOrder(out, in);
+    checkOrder(in, v);
     checkLocation(out, in, v);
     QudaPrecision precision = checkPrecision(out, in);
 
