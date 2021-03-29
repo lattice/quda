@@ -118,7 +118,7 @@ namespace quda
     void compute_coeff_mobius(const Complex *b_5, const Complex *c_5) {
       // out = (1 + kappa * D5) * in
       for (int s = 0; s < Ls; s++) {
-        coeff.alpha[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
+        coeff.kappa[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
         // axpy
         coeff.a[s] = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
         coeff.a[s] *= coeff.a[s] * static_cast<real>(a); // kappa_b * kappa_b * a
@@ -177,6 +177,10 @@ namespace quda
       case Dslash5Type::DSLASH5_MOBIUS_PRE:
         compute_coeff_mobius_pre(b_5, c_5);
         break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
+        compute_coeff_mobius_pre(b_5, c_5);
+        compute_coeff_mobius(b_5, c_5);
+        break;
       case Dslash5Type::DSLASH5_MOBIUS:
         compute_coeff_mobius(b_5, c_5);
         break;
@@ -200,11 +204,11 @@ namespace quda
     }
   };
 
-  template <bool sync, bool dagger, bool shared, class Vector, class Arg>
+  template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
     __device__ __host__ inline Vector d5(Arg &arg, const Vector &in, int parity, int x_cb, int s) {
 
       using real = typename Arg::real;
-      // coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
+      // coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
       coeff_type<real, true, Arg> coeff(arg);
 
       Vector out;
@@ -292,12 +296,12 @@ namespace quda
         }
       }
 #endif
-      if (Arg::type == Dslash5Type::DSLASH5_MOBIUS_PRE || Arg::type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || Arg::type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+      if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
         out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-      } else if (Arg::type == Dslash5Type::DSLASH5_MOBIUS) {
+      } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
         Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.alpha(s) * out + diagonal;
+        out = coeff.kappa(s) * out + diagonal;
       }
 
       return out;

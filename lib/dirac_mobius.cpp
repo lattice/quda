@@ -274,18 +274,29 @@ namespace quda {
 #endif
     } else if (!symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
+#if 0
       Dslash4(out, *tmp1, parity[0]);
       M5inv(*tmp1, out);
       Dslash4pre(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
       Dslash5Xpay(out, in, *tmp1, -1.0);
+#else
+      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+      ApplyDomainWall4DM5mob(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+      out = *tmp1;
+#endif
     } else if (!symmetric && dagger) {
+#if 0
       Dslash4(*tmp1, in, parity[0]);
       Dslash4pre(out, *tmp1);
       M5inv(*tmp1, out);
       Dslash4(out, *tmp1, parity[1]);
       Dslash4pre(*tmp1, out);
       Dslash5Xpay(out, in, *tmp1, -1.0);
+#else
+      ApplyDomainWall4DM5preM5inv(*tmp1, in, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+      ApplyDomainWall4DM5preM5mob(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+#endif
     }
 
     deleteTmp(&tmp1, reset1);

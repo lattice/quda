@@ -66,6 +66,8 @@ set (QUDA_OBJS
   dslash_domain_wall_4d_m5pre_m5inv.cu
   dslash_domain_wall_4d_m5inv_m5pre.cu
   dslash_domain_wall_4d_m5inv_m5inv.cu
+  dslash_domain_wall_4d_m5mob.cu
+  dslash_domain_wall_4d_m5pre_m5mob.cu
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu

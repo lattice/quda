@@ -146,7 +146,7 @@ namespace quda
         out = stencil_out;
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
         constexpr bool sync = false;
-        out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
+        out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(arg, stencil_out, my_spinor_parity, 0, s);
       }
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
@@ -187,7 +187,7 @@ namespace quda
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x(xs, my_spinor_parity);
           constexpr bool sync_m5mob = Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS ? false : true;
-          x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, x, my_spinor_parity, 0, s);
+          x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(arg, x, my_spinor_parity, 0, s);
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.out(xs, my_spinor_parity);
