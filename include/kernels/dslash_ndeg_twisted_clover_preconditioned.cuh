@@ -8,12 +8,11 @@
 namespace quda
 {
   
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool asymmetric_>
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
     struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_inverse();
-    static constexpr bool asymmetric = asymmetric_;
     
     typedef typename mapper<Float>::type real;
     typedef typename clover_mapper<Float, length>::type C;
@@ -48,7 +47,8 @@ namespace quda
   
   /**
      @brief Apply the preconditioned twisted-clover dslash
-       out(x) = M*in = x + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x
+       out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
+       out(x) = M*in = in + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == true )
      Note this routine only exists in xpay form.
   */
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
