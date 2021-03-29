@@ -590,8 +590,8 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv,
       wil_dslash(tmp2, gauge, out2, 0, dagger, precision, gauge_param);
       ndegTwistCloverGamma5(tmptmp1, tmptmp2, tmp1, tmp2, clover, cInv, dagger,
                             kappa, mu, epsilon, 0, QUDA_TWIST_GAMMA5_INVERSE, precision);
-      wil_dslash(out1, gauge, tmp1, 1, dagger, precision, gauge_param);
-      wil_dslash(out2, gauge, tmp2, 1, dagger, precision, gauge_param);
+      wil_dslash(out1, gauge, tmptmp1, 1, dagger, precision, gauge_param);
+      wil_dslash(out2, gauge, tmptmp2, 1, dagger, precision, gauge_param);
     }
     xpay(in, kappa2, out, 2 * Vh * spinor_site_size, precision);
     break;
