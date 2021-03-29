@@ -781,9 +781,11 @@ namespace quda
         // as well as copying to the correct location this also changes basis if necessary
         *tmp1 = *param.B[i];
 
+        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
         transfer->R(*r_coarse, *tmp1);
         transfer->P(*tmp2, *r_coarse);
         deviation = sqrt(xmyNorm(*tmp1, *tmp2) / norm2(*tmp1));
+        profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda(

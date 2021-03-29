@@ -212,20 +212,23 @@ namespace quda {
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
-              for (int i = 0; i < m; i++) caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx], v[m][tx]); // subtract the blocks to orthogonalise
+              for (int i = 0; i < m; i++) {
+                if(abs(dot[i]) > 1e-6) caxpy(-complex<real>(dot[i].real(), dot[i].imag()), v[i][tx], v[m][tx]); // subtract the blocks to orthogonalise
+              }
               nrm += norm2(v[m][tx]);
             }
-
+            
             nrm = norm_reducer.AllSum(nrm);
             auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
 #pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
+              //printf("nrm_inv = %f\n", nrm_inv);
               v[m][tx] *= nrm_inv;
             }
           }
-
+          
 #pragma unroll
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;

@@ -1327,25 +1327,28 @@ namespace quda
   void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
   {
     if(!transfer) createTransferBasis(kSpace);
+    if (!tmp1 || !tmp2) {
+      ColorSpinorParam param(*r[0]);
+      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
+      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+    }
+
     QudaPrecision prec = kSpace[0]->Precision();
     QudaFieldLocation location = kSpace[0]->Location();
     ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
 							   spin_block_size,
 							   kSpace.size(), prec,
 							   location);
-    printfQuda("tmp_coarse order = %d\n", tmp_coarse->Order());
+    
     // may want to revisit this---these were relaxed for cases where
     // ghost_precision < precision these were set while hacking in tests of quarter
     // precision ghosts
     double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
-
-    if (!tmp1 || !tmp2) {
-      ColorSpinorParam param(*kSpace[0]);
-      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
-      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
-    }
-    
+        
     bool error = false;
+    if (getVerbosity() >= QUDA_SUMMARIZE)
+      printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %lu vectors\n", kSpace.size());
+    
     for (unsigned int i = 0; i < kSpace.size(); i++) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Verifying vector %d in eigensolver\n", i);
       *tmp1 = *kSpace[i];
