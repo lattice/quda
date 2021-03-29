@@ -85,7 +85,7 @@ namespace quda
             coeff.y[s] = eofa_y[s];
           }
           break;
-        default: errorQuda("Unexpected EOFA Dslash5Type %d", type);
+        default: errorQuda("Unexpected EOFA Dslash5Type %d", static_cast<int>(type));
         }
       }
     };

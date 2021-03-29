@@ -516,9 +516,25 @@ namespace quda {
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
-  void ApplyDomainWall4DFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+  void ApplyDomainWall4DM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
-                         const int *comm_override, double m_f, Dslash5Type dslash5_type, TimeProfile &profile);
+                         const int *comm_override, double m_f, TimeProfile &profile);
+
+  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
+                         const int *comm_override, double m_f, TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
+                         const int *comm_override, double m_f, TimeProfile &profile);
+
+  void ApplyDomainWall4DM5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
+                         const int *comm_override, double m_f, TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, ColorSpinorField &y, int parity, bool dagger,
+                         const int *comm_override, double m_f, TimeProfile &profile);
 
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or

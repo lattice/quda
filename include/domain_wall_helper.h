@@ -11,6 +11,7 @@ namespace quda {
     M5_INV_MOBIUS_M5_PRE, // M5inv + M5pre
     M5_PRE_MOBIUS_M5_INV, // M5pre + M5inv
     M5_INV_MOBIUS_M5_INV_DAG, // M5pre + M5inv
+    DSLASH5_MOBIUS_PRE_M5_MOB,
     M5_INV_ZMOBIUS,
     M5_EOFA,
     M5INV_EOFA

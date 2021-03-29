@@ -65,10 +65,10 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
+  template <Dslash5Type...> struct Dslash5TypeList {
+  };
 
-    template <Dslash5Type...> struct Dslash5TypeList {
-    };
+  template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApplyFusedM5 {
 
     inline void instantiate_dslash5_type(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double ,
                                          double, const Complex *, const Complex *, const ColorSpinorField &,
@@ -101,14 +101,12 @@ namespace quda
       }
     }
 
+    template <typename D5>
     inline DomainWall4DApplyFusedM5(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                                     double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
                                     ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
-                                    Dslash5Type dslash5_type, TimeProfile &profile)
+                                    Dslash5Type dslash5_type, D5 dummy_list, TimeProfile &profile)
     {
-      auto dummy_list
-        = Dslash5TypeList<Dslash5Type::M5_INV_MOBIUS_M5_PRE, Dslash5Type::M5_PRE_MOBIUS_M5_INV, Dslash5Type::M5_INV_MOBIUS,
-            Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG, Dslash5Type::DSLASH5_MOBIUS_PRE>();
       instantiate_dslash5_type(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f, dslash5_type,
                                dummy_list, profile);
     }
@@ -122,8 +120,11 @@ namespace quda
                                 Dslash5Type dslash5_type, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    auto dummy_list
+      = Dslash5TypeList<Dslash5Type::M5_INV_MOBIUS_M5_PRE, Dslash5Type::M5_PRE_MOBIUS_M5_INV, Dslash5Type::M5_INV_MOBIUS,
+          Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG, Dslash5Type::DSLASH5_MOBIUS_PRE>();
     instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
-                                          dslash5_type, profile);
+                                          dslash5_type, dummy_list, profile);
 #else
     errorQuda("Domain-wall dslash has not been built");
 #endif // GPU_DOMAIN_WALL_DIRAC

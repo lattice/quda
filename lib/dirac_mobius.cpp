@@ -304,10 +304,10 @@ namespace quda {
       QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
       bool reset1 = newTmp(&tmp1, in);
       Dslash4pre(*tmp1, in);
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG, profile);
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, Dslash5Type::M5_PRE_MOBIUS_M5_INV, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
+      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, profile);
+      ApplyDomainWall4DM5invM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, profile);
+      ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, profile);
+      ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, profile);
       out = *tmp1;
       deleteTmp(&tmp1, reset1);
 #endif

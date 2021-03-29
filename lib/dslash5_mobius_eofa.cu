@@ -45,7 +45,7 @@ namespace quda
         switch (type) {
         case Dslash5Type::M5_EOFA:
         case Dslash5Type::M5INV_EOFA: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
-        default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
+        default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
 
         return flops_;
@@ -56,7 +56,7 @@ namespace quda
         switch (type) {
         case Dslash5Type::M5_EOFA:
         case Dslash5Type::M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
-        default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
+        default: errorQuda("Unknown Dslash5Type %d for EOFA", static_cast<int>(type));
         }
         return 0ll;
       }
@@ -119,7 +119,7 @@ namespace quda
         switch (type) {
         case Dslash5Type::M5_EOFA: strcat(aux, ",mobius_Dslash5Type::M5_EOFA"); break;
         case Dslash5Type::M5INV_EOFA: strcat(aux, ",mobius_Dslash5Type::M5INV_EOFA"); break;
-        default: errorQuda("Unknown Dslash5Type %d", type);
+        default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
         }
 
         apply(device::get_default_stream());
@@ -162,7 +162,7 @@ namespace quda
         switch (type) {
         case Dslash5Type::M5_EOFA:    Launch<Dslash5Type::M5_EOFA, eofa_dslash5>(tp, stream); break;
         case Dslash5Type::M5INV_EOFA: Launch<Dslash5Type::M5INV_EOFA, eofa_dslash5inv>(tp, stream); break;
-        default: errorQuda("Unknown Dslash5Type %d", type);
+        default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
         }
       }
     };
