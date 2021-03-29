@@ -77,7 +77,7 @@ namespace quda {
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
+      // k * D * in + (A + i*2*mu*kappa*gamma_5) *x
       ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
       // wilson + chiral twist + clover
       flops += (1320ll + 96ll + 552ll) * in.Volume();
@@ -241,9 +241,16 @@ namespace quda {
       DiracWilson::DslashXpay(out, *tmp2, parity, x, k);
       deleteTmp(&tmp2, reset);
     } else {
-      ApplyTwistedCloverPreconditioned(
-          out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
-      flops += (1320ll + 552ll) * in.Volume();
+      if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+        ApplyTwistedCloverPreconditioned(
+            out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
+        flops += (1320ll + 552ll) * in.Volume();
+      } else {
+        ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
+                                             true, in, parity, dagger, !symmetric, commDim, profile);
+        // FIXME check flops
+        flops += (1320ll + 96ll + 48ll + 552ll) * in.Volume();
+      }
     }
   }
 
@@ -256,22 +263,18 @@ namespace quda {
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
-    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (!symmetric) { // asymmetric preconditioning
-        Dslash(*tmp1, in, parity[0]);
-        DiracTwistedClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
-      } else if (!dagger) { // symmetric preconditioning
-        Dslash(*tmp1, in, parity[0]);
-        DslashXpay(out, *tmp1, parity[1], in, kappa2);
-      } else { // symmetric preconditioning, dagger
-        TwistCloverInv(out, in, parity[1]);
-        reverse = true;
-        Dslash(*tmp1, out, parity[0]);
-        reverse = false;
-        DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
-      }
-    } else { //Twist doublet
-      errorQuda("Non-degenerate operator is not implemented");
+    if (!symmetric) { // asymmetric preconditioning
+      Dslash(*tmp1, in, parity[0]);
+      DiracTwistedClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
+    } else if (!dagger) { // symmetric preconditioning
+      Dslash(*tmp1, in, parity[0]);
+      DslashXpay(out, *tmp1, parity[1], in, kappa2);
+    } else { // symmetric preconditioning, dagger
+      TwistCloverInv(out, in, parity[1]);
+      reverse = true;
+      Dslash(*tmp1, out, parity[0]);
+      reverse = false;
+      DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     }
 
     deleteTmp(&tmp1, reset);

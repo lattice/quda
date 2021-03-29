@@ -41,6 +41,9 @@ extern "C" {
   void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, double epsilon,
       int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param);
   
+  void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, double epsilon,
+                      QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
+  
   void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv,
                        double kappa, double mu, double epsilon,
                        int oddBit, QudaMatPCType matpc_type, int daggerBit,
