@@ -593,7 +593,7 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv,
       wil_dslash(out1, gauge, tmp1, 1, dagger, precision, gauge_param);
       wil_dslash(out2, gauge, tmp2, 1, dagger, precision, gauge_param);
     }
-    xpay(in, kappa2, out, Vh * spinor_site_size, precision);
+    xpay(in, kappa2, out, 2 * Vh * spinor_site_size, precision);
     break;
   case QUDA_MATPC_ODD_ODD_ASYMMETRIC:
     wil_dslash(tmp1, gauge, in1, 0, dagger, precision, gauge_param);
