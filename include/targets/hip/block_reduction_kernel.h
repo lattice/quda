@@ -15,16 +15,17 @@ namespace quda {
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
-    typename decltype(blockIdx)::value_type block_idx = blockIdx.x;
+    using IntType = decltype(arg.swizzle_factor);
+    IntType block_idx = static_cast<IntType>(blockIdx.x);
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
-      const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
+      const IntType gridp = static_cast<IntType>(gridDim.x) - static_cast<IntType>(gridDim.x) % arg.swizzle_factor;
 
-      block_idx = blockIdx.x;
-      if (blockIdx.x < gridp) {
+      block_idx = static_cast<IntType>(blockIdx.x);
+      if (static_cast<IntType>(blockIdx.x) < gridp) {
         // this is the portion of the block that we are going to transpose
-        const auto i = blockIdx.x % arg.swizzle_factor;
-        const auto j = blockIdx.x / arg.swizzle_factor;
+        const auto i = static_cast<IntType>(blockIdx.x) % arg.swizzle_factor;
+        const auto j = static_cast<IntType>(blockIdx.x) / arg.swizzle_factor;
 
         // transpose the coordinates
         block_idx = i * (gridp / arg.swizzle_factor) + j;
