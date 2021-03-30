@@ -47,15 +47,17 @@ namespace quda {
 	  for (int i=0; i<Arg::nColor; i++)
 	    for (int j=0; j<Arg::nColor; j++) {
               complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
-	      if (isnan(u.real()))
+
+	      if (std::isnan(u.real()))
 	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j));
-	      if (isnan(u.imag()))
+	      if (std::isnan(u.imag()))
 		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j+1));
+
             }
 #else
 	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);
 	  for (int i=0; i<Arg::length/2; i++)
-	    if (isnan(u(i).real()) || isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+	    if (std::isnan(u(i).real()) || std::isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
 #endif
 	}
       }

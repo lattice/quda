@@ -86,8 +86,26 @@ namespace quda {
       }
     }
 
+    /**
+       @brief Return the maximum block size in the x dimension
+       explored by the autotuner.
+     */
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_threads_per_block() / (param.block.y*param.block.z); }
+
+    /**
+       @brief Return the maximum grid size in the x dimension explored
+       by the autotuner.  This defaults to twice the number of
+       processors on the GPU, since it's unlikely a large grid size
+       will help (if a kernels needs more parallelism, the autotuner
+       will find this through increased block size.
+     */
     virtual unsigned int maxGridSize() const { return 2*device::processor_count(); }
+
+    /**
+       @brief Return the minimum grid size in the x dimension explored
+       by the autotuner.  Default is 1, but it may be desirable to
+       increase this to pare down the tuning dimension size.
+    */
     virtual unsigned int minGridSize() const { return 1; }
 
     /**
@@ -464,7 +482,7 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
