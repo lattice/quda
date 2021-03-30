@@ -118,7 +118,7 @@ inline bool isPCSolution(QudaSolutionType solution_type)
 {
   return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
           || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-};
+}
 //------------------------------------------------------
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
