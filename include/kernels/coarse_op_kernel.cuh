@@ -764,112 +764,126 @@ namespace quda {
     if (gauge::fixed_point<Float,storeType>()) {
       Float scale = A.accessor.scale;
       complex<storeType> a(round(scale * vuv.real()), round(scale * vuv.imag()));
-      atomicAdd(Y,a);
+      atomic_fetch_add(Y, a);
     } else {
-      atomicAdd(Y,reinterpret_cast<const complex<storeType>&>(vuv));
+      atomic_fetch_add(Y, reinterpret_cast<const complex<storeType>&>(vuv));
     }
   }
 
-  template <bool parity_flip, QudaDirection dir, typename VUV, typename Arg>
-#ifdef __CUDA_ARCH__
-  inline __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, Arg &arg)
-#else
-  inline __device__ __host__ void storeCoarseSharedAtomic(VUV &, bool, int, int, int, int, int, Arg &)
-#endif
-  {
-#ifdef __CUDA_ARCH__
-    using Float = typename Arg::Float;
-    using TileType = typename Arg::vuvTileType;
-    const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-    __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
-    __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+  template <bool parity_flip_, QudaDirection dir_>
+  struct Pack {
+    static constexpr bool parity_flip = parity_flip_;
+    static constexpr QudaDirection dir = dir_;
+  };
 
-    int x_ = coarse_x_cb%arg.aggregates_per_block;
-    int tx = virtualThreadIdx(arg);
-    int s_col = tx / Arg::coarseSpin;
-    int s_row = tx % Arg::coarseSpin;
-
-    // this relies on the indexing as used in getIndices
-    int i_block0 = threadIdx.y * TileType::M * (!parity_flip ? 2 : 1);
-    int j_block0 = threadIdx.z * TileType::N;
-
-#pragma unroll
-    for (int i = 0; i < TileType::M; i++) {
-#pragma unroll
-      for (int j = 0; j < TileType::N; j++) {
-        if (tx < Arg::coarseSpin*Arg::coarseSpin) {
-          if (dir != QUDA_IN_PLACE) Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
-          X[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
-        }
-      }
+  template <bool is_device> struct storeCoarseSharedAtomic_impl {
+    template <typename ...Args> void operator()(Args...)
+    {
+      errorQuda("Shared-memory atomic aggregation not supported on host");
     }
+  };
 
-    __syncthreads();
+  template <> struct storeCoarseSharedAtomic_impl<true> {
+    template <typename VUV, typename Pack, typename Arg>
+    inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, Arg &arg)
+    {
+      using Float = typename Arg::Float;
+      using TileType = typename Arg::vuvTileType;
+      const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
+      __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+      __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
 
-#pragma unroll
-    for (int i = 0; i < TileType::M; i++) {
-#pragma unroll
-      for (int j = 0; j < TileType::N; j++) {
+      int x_ = coarse_x_cb%arg.aggregates_per_block;
+      int tx = virtualThreadIdx(arg);
+      int s_col = tx / Arg::coarseSpin;
+      int s_row = tx % Arg::coarseSpin;
 
-        if (dir == QUDA_IN_PLACE || isDiagonal) {
-#pragma unroll
-          for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-            for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-              atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
-            }
-          }
-        } else {
-#pragma unroll
-          for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
-#pragma unroll
-            for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-              atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                              arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
-            }
-          }
-        }
-      }
-    }
-
-    __syncthreads();
-
-    if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || parity_flip == 1) ) {
+      // this relies on the indexing as used in getIndices
+      int i_block0 = threadIdx.y * TileType::M * (!pack.parity_flip ? 2 : 1);
+      int j_block0 = threadIdx.z * TileType::N;
 
 #pragma unroll
       for (int i = 0; i < TileType::M; i++) {
 #pragma unroll
         for (int j = 0; j < TileType::N; j++) {
-          if (dir == QUDA_IN_PLACE) {
-            // same as dir == QUDA_FORWARDS
-            arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                   X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-          } else {
-            arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                   Y[i_block0+i][j_block0+j][x_][s_row][s_col]);
+          if (tx < Arg::coarseSpin*Arg::coarseSpin) {
+            if (pack.dir != QUDA_IN_PLACE) Y[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
+            X[i_block0+i][j_block0+j][x_][s_row][s_col] = 0;
+          }
+        }
+      }
 
-            if (dir == QUDA_BACKWARDS) {
-              arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,
-                                     conj(X[i_block0+i][j_block0+j][x_][s_row][s_col]));
-            } else {
+      __syncthreads();
+
+#pragma unroll
+      for (int i = 0; i < TileType::M; i++) {
+#pragma unroll
+        for (int j = 0; j < TileType::N; j++) {
+
+          if (pack.dir == QUDA_IN_PLACE || isDiagonal) {
+#pragma unroll
+            for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+              for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
+                atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                                arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+              }
+            }
+          } else {
+#pragma unroll
+            for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+              for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
+                atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                                arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+              }
+            }
+          }
+        }
+      }
+
+      __syncthreads();
+
+      if (tx < Arg::coarseSpin*Arg::coarseSpin && (parity == 0 || pack.parity_flip == 1) ) {
+
+#pragma unroll
+        for (int i = 0; i < TileType::M; i++) {
+#pragma unroll
+          for (int j = 0; j < TileType::N; j++) {
+            if (pack.dir == QUDA_IN_PLACE) {
+              // same as dir == QUDA_FORWARDS
               arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
                                      X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-            }
+            } else {
+              arg.Y_atomic.atomicAdd(dim_index,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                     Y[i_block0+i][j_block0+j][x_][s_row][s_col]);
 
-            if (!arg.bidirectional) {
-              if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-              else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
-                                          -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
-            }
-          } // dir == QUDA_IN_PLACE
+              if (pack.dir == QUDA_BACKWARDS) {
+                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_col,s_row,j0+j,i0+i,
+                                       conj(X[i_block0+i][j_block0+j][x_][s_row][s_col]));
+              } else {
+                arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                       X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+              }
+
+              if (!arg.bidirectional) {
+                if (Arg::fineSpin != 1 && s_row == s_col) arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                                                                 X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+                else arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,s_row,s_col,i0+i,j0+j,
+                                            -X[i_block0+i][j_block0+j][x_][s_row][s_col]);
+              }
+            } // dir == QUDA_IN_PLACE
+          }
         }
       }
     }
-#else
-    errorQuda("Shared-memory atomic aggregation not supported on CPU");
-#endif
+  };
+
+  template <bool parity_flip, QudaDirection dir, typename VUV, typename Arg>
+  __device__ __host__ void storeCoarseSharedAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, Arg &arg)
+  {
+    target::dispatch<storeCoarseSharedAtomic_impl>
+      (vuv, isDiagonal, coarse_x_cb, coarse_parity, i0, j0, parity, Pack<parity_flip, dir>(), arg);
   }
 
   template <bool parity_flip, QudaDirection dir, typename VUV, typename Arg>
@@ -951,7 +965,6 @@ namespace quda {
     }
 
   }
-
 
   template<bool shared_atomic, bool parity_flip, int dim, QudaDirection dir,
            typename Arg, typename Gamma>

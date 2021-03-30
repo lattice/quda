@@ -10,7 +10,6 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include <sys/time.h>
-#include <dslash_quda.h>
 
 using namespace quda;
 
