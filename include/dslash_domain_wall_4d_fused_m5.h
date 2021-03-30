@@ -27,6 +27,7 @@ namespace quda
     DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
+      TunableVectorY::resizeStep(in.X(4));
     }
 
     void apply(const qudaStream_t &stream)

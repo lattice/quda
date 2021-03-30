@@ -255,8 +255,8 @@ namespace quda {
       Dslash4(*tmp1, out, parity[1]);
       M5invXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS, profile);
+      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+      ApplyDomainWall4DM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
       out = *tmp1;
 #endif
     } else if (symmetric && dagger) {
@@ -268,8 +268,8 @@ namespace quda {
       Dslash4(*tmp1, out, parity[1]);
       Dslash4preXpay(out, *tmp1, in, -1.0);
 #else
-      ApplyDomainWall4DFusedM5(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, Dslash5Type::M5_INV_MOBIUS_M5_PRE, profile);
-      ApplyDomainWall4DFusedM5(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, Dslash5Type::DSLASH5_MOBIUS_PRE, profile);
+      ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, profile);
+      ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
       out = *tmp1;
 #endif
     } else if (!symmetric && !dagger) {
@@ -307,7 +307,7 @@ namespace quda {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     bool reset = newTmp(&tmp2, in);
     if (symmetric) {
-#if 0 
+#if 1
       M(*tmp2, in);
       Mdag(out, *tmp2);
 #else

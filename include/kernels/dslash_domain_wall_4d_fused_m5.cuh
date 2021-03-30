@@ -157,15 +157,20 @@ namespace quda
          *    this is actually   y = 1 * x - kappa_b^2 * m5inv * D4 * in
          *                     out = m5inv * y
          */
+        Vector aggregate_external;
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x(xs, my_spinor_parity);
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.y(xs, my_spinor_parity);
-          out = x + (xpay ? arg.a_5[s] * out : out);
+          aggregate_external = xpay ? arg.a_5[s] * out : out;
+          out = x + aggregate_external;
         }
 
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.y(xs, my_spinor_parity) = out;
+        if (mykernel_type != INTERIOR_KERNEL && active) {
+          out = aggregate_external;
+        }
 
         constexpr bool sync = true;
         constexpr bool this_dagger = true;
