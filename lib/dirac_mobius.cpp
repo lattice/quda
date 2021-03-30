@@ -232,6 +232,139 @@ namespace quda {
     flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
   }
 
+  void DiracMobiusPC::Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5invM5pre(out, in, *gauge, 0.0, m5, b_5, c_5, in, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5pre
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+  }
+
+  void DiracMobiusPC::Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5preM5inv(out, in, *gauge, 0.0, m5, b_5, c_5, in, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5pre
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+  }
+
+  void DiracMobiusPC::Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5inv(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5pre(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5pre
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5mob(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5mob
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5preM5mob(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5pre
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // M5mob
+    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a, ColorSpinorField &y) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5invM5inv(out, in, *gauge, a, m5, b_5, c_5, x, y, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5inv
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
   // Apply the even-odd preconditioned mobius DWF operator
   // Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
   void DiracMobiusPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -247,8 +380,10 @@ namespace quda {
     if (symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
       if (this->use_mobius_fused_kernel) {
-        ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-        ApplyDomainWall4DM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        // ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        Dslash4M5invM5pre(out, *tmp1, parity[0]);
+        // ApplyDomainWall4DM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        Dslash4M5invXpay(*tmp1, out, parity[1], in, -1.0);
         out = *tmp1;
       } else {
         Dslash4(out, *tmp1, parity[0]);
@@ -260,8 +395,10 @@ namespace quda {
     } else if (symmetric && dagger) {
       M5inv(*tmp1, in);
       if (this->use_mobius_fused_kernel) {
-        ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, profile);
-        ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        // ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, profile);
+        Dslash4M5preM5inv(out, *tmp1, parity[0]);
+        // ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        Dslash4M5preXpay(*tmp1, out, parity[1], in, -1.0);
         out = *tmp1;
       } else {
         Dslash4(out, *tmp1, parity[0]);
@@ -273,8 +410,10 @@ namespace quda {
     } else if (!symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
       if (this->use_mobius_fused_kernel) {
-        ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-        ApplyDomainWall4DM5mob(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        // ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        Dslash4M5invM5pre(out, *tmp1, parity[0]);
+        // ApplyDomainWall4DM5mob(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        Dslash4XpayM5mob(*tmp1, out, parity[1], in, -1.0);
         out = *tmp1;
       } else {
         Dslash4(out, *tmp1, parity[0]);
@@ -285,8 +424,10 @@ namespace quda {
       }
     } else if (!symmetric && dagger) {
       if (this->use_mobius_fused_kernel) {
-        ApplyDomainWall4DM5preM5inv(*tmp1, in, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-        ApplyDomainWall4DM5preM5mob(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        // ApplyDomainWall4DM5preM5inv(*tmp1, in, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        Dslash4M5preM5inv(*tmp1, in, parity[0]);
+        // ApplyDomainWall4DM5preM5mob(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        Dslash4M5preXpayM5mob(out, *tmp1, parity[1], in, -1.0);
       } else {
         Dslash4(*tmp1, in, parity[0]);
         Dslash4pre(out, *tmp1);
@@ -310,11 +451,28 @@ namespace quda {
         QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
         bool reset1 = newTmp(&tmp1, in);
         Dslash4pre(*tmp2, in);
-        ApplyDomainWall4DM5invM5pre(*tmp1, *tmp2, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, profile);
-        ApplyDomainWall4DM5invM5inv(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, profile);
-        ApplyDomainWall4DM5preM5inv(*tmp1, out, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, profile);
-        ApplyDomainWall4DM5pre(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, profile);
+        // ApplyDomainWall4DM5invM5pre(*tmp1, *tmp2, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, profile);
+        Dslash4M5invM5pre(*tmp1, *tmp2, parity[0]);
+        // ApplyDomainWall4DM5invM5inv(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, profile);
+        Dslash4M5invXpayM5inv(out, *tmp1, parity[1], in, -1.0, *tmp2);
+        // ApplyDomainWall4DM5preM5inv(*tmp1, out, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, profile);
+        dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
+        Dslash4M5preM5inv(*tmp1, out, parity[0]);
+        // ApplyDomainWall4DM5pre(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, profile);
+        Dslash4M5preXpay(out, *tmp1, parity[1], *tmp2, -1.0);
+        dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
         deleteTmp(&tmp1, reset1);
+        // D4
+        flops += 4LL * 1320LL * (long long)in.Volume();
+        // M5inv
+        long long Ls = in.X(4);
+        flops += 4LL * 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+        // M5pre
+        long long bulk = (Ls - 2) * (in.Volume() / Ls);
+        long long wall = 2 * in.Volume() / Ls;
+        flops += 4LL * 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+        // xpay
+        flops += 4LL * 48LL * (long long)in.Volume();
       } else {
         M(*tmp2, in);
         Mdag(out, *tmp2);
