@@ -2427,12 +2427,12 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   std::vector<Complex> evals;
   std::vector<ColorSpinorField *> kSpace;
+  kSpace.reserve(eig_param->block_size);
   for (int i = 0; i < eig_param->block_size; i++) {
     kSpace.push_back(ColorSpinorField::Create(cudaParam));
     // Copy data from the host array into the the kSpace. QUDA interprets this as a
     // user supplied initial guess.
     *kSpace[i] = *host_evecs_[i];
-    printfQuda("Field order %d = %d\n", i, kSpace[i]->Order());
   }
     
   // If you use polynomial acceleration on a non-symmetric matrix,
@@ -2501,7 +2501,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
-  if (!(eig_param->arpack_check)) {
+  if (!(eig_param->arpack_check) && !eig_param->compress) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
     for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
@@ -2512,9 +2512,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
+  for (unsigned int i = 0; i < kSpace.size(); i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
-
+  
   popVerbosity();
 
   // cache is written out even if a long benchmarking job gets interrupted

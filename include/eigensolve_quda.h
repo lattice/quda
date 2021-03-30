@@ -457,14 +457,33 @@ protected:
     */        
     void createTransferBasis(std::vector<ColorSpinorField *> &kSpace);
 
+    /**
+       @brief Compress vectors from the fine space to the coarse space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to compress
+    */        
     void compressVectors(const std::vector<ColorSpinorField *> &fine,
 			 std::vector<ColorSpinorField *> &coarse,
-			 const int position);
-    
+			 const unsigned int fine_vec_position,			 
+			 const unsigned int coarse_vec_position,
+			 const unsigned int num);
+
+    /**
+       @brief Promote vectors from the coarse space to the fine space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to promote
+    */        
     void promoteVectors(const std::vector<ColorSpinorField *> &fine,
 			std::vector<ColorSpinorField *> &coarse,
-			const int position);
-    
+			const unsigned int fine_vec_position,
+			const unsigned int coarse_vec_position,
+			const unsigned int num);    
     
   };
   

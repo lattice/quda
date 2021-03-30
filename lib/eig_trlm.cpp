@@ -101,10 +101,6 @@ namespace quda
       n_conv = eig_param->n_conv;
       max_restarts = eig_param->max_restarts;
       
-      // The fine Krylov space may now be trimmed to the desired size
-      for(int i=0; i<fine_n_ev; i++) fine_space.push_back(kSpace[i]);
-      createTransferBasis(fine_space);
-      
       prepareCompressedKrylovSpace(kSpace, evals);
       compressed_mode = true;
       
@@ -246,34 +242,23 @@ namespace quda
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
     std::vector<ColorSpinorField *> v_j;
     if(compressed_mode) {
-      promoteVectors(fine_vector, v, j);
-      //int size_orig = fine_vector.size();
-      v_j.reserve(fine_vector.size());      
-      for (unsigned int i = 0; i < fine_vector.size(); i++) {
-	//printfQuda("Wrapping vector %d\n", i);
-	v_j.push_back(fine_vector[i]);
-      }
+      promoteVectors(fine_vector, v, 0, j, 1);
+      v_j.push_back(fine_vector[0]);
     } else {
       v_j.push_back(v[j]);
     }
     
     // r = A * v_j
-    //printfQuda("cheby op pre\n");
     chebyOp(mat, *r[0], *v_j[0]);
-    //printfQuda("cheby op post\n");
     
     // a_j = v_j^dag * r
-    //printfQuda("reDot op pre\n");
     alpha[j] = blas::reDotProduct(*v_j[0], *r[0]);
-    //printfQuda("reDot op post\n");
     
     // r = r - a_j * v_j
-    //printfQuda("axpy op pre\n");
     blas::axpy(-alpha[j], *v_j[0], *r[0]);
-    //printfQuda("axpy op post\n");
 
     // Done with vector v_j for now.
-    if(compressed_mode) compressVectors(fine_vector, v, j);
+    if(compressed_mode) compressVectors(fine_vector, v, 0, j, 1);
     
     int start = (j > num_keep) ? j - 1 : 0;
 
@@ -284,44 +269,16 @@ namespace quda
       if(compressed_mode) {	
 	int iter_size = fine_vector.size();
 	int iterations = (j - start)/iter_size;	
-	int remainder = (j - start)%iter_size;
-
-	//beta_.reserve(iter_size);
-	//v_.reserve(iter_size);
-	//for(int k=0; k<iter_size; k++) {
-	//beta_.push_back(0.0);
-	//v_.push_back(fine_vector[k]);
-	//}
 	
 	// We promote the v_idx vector. No need to compress as
 	// we read only.
 	for (int iter = 0; iter < iterations; iter++) {
 	  int idx = start + iter*iter_size;
-	  promoteVectors(fine_vector, v, idx);
-	  // Allocate beta values as assign pointers for this iteration
-	  //for(int k=0; k<iter_size; k++) {
-	  //beta_[k] = -beta[idx];
-	  //*v_[0] = *fine_vector[k];
-	  //}
+	  promoteVectors(fine_vector, v, 0, idx, iter_size);
+	  
 	  // r = r - b_{j-1} * v_{j-1}
-	  //printfQuda("axpy CM op pre\n");
-	  //blas::axpy(beta_.data(), fine_vector, r_);
 	  blas::axpy(-beta[idx], *fine_vector[0], *r[0]);
-	  //printfQuda("axpy CM op post\n");
 	}
-	//if(remainder > 0) {
-	//int idx = start + iterations*iter_size;
-	//promoteVectors(fine_vector, v, idx);
-	// Allocate beta values as assign pointers for this iteration
-	//for(int k=0; k<iter_size; k++) {
-	//beta_.push_back(-beta[idx]);
-	//v_.push_back(fine_vector[k]);
-	//}
-	// r = r - b_{j-1} * v_{j-1}
-	//blas::axpy(beta_.data(), v_, r_);
-	
-	// We may now compress v_j
-	//compressVectors(fine_vector, v, j);
       } else {
 	beta_.reserve(j - start);
 	v_.reserve(j - start);	
@@ -335,24 +292,24 @@ namespace quda
     }
     
     // Orthogonalise r against the Krylov space
-    if(compressed_mode) {
-      std::vector<Complex> s(j+1);
-      for (int i = 0; i < j+1; i++) {
-	promoteVectors(fine_vector, v, i);
-	s[i] = blas::cDotProduct(*fine_vector[0], *r[0]);
-      }
-      
-      for (int i = 0; i < j+1; i++) {
-	promoteVectors(fine_vector, v, i);
-	blas::caxpy(-1.0*s[i], *fine_vector[0], *r[0]);
-      }
-    } else {
-      for (int k = 0; k < 1; k++) {
-	blockOrthogonalize(v, r, j + 1);
+    if(j%2 == 0) {
+      if(compressed_mode) {
+	std::vector<Complex> s(j+1);
+	for (int i = 0; i < j+1; i++) {
+	  promoteVectors(fine_vector, v, 0, i, 1);
+	  s[i] = blas::cDotProduct(*fine_vector[0], *r[0]);
+	}
+	
+	for (int i = 0; i < j+1; i++) {
+	  promoteVectors(fine_vector, v, 0, i, 1);
+	  blas::caxpy(-1.0*s[i], *fine_vector[0], *r[0]);
+	}
+      } else {
+	for (int k = 0; k < 1; k++) {
+	  blockOrthogonalize(v, r, j + 1);
+	}
       }
     }
-
-    //printfQuda("Residual orthonormalised\n");
     
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));
@@ -360,10 +317,10 @@ namespace quda
     // Prepare next step.
     // v_{j+1} = r / b_j
     if(compressed_mode) {
-      promoteVectors(fine_vector, v, j+1);
+      promoteVectors(fine_vector, v, 0, j+1, 1);
       blas::zero(*fine_vector[0]);
       blas::axpy(1.0 / beta[j], *r[0], *fine_vector[0]);
-      compressVectors(fine_vector, v, j+1);      
+      compressVectors(fine_vector, v, 0, j+1, 1);      
     } else {
       blas::zero(*v[j + 1]);
       blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
@@ -473,35 +430,32 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    if(compressed_mode) {
+    if(compressed_mode && 0) {
       // For now (to test the compresed Lanczos step) promote the full krylov space and 
       // compress after rotation
       ColorSpinorParam csParamFine(*r[0]);      
       std::vector<ColorSpinorField *> kSpace_fine;
       kSpace_fine.reserve(kSpace.size());
       unsigned int size_orig = kSpace.size();
-      for (unsigned int i = 0; i < size_orig; i++) {
-	printfQuda("Allocating kSpace_fine vector %d of %d\n", (int)i, size_orig);
-	kSpace_fine.push_back(ColorSpinorField::Create(csParamFine));
-      }
+      for (unsigned int i = 0; i < size_orig; i++) kSpace_fine.push_back(ColorSpinorField::Create(csParamFine));
+      
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      promoteVectors(kSpace_fine, kSpace, 0);
+      promoteVectors(kSpace_fine, kSpace, 0, 0, size_orig);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       rotateVecs(kSpace_fine, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
       saveTuneCache();
+      
       // Update residual vector
       std::swap(kSpace_fine[num_locked + iter_keep], kSpace_fine[n_kr]);
       
       // kSpace may have changed size.
       ColorSpinorParam csParamCoarse(*kSpace[0]);
       kSpace.reserve(kSpace_fine.size());
-      for (unsigned int i = size_orig; i < kSpace_fine.size(); i++) {
-	printfQuda("Allocating Extra kSpace vector %d of %d\n", (int)i, (int)kSpace_fine.size());
-	kSpace.push_back(ColorSpinorField::Create(csParamCoarse));
-      }
+      for (unsigned int i = size_orig; i < kSpace_fine.size(); i++) kSpace.push_back(ColorSpinorField::Create(csParamCoarse));
+
       // Compress the vector space
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      compressVectors(kSpace_fine, kSpace, 0);
+      compressVectors(kSpace_fine, kSpace, 0, 0, kSpace_fine.size());
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       
       for (unsigned int i = 0; i < kSpace_fine.size(); i++) delete kSpace_fine[i];      
