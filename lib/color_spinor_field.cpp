@@ -252,7 +252,7 @@ namespace quda {
     }
 
     {
-      int aux_string_n = TuneKey::aux_n / 2;
+      constexpr int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
       int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
                            stride, precision, fieldOrder, nSpin, nColor);

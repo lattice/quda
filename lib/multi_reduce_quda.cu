@@ -1,7 +1,7 @@
 #include <blas_quda.h>
 #include <uint_to_char.h>
-#include <tunable_reduction.h>
 #include <kernels/multi_reduce_core.cuh>
+#include <tunable_reduction.h>
 
 namespace quda {
 

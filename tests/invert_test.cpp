@@ -160,7 +160,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   QudaEigParam eig_param = newQudaEigParam();
 
   if (inv_multigrid) {
