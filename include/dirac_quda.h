@@ -62,6 +62,8 @@ namespace quda {
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool use_mma;            // whether to use tensor cores where applicable
 
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
+
     // Default constructor
     DiracParam() :
       type(QUDA_INVALID_DIRAC),
@@ -79,10 +81,11 @@ namespace quda {
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-      use_mma(true)
+      use_mma(true),
 #else
-      use_mma(false)
+      use_mma(false),
 #endif
+      use_mobius_fused_kernel(true)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -106,6 +109,7 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
       printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
     }
   };
 
@@ -155,6 +159,8 @@ namespace quda {
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
+
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
     mutable TimeProfile profile;
 

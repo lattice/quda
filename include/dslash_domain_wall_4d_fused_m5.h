@@ -8,10 +8,7 @@
 #include <kernels/dslash_domain_wall_4d_fused_m5.cuh>
 
 /**
-   This is the gauged domain-wall 4-d preconditioned operator.
-
-   Note, for now, this just applies a batched 4-d dslash across the fifth
-   dimension.
+   This is the templated gauged domain-wall 4-d preconditioned operator, but fused with immediately followed fifth dimension operators.
 */
 
 namespace quda
@@ -47,11 +44,11 @@ namespace quda
     unsigned int sharedBytesPerThread() const
     {
       // spin components in shared depend on inversion algorithm
-#if 1
+      if (mobius_m5::use_half_vector()) {
       return 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
-#else
+      } else {
       return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
-#endif
+      }
     }
 
     void initTuneParam(TuneParam &param) const
@@ -61,6 +58,65 @@ namespace quda
       param.block.y = arg.Ls; // Ls must be contained in the block
       param.grid.y = 1;
       param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
+    }
+
+    long long m5pre_flops() const
+    {
+      long long Ls = in.X(4);
+      long long bulk = (Ls - 2) * (in.Volume() / Ls);
+      long long wall = 2 * in.Volume() / Ls;
+      long long n = in.Ncolor() * in.Nspin();
+      return n * (8ll * bulk + 10ll * wall + 14ll * in.Volume() + (arg.xpay ? 8ll * in.Volume() : 0));
+    }
+
+    long long m5mob_flops() const
+    {
+      long long Ls = in.X(4);
+      long long bulk = (Ls - 2) * (in.Volume() / Ls);
+      long long wall = 2 * in.Volume() / Ls;
+      long long n = in.Ncolor() * in.Nspin();
+      return n * (8ll * bulk + 10ll * wall + 8ll * in.Volume() + (arg.xpay ? 8ll * in.Volume() : 0));
+    }
+
+    long long m5inv_flops() const
+    {
+      long long Ls = in.X(4);
+      long long bulk = (Ls - 2) * (in.Volume() / Ls);
+      long long wall = 2 * in.Volume() / Ls;
+      long long n = in.Ncolor() * in.Nspin();
+      return ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * in.Volume();
+    }
+
+    long long flops() const
+    {
+      long long flops_ = 0;
+      switch (Arg::dslash5_type) {
+        case Dslash5Type::DSLASH5_MOBIUS_PRE:
+          flops_ = m5pre_flops(); break;
+        case Dslash5Type::DSLASH5_MOBIUS:
+          flops_ = m5mob_flops(); break;
+        case Dslash5Type::M5_INV_MOBIUS:
+          flops_ = m5inv_flops(); break;
+        case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+        case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
+          flops_ = m5inv_flops() + m5pre_flops(); break;
+        case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
+          flops_ = m5inv_flops() + m5inv_flops(); break;
+        case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
+          flops_ = m5pre_flops() + m5mob_flops(); break;
+        default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
+      }
+
+      return flops_ + Dslash::flops();
+    }
+
+    long long bytes() const
+    {
+      if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
+        return arg.y.Bytes() + Dslash::bytes();
+      } else {
+        return Dslash::bytes();
+      }
     }
 
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }

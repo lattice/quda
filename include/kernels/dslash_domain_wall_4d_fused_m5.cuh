@@ -11,7 +11,7 @@ namespace quda
     : DomainWall4DArg<Float, nColor_, nDim, reconstruct_>,
       Dslash5Arg<Float, nColor_, false, false, dslash5_type_> {
     // ^^^ Note that for Dslash5Arg we have xpay == dagger == false. This is because the xpay and dagger are determined
-    // by fused kernel, not the dslash5, so the false, false here are simply dummy instantiations.
+    // by fused kernel, not the dslash5, so the `false, false` here are simply dummy instantiations.
 
     static constexpr int nColor = nColor_;
 
@@ -49,10 +49,10 @@ namespace quda
     {
       for (int s = 0; s < Ls; s++) {
         auto kappa_b_s = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
-        // auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
-        // auto kappa_s = kappa_b_s / kappa_c_s;
         a_5[s] = a * kappa_b_s * kappa_b_s;
 #if 0
+        auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
+        auto kappa_s = kappa_b_s / kappa_c_s;
         alpha = b_5[s] - c_5[s] / kappa_s;
         beta = c_5[s] / kappa_s;
 #endif
@@ -96,7 +96,7 @@ namespace quda
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS || Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
         // Apply the m5inv.
         constexpr bool sync = false;
-        out = variableInv<sync, dagger, Vector, typename Arg::Dslash5Arg>(
+        out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(
           arg, stencil_out, my_spinor_parity, 0, s);
       }
 
@@ -114,10 +114,12 @@ namespace quda
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
         // Apply the m5inv.
         constexpr bool sync_m5inv = false;
-        out = variableInv<sync_m5inv, dagger, Vector, typename Arg::Dslash5Arg>(
+        out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
           arg, stencil_out, my_spinor_parity, 0, s);
         // Apply the m5pre.
 #if 0
+        // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
+        // But obviously this does not work when kappa ~ 0
         out = arg.alpha * out + arg.beta * stencil_out;
 #else
         constexpr bool sync_m5pre = true;
@@ -134,7 +136,7 @@ namespace quda
         out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
         // Apply the m5inv.
         constexpr bool sync_m5inv = true;
-        out = variableInv<sync_m5inv, dagger, Vector, typename Arg::Dslash5Arg>(
+        out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
           arg, out, my_spinor_parity, 0, s);
       }
 
@@ -144,7 +146,13 @@ namespace quda
        */
       if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS) {
         out = stencil_out;
-      } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
+      }
+
+      /******
+       *  Apply M5pre + M5mob:
+       *    this is actually out = m5mob * x - kappa_b^2 * m5pre * D4 * in
+       */
+      if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
         constexpr bool sync = false;
         out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(arg, stencil_out, my_spinor_parity, 0, s);
       }
@@ -175,7 +183,7 @@ namespace quda
         constexpr bool sync = true;
         constexpr bool this_dagger = true;
         // Then we apply the second m5inv-dag
-        out = variableInv<sync, this_dagger, Vector, typename Arg::Dslash5Arg>(
+        out = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(
           arg, out, my_spinor_parity, 0, s);
 
         if (mykernel_type != INTERIOR_KERNEL && active) {

@@ -391,6 +391,9 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Whether to use fused kernels for mobius */
+    QudaBoolean use_mobius_fused_kernel;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.

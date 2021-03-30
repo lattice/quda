@@ -242,61 +242,59 @@ namespace quda {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
-    printfQuda("symmetric = %s, dagger = %s\n", symmetric ? "y" : "n", dagger ? "y" : "n");
-
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     // QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
-#if 1
-      Dslash4(out, *tmp1, parity[0]);
-      M5inv(*tmp1, out);
-      Dslash4pre(out, *tmp1);
-      Dslash4(*tmp1, out, parity[1]);
-      M5invXpay(out, *tmp1, in, -1.0);
-#else
-      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-      ApplyDomainWall4DM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
-      out = *tmp1;
-#endif
+      if (this->use_mobius_fused_kernel) {
+        ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        ApplyDomainWall4DM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        out = *tmp1;
+      } else {
+        Dslash4(out, *tmp1, parity[0]);
+        M5inv(*tmp1, out);
+        Dslash4pre(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        M5invXpay(out, *tmp1, in, -1.0);
+      }
     } else if (symmetric && dagger) {
       M5inv(*tmp1, in);
-#if 1
-      Dslash4(out, *tmp1, parity[0]);
-      Dslash4pre(*tmp1, out);
-      M5inv(out, *tmp1);
-      Dslash4(*tmp1, out, parity[1]);
-      Dslash4preXpay(out, *tmp1, in, -1.0);
-#else
-      ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, profile);
-      ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
-      out = *tmp1;
-#endif
+      if (this->use_mobius_fused_kernel) {
+        ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], dagger, commDim, mass, profile);
+        ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        out = *tmp1;
+      } else {
+        Dslash4(out, *tmp1, parity[0]);
+        Dslash4pre(*tmp1, out);
+        M5inv(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        Dslash4preXpay(out, *tmp1, in, -1.0);
+      }
     } else if (!symmetric && !dagger) {
       Dslash4pre(*tmp1, in);
-#if 0
-      Dslash4(out, *tmp1, parity[0]);
-      M5inv(*tmp1, out);
-      Dslash4pre(out, *tmp1);
-      Dslash4(*tmp1, out, parity[1]);
-      Dslash5Xpay(out, in, *tmp1, -1.0);
-#else
-      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-      ApplyDomainWall4DM5mob(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
-      out = *tmp1;
-#endif
+      if (this->use_mobius_fused_kernel) {
+        ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        ApplyDomainWall4DM5mob(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+        out = *tmp1;
+      } else {
+        Dslash4(out, *tmp1, parity[0]);
+        M5inv(*tmp1, out);
+        Dslash4pre(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        Dslash5Xpay(out, in, *tmp1, -1.0);
+      }
     } else if (!symmetric && dagger) {
-#if 0
-      Dslash4(*tmp1, in, parity[0]);
-      Dslash4pre(out, *tmp1);
-      M5inv(*tmp1, out);
-      Dslash4(out, *tmp1, parity[1]);
-      Dslash4pre(*tmp1, out);
-      Dslash5Xpay(out, in, *tmp1, -1.0);
-#else
-      ApplyDomainWall4DM5preM5inv(*tmp1, in, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
-      ApplyDomainWall4DM5preM5mob(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
-#endif
+      if (this->use_mobius_fused_kernel) {
+        ApplyDomainWall4DM5preM5inv(*tmp1, in, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], dagger, commDim, mass, profile);
+        ApplyDomainWall4DM5preM5mob(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp1, parity[1], dagger, commDim, mass, profile);
+      } else {
+        Dslash4(*tmp1, in, parity[0]);
+        Dslash4pre(out, *tmp1);
+        M5inv(*tmp1, out);
+        Dslash4(out, *tmp1, parity[1]);
+        Dslash4pre(*tmp1, out);
+        Dslash5Xpay(out, in, *tmp1, -1.0);
+      }
     }
 
     deleteTmp(&tmp1, reset1);
@@ -307,21 +305,20 @@ namespace quda {
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     bool reset = newTmp(&tmp2, in);
     if (symmetric) {
-#if 1
-      M(*tmp2, in);
-      Mdag(out, *tmp2);
-#else
-      int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
-      QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-      bool reset1 = newTmp(&tmp1, in);
-      Dslash4pre(*tmp1, in);
-      ApplyDomainWall4DM5invM5pre(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, profile);
-      ApplyDomainWall4DM5invM5inv(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, profile);
-      ApplyDomainWall4DM5preM5inv(out, *tmp1, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, profile);
-      ApplyDomainWall4DM5pre(*tmp1, out, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, profile);
-      out = *tmp1;
-      deleteTmp(&tmp1, reset1);
-#endif
+      if (this->use_mobius_fused_kernel) {
+        int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+        QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+        bool reset1 = newTmp(&tmp1, in);
+        Dslash4pre(*tmp2, in);
+        ApplyDomainWall4DM5invM5pre(*tmp1, *tmp2, *gauge, 0.0, m5, b_5, c_5, *tmp1, *tmp1, parity[0], false, commDim, mass, profile);
+        ApplyDomainWall4DM5invM5inv(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, in, *tmp2, parity[1], false, commDim, mass, profile);
+        ApplyDomainWall4DM5preM5inv(*tmp1, out, *gauge, 0.0, m5, b_5, c_5, *tmp1, out, parity[0], true, commDim, mass, profile);
+        ApplyDomainWall4DM5pre(out, *tmp1, *gauge, -1.0, m5, b_5, c_5, *tmp2, *tmp1, parity[1], true, commDim, mass, profile);
+        deleteTmp(&tmp1, reset1);
+      } else {
+        M(*tmp2, in);
+        Mdag(out, *tmp2);
+      }
     } else {
       M(*tmp2, in);
       Mdag(out, *tmp2);

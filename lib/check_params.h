@@ -636,6 +636,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }
