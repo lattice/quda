@@ -15,7 +15,7 @@ namespace quda {
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
-    unsigned int  block_idx = blockIdx.x;
+    typename decltype(blockIdx)::value_type block_idx = blockIdx.x;
     if (arg.swizzle) {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
@@ -40,11 +40,9 @@ namespace quda {
      templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
 
-NB: __launch_bounds__(Arg::launch_bound ? block_size : 0) becomes
-
   */
   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __global__ typename std::enable_if<(Arg::launch_bounds || block_size > 512)>::type __launch_bounds__(block_size) BlockKernel2D(Arg arg)
+  __forceinline__ __device__ void BlockKernel2D_impl(Arg arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
@@ -54,17 +52,40 @@ NB: __launch_bounds__(Arg::launch_bound ? block_size : 0) becomes
     Transformer<block_size, Arg> t(arg);
     t(block_idx, thread_idx);
   }
-
-   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __global__ typename std::enable_if<! (Arg::launch_bounds || block_size > 512) >::type BlockKernel2D(Arg arg)
+  
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    __launch_bounds__(block_size)
+    __global__ std::enable_if_t<device::use_kernel_arg<Arg>()
+    							  && (Arg::launch_bounds || block_size > 512)	
+    							, void> BlockKernel2D(Arg arg)
   {
-    const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
-    const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    auto j = blockDim.y*blockIdx.y + threadIdx.y;
-    if (j >= arg.threads.y) return;
+    BlockKernel2D_impl<block_size, Transformer, Arg>(arg);
+  }
 
-    Transformer<block_size, Arg> t(arg);
-    t(block_idx, thread_idx);
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    __global__ std::enable_if_t<device::use_kernel_arg<Arg>()
+    							  && !(Arg::launch_bounds || block_size > 512)	
+    							, void> BlockKernel2D(Arg arg)
+  {
+    BlockKernel2D_impl<block_size, Transformer, Arg>(arg);
+  }
+
+
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    __launch_bounds__(block_size)
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>()
+                                  && (Arg::launch_bounds || block_size > 512)	
+                                , void> BlockKernel2D()
+  {
+    BlockKernel2D_impl<block_size, Transformer, Arg>(device::get_arg<Arg>());
+  }
+  
+   template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>()
+                                  && !(Arg::launch_bounds || block_size > 512)	
+                                , void> BlockKernel2D()
+  {
+    BlockKernel2D_impl<block_size, Transformer, Arg>(device::get_arg<Arg>());
   }
 
 }

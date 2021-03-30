@@ -1,3 +1,5 @@
+#pragma once
+
 #include <target_device.h>
 
 /**
