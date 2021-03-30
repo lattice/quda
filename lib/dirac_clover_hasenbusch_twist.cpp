@@ -2,7 +2,8 @@
 #include <blas_quda.h>
 #include <multigrid.h>
 
-namespace quda {
+namespace quda
+{
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param) : DiracClover(param), mu(param.mu) {}
 

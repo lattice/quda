@@ -380,7 +380,8 @@ static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    niter\n");
+  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        "
+             "Gauge_order    niter\n");
   printfQuda("%s                       %s                         %d/%d/%d                       %d                  "
              "%s           %d\n",
              get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order),
