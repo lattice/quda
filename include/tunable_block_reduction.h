@@ -4,6 +4,7 @@
 #include <device.h>
 #include <kernel_helper.h>
 #include <reduce_helper.h>
+#include <target_device.h>
 #include <block_reduction_kernel.h>
 
 #ifdef JITIFY
@@ -42,17 +43,33 @@ namespace quda {
     */
     bool tuneGridDim() const final { return false; }
 
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    typename std::enable_if<idx != 0, void>::type launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    std::enable_if_t<device::use_kernel_arg<Arg>(), void>
+      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
+      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
+    }
+
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
+      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
+      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
+    }
+
+    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
+    std::enable_if_t<idx != 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
       else launch_device<idx - 1, Block, Transformer>(arg, tp, stream);
     }
 
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    typename std::enable_if<idx == 0, void>::type launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    std::enable_if_t<idx == 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
+      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }
 
@@ -68,7 +85,7 @@ namespace quda {
 #endif
     }
 
-    template <int block_size, template <int, typename> class Transformer, typename Arg>
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
     void kernel(Arg &arg)
     {
       Transformer<block_size, Arg> t(arg);
@@ -81,16 +98,16 @@ namespace quda {
     }
 
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-      typename std::enable_if<idx != 0, void>::type launch_host(const TuneParam &tp, Arg &arg)
+    std::enable_if_t<idx != 0, void> launch_host(const TuneParam &tp, Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer>(arg);
+      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
       else launch_host<idx - 1, Block, Transformer>(tp, arg);
     }
 
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-      typename std::enable_if<idx == 0, void>::type launch_host(const TuneParam &tp, Arg &arg)
+    std::enable_if_t<idx == 0, void> launch_host(const TuneParam &tp, Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer>(arg);
+      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }
 
@@ -114,7 +131,7 @@ namespace quda {
        @param[in,out] arg Algorithm meta data
      */
     template <template <int, typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
-    typename std::enable_if<!enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Block>(tp, stream, arg);
@@ -124,7 +141,7 @@ namespace quda {
     }
 
     template <template <int, typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
-    typename std::enable_if<enable_host, void>::type launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Transformer, Block>(tp, stream ,arg);
@@ -147,6 +164,9 @@ namespace quda {
       strcpy(aux, compile_type_str(field, location));
       if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux, field.AuxString());
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, ",fast_compile");
+#endif
     }
 
     bool advanceBlockDim(TuneParam &param) const

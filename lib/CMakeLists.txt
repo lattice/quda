@@ -161,7 +161,7 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
 
 # set up QUDA compile options
 target_compile_definitions(
-  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
+  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG>
                $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
 target_compile_options(
@@ -189,6 +189,11 @@ if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
 endif(QUDA_VERBOSE_BUILD)
 
+if (${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
+  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
+endif()
+
+
 # workaround for 10.2
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
@@ -202,7 +207,8 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-p
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
+
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
@@ -227,6 +233,7 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
 endif()
 
 add_subdirectory(targets/generic)
+target_include_directories(quda PRIVATE ../include/targets/generic)
 
 add_subdirectory(interface)
 
@@ -245,10 +252,8 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
   elseif(CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
-  elseif(CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
-    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
   elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
-    set(PROPAGATED_FLAGS "${CMAKE_CUDA_FLAGS_SANITIZE}")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_SANITIZE}")
   endif()
 
   # Turne the flags into a CMAKE list
@@ -262,17 +267,18 @@ endif()
 # Specific config dependent warning suppressions and lineinfo forwarding
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             -Wreorder
-                            -Xcompiler -Wno-unknown-pragmas,-Wno-unused-function
+                            $<$<CXX_COMPILER_ID:Clang>: -Xcompiler=-Wno-unused-function -Xcompiler=-Wno-unknown-pragmas>
+                            $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-                            $<$<CONFIG:SANITIZE>:-Xcompiler -fsanitize=address,undefined -lineinfo>
+                            $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-                            -Wall -Wextra -Wno-unknown-pragmas -Wno-unused-function
+                            -Wall -Wextra -Wno-unknown-pragmas
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
-                            $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
+                            $<$<CONFIG:SANITIZE>:-fsanitize=address -fsanitize=undefined>
                             >)
 
 # some clang warnings should be warning even when turning warnings into errors

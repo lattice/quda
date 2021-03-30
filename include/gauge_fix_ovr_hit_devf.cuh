@@ -48,8 +48,8 @@ namespace quda {
   template <typename Float, int gauge_dir, int NCOLORS>
   inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
@@ -73,13 +73,13 @@ namespace quda {
       if (mu < gauge_dir || (mu >= 4 && mu < (gauge_dir + 4))) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomicAdd(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_fetch_add(elems + tid, (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomicAdd(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
+        atomic_fetch_add(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq); //a1
         // a2
-        atomicAdd(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
+        atomic_fetch_add(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq); //a2
         // a3
-        atomicAdd(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
+        atomic_fetch_add(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq); //a3
       } //FLOP per lattice site = gauge_dir * 2 * (4 + 7) = gauge_dir * 22
 
       cache.sync();
@@ -143,8 +143,8 @@ namespace quda {
   template <typename Float, int gauge_dir, int NCOLORS>
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
@@ -231,8 +231,8 @@ namespace quda {
   template <typename Float, int gauge_dir, int NCOLORS>
   inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
@@ -359,8 +359,8 @@ namespace quda {
   inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
 							const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
@@ -379,13 +379,13 @@ namespace quda {
       if (mu < gauge_dir) {
         //Retrieve the four SU(2) parameters...
         // a0
-        atomicAdd(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
+        atomic_fetch_add(elems + tid, (link1(p,p)).x + (link1(q,q)).x + (link(p,p)).x + (link(q,q)).x); //a0
         // a1
-        atomicAdd(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
+        atomic_fetch_add(elems + tid + blockSize, (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y)); //a1
         // a2
-        atomicAdd(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
+        atomic_fetch_add(elems + tid + blockSize * 2, (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x)); //a2
         // a3
-        atomicAdd(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
+        atomic_fetch_add(elems + tid + blockSize * 3, (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y)); //a3
       }
       cache.sync();
       if (mu == 0) {
@@ -442,8 +442,8 @@ namespace quda {
   inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
                                                  const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
@@ -518,8 +518,8 @@ namespace quda {
   template <typename Float, int gauge_dir, int NCOLORS>
   inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, int mu)
   {
-    auto blockSize = device::block_dim().x;
-    auto tid = device::thread_idx().x;
+    auto blockSize = target::block_dim().x;
+    auto tid = target::thread_idx().x;
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;

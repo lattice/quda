@@ -56,12 +56,11 @@ namespace quda {
   qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
                             const std::vector<std::string> &template_args,
                             const TuneParam &tp, const qudaStream_t &stream,
-                            const std::vector<constant_param_t> &param,
                             std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types);
 
   template <template <typename> class Functor, bool grid_stride, typename Arg, bool template_block_size = false>
   qudaError_t launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
-                            const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+                            const Arg &arg)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
@@ -77,13 +76,13 @@ namespace quda {
 
     return launch_jitify(Functor<Arg>::filename(), kernel, template_args,
                          //{reflect((int)tp.block.x), reflect((int)tp.block.y), Functor_naked, Arg_reflect, reflect(grid_stride)},
-                         tp, stream, param, arg_ptrs, arg_types);
+                         tp, stream, arg_ptrs, arg_types);
   }
 
   // FIXME merge the functionality of these launchers
   template <template <int, typename> class Functor, typename Arg>
   qudaError_t launch_jitify_block(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
-                                  const Arg &arg, const std::vector<constant_param_t> &param = dummy_param)
+                                  const Arg &arg)
   {
     // we need this hackery to get the naked unbound template class parameters
     using namespace jitify::reflection;
@@ -96,7 +95,7 @@ namespace quda {
 
     return launch_jitify(Functor<1, Arg>::filename(), kernel,
                          {reflect((int)tp.block.x), Functor_naked, Arg_reflect},
-                         tp, stream, param, arg_ptrs, arg_types);
+                         tp, stream, arg_ptrs, arg_types);
   }
 
 #endif

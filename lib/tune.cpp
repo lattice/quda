@@ -12,7 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
-#include <target_device.h> // for device::warp_size
+#include <target_device.h>
 
 #include <deque>
 #include <queue>
@@ -662,7 +662,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam &tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -672,7 +672,6 @@ namespace quda
     TuneKey key = tunable.tuneKey();
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
-    static TuneParam param;
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTOP(QUDA_PROFILE_INIT);
@@ -690,11 +689,11 @@ namespace quda
       launchTimer.TPSTART(QUDA_PROFILE_COMPUTE);
 #endif
 
-      TuneParam &param = it->second;
+      TuneParam &param_tuned = it->second;
 
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Launching %s with %s at vol=%s with %s\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param).c_str());
+                   tunable.paramString(param_tuned).c_str());
       }
 
 #ifdef LAUNCH_TIMER
@@ -702,10 +701,10 @@ namespace quda
       launchTimer.TPSTART(QUDA_PROFILE_EPILOGUE);
 #endif
 
-      tunable.checkLaunchParam(param);
+      tunable.checkLaunchParam(param_tuned);
 
       // we could be tuning outside of the current scope
-      if (!tuning && profile_count) param.n_calls++;
+      if (!tuning && profile_count) param_tuned.n_calls++;
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
@@ -713,11 +712,11 @@ namespace quda
 #endif
 
       if (traceEnabled() >= 2) {
-        TraceKey trace_entry(key, param.time);
+        TraceKey trace_entry(key, param_tuned.time);
         trace_list.push_back(trace_entry);
       }
 
-      return param;
+      return param_tuned;
     }
 
 #ifdef LAUNCH_TIMER
@@ -725,13 +724,18 @@ namespace quda
     launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
+    static TuneParam param;
+
     if (enabled == QUDA_TUNE_NO) {
-      tunable.defaultTuneParam(param);
-      tunable.checkLaunchParam(param);
+      TuneParam param_default;
+      tunable.defaultTuneParam(param_default);
+      tunable.checkLaunchParam(param_default);
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param).c_str());
+                   tunable.paramString(param_default).c_str());
       }
+
+      return param_default;
     } else if (!tuning) {
 
       /* As long as global reductions are not disabled, only do the
@@ -795,11 +799,7 @@ namespace quda
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-              if (tunable.launchError() == QUDA_SUCCESS) { // must be regular error
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
-              } else { // else must be a manually thrown error
-                printfQuda("    %s gives thrown error\n", tunable.paramString(param).c_str());
-              }
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
           }
           tuning = tunable.advanceTuneParam(param);

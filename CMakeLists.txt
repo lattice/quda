@@ -36,7 +36,6 @@ set(VALID_BUILD_TYPES
     STRICT
     DEBUG
     HOSTDEBUG
-    DEVICEDEBUG
     SANITIZE)
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
@@ -134,8 +133,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -256,6 +255,9 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
+# QIO legacy support
+option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
+
 # NVTX options
 option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
@@ -294,6 +296,8 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
+mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
+
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
@@ -329,6 +333,7 @@ elseif(${CPU_ARCH} STREQUAL "ppc64le")
 endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
+
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
     "-g -O3 -Wall -Wextra"
@@ -340,16 +345,13 @@ set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -365,16 +367,13 @@ set(CMAKE_C_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wextra -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall -Wextra"
-    CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
     "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -Wextra -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
@@ -428,9 +427,6 @@ set(CMAKE_CUDA_FLAGS_RELEASE
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
@@ -475,10 +471,10 @@ endif()
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
 if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.3.7)
+  set(EIGEN_VERSION 3.3.9)
   set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
   set(EIGEN_URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_SHA 685adf14bd8e9c015b78097c1dc22f2f01343756f196acdc76a678e1ae352e11)
+  set(EIGEN_SHA 0fa5cafe78f66d2b501b43016858070d52ba47bd9b1016b0165a7b8e04675677)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
@@ -579,7 +575,7 @@ if(QUDA_QMP)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
       BUILD_COMMAND ${MAKE_EXE}
       INSTALL_COMMAND ${MAKE_EXE} install
       LOG_INSTALL ON
@@ -631,14 +627,21 @@ if(QUDA_QIO)
   mark_as_advanced(QIO_FOUND)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    set(QIO_BRANCH
+        "extended")
+    if(QUDA_DOWNLOAD_QIO_LEGACY)
+      set(QIO_BRANCH
+          "qio2-5-0")
+    endif()
     ExternalProject_Add(
       QIO
       GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-      GIT_TAG qio2-5-0
+      GIT_TAG "${QIO_BRANCH}"
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install
       DEPENDS QMP
@@ -836,7 +839,6 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
@@ -844,7 +846,6 @@ mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
@@ -852,7 +853,6 @@ mark_as_advanced(CMAKE_C_FLAGS_STRICT)
 mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
 
