@@ -187,6 +187,7 @@ namespace quda
         constexpr int len = 2 * n; // real-valued length
         float nrm = isFixed<store_t>::value ? SN::load_norm(x, parity) : 0.0;
 
+        // if(x>=0 && x<=4) printf("Spinor::load x %d parity %d spinor %p spinor[0] %g\n", x, parity, spinor, spinor[0]);
         vector_type<real, len> v_;
 
         constexpr int M = len / N;

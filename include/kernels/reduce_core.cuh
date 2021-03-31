@@ -68,9 +68,14 @@ namespace quda
         if (arg.r.read.W) arg.W.load(w, i, parity);
         if (arg.r.read.V) arg.V.load(v, i, parity);
 
+        // if(0<=i&&i<4) printf("i %d  arg.r.read.X %d  arg.r.read.Y %d  arg.r.read.Z %d\n", i, arg.r.read.X, arg.r.read.Y, arg.r.read.Z);
+        // auto s = [](auto x){return reinterpret_cast<double*>(&x)[0];};  // debug purpose, assuming double
         arg.r.pre();
+        // if(0<=i&&i<4) printf("pre  %d sum %g x %g y %g z %g w %g z %g\n", i, s(sum), s(x), s(y), s(z), s(w), s(v));
         arg.r(sum, x, y, z, w, v);
+        // if(0<=i&&i<4) printf("r    %d sum %g x %g y %g z %g w %g z %g\n", i, s(sum), s(x), s(y), s(z), s(w), s(v));
         arg.r.post(sum);
+        // if(0<=i&&i<4) printf("post %d sum %g x %g y %g z %g w %g z %g\n", i, s(sum), s(x), s(y), s(z), s(w), s(v));
 
         if (arg.r.write.X) arg.X.save(x, i, parity);
         if (arg.r.write.Y) arg.Y.save(y, i, parity);

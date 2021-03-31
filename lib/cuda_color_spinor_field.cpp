@@ -400,8 +400,10 @@ namespace quda {
   }
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
+    // ompwip("DBG: loadSpinorField(const ColorSpinorField &src)");
 
     if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
+      // ompwip("DBG: reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)");
       void *buffer = pool_pinned_malloc(bytes + norm_bytes);
       memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
@@ -412,22 +414,28 @@ namespace quda {
 
       pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
+      // ompwip("DBG: typeid(src) == typeid(cudaColorSpinorField)");
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
 
       if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+        // ompwip("DBG: src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER");
         // special case where we use mapped memory to read/write directly from application's array
         void *src_d = get_mapped_device_pointer(src.V());
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
         void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
         if (!zeroCopy) {
+          // ompwip("DBG: !zeroCopy");
           buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
           Src = buffer;
           srcNorm = static_cast<char*>(Src) + src.Bytes();
+          // ompwip("DBG: !zeroCopy qudaMemcpy(Src, src.V())");
           qudaMemcpy(Src, src.V(), src.Bytes(), qudaMemcpyDefault);
+          // ompwip("DBG: !zeroCopy qudaMemcpy(srcNorm, src.Norm())");
           qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), qudaMemcpyDefault);
         } else {
+          // ompwip("DBG: else");
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
           memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
@@ -436,13 +444,16 @@ namespace quda {
         }
 
         qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); // FIXME (temporary?) bug fix for padding
+        // ompwip("DBG: begin copyGenericColorSpinor(*this, src)");
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
+        // ompwip("DBG: end copyGenericColorSpinor(*this, src)");
 
         if (zeroCopy) pool_pinned_free(buffer);
         else pool_device_free(buffer);
       }
     }
 
+    // ompwip("DBG: sync loadSpinorField(const ColorSpinorField &src)");
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
   }
 
