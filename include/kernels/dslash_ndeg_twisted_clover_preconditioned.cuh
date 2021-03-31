@@ -34,6 +34,8 @@ namespace quda
       b(dagger ? -0.5 * b : 0.5 * b), // if dagger flip the chiral twist
       c(0.5*c)
       {
+        checkPrecision(U, A);
+        checkLocation(U, A);
       }
   };
 
@@ -118,7 +120,7 @@ namespace quda
         tmp.toNonRel(); // switch back to non-chiral basis
 
         if (xpay) {
-          Vector x = arg.x(coord.x_cb, my_spinor_parity);
+          Vector x = arg.x(my_flavor_idx, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {
           // multiplication with a needed here?
