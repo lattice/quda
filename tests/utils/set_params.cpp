@@ -322,6 +322,8 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  strcpy(eig_param.coarse_vec_infile, eig_coarse_vec_infile);
+  strcpy(eig_param.coarse_vec_outfile, eig_coarse_vec_outfile);
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }

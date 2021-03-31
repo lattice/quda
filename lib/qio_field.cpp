@@ -319,7 +319,10 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 96:
   case 128:
   case 256:
-  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 384:
+  case 512:
+  case 768:
+  case 1024: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "<version>BETA</version>";
@@ -355,7 +358,10 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 96:
   case 128:
   case 256:
-  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 384:
+  case 512:
+  case 768:
+  case 1024: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
 
@@ -462,7 +468,16 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 384:
-    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);    
+    break;
+  case 512:
+    status = write_field<512>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);    
+    break;
+  case 768:
+    status = write_field<768>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);    
+    break;
+  case 1024:
+    status = write_field<1024>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);    
     break;
   default:
     errorQuda("Undefined %d", Ninternal);

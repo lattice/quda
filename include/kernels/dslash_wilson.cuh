@@ -45,7 +45,8 @@ namespace quda
       a(a)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in, x);        // check all orders match
+      checkOrder(out, in); // check all orders match
+      checkOrder(in, x); // check all orders match
       checkPrecision(out, in, x, U); // check all precisions match
       checkLocation(out, in, x, U);  // check all locations match
       if (!in.isNative() || !U.isNative())

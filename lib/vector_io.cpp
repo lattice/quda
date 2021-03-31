@@ -121,6 +121,7 @@ namespace quda
   void VectorIO::save(const std::vector<ColorSpinorField *> &vecs)
   {
     const int Nvec = vecs.size();
+    
     std::vector<ColorSpinorField *> tmp;
     tmp.reserve(Nvec);
     auto spinor_parity = vecs[0]->SuggestedParity();
@@ -152,7 +153,7 @@ namespace quda
           // copy the single parity eigen/singular vector into an
           // intermediate device-side vector
           *tmp_intermediate = *vecs[i];
-
+	  
           // copy the single parity only eigen/singular vector into the even components of the full parity vector
           if (spinor_parity == QUDA_EVEN_PARITY)
             blas::copy(tmp[i]->Even(), *tmp_intermediate);

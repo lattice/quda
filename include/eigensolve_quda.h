@@ -26,7 +26,7 @@ protected:
     // Problem parameters
     //------------------
     int n_ev;         /** Size of initial factorisation */
-    int n_kr;         /** Size of Krylov space after extension */
+    int n_kr;         /** Size of Krylov space */
     int n_conv;       /** Number of converged eigenvalues requested */
     int n_ev_deflate; /** Number of converged eigenvalues to use in deflation */
     double tol;       /** Tolerance on eigenvalues */
@@ -75,7 +75,7 @@ protected:
     int n_block_ortho;
 
     int fine_n_ev;         /** Size of initial factorisation */
-    int fine_n_kr;         /** Size of Krylov space after extension */
+    int fine_n_kr;         /** Size of initial Krylov space */
     int fine_n_conv;       /** Number of converged eigenvalues requested */
     int fine_max_restarts; /** Maximum number of restarts to perform */
     bool compressed_mode;  /** if true, the solver will apply promotion/projection to the vectors prior/after computations */

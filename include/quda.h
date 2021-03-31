@@ -519,12 +519,18 @@ extern "C" {
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
 
-    /** Filename prefix where to load the null-space vectors */
+    /** Filename prefix of the (fine)eigenvectors to load */
     char vec_infile[256];
 
-    /** Filename prefix for where to save the null-space vectors */
+    /** Filename prefix of the (fine)eigenvectors to save */
     char vec_outfile[256];
 
+    /** Filename prefix of the coarse eigenvectors to load */
+    char coarse_vec_infile[256];
+    
+    /** Filename prefix of the coarse eigenvectors to save */
+    char coarse_vec_outfile[256];
+    
     /** The precision with which to save the vectors */
     QudaPrecision save_prec;
 

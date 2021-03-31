@@ -52,50 +52,77 @@ namespace quda
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+
     // Check to see if we are loading eigenvectors
-    if (strcmp(eig_param->vec_infile, "") != 0) {
+    if (strcmp(eig_param->vec_infile, "") != 0) {      
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      
+      // Increase the size of kSpace passed to the function
+      if(compress) n_conv = fine_n_conv;
+      prepareKrylovSpace(kSpace, evals);
       loadFromFile(mat, kSpace, evals);
-      return;
+      
+      if (compress) {
+	// Set converged to true as the fine problem is solved.
+	converged = true;
+	
+	// Load the coarse space from file
+	if (strcmp(eig_param->coarse_vec_infile, "") != 0) {
+
+	  n_conv = eig_param->n_conv;	  
+	  prepareCompressedKrylovSpace(kSpace, evals);
+	  compressed_mode = true;	  
+	  loadFromFile(mat, compressed_space, evals);
+	  return;
+	}
+      } else {
+	// If not performing a compressed solve, we are done.	
+	return;      
+      }
     }
 
-    // Check for an initial guess. If none present, populate with rands, then
-    // orthonormalise.
-    prepareInitialGuess(kSpace);
-
-    // If using the compression, we first perform the fine computation. Set the
-    // eig_param values to the fine problem values, then switch to the
-    // full problem when the fine problem is complete.
-    //std::vector<ColorSpinorField *> kSpace_fine_ptr;
-    if(compress) {
-      n_ev = fine_n_ev;
-      n_kr = fine_n_kr;
-      n_conv = fine_n_conv;
-      max_restarts = fine_max_restarts;
-      fine_space.reserve(fine_n_ev);	    
+    // If no fine eigenspace was loaded, we must construct it
+    if(!converged) {
+      
+      // If using the compression, we first perform the fine computation. Set the
+      // eig_param values to the fine problem values, then switch to the
+      // full problem when the fine problem is complete.
+      if(compress) {
+	n_ev = fine_n_ev;
+	n_kr = fine_n_kr;
+	n_conv = fine_n_conv;
+	max_restarts = fine_max_restarts;
+      }
+      
+      // Check for an initial guess. If none present, populate with rands, then
+      // orthonormalise.
+      prepareInitialGuess(kSpace);
+      
+      // Increase the size of kSpace passed to the function, will be trimmed to
+      // original size before exit.
+      prepareKrylovSpace(kSpace, evals);
     }
-    
-    // Increase the size of kSpace passed to the function, will be trimmed to
-    // original size before exit.
-    prepareKrylovSpace(kSpace, evals);
 
     // Check for Chebyshev maximum estimation
     checkChebyOpMax(mat, kSpace);
-
-    // Print Eigensolver params
-    printEigensolverSetup();
     //---------------------------------------------------------------------------
 
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    converged = trlmSolve(kSpace);
 
+    // If no fine eigenspace was loaded, we must construct it
+    if(!converged) {
+      // Print Eigensolver params
+      printEigensolverSetup();
+      converged = trlmSolve(kSpace);
+    }
+    
     // Switch to the full problem parameters and continue in compressed mode
     if(compress && converged) {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
 	printfQuda("FINE PROBLEM: TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv, restart_iter, iter);
       }
+      
       n_ev = eig_param->n_ev;
       n_kr = eig_param->n_kr;
       n_conv = eig_param->n_conv;
@@ -104,8 +131,22 @@ namespace quda
       prepareCompressedKrylovSpace(kSpace, evals);
       compressed_mode = true;
       
+      // Reset algorithm data if we restarted the solve
+      // i.e., loaded a fine space from IO. 
+      if (strcmp(eig_param->vec_infile, "") != 0) {
+	num_converged = 0;
+	num_keep = 0;
+	num_locked = 0;
+	for (int i = 0; i < n_kr; i++) {
+	  alpha[i] = 0.0;
+	  beta[i] = 0.0;
+	  residua[i] = 0.0;
+	}
+      }
+      
+      // Print Eigensolver params
+      printEigensolverSetup();
       converged = trlmSolve(compressed_space);    
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
     
     // Post computation report
@@ -137,7 +178,8 @@ namespace quda
     }
 
     // Local clean-up
-    cleanUpEigensolver(kSpace, evals);
+    if(compressed_mode) cleanUpEigensolver(compressed_space, evals);
+    else cleanUpEigensolver(kSpace, evals);
   }
 
   // Destructor
@@ -153,6 +195,7 @@ namespace quda
   //---------------------------------------------------------------------------
   bool TRLM::trlmSolve(std::vector<ColorSpinorField *> &kSpace)
   {
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     // Convergence and locking criteria
     double mat_norm = 0.0;
     double epsilon = setEpsilon(kSpace[0]->Precision());
@@ -214,17 +257,19 @@ namespace quda
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
 
-      //if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
 	printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("num_converged = %d\n", num_converged);
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < n_kr; i++) {
-          //printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  for (int i = 0; i < n_kr; i++) {
+	    printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+	  }
 	}
-	//}
+      }
       
       // Check for convergence
       if (num_converged >= n_conv) {
@@ -234,6 +279,7 @@ namespace quda
 
       restart_iter++;
     }
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     return converged;
   }
   
@@ -430,7 +476,7 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    if(compressed_mode && 0) {
+    if(compressed_mode && 1) {
       // For now (to test the compresed Lanczos step) promote the full krylov space and 
       // compress after rotation
       ColorSpinorParam csParamFine(*r[0]);      
