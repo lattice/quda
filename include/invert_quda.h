@@ -1422,6 +1422,7 @@ public:
 
     ColorSpinorField *rp;       //! residual vector
     ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *ep;    
     ColorSpinorField *tmpp;     //! temporary for mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
