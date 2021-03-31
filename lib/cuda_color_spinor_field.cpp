@@ -1238,17 +1238,17 @@ namespace quda {
 
   void cudaColorSpinorField::copy_to_buffer(void *buffer) const
   {
-    qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+    qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
     if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
   }
 
   void cudaColorSpinorField::copy_from_buffer(void *buffer)
   {
-    qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
+    qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
     if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
     }
   }
 

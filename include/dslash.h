@@ -91,7 +91,7 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableVectorYZ::minGridSize();
       }
@@ -103,7 +103,7 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableVectorYZ::gridStep();
       }
@@ -137,7 +137,7 @@ namespace quda
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.in_pack.resetGhost(in, this->packBuffer);
+        arg.in_pack.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
         arg.counter = dslash::get_shmem_sync_counter();
       }
@@ -152,8 +152,7 @@ namespace quda
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
-          ((deviceProp.multiProcessorCount) / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
-          0;
+          (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) : 0;
         tp.grid.x += arg.exterior_blocks;
       }
     }
@@ -178,7 +177,7 @@ namespace quda
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
-        const int max_blocks_per_dir = std::max((deviceProp.multiProcessorCount) / (8 * nDimComms), 4);
+        const int max_blocks_per_dir = std::max(device::processor_count() / (8 * nDimComms), 4u);
         if (param.aux.x + 1 <= max_blocks_per_dir
             && (param.aux.x + 1) * param.block.x < (max_threads_per_dir + param.block.x - 1)) {
           param.aux.x++;
@@ -415,13 +414,18 @@ namespace quda
 #endif
     }
 
+#ifdef NVSHMEM_COMMS
     void setShmem(int shmem)
     {
-#ifdef NVSHMEM_COMMS
       arg.shmem = shmem;
-#endif
       setUberTuning(arg.shmem & 64);
     }
+#else
+    void setShmem(int)
+    {
+      setUberTuning(arg.shmem & 64);
+    }
+#endif
 
     void setPack(bool pack, MemoryLocation location)
     {
@@ -620,140 +624,5 @@ namespace quda
       return bytes_;
     }
   };
-
-  /**
-     @brief This instantiate function is used to instantiate the reconstruct types used
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (U.Reconstruct() == Recon::recon[0]) {
-#if QUDA_RECONSTRUCT & 4
-      Apply<Float, nColor, Recon::recon[0]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
-#endif
-    } else if (U.Reconstruct() == Recon::recon[1]) {
-#if QUDA_RECONSTRUCT & 2
-      Apply<Float, nColor, Recon::recon[1]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
-#endif
-    } else if (U.Reconstruct() == Recon::recon[2]) {
-#if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
-#endif
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
-    }
-  }
-
-  /**
-     @brief This instantiate function is used to instantiate the colors
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (in.Ncolor() == 3) {
-      instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
-
-  /**
-     @brief This instantiate function is used to instantiate the precisions
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
-      instantiate<Apply, Recon, double>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      instantiate<Apply, Recon, float>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-
-  /**
-     @brief This instantiatePrecondtiioner function is used to
-     instantiate the precisions for a preconditioner.  This is the
-     same as the instantiate helper above, except it only handles half
-     and quarter precision.
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                        Args &&... args)
-  {
-    if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-#else
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
-  {
-    if (U.Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-#endif
 
 } // namespace quda

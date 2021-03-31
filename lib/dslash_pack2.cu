@@ -171,7 +171,12 @@ protected:
 
 public:
   Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, double a,
-       double b, double c, int shmem) :
+       double b, double c,
+#ifdef NVSHMEM
+       int shmem) :
+#else
+       int) :
+#endif
     TunableVectorYZ((in.Ndim() == 5 ? in.X(4) : 1), in.SiteSubset()),
     ghost(ghost),
     in(in),

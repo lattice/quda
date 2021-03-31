@@ -119,6 +119,7 @@ namespace quda {
       host_free(backup_norm_h);
       backup_norm_h = nullptr;
     }
+  }
 
   CloverField *CloverField::Create(const CloverFieldParam &param)
   {
@@ -326,17 +327,17 @@ namespace quda {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
-      qudaMemcpy(buffer, clover, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(buffer, clover, bytes, qudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
       }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
-      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, qudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       }
     }
   }
@@ -346,17 +347,17 @@ namespace quda {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
-      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, qudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
-      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, qudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
     }
   }

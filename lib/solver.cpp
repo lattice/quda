@@ -3,6 +3,7 @@
 #include <multigrid.h>
 #include <eigensolve_quda.h>
 #include <cmath>
+#include <limits>
 
 namespace quda {
 

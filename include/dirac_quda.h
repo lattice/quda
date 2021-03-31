@@ -240,7 +240,7 @@ namespace quda {
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */
-    virtual void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+    virtual void Dslash4(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
     {
       errorQuda("Not implemented!\n");
     }
@@ -932,6 +932,8 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
+
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {

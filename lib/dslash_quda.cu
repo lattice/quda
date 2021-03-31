@@ -196,63 +196,6 @@ namespace quda {
 #endif
   }
 
-  /**
-     @brief Parameter structure for driving the Gamma operator
-   */
-  template <typename Float, int nColor>
-  struct GammaArg {
-    typedef typename colorspinor_mapper<Float,4,nColor>::type F;
-    typedef typename mapper<Float>::type RegType;
-
-    F out;                // output vector field
-    const F in;           // input vector field
-    const int d;          // which gamma matrix are we applying
-    const int nParity;    // number of parities we're working on
-    bool doublet;         // whether we applying the operator to a doublet
-    const int volumeCB;   // checkerboarded volume
-    RegType a;            // scale factor
-    RegType b;            // chiral twist
-    RegType c;            // flavor twist
-
-    GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
-	     RegType kappa=0.0, RegType mu=0.0, RegType epsilon=0.0,
-	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), d(d), nParity(in.SiteSubset()),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
-    {
-      checkPrecision(out, in);
-      checkLocation(out, in);
-      if (d < 0 || d > 4) errorQuda("Undefined gamma matrix %d", d);
-      if (in.Nspin() != 4) errorQuda("Cannot apply gamma5 to nSpin=%d field", in.Nspin());
-      if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
-
-      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-	if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          a = 1.0 / (1.0 + b * b);
-        }
-	c = 0.0;
-        if (dagger) b *= -1.0;
-      } else if (doublet) {
-        if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-          b = 2.0 * kappa * mu;
-          c = -2.0 * kappa * epsilon;
-          a = 1.0;
-        } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-          b = -2.0 * kappa * mu;
-          c = 2.0 * kappa * epsilon;
-          a = 1.0 / (1.0 + b * b - c * c);
-          if (a <= 0) errorQuda("Invalid twisted mass parameters (kappa=%e, mu=%e, epsilon=%e)\n", kappa, mu, epsilon);
-        }
-        if (dagger) b *= -1.0;
-      }
-    }
-  }
-
   template <typename Float, int nColor> class GammaApply : public TunableKernel2D {
     ColorSpinorField &out;
     const ColorSpinorField &in;

@@ -293,7 +293,12 @@ namespace quda
 
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
-              int spin_project, const int *comm_override, const int shmem_ = 0) :
+              int spin_project, const int *comm_override,
+#ifdef NVSHMEM_COMMS
+              int shmem_ = 0) :
+#else
+              int = 0) :
+#endif
       parity(parity),
       nParity(in.SiteSubset()),
       nFace(nFace),

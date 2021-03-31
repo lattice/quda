@@ -462,10 +462,10 @@ namespace quda
   */
   template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
 
+#ifdef NVSHMEM_COMMS
     void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
                     TimeProfile &profile)
     {
-#ifdef NVSHMEM_COMMS
       profile.TPSTART(QUDA_PROFILE_TOTAL);
 
       auto &dslashParam = dslash.dslashParam;
@@ -502,10 +502,13 @@ namespace quda
       dslash::inc_shmem_sync_counter();
       in->bufferIndex = (1 - in->bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
-#else
-      errorQuda("NVSHMEM Dslash policies not built.");
-#endif
     }
+#else
+    void operator()(Dslash &, cudaColorSpinorField *, const int, const int *, TimeProfile &)
+    {
+      errorQuda("NVSHMEM Dslash policies not built.");
+    }
+#endif
   };
 
   template <typename Dslash> using DslashShmemUberPackIntra = DslashShmemGeneric<Dslash, 64 + 16 + 8 + 1>;

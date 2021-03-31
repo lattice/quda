@@ -403,15 +403,21 @@ struct Communicator {
 
   int manual_set_partition[QUDA_MAX_DIM] = {0};
 
+#ifdef MULTI_GPU
   void comm_dim_partitioned_set(int dim)
   {
-#ifdef MULTI_GPU
     manual_set_partition[dim] = 1;
-#endif
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
+#else
+  void comm_dim_partitioned_set(int)
+  {
+    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+             comm_dim_partitioned(2), comm_dim_partitioned(3));
+  }
+#endif
 
   void comm_dim_partitioned_reset()
   {
@@ -463,7 +469,7 @@ struct Communicator {
         int excluded_device;
         while (blacklist_list >> excluded_device) {
           // check this is a valid device
-          if (excluded_device < 0 || excluded_device >= quda:device::get_device_count()) {
+          if (excluded_device < 0 || excluded_device >= quda::device::get_device_count()) {
             errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
           }
 

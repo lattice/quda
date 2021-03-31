@@ -761,12 +761,12 @@ namespace quda {
 
   void cudaGaugeField::copy_to_buffer(void *buffer) const
   {
-    qudaMemcpy(buffer, Gauge_p(), Bytes(), cudaMemcpyDeviceToHost);
+    qudaMemcpy(buffer, Gauge_p(), Bytes(), qudaMemcpyDeviceToHost);
   }
 
   void cudaGaugeField::copy_from_buffer(void *buffer)
   {
-    qudaMemcpy(Gauge_p(), buffer, Bytes(), cudaMemcpyHostToDevice);
+    qudaMemcpy(Gauge_p(), buffer, Bytes(), qudaMemcpyHostToDevice);
   }
 
 } // namespace quda

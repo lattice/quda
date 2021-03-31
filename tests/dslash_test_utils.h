@@ -863,14 +863,14 @@ struct DslashTestWrapper {
             if (transfer) {
               dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
             if (transfer) {
               dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+              static_cast<quda::DiracDomainWall4DPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::MatPC:
@@ -905,21 +905,21 @@ struct DslashTestWrapper {
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::Dslash4pre:
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::MatPC:
@@ -968,7 +968,7 @@ struct DslashTestWrapper {
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
             } else {
-              static_cast<quda::DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
@@ -1059,7 +1059,7 @@ struct DslashTestWrapper {
     return dslash_time;
   }
 
-  void run_test(int niter, bool print_metrics = false)
+  void run_test(int niter, bool = false)
   {
     {
       printfQuda("Tuning...\n");

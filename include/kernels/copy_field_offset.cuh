@@ -1,8 +1,8 @@
 #include <lattice_field.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-
 #include <comm_key.h>
+#include <tune_quda.h>
 
 namespace quda
 {
@@ -43,7 +43,7 @@ namespace quda
 
     CopyFieldOffsetArg(Accessor &out_accessor, Field &out_field, const Accessor &in_accessor, const Field &in_field,
                        CommKey offset) :
-      out(out_accessor), in(in_accessor), nParity(in_field.SiteSubset()), offset(offset)
+      out(out_accessor), in(in_accessor), offset(offset), nParity(in_field.SiteSubset())
     {
       const int *X_in = in_field.X();
       const int *X_out = out_field.X();
@@ -187,7 +187,6 @@ namespace quda
 
   template <class Arg> class CopyFieldOffset : public TunableVectorYZ
   {
-
     using Field = typename Arg::Field;
 
   protected:
@@ -216,7 +215,7 @@ namespace quda
                      (int)arg.dim_out[1], (int)arg.dim_out[2], (int)arg.dim_out[3], arg.Ls, arg.nParity,
                      arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0], arg.offset[1],
                      arg.offset[2], arg.offset[3], location == QUDA_CPU_FIELD_LOCATION ? "CPU" : "GPU");
-      apply(0);
+      apply(device::get_default_stream());
     }
 
     virtual ~CopyFieldOffset() { }
