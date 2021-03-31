@@ -387,7 +387,7 @@ namespace quda {
         }
 
         // we are at the leaf of the binary tree (e.g., we ran the kernel): perform the row-to-column-major transpose here.
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= max_n_reduce()) {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++)
