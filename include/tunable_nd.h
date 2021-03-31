@@ -72,11 +72,15 @@ namespace quda {
       const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
       const int ld = tp.block.x*tp.block.y*tp.grid.z;
       const int tx = arg.threads.x;
-      Functor<Arg> f(const_cast<Arg &>(arg));
+      printf("launch parameter: gd %d ld %d tx %d\n", gd, ld, tx);
+      Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+      omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+      Functor<Arg> f(*dparg);
 #pragma omp target teams distribute parallel for simd num_teams(gd) thread_limit(ld) num_threads(ld)
       for (int i = 0; i < tx; i++) {
         f(i);
       }
+      omp_target_free(dparg, omp_get_default_device());
 #else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg, param);
 #endif
@@ -193,13 +197,17 @@ namespace quda {
       const int ld = tp.block.x*tp.block.y*tp.grid.z;
       const int tx = arg.threads.x;
       const int ty = arg.threads.y;
-      Functor<Arg> f(const_cast<Arg &>(arg));
-#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld)
+      printf("launch parameter: gd %d ld %d tx %d ty %d\n", gd, ld, tx, ty);
+      Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+      omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+      Functor<Arg> f(*dparg);
+#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld) map(to:f)
       for (int i = 0; i < tx; i++) {
         for (int j = 0; j < ty; j++) {
           f(i, j);
         }
       }
+      omp_target_free(dparg, omp_get_default_device());
 #else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg, param);
 #endif
@@ -381,7 +389,10 @@ clang-12: error: llvm-spirv command failed with exit code 7 (use -v to see invoc
       const int tx = arg.threads.x;
       const int ty = arg.threads.y;
       const int tz = arg.threads.z;
-      Functor<Arg> f(const_cast<Arg &>(arg));
+      printf("launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
+      Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+      omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+      Functor<Arg> f(*dparg);
 #pragma omp target teams distribute parallel for simd collapse(3) num_teams(gd) thread_limit(ld) num_threads(ld)
       for (int i = 0; i < tx; i++) {
         for (int j = 0; j < ty; j++) {
@@ -390,6 +401,7 @@ clang-12: error: llvm-spirv command failed with exit code 7 (use -v to see invoc
           }
         }
       }
+      omp_target_free(dparg, omp_get_default_device());
 #else
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg, param);
 #endif

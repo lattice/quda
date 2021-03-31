@@ -81,17 +81,42 @@ namespace quda {
       const int ld = tp.block.x*tp.block.y*tp.grid.z;
       const int tx = arg.threads.x;
       const int ty = arg.threads.y;
+      printf("launch parameter: gd %d ld %d tx %d ty %d\n", gd, ld, tx, ty);
       using reduce_t = typename Transformer<Arg>::reduce_t;
-      Transformer<Arg> t(arg);
       reduce_t value = arg.init();
+
 #pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(Transformer<Arg>::init_omp())
 
+      Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
+      // printf("dparg %p\n", dparg);
+      omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
+      Transformer<Arg> t(*dparg);
+#if 0
+// gives wrong results?!
 #pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
       for (int j = 0; j < ty; j++) {
         for (int i = 0; i < tx; i++) {
           value = t(value, i, j);
         }
       }
+#endif
+#if 0
+// also wrong results
+      for (int j = 0; j < ty; j++) {
+#pragma omp target teams distribute parallel for reduction(OMPReduce_:value)
+        for (int i = 0; i < tx; i++) {
+          value = t(value, i, j);
+        }
+      }
+#endif
+// NOT really a parallel reduction
+#pragma omp target teams distribute parallel for simd num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
+      for (int j = 0; j < ty; j++) {
+        for (int i = 0; i < tx; i++) {
+          value = t(value, i, j);
+        }
+      }
+      omp_target_free(dparg, omp_get_default_device());
       int input_size = vec_length<reduce_t>::value;
       int output_size = result.size() * vec_length<T>::value;
       if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
