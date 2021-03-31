@@ -147,7 +147,10 @@ namespace quda {
     return c;
   }
 
-  template <int n> struct scalar<vector_type<double,n>> {
-    typedef double type;
+  template <typename s, int n> struct scalar<vector_type<s,n>> {
+    typedef s type;
+  };
+  template <typename s, int n> struct vec_length<vector_type<s,n>> {
+    static const int value = n;
   };
 }
