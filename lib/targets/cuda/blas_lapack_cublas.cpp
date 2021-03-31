@@ -31,7 +31,8 @@ namespace quda
         if (!cublas_init) {
 #ifdef NATIVE_LAPACK_LIB
           cublasStatus_t error = cublasCreate(&handle);
-          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
+          if (error != CUBLAS_STATUS_SUCCESS)
+            errorQuda("cublasCreate failed with error %d", error);
           else
             printfQuda("cublasCreated successfully\n");
           cublas_init = true;

@@ -64,12 +64,21 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 
   // open the remote memory handles and set the send ghost pointers
   for (int dim=0; dim<4; ++dim) {
+#ifndef NVSHMEM_COMMS
+    // TODO: We maybe can force loopback comms to use the IB path here
     if (comm_dim(dim)==1) continue;
+#endif
     // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-    for (int dir=0; dir<num_dir; ++dir) {
+    for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
-      if (comm_peer2peer_enabled(dir,dim)) CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+#ifndef NVSHMEM_COMMS
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+#else
+      ghost_remote_send_buffer_d[b][dim][dir]
+        = nvshmem_ptr(static_cast<char *>(ghost_recv_buffer_d[b]), comm_neighbor_rank(dir, dim));
+#endif
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
@@ -80,15 +89,21 @@ void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
   for (int dim=0; dim<4; ++dim) {
 
     if (comm_dim(dim)==1) continue;
+#ifndef NVSHMEM_COMMS
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+#endif
 
     if (comm_peer2peer_enabled(1,dim)) {
       // only close this handle if it doesn't alias the back ghost
+#ifndef NVSHMEM_COMMS
       if (num_dir == 2 && remote[dim][1]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][1]));
+#endif
     }
 
     if (comm_peer2peer_enabled(0,dim)) {
+#ifndef NVSHMEM_COMMS
       if (remote[dim][0]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][0]));
+#endif
     }
   } // iterate over dim
 }

@@ -19,7 +19,7 @@ namespace quda
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
     inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20;                            // no reliable updates within the inner solver
+    inner.delta = 1e-20; // no reliable updates within the inner solver
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
@@ -61,7 +61,9 @@ namespace quda
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    K(0),
+    Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
     // Preconditioners do not need a deflation space,

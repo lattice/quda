@@ -56,7 +56,7 @@ namespace quda {
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
   template<typename Float, typename T> struct clover_wrapper;
-  template<typename T, int N> class HMatrix;
+  template <typename T, int N> class HMatrix;
 
   template<class T, int N>
     class Matrix
@@ -570,8 +570,7 @@ namespace quda {
 	}
       }
       return result;
-    }
-
+  }
 
   template<class T>
     __device__ __host__ inline

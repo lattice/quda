@@ -83,7 +83,6 @@ int main(int argc, char **argv)
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
-  setSpinorSiteSize(24);
 
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)

@@ -5,6 +5,7 @@
 #include <math_helper.cuh>
 #include <domain_wall_helper.h>
 #include <kernel.h>
+#include <dslash_quda.h>
 
 namespace quda
 {
