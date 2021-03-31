@@ -309,28 +309,22 @@ namespace quda {
 
     TwistCloverInv(symmetric ? *src : *tmp1, odd_bit ? b.Even() : b.Odd(), odd_bit ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY);
 
-    // we desire solution to full system
-    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
+    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
+      DiracWilson::DslashXpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
+      DiracWilson::DslashXpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
+    } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      // src = b_e + k D_eo A_oo^-1 b_o
+      DiracWilson::DslashXpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      // src = b_o + k D_oe A_ee^-1 b_e
+      DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
+    } else {
+      errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
+    }
 
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        // src = A_ee^-1 (b_e + k D_eo A_oo^-1 b_o)
-        DiracWilson::DslashXpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-        // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)
-        DiracWilson::DslashXpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // src = b_e + k D_eo A_oo^-1 b_o
-        DiracWilson::DslashXpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // src = b_o + k D_oe A_ee^-1 b_e
-        DiracWilson::DslashXpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
-      }
-
-    } else { // doublet:
-      errorQuda("Non-degenerate operator is not implemented");
-    } // end of doublet
 
     if (symmetric) TwistCloverInv(*src, *tmp1, odd_bit ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY);
 
@@ -349,20 +343,15 @@ namespace quda {
     bool reset = newTmp(&tmp1, b.Even());
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
 
-    // create full solution
-    if (b.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-        // x_o = A_oo^-1 (b_o + k D_oe x_e)
-        DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        // x_e = A_ee^-1 (b_e + k D_eo x_o)
-        DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
-      } else {
-        errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
-      }
-    } else { // twist doublet:
-      errorQuda("Non-degenerate operator is not implemented");
-    } // end of twist doublet...
+    if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      // x_o = A_oo^-1 (b_o + k D_oe x_e)
+      DiracWilson::DslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
+    } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      // x_e = A_ee^-1 (b_e + k D_eo x_o)
+      DiracWilson::DslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
+    } else {
+      errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
+    }
 
     TwistCloverInv(odd_bit ? x.Even() : x.Odd(), *tmp1, odd_bit ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY);
     deleteTmp(&tmp1, reset);
