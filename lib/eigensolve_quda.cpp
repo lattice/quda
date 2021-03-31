@@ -270,6 +270,8 @@ namespace quda
       // If the fine space was just computed, we may continue the solve
       compressVectors(kSpace, compressed_space, 0, 0, num_locked + iter_keep + 1);
     }
+    delete tmp_coarse;
+
     
     // Only save if outfile is defined. Make a function for this
     if (strcmp(eig_param->vec_outfile, "") != 0) {
