@@ -166,7 +166,7 @@ namespace quda
       }
 */
 
-      if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
+      if (!deviceProp.unifiedAddressing) warningQuda("Device %d does not support unified addressing", dev);
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("Using device %d: %s\n", dev, deviceProp.name);
