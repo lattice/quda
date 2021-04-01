@@ -12,7 +12,6 @@ namespace quda
     {
       constexpr int length = 72;
       using Field = CloverField;
-      using real = typename mapper<Float>::type;
       using Element = typename mapper<Float>::type;
 
       if (in.isNative()) {
