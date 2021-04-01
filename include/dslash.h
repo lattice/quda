@@ -188,7 +188,6 @@ namespace quda
             /* if doing a fused interior+exterior kernel we use aux.y to control the number of blocks we add for the
              * exterior. We make sure to use multiple blocks per communication direction.
              */
-            auto maxgridsize = TunableVectorYZ::maxGridSize();
             if (param.aux.y < 4) {
               param.aux.y++;
               return true;

@@ -636,7 +636,7 @@ namespace quda
     // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < (unsigned)arg.pack_blocks) {
       // first few blocks do packing kernel
       P<dagger, dslash.pc_type(), Arg> packer;
       packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
