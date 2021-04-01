@@ -98,9 +98,9 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  host_free(topo->ranks);
-  host_free(topo->coords);
-  host_free(topo);
+  delete topo->ranks;
+  delete topo->coords;
+  delete topo;
 }
 
 inline int comm_ndim(const Topology *topo) { return topo->ndim; }
