@@ -9,13 +9,6 @@ bool gauge_loaded = false;
 const char *prec_str[] = {"quarter", "half", "single", "double"};
 const char *recon_str[] = {"r18", "r13", "r9"};
 
-void init(int precision, QudaReconstructType link_recon, int partition)
-{
-  dslash_test_wrapper.init_ctest(precision, link_recon, partition);
-}
-
-void end() { dslash_test_wrapper.end(); }
-
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
@@ -81,15 +74,14 @@ public:
     }
     updateR();
 
-    init(prec, recon, value);
-
+    dslash_test_wrapper.init_ctest(prec, link_recon);
     display_test_info(prec, recon);
   }
 
   virtual void TearDown()
   {
     if (skip()) GTEST_SKIP();
-    end();
+    dslash_test_wrapper.end();
   }
 
   static void SetUpTestCase() { initQuda(device_ordinal); }

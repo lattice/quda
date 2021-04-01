@@ -93,8 +93,8 @@ namespace quda
       threads(threads)
 #ifdef NVSHMEM_COMMS
       ,
-      shmem(shmem_),
       counter(dslash::get_shmem_sync_counter()),
+      shmem(shmem_),
       sync_arr(dslash::get_shmem_sync_arr()),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter())

@@ -172,7 +172,7 @@ protected:
 public:
   Pack(void *ghost[], const ColorSpinorField &in, MemoryLocation location, int nFace, bool dagger, int parity, double a,
        double b, double c,
-#ifdef NVSHMEM
+#ifdef NVSHMEM_COMMS
        int shmem) :
 #else
        int) :

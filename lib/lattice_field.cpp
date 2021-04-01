@@ -5,8 +5,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
-#include <shmem_helper.cuh>
-
 namespace quda {
 
   bool LatticeField::initIPCComms = false;

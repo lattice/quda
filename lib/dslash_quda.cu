@@ -134,21 +134,22 @@ namespace quda {
 
     /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
     by using smaller values */
-    qudaLaunchKernel(init_sync_arr<shmem_sync_t>, tp, 0, sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    auto stream = device::get_default_stream();
+    qudaLaunchKernel(init_sync_arr<shmem_sync_t>, tp, stream, sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
     sync_counter = 10;
 
     // atomic for controlling signaling in nvshmem packing
     _retcount_intra
       = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, 0, _retcount_intra, 2 * QUDA_MAX_DIM);
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, stream, _retcount_intra, 2 * QUDA_MAX_DIM);
     _retcount_inter
       = static_cast<shmem_retcount_inter_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, 0, _retcount_inter, 2 * QUDA_MAX_DIM);
+    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, stream, _retcount_inter, 2 * QUDA_MAX_DIM);
     // workspace for interior done sync in uber kernel
     _interior_done = static_cast<shmem_interior_done_t *>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_interior_done_t>, tp, 0, _interior_done, 1);
+    qudaLaunchKernel(init_dslash_atomic<shmem_interior_done_t>, tp, stream, _interior_done, 1);
     _interior_count = static_cast<shmem_interior_count_t *>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_interior_count_t>, tp, 0, _interior_count, 1);
+    qudaLaunchKernel(init_dslash_atomic<shmem_interior_count_t>, tp, stream, _interior_count, 1);
 #endif
 
     aux_worker = NULL;

@@ -176,7 +176,7 @@ struct StaggeredDslashTestWrapper {
     has_been_called = true;
   }
 
-  void init_ctest(int precision, QudaReconstructType link_recon_, int partition)
+  void init_ctest(int precision, QudaReconstructType link_recon_)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -464,6 +464,8 @@ struct StaggeredDslashTestWrapper {
 
   DslashTime dslashCUDA(int niter)
   {
+    DslashTime dslash_time;
+
     host_timer_t host_timer;
     device_timer_t device_timer;
 

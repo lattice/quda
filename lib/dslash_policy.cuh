@@ -478,7 +478,7 @@ namespace quda
       dslashParam.setExteriorDims(shmem & 64);
 
       // record start of the dslash
-      const int packIndex = Nstream - 1;
+      const int packIndex = device::get_default_stream_idx();
       constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
 
       if (!((shmem & 2) and (shmem & 1))) {
@@ -487,15 +487,15 @@ namespace quda
 
       dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
 
-      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+      PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
       dslash.setPack(false, location); // disable fused kernel packing
-      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
+      if (aux_worker) aux_worker->apply(device::get_default_stream());
 
       if (pattern.commDimTotal) {
         setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
         if (!(shmem & 64)) {
-          PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+          PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
         }
       }
 

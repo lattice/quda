@@ -2,6 +2,7 @@
 #include <quda_api.h>
 #include <quda_cuda_api.h>
 #include <algorithm>
+#include <shmem_helper.cuh>
 
 #define CHECK_CUDA_ERROR(func)                                          \
   quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -76,38 +77,35 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
       if (!comm_peer2peer_enabled(dir, dim)) continue;
       CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
 #else
-      ghost_remote_send_buffer_d[b][dim][dir]
-        = nvshmem_ptr(static_cast<char *>(ghost_recv_buffer_d[b]), comm_neighbor_rank(dir, dim));
+      remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
 #endif
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
 }
 
+#ifndef NVSHMEM_COMMS
 void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
 {
   for (int dim=0; dim<4; ++dim) {
 
     if (comm_dim(dim)==1) continue;
-#ifndef NVSHMEM_COMMS
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-#endif
 
     if (comm_peer2peer_enabled(1,dim)) {
       // only close this handle if it doesn't alias the back ghost
-#ifndef NVSHMEM_COMMS
       if (num_dir == 2 && remote[dim][1]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][1]));
-#endif
     }
 
     if (comm_peer2peer_enabled(0,dim)) {
-#ifndef NVSHMEM_COMMS
       if (remote[dim][0]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][0]));
-#endif
     }
   } // iterate over dim
 }
-  
+#else
+void comm_destroy_neighbor_memory(void *[QUDA_MAX_DIM][2]) { }
+#endif
+
 void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
 {
   // handles for obtained events
