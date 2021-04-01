@@ -97,7 +97,7 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 {
   if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
 
-  Topology *topo = (Topology *)safe_malloc(sizeof(Topology));
+  Topology *topo = new Topology;
 
   topo->ndim = ndim;
 
@@ -107,8 +107,8 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
     nodes *= dims[i];
   }
 
-  topo->ranks = (int *)safe_malloc(nodes * sizeof(int));
-  topo->coords = (int(*)[QUDA_MAX_DIM])safe_malloc(nodes * sizeof(int[QUDA_MAX_DIM]));
+  topo->ranks = new int[nodes];
+  topo->coords = (int(*)[QUDA_MAX_DIM])new int[QUDA_MAX_DIM * nodes];
 
   int x[QUDA_MAX_DIM];
   for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;
