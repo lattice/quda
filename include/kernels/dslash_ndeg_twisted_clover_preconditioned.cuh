@@ -51,7 +51,6 @@ namespace quda
      @brief Apply the preconditioned twisted-clover dslash
        out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
        out(x) = M*in = in + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == true )
-     Note this routine only exists in xpay form.
   */
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
     {
