@@ -241,7 +241,6 @@ void gauge_force_test(void)
 {
   int max_length = 6;
 
-  initQuda(device_ordinal);
   setVerbosityQuda(QUDA_VERBOSE,"",stdout);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -368,8 +367,6 @@ void gauge_force_test(void)
   delete Mom_qdp;
   delete Mom_milc;
   delete Mom_ref_milc;
-
-  endQuda();
 }
 
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree"; }
@@ -408,6 +405,8 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
+  initQuda(device_ordinal);
+
   display_test_info();
 
   gauge_force_test();
@@ -421,6 +420,7 @@ int main(int argc, char **argv)
     if (test_rc != 0) warningQuda("Tests failed");
   }
 
+  endQuda();
   finalizeComms();
   return test_rc;
 }
