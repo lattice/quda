@@ -100,8 +100,9 @@ class QUDAApp : public CLI::App
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -255,6 +256,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -438,6 +440,7 @@ extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
 extern bool eig_compute_svd;
+extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
@@ -522,6 +525,7 @@ extern char correlator_file_affix[256];
 extern std::array<int,4> momentum;
 extern bool open_flavor;
 
+extern std::array<int, 4> grid_partition;
 extern QudaBLASOperation blas_trans_a;
 extern QudaBLASOperation blas_trans_b;
 extern QudaBLASDataType blas_data_type;

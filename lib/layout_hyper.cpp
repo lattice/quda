@@ -216,4 +216,3 @@ int quda_num_sites(int)
   return static_cast<int>(sites_on_node);
 }
 #endif // QIO_HAS_EXTENDED_LAYOUT
-

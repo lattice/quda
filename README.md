@@ -259,7 +259,7 @@ http://lattice.github.com/quda .
 *  Mario Schröck (INFN)
 *  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
-*  Jiqun Tu (Columbia)
+*  Jiqun Tu (NVIDIA)
 *  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
 *  Andre Walker-Loud (Lawrence Berkley Laboratory)
