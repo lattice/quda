@@ -50,6 +50,7 @@ namespace quda
       last_error = error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
       last_error_str = cudaGetErrorString(error);
       if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, cudaGetErrorString(error), file, line, func);
+      else cudaGetLastError(); // clear the error state
     }
 
     void set_driver_error(CUresult error, const char *api_func, const char *func, const char *file, const char *line,
@@ -61,6 +62,7 @@ namespace quda
       cuGetErrorName(error, &str);
       last_error_str = str;
       if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, str, file, line, func);
+      else cudaGetLastError(); // clear the error state
     }
 
   }
