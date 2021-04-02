@@ -612,68 +612,16 @@ namespace quda
   }
 #endif
 
-  /**
-     @brief This is a helper routine for spawning a GPU kernel for
-     applying a Dslash kernel.  The dslash to be applied is passed as
-     template template class (template parameter D), which is a
-     functor that can apply the dslash.  The packing routine (P) to be
-     used is similarly passed.
-
-     When running an interior kernel, the first few "pack_blocks" CTAs
-     are reserved for data packing, which may include communication to
-     neighboring processes.
+ /**
+    @brief This is the wrapper arg struct for driving the dslash_functor.  The dslash to
+    be applied is passed as a template template class (template
+    parameter D), which is a functor that can apply the dslash.  The
+    packing routine (P) to be used is similarly passed.
    */
-  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
-            template <bool dagger, QudaPCType pc, typename Arg> class P, int nParity, bool dagger, bool xpay,
-            KernelType kernel_type, typename Arg>
-  __global__ void dslashGPU(Arg arg)
-  {
-    D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
-
-    int s = blockDim.y * blockIdx.y + threadIdx.y;
-    if (s >= arg.dc.Ls) return;
-
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < (unsigned)arg.pack_blocks) {
-      // first few blocks do packing kernel
-      P<dagger, dslash.pc_type(), Arg> packer;
-      packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
-
-      // we use that when running the exterior -- this is either
-      // * an explicit call to the exterior when not merged with the interior or
-      // * the interior with exterior_blocks > 0
-#ifdef NVSHMEM_COMMS
-    } else if (arg.shmem > 0
-               && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
-                   || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
-                       && target::block_idx().x >= (gridDim.x - arg.exterior_blocks)))) {
-      shmem_exterior<nParity>(dslash, arg, s);
-#endif
-    } else {
-      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
-      int x_cb = (target::block_idx().x - dslash_block_offset) * blockDim.x + threadIdx.x;
-      if (x_cb >= arg.threads) return;
-
-#ifdef QUDA_FAST_COMPILE_DSLASH
-      dslash(x_cb, s, parity);
-#else
-      switch (parity) {
-      case 0: dslash(x_cb, s, 0); break;
-      case 1: dslash(x_cb, s, 1); break;
-      }
-#endif
-#ifdef NVSHMEM_COMMS
-      shmem_signalinterior<kernel_type>(arg);
-#endif
-    }
-  }
-
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
             template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
-  struct DslashWrapperArg {
+  struct dslash_functor_arg {
     using Arg = Arg_;
     using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
@@ -684,11 +632,18 @@ namespace quda
     Arg arg;
     dim3 threads;
 
-    DslashWrapperArg(Arg &arg, unsigned int threads_x) :
+    dslash_functor_arg(Arg &arg, unsigned int threads_x) :
       arg(arg),
       threads(threads_x, arg.dc.Ls, arg.nParity) { }
   };
 
+ /**
+    @brief This is the functor for the dslash stencils.
+
+    When running an interior kernel, the first few "pack_blocks" CTAs
+    are reserved for data packing, which may include communication to
+    neighboring processes.
+   */
   template <typename Arg> struct dslash_functor {
     typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
