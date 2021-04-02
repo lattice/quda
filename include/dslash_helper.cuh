@@ -432,8 +432,8 @@ namespace quda
     out << std::endl;
     out << "active_dims = " << arg.active_dims << std::endl;
     out << "pack_blocks = " << arg.pack_blocks << std::endl;
-    out << "exterior_threads = " << arg.exterior_threads;
-    out << "exterior_blocks = " << arg.exterior_blocks;
+    out << "exterior_threads = " << arg.exterior_threads << std::endl;
+    out << "exterior_blocks = " << arg.exterior_blocks << std::endl;
     return out;
   }
 
@@ -478,7 +478,7 @@ namespace quda
   {
     if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
       __syncthreads();
-      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
         int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
         if (amlast == (gridDim.x - arg.pack_blocks - arg.exterior_blocks) * gridDim.y * gridDim.z - 1) {
           arg.interior_done.store(arg.counter, cuda::std::memory_order_release);
@@ -489,14 +489,14 @@ namespace quda
     }
   }
 
-  template <class D, typename Arg, int nParity>
+  template <int nParity, class D, typename Arg>
   void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
     // figure out some details on blocks
     const bool shmem_interiordone = (arg.shmem & 64);
-    const int myblockidx = arg.exterior_blocks > 0 ? blockIdx.x - (gridDim.x - arg.exterior_blocks) : blockIdx.x;
+    const int myblockidx = arg.exterior_blocks > 0 ? target::block_idx().x - (gridDim.x - arg.exterior_blocks) : target::block_idx().x;
     const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
     const int blocks_per_dim = (arg.exterior_blocks > 0 ? arg.exterior_blocks : gridDim.x) / (nComm);
     const int blocks_per_dir = blocks_per_dim / 2;
@@ -539,7 +539,7 @@ namespace quda
 
     if (shmembarrier) {
 
-      if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (shmem_interiordone && target::thread_idx().x == target::block_dim().x - 1 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
         auto tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
         while (tst_val < arg.counter - 1) {
           arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
@@ -548,41 +548,41 @@ namespace quda
         arg.interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
       }
 
-      if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (target::thread_idx().x < 8 && target::thread_idx().y == 0 && target::thread_idx().z == 0) {
         /* the first 8 threads of each block are used for spinning on halo data coming
            in from the 4*2 (dim*dir) neighbors. We figure out next on which neighbors the
            block actually needs to wait
         */
 
         // for now we can only spin per dimdir for 4d indexing as it ensure unique block->dimdir assignment
-        bool spin = (dslash.pc_type() == QUDA_5D_PC) || (threadIdx.x == dimdir);
+        bool spin = (dslash.pc_type() == QUDA_5D_PC) || (target::thread_idx().x == dimdir);
         // figure out which other directions also to spin for (to make corners work)
         switch (dim) {
         case 3:
           if (arg.commDim[3]) {
-            spin = threadIdx.x / 2 < 3 ? arg.commDim[2] : spin;
-            spin = threadIdx.x / 2 < 2 ? arg.commDim[1] : spin;
-            spin = threadIdx.x / 2 < 1 ? arg.commDim[0] : spin;
+            spin = target::thread_idx().x / 2 < 3 ? arg.commDim[2] : spin;
+            spin = target::thread_idx().x / 2 < 2 ? arg.commDim[1] : spin;
+            spin = target::thread_idx().x / 2 < 1 ? arg.commDim[0] : spin;
           } else {
             spin = false;
           }
           break;
         case 2:
           if (arg.commDim[2]) {
-            if (arg.commDim[1]) spin = threadIdx.x / 2 < 2 ? true : spin;
-            if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            if (arg.commDim[1]) spin = target::thread_idx().x / 2 < 2 ? true : spin;
+            if (arg.commDim[0]) spin = target::thread_idx().x / 2 < 1 ? true : spin;
           }
           break;
         case 1:
           if (arg.commDim[1]) {
-            if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            if (arg.commDim[0]) spin = target::thread_idx().x / 2 < 1 ? true : spin;
           }
           break;
         case 0: break;
         }
 
-        if (getNeighborRank(threadIdx.x, arg) >= 0) {
-          if (spin) { nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter); }
+        if (getNeighborRank(target::thread_idx().x, arg) >= 0) {
+          if (spin) { nvshmem_signal_wait_until((arg.sync_arr + target::thread_idx().x), NVSHMEM_CMP_GE, arg.counter); }
         }
       }
 
@@ -592,12 +592,12 @@ namespace quda
     }
     arg.kernel_type = EXTERIOR_KERNEL_ALL;
     arg.threads = arg.exterior_threads;
-    int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
+    int local_tid = target::thread_idx().x + target::block_dim().x * (myblockidx % (blocks_per_dir)); // index within the block
     int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
     while (local_tid < threads_my_dir) {
       // for full fields set parity from z thread index else use arg setting
-      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+      int parity = nParity == 2 ? target::block_dim().z * target::block_idx().z + target::thread_idx().z : arg.parity;
 #ifdef QUDA_DSLASH_FAST_COMPILE
       dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
 #else
@@ -606,8 +606,8 @@ namespace quda
       case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
       }
 #endif
-      local_tid += blockDim.x * blocks_per_dir;
-      tid += blockDim.x * blocks_per_dir;
+      local_tid += target::block_dim().x * blocks_per_dir;
+      tid += target::block_dim().x * blocks_per_dir;
     }
   }
 #endif
@@ -648,12 +648,12 @@ namespace quda
     } else if (arg.shmem > 0
                && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                    || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
-                       && blockIdx.x >= (gridDim.x - arg.exterior_blocks)))) {
-      shmem_exterior<D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
+                       && target::block_idx().x >= (gridDim.x - arg.exterior_blocks)))) {
+      shmem_exterior<nParity>(dslash, arg, s);
 #endif
     } else {
       const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
-      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
+      int x_cb = (target::block_idx().x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
 #ifdef QUDA_FAST_COMPILE_DSLASH
@@ -665,9 +665,78 @@ namespace quda
       }
 #endif
 #ifdef NVSHMEM_COMMS
-      shmem_signalinterior<kernel_type, Arg>(arg);
+      shmem_signalinterior<kernel_type>(arg);
 #endif
     }
   }
+
+  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
+            template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
+            KernelType kernel_type_, typename Arg_>
+  struct DslashWrapperArg {
+    using Arg = Arg_;
+    using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
+    template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
+    static constexpr int nParity = nParity_;
+    static constexpr bool dagger = dagger_;
+    static constexpr bool xpay = xpay_;
+    static constexpr KernelType kernel_type = kernel_type_;
+    Arg arg;
+    dim3 threads;
+
+    DslashWrapperArg(Arg &arg, unsigned int threads_x) :
+      arg(arg),
+      threads(threads_x, arg.dc.Ls, arg.nParity) { }
+  };
+
+  template <typename Arg> struct dslash_functor {
+    typename Arg::Arg &arg;
+    static constexpr int nParity = Arg::nParity;
+    static constexpr bool dagger = Arg::dagger;
+    static constexpr KernelType kernel_type = Arg::kernel_type;
+    static constexpr const char *filename() { return Arg::D::filename(); }
+    constexpr dslash_functor(Arg &arg) : arg(arg.arg) { }
+
+    __forceinline__ __device__ void operator()(int, int s, int parity)
+    {
+      typename Arg::D dslash(arg);
+
+      // for full fields set parity from z thread index else use arg setting
+      if (nParity == 1) parity = arg.parity;
+
+      if (kernel_type == INTERIOR_KERNEL && target::block_idx().x < (unsigned)arg.pack_blocks) {
+        // first few blocks do packing kernel
+        typename Arg::P<dslash.pc_type()> packer;
+        packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+
+        // we use that when running the exterior -- this is either
+        // * an explicit call to the exterior when not merged with the interior or
+        // * the interior with exterior_blocks > 0
+#ifdef NVSHMEM_COMMS
+      } else if (arg.shmem > 0
+                 && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
+                     || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
+                         && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
+        shmem_exterior<nParity>(dslash, arg, s);
+#endif
+      } else {
+        const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+        int x_cb = (target::block_idx().x - dslash_block_offset) * target::block_dim().x + target::thread_idx().x;
+        if (x_cb >= arg.threads) return;
+
+#ifdef QUDA_FAST_COMPILE_DSLASH
+        dslash(x_cb, s, parity);
+#else
+        switch (parity) {
+        case 0: dslash(x_cb, s, 0); break;
+        case 1: dslash(x_cb, s, 1); break;
+        }
+#endif
+#ifdef NVSHMEM_COMMS
+        shmem_signalinterior<kernel_type>(arg);
+#endif
+      }
+    }
+  };
 
 } // namespace quda

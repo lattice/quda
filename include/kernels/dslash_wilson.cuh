@@ -53,7 +53,7 @@ namespace quda
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
-      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
+      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel if ghost vector length is different than bulk
     }
 
     // defined the copy constructor to ensure we don't have an excess pop if the arg is copied
@@ -61,6 +61,7 @@ namespace quda
       DslashArg<Float, nDim>(arg),
       out(arg.out),
       in(arg.in),
+      in_pack(arg.in_pack),
       x(arg.x),
       U(arg.U),
       a(arg.a)
