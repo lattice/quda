@@ -6455,10 +6455,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     
     std::vector<double> force_coeff(1,2.0);//*epsilon*kappa*kappa*nnn; ???
     
-    // This is called CloverForce, but it's just computing the force
-    // from the spinor, so it is the Wilson part of the Clover fermion force
-    // DMH FIXME: Rename this to computeWilsonForce and propagator through
-    // the kernels?
+    // The Wilson part of the Clover fermion force
     profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
     computeWilsonForce(*force, *gaugeEvolved, quarkX, quarkP, force_coeff);
     updateMomentum(*device_mom, -1.0, *force, "wilson");
