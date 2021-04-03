@@ -305,7 +305,7 @@ namespace quda
     {
       os << '(' << z.real() << ',' << z.imag() << ')';
       return os;
-    };
+    }
 
   template<typename ValueType, typename charT, class traits>
     std::basic_istream<charT, traits>&
@@ -712,8 +712,8 @@ public:
     imag(im);
   }
 
-  __host__ __device__ complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
-  __host__ __device__ complex<int8_t>& operator=(const complex<int8_t> &z)
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ inline complex<int8_t>& operator=(const complex<int8_t> &z)
     {
       x = z.x;
       y = z.y;

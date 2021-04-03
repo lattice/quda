@@ -120,9 +120,22 @@ namespace quda
     default: errorQuda("Invalid eig solver type");
     }
 
-    if (!mat.hermitian() && !eig_solver->hermitian())
-      errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
+    // Sanity checks
+    //--------------------------------------------------------------------------
+    if (!mat.hermitian() && eig_solver->hermitian())
+      errorQuda("Cannot solve non-Hermitian system with strictly Hermitian eigensolver %d, %d", (int)!mat.hermitian(),
                 (int)eig_solver->hermitian());
+
+    // Support for Chebyshev only in strictly Hermitian solvers
+    if (eig_param->use_poly_acc) {
+      if (!mat.hermitian()) errorQuda("Cannot use polynomial acceleration with non-Hermitian operator");
+      if (!eig_solver->hermitian()) errorQuda("Polynomial acceleration not supported with non-Hermitian solver");
+    }
+
+    if (mat.hermitian() && (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG || eig_param->spectrum == QUDA_SPECTRUM_LI_EIG))
+      errorQuda("The imaginary spectrum of a Hermitian operator cannot be computed");
+    //--------------------------------------------------------------------------
+
     return eig_solver;
   }
 
@@ -206,18 +219,10 @@ namespace quda
   {
     double eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      eps = DBL_EPSILON;
-      break;
-    case QUDA_SINGLE_PRECISION:
-      eps = FLT_EPSILON;
-      break;
-    case QUDA_HALF_PRECISION:
-      eps = 2e-3;
-      break;
-    case QUDA_QUARTER_PRECISION:
-      eps = 5e-2;
-      break;
+    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
+    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
+    case QUDA_HALF_PRECISION: eps = 2e-3; break;
+    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
     default: errorQuda("Invalid precision %d", prec);
     }
     return eps;
@@ -299,7 +304,7 @@ namespace quda
     }
     mat(out, in, *tmp1, *tmp2);
 
-    // Save mattrix * vector tuning
+    // Save matrix * vector tuning
     saveTuneCache();
   }
 
@@ -424,7 +429,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
-        auto cnorm = H[i*size + j];
+        auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
@@ -714,8 +719,10 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evecs.size())
+      errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
@@ -724,6 +731,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *temp[0], *evecs[i]);
+
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
       // Measure ||lambda_i*v_i - A*v_i||

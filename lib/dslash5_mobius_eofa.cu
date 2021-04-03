@@ -1,9 +1,9 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <dslash_quda.h>
 #include <index_helper.cuh>
 #include <instantiate.h>
 #include <tunable_nd.h>
+#include <instantiate_dslash.h>
 #include <kernels/dslash_mobius_eofa.cuh>
 
 namespace quda
