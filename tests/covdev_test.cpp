@@ -6,7 +6,6 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
@@ -56,8 +55,6 @@ void init(int argc, char **argv)
   Ls = 1;
 
   if (Nsrc != 1) warningQuda("The covariant derivative doesn't support 5-d indexing, only source 0 will be tested");
-
-  setSpinorSiteSize(24);
 
   inv_param = newQudaInvertParam();
   setInvertParam(inv_param);

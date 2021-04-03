@@ -13,9 +13,7 @@
 #include <vector>
 #include <fstream>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
-#ifdef BUILD_MILC_INTERFACE
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // code for NVTX taken from Jiri Kraus' blog post:
 // http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
@@ -51,7 +49,9 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 
 
 static bool initialized = false;
-static int gridDim[4];
+#ifdef MULTI_GPU
+static int commsGridDim[4];
+#endif
 static int localDim[4];
 
 static bool invalidate_quda_gauge = true;
@@ -145,15 +145,14 @@ void qudaSetLayout(QudaLayout_t input)
   for(int dir=0; dir<4; ++dir) localDim[dir] = local_dim[dir];
 
 #ifdef MULTI_GPU
-  for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
+  for(int dir=0; dir<4; ++dir)  commsGridDim[dir] = input.machsize[dir];
 #ifdef QMP_COMMS
-  initCommsGridQuda(4, gridDim, nullptr, nullptr);
+  initCommsGridQuda(4, commsGridDim, nullptr, nullptr);
 #else
-  initCommsGridQuda(4, gridDim, rankFromCoords, (void *)(gridDim));
+  initCommsGridQuda(4, commsGridDim, rankFromCoords, (void *)(commsGridDim));
 #endif
   static int device = -1;
 #else
-  for(int dir=0; dir<4; ++dir)  gridDim[dir] = 1;
   static int device = input.device;
 #endif
 
@@ -1174,7 +1173,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
-  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam);
+  invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam, nullptr, nullptr);
 
   free(sln_pointer);
   free(src_pointer);
@@ -2155,7 +2154,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.solve_type = QUDA_DIRECT_SOLVE;
   invertParam.verbosity_precondition = QUDA_VERBOSE;
 
-  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     // req'd
+  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // req'd
   invertParam.cuda_prec_precondition = mg_pack->preconditioner_precision;
   invertParam.gcrNkrylov = 15;
   invertParam.pipeline = 16; // pipeline, get from file
@@ -2724,5 +2723,3 @@ void qudaGaugeFixingFFT( int precision,
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
   printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
 }
-
-#endif // BUILD_MILC_INTERFACE

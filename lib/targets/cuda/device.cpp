@@ -70,30 +70,39 @@ namespace quda
       // d) QUDA built for same major compute capability but lower minor: warn
 
       const int my_major = __COMPUTE_CAPABILITY__ / 100;
-      const int my_minor = (__COMPUTE_CAPABILITY__  - my_major * 100) / 10;
+      const int my_minor = (__COMPUTE_CAPABILITY__ - my_major * 100) / 10;
       // b) QUDA was compiled for a higher compute capability
       if (deviceProp.major * 100 + deviceProp.minor * 10 < __COMPUTE_CAPABILITY__)
-        errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+        errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. ** \n --- "
+                  "Please set the correct QUDA_GPU_ARCH when running cmake.\n",
+                  deviceProp.major, deviceProp.minor, my_major, my_minor);
 
       // c) QUDA was compiled for a lower compute capability
       if (deviceProp.major < my_major) {
         char *allow_jit_env = getenv("QUDA_ALLOW_JIT");
         if (allow_jit_env && strcmp(allow_jit_env, "1") == 0) {
-          if (getVerbosity() > QUDA_SILENT) warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+          if (getVerbosity() > QUDA_SILENT)
+            warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- "
+                        "Jitting the PTX since QUDA_ALLOW_JIT=1 was set. Note that this will take some time.\n",
+                        deviceProp.major, deviceProp.minor, my_major, my_minor);
         } else {
-          errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.", deviceProp.major, deviceProp.minor, my_major, my_minor);
+          errorQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n --- "
+                    "Please set the correct QUDA_GPU_ARCH when running cmake.\n If you want the PTX to be jitted for "
+                    "your current GPU arch please set the enviroment variable QUDA_ALLOW_JIT=1.",
+                    deviceProp.major, deviceProp.minor, my_major, my_minor);
         }
       }
       // d) QUDA built for same major compute capability but lower minor
       if (deviceProp.major == my_major and deviceProp.minor > my_minor) {
-        warningQuda("** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n", deviceProp.major, deviceProp.minor, my_major, my_minor);
+        warningQuda(
+          "** Running on a device with compute capability %i.%i but QUDA was compiled for %i.%i. **\n -- This might "
+          "result in a lower performance. Please consider adjusting QUDA_GPU_ARCH when running cmake.\n",
+          deviceProp.major, deviceProp.minor, my_major, my_minor);
       }
 
       if (!deviceProp.unifiedAddressing) errorQuda("Device %d does not support unified addressing", dev);
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("Using device %d: %s\n", dev, deviceProp.name);
-      }
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Using device %d: %s\n", dev, deviceProp.name);
 #ifndef USE_QDPJIT
       CHECK_CUDA_ERROR(cudaSetDevice(dev));
 #endif
@@ -102,7 +111,7 @@ namespace quda
       char *enable_numa_env = getenv("QUDA_ENABLE_NUMA");
       if (enable_numa_env && strcmp(enable_numa_env, "0") == 0) {
         if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling numa_affinity\n");
-      } else{
+      } else {
         setNumaAffinityNVML(dev);
       }
 #endif
@@ -197,13 +206,13 @@ namespace quda
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) CHECK_CUDA_ERROR(cudaStreamDestroy(streams[i]));
+        for (int i = 0; i < Nstream; i++) CHECK_CUDA_ERROR(cudaStreamDestroy(streams[i]));
         delete []streams;
         streams = nullptr;
       }
 
       char *device_reset_env = getenv("QUDA_DEVICE_RESET");
-      if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
+      if (device_reset_env && strcmp(device_reset_env, "1") == 0) {
         // end this CUDA context
         CHECK_CUDA_ERROR(cudaDeviceReset());
       }
@@ -310,19 +319,14 @@ namespace quda
 #endif
     }
 
-    namespace profile {
+    namespace profile
+    {
 
-      void start()
-      {
-        cudaProfilerStart();
-      }
+      void start() { cudaProfilerStart(); }
 
-      void stop()
-      {
-        cudaProfilerStop();
-      }
+      void stop() { cudaProfilerStop(); }
 
-    }
+    } // namespace profile
 
-  }
-}
+  } // namespace device
+} // namespace quda

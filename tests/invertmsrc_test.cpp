@@ -14,7 +14,7 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
@@ -86,8 +86,6 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-
-  setSpinorSiteSize(24);
 
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------

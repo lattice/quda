@@ -1,11 +1,11 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
-
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
+#include <constant_kernel_arg.h>
 #include <kernel.h>
+#include <warp_collective.h>
 
 #ifndef QUDA_FAST_COMPILE_REDUCE
 #define WARP_SPLIT
@@ -66,22 +66,6 @@ namespace quda
     template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
 
-    template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
-    {
-      constexpr int warp_size = device::warp_size();
-      if (warp_split > 1) {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          // reduce down to the first group of column-split threads
-#pragma unroll
-          for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-            x[i].real(x[i].real() + __shfl_down_sync(device::warp_converged_mask(), x[i].real(), offset));
-            x[i].imag(x[i].imag() + __shfl_down_sync(device::warp_converged_mask(), x[i].imag(), offset));
-          }
-        }
-      }
-    }
-
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
        @param[in,out] arg Argument struct with required meta data
@@ -126,8 +110,8 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) warp_combine<warp_split>(y);
-        if (arg.f.write.W) warp_combine<warp_split>(w);
+        if (arg.f.write.Y) y = warp_combine<warp_split>(y);
+        if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
@@ -137,42 +121,13 @@ namespace quda
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_, false, multi_1d_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-      const int NXZ;
-      const int NYW;
-      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
-
-      __device__ __host__ inline coeff_t a(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-#endif
-      }
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**

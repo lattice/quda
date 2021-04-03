@@ -101,8 +101,9 @@ void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
 #ifndef MULTI_GPU
 
 template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit) {
-  for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
+void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit)
+{
+  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
   for (int dir = 0; dir < 4; dir++) {  
@@ -114,8 +115,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
       sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
-      
-      sFloat projectedSpinor[4*3*2], gaugedSpinor[4*3*2];
+
+      sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
@@ -123,8 +124,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
-      
-      sum(&res[i*(4*3*2)], &res[i*(4*3*2)], gaugedSpinor, 4*3*2);
+
+      sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
   }
 }
@@ -132,9 +133,10 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 #else
 
 template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFloat *spinorField, 
-		     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit) {
-  for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
+void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField, sFloat **fwdSpinor,
+                     sFloat **backSpinor, int oddBit, int daggerBit)
+{
+  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
@@ -152,7 +154,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
       gFloat *gauge = gaugeLink_mg4dir(i, dir, oddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
       sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
 
-      sFloat projectedSpinor[my_spinor_site_size], gaugedSpinor[my_spinor_site_size];
+      sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
@@ -160,8 +162,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
 	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
-      
-      sum(&res[i*(4*3*2)], &res[i*(4*3*2)], gaugedSpinor, 4*3*2);
+
+      sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
 
   }

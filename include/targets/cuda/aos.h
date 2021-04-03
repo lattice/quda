@@ -1,11 +1,7 @@
 #pragma once
 
-// trove requires CUDA and has issues with device debug
-#if !defined(DEVICE_DEBUG)
+#include <target_device.h>
 #include <trove/ptr.h>
-#else
-#define DISABLE_TROVE
-#endif
 
 namespace quda {
 
@@ -17,53 +13,69 @@ namespace quda {
   */
   template <typename T, int n> struct S {
     T v[n];
-    __host__ __device__ const T &operator[](int i) const { return v[i]; }
-    __host__ __device__ T &operator[](int i) { return v[i]; }
+    __host__ __device__ inline const T &operator[](int i) const { return v[i]; }
+    __host__ __device__ inline T &operator[](int i) { return v[i]; }
   };
 
-  template <typename T, int n> __host__ __device__ void block_load(T out[n], const T *in)
+  /**
+     @brief block_store for the host or when DEVICE_DEBUG is enabled
+  */
+  template <bool use_trove> struct block_load_impl {
+    template <typename T> __host__ __device__ inline T operator()(const T *in) { return *(in); }
+  };
+
+#ifndef DEVICE_DEBUG
+  /**
+     @brief Device block_store that uses trove (except when DEVICE_DEBUG is enabled)
+  */
+  template <> struct block_load_impl<true> {
+    template <typename T> __device__ inline T operator()(const T *in) { return *(trove::coalesced_ptr<const T>(in)); }
+  };
+#endif
+
+  template <typename T, int n> __device__ __host__ inline void block_load(T out[n], const T *in)
   {
     using struct_t = S<T, n>;
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    struct_t v = *(trove::coalesced_ptr<const struct_t>(reinterpret_cast<const struct_t*>(in)));
-#else
-    struct_t v = *(reinterpret_cast<const struct_t*>(in));
-#endif
+    struct_t v = target::dispatch<block_load_impl>(reinterpret_cast<const struct_t*>(in));
 
 #pragma unroll
     for (int i = 0; i < n; i++) out[i] = v[i];
   }
 
-  template <typename T, int n> __host__ __device__ void block_store(T *out, const T in[n])
+  template <typename T> __host__ __device__ inline void block_load(T &out, const T *in)
+  {
+    out = target::dispatch<block_load_impl>(in);
+  }
+
+  /**
+     @brief block_store for the host or when DEVICE_DEBUG is enabled
+  */
+  template <bool use_trove> struct block_store_impl {
+    template <typename T> __host__ __device__ inline void operator()(T *out, const T &in) { *out = in; }
+  };
+
+#ifndef DEVICE_DEBUG
+  /**
+     @brief Device block_store that uses trove (except when DEVICE_DEBUG is enabled)
+  */
+  template <> struct block_store_impl<true> {
+    template <typename T> __device__ inline void operator()(T *out, const T &in) { *(trove::coalesced_ptr<T>(out)) = in; }
+  };
+#endif
+
+  template <typename T, int n> __host__ __device__ inline void block_store(T *out, const T in[n])
   {
     using struct_t = S<T, n>;
     struct_t v;
 #pragma unroll
     for (int i = 0; i < n; i++) v[i] = in[i];
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    *(trove::coalesced_ptr<struct_t>(reinterpret_cast<struct_t *>(out))) = v;
-#else
-    *(reinterpret_cast<struct_t*>(out)) = v;
-#endif
+    target::dispatch<block_store_impl>(reinterpret_cast<struct_t*>(out), v);
   }
 
-  template <typename T> __host__ __device__ void block_load(T &out, const T *in)
+  template <typename T> __host__ __device__ inline void block_store(T *out, const T &in)
   {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    out = *(trove::coalesced_ptr<const T>(in));
-#else
-    out = *(in);
-#endif
-  }
-
-  template <typename T> __host__ __device__ void block_store(T *out, const T &in)
-  {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-    *(trove::coalesced_ptr<T>(out)) = in;
-#else
-    *out = in;
-#endif
+    target::dispatch<block_store_impl>(out, in);
   }
 
 }

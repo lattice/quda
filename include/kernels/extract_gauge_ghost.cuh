@@ -16,11 +16,11 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr bool extract = extract_;
     Gauge u;
-    const unsigned char nFace;
-    unsigned short X[nDim];
-    unsigned short A[nDim];
-    unsigned short B[nDim];
-    unsigned short C[nDim];
+    const int nFace;
+    int X[nDim];
+    int A[nDim];
+    int B[nDim];
+    int C[nDim];
     int f[nDim][nDim];
     bool localParity[nDim];
     int faceVolumeCB[nDim];

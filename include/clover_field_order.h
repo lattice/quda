@@ -13,6 +13,7 @@
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
@@ -254,16 +255,18 @@ namespace quda {
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = N + 2*k;
 
-          return 2*complex<Float>(a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
-				  a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+          return static_cast<Float>(2) * complex<Float>
+            (a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x) ],
+             a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x) ]);
 	} else {
 	  // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = N + 2*k;
 
-          return 2*complex<Float>( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+0,stride,x) ],
-				  -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx+1,stride,x) ]);
+          return static_cast<Float>(2) * complex<Float>
+            ( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x) ],
+              -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x) ]);
 	}
 
       }
@@ -464,33 +467,33 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm suared of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
-	 * @return L1 norm
-	 */
-	__host__ double norm2(int =-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field
+         * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
+         * @return L1 norm
+         */
+        __host__ double norm2(int =-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int =-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field
+         * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int =-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
@@ -547,7 +550,7 @@ namespace quda {
           norm_bytes(clover.NormBytes()),
           backup_h(nullptr),
           backup_norm_h(nullptr)
-	{
+        {
           if (clover.Order() != N) {
             errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           }
@@ -630,11 +633,7 @@ namespace quda {
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;
 
-#ifdef __CUDA_ARCH__
-            real scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
-#else
-            real scale_inv = fixedMaxValue<Float>::value / scale;
-#endif
+            real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
             for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
           } else {
