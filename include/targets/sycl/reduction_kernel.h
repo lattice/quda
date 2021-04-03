@@ -48,8 +48,8 @@ namespace quda {
 					  });
 	     });
     //managed_free(a);
-    //q.wait();
-    //arg.debug();
+    q.wait();
+    arg.debug();
     warningQuda("end launchReduction2D");
     return QUDA_SUCCESS;
   }

@@ -1,5 +1,5 @@
 #include <color_spinor_field_order.h>
-#include <cub_helper.cuh>
+//#include <cub_helper.cuh>
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 #include <block_reduction_kernel.h>
@@ -146,7 +146,7 @@ namespace quda {
         }
       }
 
-      reduced = BlockReduce<vector, block_size, Arg::n_vector_y>(thread.y). template Sum<true>(reduced);
+      //reduced = BlockReduce<vector, block_size, Arg::n_vector_y>(thread.y). template Sum<true>(reduced);
 
       if (x_fine_offset == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
