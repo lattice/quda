@@ -20,7 +20,7 @@ namespace quda {
     norm(nullptr),
     cloverInv(nullptr),
     invNorm(nullptr),
-    c_sw(a.Csw()),
+    csw(a.Csw()),
     twisted(a.Twisted()),
     mu2(a.Mu2()),
     rho(a.Rho()),

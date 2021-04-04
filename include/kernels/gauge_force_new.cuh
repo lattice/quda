@@ -62,20 +62,20 @@ namespace quda {
     
     if(Arg::paths == 1) {
       computeForceStaple(arg, x, arg.X, parity, dir, staple);
-      staple = staple * 1.0;
+      staple *= (real)1.0;
     }      
     else if(Arg::paths == 2) {
       computeForceStapleRectangle(arg, x, arg.X, parity, dir, staple, rectangle);
-      staple = staple * 1.0;
-      rectangle = rectangle * 2.0;
+      staple = staple * (real)1.0;
+      rectangle = rectangle * (real)2.0;
       staple = staple + rectangle;
     }
     else if(Arg::paths == 3) {
       computeForceStapleRectangle(arg, x, arg.X, parity, dir, staple, rectangle);
       computeForceParallelogram(arg, x, arg.X, parity, dir, parallelogram);
-      staple = staple * 1.0;
-      rectangle = rectangle * 2.0;
-      parallelogram = parallelogram * 3.0;
+      staple = staple * (real)1.0;
+      rectangle = rectangle * (real)2.0;
+      parallelogram = parallelogram * (real)3.0;
       
       staple = staple + rectangle;
       staple = staple + parallelogram;
@@ -87,7 +87,7 @@ namespace quda {
     
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
-    mom = mom - arg.epsilon * Ux;
+    mom = mom - (real)arg.epsilon * Ux;
     makeAntiHerm(mom);
     arg.mom(dir, idx, parity) = mom;    
   }

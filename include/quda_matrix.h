@@ -471,7 +471,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator*(const S & scalar, const Mat<T,N> & a){
       Mat<T,N> result;
 #pragma unroll
-      for (int i=0; i<N*N; ++i) result.data[i] = scalar*a.data[i];
+      for (int i=0; i<N*N; ++i) result.data[i] = scalar * a.data[i];
       return result;
     }
 
