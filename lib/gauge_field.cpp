@@ -81,7 +81,7 @@ namespace quda {
     if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SUN_LINKS) {
       errorQuda("Cannot request a 12/8 reconstruct type without SU(N) link type");
     }
-
+    
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.
       int half_phase_bytes

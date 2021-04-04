@@ -14,7 +14,7 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
@@ -87,8 +87,6 @@ int main(int argc, char **argv)
     setDims(gauge_param.X);
   }
 
-  setSpinorSiteSize(24);
-
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];
@@ -119,7 +117,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
-  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   check = quda::ColorSpinorField::Create(cs_param);
 
   // Host arrays for solutions, sources, and check

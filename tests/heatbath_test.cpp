@@ -81,6 +81,7 @@ int main(int argc, char **argv)
 {
   // command line options
   auto app = make_app();
+  add_heatbath_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -108,8 +109,7 @@ int main(int argc, char **argv)
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
-  setSpinorSiteSize(2*4*N_COLORS);
-
+  
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }

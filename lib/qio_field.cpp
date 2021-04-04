@@ -275,11 +275,13 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
   switch (Ninternal) {
   case 2*N_COLORS: status = read_field<2*N_COLORS>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 24: status = read_field<24>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+  case 72: status = read_field<72>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 96: status = read_field<96>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
 #if (N_COLORS != 8)
   case 128: status = read_field<128>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
 #endif
   case 256: status = read_field<256>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
+  case 288: status = read_field<288>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   case 384: status = read_field<384>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
   default:
     errorQuda("Undefined %d", Ninternal);
@@ -329,10 +331,13 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 #endif
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
+  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
-  xml_record += "<version>BETA</version>";
-  xml_record += "<type>" + std::string(type) + "</type><info>";
+  xml_record += "\n";
+  xml_record += "<version>BETA</version>\n";
+  xml_record += "<type>" + std::string(type) + "</type>\n<info>\n";
 
   // if parity+even, it's a half-x-dim even only vector
   // if parity+odd, it's a half-x-dim odd only vector
@@ -341,16 +346,16 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   // if full+full, it's a full vector with all sites filled (either a full ColorSpinorField or a GaugeField)
 
   if (subset == QUDA_PARITY_SITE_SUBSET) {
-    xml_record += "<subset>parity</subset>";
+    xml_record += "  <subset>parity</subset>\n";
   } else {
-    xml_record += "<subset>full</subset>";
+    xml_record += "  <subset>full</subset>\n";
   }
   if (parity == QUDA_EVEN_PARITY) {
-    xml_record += "<parity>even</parity>";
+    xml_record += "    <parity>even</parity>\n";
   } else if (parity == QUDA_ODD_PARITY) {
-    xml_record += "<parity>odd</parity>";
+    xml_record += "    <parity>odd</parity>\n";
   } else {
-    xml_record += "<parity>full</parity>";
+    xml_record += "  <parity>full</parity>\n";
   } // abuse/hack
 
   // A lot of this is redundant of the record info, but eh.
@@ -371,8 +376,11 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 #endif
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
+  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
+  xml_record += "\n\n";
 
   int status;
 
@@ -467,6 +475,9 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
+  case 72:
+    status = write_field<72>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
   case 96:
     status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
@@ -477,6 +488,9 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 #endif
   case 256:
     status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
+  case 288:
+    status = write_field<288>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 384:
     status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);

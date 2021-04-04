@@ -170,7 +170,6 @@ invert_test(void)
 
   setDims(gaugeParam.X);
   dw_setDims(gaugeParam.X,1); // so we can use 5-d indexing from dwf
-  setSpinorSiteSize(6);
 
   for (int dir = 0; dir < 4; dir++) {
     qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);

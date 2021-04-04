@@ -2,6 +2,7 @@
 #include <dslash.h>
 #include <tunable_nd.h>
 #include <kernels/mdw_fused_dslash.cuh>
+#include <instantiate_dslash.h>
 
 namespace quda
 {

@@ -136,7 +136,7 @@
 #define QudaEigType integer(4)
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
 #define QUDA_EIG_BLK_IR_LANCZOS 1 // Block Thick Restarted Lanczos Solver
-#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver
+#define QUDA_EIG_IR_ARNOLDI 2     // Implicitly restarted Arnoldi solver
 #define QUDA_EIG_BLK_IR_ARNOLDI 3 // Block Implicitly restarted Arnoldi solver (not yet implemented)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
@@ -475,9 +475,14 @@
 #define QUDA_STAGGERED_PHASE_INVALID QUDA_INVALID_ENUM
 
 #define QudaContractType integer(4)
-#define QUDA_CONTRACT_TYPE_OPEN ,
-#define QUDA_CONTRACT_TYPE_DR ,
-#define QUDA_CONTRACT_TYPE_DP ,
+#define QUDA_CONTRACT_TYPE_OPEN 0
+#define QUDA_CONTRACT_TYPE_OPEN_SUM_T 1 
+#define QUDA_CONTRACT_TYPE_OPEN_SUM_Z 2
+#define QUDA_CONTRACT_TYPE_OPEN_FT_T 3
+#define QUDA_CONTRACT_TYPE_OPEN_FT_Z 4
+#define QUDA_CONTRACT_TYPE_DR 5
+#define QUDA_CONTRACT_TYPE_DR_FT_T 6
+#define QUDA_CONTRACT_TYPE_DR_FT_Z 7
 #define QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 
 #define QudaContractGamma integer(4)

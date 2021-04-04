@@ -22,18 +22,12 @@ namespace quda {
   // Forward declaration of all children
   class LatticeField;
 
+  class Propagator;
+
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
   
-  class EigValueSet;
-  class cudaEigValueSet;
-  class cpuEigValueSet;
-
-  class EigVecSet;
-  class cpuEigVecSet;
-  class cudaEigVecSet;
-
   class GaugeField;
   class cpuGaugeField;
   class cudaGaugeField;
@@ -41,6 +35,8 @@ namespace quda {
   class CloverField;
   class cudaCloverField;
   class cpuCloverField;
+
+  enum class QudaOffsetCopyMode { COLLECT, DISPERSE };
 
   struct LatticeFieldParam {
 
@@ -521,6 +517,11 @@ namespace quda {
     const int* LocalX() const { return local_x; }
 
     /**
+      @return The pointer to the **full** lattice-dimension array
+    */
+    virtual int full_dim(int d) const = 0;
+
+    /**
        @return The full-field volume
     */
     size_t Volume() const { return volume; }
@@ -682,6 +683,14 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const;
 
+    /**
+       @brief Return base pointer to the ghost recv buffer. Since this is a
+       base pointer, one still needs to take care of offsetting to the
+       correct point for each direction/dimension.
+       @return Pointer to remote memory buffer
+     */
+    void *remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
+
     virtual void gather(int, int, int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     virtual void commsStart(int, int, int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
@@ -717,6 +726,24 @@ namespace quda {
        @brief Return the number of bytes in the field allocation.
      */
     virtual size_t Bytes() const = 0;
+
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+
+      *** Currently `buffer` has to be a host pointer:
+            passing in UVM or device pointer leads to undefined behavior. ***
+    */
+    virtual void copy_to_buffer(void *buffer) const = 0;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+
+      *** Currently `buffer` has to be a host pointer:
+            passing in UVM or device pointer leads to undefined behavior. ***
+    */
+    virtual void copy_from_buffer(void *buffer) = 0;
   };
   
   /**
