@@ -51,10 +51,11 @@ namespace quda {
     }
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m>
+  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
   struct GaugeForceArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
+    static constexpr bool force = force_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     typedef typename gauge_mapper<Float,recon_u>::type Gauge;
     typedef typename gauge_mapper<Float,recon_m>::type Mom;
@@ -153,8 +154,13 @@ namespace quda {
 
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
-    mom = mom - arg.epsilon * linkA;
-    makeAntiHerm(mom);
+    if(arg.force) {
+      mom = mom - arg.epsilon * linkA;
+      makeAntiHerm(mom);
+    }
+    else {
+      mom = mom + arg.epsilon * linkA;
+    }
     arg.mom(dir, idx, parity) = mom;
   }
 
