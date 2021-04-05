@@ -22,7 +22,7 @@
 constexpr int NcontractType = 3;
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
-const char *names[] = {"OpenSpin", "DegrandRossi", "Staggered"};
+const char *names[] = {"DegrandRossi_FT_t","DegrandRossi_FT_z", "Staggered_FT_t"};
 
 namespace quda
 {
@@ -37,7 +37,7 @@ void display_test_info()
   printfQuda("%s   %s             %d/%d/%d          %d         %d\n", get_prec_str(prec), get_prec_str(prec_sloppy),
              xdim, ydim, zdim, tdim, Lsdim);
 
-  printfQuda("Contraction test");
+  printfQuda("contractFTQuda test");
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -75,7 +75,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  //setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -86,7 +85,7 @@ int main(int argc, char **argv)
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
     result = RUN_ALL_TESTS();
-    if (result) warningQuda("Google tests for QUDA contraction failed!");
+    if (result) warningQuda("Google tests for contractFTQuda failed!");
   }
   //-----------------------------------------------------------------------------
 
@@ -105,17 +104,39 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
+  int X[4] = {xdim, ydim, zdim, tdim};
+
   QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
   int nSpin = 0;
+  int red_size = 0;
   switch (contractionType) {
-  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; nSpin = 4; setSpinorSiteSize(spinor_site_size); break;
-  case 1: cType = QUDA_CONTRACT_TYPE_DR; nSpin = 4; setSpinorSiteSize(spinor_site_size); break;
-  case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; setSpinorSiteSize(stag_spinor_site_size); break;
+  case 0:
+    cType = QUDA_CONTRACT_TYPE_DR_FT_T;
+    nSpin = 4;
+    setSpinorSiteSize(spinor_site_size);
+    red_size = X[3];
+    break;
+  case 1:
+    cType = QUDA_CONTRACT_TYPE_DR_FT_Z;
+    nSpin = 4;
+    setSpinorSiteSize(spinor_site_size);
+    red_size = X[2];
+    break;
+  case 2:
+    cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
+    nSpin = 1;
+    setSpinorSiteSize(stag_spinor_site_size);
+    red_size = X[3];
+    break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
 
-  int X[4] = {xdim, ydim, zdim, tdim};
-
+  ColorSpinorParam cs_param;
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
   QudaInvertParam inv_param = newQudaInvertParam();
   setContractInvertParam(inv_param);
   inv_param.cpu_prec = test_prec;
@@ -123,49 +144,81 @@ int test(int contractionType, QudaPrecision test_prec)
   inv_param.cuda_prec_sloppy = test_prec;
   inv_param.cuda_prec_precondition = test_prec;
   if ( nSpin == 1 ) {
-    inv_param.dslash_type = QUDA_STAGGERED_DSLASH; }
+    inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
+    constructStaggeredSpinorParam(&cs_param, &inv_param, &gauge_param);
+  } else {
+    inv_param.dslash_type = QUDA_WILSON_DSLASH;
+    constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+  }
+
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V * my_spinor_site_size * data_size);
-  void *spinorY = malloc(V * my_spinor_site_size * data_size);
-  void *d_result = malloc(V * nSpin*nSpin*2 * data_size);
+  int src_colors = 2; // source color (dilutions)
+  int const nprops = nSpin * src_colors;
+  size_t spinor_field_floats = V * my_spinor_site_size * 2;
+  void *buffX = malloc(nprops * spinor_field_floats * data_size);
+  void *buffY = malloc(nprops * spinor_field_floats * data_size);
 
+  // propagators set to random values
   if (test_prec == QUDA_SINGLE_PRECISION) {
-    for (int i = 0; i < V * my_spinor_site_size; i++) {
-      ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
-      ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
+    for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
+      ((float *)buffX)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
+      ((float *)buffY)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
     }
   } else {
-    for (int i = 0; i < V * my_spinor_site_size; i++) {
-      ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
-      ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
+    for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
+      ((double *)buffX)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
+      ((double *)buffY)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
     }
   }
+
+  // array of spinor field for each source spin and color
+  void* spinorX[nprops];
+  void* spinorY[nprops];
+  { size_t off=0; for(int s=0; s<nprops; ++s, off += spinor_field_floats * data_size) {
+      spinorX[s] = (void*)((uintptr_t)buffX + off);
+      spinorY[s] = (void*)((uintptr_t)buffY + off);
+    }}
+
+  const int source_position[4]{0,0,0,0};
+  const int n_mom = 1;
+  const int mom[4]{0,0,0,0};
+
+  int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
+  void *d_result = malloc(n_contract_results * sizeof(double)); // meson correlators are always double
+  for(int c=0; c < n_contract_results; ++c) ((double*)d_result)[c] = 0.0;
 
   // Host side spinor data and result passed to QUDA.
   // QUDA will allocate GPU memory, transfer the data,
   // perform the requested contraction, and return the
   // result in the array 'result'
-  // We then compare the GPU result with a CPU refernce code
-
 
   // Perform GPU contraction.
-  contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
+  contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom);
 
-  // Compare each site contraction from the host and device.
-  // It returns the number of faults it detects.
-  int faults = 0;
-  if (test_prec == QUDA_DOUBLE_PRECISION) {
-    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType);
-  } else {
-    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType);
+  printfQuda("contraction:");
+  for(int c=0; c < n_contract_results; c += 2) {
+    if( c % 8 == 0 ) printfQuda("\n%3d ",c/2);
+    printfQuda(" (%10.3e,%10.3e)",((double*)d_result)[c],((double*)d_result)[c+1]);
   }
+  printfQuda("\n");
+  // Compare contraction from the host and device. Return the number of detected faults.
+  int faults = 0;
+  /*  TODO: write CPU checks
+  if (test_prec == QUDA_DOUBLE_PRECISION) {
+    faults = contractionFT_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType,
+                          src_colors, X, source_position, n_mom, mom);
+  } else {
+    faults = contractionFT_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType,
+                          src_colors, X, source_position, n_mom, mom);
+  }
+  */
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
-             faults, V * nSpin*nSpin * 2);
+             faults, n_contract_results);
 
-  free(spinorX);
-  free(spinorY);
   free(d_result);
+  free(buffY);
+  free(buffX);
 
   return faults;
 }

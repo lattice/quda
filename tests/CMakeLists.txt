@@ -205,6 +205,12 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+#
+  add_executable(contractFT_test contractFT_test.cpp)
+  target_link_libraries(contractFT_test ${TEST_LIBS})
+  quda_checkbuildtest(contractFT_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS contractFT_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 endif()
 
 if(QUDA_DIRAC_STAGGERED)

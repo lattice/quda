@@ -69,7 +69,7 @@ template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam
 
 // Spinor utils
 //------------------------------------------------------
-void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+void constructStaggeredSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
 //------------------------------------------------------
 

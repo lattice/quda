@@ -8,16 +8,7 @@
 
 namespace quda
 {
-  /*
-    Compile-time constants max_contract_mom_modes and max_contract_results affect the maximum
-    number of Fourier momentum modes that are possible per contraction kernel. Setting
-    max_contract_results = 16 is sufficient space for:
-     - one momentum mode in DegrandRossiContractFT
-     - 16 modes in StaggeredContractFT
-    The setting max_contract_mom_modes = 16 allows for the max in StaggeredContractFT.
-  */
-  static constexpr int max_contract_mom_modes = 16;
-  static constexpr int max_contract_results = 16;
+  static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
   using contract_array = vector_type<double2, max_contract_results>;
   
   template <typename real> class DRGammaMatrix
@@ -269,8 +260,7 @@ namespace quda
     F x;
     F y;
     int s1, b1;
-    int nmom_modes;
-    int mom_mode[max_contract_mom_modes][4];
+    int mom_mode[4];
     int source_position[4];
     int NxNyNzNt[4];
     DRGammaMatrix<real> Gamma;
@@ -282,7 +272,7 @@ namespace quda
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4],
-			 const std::vector<int[4]> &mom_mode_in,
+			 const int mom_mode_in[4],
 			 const int s1, const int b1) :
       ReduceArg<contract_array>(x.X()[reduction_dim]),
       x(x),
@@ -296,13 +286,10 @@ namespace quda
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
         source_position[i] = source_position_in[i];
+	mom_mode[i] = mom_mode_in[i];
         offsets[i] = comm_coord(i) * x.X()[i];
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
-      nmom_modes = mom_mode_in.size();
-      for(int m=0; m<nmom_modes;++m)
-	for(int dir=0; dir<4; ++dir)
-	  mom_mode[m][dir] = mom_mode_in[m][dir];
     }
     __device__ __host__ contract_array init() const { return contract_array(); }
   };
@@ -326,7 +313,6 @@ namespace quda
       reduce_t result_all_channels = contract_array();
       int s1 = arg.s1;
       int b1 = arg.b1;
-      //int nmom_modes = 1;
       int mom_mode[4];
       int source_position[4];
       int offsets[4];
@@ -334,7 +320,7 @@ namespace quda
       for(int i=0; i<4; i++) {
 	source_position[i] = arg.source_position[i];
 	offsets[i] = arg.offsets[i];
-	mom_mode[i] = arg.mom_mode[0][i];
+	mom_mode[i] = arg.mom_mode[i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
       
@@ -411,19 +397,16 @@ namespace quda
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
       reduce_t result_all_channels = contract_array();
-      int nmom_modes = arg.nmom_modes;
-      int mom_mode[max_contract_mom_modes][4];
+      int mom_mode[4];
       int source_position[4];
       int offsets[4];
       int NxNyNzNt[4];
       for(int i=0; i<4; i++) {
 	source_position[i] = arg.source_position[i];
+	mom_mode[i] = arg.mom_mode[i];
 	offsets[i] = arg.offsets[i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
-      for(int m=0; m<nmom_modes;++m)
-	for(int dir=0; dir<4; ++dir)
-	  mom_mode[m][dir] = arg.mom_mode[m][dir];
       
       //The coordinate of the sink
       int *sink;
@@ -439,46 +422,37 @@ namespace quda
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
 
-      int mom_proj;
-      for(mom_proj = 0; mom_proj<nmom_modes; ++mom_proj)
+      // Fourier phase
+      double phase_real = 1.0;
+      double phase_imag = 0.0;
+      // Phase factor for each direction is either the cos, sin, or exp Fourier phase
+      for(int dir=0; dir<4; ++dir)
 	{
-	  /* Calculate exp(-i * [x dot p]) phase factor
-	  double Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*mom_mode[0]*1./NxNyNzNt[0]+
-					   (source_position[1]-sink[1]-offsets[1])*mom_mode[1]*1./NxNyNzNt[1]+
-					   (source_position[2]-sink[2]-offsets[2])*mom_mode[2]*1./NxNyNzNt[2]+
-					   (source_position[3]-sink[3]-offsets[3])*mom_mode[3]*1./NxNyNzNt[3]);
-	  double phase_real =  cos(Sum_dXi_dot_Pi*2.*M_PI);
-	  double phase_imag = -sin(Sum_dXi_dot_Pi*2.*M_PI);
-	  */
-	  double phase_real = 1.0;
-	  double phase_imag = 0.0;
-	  // Phase factor for each direction is either the cos, sin, or exp Fourier phase
-	  for(int dir=0; dir<4; ++dir)
-	    {
-	      if(mom_mode[mom_proj][dir] == 0) continue; // phase is one
-	      double dXi_dot_Pi = 1./NxNyNzNt[dir];
-	      dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[mom_proj][dir];
-	      double ph_real;
-	      double ph_imag;
-	      { // exp case
-		ph_real =  cos(dXi_dot_Pi*2.*M_PI);
-		ph_imag = -sin(dXi_dot_Pi*2.*M_PI);
-	      }
-	      // phase *= ph
-	      double tmp_real = phase_real;
-	      double tmp_imag = phase_imag;
-	      phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
-	      phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
-	    }
+	  if(mom_mode[dir] == 0) continue; // phase is one
+	  double dXi_dot_Pi = 1./NxNyNzNt[dir];
+	  dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[dir];
+	  double ph_real;
+	  double ph_imag;
+	  { // exp case
+	    ph_real =  cos(dXi_dot_Pi*2.*M_PI);
+	    ph_imag = -sin(dXi_dot_Pi*2.*M_PI);
+	  }
+	  // phase *= ph
+	  double tmp_real = phase_real;
+	  double tmp_imag = phase_imag;
+	  phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
+	  phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
+	}
       
-	  result_all_channels[mom_proj].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
-	  result_all_channels[mom_proj].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
-	}
-      for( ; mom_proj<max_contract_mom_modes; ++mom_proj) // zero fill any trailing unused result elements
+      // Staggered only uses the first element of result_all_channels
+      result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
+      result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
+      for(int i=1; i<max_contract_results; ++i) // zero unused
 	{
-	  result_all_channels[mom_proj].x = 0.;
-	  result_all_channels[mom_proj].y = 0.;
+	  result_all_channels[i].x = 0.;
+	  result_all_channels[i].y = 0.;
 	}
+
       return plus::operator()(result_all_channels, result);
     }
   };

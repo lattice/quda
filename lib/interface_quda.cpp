@@ -5729,23 +5729,30 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 }
 
 void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **result,
-		    const QudaContractType cType, void *cs_param_ptr,
-		    const int *X, const int *const source_position, int* mom)
+		    const QudaContractType cType, void *cs_param_ptr, const int src_colors,
+		    const int *X, const int *const source_position,
+		    const int n_mom, const int *const mom_modes)
 {
   profileContractFT.TPSTART(QUDA_PROFILE_TOTAL);
   profileContractFT.TPSTART(QUDA_PROFILE_INIT);
 
+
   // create ColorSpinorFields from void** and parameter
   auto cs_param = (ColorSpinorParam *)cs_param_ptr;
   const size_t nSpin = cs_param->nSpin;
-  const size_t nColor = cs_param->nColor;
+  const size_t src_nColor = src_colors;
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
+
+  // max results set by contraction kernel and sized for nSpin**2 = 16
+  const int max_contract_results = 16;
+  // The number of contraction results expected in the output
+  size_t num_out_results = nSpin * nSpin;
 
   //FIXME can we merge the two propagators if they are the same to save mem?
   // wrap CPU host side pointers
   std::vector<ColorSpinorField*> h_prop1, h_prop2;
-  for(size_t i=0; i<nSpin*nColor; i++) {
+  for(size_t i=0; i<nSpin*src_nColor; i++) {
     cs_param->v = prop_array_flavor_1[i];
     h_prop1.push_back(ColorSpinorField::Create(*cs_param));
     cs_param->v = prop_array_flavor_2[i];
@@ -5756,11 +5763,11 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not relevent for staggered
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   
   std::vector<ColorSpinorField *> d_prop1, d_prop2;
-  for(size_t i=0; i<nSpin*nColor; i++) {
+  for(size_t i=0; i<nSpin*src_nColor; i++) {
     d_prop1.push_back(ColorSpinorField::Create(cudaParam));
     d_prop2.push_back(ColorSpinorField::Create(cudaParam));
   }
@@ -5777,60 +5784,41 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   // The number of slices in the decay dimension globally.
   size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim(corr_dim);
 
-  // The number of complex elements on each slice.
-  size_t elems_per_slice = nSpin * nSpin;
   profileContractFT.TPSTOP(QUDA_PROFILE_INIT);
 
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
-  for(size_t i=0; i<nSpin*nColor; i++) {
+  for(size_t i=0; i<nSpin*src_nColor; i++) {
     *d_prop1[i] = *h_prop1[i];
     *d_prop2[i] = *h_prop2[i];
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
   // Array for all decay slices and channels, is zeroed prior to kernel launch
-  std::vector<Complex> result_global(elems_per_slice * global_decay_dim_slices);
+  std::vector<Complex> result_global(max_contract_results * global_decay_dim_slices);
   
-  for (int px = 0; px <= mom[0]; px++) {
-    for (int py = 0; py <= mom[1]; py++) {
-      for (int pz = 0; pz <= mom[2]; pz++) {
-        for (int pt = 0; pt <= mom[3]; pt++) {
-	  std::vector<int[4]> mom_mode(1); // list has one momentum mode
-	  mom_mode[0][0] = px;
-	  mom_mode[0][1] = py;
-	  mom_mode[0][2] = pz;
-	  mom_mode[0][3] = pt;
-	  int mom_idx = (px +
-			 py*(mom[0]+1) +
-			 pz*(mom[0]+1)*(mom[1]+1) +
-			 pt*(mom[0]+1)*(mom[1]+1)*(mom[2]+1));
-			 
-	    for (size_t s1 = 0; s1 < nSpin; s1++) {
-	      for (size_t c1 = 0; c1 < nColor; c1++) {
-		for (size_t b1 = 0; b1 < nSpin; b1++) {
-		profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
+  for (int mom_idx=0; mom_idx<n_mom; ++mom_idx) {
+
+    for (size_t s1 = 0; s1 < nSpin; s1++) {
+      for (size_t b1 = 0; b1 < nSpin; b1++) {
+	for (size_t c1 = 0; c1 < src_nColor; c1++) {
+	  profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 	  
-		std::fill(result_global.begin(), result_global.end(), 0.0);
-		contractSummedQuda(*d_prop1[s1 * nColor + c1],
-				   *d_prop2[b1 * nColor + c1],
-				   result_global, cType, source_position, mom_mode, s1, b1);
+	  std::fill(result_global.begin(), result_global.end(), 0.0);
+	  contractSummedQuda(*d_prop1[s1 * src_nColor + c1],
+			     *d_prop2[b1 * src_nColor + c1],
+			     result_global, cType, source_position, &mom_modes[4*mom_idx], s1, b1);
 		
-		comm_allreduce_array((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
-		for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
-		  for (size_t t = 0; t < global_decay_dim_slices; t++) {
-		    int index = ((mom_idx) * 2*elems_per_slice * global_decay_dim_slices + 2*elems_per_slice * t + 2*G_idx);
-		    
-		    ((double *)*result)[index]
-		      += result_global[(2*elems_per_slice * t) / 2 + G_idx].real();
-		    ((double *)*result)[index+1]
-		      += result_global[(2*elems_per_slice * t) / 2 + G_idx].imag();
-		  }
-		}
-		profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
-	      }
+	  comm_allreduce_array((double *)&result_global[0], 2*max_contract_results * global_decay_dim_slices);
+
+	  for (size_t t = 0; t < global_decay_dim_slices; t++) {
+	    for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
+	      int index = 2*(mom_idx *num_out_results * global_decay_dim_slices + num_out_results * t + G_idx);
+	      ((double *)*result)[index  ] += result_global[max_contract_results * t + G_idx].real();
+	      ((double *)*result)[index+1] += result_global[max_contract_results * t + G_idx].imag();
 	    }
 	  }
+	  profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 	}
       }
     }
@@ -5838,7 +5826,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
-  for(size_t i=0; i<nSpin*nColor; i++) {
+  for(size_t i=0; i<nSpin*src_nColor; i++) {
     delete d_prop1[i];
     delete d_prop2[i];
     delete h_prop1[i];
@@ -5858,6 +5846,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
+
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
 
   cpuParam.v = (void *)hp_y;

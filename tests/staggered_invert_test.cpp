@@ -277,7 +277,7 @@ int main(int argc, char **argv)
   quda::ColorSpinorField *ref;
   quda::ColorSpinorField *tmp;
   quda::ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructStaggeredSpinorParam(&cs_param, &inv_param, &gauge_param);
   for (int k = 0; k < Nsrc; k++) { in.emplace_back(quda::ColorSpinorField::Create(cs_param)); }
   out = quda::ColorSpinorField::Create(cs_param);
   ref = quda::ColorSpinorField::Create(cs_param);

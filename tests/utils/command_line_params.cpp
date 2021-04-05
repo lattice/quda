@@ -323,8 +323,9 @@ namespace
                                                            {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR},
 							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
-                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
-
+							   {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
+							   {"stag", QUDA_CONTRACT_TYPE_STAGGERED},
+							   {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}
   };
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},

@@ -17,7 +17,7 @@ namespace quda {
     std::vector<Complex> &result_global;
     const QudaContractType cType;
     const int *const source_position;
-    const std::vector<int[4]> &mom_mode; // list of momentum modes
+    const int *const mom_mode;
     const size_t s1;
     const size_t b1;
     
@@ -26,7 +26,7 @@ namespace quda {
 		      std::vector<Complex> &result_global,
 		      const QudaContractType cType,
 		      const int *const source_position,
-		      const std::vector<int[4]> &mom_mode,
+		      const int *const mom_mode,
 		      const size_t s1, const size_t b1) :
       TunableMultiReduction(x, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z ||
 				     cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
@@ -55,15 +55,14 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       int reduction_dim = 3;
-      const int nMom = mom_mode.size();
       const int nSpinSq = x.Nspin()*x.Nspin();
       
       if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduction_dim = 2;      
-      std::vector<double> result_local(2*nSpinSq*nMom * x.X()[reduction_dim]);
+      std::vector<double> result_local(2*max_contract_results * x.X()[reduction_dim]);
       
       // Zero out the local results.
       if(!activeTuning()) {
-	for(int i=0; i<nSpinSq*nMom * x.X()[reduction_dim]; i++) {
+	for(int i=0; i<max_contract_results * x.X()[reduction_dim]; i++) {
 	  result_local[2*i] = 0.0;
 	  result_local[2*i+1] = 0.0;
 	}
@@ -104,14 +103,14 @@ namespace quda {
 
       // Copy results back to host array
       if(!activeTuning()) {
-	for(int i=0; i<nSpinSq*nMom * x.X()[reduction_dim]; i++) {
-	  result_global[nSpinSq * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].real(result_local[2*i]);
-	  result_global[nSpinSq * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].imag(result_local[2*i+1]);
+	for(int i=0; i<max_contract_results * x.X()[reduction_dim]; i++) {
+	  result_global[max_contract_results * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].real(result_local[2*i]);
+	  result_global[max_contract_results * comm_coord(reduction_dim) * x.X()[reduction_dim] + i].imag(result_local[2*i+1]);
 	}
       }
     }
     
-    long long flops() const //TODO: nMom>1 and Nspin=1 ?
+    long long flops()
     {
       return ((x.Nspin() * x.Nspin() * x.Ncolor() * 6ll) + (x.Nspin() * x.Nspin() * (x.Nspin() + x.Nspin()*x.Ncolor()))) * x.Volume();
     }
@@ -127,7 +126,7 @@ namespace quda {
 			  std::vector<Complex> &result_global,
 			  const QudaContractType cType,
 			  const int *const source_position,
-			  const std::vector<int[4]> &mom_mode,
+			  const int *const mom_mode,
 			  const size_t s1, const size_t b1)
   {
     checkPrecision(x, y);
@@ -145,16 +144,12 @@ namespace quda {
       }
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
 
-    int nSpin = x.Nspin();
-    int nMom = mom_mode.size();
-    if( nSpin*nSpin*nMom > max_contract_results ) errorQuda("Kernel result space too small for nMom=%d contractions with nSpin=%d",nMom,nSpin);
-    
     instantiate<ContractionSummed>(x, y, result_global, cType, source_position, mom_mode, s1, b1);
   }
 #else
   void contractSummedQuda(const ColorSpinorField &, const ColorSpinorField &,
 			  std::vector<Complex> &, const QudaContractType,
-			  const int *const, const int *const,
+			  const int *const, int *const,
 			  const size_t, const size_t)
   {
     errorQuda("Contraction code has not been built");

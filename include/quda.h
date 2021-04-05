@@ -1397,37 +1397,38 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host spinorfields contained
-   * inside first two arguments. Used for cases where one wishes to contract data in
-   * either the T or Z dim, with a Fourier phase applied
+   * Public function to perform color contractions of the host propagators described by the
+   * first two arguments. The contraction includes a Fourier phase and is summed over
+   * either the T or Z direction. Each input propagator has nSpin * src_nColor ColorSpinorFields components.
+   * The output result must be able to hold nSpin*nSpin * dim(T or Z) * n_mom values. 
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
-   *            result correlators
-   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[out] h_result adress of host pointer to the output complex double correlators
+   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
    * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
    *            construction of ColorSpinorFields
+   * @param[in] src_colors the number of source colors for the input propagators
    * @param[in] X spacetime data for construction of ColorSpinorFields
+   * @param[in] source_position needed in Fourier phases
+   * @param[in] n_mom number of momentum modes
+   * @param[in] mom_modes in Fourier phase
    */
-  void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **h_result,
-		      const QudaContractType cType, void *cs_param_ptr,
-		      const int *X, const int *const source_position, int* Mom);
+  void contractFTQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
+		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
+		      const int *X, const int *const source_position,
+		      const int n_mom, const int *const mom_modes);
   
   /**
    * Public function to perform color contractions of the host spinorfields contained
-   * inside first two arguments. Used for cases where one wishes to contract data in
-   * either the T or Z dim
-   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
-   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
+   * inside first two arguments.
+   * @param[in] x pointer to ColorSpinorField host data
+   * @param[in] y pointer to ColorSpinorField host data
+   * @param[out] h_result adress of pointer to the nSpin*nSpin*V complex numbers of the
    *            result correlators
-   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
-   *            construction of ColorSpinorFields
    * @param[in] X spacetime data for construction of ColorSpinorFields
    */
-  
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
 
@@ -1448,6 +1449,7 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta,
                                 QudaGaugeParam *param, double *timeinfo);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
