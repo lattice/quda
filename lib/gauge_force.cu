@@ -48,9 +48,11 @@ namespace quda {
     if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
 
     // create path struct in a single allocation
-    size_t bytes = 4 * num_paths * path_max_length * sizeof(int) + num_paths*sizeof(int) + num_paths*sizeof(double);
+    size_t bytes = 4 * num_paths * path_max_length * sizeof(int) + num_paths*sizeof(int);
+    int pad = (sizeof(double) - bytes % sizeof(double)) % sizeof(double);
+    bytes += pad + num_paths*sizeof(double);
     void *buffer = pool_device_malloc(bytes);
-    paths p(buffer, bytes, input_path, length_h, path_coeff_h, num_paths, path_max_length);
+    paths p(buffer, bytes, pad, input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
     // gauge field must be passed as first argument so we peel off its reconstruct type
     instantiate<ForceGauge,ReconstructNo12>(u, mom, epsilon, p);

@@ -16,7 +16,7 @@ namespace quda {
     const double *path_coeff;
     int count;
 
-    paths(void *buffer, size_t bytes, int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
+    paths(void *buffer, size_t bytes, int pad, int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
       num_paths(num_paths),
       max_length(max_length),
       count(0)
@@ -39,7 +39,7 @@ namespace quda {
       memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int), length_h, num_paths*sizeof(int));
 
       // path_coeff array
-      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int), path_coeff_h, num_paths*sizeof(double));
+      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int) + pad, path_coeff_h, num_paths*sizeof(double));
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
@@ -47,7 +47,7 @@ namespace quda {
       // finally set the pointers to the correct offsets in the buffer
       for (int d=0; d < 4; d++) this->input_path[d] = (int*)((char*)buffer + d*num_paths*max_length*sizeof(int));
       length = (int*)((char*)buffer + 4*num_paths*max_length*sizeof(int));
-      path_coeff = (double*)((char*)buffer + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int));
+      path_coeff = (double*)((char*)buffer + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int) + pad);
     }
   };
 
