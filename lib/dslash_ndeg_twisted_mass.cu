@@ -23,7 +23,7 @@ namespace quda
   public:
     NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableVectorYZ::resizeVector(2, arg.nParity);
+      TunableKernel3D::resizeVector(2, arg.nParity);
     }
 
     void apply(const qudaStream_t &stream)
