@@ -101,7 +101,7 @@ namespace quda {
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
 
-    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += (72LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
@@ -320,7 +320,7 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
     // xpay
     flops += 48LL * (long long)in.Volume();
   }
@@ -341,7 +341,7 @@ namespace quda {
     long long wall = 2 * in.Volume() / Ls;
     flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
     // M5mob
-    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
     // xpay
     flops += 48LL * (long long)in.Volume();
   }
@@ -453,17 +453,6 @@ namespace quda {
 
       dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
       deleteTmp(&tmp1, reset1);
-      // D4
-      flops += 4LL * 1320LL * (long long)in.Volume();
-      // M5inv
-      long long Ls = in.X(4);
-      flops += 4LL * 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
-      // M5pre
-      long long bulk = (Ls - 2) * (in.Volume() / Ls);
-      long long wall = 2 * in.Volume() / Ls;
-      flops += 4LL * 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
-      // xpay
-      flops += 4LL * 48LL * (long long)in.Volume();
     } else {
       M(*tmp2, in);
       Mdag(out, *tmp2);
