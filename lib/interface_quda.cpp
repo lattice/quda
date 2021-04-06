@@ -4336,8 +4336,8 @@ int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int*
 
 void momResidentQuda(void *mom, QudaGaugeParam *param)
 {
-  profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(param);
 
@@ -4367,26 +4367,26 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
               param->return_result_mom);
   }
 
-  profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
 
   if (param->make_resident_mom) {
     // we are downloading the momentum from the host
-    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
     momResident->loadCPUField(cpuMom);
-    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
   } else if (param->return_result_mom) {
     // we are uploading the momentum to the host
-    profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
+    profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
     momResident->saveCPUField(cpuMom);
-    profileGaugePath.TPSTOP(QUDA_PROFILE_D2H);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
 
-    profileGaugePath.TPSTART(QUDA_PROFILE_FREE);
+    profileGaugeForce.TPSTART(QUDA_PROFILE_FREE);
     delete momResident;
     momResident = nullptr;
-    profileGaugePath.TPSTOP(QUDA_PROFILE_FREE);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void createCloverQuda(QudaInvertParam* invertParam)
