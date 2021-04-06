@@ -73,7 +73,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
-            double b, double c, int shmem_ = 0) :
+            double b, double c, int shmem_) :
       in_pack(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       dagger(dagger),
