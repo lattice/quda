@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <limits>
 
 #include <register_traits.h>
 #include <math_helper.cuh>
@@ -16,11 +17,10 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <type_traits>
-#include <limits>
 #include <atomic.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
+#include <load_store.h>
 #include <aos.h>
 #include <transform_reduce.h>
 
@@ -361,17 +361,14 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const
       {
-	using vec2 = typename vector<storeFloat,2>::type;
+        using vec2 = vector_type<storeFloat, 2>;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
-        if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-          atomic_update(&u2->x, val_.real());
-          atomic_update(&u2->y, val_.imag());
-	} else {
-          atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
-          atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
-	}
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>
@@ -490,16 +487,14 @@ namespace quda {
       template <typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
       {
-        using vec2 = typename vector<storeFloat,2>::type;
+        using vec2 = vector_type<storeFloat, 2>;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomic_update(&u2->x, val_.real());
-	  atomic_update(&u2->y, val_.imag());
-	} else {
-	  atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
-	  atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
-	}
+
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>
@@ -631,18 +626,16 @@ namespace quda {
       }
 
       template <typename theirFloat>
-      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-	using vec2 = typename vector<storeFloat,2>::type;
+      __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
+      {
+        using vec2 = vector_type<storeFloat, 2>;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
-	if (fixed && !match<storeFloat,theirFloat>()) {
-	  complex<storeFloat> val_(round(scale * val.real()), round(scale * val.imag()));
-	  atomic_update(&u2->x, val_.real());
-	  atomic_update(&u2->y, val_.imag());
-	} else {
-	  atomic_update(&u2->x, static_cast<storeFloat>(val.real()));
-	  atomic_update(&u2->y, static_cast<storeFloat>(val.imag()));
-	}
+        vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
+          vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
+          vec2(static_cast<storeFloat>(val.real()), static_cast<storeFloat>(val.imag()));
+
+        atomic_fetch_add(u2, val_);
       }
 
       template <typename helper, typename reducer>
@@ -668,9 +661,11 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
-      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
-	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
+      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_ = 0) :
+        volumeCB(U.VolumeCB()),
+        scale(static_cast<Float>(1.0)),
+        scale_inv(static_cast<Float>(1.0)),
+        accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
@@ -984,11 +979,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm squared of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return L2 norm squared
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return L2 norm squared
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
@@ -996,11 +991,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
@@ -1008,11 +1003,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
@@ -1020,7 +1015,7 @@ namespace quda {
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
     };
 
       /**
@@ -2167,14 +2162,14 @@ namespace quda {
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
       // get base pointer
-      auto in = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      auto in = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length * sizeof(Float));
       block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
     {
       // get base pointer
-      auto out = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length);
+      auto out = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset + dir * length * sizeof(Float));
       block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
     }
 
@@ -2735,6 +2730,9 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDPJIT_GAUGE_ORDER,Nc> { typedef gauge::QDPJITOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_MILC_GAUGE_ORDER,Nc> { typedef gauge::MILCOrder<T, 2*Nc*Nc> type; };
+  template <typename T, int Nc> struct gauge_order_mapper<T, QUDA_CPS_WILSON_GAUGE_ORDER, Nc> {
+    typedef gauge::CPSOrder<T, 2 * Nc * Nc> type;
+  };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_BQCD_GAUGE_ORDER,Nc> { typedef gauge::BQCDOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_GAUGE_ORDER,Nc> { typedef gauge::TIFROrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };

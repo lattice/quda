@@ -11,7 +11,6 @@
 #include "util_quda.h"
 #include "malloc_quda.h"
 #include <unitarization_links.h>
-#include "dslash_quda.h"
 #include "ks_improved_force.h"
 
 #ifdef MULTI_GPU

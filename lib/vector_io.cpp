@@ -117,9 +117,9 @@ namespace quda
   void VectorIO::load(std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
 #endif
 
+#ifdef HAVE_QIO
   void VectorIO::loadProp(std::vector<ColorSpinorField *> &vecs)
   {
-#ifdef HAVE_QIO
     if (vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
     const int Nvec = vecs.size();
     auto spinor_parity = vecs[0]->SuggestedParity();
@@ -212,10 +212,10 @@ namespace quda
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done loading vectors\n");
-#else
-    errorQuda("\nQIO library was not built.\n");
-#endif
   }
+#else
+  void VectorIO::loadProp(std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
+#endif
 
 #ifdef HAVE_QIO
   void VectorIO::save(const std::vector<ColorSpinorField *> &vecs)
@@ -313,9 +313,9 @@ namespace quda
   void VectorIO::save(const std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
 #endif
 
+#ifdef HAVE_QIO
   void VectorIO::saveProp(const std::vector<ColorSpinorField *> &vecs)
   {
-#ifdef HAVE_QIO
     if (vecs.size() != 12) errorQuda("Must have 12 vectors in propagator, passed %lu", vecs.size());
 
     const int Nvec = vecs.size();
@@ -406,10 +406,10 @@ namespace quda
         || (vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
       for (int i = 0; i < Nvec; i++) delete tmp[i];
     }
-#else
-    errorQuda("\nQIO library was not built.\n");
-#endif
   }
+#else
+  void VectorIO::saveProp(const std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
+#endif
 
   void VectorIO::downPrec(const std::vector<ColorSpinorField *> &vecs_high_prec,
                           std::vector<ColorSpinorField *> &vecs_low_prec, const QudaPrecision low_prec)

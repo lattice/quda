@@ -12,15 +12,18 @@
 
 namespace quda {
 
-  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) {
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y)
+  {
     return make_double2(x.x + y.x, x.y + y.y);
   }
 
-  __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y) {
+  __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y)
+  {
     return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
   }
 
-  __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y) {
+  __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y)
+  {
     return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
@@ -28,18 +31,41 @@ namespace quda {
     return make_float2(x.x + y.x, x.y + y.y);
   }
 
-  template<typename T> struct RealType {};
-  template<> struct RealType<double> { typedef double type; };
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<complex<double> > { typedef double type; };
-  template<> struct RealType<float> { typedef float type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<complex<float> > { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short> { typedef short type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<complex<short> > { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
+  template <typename T> struct RealType {
+  };
+  template <> struct RealType<double> {
+    typedef double type;
+  };
+  template <> struct RealType<double2> {
+    typedef double type;
+  };
+  template <> struct RealType<complex<double>> {
+    typedef double type;
+  };
+  template <> struct RealType<float> {
+    typedef float type;
+  };
+  template <> struct RealType<float2> {
+    typedef float type;
+  };
+  template <> struct RealType<complex<float>> {
+    typedef float type;
+  };
+  template <> struct RealType<float4> {
+    typedef float type;
+  };
+  template <> struct RealType<short> {
+    typedef short type;
+  };
+  template <> struct RealType<short2> {
+    typedef short type;
+  };
+  template <> struct RealType<complex<short>> {
+    typedef short type;
+  };
+  template <> struct RealType<short4> {
+    typedef short type;
+  };
   template <> struct RealType<int8_t> {
     typedef int8_t type;
   };
@@ -120,31 +146,6 @@ namespace quda {
     vector_type<scalar, n>& operator=(const vector_type<scalar, n> &) = default;
     vector_type<scalar, n>& operator=(vector_type<scalar, n> &&) = default;
   };
-
-  // the following four specializations are WARs required while we
-  // have retain Kepler support to avoid.  Without these, the default
-  // Kepler path will try to wrap these in __ldg which will fail to
-  // compile.  When we either remove Kepler support or do another pass
-  // at cleaning up vector_type, we can delete these
-  template <> __device__ __host__ inline vector_type<double,24> vector_load(const void *ptr, int idx)
-  {
-    return reinterpret_cast< const vector_type<double,24>* >(ptr)[idx];
-  }
-
-  template <> __device__ __host__ inline vector_type<float,24> vector_load(const void *ptr, int idx)
-  {
-    return reinterpret_cast< const vector_type<float,24>* >(ptr)[idx];
-  }
-
-  template <> __device__ __host__ inline vector_type<double,6> vector_load(const void *ptr, int idx)
-  {
-    return reinterpret_cast< const vector_type<double,6>* >(ptr)[idx];
-  }
-
-  template <> __device__ __host__ inline vector_type<float,6> vector_load(const void *ptr, int idx)
-  {
-    return reinterpret_cast< const vector_type<float,6>* >(ptr)[idx];
-  }
 
   template <typename T, int n> std::ostream &operator<<(std::ostream &output, const vector_type<T, n> &a)
   {

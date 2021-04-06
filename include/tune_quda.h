@@ -77,7 +77,7 @@ namespace quda {
         param.grid.x += step;
         if (param.grid.x > maxGridSize()) {
           param.grid.x = minGridSize();
-	  return false;
+          return false;
         } else {
           return true;
         }
@@ -86,8 +86,26 @@ namespace quda {
       }
     }
 
+    /**
+       @brief Return the maximum block size in the x dimension
+       explored by the autotuner.
+     */
     virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_threads_per_block() / (param.block.y*param.block.z); }
+
+    /**
+       @brief Return the maximum grid size in the x dimension explored
+       by the autotuner.  This defaults to twice the number of
+       processors on the GPU, since it's unlikely a large grid size
+       will help (if a kernels needs more parallelism, the autotuner
+       will find this through increased block size.
+     */
     virtual unsigned int maxGridSize() const { return 2*device::processor_count(); }
+
+    /**
+       @brief Return the minimum grid size in the x dimension explored
+       by the autotuner.  Default is 1, but it may be desirable to
+       increase this to pare down the tuning dimension size.
+    */
     virtual unsigned int minGridSize() const { return 1; }
 
     /**
@@ -109,8 +127,8 @@ namespace quda {
         const auto max_blocks = device::max_grid_size(0);
 
         // ensure the blockDim is large enough given the limit on gridDim
-        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+        param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
+        param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
       }
@@ -390,6 +408,7 @@ namespace quda {
 
   class TunableVectorYZ : public TunableVectorY {
 
+  protected:
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;
@@ -464,7 +483,7 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
@@ -485,6 +504,21 @@ namespace quda {
    * @brief Enable / disable whether are tuning a policy
    */
   void setPolicyTuning(bool);
+
+  /**
+   * @brief Query whether we are currently tuning a policy
+   */
+  bool policyTuning();
+
+  /**
+   * @brief Enable / disable whether we are tuning an uber kernel
+   */
+  void setUberTuning(bool);
+
+  /**
+   * @brief Query whether we are tuning an uber kernel
+   */
+  bool uberTuning();
 
 } // namespace quda
 

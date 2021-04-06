@@ -6,8 +6,8 @@
 
 /**
  * @def   __COMPUTE_CAPABILITY__
- * @brief This macro sets the target GPU architecture.  Unlike
- * __CUDA_ARCH__, this is defined on host and device.
+ * @brief This macro sets the target GPU architecture, which is
+ * defined on both host and device.
  */
 #define __COMPUTE_CAPABILITY__ @COMP_CAP@
 

@@ -113,23 +113,21 @@ int test(int contractionType, QudaPrecision test_prec)
   case 0:
     cType = QUDA_CONTRACT_TYPE_DR_FT_T;
     nSpin = 4;
-    setSpinorSiteSize(spinor_site_size);
     red_size = X[3];
     break;
   case 1:
     cType = QUDA_CONTRACT_TYPE_DR_FT_Z;
     nSpin = 4;
-    setSpinorSiteSize(spinor_site_size);
     red_size = X[2];
     break;
   case 2:
     cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
     nSpin = 1;
-    setSpinorSiteSize(stag_spinor_site_size);
     red_size = X[3];
     break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
+  int my_spinor_site_size = nSpin * 3 * 2;
 
   ColorSpinorParam cs_param;
   QudaGaugeParam gauge_param = newQudaGaugeParam();

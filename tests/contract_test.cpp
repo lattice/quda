@@ -75,7 +75,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  //setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -108,11 +107,12 @@ int test(int contractionType, QudaPrecision test_prec)
   QudaContractType cType = QUDA_CONTRACT_TYPE_INVALID;
   int nSpin = 0;
   switch (contractionType) {
-  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; nSpin = 4; setSpinorSiteSize(spinor_site_size); break;
-  case 1: cType = QUDA_CONTRACT_TYPE_DR; nSpin = 4; setSpinorSiteSize(spinor_site_size); break;
-  case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; setSpinorSiteSize(stag_spinor_site_size); break;
+  case 0: cType = QUDA_CONTRACT_TYPE_OPEN; nSpin = 4; break;
+  case 1: cType = QUDA_CONTRACT_TYPE_DR; nSpin = 4; break;
+  case 2: cType = QUDA_CONTRACT_TYPE_STAGGERED; nSpin = 1; break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
+  int my_spinor_site_size = nSpin * 3 * 2;
 
   int X[4] = {xdim, ydim, zdim, tdim};
 

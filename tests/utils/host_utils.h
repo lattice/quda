@@ -28,7 +28,6 @@ extern int Ls;
 extern int V5;
 extern int V5h;
 
-extern int my_spinor_site_size;
 extern size_t host_gauge_data_type_size;
 extern size_t host_spinor_data_type_size;
 extern size_t host_clover_data_type_size;
@@ -107,7 +106,7 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *csParam, const QudaInver
 				const QudaGaugeParam *gauge_param);
 void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                 const int dil, const int *const src);
-void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil);
+void constructWallSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int dil);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
                                  const int *const x, quda::RNG &rng);
 //------------------------------------------------------
@@ -118,7 +117,7 @@ inline bool isPCSolution(QudaSolutionType solution_type)
 {
   return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
           || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-};
+}
 //------------------------------------------------------
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
@@ -131,10 +130,9 @@ void initRand();
 int lex_rank_from_coords_t(const int *coords, void *fdata);
 int lex_rank_from_coords_x(const int *coords, void *fdata);
 
-void get_gridsize_from_env(int *const dims);
+void get_size_from_env(int *const dims, const char env[]);
 void setDims(int *X);
 void dw_setDims(int *X, const int L5);
-void setSpinorSiteSize(int n);
 int dimPartitioned(int dim);
 
 bool last_node_in_t();

@@ -5,6 +5,7 @@
 #include <quda_matrix.h>
 #include <matrix_field.h>
 #include <kernel.h>
+#include <fast_intdiv.h>
 
 namespace quda
 {
