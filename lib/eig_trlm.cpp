@@ -278,7 +278,6 @@ namespace quda
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
     int dim = n_kr - num_locked;
-    // int arrow_pos = std::max(num_keep - num_locked + 1, 2);
     int arrow_pos = num_keep - num_locked;
 
     // Eigen objects

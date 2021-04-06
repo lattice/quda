@@ -120,10 +120,6 @@ int main(int argc, char **argv)
     setDims(gauge_param.X);
   }
 
-  // Set spinor site size (wilson types only in this file)
-  int sss = 24;
-  setSpinorSiteSize(sss);
-
   // Allocate host side memory for the gauge field.
   void *gauge[4];
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -146,7 +142,7 @@ int main(int argc, char **argv)
   // Host side arrays to store the eigenpairs computed by QUDA
   void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
   for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
+    host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
   }
   double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
 

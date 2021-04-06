@@ -272,7 +272,11 @@ namespace quda {
                       const range &range_x, const range &range_y, int upper, int coeff_width)
     {
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, false)) {
+      size_t max_yw_size = y[0]->Precision() == QUDA_DOUBLE_PRECISION ?
+        max_YW_size<Functor<double>>(x.size(), x[0]->Precision(), y[0]->Precision()) :
+        max_YW_size<Functor<float>>(x.size(), x[0]->Precision(), y[0]->Precision());
+
+      if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
         T *tmpmajor = new T[x.size() * y.size()];
         T *tmpmajor0 = &tmpmajor[0];
@@ -363,7 +367,11 @@ namespace quda {
                         int pass, int upper)
     {
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, 2, false)) {
+      size_t max_yw_size = y[0]->Precision() == QUDA_DOUBLE_PRECISION ?
+        max_YW_size<multicaxpyz_<double>>(x.size(), x[0]->Precision(), y[0]->Precision()) :
+        max_YW_size<multicaxpyz_<float>>(x.size(), x[0]->Precision(), y[0]->Precision());
+
+      if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];

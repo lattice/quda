@@ -138,7 +138,7 @@ namespace quda
          @brief Stop profiling
        */
       void stop();
-    }
+    } // namespace profile
 
-  }
-}
+  } // namespace device
+} // namespace quda

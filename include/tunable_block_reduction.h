@@ -4,6 +4,7 @@
 #include <device.h>
 #include <kernel_helper.h>
 #include <reduce_helper.h>
+#include <target_device.h>
 #include <block_reduction_kernel.h>
 
 #ifdef JITIFY
@@ -42,17 +43,33 @@ namespace quda {
     */
     bool tuneGridDim() const final { return false; }
 
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    std::enable_if_t<device::use_kernel_arg<Arg>(), void>
+      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
+    }
+
+    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
+      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    {
+      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
+      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
+      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
+    }
+
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
     std::enable_if_t<idx != 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
+      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
       else launch_device<idx - 1, Block, Transformer>(arg, tp, stream);
     }
 
     template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
     std::enable_if_t<idx == 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == Block::block[idx]) qudaLaunchKernel(BlockKernel2D<Block::block[idx], Transformer, Arg>, tp, stream, arg);
+      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
       else errorQuda("Unexpected block size %d\n", tp.block.x);
     }
 

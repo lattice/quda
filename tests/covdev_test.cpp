@@ -56,8 +56,6 @@ void init(int argc, char **argv)
 
   if (Nsrc != 1) warningQuda("The covariant derivative doesn't support 5-d indexing, only source 0 will be tested");
 
-  setSpinorSiteSize(24);
-
   inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
   inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
