@@ -172,6 +172,9 @@ static TimeProfile profileFatLink("computeKSLinkQuda");
 //!< Profiler for computeGaugeForceQuda
 static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 
+//!< Profiler for computeGaugePathQuda
+static TimeProfile profileGaugePath("computeGaugePathQuda");
+
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
@@ -4248,10 +4251,93 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   return 0;
 }
 
+int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int* path_length,
+			 double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
+{
+  profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(qudaGaugeParam);
+
+  GaugeFieldParam gParam(siteLink, *qudaGaugeParam);
+  gParam.site_offset = qudaGaugeParam->gauge_offset;
+  gParam.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
+
+  cudaGaugeField* cudaSiteLink = nullptr;
+
+  if (qudaGaugeParam->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaSiteLink = gaugePrecise;
+  } else {
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
+
+    cudaSiteLink = new cudaGaugeField(gParam);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaSiteLink->loadCPUField(*cpuSiteLink);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+  }
+
+  GaugeFieldParam gParamOut(out, *qudaGaugeParam);
+  gParamOut.site_offset = qudaGaugeParam->gauge_offset;
+  gParamOut.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField* cpuOut = new cpuGaugeField(gParamOut);
+  gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
+  gParamOut.reconstruct = qudaGaugeParam->reconstruct;
+  gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
+  cudaGaugeField* cudaOut = new cudaGaugeField(gParamOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+  if (!qudaGaugeParam->overwrite_gauge) {
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaOut->loadCPUField(*cpuOut);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+  }
+
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
+
+  // actually do the computation
+  profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
+  cudaOut->saveCPUField(*cpuOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_FREE);
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
+    gaugePrecise = cudaSiteLink;
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaSiteLink;
+    delete cudaGauge;
+  }
+
+  delete cudaOut;
+
+  if (cpuSiteLink) delete cpuSiteLink;
+  if (cpuOut) delete cpuOut;
+  profileGaugePath.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
+  return 0;
+}
+
+
 void momResidentQuda(void *mom, QudaGaugeParam *param)
 {
-  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeForce.TPSTART(QUDA_PROFILE_INIT);
+  profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(param);
 
@@ -4281,26 +4367,26 @@ void momResidentQuda(void *mom, QudaGaugeParam *param)
               param->return_result_mom);
   }
 
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
 
   if (param->make_resident_mom) {
     // we are downloading the momentum from the host
-    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
     momResident->loadCPUField(cpuMom);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
   } else if (param->return_result_mom) {
     // we are uploading the momentum to the host
-    profileGaugeForce.TPSTART(QUDA_PROFILE_D2H);
+    profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
     momResident->saveCPUField(cpuMom);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_D2H);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_D2H);
 
-    profileGaugeForce.TPSTART(QUDA_PROFILE_FREE);
+    profileGaugePath.TPSTART(QUDA_PROFILE_FREE);
     delete momResident;
     momResident = nullptr;
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void createCloverQuda(QudaInvertParam* invertParam)
