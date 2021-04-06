@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <index_helper.cuh>
 #include <timer.h>
+#include <dslash_quda.h>
 
 namespace quda
 {

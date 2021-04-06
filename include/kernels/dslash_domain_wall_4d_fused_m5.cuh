@@ -1,5 +1,6 @@
 #pragma once
 
+#include <constant_kernel_arg.h>
 #include <kernels/dslash_domain_wall_4d.cuh>
 #include <kernels/dslash_domain_wall_m5.cuh>
 

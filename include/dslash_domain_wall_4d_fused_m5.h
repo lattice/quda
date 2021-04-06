@@ -1,11 +1,9 @@
 #include <gauge_field.h>
 #include <color_spinor_field.h>
-#include <constant_kernel_arg.h>
-#include <dslash.h>
 #include <worker.h>
-
 #include <dslash_policy.cuh>
 #include <kernels/dslash_domain_wall_4d_fused_m5.cuh>
+#include <dslash.h>
 
 /**
    This is the templated gauged domain-wall 4-d preconditioned operator, but fused with immediately followed fifth dimension operators.
@@ -23,8 +21,8 @@ namespace quda
   public:
     DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
-      TunableVectorY::resizeStep(in.X(4));
+      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      TunableKernel3D::resizeStep(in.X(4), 1);
     }
 
     void apply(const qudaStream_t &stream)
@@ -32,22 +30,16 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       typedef typename mapper<typename Arg::Float>::type real;
-#ifdef JITIFY
-      // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
-      auto instance = Dslash::template kernel_instance<packShmem>();
-      Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
       Dslash::template instantiate<packShmem>(tp, stream);
-#endif
     }
 
     unsigned int sharedBytesPerThread() const
     {
       // spin components in shared depend on inversion algorithm
       if (mobius_m5::use_half_vector()) {
-      return 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+        return 2 * (Arg::nSpin / 2) * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
       } else {
-      return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
+        return 2 * Arg::nSpin * Arg::nColor * sizeof(typename mapper<typename Arg::Float>::type);
       }
     }
 
@@ -135,7 +127,6 @@ namespace quda
     {
       constexpr int nDim = 4;
       using Arg = DomainWall4DFusedM5Arg<Float, nColor, nDim, recon, dslash5_type_impl>;
-      static_assert(sizeof(Arg) <= 4096, "arg size too large");
       Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in);
 

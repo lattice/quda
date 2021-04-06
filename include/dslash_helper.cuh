@@ -4,6 +4,7 @@
 #include <gauge_field.h>
 #include <register_traits.h>
 #include <index_helper.cuh>
+#include <fast_intdiv.h>
 #include <shmem_helper.cuh>
 #include <kernel.h>
 
