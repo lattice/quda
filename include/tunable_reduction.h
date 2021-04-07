@@ -85,32 +85,13 @@ namespace quda {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       reduce_t value = arg.init();
 
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(Transformer<Arg>::init_omp())
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
 
       Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
       // printf("dparg %p\n", dparg);
       omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
       Transformer<Arg> t(*dparg);
-#if 0
-// gives wrong results?!
 #pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
-      for (int j = 0; j < ty; j++) {
-        for (int i = 0; i < tx; i++) {
-          value = t(value, i, j);
-        }
-      }
-#endif
-#if 0
-// also wrong results
-      for (int j = 0; j < ty; j++) {
-#pragma omp target teams distribute parallel for reduction(OMPReduce_:value)
-        for (int i = 0; i < tx; i++) {
-          value = t(value, i, j);
-        }
-      }
-#endif
-// NOT really a parallel reduction
-#pragma omp target teams distribute parallel for simd num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
       for (int j = 0; j < ty; j++) {
         for (int i = 0; i < tx; i++) {
           value = t(value, i, j);
