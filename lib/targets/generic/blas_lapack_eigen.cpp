@@ -1,3 +1,4 @@
+#include <timer.h>
 #include <blas_lapack.h>
 #include <eigen_helper.h>
 
@@ -58,7 +59,7 @@ namespace quda
         size_t size = 2 * n * n * batch * prec;
         void *A_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : A);
         void *Ainv_h = (location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size) : Ainv);
-        if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, cudaMemcpyDeviceToHost); }
+        if (location == QUDA_CUDA_FIELD_LOCATION) { qudaMemcpy(A_h, A, size, qudaMemcpyDeviceToHost); }
 
         long long flops = 0;
         timeval start, stop;
@@ -103,7 +104,7 @@ namespace quda
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
-          qudaMemcpy((void *)Ainv, Ainv_h, size, cudaMemcpyHostToDevice);
+          qudaMemcpy((void *)Ainv, Ainv_h, size, qudaMemcpyHostToDevice);
         }
 
         return flops;
@@ -322,9 +323,9 @@ namespace quda
         void *B_h = location == QUDA_CPU_FIELD_LOCATION ? B_data : pool_pinned_malloc(sizeBarr);
         void *C_h = location == QUDA_CPU_FIELD_LOCATION ? C_data : pool_pinned_malloc(sizeCarr);
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          qudaMemcpy(A_h, A_data, sizeAarr, cudaMemcpyDeviceToHost);
-          qudaMemcpy(B_h, B_data, sizeBarr, cudaMemcpyDeviceToHost);
-          qudaMemcpy(C_h, C_data, sizeCarr, cudaMemcpyDeviceToHost);
+          qudaMemcpy(A_h, A_data, sizeAarr, qudaMemcpyDeviceToHost);
+          qudaMemcpy(B_h, B_data, sizeBarr, qudaMemcpyDeviceToHost);
+          qudaMemcpy(C_h, C_data, sizeCarr, qudaMemcpyDeviceToHost);
         }
 
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
@@ -371,7 +372,7 @@ namespace quda
 
         // Transfer data
         if (location == QUDA_CUDA_FIELD_LOCATION) {
-          qudaMemcpy(C_data, C_h, sizeCarr, cudaMemcpyHostToDevice);
+          qudaMemcpy(C_data, C_h, sizeCarr, qudaMemcpyHostToDevice);
           pool_pinned_free(A_h);
           pool_pinned_free(B_h);
           pool_pinned_free(C_h);

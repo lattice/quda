@@ -9,7 +9,7 @@ extern int Vh;
 extern int V;
 
 using namespace quda;
-using namespace std;
+template <typename T> using complex = std::complex<T>;
 
 template <typename Float> void contractDegrandRossi(Float *h_result_)
 {
@@ -188,7 +188,7 @@ template <typename Float> void contractColor(Float *spinorX, Float *spinorY, Flo
 }
 
 template <typename Float>
-int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaContractType cType, int X[])
+int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaContractType cType)
 {
 
   int faults = 0;

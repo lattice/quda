@@ -1,5 +1,6 @@
 #include <iostream>
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 
 namespace quda {
@@ -106,8 +107,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracDomainWall::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				    const QudaSolutionType solType) const
+  void DiracDomainWall::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }

@@ -425,7 +425,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha[Np];
+    std::unique_ptr<double[]> alpha(new double[Np]);
     double pAp;
     int rUpdate = 0;
 
@@ -569,7 +569,7 @@ namespace quda {
 	    if ( (j+1)%Np == 0 ) {
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-              blas::axpy(alpha, p, x_);
+              blas::axpy(alpha.get(), p, x_);
             }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
@@ -605,7 +605,7 @@ namespace quda {
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-          blas::axpy(alpha, p_, x_);
+          blas::axpy(alpha.get(), p_, x_);
         }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
@@ -740,7 +740,7 @@ namespace quda {
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-        blas::axpy(alpha, p_, x_);
+        blas::axpy(alpha.get(), p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
@@ -789,11 +789,15 @@ namespace quda {
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
-  #ifndef BLOCKSOLVER
-  errorQuda("QUDA_BLOCKSOLVER not built.");
-  #else
 
+#ifndef BLOCKSOLVER
+
+void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+
+#else
+
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
+{
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
@@ -1157,8 +1161,8 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
 
   return;
 
-  #endif
 }
+#endif
 
 #else
 

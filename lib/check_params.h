@@ -284,7 +284,7 @@ void printQudaCloverParam(QudaInvertParam *param)
 #endif
 
 #ifdef INIT_PARAM
-    P(compute_clover_trlog, 0);
+    P(compute_clover_trlog, 1);
     P(compute_clover, 0);
     P(compute_clover_inverse, 0);
     P(return_clover, 0);

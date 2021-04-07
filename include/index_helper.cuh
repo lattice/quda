@@ -1,5 +1,7 @@
 #pragma once
 
+#include <enum_quda.h>
+
 namespace quda {
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] + dx[]
@@ -10,7 +12,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
-  __device__ __host__ inline int linkIndexShift(const I x[], const J dx[], const K X[4]) {
+  __device__ __host__ inline int linkIndexShift(const I &x, const J &dx, const K &X) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
@@ -207,7 +209,7 @@ namespace quda {
      @return Full linear lattice index
    */
   template <typename Coord, typename I, typename J>
-  __device__ __host__ inline int getCoordsCB(Coord &x, int cb_index, const I X[], J X0h, int parity)
+  __device__ __host__ inline int getCoordsCB(Coord &x, int cb_index, const I &X, J X0h, int parity)
   {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
@@ -236,7 +238,7 @@ namespace quda {
      @param[in] parity Site parity
      @return Full linear lattice index
    */
-  template <typename Coord, typename I> __device__ __host__ inline int getCoords(Coord &x, int cb_index, const I X[], int parity)
+  template <typename Coord, typename I> __device__ __host__ inline int getCoords(Coord &x, int cb_index, const I &X, int parity)
   {
     return getCoordsCB(x, cb_index, X, X[0] >> 1, parity);
   }
@@ -249,8 +251,8 @@ namespace quda {
      @param X Full lattice dimensions
      @param parity Site parity
    */
-  template <typename I, typename J>
-  __device__ __host__ inline void getCoordsExtended(I x[], int cb_index, const J X[], int parity, const int R[]) {
+  template <typename Coord, typename J>
+  __device__ __host__ inline void getCoordsExtended(Coord &x, int cb_index, const J &X, int parity, const int R[]) {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
     //x[1] = (cb_index/(X[0]/2)) % X[1];
@@ -279,7 +281,7 @@ namespace quda {
      @return Full linear lattice index
    */
   template <typename Coord, typename I, typename J>
-  __device__ __host__ inline int getCoords5CB(Coord &x, int cb_index, const I X[5], J X0h, int parity, QudaPCType pc_type)
+  __device__ __host__ inline int getCoords5CB(Coord &x, int cb_index, const I &X, J X0h, int parity, QudaPCType pc_type)
   {
     //x[4] = cb_index/(X[3]*X[2]*X[1]*X[0]/2);
     //x[3] = (cb_index/(X[2]*X[1]*X[0]/2) % X[3];
@@ -310,8 +312,8 @@ namespace quda {
      @param[in] parity Site parity
      @return Full linear lattice index
    */
-  template <typename I>
-  __device__ __host__ inline int getCoords5(int x[5], int cb_index, const I X[5], int parity, QudaPCType pc_type)
+  template <typename Coord, typename I>
+  __device__ __host__ inline int getCoords5(Coord &x, int cb_index, const I &X, int parity, QudaPCType pc_type)
   {
     return getCoords5CB(x, cb_index, X, X[0] >> 1, parity, pc_type);
   }
@@ -326,7 +328,7 @@ namespace quda {
      @param parity Site parity
    */
   template <typename I>
-  __device__ __host__ inline int getIndexFull(int cb_index, const I X[4], int parity) {
+  __device__ __host__ inline int getIndexFull(int cb_index, const I &X, int parity) {
     int za = (cb_index / (X[0] / 2));
     int zb =  (za / X[1]);
     int x1 = za - zb * X[1];
@@ -346,7 +348,7 @@ namespace quda {
       @return 1-d checkerboard index
    */
   template <typename I>
-  __device__ __host__ inline int getParityCBFromFull(int& out_parity, const I X[4], const int full_index) {
+  __device__ __host__ inline int getParityCBFromFull(int& out_parity, const I &X, const int full_index) {
 
     const int za = (full_index / X[0]);
     const int x0 = full_index % X[0];
@@ -820,9 +822,9 @@ namespace quda {
   {
 
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-    const int s = (nDim == 5 ? tid / arg.threads : 0);
+    const int s = (nDim == 5 ? tid / arg.work_items : 0);
 
-    face_idx = tid - s * arg.threads; // face_idx = face_idx % arg.threads
+    face_idx = tid - s * arg.work_items; // face_idx = face_idx % arg.work_items
 
     if (face_idx < arg.threadDimMapUpper[0]) {
       face_idx += s * arg.threadDimMapUpper[0];
@@ -867,9 +869,9 @@ namespace quda {
      @return Swizzled block index
   */
   //#define SWIZZLE
+#ifdef SWIZZLE
   template <typename T> __device__ inline int block_idx(const T &swizzle)
   {
-#ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
     const int gridp = gridDim.x - gridDim.x % swizzle;
 
@@ -883,10 +885,13 @@ namespace quda {
       block_idx = i * (gridp / swizzle) + j;
     }
     return block_idx;
-#else
-    return blockIdx.x;
-#endif
   }
+#else
+  template <typename T> __device__ inline int block_idx(const T &)
+  {
+    return blockIdx.x;
+  }
+#endif
 
   /**
      @brief Compute the staggered phase factor at unit shift from the

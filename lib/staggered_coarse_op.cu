@@ -1,9 +1,6 @@
-#include <tune_quda.h>
 #include <transfer.h>
-#include <color_spinor_field.h>
 #include <gauge_field.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 
 // For naive Kahler-Dirac coarsening
 #include <kernels/staggered_coarse_op_kernel.cuh>
@@ -46,7 +43,7 @@ namespace quda {
   }
 
   template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  class CalculateStaggeredY : public TunableVectorYZ {
+  class CalculateStaggeredY : public TunableKernel3D {
 
     Arg &arg;
     const GaugeField &meta;
@@ -63,24 +60,15 @@ namespace quda {
 
     unsigned int minThreads() const { return arg.fineVolumeCB; }
     bool tuneSharedBytes() const { return false; } // don't tune the grid dimension
-    bool tuneGridDim() const { return false; } // don't tune the grid dimension
-    bool tuneAuxDim() const { return false; }
 
   public:
     CalculateStaggeredY(Arg &arg, const GaugeField &meta, GaugeField &Y, GaugeField &X) :
-      TunableVectorYZ(fineColor*fineColor, 2),
+      TunableKernel3D(meta, fineColor*fineColor, 2),
       arg(arg),
       meta(meta),
       Y(Y),
       X(X)
     {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-#ifdef JITIFY
-        create_jitify_program("kernels/staggered_coarse_op_kernel.cuh");
-#endif
-      }
-      strcpy(aux, compile_type_str(meta));
-      strcpy(aux, meta.AuxString());
       strcat(aux,comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux,",computeStaggeredVUV");
@@ -92,19 +80,12 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        ComputeStaggeredVUVCPU<Float,fineColor,coarseSpin,coarseColor>(arg);
+        launch_host<ComputeStaggeredVUV>(tp, stream, arg);
       } else {
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::ComputeStaggeredVUVGPU")
-          .instantiate(Type<Float>(),fineColor,coarseSpin,coarseColor,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else // not jitify
-        qudaLaunchKernel(ComputeStaggeredVUVGPU<Float,fineColor,coarseSpin,coarseColor,Arg>, tp, stream, arg);
-#endif // JITIFY
+        launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
     }
 
@@ -113,8 +94,6 @@ namespace quda {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;
     }
-
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
   /**
@@ -160,13 +139,12 @@ namespace quda {
 
     int geo_bs[QUDA_MAX_DIM] = { };
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
-    int spin_bs = 0; // 0 -> spin-less types.
 
     // Calculate VUV in one pass (due to KD-transform) for each dimension,
     // accumulating directly into the coarse gauge field Y
 
     using Arg = CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,fineGauge>;
-    Arg arg(Y, X, G, mass, x_size, xc_size, geo_bs, spin_bs);
+    Arg arg(Y, X, G, mass, x_size, xc_size, geo_bs);
     CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, Y_, X_);
 
     QudaFieldLocation location = checkLocation(Y_, X_, G_);
@@ -188,7 +166,7 @@ namespace quda {
     // it's faster to skip the flip!
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing VUV\n");
-    y.apply(0);
+    y.apply(device::get_default_stream());
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
@@ -436,11 +414,11 @@ namespace quda {
     }
   }
 
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
-#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
     checkPrecision(T.Vectors(X.Location()), X, Y);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
@@ -478,12 +456,16 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
-#else
-    errorQuda("Staggered multigrid has not been built");
-#endif
   }
+#else
+  void calculateStaggeredY(GaugeField &, GaugeField &, const Transfer &, const GaugeField &,
+                           const GaugeField &, double, QudaDiracType, QudaMatPCType)
+  {
+    errorQuda("Staggered multigrid has not been built");
+  }
+#endif
 
-  //Calculates the coarse color matrix and puts the result in Y.
+//Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
                          const cudaGaugeField* XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)

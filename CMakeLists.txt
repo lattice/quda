@@ -36,7 +36,6 @@ set(VALID_BUILD_TYPES
     STRICT
     DEBUG
     HOSTDEBUG
-    DEVICEDEBUG
     SANITIZE)
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
@@ -70,11 +69,13 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA") 
+if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA")
+  set(QUDA_TARGET_CUDA ON)
   set(QUDA_TARGET_LIBRARY quda_cuda_target)
 endif()
 
 if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
+  set(QUDA_TARGET_HIP ON)
   set(QUDA_TARGET_LIBRARY quda_hip_target)
 endif()
 #
@@ -107,7 +108,7 @@ endif(GIT_FOUND)
 
 project(
   "QUDA"
-  VERSION 1.0.0
+  VERSION 1.1.0
   LANGUAGES)
 
 message(STATUS "")
@@ -132,8 +133,8 @@ endif()
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -351,52 +352,47 @@ elseif(${CPU_ARCH} STREQUAL "ppc64le")
 endif()
 
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
+
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall"
+    "-g -O3 -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Wall -Werror"
+    "-O3 -Werror -Wall -Wextra"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
 
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL
-    "-Wall -g -O3"
+    "-g -O3 -Wall -Wextra"
     CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
-    "-Wall -O3 -Werror"
+    "-O3 -Werror -Wall -Wextra"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
 set(CMAKE_C_FLAGS_RELEASE
-    "-Wall -O3"
+    "-O3 -w"
     CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas"
-    CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline"
+    "-Wall -Wextra -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    "-Wall -Wextra -g -fno-inline \"-fsanitize=address,undefined\""
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
@@ -450,9 +446,6 @@ set(CMAKE_CUDA_FLAGS_RELEASE
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "-g"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
@@ -708,7 +701,7 @@ if(QUDA_QIO)
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
                         "CFLAGS=-Wall -O3 -std=c99 " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
-                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering --enable-dml-bufsize=33554432
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install
       DEPENDS QMP
@@ -907,7 +900,6 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
@@ -915,7 +907,6 @@ mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_CXX_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CXX_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_CXX_FLAGS_SANITIZE)
 
 mark_as_advanced(CMAKE_C_FLAGS_DEVEL)
@@ -923,7 +914,6 @@ mark_as_advanced(CMAKE_C_FLAGS_STRICT)
 mark_as_advanced(CMAKE_C_FLAGS_RELEASE)
 mark_as_advanced(CMAKE_C_FLAGS_DEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
 

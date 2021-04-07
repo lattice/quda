@@ -3,10 +3,9 @@
 #include <typeinfo>
 
 #include <color_spinor_field.h>
-#include <tune_quda.h>
 #include <dslash_quda.h>
 #include <dslash_helper.cuh>
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <instantiate.h>
 #include <instantiate_dslash.h>
 
@@ -29,7 +28,7 @@ namespace quda
      defined in the same file is the corresponding argument class.
   */
   template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
-  class Dslash : public TunableVectorYZ
+  class Dslash : public TunableKernel3D
   {
 
   protected:
@@ -47,7 +46,6 @@ namespace quda
     // pointers to ghost buffers we are packing to
     void *packBuffer[4 * QUDA_MAX_DIM];
 
-    std::string kernel_file;
     /**
        @brief Set the base strings used by the different dslash kernel
        types for autotuning.
@@ -79,7 +77,7 @@ namespace quda
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
     }
 
-    virtual bool tuneGridDim() const { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
+    virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
     virtual unsigned int minThreads() const { return arg.threads; }
 
     virtual unsigned int minGridSize() const
@@ -91,9 +89,9 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
-        return TunableVectorYZ::minGridSize();
+        return TunableKernel3D::minGridSize();
       }
     }
 
@@ -103,9 +101,9 @@ namespace quda
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
-        return TunableVectorYZ::gridStep();
+        return TunableKernel3D::gridStep();
       }
     }
 
@@ -132,12 +130,12 @@ namespace quda
         }
       }
 
-      arg.in.resetGhost(in, ghost);
+      arg.in.resetGhost(ghost);
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
-        arg.in_pack.resetGhost(in, this->packBuffer);
+        arg.in_pack.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
         arg.counter = dslash::get_shmem_sync_counter();
       }
@@ -152,8 +150,7 @@ namespace quda
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
-          ((deviceProp.multiProcessorCount) / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
-          0;
+          (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) : 0;
         tp.grid.x += arg.exterior_blocks;
       }
     }
@@ -178,7 +175,7 @@ namespace quda
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
-        const int max_blocks_per_dir = std::max((deviceProp.multiProcessorCount) / (8 * nDimComms), 4);
+        const int max_blocks_per_dir = std::max(device::processor_count() / (8 * nDimComms), 4u);
         if (param.aux.x + 1 <= max_blocks_per_dir
             && (param.aux.x + 1) * param.block.x < (max_threads_per_dir + param.block.x - 1)) {
           param.aux.x++;
@@ -189,7 +186,6 @@ namespace quda
             /* if doing a fused interior+exterior kernel we use aux.y to control the number of blocks we add for the
              * exterior. We make sure to use multiple blocks per communication direction.
              */
-            auto maxgridsize = TunableVectorYZ::maxGridSize();
             if (param.aux.y < 4) {
               param.aux.y++;
               return true;
@@ -219,8 +215,8 @@ namespace quda
         step_y = vector_length_y;
         step_z = vector_length_z;
       }
-      TunableVectorYZ::initTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      TunableKernel3D::initTuneParam(param);
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
@@ -233,8 +229,8 @@ namespace quda
         step_y = vector_length_y;
         step_z = vector_length_z;
       }
-      TunableVectorYZ::defaultTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      TunableKernel3D::defaultTuneParam(param);
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
       if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
@@ -247,38 +243,9 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
-      if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
-        tp.set_max_shared_bytes = true;
-      }
-      qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+      tp.set_max_shared_bytes = true;
+      launch_device<dslash_functor>(tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
-
-#ifdef JITIFY
-    /**
-       @brief Return a jitify kernel instance
-    */
-    template <template <bool, QudaPCType, typename> class P> auto kernel_instance()
-    {
-      if (!program) errorQuda("Jitify program has not been created");
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      // Since we pass the operator and packer classes as strings to
-      // jitify, we need to handle the reflection for all other
-      // template parameters here as well as opposed to leaving this
-      // to jitify.
-      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect(arg.nParity), reflect(arg.dagger),
-                                                           reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
-
-      return instance;
-    }
-#endif
 
   public:
     /**
@@ -293,9 +260,6 @@ namespace quda
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
-#ifdef JITIFY
-        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
@@ -309,7 +273,6 @@ namespace quda
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
 #endif
         }
-#endif // JITIFY
       }
     }
 
@@ -322,14 +285,10 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
       if (arg.dagger)
         instantiate<P, nParity, true, xpay>(tp, stream);
       else
         instantiate<P, nParity, false, xpay>(tp, stream);
-#endif
     }
 
     /**
@@ -341,15 +300,11 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
       case 2: instantiate<P, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
-#endif
     }
 
     /**
@@ -361,20 +316,16 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
       if (arg.xpay)
         instantiate<P, true>(tp, stream);
       else
         instantiate<P, false>(tp, stream);
-#endif
     }
 
     Arg &dslashParam; // temporary addition for policy compatibility
 
     Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      TunableVectorYZ(1, arg.nParity),
+      TunableKernel3D(in, 1, arg.nParity),
       arg(arg),
       out(out),
       in(in),
@@ -402,24 +353,20 @@ namespace quda
 
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
       strcat(aux_barrier, ",shmem");
-
-      // extract the filename from the template template class (do
-      // this regardless of jitify to ensure a build error if filename
-      // helper isn't defined)
-      using D_ = D<0, false, false, INTERIOR_KERNEL, Arg>;
-      kernel_file = std::string("kernels/") + D_::filename();
-#ifdef JITIFY
-      create_jitify_program(kernel_file);
-#endif
     }
 
+#ifdef NVSHMEM_COMMS
     void setShmem(int shmem)
     {
-#ifdef NVSHMEM_COMMS
       arg.shmem = shmem;
-#endif
       setUberTuning(arg.shmem & 64);
     }
+#else
+    void setShmem(int)
+    {
+      setUberTuning(arg.shmem & 64);
+    }
+#endif
 
     void setPack(bool pack, MemoryLocation location)
     {
@@ -551,7 +498,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -567,6 +513,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         flops_ -= ghost_flops * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }
@@ -597,7 +545,6 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) { bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -610,6 +557,8 @@ namespace quda
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
 
+        if (arg.kernel_type == INTERIOR_KERNEL && arg.pack_threads)
+          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         break;
       }
       }

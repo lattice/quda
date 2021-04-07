@@ -122,7 +122,7 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
 
 int Communicator::comm_rank(void) { return rank; }
 
-int Communicator::comm_size(void) { return size; }
+size_t Communicator::comm_size(void) { return size; }
 
 /**
  * Declare a message handle for sending `nbytes` to the `rank` with `tag`.

@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 #include <qio_field.h>
@@ -451,8 +452,8 @@ namespace quda {
     bool deflate_init;      /** If true, the deflation space has been computed. */
     bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
-    std::vector<ColorSpinorField *> evecs;     /** Holds the eigenvectors. */
-    std::vector<Complex> evals;                /** Holds the eigenvalues. */
+    std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
+    std::vector<Complex> evals;            /** Holds the eigenvalues. */
 
   public:
     Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -463,9 +464,9 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    const DiracMatrix& M() { return mat; }
-    const DiracMatrix& Msloppy() { return matSloppy; }
-    const DiracMatrix& Mprecon() { return matPrecon; }
+    const DiracMatrix &M() { return mat; }
+    const DiracMatrix &Msloppy() { return matSloppy; }
+    const DiracMatrix &Mprecon() { return matPrecon; }
     const DiracMatrix &Meig() { return matEig; }
 
     /**
@@ -1455,14 +1456,14 @@ public:
     bool hermitian() { return false; } // GMRESDR for any linear system
  };
 
-  /**
-     @brief This is an object that captures the state required for a
-     deflated solver.
-  */
-  struct deflation_space : public Object {
-    bool svd;                              /** Whether this space is for an SVD deflaton */
-    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
-    std::vector<Complex> evals;            /** The eigenvalues */
-  };
+ /**
+    @brief This is an object that captures the state required for a
+    deflated solver.
+ */
+ struct deflation_space : public Object {
+   bool svd;                              /** Whether this space is for an SVD deflaton */
+   std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
+   std::vector<Complex> evals;            /** The eigenvalues */
+ };
 
 } // namespace quda

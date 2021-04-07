@@ -162,7 +162,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   QudaEigParam eig_param = newQudaEigParam();
 
   if (inv_multigrid) {
@@ -304,8 +304,7 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  auto *rng = new quda::RNG(*check, 1234);
 
   std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
   std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
@@ -369,7 +368,6 @@ int main(int argc, char **argv)
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
-  rng->Release();
   delete rng;
 
   // free the multigrid solver

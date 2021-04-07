@@ -81,6 +81,7 @@ double eps_naik = 0.0;
 int n_naiks = 1;
 double clover_coeff = 0.1;
 bool compute_clover = false;
+bool compute_clover_trlog = true;
 bool compute_fatlong = false;
 double tol = 1e-7;
 double tol_precondition = 1e-1;
@@ -358,10 +359,6 @@ namespace
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},
     {"normop-pc", QUDA_NORMOP_PC_SOLVE}, {"normerr", QUDA_NORMERR_SOLVE},     {"normerr-pc", QUDA_NORMERR_PC_SOLVE}};
 
-  CLI::TransformPairs<QudaEigSpectrumType> seig_pectrum_map {
-    {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
-    {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
-
   CLI::TransformPairs<QudaFieldLocation> field_location_map {{"cpu", QUDA_CPU_FIELD_LOCATION},
                                                              {"host", QUDA_CPU_FIELD_LOCATION},
                                                              {"gpu", QUDA_CUDA_FIELD_LOCATION},
@@ -416,9 +413,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
+  quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
+                       "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-
+  
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
@@ -656,9 +655,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       int p;
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
-        if (p & (1 << j)) {
-          dim_partitioned[j] = 1;
-        }
+        if (p & (1 << j)) { dim_partitioned[j] = 1; }
       }
       return retval;
     },
@@ -850,7 +847,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
-  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,
+                      "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");

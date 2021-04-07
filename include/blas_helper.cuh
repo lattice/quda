@@ -1,6 +1,9 @@
 #pragma once
 
 #include <color_spinor_field.h>
+#include <reduce_helper.h>
+#include <load_store.h>
+#include <convert.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -102,17 +105,6 @@ namespace quda
       {
       }
 
-      SpinorNorm(const SpinorNorm &sn) : norm(sn.norm), cb_norm_offset(sn.cb_norm_offset) {}
-
-      SpinorNorm &operator=(const SpinorNorm &src)
-      {
-        if (&src != this) {
-          norm = src.norm;
-          cb_norm_offset = src.cb_norm_offset;
-        }
-        return *this;
-      }
-
       void set(const ColorSpinorField &x)
       {
         norm = (norm_t *)x.Norm();
@@ -136,11 +128,7 @@ namespace quda
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm[x + parity * cb_norm_offset] = scale;
 
-#ifdef __CUDA_ARCH__
-        return __fdividef(fixedMaxValue<store_t>::value, scale);
-#else
-        return fixedMaxValue<store_t>::value / scale;
-#endif
+        return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
       norm_t *Norm() { return norm; }
@@ -149,18 +137,16 @@ namespace quda
     template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
       using norm_t = float;
       SpinorNorm() {}
-      SpinorNorm(const ColorSpinorField &x) {}
-      SpinorNorm(const SpinorNorm &sn) {}
-      SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
-      void set(const ColorSpinorField &x) {}
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
+      SpinorNorm(const ColorSpinorField &) {}
+      void set(const ColorSpinorField &) {}
+      __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int)
       {
         return 1.0;
       }
-      void backup(char **norm_h, size_t norm_bytes) {}
-      void restore(char **norm_h, size_t norm_bytes) {}
+      void backup(char **, size_t) {}
+      void restore(char **, size_t) {}
       norm_t *Norm() { return nullptr; }
     };
 
@@ -185,19 +171,6 @@ namespace quda
         stride(x.Stride()),
         cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
       {
-      }
-
-      Spinor(const Spinor &st) : SN(st), spinor(st.spinor), stride(st.stride), cb_offset(st.cb_offset) {}
-
-      Spinor &operator=(const Spinor &src)
-      {
-        if (&src != this) {
-          SN::operator=(src);
-          spinor = src.spinor;
-          stride = src.stride;
-          cb_offset = src.cb_offset;
-        }
-        return *this;
       }
 
       void set(const ColorSpinorField &x)
@@ -310,13 +283,10 @@ namespace quda
     template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
-#endif
-
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Nspin() == 4 || x.Nspin() == 2) {
@@ -334,10 +304,11 @@ namespace quda
 #endif
       }
     }
-
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
+#else
+    constexpr void instantiate(const T &, const T &, const T &, V &x, Args &&...)
+    {
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+    }
 #endif
 
     // The instantiate helpers are used to instantiate the precision
@@ -346,8 +317,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<!mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x,
-                                                                      Args &&... args)
+    constexpr std::enable_if_t<!mixed, void> instantiate(const T &a, const T &b, const T &c, V &x,
+                                                         Args &&... args)
     {
       return instantiate<Functor, Blas, T, store_t, store_t>(a, b, c, x, args...);
     }
@@ -355,8 +326,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename x_store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x, V &y,
-                                                                     Args &&... args)
+    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, V &x, V &y,
+                                                        Args &&... args)
     {
       if (y.Precision() < x.Precision()) errorQuda("Y precision %d not supported", y.Precision());
 

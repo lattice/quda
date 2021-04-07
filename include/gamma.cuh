@@ -23,7 +23,7 @@ namespace quda {
 
   public:
     __device__ __host__ inline Gamma() { }
-    __device__ __host__ inline Gamma(const Gamma &g) { }
+    Gamma(const Gamma &g) = default;
 
     __device__ __host__ inline int getcol(int row) const {
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {

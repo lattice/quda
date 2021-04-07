@@ -172,12 +172,12 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
 
 int Communicator::comm_rank(void) { return QMP_comm_get_node_number(QMP_COMM_HANDLE); }
 
-int Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
+size_t Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
 
 /**
  * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
  */
-MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
+MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int, size_t nbytes)
 {
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -197,7 +197,7 @@ MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag,
 /**
  * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
  */
-MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes)
+MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int, size_t nbytes)
 {
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 

@@ -286,9 +286,8 @@ namespace quda {
 
     /**
        @brief Helper function called on exit to each MG member function
-       @param[in] level The level we working on
     */
-    void popLevel(int level) const;
+    void popLevel() const;
 
 public:
     /**

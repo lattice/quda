@@ -11,15 +11,6 @@ namespace quda {
     // creates and destroys reduction buffers
     void init();
     void destroy();
-
-    // creates and destroys additional copy stream
-    void createAuxBlasStream();
-    void destroyAuxBlasStream();
-    // Activate/deactivate (and synchronize) aux stream handle
-    void registerAuxBlasStream();
-    void unregisterAuxBlasStream(bool sync = true);
-    // Synchronize aux blas stream
-    void synchronizeAuxBlasStream();
     
     void setParam(int kernel, int prec, int threads, int blocks);
 
@@ -129,7 +120,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+    void axpy(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
 
     /**
        @brief This is a wrapper for calling the block "axpy" with a

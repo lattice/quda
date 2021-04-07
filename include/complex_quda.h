@@ -20,12 +20,10 @@
 
 #pragma once
 
-//#include <math.h>
-
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <cuComplex.h>
+#include <cstdint>
 
 namespace quda {
   namespace gauge {
@@ -109,11 +107,7 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
-#if (CUDA_VERSION < 7050)
     return std::pow(x,static_cast<ValueType>(e));
-#else
-    return std::pow(x,e);
-#endif
   }
   template <typename ValueType>
     __host__ __device__
@@ -311,7 +305,7 @@ namespace quda
     {
       os << '(' << z.real() << ',' << z.imag() << ')';
       return os;
-    };
+    }
 
   template<typename ValueType, typename charT, class traits>
     std::basic_istream<charT, traits>&
@@ -468,23 +462,21 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    complex<float>(const complex<float> & z)
-    : float2(z){}
+  __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
+  __host__ __device__ complex<float>& operator=(const complex<float> &z)
+    {
+      real(z.real());
+      imag(z.imag());
+      return *this;
+    }
 
   __host__ __device__
     complex<float>(float2 z)
     : float2(z){}
-  
-  template <class X>
-    inline complex<float>(const std::complex<X> & z)
-    {
-      real(z.real());
-      imag(z.imag());
-    }  
 
+  template <typename X>
+    inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
+  
   // Member operators
   template <typename T>
     __host__ __device__
@@ -590,11 +582,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    inline complex<double>(const complex<double> & z)
-    : double2(z) {}
+  __host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
+  __host__ __device__ complex<double>& operator=(const complex<double> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     inline complex<double>(double2 z)
@@ -718,7 +712,13 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) { }
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ inline complex<int8_t>& operator=(const complex<int8_t> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
@@ -765,7 +765,13 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+  __host__ __device__ complex<short>(const complex<short> & z) : short2(z) {}
+  __host__ __device__ complex<short>& operator=(const complex<short> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
     {
@@ -812,7 +818,16 @@ public:
     }
 
   __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+  __host__ __device__ complex<int>& operator=(const complex<int> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
+  template <typename X>
+  inline complex<int>(const std::complex<X> & z) : int2{static_cast<int>(z.x), static_cast<int>(z.y)} {}
+  
   __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
     {
       real(real()+z.real());

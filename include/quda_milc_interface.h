@@ -643,9 +643,6 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
-   * @param milc_link Ignored
-   * @param milc_clover Ignored
-   * @param milc_clover_inv Ignored
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
@@ -660,9 +657,6 @@ extern "C" {
       double clover_coeff,
       QudaInvertArgs_t inv_args,
       const double* target_residual,
-      const void* milc_link,
-      void* milc_clover,
-      void* milc_clover_inv,
       void* source,
       void** solutionArray,
       double* const final_residual,

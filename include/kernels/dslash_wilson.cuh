@@ -42,8 +42,8 @@ namespace quda
       out(out),
       in(in),
       in_pack(in),
-      U(U),
       x(x),
+      U(U),
       a(a)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
@@ -53,7 +53,20 @@ namespace quda
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
-      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
+      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel if ghost vector length is different than bulk
+    }
+
+    // defined the copy constructor to ensure we don't have an excess pop if the arg is copied
+    WilsonArg(const WilsonArg &arg) :
+      DslashArg<Float, nDim>(arg),
+      out(arg.out),
+      in(arg.in),
+      in_pack(arg.in_pack),
+      x(arg.x),
+      U(arg.U),
+      a(arg.a)
+    {
+      if (F::N != F::N_ghost) pushKernelPackT(true);
     }
 
     virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
@@ -147,7 +160,7 @@ namespace quda
 
     // out(x) = M*in = (-D + m) * in(x-mu)
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

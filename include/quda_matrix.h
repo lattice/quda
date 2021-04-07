@@ -1,16 +1,16 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
 #include <iostream>
-#include <iomanip>
 
 #include <register_traits.h>
 #include <float_vector.h>
 #include <complex_quda.h>
+#include <math_helper.cuh>
 
 namespace quda {
 
+  template <typename T> constexpr bool is_nan(T x) { return x != x; }
 
   template<class T>
     struct Zero
@@ -56,28 +56,27 @@ namespace quda {
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
   template<typename Float, typename T> struct clover_wrapper;
-  template<typename T, int N> class HMatrix;
+  template <typename T, int N> class HMatrix;
 
   template<class T, int N>
     class Matrix
     {
-      typedef typename RealType<T>::type real;
+      using real = typename RealType<T>::type;
 
     private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
-      public:
+    public:
         T data[N*N];
 
         __device__ __host__ constexpr int size() const { return N; }
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
-        {
-#pragma unroll
-	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-        }
+        Matrix(const Matrix<T,N> &) = default;
+        Matrix(Matrix<T,N> &&) = default;
+        Matrix& operator=(const Matrix<T,N> &) = default;
+        Matrix& operator=(Matrix<T,N> &&) = default;
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -207,28 +206,33 @@ namespace quda {
           const auto identity = conj(*this) * *this;
 
 #pragma unroll
-          for (int i = 0; i < N; ++i) {
-            if (fabs(identity(i, i).real() - 1.0) > max_error || fabs(identity(i, i).imag()) > max_error) return false;
+          for (int i=0; i<N; ++i){
+            if( fabs(identity(i,i).real() - 1.0) > max_error ||
+                fabs(identity(i,i).imag()) > max_error) return false;
 
 #pragma unroll
-            for (int j = i + 1; j < N; ++j) {
-              if (fabs(identity(i, j).real()) > max_error || fabs(identity(i, j).imag()) > max_error
-                  || fabs(identity(j, i).real()) > max_error || fabs(identity(j, i).imag()) > max_error) {
+            for (int j=i+1; j<N; ++j){
+              if( fabs(identity(i,j).real()) > max_error ||
+                  fabs(identity(i,j).imag()) > max_error ||
+                  fabs(identity(j,i).real()) > max_error ||
+                  fabs(identity(j,i).imag()) > max_error ){
                 return false;
               }
             }
           }
 
 #pragma unroll
-          for (int i = 0; i < N; i++) {
+          for (int i=0; i<N; i++) {
 #pragma unroll
-            for (int j = 0; j < N; j++) {
-              if (std::isnan((*this)(i, j).real()) || std::isnan((*this)(i, j).imag())) return false;
+            for (int j=0; j<N; j++) {
+              if (is_nan((*this)(i,j).real()) ||
+                  is_nan((*this)(i,j).imag())) return false;
             }
           }
 
           return true;
         }
+
     };
 
   /**
@@ -300,10 +304,10 @@ namespace quda {
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
-#pragma unroll
-	for (int i=0; i<N*N; i++) data[i] = a.data[i];
-      }
+      HMatrix(const HMatrix<T,N> &) = default;
+      HMatrix(HMatrix<T,N> &&) = default;
+      HMatrix& operator=(const HMatrix<T,N> &) = default;
+      HMatrix& operator=(HMatrix<T,N> &&) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 #pragma unroll
@@ -740,7 +744,7 @@ namespace quda {
     for (int i=0; i<N; i++) {
       am(i,i).y -= imag_trace/N;
     }
-    m = 0.5*am;
+    m = static_cast<real>(0.5)*am;
   }
 
   template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
@@ -1018,7 +1022,7 @@ namespace quda {
       //[25]
       theta  = acos(c0/c0_max);
 
-      sincos(theta * inv3, &w_p, &u_p);
+      quda::sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
 
@@ -1030,7 +1034,7 @@ namespace quda {
       matType w_sq = w_p * w_p;
       matType denom_inv = 1.0 / (9 * u_sq - w_sq);
       matType exp_iu_re, exp_iu_im;
-      sincos(u_p, &exp_iu_im, &exp_iu_re);
+      quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
       matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
       matType cos_w = cos(w_p);

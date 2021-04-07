@@ -98,9 +98,9 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  host_free(topo->ranks);
-  host_free(topo->coords);
-  host_free(topo);
+  delete [] topo->ranks;
+  delete [] topo->coords;
+  delete topo;
 }
 
 inline int comm_ndim(const Topology *topo) { return topo->ndim; }
@@ -127,28 +127,6 @@ inline int comm_rank_displaced(const Topology *topo, const int displacement[])
   }
 
   return comm_rank_from_coords(topo, coords);
-}
-
-inline bool isHost(const void *buffer)
-{
-  CUmemorytype memType;
-  void *attrdata[] = {(void *)&memType};
-  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
-    const char *str;
-    cuGetErrorName(err, &str);
-    errorQuda("cuPointerGetAttributes returned error %s", str);
-  }
-
-  switch (memType) {
-  case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_HOST:
-  default: // memory not allocated by CUDA allocaters will default to being host memory
-    return true;
-  }
 }
 
 inline void check_displacement(const int displacement[], int ndim)
@@ -270,11 +248,7 @@ struct Communicator {
             enable_p2p_max_access_rank);
       }
 
-      // first check that the local GPU supports UVA
       const int gpuid = comm_gpuid();
-      cudaDeviceProp prop;
-      cudaGetDeviceProperties(&prop, gpuid);
-      if (!prop.unifiedAddressing) return;
 
       comm_set_neighbor_ranks();
 
@@ -296,26 +270,18 @@ struct Communicator {
           // if the neighbors are on the same
           if (!strncmp(hostname, &hostname_recv_buf[128 * neighbor_rank], 128)) {
             int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
-            int canAccessPeer[2];
-            cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-            cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-            int accessRank[2] = {};
-            if (canAccessPeer[0] * canAccessPeer[1] != 0) {
-              cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-              cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-            }
+            bool can_access_peer = comm_peer2peer_possible(gpuid, neighbor_gpuid);
+            int access_rank = comm_peer2peer_performance(gpuid, neighbor_gpuid);
 
             // enable P2P if we can access the peer or if peer is self
             // if (canAccessPeer[0] * canAccessPeer[1] != 0 || gpuid == neighbor_gpuid) {
-            if ((canAccessPeer[0] * canAccessPeer[1] != 0 && accessRank[0] <= enable_p2p_max_access_rank
-                 && accessRank[1] <= enable_p2p_max_access_rank)
-                || gpuid == neighbor_gpuid) {
+            if ((can_access_peer && access_rank <= enable_p2p_max_access_rank) || gpuid == neighbor_gpuid) {
               peer2peer_enabled[dir][dim] = true;
               if (getVerbosity() > QUDA_SILENT) {
                 printf("Peer-to-peer enabled for rank %3d (gpu=%d) with neighbor %3d (gpu=%d) dir=%d, dim=%d, "
-                       "access rank = (%3d, %3d)\n",
-                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, accessRank[0], accessRank[1]);
+                       "access rank = (%3d)\n",
+                       comm_rank(), gpuid, neighbor_rank, neighbor_gpuid, dir, dim, access_rank);
               }
             } else {
               intranode_enabled[dir][dim] = true;
@@ -338,8 +304,6 @@ struct Communicator {
     comm_barrier();
 
     peer2peer_present = comm_peer2peer_enabled_global();
-
-    checkCudaErrorNoSync();
   }
 
   bool comm_peer2peer_present() { return peer2peer_present; }
@@ -353,7 +317,6 @@ struct Communicator {
 
   int comm_peer2peer_enabled_global()
   {
-
     if (!enable_p2p) return false;
 
     if (!init) {
@@ -440,15 +403,21 @@ struct Communicator {
 
   int manual_set_partition[QUDA_MAX_DIM] = {0};
 
+#ifdef MULTI_GPU
   void comm_dim_partitioned_set(int dim)
   {
-#ifdef MULTI_GPU
     manual_set_partition[dim] = 1;
-#endif
 
     snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
              comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
+#else
+  void comm_dim_partitioned_set(int)
+  {
+    snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+             comm_dim_partitioned(2), comm_dim_partitioned(3));
+  }
+#endif
 
   void comm_dim_partitioned_reset()
   {
@@ -497,13 +466,10 @@ struct Communicator {
       if (blacklist_env) { // set the policies to tune for explicitly
         std::stringstream blacklist_list(blacklist_env);
 
-        int device_count;
-        cudaGetDeviceCount(&device_count);
-
         int excluded_device;
         while (blacklist_list >> excluded_device) {
           // check this is a valid device
-          if (excluded_device < 0 || excluded_device >= device_count) {
+          if (excluded_device < 0 || excluded_device >= quda::device::get_device_count()) {
             errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
           }
 
@@ -557,9 +523,8 @@ struct Communicator {
         if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
 
-      int device_count;
-      cudaGetDeviceCount(&device_count);
-      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+      int device_count = quda::device::get_device_count();
+      if (device_count == 0) { errorQuda("No devices found"); }
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -591,8 +556,6 @@ struct Communicator {
         std::stringstream device_list;                       // formatted (no commas)
 
         int device;
-        int deviceCount;
-        cudaGetDeviceCount(&deviceCount);
         while (device_list_raw >> device) {
           // check this is a valid policy choice
           if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
@@ -635,19 +598,10 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
-                         comm_dim_override[0]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(1) ? '0' :
-                         comm_dim_override[1]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(2) ? '0' :
-                         comm_dim_override[2]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(3) ? '0' :
-                         comm_dim_override[3]   ? '1' :
-                                                  '0'),
-                      '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;
@@ -699,18 +653,18 @@ struct Communicator {
 
 #if defined(QMP_COMMS)
   QMP_comm_t QMP_COMM_HANDLE;
-  
+
   /**
-  * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
-  * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
-  */
+   * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
+   * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
+   */
   bool is_qmp_handle_default;
 #endif
 
   int rank = -1;
   int size = -1;
 
-  Communicator() { }
+  Communicator() {}
 
   Communicator(Communicator &other, const int *comm_split);
 
@@ -727,7 +681,7 @@ struct Communicator {
 
   int comm_rank(void);
 
-  int comm_size(void);
+  size_t comm_size(void);
 
   int comm_rank_from_coords(const int *coords)
   {

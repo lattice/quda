@@ -37,7 +37,7 @@ set (QUDA_OBJS
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
-  inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
+  inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   gauge_covdev.cpp 
@@ -79,14 +79,13 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  extended_color_spinor_utilities.cu
-  blas_magma.cu
+  blas_magma.cu tune.cpp
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
-  gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
+  gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  checksum.cu
+  checksum.cu transform_reduce.cu
   mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
@@ -172,8 +171,8 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
 
 # set up QUDA compile options
 target_compile_definitions(
-  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
-               $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG>
+               $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 
 target_compile_options(
   quda
@@ -200,6 +199,11 @@ if(QUDA_VERBOSE_BUILD)
   target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
 endif(QUDA_VERBOSE_BUILD)
 
+if (${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC" AND NOT ${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
+  target_compile_options(quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:SHELL: -gpu=nodebug" >)
+endif()
+
+
 # workaround for 10.2
 if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
@@ -212,7 +216,8 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-p
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
+
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
@@ -242,12 +247,16 @@ endif()
 # add target specific files		
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
   add_subdirectory(targets/cuda)		
+  target_include_directories(quda PRIVATE ../include/targets/cuda)
+  target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
 endif()		
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
   add_subdirectory(targets/hip)
+  target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
 
 add_subdirectory(targets/generic)
+target_include_directories(quda PRIVATE ../include/targets/generic)
 
 add_subdirectory(interface)
 
@@ -266,10 +275,8 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
   elseif(CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
-  elseif(CMAKE_BUILD_TYPE STREQUAL "DEVICEDEBUG")
-    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVICEDEBUG}")
   elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
-    set(PROPAGATED_FLAGS "${CMAKE_CUDA_FLAGS_SANITIZE}")
+    set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_SANITIZE}")
   endif()
 
   # Turne the flags into a CMAKE list
@@ -280,37 +287,26 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
   endforeach()
 endif()
 
-# Specific comnfig dependent warning suppressions and lineinfo forwarding
-  target_compile_options(
-    quda
-  PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-          $<$<CONFIG:DEVEL>:-lineinfo
-          -Xcompiler
-          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-          $<$<CONFIG:STRICT>:
-          -Xcompiler
-          -Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field>
-          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
-          $<$<CONFIG:SANITIZE>:-lineinfo
-          -Xcompiler
-          -fsanitize=address,-fsanitize=undefined>>
-          $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-          $<$<CONFIG:DEVEL>:-Wno-unknown-pragmas
-          -Wno-unused-function
-          -Wno-unused-local-typedef
-          -Wno-unused-private-field>
-          $<$<CONFIG:STRICT>:-Wno-unknown-pragmas
-          -Wno-unused-function
-          -Wno-unused-local-typedef
-          -Wno-unused-private-field>
-          $<$<CONFIG:HOSTDEBUG>:>
-          $<$<CONFIG:SANITIZE>:-fsanitize=address,-fsanitize=undefined>
-           >)
+# Specific config dependent warning suppressions and lineinfo forwarding
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
+                            -Wreorder
+                            $<$<CXX_COMPILER_ID:Clang>: -Xcompiler=-Wno-unused-function -Xcompiler=-Wno-unknown-pragmas>
+                            $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
+                            $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
+                            $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
+                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+                            $<$<CONFIG:SANITIZE>:-lineinfo>
+                            >)
+
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
+                            -Wall -Wextra -Wno-unknown-pragmas
+                            $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
+                            $<$<CONFIG:SANITIZE>:-fsanitize=address -fsanitize=undefined>
+                            >)
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field
-                                         -Wno-error=unused-function>)
+  target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)
 
   # this is a hack to get colored diagnostics back when using Ninja and clang
   if(CMAKE_GENERATOR MATCHES "Ninja")

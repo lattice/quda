@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <gauge_field.h>
 
 #include <comm_quda.h>
@@ -22,7 +23,16 @@
 using namespace quda;
 
 class GaugeAlgTest : public ::testing::Test {
- protected:
+
+  QudaGaugeParam param;
+  host_timer_t a0;
+  host_timer_t a1;
+  RNG * randstates;
+
+protected:
+  cudaGaugeField *U;
+  double3 plaq;
+
   void SetReunitarizationConsts(){
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -34,13 +44,6 @@ class GaugeAlgTest : public ::testing::Test {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
 
-  }
-
-  bool checkDimsPartitioned()
-  {
-    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
-      return true;
-    return false;
   }
 
   bool comparePlaquette(double3 a, double3 b){
@@ -62,7 +65,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   virtual void SetUp() {
-    setVerbosity(QUDA_VERBOSE);
+    setVerbosity(verbosity);
 
     param = newQudaGaugeParam();
 
@@ -115,22 +118,21 @@ class GaugeAlgTest : public ::testing::Test {
     U = new cudaGaugeField(gParam);
 #endif
     // CURAND random generator initialization
-    randstates = new RNG(gParam, 1234);
-    randstates->Init();
+    randstates = new RNG(*U, 1234);
 
-    nsteps = 10;
-    nhbsteps = 4;
-    novrsteps = 4;
-    coldstart = false;
-    beta_value = 6.2;
+    int nsteps = 10;
+    int nhbsteps = 4;
+    int novrsteps = 4;
+    bool coldstart = false;
+    double beta_value = 6.2;
 
-    a0.Start(__func__, __FILE__, __LINE__);
-    a1.Start(__func__, __FILE__, __LINE__);
+    a0.start();
+    a1.start();
 
     int *num_failures_h = (int *)mapped_malloc(sizeof(int));
     int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
 
-    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+    if (coldstart)
       InitGaugeField(*U);
     else
       InitGaugeField(*U, *randstates);
@@ -139,21 +141,20 @@ class GaugeAlgTest : public ::testing::Test {
     SetReunitarizationConsts();
     plaquette(*U);
 
-    for(int step=1; step<=nsteps; ++step){
+    for (int step=1; step<=nsteps; ++step) {
       printfQuda("Step %d\n",step);
       Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
       *num_failures_h = 0;
       unitarizeLinks(*U, num_failures_d);
-      qudaDeviceSynchronize();
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization");
 
       plaquette(*U);
     }
-    a1.Stop(__func__, __FILE__, __LINE__);
+    a1.stop();
 
-    printfQuda("Time Monte -> %.6f s\n", a1.Last());
+    printfQuda("Time Monte -> %.6f s\n", a1.last());
     plaq = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
 
@@ -161,7 +162,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   virtual void TearDown() {
-    detu = getLinkDeterminant(*U);
+    auto detu = getLinkDeterminant(*U);
     double2 tru = getLinkTrace(*U);
     printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
@@ -170,30 +171,16 @@ class GaugeAlgTest : public ::testing::Test {
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    a0.Stop(__func__, __FILE__, __LINE__);
-    printfQuda("Time -> %.6f s\n", a0.Last());
-    randstates->Release();
+    a0.stop();
+    printfQuda("Time -> %.6f s\n", a0.last());
     delete randstates;
   }
-
-  QudaGaugeParam param;
-
-  Timer a0,a1;
-  double2 detu;
-  double3 plaq;
-  cudaGaugeField *U;
-  int nsteps;
-  int nhbsteps;
-  int novrsteps;
-  bool coldstart;
-  double beta_value;
-  RNG * randstates;
 
 };
 
 TEST_F(GaugeAlgTest, Generation)
 {
-  detu = getLinkDeterminant(*U);
+  auto detu = getLinkDeterminant(*U);
   plaq = plaquette(*U);
   bool testgen = false;
   //check plaquette value for beta = 6.2
@@ -224,7 +211,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 
 TEST_F(GaugeAlgTest, Landau_FFT)
 {
-  if (!checkDimsPartitioned()) {
+  if (!comm_partitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*U, 4, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*U);
@@ -235,7 +222,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
 
 TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
-  if (!checkDimsPartitioned()) {
+  if (!comm_partitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
     gaugeFixingFFT(*U, 3, 100, 10, 0.08, 0, 0, 1);
     auto plaq_gf = plaquette(*U);

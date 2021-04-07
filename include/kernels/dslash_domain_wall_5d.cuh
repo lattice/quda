@@ -19,12 +19,7 @@ namespace quda
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
       Ls(in.X(4)),
       a(a),
-      m_f(m_f)
-    {
-      pushKernelPackT(true); // with 5-d checkerboarding we must use kernel packing
-    }
-
-    virtual ~DomainWall5DArg() { popKernelPackT(); }
+      m_f(m_f) {}
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>

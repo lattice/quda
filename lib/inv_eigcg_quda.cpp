@@ -350,7 +350,7 @@ namespace quda {
        eigenVecs.block(0, 0, m, 2 * k) = inv_normr_m * Qm2k;
 
        // 5. Synchronize an aux compute stream for the pipelined version:
-       if (is_host_location) blas::synchronizeAuxBlasStream();
+       //if (is_host_location) blas::synchronizeAuxBlasStream();
 
        // 6. Compute VQ
        ColorSpinorFieldSet &v2k = *V2k;
@@ -454,7 +454,7 @@ namespace quda {
 
          const int elements = d == 0 ? solver_param.pipeline : d; // might be d for the last copy stage
          //
-         blas::registerAuxBlasStream();
+         //blas::registerAuxBlasStream();
 
          const int dst_offset = cid - elements;
          const int src_offset = l - elements + (l == 0 ? Vm->CompositeDim() : 0);
@@ -463,7 +463,7 @@ namespace quda {
          for (int i = 0; i < elements; i++) blas::copy(hvm[dst_offset + i], vm[src_offset + i]);
 
          if (last_stage) blas::copy(*hAz, *Az);
-         blas::unregisterAuxBlasStream();
+         //blas::unregisterAuxBlasStream();
          //
        }
 
@@ -1293,7 +1293,7 @@ namespace quda {
       memcpy(reinterpret_cast<double *>(&local_buffer), recvbuff.get(), 4 * sizeof(double));
     }
 
-    blas::createAuxBlasStream();
+    //blas::createAuxBlasStream();
 
     PrintStats("CAeigCG", k, nu, b2, heavy_quark_res);
 
@@ -1350,7 +1350,7 @@ namespace quda {
       for (int i = 0; i < param.eig_param.nLockedMax; i++) blas::copy((*args.Vm)[i], (*args.hVm)[i]);
     }
 
-    blas::destroyAuxBlasStream();
+    //blas::destroyAuxBlasStream();
 
     args.CleanArgs();
     if (comm_size() > 1) comm_free( iallreduce_request_handle );

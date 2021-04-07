@@ -5,8 +5,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
-#include <shmem_helper.cuh>
-
 namespace quda {
 
   bool LatticeField::initIPCComms = false;
@@ -21,8 +19,8 @@ namespace quda {
   MsgHandle* LatticeField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
   MsgHandle* LatticeField::mh_recv_p2p_back[2][QUDA_MAX_DIM] { };
 
-  cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
-  cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
   void *LatticeField::ghost_pinned_send_buffer_h[2] = {nullptr, nullptr};
   void *LatticeField::ghost_pinned_send_buffer_hd[2] = {nullptr, nullptr};
@@ -117,12 +115,15 @@ namespace quda {
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
-      volume *= param.x[i];
-      localVolume *= (x[i] - 2 * r[i]);
+      local_x[i] = x[i] - 2 * r[i];
+      volume *= x[i];
+      localVolume *= local_x[i];
       surface[i] = 1;
+      local_surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
 	surface[i] *= param.x[j];
+	local_surface[i] *= param.x[j] - 2 * param.r[j];
       }
     }
 
@@ -132,8 +133,10 @@ namespace quda {
     stride = volumeCB + pad;
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
-    for (int i=0; i<nDim; i++)
+    for (int i=0; i<nDim; i++) {
       surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
+      local_surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? local_surface[i] / 2 : local_surface[i];
+    }
 
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
@@ -152,8 +155,11 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field) :
-    volume(1),
-    localVolume(1),
+    volume(field.volume),
+    volumeCB(field.volumeCB),
+    localVolume(field.localVolume),
+    localVolumeCB(field.localVolumeCB),
+    stride(field.stride),
     pad(field.pad),
     total_bytes(0),
     nDim(field.nDim),
@@ -163,6 +169,7 @@ namespace quda {
     scale(field.scale),
     siteSubset(field.siteSubset),
     ghostExchange(field.ghostExchange),
+    nDimComms(field.nDimComms),
     ghost_bytes(0),
     ghost_bytes_old(0),
     ghost_face_bytes {},
@@ -198,27 +205,13 @@ namespace quda {
 
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
-      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
-      volume *= field.x[i];
-      localVolume *= (x[i] - 2 * r[i]);
-      surface[i] = 1;
-      for (int j=0; j<nDim; j++) {
-	if (i==j) continue;
-	surface[i] *= field.x[j];
-      }
+      r[i] = field.r[i];
+      local_x[i] = field.local_x[i];
+      surface[i] = field.surface[i];
+      surfaceCB[i] = field.surfaceCB[i];
+      local_surface[i] = field.local_surface[i];
+      local_surfaceCB[i] = field.local_surfaceCB[i];
     }
-
-    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
-    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
-    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
-    stride = volumeCB + pad;
-  
-    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
-    for (int i=0; i<nDim; i++) 
-      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
-
-    // for 5-dimensional fields, we only communicate in the space-time dimensions
-    nDimComms = nDim == 5 ? 4 : nDim;
 
     setTuningString();
   }
@@ -309,7 +302,7 @@ namespace quda {
     initGhostFaceBuffer = false;
   }
 
-  void LatticeField::createComms(bool no_comms_fill, bool bidir)
+  void LatticeField::createComms(bool no_comms_fill)
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
@@ -380,7 +373,6 @@ namespace quda {
     } // loop over dimension
 
     initComms = true;
-    checkCudaError();
   }
 
   void LatticeField::destroyComms()
@@ -415,129 +407,19 @@ namespace quda {
 
   }
 
-  void LatticeField::createIPCComms() {
+  void LatticeField::createIPCComms()
+  {
     if ( initIPCComms && !ghost_field_reset ) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
 
-    // handles for obtained ghost pointers
-    cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
-
     for (int b=0; b<2; b++) {
-      for (int dim=0; dim<4; ++dim) {
-	if (comm_dim(dim)==1) continue;
-	for (int dir=0; dir<2; ++dir) {
-	  MsgHandle* sendHandle = nullptr;
-	  MsgHandle* receiveHandle = nullptr;
-	  int disp = (dir == 1) ? +1 : -1;
-
-          // first set up receive
-          if (comm_peer2peer_enabled(1-dir,dim)) {
-	    receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[b][1-dir][dim],
-							  dim, -disp,
-							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
-	  }
-	  // now send
-          cudaIpcMemHandle_t ipcLocalGhostDestHandle;
-          if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
-	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
-						    dim, disp,
-						    sizeof(ipcLocalGhostDestHandle));
-	  }
-	  if (receiveHandle) comm_start(receiveHandle);
-	  if (sendHandle) comm_start(sendHandle);
-
-	  if (receiveHandle) comm_wait(receiveHandle);
-	  if (sendHandle) comm_wait(sendHandle);
-
-	  if (sendHandle) comm_free(sendHandle);
-	  if (receiveHandle) comm_free(receiveHandle);
-	}
-      }
-
-      checkCudaError();
-
-      // open the remote memory handles and set the send ghost pointers
-      for (int dim = 0; dim < 4; ++dim) {
-#ifndef NVSHMEM_COMMS
-        // TODO: We maybe can force loopback comms to use the IB path here
-        if (comm_dim(dim) == 1) continue;
-#endif
-        // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-        const int num_dir
-          = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
-        for (int dir = 0; dir < num_dir; ++dir) {
-#ifndef NVSHMEM_COMMS
-          if (!comm_peer2peer_enabled(dir, dim)) continue;
-          void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
-          cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], cudaIpcMemLazyEnablePeerAccess);
-#else
-          ghost_remote_send_buffer_d[b][dim][dir]
-            = nvshmem_ptr(static_cast<char *>(ghost_recv_buffer_d[b]), comm_neighbor_rank(dir, dim));
-#endif
-        }
-        if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
-      }
-    } // buffer index
-
-    checkCudaError();
-
-    // handles for obtained events
-    cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
-
-    // Note that no b index is necessary here
-    // Now communicate the event handles
-    for (int dim=0; dim<4; ++dim) {
-      if (comm_dim(dim)==1) continue;
-      for (int dir=0; dir<2; ++dir) {
-	for (int b=0; b<2; b++) {
-
-	  MsgHandle* sendHandle = NULL;
-	  MsgHandle* receiveHandle = NULL;
-	  int disp = (dir == 1) ? +1 : -1;
-
-	  // first set up receive
-	  if (comm_peer2peer_enabled(1-dir,dim)) {
-	    receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim], dim, -disp,
-							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
-	  }
-
-	  // now send
-          cudaIpcEventHandle_t ipcLocalEventHandle;
-          if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
-
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
-						    sizeof(ipcLocalEventHandle));
-	  }
-
-	  if (receiveHandle) comm_start(receiveHandle);
-	  if (sendHandle) comm_start(sendHandle);
-
-	  if (receiveHandle) comm_wait(receiveHandle);
-	  if (sendHandle) comm_wait(sendHandle);
-
-	  if (sendHandle) comm_free(sendHandle);
-	  if (receiveHandle) comm_free(receiveHandle);
-
-	} // buffer index
-      }
-    }
-
-    checkCudaError();
-
-    for (int dim=0; dim<4; ++dim) {
-      if (comm_dim(dim)==1) continue;
-      for (int dir=0; dir<2; ++dir) {
-	if (!comm_peer2peer_enabled(dir,dim)) continue;
-	for (int b=0; b<2; b++) {
-	  cudaIpcOpenEventHandle(&(ipcRemoteCopyEvent[b][dir][dim]), ipcRemoteEventHandle[b][dir][dim]);
-	}
-      }
+      // set remote send buffer to ghost receive buffers on neighboring processes
+      comm_create_neighbor_memory(ghost_remote_send_buffer_d[b], ghost_recv_buffer_d[b]);
+      // get remote events
+      comm_create_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
     }
 
     // Create message handles for IPC synchronization
@@ -561,14 +443,13 @@ namespace quda {
 	}
       }
     }
-    checkCudaError();
 
     initIPCComms = true;
     ghost_field_reset = false;
   }
 
-  void LatticeField::destroyIPCComms() {
-
+  void LatticeField::destroyIPCComms()
+  {
     if (!initIPCComms) return;
 
     // ensure that all processes bring down their communicators
@@ -576,41 +457,27 @@ namespace quda {
     qudaDeviceSynchronize();
     comm_barrier();
 
+    for (int b = 0; b < 2; b++) {
+      comm_destroy_neighbor_memory(ghost_remote_send_buffer_d[b]);
+      comm_destroy_neighbor_event(ipcRemoteCopyEvent[b], ipcCopyEvent[b]);
+    }
+
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
-#ifndef NVSHMEM_COMMS
-      const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-#endif
+
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
-	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-	    // only close this handle if it doesn't alias the back ghost
-
-#ifndef NVSHMEM_COMMS
-            if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
-#endif
-          }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
           if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
         }
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
-	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-
-#ifndef NVSHMEM_COMMS
-            cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
-#endif
-          }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
         }
       } // buffer
     } // iterate over dim
-
-    checkCudaError();
 
     // local take down complete - now synchronize to ensure globally complete
     qudaDeviceSynchronize();
@@ -621,20 +488,40 @@ namespace quda {
 
   bool LatticeField::ipcCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == cudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]);
   }
 
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return qudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]);
   }
 
-  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+  const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
     return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
-  const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
+  const qudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
+  }
+
+  void* LatticeField::myFace_h(int dir, int dim) const
+  {
+    return my_face_dim_dir_h[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_hd(int dir, int dim) const
+  {
+    return my_face_dim_dir_hd[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::myFace_d(int dir, int dim) const
+  {
+    return my_face_dim_dir_d[bufferIndex][dim][dir];
+  }
+
+  void* LatticeField::remoteFace_d(int dir, int dim) const
+  {
+    return ghost_remote_send_buffer_d[bufferIndex][dim][dir];
   }
 
   void LatticeField::setTuningString() {
@@ -674,17 +561,19 @@ namespace quda {
 	if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
 	if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);
 	if (a.surfaceCB[i] != surfaceCB[i]) errorQuda("surfaceCB[%d] does not match %d %d", i, surfaceCB[i], a.surfaceCB[i]);
+	if (a.local_surface[i] != local_surface[i]) errorQuda("local_surface[%d] does not match %d %d", i, local_surface[i], a.local_surface[i]);
+	if (a.local_surfaceCB[i] != local_surfaceCB[i]) errorQuda("local_surfaceCB[%d] does not match %d %d", i, local_surfaceCB[i], a.local_surfaceCB[i]);
       }
     }
   }
 
-  QudaFieldLocation LatticeField::Location() const { 
+  QudaFieldLocation LatticeField::Location() const {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (typeid(*this)==typeid(cudaCloverField) || 
+    if (typeid(*this)==typeid(cudaCloverField) ||
 	typeid(*this)==typeid(cudaColorSpinorField) ||
 	typeid(*this)==typeid(cudaGaugeField)) {
-      location = QUDA_CUDA_FIELD_LOCATION; 
-    } else if (typeid(*this)==typeid(cpuCloverField) || 
+      location = QUDA_CUDA_FIELD_LOCATION;
+    } else if (typeid(*this)==typeid(cpuCloverField) ||
 	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
@@ -694,11 +583,11 @@ namespace quda {
     return location;
   }
 
-  void LatticeField::read(char *filename) {
+  void LatticeField::read(char *) {
     errorQuda("Not implemented");
   }
-  
-  void LatticeField::write(char *filename) {
+
+  void LatticeField::write(char *) {
     errorQuda("Not implemented");
   }
 
@@ -711,7 +600,7 @@ namespace quda {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
 	return static_cast<int>(gField.Order());
-    } else if (typeid(*this) == typeid(const cudaCloverField)) { 
+    } else if (typeid(*this) == typeid(const cudaCloverField)) {
       const CloverField &cField = static_cast<const CloverField&>(*this);
       if (cField.Order() == 2 || cField.Order() == 4)
 	return static_cast<int>(cField.Order());
@@ -726,7 +615,7 @@ namespace quda {
   {
     output << "nDim = " << param.nDim << std::endl;
     for (int i=0; i<param.nDim; i++) {
-      output << "x[" << i << "] = " << param.x[i] << std::endl;    
+      output << "x[" << i << "] = " << param.x[i] << std::endl;
     }
     output << "pad = " << param.pad << std::endl;
     output << "precision = " << param.Precision() << std::endl;
