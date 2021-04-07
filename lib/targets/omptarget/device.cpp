@@ -127,6 +127,8 @@ namespace quda
       if (NVML_SUCCESS != result) errorQuda("NVML Shutdown failed with error %d", result);
 #endif
 
+      if(get_device_count() == 0)  /* TODO: get CPU device properties */
+        cudaGetDeviceProperties(&deviceProp, -1);
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_CUDA_ERROR(cudaGetDeviceProperties(&deviceProp, i));
         if (getVerbosity() >= QUDA_SUMMARIZE) {
