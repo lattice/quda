@@ -1322,7 +1322,7 @@ struct mgInputStruct {
     // set dummy values so all elements are initialized
     // some of these values get immediately overriden in the
     // constructor, in some cases with identical values:
-    // this is to separate "initialzing" with "best practices"
+    // this is to separate "initializing" with "best practices"
     for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
       nvec[i] = 24;
       setup_inv[i] = QUDA_CGNR_INVERTER;
