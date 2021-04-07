@@ -1317,7 +1317,8 @@ struct mgInputStruct {
   double deflate_a_min; // ignored if no polynomial acceleration
   int deflate_poly_deg; // ignored if no polynomial acceleration
 
-  void setArrayDefaults() {
+  void setArrayDefaults()
+  {
     // set dummy values so all elements are initialized
     // some of these values get immediately overriden in the
     // constructor, in some cases with identical values:
@@ -1329,9 +1330,7 @@ struct mgInputStruct {
       setup_maxiter[i] = 500;
       mg_vec_infile[i][0] = 0;
       mg_vec_outfile[i][0] = 0;
-      for (int d = 0; d < 4; d++) {
-        geo_block_size[i][d] = 2;
-      }
+      for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
 
       coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
       coarse_solver[i] = QUDA_GCR_INVERTER;
