@@ -369,7 +369,7 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
  *
  */
 void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
-                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths, const lattice_t &lat, bool force)
+                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths, const lattice_t &lat, bool compute_force)
 {
   size_t size = V * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
@@ -385,7 +385,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
     }
   }
 
-  if (force) {
+  if (compute_force) {
     if (prec == QUDA_DOUBLE_PRECISION) {
       update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
     } else {
@@ -402,7 +402,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
 }
 
 void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
-                           void *loop_coeff, int num_paths, bool force)
+                           void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
   int R[4];
@@ -416,7 +416,7 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   lattice_t lat(*qdp_ex);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff, num_paths, lat, force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff, num_paths, lat, compute_force);
   }
 
   delete qdp_ex;

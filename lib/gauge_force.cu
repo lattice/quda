@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon_u, bool force=true> class ForceGauge : public TunableKernel3D
+  template <typename Float, int nColor, QudaReconstructType recon_u, bool compute_force=true> class ForceGauge : public TunableKernel3D
   {
     const GaugeField &u;
     GaugeField &mom;
@@ -29,7 +29,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<GaugeForce>(tp, stream, GaugeForceArg<Float, nColor, recon_u, force ? QUDA_RECONSTRUCT_10 : recon_u, force>(mom, u, epsilon, p));
+      launch<GaugeForce>(tp, stream, GaugeForceArg<Float, nColor, recon_u, compute_force ? QUDA_RECONSTRUCT_10 : recon_u, compute_force>(mom, u, epsilon, p));
     }
 
     void preTune() { mom.backup(); }

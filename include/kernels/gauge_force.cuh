@@ -64,7 +64,7 @@ namespace quda {
   struct GaugeForceArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static constexpr bool force = force_;
+    static constexpr bool compute_force = force_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     typedef typename gauge_mapper<Float,recon_u>::type Gauge;
     typedef typename gauge_mapper<Float,recon_m>::type Mom;
@@ -163,7 +163,7 @@ namespace quda {
 
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
-    if(arg.force) {
+    if(arg.compute_force) {
       mom = mom - arg.epsilon * linkA;
       makeAntiHerm(mom);
     }
