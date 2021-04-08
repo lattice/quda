@@ -663,7 +663,7 @@ namespace quda
 
       if (kernel_type == INTERIOR_KERNEL && target::block_idx().x < (unsigned)arg.pack_blocks) {
         // first few blocks do packing kernel
-        typename Arg::P<dslash.pc_type()> packer;
+        typename Arg::template P<dslash.pc_type()> packer;
         packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
 
         // we use that when running the exterior -- this is either

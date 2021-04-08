@@ -78,9 +78,9 @@ namespace quda
     }
 
     virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
-    virtual unsigned int minThreads() const { return arg.threads; }
+    virtual unsigned int minThreads() const override { return arg.threads; }
 
-    virtual unsigned int minGridSize() const
+    virtual unsigned int minGridSize() const override
     {
       /* when using nvshmem we perform the exterior Dslash using a grid strided loop and uniquely assign communication
        * directions to CUDA block and have all communication directions resident. We therefore figure out the number of
@@ -95,7 +95,7 @@ namespace quda
       }
     }
 
-    virtual int gridStep() const
+    virtual int gridStep() const override
     {
       /* see comment for minGridSize above for gridStep choice when using nvshmem */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
@@ -155,14 +155,14 @@ namespace quda
       }
     }
 
-    virtual int tuningIter() const { return 10; }
+    virtual int tuningIter() const override { return 10; }
 
-    virtual int blockStep() const { return 16; }
-    virtual int blockMin() const { return 16; }
+    virtual int blockStep() const override { return 16; }
+    virtual int blockMin() const override { return 16; }
 
-    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+    unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
-    virtual bool advanceAux(TuneParam &param) const
+    virtual bool advanceAux(TuneParam &param) const override
     {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
 
@@ -201,12 +201,12 @@ namespace quda
       }
     }
 
-    virtual bool advanceTuneParam(TuneParam &param) const
+    virtual bool advanceTuneParam(TuneParam &param) const override
     {
       return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
     }
 
-    virtual void initTuneParam(TuneParam &param) const
+    virtual void initTuneParam(TuneParam &param) const override
     {
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
@@ -220,7 +220,7 @@ namespace quda
       if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
-    virtual void defaultTuneParam(TuneParam &param) const
+    virtual void defaultTuneParam(TuneParam &param) const override
     {
       /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
        * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
@@ -430,7 +430,7 @@ namespace quda
 
     void augmentAux(KernelType type, const char *extra) { strcat(aux[type], extra); }
 
-    virtual TuneKey tuneKey() const
+    virtual TuneKey tuneKey() const override
     {
       auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
         aux_pack :
@@ -442,7 +442,7 @@ namespace quda
        @brief Save the output field since the output field is both
        read from and written to in the exterior kernels
      */
-    virtual void preTune()
+    virtual void preTune() override
     {
       if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.backup();
     }
@@ -450,7 +450,7 @@ namespace quda
     /**
        @brief Restore the output field if doing exterior kernel
      */
-    virtual void postTune()
+    virtual void postTune() override
     {
       if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore();
     }
@@ -471,7 +471,7 @@ namespace quda
 
       For Wilson this should give 1344 for Nc=3,Ns=2 and 1368 for the xpay equivalent
     */
-    virtual long long flops() const
+    virtual long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
@@ -522,7 +522,7 @@ namespace quda
       return flops_;
     }
 
-    virtual long long bytes() const
+    virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
