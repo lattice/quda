@@ -242,7 +242,7 @@ namespace quda
         coarseDslash<Float, nDim, Ns, Nc, Mc, dslash, clover, dagger, type>(arg);
       } else {
 
-        const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
           errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
