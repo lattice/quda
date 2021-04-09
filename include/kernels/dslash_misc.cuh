@@ -78,7 +78,6 @@ namespace quda {
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
 	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1)),
       out(out), in(in), d(d), nParity(in.SiteSubset()),
       doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
@@ -112,6 +111,7 @@ namespace quda {
         }
         if (dagger) b *= -1.0;
       }
+      this->threads = dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1);
     }
   };
 
@@ -195,7 +195,6 @@ namespace quda {
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
-      kernel_param(dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1)),
       out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
       cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
       nParity(in.SiteSubset()), parity(parity),
@@ -217,6 +216,7 @@ namespace quda {
       } else if (doublet) {
 	errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
       }
+      this->threads = dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1);
     }
   };
 
