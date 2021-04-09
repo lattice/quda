@@ -7,7 +7,7 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
-  struct GaugePhaseArg {
+  struct GaugePhaseArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -17,13 +17,12 @@ namespace quda {
 
     Gauge u;
     int X[4];
-    dim3 threads;
     Float tBoundary;
     Float i_mu;
     complex<Float> i_mu_phase;
     GaugePhaseArg(GaugeField &u) :
+      kernel_param(dim3(u.VolumeCB(), 2, 1)),
       u(u),
-      threads(u.VolumeCB(), 2, 1),
       i_mu(u.iMu())
     {
       // if staggered phases are applied, then we are removing them

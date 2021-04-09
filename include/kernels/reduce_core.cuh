@@ -26,7 +26,6 @@ namespace quda
 
       const int length_cb;
       const int nParity;
-      dim3 threads;
 
       ReductionArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
                    ColorSpinorField &v, Reducer r, int length, int nParity) :
@@ -37,9 +36,10 @@ namespace quda
         V(v),
         r(r),
         length_cb(length / nParity),
-        nParity(nParity),
-        threads(length, 1, 1)
-      { ; }
+        nParity(nParity)
+      {
+        this->threads = dim3(length, 1, 1);
+      }
 
       __device__ __host__ auto init() const { return ::quda::zero<reduce_t>(); }
     };

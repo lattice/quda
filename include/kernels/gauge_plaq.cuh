@@ -16,7 +16,6 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    dim3 threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
     int border[4];
@@ -33,7 +32,7 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads.x = X[0]*X[1]*X[2]*X[3]/2;
+      this->threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
     __device__ __host__ reduce_t init() const { return reduce_t(); }

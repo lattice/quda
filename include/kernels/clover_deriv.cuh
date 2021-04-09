@@ -6,7 +6,7 @@
 namespace quda
 {
 
-  template <typename Float, QudaReconstructType recon> struct CloverDerivArg {
+  template <typename Float, QudaReconstructType recon> struct CloverDerivArg : kernel_param<> {
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon>::type;
@@ -16,16 +16,15 @@ namespace quda
     int border[4];
     real coeff;
     int parity;
-    dim3 threads;
 
     Force force;
     Gauge gauge;
     Oprod oprod;
 
     CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff, int parity) :
+      kernel_param(dim3(force.VolumeCB(), 2, 4)),
       coeff(coeff),
       parity(parity),
-      threads(force.VolumeCB(), 2, 4),
       force(force),
       gauge(gauge),
       oprod(oprod)

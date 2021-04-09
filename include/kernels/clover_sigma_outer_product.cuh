@@ -11,7 +11,8 @@ namespace quda
   // FIXME - make this multi-RHS once we have the multi-RHS framework developed
 #define MAX_NVECTOR 1
 
-  template <typename Float, int nColor_, int nvector_> struct CloverSigmaOprodArg {
+  template <typename Float, int nColor_, int nvector_>
+  struct CloverSigmaOprodArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -23,15 +24,14 @@ namespace quda
     const F inA[nvector];
     const F inB[nvector];
     real coeff[nvector][2];
-    dim3 threads;
 
     CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,
                         const std::vector<ColorSpinorField*> &inB,
                         const std::vector<std::vector<double>> &coeff_) :
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
       oprod(oprod),
       inA{*inA[0]},
-      inB{*inB[0]},
-      threads(oprod.VolumeCB(), 2, 6)
+      inB{*inB[0]}
     {
       for (int i = 0; i < nvector; i++) {
         coeff[i][0] = coeff_[i][0];

@@ -10,7 +10,7 @@ namespace quda {
 
   template <typename vFloatSpinor_, typename vFloatGauge_, int coarseDof_, int fineColor_,
             bool dagger_, typename fineColorSpinor, typename xInvGauge>
-  struct ApplyStaggeredKDBlockArg {
+  struct ApplyStaggeredKDBlockArg : kernel_param<> {
 
     using vFloatSpinor = vFloatSpinor_;
     using vFloatGauge = vFloatGauge_;
@@ -41,16 +41,15 @@ namespace quda {
     const int_fastdiv coarseVolumeCB;   /** Coarse grid volume */
 
     SharedMemoryCache<complex<real>> cs_buffer; /** scratch storaged used for inter-thread exchange */
-    dim3 threads;
 
     ApplyStaggeredKDBlockArg(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &xInv,
                              const int *x_size_, const int *xc_size_) :
+      kernel_param(dim3(2 * in.volumeCB, 1, 1)),
       out(out),
       in(in),
       xInv(xInv),
       fineVolumeCB(in.volumeCB),
-      coarseVolumeCB(xInv.VolumeCB()),
-      threads(2 * fineVolumeCB)
+      coarseVolumeCB(xInv.VolumeCB())
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];

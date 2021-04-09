@@ -193,7 +193,10 @@ namespace quda {
        argument.  Otherwise the parameter struct is explicitly copied
        to the device prior to kernel launch.
     */
-    template <typename Arg> constexpr bool use_kernel_arg() { return sizeof(Arg) <= device::max_kernel_arg_size(); }
+    template <typename Arg> constexpr bool use_kernel_arg()
+    {
+      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+    }
 
     /**
        @brief Helper function that returns kernel argument from

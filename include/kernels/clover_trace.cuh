@@ -8,7 +8,7 @@
 namespace quda {
 
   template <typename Float, int nColor_>
-  struct CloverTraceArg {
+  struct CloverTraceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     using C = typename clover_mapper<Float>::type;
@@ -17,14 +17,13 @@ namespace quda {
     const C clover1;
     const C clover2;
     real coeff;
-    dim3 threads;
 
     CloverTraceArg(GaugeField& output, const CloverField& clover, double coeff) :
+      kernel_param(dim3(clover.VolumeCB(), 1, 1)),
       output(output),
       clover1(clover, 0),
       clover2(clover, 1),
-      coeff(coeff),
-      threads(clover.VolumeCB(), 1, 1) {}
+      coeff(coeff) {}
   };
 
   template <typename Arg>

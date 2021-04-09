@@ -18,7 +18,7 @@
 namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct UnitarizeArg {
+  struct UnitarizeArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -36,11 +36,11 @@ namespace quda {
     const double svd_rel_error;
     const double svd_abs_error;
     const static bool check_unitarization = true;
-    dim3 threads; // number of active threads required
 
     UnitarizeArg(GaugeField &out, const GaugeField &in, int* fails, int max_iter,
                  double unitarize_eps, double max_error, int reunit_allow_svd,
                  int reunit_svd_only, double svd_rel_error, double svd_abs_error) :
+      kernel_param(dim3(in.VolumeCB(), 2, 4)),
       out(out),
       in(in),
       fails(fails),
@@ -50,8 +50,7 @@ namespace quda {
       reunit_allow_svd(reunit_allow_svd),
       reunit_svd_only(reunit_svd_only),
       svd_rel_error(svd_rel_error),
-      svd_abs_error(svd_abs_error),
-      threads(in.VolumeCB(), 2, 4)
+      svd_abs_error(svd_abs_error)
     {
       for (int dir=0; dir<4; ++dir) X[dir] = in.X()[dir];
     }
@@ -239,7 +238,7 @@ namespace quda {
   };
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct ProjectSU3Arg {
+  struct ProjectSU3Arg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -248,12 +247,11 @@ namespace quda {
 
     real tol;
     int *fails;
-    dim3 threads;
     ProjectSU3Arg(GaugeField &u, real tol, int *fails) :
+      kernel_param(dim3(u.VolumeCB(), 2, 4)),
       u(u),
       tol(tol),
-      fails(fails),
-      threads(u.VolumeCB(), 2, 4) { }
+      fails(fails) { }
   };
 
   template <typename Arg> struct Projector

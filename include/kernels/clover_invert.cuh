@@ -15,7 +15,6 @@ namespace quda
     static constexpr int nSpin = 4;
     using Clover = typename clover_mapper<store_t>::type;
 
-    dim3 threads; // number of active threads required
     Clover inverse;
     const Clover clover;
     bool compute_tr_log;
@@ -23,12 +22,12 @@ namespace quda
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
       ReduceArg<reduce_t>(),
-      threads(field.VolumeCB(), 2, 1),
       inverse(field, true),
       clover(field, false),
       compute_tr_log(compute_tr_log),
       mu2(field.Mu2())
     {
+      this->threads = dim3(field.VolumeCB(), 2, 1);
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
 

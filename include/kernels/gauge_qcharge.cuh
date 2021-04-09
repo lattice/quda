@@ -18,13 +18,14 @@ namespace quda
 
     F f;
     Float *qDensity;
-    dim3 threads; // number of active threads required
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<reduce_t>(),
       f(Fmunu),
-      qDensity(qDensity),
-      threads(Fmunu.VolumeCB(), 2, 1) {}
+      qDensity(qDensity)
+    {
+      threads = dim3(Fmunu.VolumeCB(), 2, 1);
+    }
 
     __device__ __host__ auto init() const { return reduce_t(); }
   };

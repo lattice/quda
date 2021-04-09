@@ -58,7 +58,7 @@ namespace quda {
   }
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
-  struct PackGhostArg {
+  struct PackGhostArg : kernel_param<> {
     static constexpr bool block_float_requested = sizeof(store_t) == QUDA_SINGLE_PRECISION &&
       isFixed<ghost_store_t>::value;
 
@@ -82,17 +82,16 @@ namespace quda {
     const int dagger;
     const QudaPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
-    dim3 threads;
 
     PackGhostArg(const ColorSpinorField &a, void **ghost, int parity, int nFace, int dagger) :
+      kernel_param(dim3(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())),
       field(a, nFace, 0, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),
       nParity(a.SiteSubset()),
       dagger(dagger),
-      pc_type(a.PCType()),
-      threads(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())
+      pc_type(a.PCType())
     {
       if (block_float_requested && nColor_ > max_block_float_nc)
         errorQuda("Block-float format not supported for Nc = %d", nColor_);

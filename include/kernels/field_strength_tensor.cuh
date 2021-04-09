@@ -6,7 +6,8 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_ > struct FmunuArg
+  template <typename Float_, int nColor_, QudaReconstructType recon_ >
+  struct FmunuArg : kernel_param<1>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -20,12 +21,11 @@ namespace quda
 
     int X[4];    // grid dimensions
     int border[4];
-    dim3 threads; // number of active threads required
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
+      kernel_param(dim3(f.VolumeCB(), 2, 6)),
       u(u),
-      f(f),
-      threads(f.VolumeCB(), 2, 6)
+      f(f)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];

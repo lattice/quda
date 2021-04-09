@@ -14,7 +14,7 @@ namespace quda
 
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true,
             bool dagger_ = false, int twist_ = 0, QudaPCType pc_type_ = QUDA_4D_PC>
-  struct PackArg {
+  struct PackArg : kernel_param<> {
 
     typedef Float_ Float;
     typedef typename mapper<Float>::type real;
@@ -44,7 +44,6 @@ namespace quda
     real twist_c; // preconditioned twisted-mass flavor twist factor
 
     int_fastdiv work_items;
-    dim3 threads;
     int threadDimMapLower[4];
     int threadDimMapUpper[4];
 
@@ -82,6 +81,7 @@ namespace quda
 #else
             int = 0) :
 #endif
+      kernel_param(dim3(block * grid, in.getDslashConstant().Ls, in.SiteSubset())),
       in_pack(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),
@@ -91,8 +91,7 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
-      threads(block * grid, dc.Ls, nParity),
-        swizzle(swizzle),
+      swizzle(swizzle),
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,

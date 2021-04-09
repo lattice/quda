@@ -8,7 +8,7 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon>
-  struct LinkArg {
+  struct LinkArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
@@ -28,13 +28,11 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    dim3 threads;
-
     LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
+      kernel_param(dim3(link.VolumeCB(), 2, 4)),
       link(link),
       u(u),
-      coeff(coeff),
-      threads(link.VolumeCB(), 2, 4)
+      coeff(coeff)
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
@@ -106,14 +104,13 @@ namespace quda {
   };
 
   template <typename Float_, int nColor_, QudaReconstructType recon, QudaReconstructType recon_mu, bool save_staple_>
-  struct StapleArg {
+  struct StapleArg : kernel_param<> {
     using Float = Float_;
     using Link = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     using MuLink = typename gauge_mapper<Float, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool save_staple = save_staple_;
-    dim3 threads;
 
     int_fastdiv X[4];
     int_fastdiv E[4];
@@ -139,7 +136,13 @@ namespace quda {
 
     StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
               Float coeff, int nu, int mu_map[4]) :
-      threads(1, 2, 1), fat(fat), staple(staple), mulink(mulink), u(u), coeff(coeff), nu(nu),
+      kernel_param(dim3(1, 2, 1)),
+      fat(fat),
+      staple(staple),
+      mulink(mulink),
+      u(u),
+      coeff(coeff),
+      nu(nu),
       odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
                 commDimPartitioned(2)+commDimPartitioned(3))%2 )
     {
@@ -147,14 +150,14 @@ namespace quda {
         X[d] = (fat.X()[d] + u.X()[d]) / 2;
         E[d] = u.X()[d];
         border[d] = (E[d] - X[d]) / 2;
-        threads.x *= X[d];
+        this->threads.x *= X[d];
 
         inner_X[d] = fat.X()[d];
         inner_border[d] = (E[d] - inner_X[d]) / 2;
 
         this->mu_map[d] = mu_map[d];
       }
-      threads.x /= 2; // account for parity in y dimension
+      this->threads.x /= 2; // account for parity in y dimension
     }
   };
 

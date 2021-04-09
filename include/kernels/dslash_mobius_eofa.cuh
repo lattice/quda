@@ -21,7 +21,8 @@ namespace quda
       real y[QUDA_MAX_DWF_LS];
     };
 
-    template <typename storage_type, int nColor_, bool pm_, bool dagger_, bool xpay_, Dslash5Type type_> struct Dslash5Arg {
+    template <typename storage_type, int nColor_, bool pm_, bool dagger_, bool xpay_, Dslash5Type type_>
+    struct Dslash5Arg : kernel_param<> {
       static constexpr int nColor = nColor_;
       static constexpr bool pm = pm_;
       static constexpr bool dagger = dagger_;
@@ -51,11 +52,10 @@ namespace quda
 
       eofa_coeff<real> coeff;
 
-      dim3 threads;
-
       Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
                  const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
                  const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),
         in(in),
         x(x),
@@ -68,8 +68,7 @@ namespace quda
         a(a_),
         kappa(kappa_),
         inv(inv_),
-        sherman_morrison(sherman_morrison_),
-        threads(volume_4d_cb, Ls, nParity)
+        sherman_morrison(sherman_morrison_)
       {
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
         if (!in.isNative() || !out.isNative())

@@ -15,7 +15,7 @@ namespace quda
        @tparam n real numbers per thread
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct BlasArg {
+    struct BlasArg : kernel_param<> {
       using real = real_;
       static constexpr int n = n_;
       Spinor<store_t, N> X;
@@ -26,17 +26,16 @@ namespace quda
       Functor f;
 
       const int nParity;
-      dim3 threads;
       BlasArg(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
               ColorSpinorField &v, Functor f, int length, int nParity) :
+        kernel_param(dim3(length, nParity, 1)),
         X(x),
         Y(y),
         Z(z),
         W(w),
         V(v),
         f(f),
-        nParity(nParity),
-        threads(length, nParity, 1)
+        nParity(nParity)
       { ; }
     };
 

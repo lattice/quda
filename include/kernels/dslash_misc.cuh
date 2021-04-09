@@ -12,14 +12,13 @@ namespace quda {
   /**
      @brief Parameter structure for driving init_dslash_atomic
   */
-  template <typename T_> struct init_dslash_atomic_arg {
+  template <typename T_> struct init_dslash_atomic_arg : kernel_param<> {
     using T = T_;
     T *count;
-    dim3 threads;
 
     init_dslash_atomic_arg(T *count, unsigned int size) :
-      count(count),
-      threads(size, 1, 1) { }
+      kernel_param(dim3(size, 1, 1)),
+      count(count) { }
   };
 
   /**
@@ -36,16 +35,15 @@ namespace quda {
   /**
      @brief Parameter structure for driving init_dslash_arr
   */
-  template <typename T_> struct init_arr_arg {
+  template <typename T_> struct init_arr_arg : kernel_param<> {
     using T = T_;
     T *arr;
     T val;
-    dim3 threads;
 
     init_arr_arg(T *arr, T val, unsigned int size) :
+      kernel_param(dim3(size, 1, 1)),
       arr(arr),
-      val(val),
-      threads(size, 1, 1) { }
+      val(val) { }
   };
 
   /**
@@ -62,7 +60,7 @@ namespace quda {
      @brief Parameter structure for driving the Gamma operator
    */
   template <typename Float, int nColor_>
-  struct GammaArg {
+  struct GammaArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     constexpr static int nColor = nColor_;
     typedef typename colorspinor_mapper<Float,4,nColor>::type F;
@@ -72,7 +70,6 @@ namespace quda {
     const int d;          // which gamma matrix are we applying
     const int nParity;    // number of parities we're working on
     bool doublet;         // whether we applying the operator to a doublet
-    dim3 threads;         // thread shape for this kernel
     const int volumeCB;   // checkerboarded volume
     real a;               // scale factor
     real b;               // chiral twist
@@ -80,11 +77,11 @@ namespace quda {
 
     GammaArg(ColorSpinorField &out, const ColorSpinorField &in, int d,
 	     real kappa=0.0, real mu=0.0, real epsilon=0.0,
-	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), d(d), nParity(in.SiteSubset()),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-        threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
-	volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
+	     bool dagger=false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
+      kernel_param(dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1)),
+      out(out), in(in), d(d), nParity(in.SiteSubset()),
+      doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0)
     {
       checkPrecision(out, in);
       checkLocation(out, in);
@@ -171,7 +168,7 @@ namespace quda {
      @tparam dynamic_clover Whether we are inverting the clover field on the fly
   */
   template <typename Float, int nColor_, bool inverse_ = true>
-  struct CloverArg {
+  struct CloverArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nSpin = 4;
     static constexpr int nColor = nColor_;
@@ -189,7 +186,6 @@ namespace quda {
     const int nParity;    // number of parities we're working on
     const int parity;     // which parity we're acting on (if nParity=1)
     bool doublet;         // whether we applying the operator to a doublet
-    dim3 threads;
     const int volumeCB;   // checkerboarded volume
     real a;
     real b;
@@ -198,13 +194,13 @@ namespace quda {
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
-	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID)
-      : out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
-	cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
-	nParity(in.SiteSubset()), parity(parity),
-	doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-        threads(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1),
-        volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
+	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
+      kernel_param(dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1)),
+      out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
+      cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
+      nParity(in.SiteSubset()), parity(parity),
+      doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
+      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
     {
       checkPrecision(out, in, clover);
       checkLocation(out, in, clover);

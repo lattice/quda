@@ -23,16 +23,15 @@ namespace quda {
 #endif
 
   template <typename Float, int dir_>
-  struct GaugeFixFFTRotateArg {
+  struct GaugeFixFFTRotateArg : kernel_param<> {
     static constexpr int dir = dir_;
     int_fastdiv X[4];     // grid dimensions
     complex<Float> *tmp0;
     complex<Float> *tmp1;
-    dim3 threads;  // number of active threads required
     GaugeFixFFTRotateArg(const GaugeField &data, complex<Float> *tmp0, complex<Float> *tmp1) :
+      kernel_param(dim3(data.Volume(), 1, 1)),
       tmp0(tmp0),
-      tmp1(tmp1),
-      threads(data.Volume(), 1, 1)
+      tmp1(tmp1)
     {
       for (int d = 0; d < 4; d++) X[d] = data.X()[d];
     }
@@ -71,7 +70,7 @@ namespace quda {
   };
 
   template <typename store_t, QudaReconstructType recon>
-  struct GaugeFixArg {
+  struct GaugeFixArg : kernel_param<> {
     using Float = typename mapper<store_t>::type;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int elems = recon / 2;
@@ -82,13 +81,12 @@ namespace quda {
     complex<Float> *gx;
     Float alpha;
     int volume;
-    dim3 threads;     // number of active threads required
 
     GaugeFixArg(GaugeField &data, double alpha) :
+      kernel_param(dim3(data.VolumeCB(), 2, 1)),
       data(data),
       alpha(static_cast<Float>(alpha)),
-      volume(data.Volume()),
-      threads(data.VolumeCB(), 2, 1)
+      volume(data.Volume())
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);
@@ -163,15 +161,14 @@ namespace quda {
     complex<real> *delta;
     reduce_t result;
     int volume;
-    dim3 threads;     // number of active threads required
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
       ReduceArg<reduce_t>(1, true), // reset = true
       data(data),
       delta(delta),
-      volume(data.Volume()),
-      threads(data.VolumeCB(), 2, 1)
+      volume(data.Volume())
     {
+      this->threads = dim3(data.VolumeCB(), 2, 1);
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 

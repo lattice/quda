@@ -38,7 +38,6 @@ namespace quda
 
       const int length_cb;
       const int nParity;
-      dim3 threads;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
@@ -48,9 +47,9 @@ namespace quda
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
-        nParity(nParity),
-        threads(length, NYW, 1)
+        nParity(nParity)
       {
+        this->threads = dim3(length, NYW, 1);
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {

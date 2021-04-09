@@ -10,7 +10,7 @@ namespace quda {
      Kernel argument struct
    */
   template <typename store_out_t, typename store_in_t, int length_, typename OutOrder, typename InOrder>
-  struct CopyGaugeArg {
+  struct CopyGaugeArg : kernel_param<> {
     using real_out_t  = typename mapper<store_out_t>::type;
     using real_in_t  = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
@@ -23,11 +23,15 @@ namespace quda {
     int_fastdiv geometry;
     int out_offset;
     int in_offset;
-    dim3 threads;
-    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta)
-      : out(out), in(in), volume(meta.Volume()), nDim(meta.Ndim()),
-        geometry(meta.Geometry()), out_offset(0), in_offset(0),
-        threads(1, 1, meta.Geometry() * 2) // FIXME - need to set .x and .y components
+    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta) :
+      kernel_param(dim3(1, 1, meta.Geometry() * 2)), // FIXME - need to set .x and .y components
+      out(out),
+      in(in),
+      volume(meta.Volume()),
+      nDim(meta.Ndim()),
+      geometry(meta.Geometry()),
+      out_offset(0),
+      in_offset(0)
     {
       for (int d=0; d<nDim; d++) faceVolumeCB[d] = meta.SurfaceCB(d) * meta.Nface();
     }

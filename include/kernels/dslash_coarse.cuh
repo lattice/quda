@@ -18,7 +18,7 @@ namespace quda {
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  struct DslashCoarseArg {
+  struct DslashCoarseArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
@@ -48,10 +48,10 @@ namespace quda {
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
-    dim3 threads;
 
     inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                            const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread()))),
       out(const_cast<ColorSpinorField &>(out)),
       inA(const_cast<ColorSpinorField &>(inA)),
       inB(const_cast<ColorSpinorField &>(inB)),
@@ -64,8 +64,7 @@ namespace quda {
       X0h(((3 - nParity) * out.X(0)) / 2),
       dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out.VolumeCB() / dim[4]),
-      threads(color_stride * X.VolumeCB(), nParity, 2 * dim_stride * 2 * (nColor / colors_per_thread()))
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {  }
   };
 

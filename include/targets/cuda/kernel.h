@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kernel_helper.h>
+
 namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>

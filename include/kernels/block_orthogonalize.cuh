@@ -29,7 +29,7 @@ namespace quda {
       Kernel argument struct
   */
   template <bool is_device_, typename vFloat, typename Rotator, typename Vector, int fineSpin_, int nColor_, int coarseSpin_, int nVec_>
-  struct BlockOrthoArg {
+  struct BlockOrthoArg : kernel_param<> {
     using sum_t = double;
     using real = typename mapper<vFloat>::type;
     static constexpr bool is_device = is_device_;
@@ -57,11 +57,11 @@ namespace quda {
     static constexpr bool launch_bounds = true;
     dim3 grid_dim;
     dim3 block_dim;
-    dim3 threads;
 
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
                   const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
+      kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), chiral_blocks, 1)),
       V(V),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
@@ -72,8 +72,7 @@ namespace quda {
       fineVolumeCB(meta.VolumeCB()),
       B{*B...},
       grid_dim(),
-      block_dim(),
-      threads(fineVolumeCB * (fineSpin > 1 ? nParity : 1), chiral_blocks, 1)
+      block_dim()
     {
       int aggregate_size = 1;
       for (int d = 0; d < V.Ndim(); d++) aggregate_size *= geo_bs[d];

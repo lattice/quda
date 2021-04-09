@@ -22,7 +22,7 @@ namespace quda {
   */
   template <typename Float, typename vFloat, int fineSpin_, int fineColor_,
 	    int coarseSpin_, int coarseColor_, QudaFieldOrder order>
-  struct RestrictArg {
+  struct RestrictArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int fineColor = fineColor_;
@@ -50,16 +50,15 @@ namespace quda {
     static constexpr bool launch_bounds = false;
     dim3 grid_dim;
     dim3 block_dim;
-    dim3 threads;
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
-		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
-      : out(out), in(in), V(V),
-        aggregate_size(in.Volume()/out.Volume()),
-        aggregate_size_cb(in.VolumeCB()/out.Volume()),
-        fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-	spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle_factor(1),
-        threads(aggregate_size, coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), 1)
+		const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
+      kernel_param(dim3(in.Volume()/out.Volume(), coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), 1)),
+      out(out), in(in), V(V),
+      aggregate_size(in.Volume()/out.Volume()),
+      aggregate_size_cb(in.VolumeCB()/out.Volume()),
+      fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle_factor(1)
     { }
   };
 

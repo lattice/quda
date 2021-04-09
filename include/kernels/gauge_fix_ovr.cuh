@@ -24,13 +24,12 @@ namespace quda {
     int border[4];
     Gauge data;
     reduce_t result;
-    dim3 threads; // number of active threads required
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<reduce_t>(1, true), // reset = true
-      data(data),
-      threads(data.LocalVolumeCB(), 2, 1)
+      data(data)
     {
+      this->threads = dim3(data.LocalVolumeCB(), 2, 1);
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
@@ -100,7 +99,7 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing kernel
    */
   template <typename store_t, QudaReconstructType recon, int gauge_dir_, bool halo_, int type_>
-  struct GaugeFixArg {
+  struct GaugeFixArg : kernel_param<> {
     using real = typename mapper<store_t>::type;
     static constexpr int gauge_dir = gauge_dir_;
     static constexpr bool halo = halo_;
@@ -111,14 +110,13 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     int *borderpoints[2];
-    dim3 threads; // number of active threads required
 
     GaugeFixArg(const GaugeField &u, const double relax_boost, int parity, int *borderpoints[2], unsigned threads) :
+      kernel_param(dim3(threads, type < 3 ? 8 : 4, 1)),
       u(u),
       relax_boost(static_cast<real>(relax_boost)),
       parity(parity),
-      borderpoints{ borderpoints[0], borderpoints[1] },
-      threads(threads, type < 3 ? 8 : 4, 1)
+      borderpoints{ borderpoints[0], borderpoints[1] }
     {
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = halo ? u.R()[dir] : comm_dim_partitioned(dir) ? u.R()[dir] + 1 : 0;
@@ -225,7 +223,7 @@ namespace quda {
   };
 
   template <typename store_t_, QudaReconstructType recon, bool pack_, bool top_>
-  struct GaugeFixPackArg {
+  struct GaugeFixPackArg : kernel_param<> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr int NElems = recon;
@@ -237,14 +235,13 @@ namespace quda {
     int dim;
     int X[4]; // grid dimensions
     int border[4];
-    dim3 threads;
 
     GaugeFixPackArg(GaugeField &u, complex<store_t> *array, int parity, int dim) :
+      kernel_param(dim3(u.LocalSurfaceCB(dim), 1, 1)),
       u(u),
       array(array),
       parity(parity),
-      dim(dim),
-      threads(u.LocalSurfaceCB(dim), 1, 1)
+      dim(dim)
     {
       for (int dir = 0; dir < 4; dir++) {
         X[dir] = u.X()[dir] - u.R()[dir] * 2;
@@ -333,16 +330,15 @@ namespace quda {
     }
   };
 
-  struct BorderIdArg {
+  struct BorderIdArg : kernel_param<> {
     int X[4]; // grid dimensions
     int border[4];
     int *faceindices[8];
     int offset[5];
     int surface_cb[4];
-    dim3 threads;
     BorderIdArg(const GaugeField &u, int *faceindices[2]) :
-      faceindices{faceindices[0], faceindices[1]},
-      threads(0, 2, 2)
+      kernel_param(dim3(0, 2, 2)),
+      faceindices{faceindices[0], faceindices[1]}
     {
       offset[0] = 0;
       for (int dim = 0; dim < 4; dim++) {

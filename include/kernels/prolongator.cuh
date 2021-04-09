@@ -12,7 +12,7 @@ namespace quda {
       Kernel argument struct
   */
   template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, QudaFieldOrder order>
-  struct ProlongateArg {
+  struct ProlongateArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int coarseSpin = coarseSpin_;
@@ -26,12 +26,12 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
     const int nParity; // number of parities of input fine field
-    dim3 threads;
 
     ProlongateArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
                   const int *geo_map,  const int parity) :
-      out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset()),
-      threads(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread) { }
+      kernel_param(dim3(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread)),
+      out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset())
+    { }
   };
 
   /**

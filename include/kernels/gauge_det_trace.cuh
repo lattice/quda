@@ -16,13 +16,12 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
-    dim3 threads; // number of active threads required
 
     KernelArg(const GaugeField &u) :
       ReduceArg<reduce_t>(),
-      u(u),
-      threads(u.LocalVolumeCB(), 2, 1)
+      u(u)
     {
+      this->threads = dim3(u.LocalVolumeCB(), 2, 1);
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];
         X[dir] = u.X()[dir] - border[dir]*2;

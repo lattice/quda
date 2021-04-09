@@ -5,13 +5,12 @@ namespace quda {
 
   namespace reducer {
 
-    template <typename T_> struct init_arg {
+    template <typename T_> struct init_arg : kernel_param<> {
       using T = T_;
       T *count;
-      dim3 threads;
       init_arg(T *count) :
-        count(count),
-        threads(max_n_reduce(), 1, 1) {}
+        kernel_param(dim3(max_n_reduce(), 1, 1)),
+        count(count) { }
     };
 
     template <typename Arg> struct init_count {

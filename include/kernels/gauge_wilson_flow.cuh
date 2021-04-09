@@ -16,7 +16,7 @@ namespace quda
 
   template <typename Float, int nColor_, QudaReconstructType recon_, int wflow_dim_,
             QudaWFlowType wflow_type_, WFlowStepType step_type_>
-  struct GaugeWFlowArg {
+  struct GaugeWFlowArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -37,16 +37,15 @@ namespace quda
     const real epsilon;
     const real coeff1x1;
     const real coeff2x1;
-    dim3 threads; // number of active threads required
 
     GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
+      kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
       epsilon(epsilon),
       coeff1x1(5.0/3.0),
-      coeff2x1(-1.0/12.0),
-      threads(in.LocalVolumeCB(), 2, wflow_dim)
+      coeff2x1(-1.0/12.0)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];

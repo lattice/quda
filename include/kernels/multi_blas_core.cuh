@@ -27,7 +27,7 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
-    struct MultiBlasArg :    
+    struct MultiBlasArg : kernel_param<>,
       SpinorXZ<NXZ_, store_t, N, Functor_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
       using real = real_;
@@ -38,13 +38,12 @@ namespace quda
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
-      dim3 threads;
       MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                    Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x[0]->SiteSubset())),
         NYW(NYW),
-        f(f),
-        threads(length * warp_split, NYW, x[0]->SiteSubset())
+        f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 

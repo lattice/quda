@@ -7,7 +7,7 @@
 namespace quda {
 
   template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_, bool compute_max_>
-  struct CalculateYhatArg {
+  struct CalculateYhatArg : kernel_param<> {
     using Float = Float_;
     using yhatTileType = TileSize<n_, n_, n_, M_, N_, 1>;
     yhatTileType tile;
@@ -30,11 +30,9 @@ namespace quda {
     Float *max_d; // device scalar that stores the maximum element of Yhat
     Float *max;
 
-    dim3 threads;
-
     CalculateYhatArg(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv) :
-      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(1), max_h(nullptr), max_d(nullptr),
-      threads(Y.VolumeCB(), 2 * yhatTileType::M_tiles, 4 * yhatTileType::N_tiles)
+      kernel_param(dim3(Y.VolumeCB(), 2 * yhatTileType::M_tiles, 4 * yhatTileType::N_tiles)),
+      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(1), max_h(nullptr), max_d(nullptr)
     {
       for (int i=0; i<4; i++) {
         this->comm_dim[i] = comm_dim_partitioned(i);

@@ -9,7 +9,7 @@
 namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon, int dim_ = -1>
-  struct CloverForceArg {
+  struct CloverForceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -30,10 +30,10 @@ namespace quda {
     int displacement;
     bool partitioned[4];
     real coeff;
-    dim3 threads;
 
     CloverForceArg(GaugeField &force, const GaugeField &U, const ColorSpinorField &inA, const ColorSpinorField &inB,
                    const ColorSpinorField &inC, const ColorSpinorField &inD, const unsigned int parity, const double coeff) :
+      kernel_param(dim3(dim == -1 ? inA.VolumeCB() : inA.GhostFaceCB()[dim])),
       force(force),
       inA(inA),
       inB(inB),
@@ -42,8 +42,7 @@ namespace quda {
       U(U),
       parity(parity),
       displacement(1),
-      coeff(coeff),
-      threads(dim == -1 ? inA.VolumeCB() : inA.GhostFaceCB()[dim])
+      coeff(coeff)
     {
       for (int i=0; i<4; ++i) this->X[i] = U.X()[i];
       for (int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
