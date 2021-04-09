@@ -592,8 +592,8 @@ namespace quda
       __syncthreads();
       // do exterior
     }
-    arg.kernel_type = EXTERIOR_KERNEL_ALL;
-    arg.threads = arg.exterior_threads;
+    // arg.kernel_type = EXTERIOR_KERNEL_ALL;
+    // arg.threads = arg.exterior_threads;
     int local_tid = target::thread_idx().x + target::block_dim().x * (myblockidx % (blocks_per_dir)); // index within the block
     int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
