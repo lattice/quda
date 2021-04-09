@@ -363,7 +363,7 @@ namespace quda
     }
     // if we are not in the uber kernel
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
           nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, getNeighborRank(2 * dim + dir, arg));
       }
