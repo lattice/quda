@@ -5765,7 +5765,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void **result,
 		    const QudaContractType cType, void *cs_param_ptr, const int src_colors,
 		    const int *X, const int *const source_position,
-		    const int n_mom, const int *const mom_modes)
+		    const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type)
 {
   profileContractFT.TPSTART(QUDA_PROFILE_TOTAL);
   profileContractFT.TPSTART(QUDA_PROFILE_INIT);
@@ -5841,7 +5841,9 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 	  std::fill(result_global.begin(), result_global.end(), 0.0);
 	  contractSummedQuda(*d_prop1[s1 * src_nColor + c1],
 			     *d_prop2[b1 * src_nColor + c1],
-			     result_global, cType, source_position, &mom_modes[4*mom_idx], s1, b1);
+			     result_global, cType,
+			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
+			     s1, b1);
 		
 	  comm_allreduce_array((double *)&result_global[0], 2*max_contract_results * global_decay_dim_slices);
 

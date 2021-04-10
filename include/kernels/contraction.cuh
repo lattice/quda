@@ -262,6 +262,7 @@ namespace quda
     F y;
     int s1, b1;
     int mom_mode[4];
+    QudaFFTSymmType fft_type[4];
     int source_position[4];
     int NxNyNzNt[4];
     DRGammaMatrix<real> Gamma;
@@ -273,7 +274,7 @@ namespace quda
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4],
-			 const int mom_mode_in[4],
+			 const int mom_mode_in[4], const QudaFFTSymmType fft_type_in[4],
 			 const int s1, const int b1) :
       ReduceArg<contract_array>(x.X()[reduction_dim]),
       x(x),
@@ -288,6 +289,7 @@ namespace quda
 	X[i] = x.X()[i];
         source_position[i] = source_position_in[i];
 	mom_mode[i] = mom_mode_in[i];
+	fft_type[i] = fft_type_in[i];
         offsets[i] = comm_coord(i) * x.X()[i];
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
@@ -315,6 +317,7 @@ namespace quda
       int s1 = arg.s1;
       int b1 = arg.b1;
       int mom_mode[4];
+      QudaFFTSymmType fft_type[4];
       int source_position[4];
       int offsets[4];
       int NxNyNzNt[4];
@@ -322,6 +325,7 @@ namespace quda
 	source_position[i] = arg.source_position[i];
 	offsets[i] = arg.offsets[i];
 	mom_mode[i] = arg.mom_mode[i];
+	fft_type[i] = arg.fft_type[i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
       
@@ -399,12 +403,14 @@ namespace quda
 
       reduce_t result_all_channels = contract_array();
       int mom_mode[4];
+      QudaFFTSymmType fft_type[4];
       int source_position[4];
       int offsets[4];
       int NxNyNzNt[4];
       for(int i=0; i<4; i++) {
 	source_position[i] = arg.source_position[i];
 	mom_mode[i] = arg.mom_mode[i];
+	fft_type[i] = arg.fft_type[i],
 	offsets[i] = arg.offsets[i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
@@ -434,9 +440,18 @@ namespace quda
 	  dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[dir];
 	  double ph_real;
 	  double ph_imag;
-	  { // exp case
-	    ph_real =  cos(dXi_dot_Pi*2.*M_PI);
-	    ph_imag = -sin(dXi_dot_Pi*2.*M_PI);
+	  if(fft_type[dir] == QUDA_FFT_SYMM_EO) {
+	    // exp(+i k.x) case
+	    ph_real = cos(dXi_dot_Pi*2.*M_PI);
+	    ph_imag = sin(dXi_dot_Pi*2.*M_PI);
+	  } else if(fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
+	    // cos(k.x) case
+	    ph_real = cos(dXi_dot_Pi*2.*M_PI);
+	    ph_imag = 0.0;
+	  } else if(fft_type[dir] == QUDA_FFT_SYMM_ODD) {
+	    // sin(k.x) case
+	    ph_real = 0.0;
+	    ph_imag = sin(dXi_dot_Pi*2.*M_PI);
 	  }
 	  // phase *= ph
 	  double tmp_real = phase_real;
@@ -448,7 +463,7 @@ namespace quda
       // Staggered only uses the first element of result_all_channels
       result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
       result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
-      for(int i=1; i<max_contract_results; ++i) // zero unused
+      for(int i=1; i<max_contract_results; ++i) // zero unused elements
 	{
 	  result_all_channels[i].x = 0.;
 	  result_all_channels[i].y = 0.;

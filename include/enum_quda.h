@@ -532,6 +532,13 @@ typedef enum QudaContractType_s {
   QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaContractType;
 
+typedef enum QudaFFTSymmType_t {
+  QUDA_FFT_SYMM_ODD  = 1,  // sin(phase)
+  QUDA_FFT_SYMM_EVEN = 2,  // cos(phase)
+  QUDA_FFT_SYMM_EO   = 3,  // exp(-i phase)
+  QUDA_FFT_SYMM_INVALID = QUDA_INVALID_ENUM
+} QudaFFTSymmType;
+
 typedef enum QudaContractGamma_s {
   QUDA_CONTRACT_GAMMA_G1 = 0,
   QUDA_CONTRACT_GAMMA_G2 = 1,

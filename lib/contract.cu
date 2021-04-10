@@ -18,6 +18,7 @@ namespace quda {
     const QudaContractType cType;
     const int *const source_position;
     const int *const mom_mode;
+    const QudaFFTSymmType *const fft_type;
     const size_t s1;
     const size_t b1;
     
@@ -26,7 +27,7 @@ namespace quda {
 		      std::vector<Complex> &result_global,
 		      const QudaContractType cType,
 		      const int *const source_position,
-		      const int *const mom_mode,
+		      const int *const mom_mode, const QudaFFTSymmType *const fft_type,
 		      const size_t s1, const size_t b1) :
       TunableMultiReduction(x, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z ||
 				     cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
@@ -36,6 +37,7 @@ namespace quda {
       cType(cType),
       source_position(source_position),
       mom_mode(mom_mode),
+      fft_type(fft_type),
       s1(s1),
       b1(b1)
     {
@@ -75,7 +77,7 @@ namespace quda {
 	  constexpr int nSpin = 4;
 	  constexpr bool spin_project = true;
 	  constexpr int ft_dir = 3;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, s1, b1);
+	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
@@ -84,7 +86,7 @@ namespace quda {
 	  constexpr int nSpin = 4;
 	  constexpr bool spin_project = true;
 	  constexpr int ft_dir = 2;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, s1, b1);
+	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
@@ -93,7 +95,7 @@ namespace quda {
 	  constexpr int nSpin = 1;
 	  constexpr bool spin_project = false;
 	  constexpr int ft_dir = 3;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, s1, b1);
+	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<StaggeredContractFT>(result_local, tp, stream, arg);
 	}
 	break;
@@ -126,7 +128,7 @@ namespace quda {
 			  std::vector<Complex> &result_global,
 			  const QudaContractType cType,
 			  const int *const source_position,
-			  const int *const mom_mode,
+			  const int *const mom_mode, const QudaFFTSymmType *const fft_type,
 			  const size_t s1, const size_t b1)
   {
     checkPrecision(x, y);
@@ -144,7 +146,7 @@ namespace quda {
       }
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
 
-    instantiate<ContractionSummed>(x, y, result_global, cType, source_position, mom_mode, s1, b1);
+    instantiate<ContractionSummed>(x, y, result_global, cType, source_position, mom_mode, fft_type, s1, b1);
   }
 #else
   void contractSummedQuda(const ColorSpinorField &, const ColorSpinorField &,

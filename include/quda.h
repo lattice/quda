@@ -1491,7 +1491,7 @@ extern "C" {
    * The output result must be able to hold nSpin*nSpin * dim(T or Z) * n_mom values. 
    * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
    * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of host pointer to the output complex double correlators
+   * @param[out] h_result adress of host pointer to the output complex correlators in double precision
    * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
    * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
    *            construction of ColorSpinorFields
@@ -1499,12 +1499,13 @@ extern "C" {
    * @param[in] X spacetime data for construction of ColorSpinorFields
    * @param[in] source_position needed in Fourier phases
    * @param[in] n_mom number of momentum modes
-   * @param[in] mom_modes in Fourier phase
+   * @param[in] mom_modes[n_mom][4] in Fourier phase
+   * @param[in] fft_type[n_mom][4] selects exp, cos, or sin FFT for each direction
    */
   void contractFTQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
 		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
 		      const int *X, const int *const source_position,
-		      const int n_mom, const int *const mom_modes);
+		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);
   
   /**
    * Public function to perform color contractions of the host spinorfields contained

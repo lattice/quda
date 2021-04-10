@@ -181,6 +181,7 @@ int test(int contractionType, QudaPrecision test_prec)
   const int source_position[4]{0,0,0,0};
   const int n_mom = 1;
   const int mom[4]{0,0,0,0};
+  const QudaFFTSymmType fft_type[4]{QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN};
 
   int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
   void *d_result = malloc(n_contract_results * sizeof(double)); // meson correlators are always double
@@ -192,7 +193,7 @@ int test(int contractionType, QudaPrecision test_prec)
   // result in the array 'result'
 
   // Perform GPU contraction.
-  contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom);
+  contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom, fft_type);
 
   printfQuda("contraction:");
   for(int c=0; c < n_contract_results; c += 2) {
