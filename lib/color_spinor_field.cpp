@@ -252,7 +252,7 @@ namespace quda {
     }
 
     {
-      int aux_string_n = TuneKey::aux_n / 2;
+      constexpr int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
       int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
                            stride, precision, fieldOrder, nSpin, nColor);
@@ -742,9 +742,10 @@ namespace quda {
     return field;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
+  ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
-    if (param_.Precision() > precision) errorQuda("Cannot create an alias to source with lower precision than the alias");
+    if (param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
     ColorSpinorParam param(param_);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = V();
@@ -755,8 +756,9 @@ namespace quda {
     // internal field
     if (param.Precision() < QUDA_SINGLE_PRECISION) {
       auto norm_offset = (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) ?
-        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(Bytes()/4) : ALIGNMENT_ADJUST(Bytes()/2) : 0;
-      param.norm = Norm() ? Norm() : static_cast<char*>(V()) + norm_offset;
+        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2 * ALIGNMENT_ADJUST(Bytes() / 4) : ALIGNMENT_ADJUST(Bytes() / 2) :
+        0;
+      param.norm = Norm() ? Norm() : static_cast<char *>(V()) + norm_offset;
     }
 
     auto alias = ColorSpinorField::Create(param);
@@ -764,10 +766,10 @@ namespace quda {
     if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
     if (alias->Precision() < QUDA_SINGLE_PRECISION) {
       // check that norm does not overlap with body
-      if (static_cast<char*>(alias->V()) + alias->Bytes() > alias->Norm())
+      if (static_cast<char *>(alias->V()) + alias->Bytes() > alias->Norm())
         errorQuda("Overlap between alias body and norm");
       // check that norm does fall off the end
-      if (static_cast<char*>(alias->Norm()) + alias->NormBytes() > static_cast<char*>(V()) + Bytes())
+      if (static_cast<char *>(alias->Norm()) + alias->NormBytes() > static_cast<char *>(V()) + Bytes())
         errorQuda("Norm is not contained in the srouce field");
     }
 

@@ -661,9 +661,11 @@ namespace quda {
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
       Accessor<Float, nColor, QUDA_FLOAT2_GAUGE_ORDER, storeFloat> accessor;
 
-      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
-	: volumeCB(U.VolumeCB()), scale(static_cast<Float>(1.0)), 
-	  scale_inv(static_cast<Float>(1.0)), accessor(U, gauge_, ghost_)
+      GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_ = 0) :
+        volumeCB(U.VolumeCB()),
+        scale(static_cast<Float>(1.0)),
+        scale_inv(static_cast<Float>(1.0)),
+        accessor(U, gauge_, ghost_)
       {
 	if (!native_ghost) assert(ghost_ != nullptr);
 	for (int d=0; d<4; d++) {
@@ -977,11 +979,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm squared of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return L2 norm squared
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return L2 norm squared
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
@@ -989,11 +991,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
@@ -1001,11 +1003,11 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
@@ -1013,7 +1015,7 @@ namespace quda {
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
     };
 
       /**
@@ -1628,7 +1630,7 @@ namespace quda {
             ghost[i] = ghost_ ? ghost_[i] : 0;
             faceVolumeCB[i] = u.SurfaceCB(i) * u.Nface(); // face volume equals surface * depth
           }
-      }
+        }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -2733,6 +2735,9 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDPJIT_GAUGE_ORDER,Nc> { typedef gauge::QDPJITOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_MILC_GAUGE_ORDER,Nc> { typedef gauge::MILCOrder<T, 2*Nc*Nc> type; };
+  template <typename T, int Nc> struct gauge_order_mapper<T, QUDA_CPS_WILSON_GAUGE_ORDER, Nc> {
+    typedef gauge::CPSOrder<T, 2 * Nc * Nc> type;
+  };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_BQCD_GAUGE_ORDER,Nc> { typedef gauge::BQCDOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_GAUGE_ORDER,Nc> { typedef gauge::TIFROrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };

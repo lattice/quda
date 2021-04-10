@@ -822,9 +822,9 @@ namespace quda {
   {
 
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-    const int s = (nDim == 5 ? tid / arg.threads : 0);
+    const int s = (nDim == 5 ? tid / arg.work_items : 0);
 
-    face_idx = tid - s * arg.threads; // face_idx = face_idx % arg.threads
+    face_idx = tid - s * arg.work_items; // face_idx = face_idx % arg.work_items
 
     if (face_idx < arg.threadDimMapUpper[0]) {
       face_idx += s * arg.threadDimMapUpper[0];

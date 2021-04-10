@@ -475,8 +475,8 @@ namespace quda {
     bool deflate_init;      /** If true, the deflation space has been computed. */
     bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
-    std::vector<ColorSpinorField *> evecs;     /** Holds the eigenvectors. */
-    std::vector<Complex> evals;                /** Holds the eigenvalues. */
+    std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
+    std::vector<Complex> evals;            /** Holds the eigenvalues. */
 
   public:
     Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -487,9 +487,9 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    const DiracMatrix& M() { return mat; }
-    const DiracMatrix& Msloppy() { return matSloppy; }
-    const DiracMatrix& Mprecon() { return matPrecon; }
+    const DiracMatrix &M() { return mat; }
+    const DiracMatrix &Msloppy() { return matSloppy; }
+    const DiracMatrix &Mprecon() { return matPrecon; }
     const DiracMatrix &Meig() { return matEig; }
 
     /**
@@ -563,6 +563,13 @@ namespace quda {
        @param[in] hq_tol Solver heavy-quark tolerance
     */
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
+
+    /**
+       @brief Returns the epsilon tolerance for a given precision, by default returns
+       the solver precision.
+       @param[in] prec Input precision, default value is solver precision
+    */
+    double precisionEpsilon(QudaPrecision prec = QUDA_INVALID_PRECISION) const;
 
     /**
        @brief Constructs the deflation space and eigensolver
@@ -855,7 +862,7 @@ namespace quda {
     int n_krylov; // in the language of BiCGstabL, this is L.
 
     // Various coefficients and params needed on each iteration.
-    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
+    Complex rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
     Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
     Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
     double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
@@ -865,7 +872,7 @@ namespace quda {
     ColorSpinorField *r_fullp;   //! Full precision residual.
     ColorSpinorField *yp;        //! Full precision temporary.
     // sloppy precision fields
-    ColorSpinorField *tempp;     //! Sloppy temporary vector.
+    ColorSpinorField *tempp;          //! Sloppy temporary vector.
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
 
@@ -1157,20 +1164,20 @@ public:
   // Extended Steepest Descent solver used for overlapping DD preconditioning
   class XSD : public Solver
   {
-    private:
-      cudaColorSpinorField *xx;
-      cudaColorSpinorField *bx;
-      SD *sd; // extended sd is implemented using standard sd
-      bool init;
-      int R[4];
+  private:
+    cudaColorSpinorField *xx;
+    cudaColorSpinorField *bx;
+    SD *sd; // extended sd is implemented using standard sd
+    bool init;
+    int R[4];
 
-    public:
-      XSD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-      virtual ~XSD();
+  public:
+    XSD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~XSD();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-      virtual bool hermitian() { return false; } /** CGNE is for any linear system */
+    virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };
 
   class PreconditionedSolver : public Solver
@@ -1233,7 +1240,13 @@ public:
 
   public:
     MultiShiftSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-      mat(mat), matSloppy(matSloppy), param(param), profile(profile) { ; }
+      mat(mat),
+      matSloppy(matSloppy),
+      param(param),
+      profile(profile)
+    {
+      ;
+    }
     virtual ~MultiShiftSolver() { ; }
 
     virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
@@ -1248,29 +1261,29 @@ public:
   public:
     MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
-/**
- * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
- *
- * @param out std::vector of pointer to solutions for all the shifts.
- * @param in right-hand side.
- * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
- * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
- */
+    /**
+     * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+     *
+     * @param out std::vector of pointer to solutions for all the shifts.
+     * @param in right-hand side.
+     * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
+     * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
+     */
     void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
 
-/**
- * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
- *
- * @param out std::vector of pointer to solutions for all the shifts.
- * @param in right-hand side.
- */
+    /**
+     * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
+     *
+     * @param out std::vector of pointer to solutions for all the shifts.
+     * @param in right-hand side.
+     */
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
       std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
       std::vector<ColorSpinorField*> p;
 
       (*this)(out, in, p, r2_old.get());
 
-      for (auto& pp : p) delete pp;
+      for (auto &pp : p) delete pp;
     }
 
   };
@@ -1355,7 +1368,7 @@ public:
     ColorSpinorField* p;  // conjugate vector
     ColorSpinorField* Ap; // mat * conjugate vector
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField* Az; // mat * conjugate vector from the previous iteration
+    ColorSpinorField *Az;       // mat * conjugate vector from the previous iteration
     ColorSpinorField *r_pre;    //! residual passed to preconditioner
     ColorSpinorField *p_pre;    //! preconditioner result
 
@@ -1366,27 +1379,28 @@ public:
     bool init;
 
 public:
-    IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+  IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile);
 
-    virtual ~IncEigCG();
+  virtual ~IncEigCG();
 
-    /**
-       @brief Expands deflation space.
-       @param V Composite field container of new eigenvectors
-       @param n_ev number of vectors to load
-     */
-    void increment(ColorSpinorField &V, int n_ev);
+  /**
+     @brief Expands deflation space.
+     @param V Composite field container of new eigenvectors
+     @param n_ev number of vectors to load
+   */
+  void increment(ColorSpinorField &V, int n_ev);
 
-    void RestartVT(const double beta, const double rho);
-    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
-    //EigCG solver:
-    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //InitCG solver:
-    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //Incremental eigCG solver (for eigcg and initcg calls)
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  void RestartVT(const double beta, const double rho);
+  void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2);
+  // EigCG solver:
+  int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+  // InitCG solver:
+  int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+  // Incremental eigCG solver (for eigcg and initcg calls)
+  void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    bool hermitian() { return true; } // EigCG is only for Hermitian systems
+  bool hermitian() { return true; } // EigCG is only for Hermitian systems
   };
 
 //forward declaration
@@ -1415,9 +1429,10 @@ public:
     bool init;
 
   public:
-
-    GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-    GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+            TimeProfile &profile);
+    GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+            SolverParam &param, TimeProfile &profile);
 
     virtual ~GMResDR();
 
@@ -1436,14 +1451,14 @@ public:
     bool hermitian() { return false; } // GMRESDR for any linear system
  };
 
-  /**
-     @brief This is an object that captures the state required for a
-     deflated solver.
-  */
-  struct deflation_space : public Object {
-    bool svd;                              /** Whether this space is for an SVD deflaton */
-    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
-    std::vector<Complex> evals;            /** The eigenvalues */
-  };
+ /**
+    @brief This is an object that captures the state required for a
+    deflated solver.
+ */
+ struct deflation_space : public Object {
+   bool svd;                              /** Whether this space is for an SVD deflaton */
+   std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
+   std::vector<Complex> evals;            /** The eigenvalues */
+ };
 
 } // namespace quda

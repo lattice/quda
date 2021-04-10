@@ -8,6 +8,10 @@
 #include <domain_wall_helper.h>
 #include <fast_intdiv.h>
 
+#ifdef NVSHMEM_COMMS
+#include <cuda/atomic>
+#endif
+
 namespace quda {
 
   /**
@@ -71,6 +75,77 @@ namespace quda {
 
   void createDslashEvents();
   void destroyDslashEvents();
+
+  namespace dslash
+  {
+    /**
+     * @brief type used for shmem signaling
+     */
+    using shmem_sync_t = uint64_t;
+
+    /**
+     * @brief Get the shmem sync counter
+     *
+     * @return shmem_sync_t
+     */
+    shmem_sync_t get_shmem_sync_counter();
+
+    /**
+     * @brief Set the shmem sync counter to count
+     *
+     * @param count
+     * @return shmem_sync_t
+     */
+    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count);
+
+    /**
+     * @brief increase the shmem sync counter for the next dslash application
+     *
+     * @return shmem_sync_t
+     */
+    shmem_sync_t inc_shmem_sync_counter();
+#ifdef NVSHMEM_COMMS
+    using shmem_retcount_intra_t = cuda::atomic<int, cuda::thread_scope_system>;
+    using shmem_retcount_inter_t = cuda::atomic<int, cuda::thread_scope_device>;
+    using shmem_interior_done_t = cuda::atomic<shmem_sync_t, cuda::thread_scope_device>;
+    using shmem_interior_count_t = cuda::atomic<int, cuda::thread_scope_block>;
+
+    /**
+     * @brief Get the shmem sync arr which is used for signaling which exterior halos have arrived
+     *
+     * @return shmem_sync_t*
+     */
+    shmem_sync_t *get_shmem_sync_arr();
+
+    /**
+     * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which intra node packing blocks have finished per dim/dir
+     *
+     * @return shmem_retcount_intra_t*
+     */
+    shmem_retcount_intra_t *get_shmem_retcount_intra();
+
+    /**
+     * @brief Get the array[2*QUDA_MAX_DIM] of atomic to count which inter node packing blocks have finished per dim/dir
+     *
+     * @return shmem_retcount_inter_t*
+     */
+    shmem_retcount_inter_t *get_shmem_retcount_inter();
+
+    /**
+     * @brief Get the atomic object used for signaling that the interior Dslash has been applied. Used in the uber kernel.
+     *
+     * @return shmem_interior_done_t*
+     */
+    shmem_interior_done_t *get_shmem_interior_done();
+
+    /**
+     * @brief Get the atomic counter for tracking how many of the interior blocks have finished. See also above.
+     *
+     * @return shmem_interior_count_t*
+     */
+    shmem_interior_count_t *get_shmem_interior_count();
+#endif
+  } // namespace dslash
 
   /**
      @brief Driver for applying the Wilson stencil
@@ -692,7 +767,8 @@ namespace quda {
      @param[in] stream Which stream are we executing in
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
-                 bool dagger, int parity, bool spin_project, double a, double b, double c, const qudaStream_t &stream);
+                 bool dagger, int parity, bool spin_project, double a, double b, double c, int shmem,
+                 const qudaStream_t &stream);
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

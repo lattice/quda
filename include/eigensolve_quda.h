@@ -18,7 +18,7 @@ namespace quda
   {
     using range = std::pair<int, int>;
 
-protected:
+  protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
     TimeProfile &profile;
@@ -267,7 +267,8 @@ protected:
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+                     blockType b_type);
 
     /**
        @brief Rotate part of kSpace
@@ -510,7 +511,7 @@ protected:
     /**
        @return Whether the solver is only for Hermitian systems
     */
-    virtual bool hermitian() { return false; } /** TRLM is only for Hermitian systems */
+    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<double> ritz_mat;
@@ -645,7 +646,10 @@ protected:
     */
     IRAM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
-    virtual bool hermitian() { return true; } /** IRAM is for any linear system */
+    /**
+       @return Whether the solver is only for Hermitian systems
+    */
+    virtual bool hermitian() { return false; } /** IRAM is for any linear system */
 
     /**
        @brief Destructor for Thick Restarted Eigensolver class

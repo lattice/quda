@@ -143,8 +143,8 @@ namespace quda {
     }
   }
 
-  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex** const beta, 
-		      double *gamma, int k, std::vector<ColorSpinorField*> p)
+  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex **const beta, double *gamma, int k,
+                      std::vector<ColorSpinorField *> p)
   {
     Complex *delta = new Complex[k];
 

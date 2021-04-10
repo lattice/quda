@@ -164,7 +164,44 @@ public:
       group->add_option(opt);
       return opt;
     }
-  
+
+  template <typename T>
+    CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
+                              std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool = false)
+    {
+      
+      CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+      size_t l;
+      T j; // results_t is just a vector of strings
+      bool worked = true;
+
+      CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
+      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
+        auto levelok = validlevel(vals.at((4 + 1) * i));
+
+        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
+
+        for (int k = 0; k < 4; k++) {
+          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
+          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
+          if (worked) variable[l][k] = j;
+        }
+      }
+      return worked;
+    };
+    CLI::Option *opt = add_option(option_name, f, option_description);
+    auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
+    opt->type_name(valuename)->type_size(-4 - 1);
+    opt->expected(-1);
+    opt->check(CLI::Validator(trans.get_description()));
+    // opt->transform(trans);
+    // opt->default_str("");
+    group->add_option(opt);
+    return opt;
+    }
 };
 
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
@@ -173,6 +210,7 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -348,6 +386,7 @@ extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
 extern bool eig_compute_svd;
+extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
@@ -421,6 +460,7 @@ extern int measurement_interval;
 
 extern QudaContractType contract_type;
 
+extern std::array<int, 4> grid_partition;
 extern QudaBLASOperation blas_trans_a;
 extern QudaBLASOperation blas_trans_b;
 extern QudaBLASDataType blas_data_type;

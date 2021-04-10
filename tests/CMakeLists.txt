@@ -23,6 +23,10 @@ if(QUDA_QMP
   add_dependencies(quda_test QMP)
 endif()
 
+if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
+  add_dependencies(quda_test NVSHMEM)
+endif()
+
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
@@ -359,6 +363,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_WILSON)
+    set(DIRAC_NAME wilson)
     add_test(NAME dslash_wilson-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type wilson
@@ -368,10 +373,23 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_wilson-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type ${DIRAC_NAME}
+                     --test 0
+                     --dim 20 20 20 20
+                     --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+                     --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_CLOVER)
     # symmetric preconditioning
+    set(DIRAC_NAME clover)
     add_test(NAME dslash_clover-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover
@@ -394,9 +412,23 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_clover-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
   endif()
 
   if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+    set(DIRAC_NAME clover-hasenbusch-twist)
     # symmetric preconditioning
     add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -420,9 +452,22 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     if(polenv)
       set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_MASS)
+    set(DIRAC_NAME twisted-mass)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
@@ -477,9 +522,22 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
   endif()
 
   if(QUDA_DIRAC_TWISTED_CLOVER)
+    set(DIRAC_NAME twisted-clover)
     # symmetric preconditioning
     add_test(NAME dslash_twisted-clover-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -505,9 +563,23 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_twisted-clover-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
+    
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})  
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
   endif()
 
   if(QUDA_DIRAC_DOMAIN_WALL)
+    set(DIRAC_NAME domain-wall)
     add_test(NAME dslash_domain-wall-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall
@@ -520,7 +592,21 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_domain-wall-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --Lsdim 12
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
     # symmetric 4-d preconditioning
+    set(DIRAC_NAME domain-wall-4d)
     add_test(NAME dslash_domain-wall-4d-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d
@@ -529,6 +615,21 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
         --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --Lsdim 12
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    set(DIRAC_NAME mobius)
     add_test(NAME dslash_mobius-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
@@ -537,6 +638,20 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+    
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --Lsdim 12
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
     add_test(NAME dslash_mobius_eofa-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius-eofa
@@ -596,12 +711,28 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_STAGGERED)
+    set(DIRAC_NAME asqtad)
     add_test(NAME dslash_improved_staggered-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type asqtad
                      --test MatPC
                      --dim 6 8 10 12
                      --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()                 
+
+
+    set(DIRAC_NAME staggered)
     add_test(NAME dslash_naive_staggered-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
@@ -614,6 +745,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_naive_staggered-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
+
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif() 
 
     add_test(NAME dslash_improved_staggered_build-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
