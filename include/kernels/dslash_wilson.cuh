@@ -56,19 +56,22 @@ namespace quda
       if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
     }
 
+#if 0
     // defined the copy constructor to ensure we don't have an excess pop if the arg is copied
     WilsonArg(const WilsonArg &arg) :
       DslashArg<Float, nDim>(arg),
       out(arg.out),
       in(arg.in),
+      in_pack(arg.in_pack),
       x(arg.x),
       U(arg.U),
       a(arg.a)
     {
       if (F::N != F::N_ghost) pushKernelPackT(true);
     }
+#endif
 
-    virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
+    //virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
   };
 
   /**

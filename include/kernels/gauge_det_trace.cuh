@@ -34,6 +34,7 @@ namespace quda {
 
   template <typename Arg> struct DetTrace : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
+    using reducer_t = plus<reduce_t>;
     using plus<reduce_t>::operator();
     Arg &arg;
     constexpr DetTrace(Arg &arg) : arg(arg) {}

@@ -80,7 +80,8 @@ namespace quda
     template <typename Arg> struct MultiReduce_ : plus<vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
       using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
       using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
-      using plus<reduce_t>::operator();
+      using reducer_t = plus<reduce_t>;
+      using reducer_t::operator();
       Arg &arg;
       constexpr MultiReduce_(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }

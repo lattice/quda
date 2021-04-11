@@ -332,6 +332,43 @@ namespace quda
   }
 
   /**
+   * Allocate shemm device memory. This function should only be called via
+   * device_comms_pinned_malloc_()
+   */
+#ifdef NVSHMEM_COMMS
+  void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+
+    a.size = a.base_size = size;
+
+    auto ptr = nvshmem_malloc(size);
+    if (ptr == nullptr) {
+      printfQuda("ERROR: Failed to allocate shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+    track_malloc(SHMEM, a, ptr);
+#ifdef HOST_DEBUG
+    qudaMemset(ptr, 0xff, size);
+#endif
+    return ptr;
+  }
+#endif
+
+  /**
+   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
+   * device_comms_pinned_malloc macro, defined in malloc_quda.h
+   */
+  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+#ifdef NVSHMEM_COMMS
+    return shmem_malloc_(func, file, line, size);
+#else
+    return device_pinned_malloc_(func, file, line, size);
+#endif
+  }
+
+  /**
    * Free device memory allocated with device_malloc().  This function
    * should only be called via the device_free() macro, defined in
    * malloc_quda.h
@@ -417,6 +454,38 @@ namespace quda
       print_trace();
       errorQuda("Aborting");
     }
+  }
+
+#ifdef NVSHMEM_COMMS
+  /**
+   * Free symmetric memory allocated with shmem_malloc_. Should only be called via the device_comms_* functions.
+   */
+  void shmem_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) {
+      printfQuda("ERROR: Attempt to free NULL shmem pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    if (!alloc[SHMEM].count(ptr)) {
+      printfQuda("ERROR: Attempt to free invalid shmem pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    nvshmem_free(ptr);
+    track_free(SHMEM, ptr);
+  }
+#endif
+
+  /**
+   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be
+   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
+   */
+  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+#ifdef NVSHMEM_COMMS
+    shmem_free_(func, file, line, ptr);
+#else
+    device_pinned_free_(func, file, line, ptr);
+#endif
   }
 
   void printPeakMemUsage()

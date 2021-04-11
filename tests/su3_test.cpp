@@ -61,7 +61,7 @@ void display_test_info()
   return;
 }
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {
+void setGaugeParamSu3(QudaGaugeParam &gauge_param) {
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
     link_recon_sloppy = link_recon;
 
-  setGaugeParam(gauge_param);
+  setGaugeParamSu3(gauge_param);
   setDims(gauge_param.X);
 
   void *gauge[4], *new_gauge[4];

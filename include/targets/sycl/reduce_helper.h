@@ -192,6 +192,8 @@ namespace quda
 
   };
 
+#if 0 ///// TEST
+
 #ifdef HETEROGENEOUS_ATOMIC
     /**
        @brief Generic reduction function that reduces block-distributed
@@ -353,15 +355,16 @@ namespace quda
   }
 
 
+
   template <typename T, typename U>
-  void blockReduceSum(sycl::group<3> grp, T &agg, U &in)
+  void blockReduceSum(sycl::group<3> &grp, T &agg, const U &in)
   {
     auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
     agg = fromGroupReduceType<T>(t);
   }
 
   template <typename T>
-  void blockReduceSum(sycl::group<3> grp, T &agg,
+  void blockReduceSum(sycl::group<3> &grp, T &agg,
 		      const sycl::vec<double,16> *in)
   {
     auto t0 = sycl::ONEAPI::reduce(grp, in[0], sycl::ONEAPI::plus<>());
@@ -370,26 +373,43 @@ namespace quda
     agg = *reinterpret_cast<T*>(x);
   }
 
-  template <typename T, typename R>
-  void blockReduce(sycl::group<3> grp, T &agg, const T &in, R &r)
-  {
-    auto inX = toGroupReduceType(in);
-    blockReduceSum(grp, agg, inX);
-  }
 
   template <typename T, typename U>
-  void blockReduceMax(sycl::group<3> grp, T &agg, U &in)
+  void blockReduceMax(sycl::group<3> &grp, T &agg, const U &in)
   {
     auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::maximum<>());
     agg = fromGroupReduceType<T>(t);
   }
 
+
   template <typename T>
-  void blockReduce(sycl::group<3> grp, T &agg, const T &in,
-		   quda::maximum<T> &r)
+  inline void blockReduce(sycl::group<3> &grp, T &agg, const T &in,
+			  const quda::plus<T> &r)
   {
     auto inX = toGroupReduceType(in);
-    blockReduceMax(grp, agg, inX, r);
+    blockReduceSum(grp, agg, inX);
+  }
+
+  template <typename T>
+  inline void blockReduce(sycl::group<3> &grp, T &agg, const T &in,
+			  const quda::maximum<T> &r)
+  {
+    auto inX = toGroupReduceType(in);
+    blockReduceMax(grp, agg, inX);
+  }
+
+  template <typename T, typename R>
+  inline void blockReduce(sycl::group<3> &grp, T &agg, const T &in,
+			  const R &r)
+  {
+    if (R::do_sum) {
+      auto inX = toGroupReduceType(in);
+      blockReduceSum(grp, agg, inX);
+    } else {
+      // FIXME: custom operation
+      auto inX = toGroupReduceType(in);
+      blockReduceSum(grp, agg, inX);
+    }
   }
 
   //template <typename T, typename U>
@@ -418,11 +438,6 @@ namespace quda
     {
       auto ndi = getNdItem();
       auto grp = getGroup();
-      //T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
-      //auto inX = toGroupReduceType(in);
-      //auto aggregateX = Reducer::do_sum ? sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, inX, sycl::ONEAPI::plus<>());  // FIXME non sum
-      //T aggregate = fromGroupReduceType<T>(aggregateX);
-      //T aggregate;
       T aggregate;
       blockReduce(grp, aggregate, in, r);
 
@@ -433,32 +448,29 @@ namespace quda
       bool isLastBlockDone = false;
       if (llid==0) {
 	arg.partial[idx*grpRg + grpId] = aggregate;
-	ndi.mem_fence(sycl::access::fence_space::global_and_local);  // flush result
+	//sycl::ONEAPI::atomic_fence(sycl::ONEAPI::memory_order::release,
+	//			   sycl::ONEAPI::memory_scope::device);
 	// increment global block counter
-	unsigned int value = atomicAdd(&arg.count[idx], 1);
+	unsigned int prev = atomicAdd(&arg.count[idx], 1);
 	// determine if last block
-	isLastBlockDone = (value == grpRg);
+	isLastBlockDone = (prev == (grpRg-1));
       }
-      ////      isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
+      //isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
+      isLastBlockDone = sycl::ONEAPI::any_of(grp, isLastBlockDone);
       //isLastBlockDone = group_broadcast(grp, isLastBlockDone);
-
-      ndi.barrier();
-      //sycl::group_barrier(grp);
-      isLastBlockDone = (arg.count[idx] == grpRg);
 
       // finish the reduction if last block
       if (isLastBlockDone) {
+	auto nloc = ndi.get_local_range(0) * ndi.get_local_range(1);
 	uint i = llid;
-        //T sum = arg.init();
         T sum = arg.init();
+	//sycl::ONEAPI::atomic_fence(sycl::ONEAPI::memory_order::acquire,
+	//			   sycl::ONEAPI::memory_scope::device);
 	while (i<grpRg) {
 	  sum = r(sum, arg.partial[idx*grpRg + i]);
-	  i += block_size_x*block_size_y;
+	  //i += block_size_x*block_size_y;
+	  i += nloc;
 	}
-        //sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
-	//auto sumX = toGroupReduceType(sum);
-        //sumX = (Reducer::do_sum ? sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()) : sycl::ONEAPI::reduce(grp, sumX, sycl::ONEAPI::plus<>()));  // FIXME non sum
-        //sum = fromGroupReduceType<T>(sumX);
 	blockReduce(grp, sum, sum, r);
 
 	// write out the final reduced value
@@ -469,5 +481,7 @@ namespace quda
       }
     }
 #endif
+
+#endif /////// TEST
 
 } // namespace quda

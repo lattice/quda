@@ -1,9 +1,10 @@
 #pragma once
-
+#include <tune_quda.h>
 #include <reduce_helper.h>
 
 namespace quda {
 
+#if 0
   template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __global__ void Reduction2D(Arg arg, sycl::nd_item<3> ndi)
   {
@@ -26,28 +27,59 @@ namespace quda {
     // perform final inter-block reduction and write out result
     quda::reduce<block_size_x, block_size_y>(arg, t, value);
   }
+#endif
+  template <int block_size_x, int block_size_y,
+	    template <typename> class Transformer, typename Arg, typename S,
+	    bool grid_stride = true>
+  void Reduction2Dn(Arg arg, sycl::nd_item<3> ndi, S sum)
+  {
+    Transformer<Arg> t(arg);
+    auto idx = ndi.get_global_id(0);
+    auto j = ndi.get_local_id(1);
+    auto value = arg.init();
+    while (idx < arg.threads.x) {
+      value = t(value, idx, j);
+      if (grid_stride) idx += ndi.get_global_range(0); else break;
+    }
+    sum.combine(value);
+  }
   template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
   qudaError_t
   launchReduction2D(const TuneParam &tp, const qudaStream_t &stream, Arg arg)
   {
-    //auto a = (Arg *)managed_malloc(sizeof(Arg));
-    //memcpy((void*)a, &arg, sizeof(Arg));
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    //sycl::range<3> globalSize{1,1,1};
+    //sycl::range<3> localSize{1,tp.block.y,1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     warningQuda("launchReduction2D %s", grid_stride?"true":"false");
     warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
     warningQuda("%s", str(arg.threads).c_str());
     //arg.debug();
+#if 0
     q.submit([&](sycl::handler& h) {
-	       h.parallel_for<class Reduction2D>(ndRange,
-					  [=](sycl::nd_item<3> ndi)
-					  {
-					    quda::Reduction2D<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg, ndi);
-					  });
+	       h.parallel_for<class Reduction2D>
+		 (ndRange,
+		  [=](sycl::nd_item<3> ndi) {
+		    quda::Reduction2D<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg, ndi);
+		  });
 	     });
-    //managed_free(a);
+#else
+    q.submit([&](sycl::handler& h) {
+	       using reduce_t = typename Transformer<Arg>::reduce_t;
+	       auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
+	       *result_h = arg.init();
+	       auto result = reinterpret_cast<reduce_t *>(quda::reducer::get_mapped_buffer());
+	       auto red = sycl::ONEAPI::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+	       h.parallel_for<class Reduction2Dn>
+		 (ndRange, red,
+		  [=](sycl::nd_item<3> ndi, auto &sum) {
+		    using Sum = decltype(sum);
+		    quda::Reduction2Dn<block_size_x, block_size_y, Transformer, Arg, Sum, grid_stride>(arg, ndi, sum);
+		  });
+	     });
+#endif
     q.wait();
     arg.debug();
     warningQuda("end launchReduction2D");
@@ -55,6 +87,7 @@ namespace quda {
   }
 
 
+#if 0
   template <int block_size_x, int block_size_y, template <typename> class Transformer,
 	    typename Arg, bool grid_stride = true>
   void MultiReduction(Arg arg, sycl::nd_item<3> ndi)
@@ -82,6 +115,26 @@ namespace quda {
     // perform final inter-block reduction and write out result
     reduce<block_size_x, block_size_y>(arg, t, value, j);
   }
+#endif
+  template <int block_size_x, int block_size_y, template <typename> class Transformer,
+	    typename Arg, typename S, bool grid_stride = true>
+  void MultiReduction1(Arg arg, sycl::nd_item<3> ndi, S sum)
+  {
+    using reduce_t = typename Transformer<Arg>::reduce_t;
+    Transformer<Arg> t(arg);
+    auto idx = ndi.get_global_id(0);
+    auto j = ndi.get_global_id(1);
+    auto k = ndi.get_local_id(2);
+    if (j >= arg.threads.y) return;
+    reduce_t value = arg.init();
+    while (idx < arg.threads.x) {
+      value = t(value, idx, j, k);
+      if (grid_stride) idx += ndi.get_global_range(0); else break;
+    }
+    // perform final inter-block reduction and write out result
+    //reduce<block_size_x, block_size_y>(arg, t, value, j);
+    sum.combine(value);
+  }
   template <int block_size_x, int block_size_y, template <typename> class Transformer,
 	    typename Arg, bool grid_stride = true>
   qudaError_t
@@ -94,13 +147,33 @@ namespace quda {
     warningQuda("launchMultiReduction %s", grid_stride?"true":"false");
     warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
     warningQuda("%s", str(arg.threads).c_str());
+#if 0
     q.submit([&](sycl::handler& h) {
-	       h.parallel_for<class Reduction2D>
+	       h.parallel_for<class MultiReduction>
 		 (ndRange,
 		  [=](sycl::nd_item<3> ndi) {
 		    MultiReduction<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg, ndi);
 		  });
 	     });
+#else
+    if(arg.threads.y==1) {
+      using reduce_t = typename Transformer<Arg>::reduce_t;
+      auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
+      *result_h = arg.init();
+      auto result = reinterpret_cast<reduce_t *>(quda::reducer::get_mapped_buffer());
+      auto red = sycl::ONEAPI::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+      q.submit([&](sycl::handler& h) {
+		 h.parallel_for<class Reduction2Dn>
+		   (ndRange, red,
+		    [=](sycl::nd_item<3> ndi, auto &sum) {
+		      using Sum = decltype(sum);
+		      MultiReduction1<block_size_x, block_size_y, Transformer, Arg, Sum, grid_stride>(arg, ndi, sum);
+		    });
+	       });
+    } else {
+      errorQuda("multireduce %i\n", arg.threads.y);
+    }
+#endif
     warningQuda("end launchMultiReduction");
     return QUDA_SUCCESS;
   }

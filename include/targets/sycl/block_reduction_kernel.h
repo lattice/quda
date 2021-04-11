@@ -1,5 +1,5 @@
 #pragma once
-
+#include <tune_quda.h>
 #include <reduce_helper.h>
 
 namespace quda {
