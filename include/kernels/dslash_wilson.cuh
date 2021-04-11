@@ -53,7 +53,7 @@ namespace quda
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
 
-      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
+      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel if ghost vector length is different than bulk
     }
 
 #if 0

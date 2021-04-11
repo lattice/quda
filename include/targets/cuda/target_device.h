@@ -74,6 +74,19 @@ namespace quda {
     __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
 
 
+    template <bool is_device> struct grid_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct grid_dim_impl<true> { __device__ dim3 operator()() { return dim3(gridDim.x, gridDim.y, gridDim.z); } };
+#endif
+
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    __device__ __host__ inline dim3 grid_dim() { return dispatch<grid_dim_impl>(); }
+
+
     template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
 #ifdef QUDA_CUDA_CC
     template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };

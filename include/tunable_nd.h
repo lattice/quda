@@ -67,11 +67,11 @@ namespace quda {
     QudaFieldLocation location;
 
     /**
-       Kernel1D (and its derivations Kernel2D and Kernel3D) do not
-       use grid-size tuning, so disable this, and we mark as final to
-       prevent a derived class from accidentally switching it on.
+       Return whether we are grid-size tuning.  Marked as virtual in
+       case we need to override this, despite the grid_stride template
+       (Dslash NVSHMEM does this).
     */
-    bool tuneGridDim() const final { return grid_stride; }
+    virtual bool tuneGridDim() const { return grid_stride; }
 
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
