@@ -382,7 +382,8 @@ namespace quda
     evals.resize(n_conv);
     
     // Only save if outfile is defined
-    if (strcmp(eig_param->vec_outfile, "") != 0 || strcmp(eig_param->coarse_vec_outfile, "") != 0) {
+    if ((strcmp(eig_param->vec_outfile, "") != 0 && !compressed_mode) || 
+        (strcmp(eig_param->coarse_vec_outfile, "") != 0 && compressed_mode)) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size n_conv
       std::vector<ColorSpinorField *> vecs_ptr;
@@ -607,6 +608,66 @@ namespace quda
   void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
   {
     int vecs_size = j;
+    int r_size = rvecs.size();
+    int array_size = vecs_size * r_size;
+
+    std::vector<ColorSpinorField *> vecs_ptr;
+
+    if(!compressed_mode) {
+      std::vector<Complex> s(array_size);
+
+      vecs_ptr.reserve(vecs_size);
+      for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
+
+      // Block dot products stored in s.
+      blas::cDotProduct(s.data(), vecs_ptr, rvecs);
+
+      // Block orthogonalise
+      for (int i = 0; i < array_size; i++) s[i] *= -1.0;
+      blas::caxpy(s.data(), vecs_ptr, rvecs);
+    } else {
+
+      int batch_size = std::min((int)fine_vector.size(), j);
+      int full_batches = (j)/batch_size;
+      int remainder = (j)%batch_size;
+      bool do_remainder = (j)%batch_size != 0 ? true : false;
+
+      for (int b = 0; b < full_batches; b++) {
+        int idx = b * batch_size;
+        promoteVectors(fine_vector, vecs, 0, idx, batch_size);
+
+        // Block dot products stored in s.
+        std::vector<Complex> s(batch_size * r_size);
+        blas::cDotProduct(s.data(), fine_vector, rvecs);
+        // Block orthogonalise
+        for (int i = 0; i < batch_size * r_size; i++) s[i] *= -1.0;
+        blas::caxpy(s.data(), fine_vector, rvecs);
+      }
+      if(do_remainder) {
+        int idx = full_batches * batch_size;
+        promoteVectors(fine_vector, vecs, 0, idx, remainder);
+        vecs_ptr.reserve(remainder);
+        for (int i = 0; i < remainder; i++) { vecs_ptr.push_back(fine_vector[i]); }
+
+        // Block dot products stored in s
+        std::vector<Complex> s(remainder * r_size);
+        blas::cDotProduct(s.data(), vecs_ptr, rvecs);
+
+        // Block orthogonalise
+        for (int i = 0; i < remainder * r_size; i++) s[i] *= -1.0;
+        blas::caxpy(s.data(), vecs_ptr, rvecs);
+      }
+    }
+
+    // Save orthonormalisation tuning
+    saveTuneCache();
+  }
+
+#if 0
+  // Orthogonalise r[0:] against V_[0:j]
+  void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
+  {
+    int vecs_size = j;
     int r_size = (int)rvecs.size();
     int array_size = vecs_size * r_size;
     std::vector<Complex> s(array_size);
@@ -625,6 +686,7 @@ namespace quda
     // Save orthonormalisation tuning
     saveTuneCache();
   }
+#endif
 
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
   {

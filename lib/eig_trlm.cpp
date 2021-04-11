@@ -312,6 +312,8 @@ namespace quda
       std::vector<ColorSpinorField *> r_ {r[0]};
       std::vector<double> beta_;
       std::vector<ColorSpinorField *> v_;
+
+      /*
       if(compressed_mode) {	
 	int iter_size = fine_vector.size();
 	int iterations = (j - start)/iter_size;	
@@ -335,8 +337,7 @@ namespace quda
 	// r = r - b_{j-1} * v_{j-1}
 	blas::axpy(beta_.data(), v_, r_);
       }
-    }
-    
+    }    
     // Orthogonalise r against the Krylov space
     if(j%2 == 0) {
       if(compressed_mode) {
@@ -356,10 +357,63 @@ namespace quda
 	}
       }
     }
+      */
+    
+      if(compressed_mode) {
+        int batch_size = std::min((int)fine_vector.size(), j - start);
+        int full_batches = (j - start)/batch_size;
+        int remainder = (j - start)%batch_size;
+        bool do_remainder = (j - start)%batch_size != 0 ? true : false;
+        // We promote the v_idx + `batched_rotate` vectors.
+        // No need to compress after as we read only.
+        for (int b = 0; b < full_batches; b++) {
+        beta_.reserve(batch_size);
+        v_.reserve(batch_size);
+        
+        int idx = start + b * batch_size;
+        promoteVectors(fine_vector, v, 0, idx, batch_size);
+        for(int i = 0; i < batch_size; i++) {
+          beta_.push_back(-beta[idx + i]);
+          v_.push_back(fine_vector[i]);
+        }
+        // r = r - b_{j-1} * v_{j-1}                                                                                                                                                                      
+        blas::axpy(beta_.data(), v_, r_);
+        beta_.resize(0);
+        v_.resize(0);
+      }
+      if(do_remainder) {
+        beta_.reserve(remainder);
+        v_.reserve(remainder);
+
+        int idx = start + full_batches * batch_size;
+        promoteVectors(fine_vector, v, 0, idx, remainder);
+        for(int i = 0; i < remainder; i++) {
+          beta_.push_back(-beta[idx + i]);
+          v_.push_back(fine_vector[i]);
+        }
+        // r = r - b_{j-1} * v_{j-1}                                                                                                                                                                      
+        blas::axpy(beta_.data(), v_, r_);
+        beta_.resize(0);
+        v_.resize(0);
+      }
+      } else {
+        beta_.reserve(j - start);
+        v_.reserve(j - start);
+        for (int i = start; i < j; i++) {
+        beta_.push_back(-beta[i]);
+        v_.push_back(v[i]);
+        }
+        // r = r - b_{j-1} * v_{j-1}
+        blas::axpy(beta_.data(), v_, r_);
+      }
+    }
+    
+    // Orthogonalise r against the Krylov space
+    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
     
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));
-
+    
     // Prepare next step.
     // v_{j+1} = r / b_j
     if(compressed_mode) {
@@ -374,7 +428,7 @@ namespace quda
     // Save Lanczos step tuning
     saveTuneCache();
   }
-
+  
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
   {
     int i = 0;
