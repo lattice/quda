@@ -818,7 +818,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.mass = mass;
   inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
   inv_param.laplace3D = laplace3D;              // for Laplace operator
@@ -960,10 +960,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];                 // default to 64 vectors if not set
-    mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
-    mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];          // default to 64 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
+    mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];

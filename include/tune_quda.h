@@ -36,7 +36,13 @@ namespace quda {
     long long n_calls;
 
     inline TuneParam() :
-      block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), set_max_shared_bytes(false), aux(), time(FLT_MAX), n_calls(0)
+      block(32, 1, 1),
+      grid(1, 1, 1),
+      shared_bytes(0),
+      set_max_shared_bytes(false),
+      aux(),
+      time(FLT_MAX),
+      n_calls(0)
     {
       aux = make_int4(1,1,1,1);
     }
@@ -111,7 +117,7 @@ namespace quda {
         param.grid.x += step;
         if (param.grid.x > maxGridSize()) {
           param.grid.x = minGridSize();
-	  return false;
+          return false;
         } else {
           return true;
         }
@@ -143,8 +149,8 @@ namespace quda {
         const auto max_blocks = deviceProp.maxGridSize[0];
 
         // ensure the blockDim is large enough given the limit on gridDim
-        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+        param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
+        param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
       }
@@ -181,7 +187,8 @@ namespace quda {
     {
 #if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
-      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+      if (!max_blocks_per_sm)
+        cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
       return max_blocks_per_sm;
 #else
       // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
@@ -369,34 +376,33 @@ namespace quda {
                   param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
 
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d",
-		  param.block.x, deviceProp.maxThreadsDim[0]);
+        errorQuda("Requested X-dimension block size %d greater than hardware limit %d", param.block.x,
+                  deviceProp.maxThreadsDim[0]);
 
       if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d",
-		  param.block.y, deviceProp.maxThreadsDim[1]);
+        errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", param.block.y,
+                  deviceProp.maxThreadsDim[1]);
 
       if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d",
-		  param.block.z, deviceProp.maxThreadsDim[2]);
+        errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", param.block.z,
+                  deviceProp.maxThreadsDim[2]);
 
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d",
-		  param.grid.x, deviceProp.maxGridSize[0]);
+        errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", param.grid.x,
+                  deviceProp.maxGridSize[0]);
 
       if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d",
-		  param.grid.y, deviceProp.maxGridSize[1]);
+        errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", param.grid.y,
+                  deviceProp.maxGridSize[1]);
 
       if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d",
-		  param.grid.z, deviceProp.maxGridSize[2]);
+        errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", param.grid.z,
+                  deviceProp.maxGridSize[2]);
     }
 
     CUresult jitifyError() const { return jitify_error; }
     CUresult& jitifyError() { return jitify_error; }
   };
-
 
   /**
      This derived class is for algorithms that deploy parity across
@@ -514,6 +520,7 @@ namespace quda {
 
   class TunableVectorYZ : public TunableVectorY {
 
+  protected:
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;
@@ -609,6 +616,21 @@ namespace quda {
    * @brief Enable / disable whether are tuning a policy
    */
   void setPolicyTuning(bool);
+
+  /**
+   * @brief Query whether we are currently tuning a policy
+   */
+  bool policyTuning();
+
+  /**
+   * @brief Enable / disable whether we are tuning an uber kernel
+   */
+  void setUberTuning(bool);
+
+  /**
+   * @brief Query whether we are tuning an uber kernel
+   */
+  bool uberTuning();
 
 } // namespace quda
 

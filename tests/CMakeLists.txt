@@ -11,6 +11,10 @@ target_compile_options(quda_test PUBLIC -fPIC)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
 
+if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
+  add_dependencies(quda_test NVSHMEM)
+endif()
+
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)

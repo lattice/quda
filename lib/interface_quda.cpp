@@ -289,14 +289,14 @@ static void profilerStart(const char *f)
         enable_profiler = true;
         printfQuda("Starting profiling for %s\n", f);
         device::profile::start();
-      i++; // advance to next target
+        i++; // advance to next target
     }
   }
 }
 }
 
 static void profilerStop(const char *f) {
-  if (do_not_profile_quda){
+  if (do_not_profile_quda) {
     device::profile::start();
   } else {
 
@@ -472,7 +472,7 @@ void initQudaDevice(int dev)
   if (dev < 0) {
     if (!comms_initialized) {
       errorQuda("initDeviceQuda() called with a negative device ordinal, but comms have not been initialized");
-        }
+    }
     dev = comm_gpuid();
   }
 #else
@@ -508,18 +508,19 @@ void initQudaMemory()
   if (!comms_initialized) init_default_comms();
 
   device::create_context();
+
+  loadTuneCache();
+
+  // initalize the memory pool allocators
+  pool::init();
+
   createDslashEvents();
 
   blas_lapack::native::init();
   blas::init();
 
-  // initalize the memory pool allocators
-  pool::init();
-
-  num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  num_failures_d = static_cast<int*>(get_mapped_device_pointer(num_failures_h));
-
-  loadTuneCache();
+  num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
 
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
 
@@ -958,7 +959,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       if (!dynamic_clover_inverse()) {
-	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
+        cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
 	if (inv_param->compute_clover_trlog) {
 	  inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
 	  inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
@@ -5614,8 +5615,8 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   int parity = 0;
 
   // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
-  double a = alpha/(1.+6.*alpha);
-  double b = 1./(1.+6.*alpha);
+  double a = alpha / (1. + 6. * alpha);
+  double b = 1. / (1. + 6. * alpha);
 
   for (unsigned int i = 0; i < n_steps; i++) {
     if (i) in = out;

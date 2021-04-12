@@ -98,9 +98,9 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  host_free(topo->ranks);
-  host_free(topo->coords);
-  host_free(topo);
+  delete [] topo->ranks;
+  delete [] topo->coords;
+  delete topo;
 }
 
 inline int comm_ndim(const Topology *topo) { return topo->ndim; }
@@ -520,6 +520,23 @@ struct Communicator {
     return blacklist;
   }
 
+  bool comm_nvshmem_enabled()
+  {
+#if (defined MULTI_GPU) && (defined NVSHMEM_COMMS)
+    static bool nvshmem_enabled = true;
+    static bool nvshmem_init = false;
+    if (!nvshmem_init) {
+      char *enable_nvshmem_env = getenv("QUDA_ENABLE_NVSHMEM");
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "1") == 0) { nvshmem_enabled = true; }
+      if (enable_nvshmem_env && strcmp(enable_nvshmem_env, "0") == 0) { nvshmem_enabled = false; }
+      nvshmem_init = true;
+    }
+#else
+    static bool nvshmem_enabled = false;
+#endif
+    return nvshmem_enabled;
+  }
+
   bool use_deterministic_reduce = false;
 
   void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -607,6 +624,8 @@ struct Communicator {
       }
       strcat(config_string, ",gdr=");
       strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+      strcat(config_string, ",nvshmem=");
+      strcat(config_string, std::to_string(comm_nvshmem_enabled()).c_str());
       config_init = true;
     }
 
@@ -616,19 +635,10 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
-                         comm_dim_override[0]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(1) ? '0' :
-                         comm_dim_override[1]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(2) ? '0' :
-                         comm_dim_override[2]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(3) ? '0' :
-                         comm_dim_override[3]   ? '1' :
-                                                  '0'),
-                      '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;
@@ -680,18 +690,18 @@ struct Communicator {
 
 #if defined(QMP_COMMS)
   QMP_comm_t QMP_COMM_HANDLE;
-  
+
   /**
-  * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
-  * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
-  */
+   * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
+   * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
+   */
   bool is_qmp_handle_default;
 #endif
 
   int rank = -1;
   int size = -1;
 
-  Communicator() { }
+  Communicator() {}
 
   Communicator(Communicator &other, const int *comm_split);
 
