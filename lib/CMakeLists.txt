@@ -103,6 +103,10 @@ set(QUDA_DSLASH_OBJS
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   dslash_pack2.cu laplace.cu covDev.cu)
 
+if(QUDA_NVSHMEM)
+  list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
+endif()
+
 if(NOT QUDA_NVSHMEM)
   list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
 endif()

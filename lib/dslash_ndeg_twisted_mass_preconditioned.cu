@@ -41,7 +41,7 @@ namespace quda
       shared(arg.asymmetric || !arg.dagger)
     {
       TunableKernel3D::resizeVector(2, arg.nParity);
-      if (shared) TunableKernel2D::resizeStep(2); // this will force flavor to be contained in the block
+      if (shared) TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
 
     void apply(const qudaStream_t &stream)
