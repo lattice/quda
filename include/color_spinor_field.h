@@ -707,12 +707,6 @@ namespace quda {
                                  QudaPrecision precision=QUDA_INVALID_PRECISION,
 				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
                                  QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
-
-    virtual void CopySubset(ColorSpinorField &src, const int range, const int first_element) = 0;
-    virtual void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst,
-                            const int first_element_src)
-      = 0;
-
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
@@ -958,9 +952,6 @@ namespace quda {
     CompositeColorSpinorField& Components() const;
     CompositeColorSpinorField Components(const int first_element, const int last_element) const;
 
-    void CopySubset(ColorSpinorField &src, const int range, const int first_element);
-    void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src);
-
     void zero();
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
@@ -1091,15 +1082,6 @@ namespace quda {
        @brief Restores the cpuColorSpinorField
     */
     void restore() const;
-
-    void CopySubset(ColorSpinorField &src, const int range, const int first_element)
-    {
-      errorQuda("Not implemented yet..\n");
-    }
-    void CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src)
-    {
-      errorQuda("Not implemented yet..\n");
-    }
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
