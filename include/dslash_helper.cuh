@@ -471,7 +471,7 @@ namespace quda
    */
   template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
-    if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
+    if (kernel_type == UBER_KERNEL && (arg.shmem & 64)) {
       __syncthreads();
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
@@ -630,7 +630,7 @@ namespace quda
     // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+    if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) && blockIdx.x < arg.pack_blocks) {
       // first few blocks do packing kernel
       P<dagger, dslash.pc_type(), Arg> packer;
       packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
@@ -641,21 +641,22 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     } else if (arg.shmem > 0
                && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
-                   || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
+                   || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
                        && blockIdx.x >= (gridDim.x - arg.exterior_blocks)))) {
       shmem_exterior<D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
 #endif
     } else {
-      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+      const int dslash_block_offset = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
-#ifdef QUDA_DSLASH_FAST_COMPILE
-      dslash(x_cb, s, parity);
+      #ifdef QUDA_DSLASH_FAST_COMPILE
+      // dslash(x_cb, s, partity);
+      dslash.template operator()<kernel_type==UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
 #else
       switch (parity) {
-      case 0: dslash(x_cb, s, 0); break;
-      case 1: dslash(x_cb, s, 1); break;
+      case 0: dslash.template operator()<kernel_type==UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
+      case 1: dslash.template operator()<kernel_type==UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
       }
 #endif
 #ifdef NVSHMEM_COMMS
