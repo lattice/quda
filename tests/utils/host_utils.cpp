@@ -294,7 +294,7 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
   int parity = local_idx % 2;
 
   size_t bytes = (size_t)V;
-  bytes *= (size_t)my_spinor_site_size;
+  bytes *= (size_t)spinor_site_size;
   bytes *= (size_t)host_spinor_data_type_size;
   memset(v, 0, bytes);
 
@@ -306,23 +306,23 @@ void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision pr
       && (comm_coord(3) * X[3] <= source_position[3] && source_position[3] < (comm_coord(3) + 1) * X[3])) {
 
     if (precision == QUDA_DOUBLE_PRECISION) {
-      ((double *)v)[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
+      ((double *)v)[spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
     } else {
-      ((float *)v)[my_spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
+      ((float *)v)[spinor_site_size * (parity * Vh + local_idx_cb) + 2 * dil] = 1.0;
     }
   }
 }
 
 void constructWallSpinorSource(void *v, QudaPrecision precision, const int dil)
 {
-  size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
+  size_t bytes = V * spinor_site_size * host_spinor_data_type_size;
   memset(v, bytes, 0.0);
 
   for (int i = 0; i < V; i++) {
     if (precision == QUDA_DOUBLE_PRECISION) {
-      ((double *)v)[my_spinor_site_size * i + 2 * dil] = 1.0;
+      ((double *)v)[spinor_site_size * i + 2 * dil] = 1.0;
     } else {
-      ((float *)v)[my_spinor_site_size * i + 2 * dil] = 1.0;
+      ((float *)v)[spinor_site_size * i + 2 * dil] = 1.0;
     }
   }
 }

@@ -350,7 +350,6 @@ int main(int argc, char **argv)
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
-  setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
   // Allocate memory on host for one source for each of the 12x12 color+spinor combinations
   size_t bytes_per_float = sizeof(double);
