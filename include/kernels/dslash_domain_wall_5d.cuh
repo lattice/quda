@@ -87,7 +87,7 @@ namespace quda
     template <KernelType mykernel_type = kernel_type>
     __host__ __device__ __forceinline__ void operator()(int idx, int s, int parity)
     {
-      int x5_cb = s * arg.threads + idx; // 5-d checkerboard index
+      int x5_cb = s * (mykernel_type == EXTERIOR_KERNEL_ALL ? arg.exterior_threads : arg.threads) + idx; // 5-d checkerboard index
       apply<mykernel_type>(x5_cb, parity);
     }
   };
