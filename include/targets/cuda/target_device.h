@@ -205,7 +205,7 @@ namespace quda {
        translation units where constant memory is not used.
      */
     template <typename Arg>
-      constexpr std::enable_if_t<use_kernel_arg<Arg>(), Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
 
     /**
        @brief Helper function that returns a pointer to the

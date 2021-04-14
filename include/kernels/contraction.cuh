@@ -36,8 +36,8 @@ namespace quda
   };
 
   template <typename Arg> struct ColorContract {
-    Arg &arg;
-    constexpr ColorContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -65,8 +65,8 @@ namespace quda
   };
 
   template <typename Arg> struct DegrandRossiContract {
-    Arg &arg;
-    constexpr DegrandRossiContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

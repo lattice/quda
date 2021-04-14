@@ -35,17 +35,17 @@ namespace quda
   };
 
   template <int mu, int nu, typename Arg>
-  __device__ __host__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
+  __device__ __host__ __forceinline__ void computeFmunuCore(const Arg &arg, int idx, int parity)
   {
     using Link = Matrix<complex<typename Arg::Float>, 3>;
 
     int x[4];
-    auto &X = arg.X;
+    int X[4];
 
-    getCoords(x, idx, X, parity);
+    getCoords(x, idx, arg.X, parity);
     for (int dir = 0; dir < 4; ++dir) {
       x[dir] += arg.border[dir];
-      X[dir] += 2 * arg.border[dir];
+      X[dir] = arg.X[dir] + 2 * arg.border[dir];
     }
 
     Link F;
@@ -174,8 +174,8 @@ namespace quda
   }
 
   template <typename Arg> struct ComputeFmunu {
-    Arg &arg;
-    constexpr ComputeFmunu(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeFmunu(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ __forceinline__ void operator()(int x_cb, int parity, int mu_nu)

@@ -91,7 +91,7 @@ namespace quda
   template <class Arg>
   __device__ __host__ inline
     typename std::enable_if<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>::type
-    copy_field(int out, int in, int parity, Arg &arg)
+    copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
 
@@ -101,7 +101,7 @@ namespace quda
 
   template <class Arg>
   __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, CloverField>::value, void>::type
-  copy_field(int out, int in, int parity, Arg &arg)
+  copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
     constexpr int length = 72;
@@ -114,7 +114,7 @@ namespace quda
 
   template <class Arg>
   __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, GaugeField>::value, void>::type
-  copy_field(int out, int in, int parity, Arg &arg)
+  copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
 #pragma unroll
@@ -126,8 +126,8 @@ namespace quda
 
   template <typename Arg> struct copy_field_offset
   {
-    Arg &arg;
-    constexpr copy_field_offset(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr copy_field_offset(const Arg &arg) : arg(arg) { }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int s, int parity)

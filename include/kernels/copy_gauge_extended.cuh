@@ -45,8 +45,8 @@ namespace quda {
      Copy a regular/extended gauge field into an extended/regular gauge field
   */
   template <typename Arg> struct CopyGaugeEx_ {
-    Arg &arg;
-    constexpr CopyGaugeEx_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGaugeEx_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

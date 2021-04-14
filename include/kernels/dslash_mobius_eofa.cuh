@@ -98,8 +98,8 @@ namespace quda
       @param[in] s      Ls dimension coordinate
      */
     template <typename Arg> struct eofa_dslash5 {
-      Arg &arg;
-      constexpr eofa_dslash5(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)
@@ -175,8 +175,8 @@ namespace quda
       @param[in] s      Ls dimension coordinate
      */
     template <typename Arg> struct eofa_dslash5inv {
-      Arg &arg;
-      constexpr eofa_dslash5inv(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)

@@ -29,8 +29,8 @@ namespace quda {
   };
 
   template <typename Arg> struct UpdateGauge {
-    Arg &arg;
-    constexpr UpdateGauge(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr UpdateGauge(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int parity, int dir)

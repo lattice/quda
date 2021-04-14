@@ -25,8 +25,8 @@ namespace quda {
       Generic clover reordering and packing
   */
   template <typename Arg> struct CloverCopy {
-    Arg &arg;
-    constexpr CloverCopy(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverCopy(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

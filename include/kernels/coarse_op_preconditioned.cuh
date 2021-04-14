@@ -42,7 +42,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  inline __device__ __host__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, int i0, int j0)
+  inline __device__ __host__ auto computeYhat(const Arg &arg, int d, int x_cb, int parity, int i0, int j0)
   {
     using real = typename Arg::Float;
     using complex = complex<real>;
@@ -122,8 +122,8 @@ namespace quda {
   }
 
   template <typename Arg> struct ComputeYhat {
-    Arg &arg;
-    constexpr ComputeYhat(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeYhat(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int i_parity, int j_d)

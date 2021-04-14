@@ -41,7 +41,7 @@ namespace quda {
   };
 
   // FIXME need to check this with odd local volumes
-  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, Arg &arg) {
+  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
     typename Arg::Float phase = 1.0;
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
@@ -79,7 +79,7 @@ namespace quda {
   }
 
   template <int dim, typename Arg>
-  __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg) {
+  __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg) {
     typedef typename mapper<typename Arg::Float>::type real;
 
     int x[4];
@@ -97,8 +97,8 @@ namespace quda {
 
   template <typename Arg> struct GaugePhase
   {
-    Arg &arg;
-    constexpr GaugePhase(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaugePhase(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

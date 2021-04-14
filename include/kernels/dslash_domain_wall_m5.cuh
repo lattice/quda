@@ -168,8 +168,8 @@ namespace quda
   };
 
   template <typename Arg> struct dslash5 {
-    Arg &arg;
-    constexpr dslash5(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr dslash5(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -249,7 +249,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
     const auto k = arg.b;
@@ -304,7 +304,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
@@ -379,8 +379,8 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5inv {
-    Arg &arg;
-    constexpr dslash5inv(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr dslash5inv(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

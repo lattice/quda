@@ -107,7 +107,7 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   template <int Mc, int thread_dir, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
+  __device__ __host__ inline void applyDslash(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -267,7 +267,7 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   template <int Mc, typename V, typename Arg>
-  __device__ __host__ inline void applyClover(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
+  __device__ __host__ inline void applyClover(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
@@ -295,7 +295,7 @@ namespace quda {
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template <int Mc, int dir, int dim, typename Arg>
-  __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
+  __device__ __host__ inline void coarseDslash(const Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
   {
     constexpr int src_idx = 0;
     vector_type<complex <typename Arg::real>, Mc> out;
@@ -322,8 +322,8 @@ namespace quda {
   }
 
   template <typename Arg> struct CoarseDslash {
-    Arg &arg;
-    constexpr CoarseDslash(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)

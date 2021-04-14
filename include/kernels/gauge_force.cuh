@@ -88,7 +88,7 @@ namespace quda {
   constexpr bool isForwards(int dir) { return (dir <= 3); }
 
   template <typename Arg, int dir>
-  __device__ __host__ inline void GaugeForceKernel(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void GaugeForceKernel(const Arg &arg, int idx, int parity)
   {
     using real = typename Arg::Float;
     typedef Matrix<complex<real>,Arg::nColor> Link;
@@ -160,8 +160,8 @@ namespace quda {
 
   template <typename Arg> struct GaugeForce
   {
-    Arg &arg;
-    constexpr GaugeForce(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaugeForce(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }    
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)

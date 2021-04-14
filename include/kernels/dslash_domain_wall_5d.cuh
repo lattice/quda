@@ -25,8 +25,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct domainWall5D : dslash_default {
 
-    Arg &arg;
-    constexpr domainWall5D(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr domainWall5D(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 

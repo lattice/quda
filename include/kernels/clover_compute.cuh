@@ -59,8 +59,8 @@ namespace quda {
   */
   // Core routine for constructing clover term from field strength
   template <typename Arg> struct CloverCompute {
-    Arg &arg;
-    constexpr CloverCompute(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

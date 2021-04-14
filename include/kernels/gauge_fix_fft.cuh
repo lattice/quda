@@ -39,8 +39,8 @@ namespace quda {
 
   template <typename Arg> struct FFTrotate
   {
-    Arg &arg;
-    constexpr FFTrotate(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr FFTrotate(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int id)
@@ -108,8 +108,8 @@ namespace quda {
 
   template <typename Arg> struct set_invpsq
   {
-    Arg &arg;
-    constexpr set_invpsq(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr set_invpsq(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -135,8 +135,8 @@ namespace quda {
 
   template <typename Arg> struct mult_norm_2d
   {
-    Arg &arg;
-    constexpr mult_norm_2d(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr mult_norm_2d(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
@@ -180,9 +180,9 @@ namespace quda {
   template <typename Arg> struct FixQualityFFT : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
+    constexpr FixQualityFFT(const Arg &arg) : arg(arg) {}
 
     /**
      * @brief Measure gauge fixing quality
@@ -272,8 +272,8 @@ namespace quda {
   }
 
   template <typename Arg> struct U_EO_NEW {
-    Arg &arg;
-    constexpr U_EO_NEW(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr U_EO_NEW(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -338,8 +338,8 @@ namespace quda {
   };
 
   template <typename Arg> struct GX {
-    Arg &arg;
-    constexpr GX(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GX(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -381,8 +381,8 @@ namespace quda {
   };
 
   template <typename Arg> struct U_EO {
-    Arg &arg;
-    constexpr U_EO(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr U_EO(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

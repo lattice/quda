@@ -50,8 +50,8 @@ namespace quda {
   };
 
   template <typename Arg> struct Interior {
-    Arg &arg;
-    constexpr Interior(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)
@@ -89,8 +89,8 @@ namespace quda {
   };
 
   template <typename Arg> struct Exterior {
-    Arg &arg;
-    constexpr Exterior(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

@@ -112,8 +112,8 @@ namespace quda {
      fine degree of freedom
   */
   template <typename Arg> struct StaggeredProlongRestrict_ {
-    Arg &arg;
-    constexpr StaggeredProlongRestrict_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr StaggeredProlongRestrict_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int c)

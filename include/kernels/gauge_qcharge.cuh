@@ -34,8 +34,8 @@ namespace quda
   template <typename Arg> struct qCharge : plus<vector_type<double, 3>> {
     using reduce_t = vector_type<double, 3>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr qCharge(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr qCharge(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the qcharge and field strength at site (x_cb, parity)

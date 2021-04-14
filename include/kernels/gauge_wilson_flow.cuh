@@ -56,7 +56,7 @@ namespace quda
   };
 
   template <typename Arg>
-  __host__ __device__ inline auto computeStaple(Arg &arg, const int *x, int parity, int dir)
+  __host__ __device__ inline auto computeStaple(const Arg &arg, const int *x, int parity, int dir)
   {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
@@ -80,7 +80,7 @@ namespace quda
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeW1Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW1Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z0
     Link Z0 = computeStaple(arg, x, parity, dir);
@@ -92,7 +92,7 @@ namespace quda
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeW2Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW2Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z1
     Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(arg, x, parity, dir);
@@ -109,7 +109,7 @@ namespace quda
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeVtStep(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeVtStep(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z2
     Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(arg, x, parity, dir);
@@ -126,8 +126,8 @@ namespace quda
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   template <typename Arg> struct WFlow
   {
-    Arg &arg;
-    constexpr WFlow(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr WFlow(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

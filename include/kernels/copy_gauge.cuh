@@ -41,7 +41,7 @@ namespace quda {
      Check whether the field contains Nans
   */
   template <typename Arg>
-  void checkNan(Arg &arg)
+  void checkNan(const Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 
@@ -72,8 +72,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGauge_ {
-    Arg &arg;
-    constexpr CopyGauge_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGauge_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int, int parity_d)
@@ -91,8 +91,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGaugeFineGrained_ {
-    Arg &arg;
-    constexpr CopyGaugeFineGrained_(Arg &arg) :arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGaugeFineGrained_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)
@@ -108,8 +108,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGhost_ {
-    Arg &arg;
-    constexpr CopyGhost_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGhost_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int, int parity_d)
@@ -130,8 +130,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGhostFineGrained_ {
-    Arg &arg;
-    constexpr CopyGhostFineGrained_(Arg &arg) :arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGhostFineGrained_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)

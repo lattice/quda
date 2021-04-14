@@ -158,7 +158,7 @@ namespace quda {
     // Also modify q if the eigenvalues are dangerously small.
     template<class Float, typename Arg>
     __device__  __host__  void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
-                                              Float f[3], Matrix<complex<Float>,3> & q, Arg &arg)
+                                              Float f[3], Matrix<complex<Float>,3> & q, const Arg &arg)
     {
       Matrix<complex<Float>,3> qsq, tempq;
 
@@ -277,7 +277,7 @@ namespace quda {
     // "v" denotes a "fattened" link variable
     template <class Float, typename Arg>
     __device__ __host__ void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
-                                                   const Matrix<complex<Float>,3> & outer_prod, Arg &arg)
+                                                   const Matrix<complex<Float>,3> & outer_prod, const Arg &arg)
     {
       typedef Matrix<complex<Float>,3> Link;
       Float f[3];
@@ -331,8 +331,8 @@ namespace quda {
 
     template <typename Arg> struct UnitarizeForce
     {
-      Arg &arg;
-      constexpr UnitarizeForce(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr UnitarizeForce(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity)

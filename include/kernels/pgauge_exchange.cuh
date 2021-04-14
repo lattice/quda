@@ -30,8 +30,8 @@ namespace quda {
   };
 
   template <typename Arg> struct unpacker {
-    Arg &arg;
-    constexpr unpacker(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr unpacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int idx)

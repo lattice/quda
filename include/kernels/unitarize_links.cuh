@@ -91,7 +91,7 @@ namespace quda {
   // Compute the reciprocal square root of the matrix q
   // Also modify q if the eigenvalues are dangerously small.
   template <typename real, typename mat, typename Arg>
-  __device__  __host__ bool reciprocalRoot(mat &res, const mat& q, Arg &arg)
+  __device__  __host__ bool reciprocalRoot(mat &res, const mat& q, const Arg &arg)
   {
     mat qsq, tempq;
 
@@ -174,7 +174,7 @@ namespace quda {
   }
 
   template <typename real, typename mat, typename Arg>
-  __host__ __device__ bool unitarizeLinkMILC(mat &out, const mat &in, Arg &arg)
+  __host__ __device__ bool unitarizeLinkMILC(mat &out, const mat &in, const Arg &arg)
   {
     mat u;
     if (!arg.reunit_svd_only) {
@@ -216,8 +216,8 @@ namespace quda {
 
   template <typename Arg> struct Unitarize
   {
-    Arg &arg;
-    constexpr Unitarize(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Unitarize(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu)
@@ -256,8 +256,8 @@ namespace quda {
 
   template <typename Arg> struct Projector
   {
-    Arg &arg;
-    constexpr Projector(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Projector(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu)

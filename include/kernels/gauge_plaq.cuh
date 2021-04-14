@@ -39,7 +39,7 @@ namespace quda {
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>,3>;
 
@@ -59,8 +59,8 @@ namespace quda {
   template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr Plaquette(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Plaquette(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)

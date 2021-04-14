@@ -39,9 +39,9 @@ namespace quda {
     using count_t = decltype(Arg::n_items);
     using reduce_t = decltype(Arg::init_value);
 
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr transform_reducer(Arg &arg) : arg(arg) {}
+    constexpr transform_reducer(const Arg &arg) : arg(arg) {}
 
     static constexpr bool do_sum = Arg::reducer::do_sum;
 

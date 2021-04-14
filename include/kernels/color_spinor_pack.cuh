@@ -144,7 +144,7 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
   */
   template <typename Arg>
-  __device__ __host__ inline auto compute_site_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  __device__ __host__ inline auto compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -170,7 +170,7 @@ namespace quda {
   }
 
   template <int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  __device__ __host__ inline void packGhost(const Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -218,8 +218,8 @@ namespace quda {
   }
 
   template <typename Arg> struct GhostPacker {
-    Arg &arg;
-    constexpr GhostPacker(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int spin_color_block, int parity_dir)

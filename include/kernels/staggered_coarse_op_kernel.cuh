@@ -57,8 +57,8 @@ namespace quda {
 
   template <typename Arg>
   struct ComputeStaggeredVUV {
-    Arg &arg;
-    constexpr ComputeStaggeredVUV(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeStaggeredVUV(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int c, int parity)

@@ -49,8 +49,8 @@ namespace quda
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 
-    Arg &arg;
-    constexpr STOUT(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr STOUT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)
@@ -117,8 +117,8 @@ namespace quda
     using Complex = complex<real>;
     using Link = Matrix<complex<real>, Arg::nColor>;
 
-    Arg &arg;
-    constexpr OvrImpSTOUT(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr OvrImpSTOUT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

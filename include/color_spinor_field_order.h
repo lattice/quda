@@ -38,7 +38,7 @@ namespace quda {
   */
   template <typename Float, typename T>
     struct colorspinor_wrapper {
-      T &field;
+      const T &field;
       const int x_cb;
       const int parity;
 
@@ -48,18 +48,17 @@ namespace quda {
          @param[in] x_cb checkerboarded space-time index we are accessing
          @param[in] parity Parity we are accessing
       */
-      __device__ __host__ inline colorspinor_wrapper<Float, T>(T &field, int x_cb, int parity) :
+      __device__ __host__ inline colorspinor_wrapper<Float, T>(const T &field, int x_cb, int parity) :
           field(field),
           x_cb(x_cb),
           parity(parity)
-      {
-      }
+      { }
 
       /**
          @brief Assignment operator with ColorSpinor instance as input
          @param[in] C ColorSpinor we want to store in this accessor
       */
-      template <typename C> __device__ __host__ inline void operator=(const C &a) { field.save(a.data, x_cb, parity); }
+      template <typename C> __device__ __host__ inline void operator=(const C &a) const { field.save(a.data, x_cb, parity); }
     };
 
   template <typename T, int Nc, int Ns>
@@ -116,7 +115,7 @@ namespace quda {
       const int dir;
       const int ghost_idx;
       const int parity;
-      T &field;
+      const T &field;
 
       /**
          @brief colorspinor_ghost_wrapper constructor
@@ -126,24 +125,20 @@ namespace quda {
          @param[in] ghost_idx Checkerboarded space-time ghost index we are accessing
          @param[in] parity Parity we are accessing
       */
-      __device__ __host__ inline colorspinor_ghost_wrapper<Float, T>(
-          T &field, int dim, int dir, int ghost_idx, int parity) :
+      __device__ __host__ inline colorspinor_ghost_wrapper<Float, T>(const T &field, int dim, int dir, int ghost_idx, int parity) :
           dim(dim),
           dir(dir),
           ghost_idx(ghost_idx),
           parity(parity),
           field(field)
-      {
-      }
+      { }
 
       /**
          @brief Assignment operator with Matrix instance as input
          @param[in] C ColorSpinor we want to store in this accessot
       */
       template<typename C>
-      __device__ __host__ inline void operator=(const C &a) {
-        field.saveGhost(a.data, ghost_idx, dim, dir, parity);
-      }
+      __device__ __host__ inline void operator=(const C &a) const { field.saveGhost(a.data, ghost_idx, dim, dir, parity); }
     };
 
   template <typename T, int Nc, int Ns>
@@ -424,7 +419,7 @@ namespace quda {
        for fixed-point accessors providing the necessary conversion
        and scaling when writing to a fixed-point field.
     */
-    template <typename Float, typename storeFloat>
+    template <typename Float, typename storeFloat, bool block_float_, typename norm_t>
       struct fieldorder_wrapper {
         /**
          * computing type and storage types that can be inferred from this object.
@@ -435,38 +430,111 @@ namespace quda {
         const int idx;
         const Float scale;
         const Float scale_inv;
+        norm_t *norm;
+        const int norm_idx;
+        const bool norm_write;
         static constexpr bool fixed = fixed_point<Float, storeFloat>();
+        static constexpr bool block_float = block_float_;
 
         /**
            @brief fieldorder_wrapper constructor
            @param idx Field index
         */
-        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv,
+                                                      norm_t *norm = nullptr, int norm_idx = 0, bool norm_write = false) :
           v(v),
           idx(idx),
           scale(scale),
-          scale_inv(scale_inv)
+          scale_inv(scale_inv),
+          norm(norm),
+          norm_idx(norm_idx),
+          norm_write(norm_write)
         { }
 
-        fieldorder_wrapper(const fieldorder_wrapper<Float,storeFloat> &a) = default;
+        fieldorder_wrapper(const fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &a) = delete;
+
+        fieldorder_wrapper(fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &&a) = default;
+
+        /**
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &a) const
+        {
+          static_assert(!block_float, "Routine does not support block_float");
+          complex<Float> in = a;
+          v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : complex<storeFloat>(in.real(), in.imag());
+        }
+
+        /**
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        template <typename theirFloat, typename theirStoreFloat, bool their_block_float, typename their_norm_t>
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat, their_block_float, their_norm_t> &a) const
+        {
+          static_assert(!block_float, "Routine does not support block_float");
+          complex<theirFloat> in = a;
+          v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : complex<storeFloat>(in.real(), in.imag());
+        }
+
+        /**
+           @brief Assignment operator with complex number instance as input
+           @param a Complex number we want to store in this accessor
+        */
+        template<typename theirFloat>
+        __device__ __host__ inline void operator=(const complex<theirFloat> &a) const
+        {
+          if (block_float && norm_write) norm[norm_idx] = scale_inv;
+          if (match<storeFloat,theirFloat>()) {
+            v[idx] = complex<storeFloat>(a.real(), a.imag());
+          } else {
+            v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : complex<storeFloat>(a.real(), a.imag());
+          }
+        }
+
+        /**
+           @brief Assignment operator with real number instance as input
+           @param a real number we want to store in this accessor
+        */
+        template<typename theirFloat>
+        __device__ __host__ inline void operator=(const theirFloat &a) const { *this = complex<Float>(static_cast<Float>(a), static_cast<Float>(0.0)); }
+
+        /**
+           @brief complex cast operator
+        */
+        __device__ __host__ inline operator complex<Float>() const
+        {
+          if (!fixed) {
+            return complex<Float>(v[idx]);
+          } else {
+            complex<storeFloat> tmp = v[idx];
+            Float norm_ = block_float ? norm[norm_idx] : scale_inv;
+            return norm_ * complex<Float>(static_cast<Float>(tmp.real()), static_cast<Float>(tmp.imag()));
+          }
+        }
 
         __device__ __host__ inline Float real() const
         {
+          static_assert(!block_float, "Routine does not support block_float");
           return fixed ? scale_inv*static_cast<Float>(v[idx].real()) : v[idx].real();
         }
 
         __device__ __host__ inline Float imag() const
         {
+          static_assert(!block_float, "Routine does not support block_float");
           return fixed ? scale_inv*static_cast<Float>(v[idx].imag()) : v[idx].imag();
         }
 
         __device__ __host__ inline void real(const Float &a)
         {
+          static_assert(!block_float, "Routine does not support block_float");
           return fixed ? v[idx].real(storeFloat(round(scale * a))) : v[idx].real(storeFloat(a));
         }
 
         __device__ __host__ inline void imag(const Float &a)
         {
+          static_assert(!block_float, "Routine does not support block_float");
           return fixed ? v[idx].imag(storeFloat(round(scale * a))) : v[idx].imag(storeFloat(a));
         }
 
@@ -481,50 +549,22 @@ namespace quda {
         */
         __device__ __host__ inline complex<Float> operator-() const
         {
+          static_assert(!block_float, "Routine does not support block_float");
           return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
         }
-
-        /**
-           @brief Assignment operator with fieldorder_wrapper instance as input
-           @param a fieldorder_wrapper we are copying from
-        */
-        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float,storeFloat> &a)
-        {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
-        }
-
-        /**
-           @brief Assignment operator with complex number instance as input
-           @param a Complex number we want to store in this accessor
-        */
-        template<typename theirFloat>
-        __device__ __host__ inline void operator=(const complex<theirFloat> &a)
-        {
-          if (match<storeFloat,theirFloat>()) {
-            v[idx] = complex<storeFloat>(a.x, a.y);
-          } else {
-            v[idx] = fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
-          }
-        }
-
-        /**
-           @brief Assignment operator with real number instance as input
-           @param a real number we want to store in this accessor
-        */
-        template<typename theirFloat>
-        __device__ __host__ inline void operator=(const theirFloat &a) { *this = complex<theirFloat>(a,static_cast<theirFloat>(0.0)); }
 
         /**
            @brief Operator+= with complex number instance as input
            @param a Complex number we want to add to this accessor
         */
         template<typename theirFloat>
-        __device__ __host__ inline void operator+=(const complex<theirFloat> &a)
+        __device__ __host__ inline void operator+=(const complex<theirFloat> &a) const
         {
+          static_assert(!block_float, "Routine does not support block_float");
           if (match<storeFloat,theirFloat>()) {
-            v[idx] += complex<storeFloat>(a.x, a.y);
+            v[idx] += complex<storeFloat>(a.real(), a.imag());
           } else {
-            v[idx] += fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+            v[idx] += fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : complex<storeFloat>(a.real(), a.imag());
           }
         }
 
@@ -533,22 +573,55 @@ namespace quda {
            @param a Complex number we want to subtract from this accessor
         */
         template<typename theirFloat>
-        __device__ __host__ inline void operator-=(const complex<theirFloat> &a)
+        __device__ __host__ inline void operator-=(const complex<theirFloat> &a) const
         {
+          static_assert(!block_float, "Routine does not support block_float");
           if (match<storeFloat,theirFloat>()) {
-            v[idx] -= complex<storeFloat>(a.x, a.y);
+            v[idx] -= complex<storeFloat>(a.real(), a.imag());
           } else {
-            v[idx] -= fixed ? complex<storeFloat>(round(scale * a.x), round(scale * a.y)) : complex<storeFloat>(a.x, a.y);
+            v[idx] -= fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : complex<storeFloat>(a.real(), a.imag());
           }
         }
 
       };
 
+      template<typename Float, typename storeFloat, bool block_float, typename norm_t>
+      __device__ __host__ inline complex<Float> operator*(const Float &a, const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &b)
+      {
+        return a * complex<Float>(b);
+      }
+
+      template<typename Float, typename storeFloat, bool block_float, typename norm_t>
+      __device__ __host__ inline complex<Float> operator*(const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &a,
+                                                          const Float &b)
+      {
+        return complex<Float>(a) * b;
+      }
+
+      template<typename Float, typename storeFloat, bool block_float, typename norm_t>
+      __device__ __host__ inline complex<Float> operator*(const complex<Float> &a, const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &b)
+      {
+        return a * complex<Float>(b);
+      }
+
+      template<typename Float, typename storeFloat, bool block_float, typename norm_t>
+      __device__ __host__ inline complex<Float> operator*(const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &a,
+                                                          const complex<Float> &b)
+      {
+        return complex<Float>(a) * b;
+      }
+
+      template <typename Float, typename storeFloat, bool block_float, typename norm_t>
+      __device__ __host__ inline complex<Float> conj(const fieldorder_wrapper<Float, storeFloat, block_float, norm_t> &a)
+      {
+        return conj(static_cast<complex<Float>>(a));
+      }
+
       template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat = Float,
                 typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
       class FieldOrderCB
       {
-        typedef float norm_type;
+        using norm_t = float;
 
       public:
         /** Does this field type support ghost zones? */
@@ -559,7 +632,7 @@ namespace quda {
         const AccessorCB<storeFloat, nSpin, nColor, nVec, order> accessor;
         // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
         union {
-          norm_type *norm;
+          norm_t *norm;
           Float scale;
         };
         union {
@@ -568,7 +641,7 @@ namespace quda {
         };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
-      mutable norm_type *ghost_norm[8];
+      mutable norm_t *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
       const int volumeCB;
       const int nDim;
@@ -618,8 +691,8 @@ namespace quda {
 
         if (block_float) {
           // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
-          norm = static_cast<norm_type *>(const_cast<void *>(field.Norm()));
-          norm_offset = field.NormBytes() / (2 * sizeof(norm_type));
+          norm = static_cast<norm_t*>(const_cast<void *>(field.Norm()));
+          norm_offset = field.NormBytes() / (2 * sizeof(norm_t));
         }
       }
 
@@ -631,7 +704,7 @@ namespace quda {
             ghost[2 * dim + dir] = static_cast<complex<ghostFloat> *>(ghost_[2 * dim + dir]);
             ghost_norm[2 * dim + dir] = !block_float_ghost ?
               nullptr :
-              reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+              reinterpret_cast<norm_t*>(static_cast<char *>(ghost_[2 * dim + dir])
                                             + nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim]
                                               * sizeof(ghostFloat));
           }
@@ -685,26 +758,6 @@ namespace quda {
       }
 
       /**
-       * Read-only complex-member accessor function.  The last
-       * parameter n is only used for indexed into the packed
-       * null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param v vector number
-       */
-      __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
-      {
-        if (!fixed) {
-          return complex<Float>( v[accessor.index(parity,x_cb,s,c,n)] );
-	} else {
-	  complex<storeFloat> tmp = v[accessor.index(parity,x_cb,s,c,n)];
-	  Float norm_ = block_float ? norm[parity*norm_offset+x_cb] : scale_inv;
-	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        }
-      }
-
-      /**
        * Writable complex-member accessor function.  The last
        * parameter n is only used for indexed into the packed
        * null-space vectors.
@@ -713,44 +766,26 @@ namespace quda {
        * @param c color index
        * @param v vector number
        */
-      __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
-  { return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
-
-  /**
-   * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
-   * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
-   * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
-   * @param parity Parity index
-   * @param x_cb 1-d checkboarding site index
-   * @param s spin index
-   */
-  __device__ __host__ inline auto wrap(int parity, int x_cb, int s) const
-  {
-    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
-  }
-
-#ifndef DISABLE_GHOST
-      /**
-       * Read-only complex-member accessor function for the ghost
-       * zone.  The last parameter n is only used for indexed into the
-       * packed null-space vectors.
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param v vector number
-       */
-      __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
+      __device__ __host__ inline fieldorder_wrapper<Float, storeFloat, block_float, norm_t> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-        if (!ghost_fixed) {
-          return complex<Float>( ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)] );
-        } else {
-          Float scale = ghost_scale_inv;
-          if (block_float_ghost) scale *= ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb];
-          complex<ghostFloat> tmp = ghost[2*dim+dir][ghostAccessor.index(dim,parity,x_cb,s,c,n)];
-          return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
-        }
+        return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv,
+                                                                          norm, parity * norm_offset + x_cb);
       }
 
+      /**
+       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+       * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       */
+      __device__ __host__ inline auto wrap(int parity, int x_cb, int s) const
+      {
+        return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+      }
+
+#ifndef DISABLE_GHOST
       /**
        * Writable complex-member accessor function for the ghost zone.
        * The last parameter n is only used for indexed into the packed
@@ -759,16 +794,18 @@ namespace quda {
        * @param s spin index
        * @param c color index
        * @param n vector number
-       * @param max site-element max (only when using block-float format)
+       * @param max site-element max (only when writing in block-float format)
        */
-	__device__ __host__ inline fieldorder_wrapper<Float,ghostFloat> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0, Float max=0)
+      __device__ __host__ inline fieldorder_wrapper<Float, ghostFloat, block_float, norm_t>
+        Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0, Float max = 0) const
       {
-        if (block_float_ghost && s==0 && c==0 && n==0) ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb] = max;
-        const int idx = ghostAccessor.index(dim,parity,x_cb,s,c,n);
-        return fieldorder_wrapper<Float,ghostFloat>(ghost[2*dim+dir], idx,
-              block_float_ghost ? ghost_scale/max : ghost_scale,
-              block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
-
+        return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(ghost[2*dim+dir],
+                                                                                ghostAccessor.index(dim,parity,x_cb,s,c,n),
+                                                                                block_float_ghost ? fdividef(1.f, max) : ghost_scale,
+                                                                                block_float_ghost ? max : ghost_scale_inv,
+                                                                                ghost_norm[2 * dim + dir],
+                                                                                parity*ghostAccessor.faceVolumeCB[dim] + x_cb,
+                                                                                s == 0 && c == 0 && n == 0);
       }
 
       /**
@@ -784,7 +821,7 @@ namespace quda {
       __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
       {
         const int idx = ghostAccessor.wrap_index(dim, parity, x_cb, s);
-        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
+        return fieldorder_wrapper<Float, ghostFloat, block_float, norm_t>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
       /**
@@ -983,7 +1020,7 @@ namespace quda {
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
   {
     real v[length];
 
@@ -1028,23 +1065,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
-
-  /**
-     @brief This accessor routine returns a const colorspinor_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] x_cb Checkerboarded space-time index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
@@ -1103,21 +1126,6 @@ namespace quda {
   }
 
   /**
-     @brief This accessor routine returns a colorspinor_ghost_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] dim Dimensions of the ghost we are requesting
-     @param[in] ghost_idx Checkerboarded space-time ghost index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_ghost_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline colorspinor_ghost_wrapper<real, Accessor> Ghost(int dim, int dir, int ghost_idx, int parity)
-  {
-    return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
-  }
-
-  /**
      @brief This accessor routine returns a const
      colorspinor_ghost_wrapper to this object, allowing us to
      overload various operators for manipulating at the site
@@ -1128,10 +1136,9 @@ namespace quda {
      @return Instance of a colorspinor_ghost+wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_ghost_wrapper<real, Accessor> Ghost(int dim, int dir, int ghost_idx,
-                                                                                   int parity) const
+  __device__ __host__ inline auto Ghost(int dim, int dir, int ghost_idx, int parity) const
   {
-    return colorspinor_ghost_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, dir, ghost_idx, parity);
+    return colorspinor_ghost_wrapper<real, Accessor>(*this, dim, dir, ghost_idx, parity);
   }
 
   /**
@@ -1196,7 +1203,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
   {
     auto out = &field[(parity * volumeCB + x) * length];
     complex v_[length/2];
@@ -1218,23 +1225,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
-
-  /**
-     @brief This accessor routine returns a const colorspinor_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] x_cb Checkerboarded space-time index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1247,7 +1240,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1291,7 +1284,7 @@ namespace quda {
     block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
   {
     auto out = &field[(parity * volumeCB + x) * length];
     block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
@@ -1306,23 +1299,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
-
-  /**
-     @brief This accessor routine returns a const colorspinor_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] x_cb Checkerboarded space-time index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1335,7 +1314,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1405,7 +1384,7 @@ namespace quda {
     block_load<complex, length/2>(v, reinterpret_cast<const complex *>(in));
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
   {
     int y = getPaddedIndex(x, parity);
     auto out = &field[(parity * exVolumeCB + y) * length];
@@ -1421,23 +1400,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
-
-  /**
-     @brief This accessor routine returns a const colorspinor_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] x_cb Checkerboarded space-time index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1450,7 +1415,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0)
+  __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dim, int dir, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1489,7 +1454,7 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1508,53 +1473,15 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
+  __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
     return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
-  }
-
-  /**
-     @brief This accessor routine returns a const colorspinor_wrapper to this object,
-     allowing us to overload various operators for manipulating at
-     the site level interms of matrix operations.
-     @param[in] x_cb Checkerboarded space-time index we are requesting
-     @param[in] parity Parity we are requesting
-     @return Instance of a colorspinor_wrapper that curries in access to
-     this field at the above coordinates.
-  */
-  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
-  {
-    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };
 
   } // namespace colorspinor
-
-  template <typename otherFloat, typename storeFloat>
-    __device__ __host__ inline void complex<double>::operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
-    x = a.real();
-    y = a.imag();
-  }
-
-  template <typename otherFloat, typename storeFloat>
-    __device__ __host__ inline void complex<float>::operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
-    x = a.real();
-    y = a.imag();
-  }
-
-  template <typename otherFloat, typename storeFloat>
-    __device__ __host__ inline complex<double>::complex(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
-    x = a.real();
-    y = a.imag();
-  }
-
-  template <typename otherFloat, typename storeFloat>
-    __device__ __host__ inline complex<float>::complex(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a) {
-    x = a.real();
-    y = a.imag();
-  }
 
   // Use traits to reduce the template explosion
   template <typename T, int Ns, int Nc, bool project = false, bool huge_alloc = false> struct colorspinor_mapper {

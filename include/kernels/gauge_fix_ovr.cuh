@@ -44,9 +44,9 @@ namespace quda {
   template <typename Arg> struct FixQualityOVR : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr FixQualityOVR(Arg &arg) : arg(arg) {}
+    constexpr FixQualityOVR(const Arg &arg) : arg(arg) {}
 
     /**
      * @brief Measure gauge fixing quality
@@ -129,8 +129,8 @@ namespace quda {
    * @brief Perform gauge fixing with overrelaxation
    */
   template <typename Arg> struct computeFix {
-    Arg &arg;
-    constexpr computeFix(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr computeFix(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int idx, int mu)
@@ -252,8 +252,8 @@ namespace quda {
 
   template <typename Arg> struct Packer
   {
-    Arg &arg;
-    constexpr Packer(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Packer(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int idx)
@@ -352,8 +352,8 @@ namespace quda {
   };
 
   template <typename Arg> struct BorderPointsCompute {
-    Arg &arg;
-    constexpr BorderPointsCompute(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr BorderPointsCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int idd, int parity, int dir)

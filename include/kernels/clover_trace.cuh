@@ -27,7 +27,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  __device__ __host__ void cloverSigmaTraceCompute(Arg & arg, const int x, int parity)
+  __device__ __host__ void cloverSigmaTraceCompute(const Arg &arg, const int x, int parity)
   {
     using real = typename Arg::real;
     real A[72];
@@ -150,8 +150,8 @@ namespace quda {
 
   template <typename Arg> struct CloverSigmaTr
   {
-    Arg &arg;
-    constexpr CloverSigmaTr(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverSigmaTr(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

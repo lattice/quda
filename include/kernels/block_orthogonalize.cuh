@@ -83,7 +83,7 @@ namespace quda {
   };
 
   template <int block_size, typename Arg> struct BlockOrtho_ {
-    Arg &arg;
+    const Arg &arg;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;
@@ -105,7 +105,7 @@ namespace quda {
     using dot_t = vector_type<complex<sum_t>, mVec>;
     using real = typename Arg::real;
 
-    constexpr BlockOrtho_(Arg &arg) : arg(arg) {}
+    constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)

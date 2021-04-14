@@ -14,9 +14,9 @@ namespace quda {
     };
 
     template <typename Arg> struct init_count {
-      Arg &arg;
+      const Arg &arg;
       static constexpr const char *filename() { return KERNEL_FILE; }
-      constexpr init_count(Arg &arg) : arg(arg) {}
+      constexpr init_count(const Arg &arg) : arg(arg) {}
       __device__ void operator()(int i) { new (arg.count + i) typename Arg::T {0}; }
     };
 

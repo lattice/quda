@@ -66,8 +66,8 @@ namespace quda {
   };
 
   template <typename Arg> struct GhostExtractor {
-    Arg &arg;
-    constexpr GhostExtractor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int, int parity_dim)
@@ -116,8 +116,8 @@ namespace quda {
      FIXME this implementation will have two-way warp divergence
   */
   template <typename Arg> struct GhostExtractorFineGrained {
-    Arg &arg;
-    constexpr GhostExtractorFineGrained(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractorFineGrained(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int i, int parity_dim)

@@ -38,7 +38,7 @@ namespace quda
   };
 
   template <typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(Link &force, Arg &arg, int xIndex, int yIndex)
+  __device__ __forceinline__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex)
   {
     int otherparity = (1 - arg.parity);
 
@@ -226,8 +226,8 @@ namespace quda
 
   template <typename Arg> struct CloverDerivative
   {
-    Arg &arg;
-    constexpr CloverDerivative(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverDerivative(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __host__ __device__ void operator()(int x_cb, int parity, int mu)

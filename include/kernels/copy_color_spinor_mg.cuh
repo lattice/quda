@@ -23,8 +23,8 @@ namespace quda {
   };
 
   template <typename Arg> struct CopySpinor_ {
-    Arg &arg;
-    constexpr CopySpinor_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopySpinor_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

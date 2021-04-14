@@ -89,7 +89,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  __device__ __host__ void extractor(Arg &arg, int dir, int a, int b,
+  __device__ __host__ void extractor(const Arg &arg, int dir, int a, int b,
 				     int c, int d, int g, int parity)
   {
     auto dim = Arg::dim;
@@ -109,7 +109,7 @@ namespace quda {
 
 
   template <typename Arg>
-  __device__ __host__ void injector(Arg &arg, int dir, int a, int b,
+  __device__ __host__ void injector(const Arg &arg, int dir, int a, int b,
 				    int c, int d, int g, int parity)
   {
     auto dim = Arg::dim;
@@ -136,8 +136,8 @@ namespace quda {
      FIXME this implementation will have two-way warp divergence
   */
   template <typename Arg> struct GhostExtractorEx {
-    Arg &arg;
-    constexpr GhostExtractorEx(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractorEx(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int parity, int dir)

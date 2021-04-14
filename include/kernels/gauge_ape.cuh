@@ -43,8 +43,8 @@ namespace quda
   };
   
   template <typename Arg> struct APE {
-    Arg &arg;
-    constexpr APE(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr APE(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

@@ -491,7 +491,7 @@ namespace quda
   }
 
   template <int nParity, class D, typename Arg>
-  void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
+  void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
@@ -632,7 +632,7 @@ namespace quda
     static constexpr KernelType kernel_type = kernel_type_;
     Arg arg;
 
-    dslash_functor_arg(Arg &arg, unsigned int threads_x) :
+    dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
       kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
       arg(arg) { }
   };
@@ -645,12 +645,12 @@ namespace quda
     neighboring processes.
    */
   template <typename Arg> struct dslash_functor {
-    typename Arg::Arg &arg;
+    const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    constexpr dslash_functor(Arg &arg) : arg(arg.arg) { }
+    constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
 
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {

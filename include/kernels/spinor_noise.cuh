@@ -40,8 +40,8 @@ namespace quda {
   }
 
   template <typename Arg> struct NoiseSpinor {
-    Arg &arg;
-    constexpr NoiseSpinor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr NoiseSpinor(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

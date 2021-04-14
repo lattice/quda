@@ -41,7 +41,7 @@ namespace quda
   };
 
   template <int mu, int nu, typename Arg>
-  inline __device__ void sigmaOprod(Arg &arg, int x_cb, int parity)
+  inline __device__ void sigmaOprod(const Arg &arg, int x_cb, int parity)
   {
     using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -62,8 +62,8 @@ namespace quda
   }
 
   template <typename Arg> struct SigmaOprod {
-    Arg &arg;
-    constexpr SigmaOprod(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr SigmaOprod(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)

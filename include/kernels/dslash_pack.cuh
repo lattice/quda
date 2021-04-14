@@ -129,7 +129,7 @@ namespace quda
   };
 
   template <bool dagger, int twist, int dim, QudaPCType pc, typename Arg>
-  __device__ __host__ inline void pack(Arg &arg, int ghost_idx, int s, int parity)
+  __device__ __host__ inline void pack(const Arg &arg, int ghost_idx, int s, int parity)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, Arg::nSpin> Vector;
@@ -199,7 +199,7 @@ namespace quda
   }
 
   template <int dim, int nFace = 1, typename Arg>
-  __device__ __host__ inline void packStaggered(Arg &arg, int ghost_idx, int s, int parity)
+  __device__ __host__ inline void packStaggered(const Arg &arg, int ghost_idx, int s, int parity)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, Arg::nSpin> Vector;
@@ -230,8 +230,8 @@ namespace quda
   }
 
   template <typename Arg> struct pack_wilson {
-    Arg &arg;
-    constexpr pack_wilson(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr pack_wilson(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int s, int parity)
@@ -269,7 +269,7 @@ namespace quda
   };
 
 #ifdef NVSHMEM_COMMS
-  template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, Arg &arg)
+  template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, const Arg &arg)
   {
     switch (shmemindex) {
     case 0: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 0]);
@@ -284,7 +284,7 @@ namespace quda
     }
   }
 
-  template <typename Arg> __device__ inline int getNeighborRank(int idx, Arg &arg)
+  template <typename Arg> __device__ inline int getNeighborRank(int idx, const Arg &arg)
   {
     switch (idx) {
     case 0: return arg.neighbor_ranks[0];
@@ -299,7 +299,7 @@ namespace quda
     }
   }
 
-  template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, Arg &arg)
+  template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, const Arg &arg)
   {
     switch (shmemindex) {
     case 0:
@@ -330,7 +330,7 @@ namespace quda
     }
   }
 
-  template <typename Arg> __device__ inline bool do_shmempack(int dim, int dir, Arg &arg)
+  template <typename Arg> __device__ inline bool do_shmempack(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
     const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
@@ -339,7 +339,7 @@ namespace quda
     return (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode));
   }
 
-  template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, Arg &arg)
+  template <typename Arg> __device__ inline void shmem_signal(int dim, int dir, const Arg &arg)
   {
     const int shmemidx = 2 * dim + dir;
     const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
@@ -412,7 +412,7 @@ namespace quda
   // 64 - use uber kernel (merge exterior)
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
-    template <int twist> __device__ __forceinline__ void operator()(Arg &arg, int s, int parity)
+    template <int twist> __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -479,7 +479,7 @@ namespace quda
 #endif
     }
 
-    __device__ __forceinline__ void operator()(Arg &arg, int s, int parity, int twist_pack)
+    __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity, int twist_pack)
     {
       switch (twist_pack) {
       case 0: this->operator()<0>(arg, s, parity); break;
@@ -490,8 +490,8 @@ namespace quda
   };
 
   template <typename Arg> struct pack_wilson_shmem {
-    Arg &arg;
-    constexpr pack_wilson_shmem(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr pack_wilson_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int s, int parity)
@@ -503,8 +503,8 @@ namespace quda
   };
 
   template <typename Arg> struct pack_staggered {
-    Arg &arg;
-    constexpr pack_staggered(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr pack_staggered(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int s, int parity)
@@ -543,7 +543,7 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ __forceinline__ void operator()(Arg &arg, int s, int parity, int = 0)
+    __device__ __forceinline__ void operator()(const Arg &arg, int s, int parity, int = 0)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = target::block_idx().x % arg.blocks_per_dir;
@@ -612,8 +612,8 @@ namespace quda
   };
 
   template <typename Arg> struct pack_staggered_shmem {
-    Arg &arg;
-    constexpr pack_staggered_shmem(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr pack_staggered_shmem(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int, int s, int parity)

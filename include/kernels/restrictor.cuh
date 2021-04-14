@@ -107,8 +107,8 @@ namespace quda {
   template <int block_size, typename Arg> struct Restrictor {
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
-    Arg &arg;
-    constexpr Restrictor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)

@@ -34,8 +34,8 @@ namespace quda {
   template <typename Arg> struct DetTrace : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr DetTrace(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DetTrace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the determinant or trace at site (x_cb, parity)

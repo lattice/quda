@@ -588,8 +588,8 @@ namespace quda {
 
   template <typename Arg> struct HB
   {
-    Arg &arg;
-    constexpr HB(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr HB(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb)

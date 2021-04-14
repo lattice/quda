@@ -24,8 +24,8 @@ namespace quda {
   template <typename Arg> struct MomAction : plus<double> {
     using reduce_t = double;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr MomAction(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr MomAction(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // calculate the momentum contribution to the action.  This uses the
@@ -89,8 +89,8 @@ namespace quda {
 
   template <typename Arg> struct MomUpdate {
     using reduce_t = vector_type<double, 2>;
-    Arg &arg;
-    constexpr MomUpdate(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     static constexpr bool do_sum = false;
@@ -115,7 +115,7 @@ namespace quda {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
-      int e_cb = linkIndex(x,arg.E);
+      int e_cb = linkIndex(x, arg.E);
 
 #pragma unroll
       for (int d=0; d<4; d++) {
@@ -159,8 +159,8 @@ namespace quda {
 
   template <typename Arg> struct ApplyU
   {
-    Arg &arg;
-    constexpr ApplyU(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ApplyU(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

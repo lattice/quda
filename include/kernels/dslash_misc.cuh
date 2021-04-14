@@ -119,8 +119,8 @@ namespace quda {
      @brief Application of Gamma matrix to a color spinor field
   */
   template <typename Arg> struct Gamma {
-    Arg &arg;
-    constexpr Gamma(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Gamma(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -141,8 +141,8 @@ namespace quda {
   */
   template <typename Arg> struct TwistGamma {
     using fermion_t = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
-    Arg &arg;
-    constexpr TwistGamma(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr TwistGamma(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -225,8 +225,8 @@ namespace quda {
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
-    Arg &arg;
-    constexpr CloverApply(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -267,8 +267,8 @@ namespace quda {
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
-    Arg &arg;
-    constexpr TwistCloverApply(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr TwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
