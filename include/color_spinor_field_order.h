@@ -199,6 +199,17 @@ namespace quda {
       const int offset_cb;
       AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
       AccessorCB() : offset_cb(0) { }
+
+      /**
+       * @brief This method returns the index for the pointer that
+       * points to the start of the memory chunk corresponds to the
+       * matrix at parity, x_cb, s, c, v.
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector index
+       */
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
@@ -215,19 +226,6 @@ namespace quda {
           ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), x_cb * N + chi * M + i);
         }
       }
-
-      /**
-       * @brief This and the following `wrap_index` method returns the index for the pointer that points to
-       * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
-       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
-       * @param parity Parity index
-       * @param x_cb 1-d checkboarding site index
-       * @param s spin index
-       */
-      __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
-      {
-        return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
-      }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -241,15 +239,10 @@ namespace quda {
         }
       }
       GhostAccessorCB() : ghostOffset{ } { }
-      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
-      { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
 
-      /**
-       * @brief This `wrap_index` method for ghost.
-       */
-      __device__ __host__ inline int wrap_index(int dim, int parity, int x_cb, int s) const
+      __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
       {
-        return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec;
+        return parity * ghostOffset[dim] + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
       }
     };
 
@@ -269,9 +262,9 @@ namespace quda {
       AccessorCB(const ColorSpinorField &field) :
         stride(field.Stride()),
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
-      {
-      }
+      { }
       AccessorCB() : stride(0), offset_cb(0) {}
+
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
@@ -300,8 +293,11 @@ namespace quda {
         }
       }
       GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+
       __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
-      { return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb; }
+      {
+        return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb;
+      }
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
@@ -343,8 +339,11 @@ namespace quda {
         }
       }
       GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
+
       __device__ __host__ inline int index(int dim, int parity, int x_cb, int s, int c, int v) const
-      { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
+      {
+        return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]);
+      }
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
@@ -354,9 +353,9 @@ namespace quda {
       AccessorCB(const ColorSpinorField &field) :
         stride(field.Stride()),
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
-      {
-      }
+      { }
       AccessorCB() : stride(0), offset_cb(0) {}
+
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
       {
         return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, stride);
@@ -758,7 +757,7 @@ namespace quda {
       }
 
       /**
-       * Writable complex-member accessor function.  The last
+       * Complex-member accessor function.  The last
        * parameter n is only used for indexed into the packed
        * null-space vectors.
        * @param x 1-d checkerboard site index
@@ -766,28 +765,15 @@ namespace quda {
        * @param c color index
        * @param v vector number
        */
-      __device__ __host__ inline fieldorder_wrapper<Float, storeFloat, block_float, norm_t> operator()(int parity, int x_cb, int s, int c, int n=0) const
+      __device__ __host__ inline auto operator()(int parity, int x_cb, int s, int c, int n = 0) const
       {
         return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv,
                                                                           norm, parity * norm_offset + x_cb);
       }
 
-      /**
-       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
-       * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
-       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
-       * @param parity Parity index
-       * @param x_cb 1-d checkboarding site index
-       * @param s spin index
-       */
-      __device__ __host__ inline auto wrap(int parity, int x_cb, int s) const
-      {
-        return fieldorder_wrapper<Float, storeFloat, block_float, norm_t>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
-      }
-
 #ifndef DISABLE_GHOST
       /**
-       * Writable complex-member accessor function for the ghost zone.
+       * Complex-member accessor function for the ghost zone.
        * The last parameter n is only used for indexed into the packed
        * null-space vectors.
        * @param x 1-d checkerboard site index
@@ -796,8 +782,7 @@ namespace quda {
        * @param n vector number
        * @param max site-element max (only when writing in block-float format)
        */
-      __device__ __host__ inline fieldorder_wrapper<Float, ghostFloat, block_float, norm_t>
-        Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0, Float max = 0) const
+      __device__ __host__ inline auto Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n = 0, Float max = 0) const
       {
         return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(ghost[2*dim+dir],
                                                                                 ghostAccessor.index(dim,parity,x_cb,s,c,n),
@@ -808,23 +793,7 @@ namespace quda {
                                                                                 s == 0 && c == 0 && n == 0);
       }
 
-      /**
-       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
-       * the start of the memory chunk corresponds to the matrix at dim, dir, parity, x_cb, s. Only available for the
-       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
-       * @param dim
-       * @param dir
-       * @param parity Parity index
-       * @param x_cb 1-d checkboarding site index
-       * @param s spin index
-       */
-      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
-      {
-        const int idx = ghostAccessor.wrap_index(dim, parity, x_cb, s);
-        return fieldorder_wrapper<Float, ghostFloat, block_float, norm_t>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
-      }
-
-      /**
+        /**
          @brief Convert from 1-dimensional index to the n-dimensional
          spatial index.  With full fields, we assume that the field is
          even-odd ordered.  The lattice coordinates that are computed
