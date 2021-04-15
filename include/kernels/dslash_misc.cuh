@@ -26,9 +26,9 @@ namespace quda {
      the atomic counters
   */
   template <typename Arg> struct init_dslash_atomic {
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr init_dslash_atomic(Arg &arg) : arg(arg) { }
+    constexpr init_dslash_atomic(const Arg &arg) : arg(arg) { }
     __device__ void operator()(int i) { new (arg.count + i) typename Arg::T {0}; }
   };
 
@@ -50,9 +50,9 @@ namespace quda {
      @brief Functor to initialize the arrive signal
   */
   template <typename Arg> struct init_sync_arr {
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr init_sync_arr(Arg &arg) : arg(arg) { }
+    constexpr init_sync_arr(const Arg &arg) : arg(arg) { }
     __device__ void operator()(int i) { *(arg.arr + i) = arg.val; }
   };
 

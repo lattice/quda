@@ -75,7 +75,8 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a,
-            double b, double c, unsigned int block, unsigned int grid, unsigned int swizzle, int shmem_) :
+            double b, double c, unsigned int block, unsigned int grid, unsigned int swizzle,
+#ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
             int) :
