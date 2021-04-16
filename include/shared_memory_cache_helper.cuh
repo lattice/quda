@@ -72,8 +72,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-        //extern __shared__ atom_t cache_[];
-        atom_t *cache_ = nullptr;
+        extern __shared__ atom_t cache_[];
         return reinterpret_cast<atom_t*>(cache_);
       }
     };
@@ -85,8 +84,7 @@ namespace quda
     template <typename dummy> struct cache_static<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-        //static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
-        atom_t *cache_ = nullptr;
+        static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t*>(cache_);
       }
     };

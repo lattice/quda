@@ -9,6 +9,8 @@
 //#define cudaMemcpyDeviceToDevice qudaMemcpyDeviceToDevice
 //#define cudaMemcpyDefault qudaMemcpyDefault
 
+// warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
+
 //using qudaEvent_t = double;
 //using cudaEvent_t = qudaEvent_t;
 using cudaStream_t = int;
