@@ -94,7 +94,11 @@ namespace quda
       /******
        *  Apply M5inv
        */
+#if 1
+      if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
+#else
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS || Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
+#endif
         // Apply the m5inv.
         constexpr bool sync = false;
         out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(
@@ -161,36 +165,46 @@ namespace quda
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
 
+        out = stencil_out;
+
+        bool complete = isComplete<mykernel_type>(arg, coord);
+
         /******
-         *  Apply the second M5inv:
+         *  Apply the two M5inv's:
          *    this is actually   y = 1 * x - kappa_b^2 * m5inv * D4 * in
-         *                     out = m5inv * y
+         *                     out = m5inv-dagger * y
+         *    Rewrite this into  y = m5inv * (m5 * x - kappa_b^2 * D4 * in),
+         *
+         *    which enables us to only perform the two m5inv's in the final (`complete`) exterior part for boundary threads
          */
-        Vector aggregate_external;
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x(xs, my_spinor_parity);
+          x = d5<true, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(arg, x, my_spinor_parity, 0, s);
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
-          Vector x = arg.y(xs, my_spinor_parity);
-          aggregate_external = xpay ? arg.a_5[s] * out : out;
-          out = x + aggregate_external;
+          Vector y = arg.y(xs, my_spinor_parity);
+          out = y + (xpay ? arg.a_5[s] * out : out);
+        }
+
+        if (complete && active) {
+          // Apply the m5inv.
+          constexpr bool sync = true;
+          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(
+              arg, out, my_spinor_parity, 0, s);
         }
 
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.y(xs, my_spinor_parity) = out;
-        if (mykernel_type != INTERIOR_KERNEL && active) {
-          out = aggregate_external;
+
+        if (complete && active) {
+          constexpr bool this_sync = true;
+          constexpr bool this_dagger = true;
+          // Then we apply the second m5inv-dag
+          out = variableInv<this_sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(
+            arg, out, my_spinor_parity, 0, s);
+        } else {
+          return; // If not active, don't need to write to out.
         }
 
-        constexpr bool sync = true;
-        constexpr bool this_dagger = true;
-        // Then we apply the second m5inv-dag
-        out = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(
-          arg, out, my_spinor_parity, 0, s);
-
-        if (mykernel_type != INTERIOR_KERNEL && active) {
-          Vector x = arg.out(xs, my_spinor_parity);
-          out = x + out;
-        }
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS || Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
 
         /******

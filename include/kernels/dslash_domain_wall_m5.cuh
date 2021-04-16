@@ -201,6 +201,7 @@ namespace quda
         break;
       case Dslash5Type::M5_INV_MOBIUS:
       case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
+        compute_coeff_mobius(b_5, c_5);
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
       case Dslash5Type::M5_INV_ZMOBIUS:
@@ -212,7 +213,7 @@ namespace quda
   };
 
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
-    __device__ __host__ inline Vector d5(Arg &arg, const Vector &in, int parity, int x_cb, int s) {
+    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s) {
 
       using real = typename Arg::real;
       constexpr bool is_variable = true;
@@ -372,7 +373,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     using real = typename Arg::real;
     const auto k = arg.kappa;
@@ -429,7 +430,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
