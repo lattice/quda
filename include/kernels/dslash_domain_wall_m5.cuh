@@ -81,7 +81,8 @@ namespace quda
   /**
      @brief Parameter structure for applying the Dslash
    */
-  template <typename Float, int nColor_, bool dagger_, bool xpay_, Dslash5Type type_> struct Dslash5Arg {
+  template <typename Float, int nColor_, bool dagger_, bool xpay_, Dslash5Type type_>
+  struct Dslash5Arg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool dagger = dagger_;
@@ -108,8 +109,6 @@ namespace quda
     real inv;   // The denominator for the M5inv
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
-
-    dim3 threads;
 
     void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5) {
       // out = (b + c * D5) * in
@@ -163,17 +162,17 @@ namespace quda
 
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
                const Complex *b_5, const Complex *c_5, double a_) :
-      out(out),
-      in(in),
-      x(x),
-      nParity(in.SiteSubset()),
-      volume_cb(in.VolumeCB()),
-      volume_4d_cb(volume_cb / in.X(4)),
-      Ls(in.X(4)),
-      m_f(m_f),
-      m_5(m_5),
-      a(a_),
-      threads(volume_4d_cb, Ls, nParity)
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
+        out(out),
+        in(in),
+        x(x),
+        nParity(in.SiteSubset()),
+        volume_cb(in.VolumeCB()),
+        volume_4d_cb(volume_cb / in.X(4)),
+        Ls(in.X(4)),
+        m_f(m_f),
+        m_5(m_5),
+        a(a_)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
@@ -319,8 +318,8 @@ namespace quda
     }
 
   template <typename Arg> struct dslash5 {
-    Arg &arg;
-    constexpr dslash5(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr dslash5(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -552,8 +551,8 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5inv {
-    Arg &arg;
-    constexpr dslash5inv(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr dslash5inv(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

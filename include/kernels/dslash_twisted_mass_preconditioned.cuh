@@ -46,7 +46,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, Arg &arg, Coord &coord, int parity, int idx,
+  __device__ __host__ __forceinline__ void applyWilsonTM(Vector &out, const Arg &arg, Coord &coord, int parity, int idx,
                                                          int thread_dim, bool &active)
   {
     static_assert(twist == 1 || twist == 2, "twist template must equal 1 or 2"); // ensure singlet or doublet
@@ -136,8 +136,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct twistedMassPreconditioned : dslash_default {
 
-    Arg &arg;
-    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr twistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 1 : 0; }
 

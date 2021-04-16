@@ -8,7 +8,7 @@
 namespace quda {
 
   template <typename store_t_>
-  struct CloverArg {
+  struct CloverArg : kernel_param<> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr int nColor = 3;
@@ -19,14 +19,13 @@ namespace quda {
 
     Clover clover;
     const Fmunu f;
-    dim3 threads; // number of active threads required
     int X[4]; // grid dimensions
     real coeff;
     
     CloverArg(CloverField &clover, const GaugeField &f, double coeff) :
+      kernel_param(dim3(f.VolumeCB(), 2, 1)),
       clover(clover, 0),
       f(f),
-      threads(f.VolumeCB(), 2, 1),
       coeff(coeff)
     { 
       for (int dir=0; dir<4; ++dir) X[dir] = f.X()[dir];
@@ -60,8 +59,8 @@ namespace quda {
   */
   // Core routine for constructing clover term from field strength
   template <typename Arg> struct CloverCompute {
-    Arg &arg;
-    constexpr CloverCompute(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

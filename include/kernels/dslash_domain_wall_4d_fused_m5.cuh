@@ -66,8 +66,8 @@ namespace quda
 
     static constexpr Dslash5Type dslash5_type = Arg::type;
 
-    Arg &arg;
-    constexpr domainWall4DFusedM5(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr domainWall4DFusedM5(const Arg &arg) : arg(arg) { }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

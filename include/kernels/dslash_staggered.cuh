@@ -85,7 +85,7 @@ namespace quda
      @param[in] x_cb The checkerboarded site index
   */
   template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord & coord, int parity,
+  __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord & coord, int parity,
                                                  int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
@@ -172,8 +172,8 @@ namespace quda
   template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
-    Arg &arg;
-    constexpr staggered(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr staggered(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

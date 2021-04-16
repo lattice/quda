@@ -492,7 +492,7 @@ namespace quda
   }
 
   template <int nParity, class D, typename Arg>
-  void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
+  void __device__ __forceinline__ shmem_exterior(D &dslash, const Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
 
@@ -592,8 +592,7 @@ namespace quda
       __syncthreads();
       // do exterior
     }
-    // arg.kernel_type = EXTERIOR_KERNEL_ALL;
-    // arg.threads = arg.exterior_threads;
+
     int local_tid = target::thread_idx().x + target::block_dim().x * (myblockidx % (blocks_per_dir)); // index within the block
     int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
@@ -623,7 +622,7 @@ namespace quda
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
             template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
-  struct dslash_functor_arg {
+  struct dslash_functor_arg : kernel_param<> {
     using Arg = Arg_;
     using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
@@ -632,11 +631,10 @@ namespace quda
     static constexpr bool xpay = xpay_;
     static constexpr KernelType kernel_type = kernel_type_;
     Arg arg;
-    dim3 threads;
 
-    dslash_functor_arg(Arg &arg, unsigned int threads_x) :
-      arg(arg),
-      threads(threads_x, arg.dc.Ls, arg.nParity) { }
+    dslash_functor_arg(const Arg &arg, unsigned int threads_x) :
+      kernel_param(dim3(threads_x, arg.dc.Ls, arg.nParity)),
+      arg(arg) { }
   };
 
  /**
@@ -647,12 +645,12 @@ namespace quda
     neighboring processes.
    */
   template <typename Arg> struct dslash_functor {
-    typename Arg::Arg &arg;
+    const typename Arg::Arg &arg;
     static constexpr int nParity = Arg::nParity;
     static constexpr bool dagger = Arg::dagger;
     static constexpr KernelType kernel_type = Arg::kernel_type;
     static constexpr const char *filename() { return Arg::D::filename(); }
-    constexpr dslash_functor(Arg &arg) : arg(arg.arg) { }
+    constexpr dslash_functor(const Arg &arg) : arg(arg.arg) { }
 
     __forceinline__ __device__ void operator()(int, int s, int parity)
     {

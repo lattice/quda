@@ -52,7 +52,7 @@ namespace quda {
   };
 
   template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m>
-  struct GaugeForceArg {
+  struct GaugeForceArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -62,7 +62,6 @@ namespace quda {
     Mom mom;
     const Gauge u;
 
-    dim3 threads;
     int X[4]; // the regular volume parameters
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
@@ -70,11 +69,12 @@ namespace quda {
     Float epsilon; // stepsize and any other overall scaling factor
     const paths p;
 
-    GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths &p)
-      : mom(mom), u(u),
-        threads(mom.VolumeCB(), 2, 4),
-	epsilon(epsilon),
-        p(p)
+    GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths &p) :
+      kernel_param(dim3(mom.VolumeCB(), 2, 4)),
+      mom(mom),
+      u(u),
+      epsilon(epsilon),
+      p(p)
     {
       for (int i=0; i<4; i++) {
 	X[i] = mom.X()[i];
@@ -88,7 +88,7 @@ namespace quda {
   constexpr bool isForwards(int dir) { return (dir <= 3); }
 
   template <typename Arg, int dir>
-  __device__ __host__ inline void GaugeForceKernel(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void GaugeForceKernel(const Arg &arg, int idx, int parity)
   {
     using real = typename Arg::Float;
     typedef Matrix<complex<real>,Arg::nColor> Link;
@@ -160,8 +160,8 @@ namespace quda {
 
   template <typename Arg> struct GaugeForce
   {
-    Arg &arg;
-    constexpr GaugeForce(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaugeForce(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }    
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)

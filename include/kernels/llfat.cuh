@@ -8,7 +8,7 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon>
-  struct LinkArg {
+  struct LinkArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
@@ -28,13 +28,11 @@ namespace quda {
     partitioned then we have to correct for this when computing the local index */
     int odd_bit;
 
-    dim3 threads;
-
     LinkArg(GaugeField &link, const GaugeField &u, Float coeff) :
+      kernel_param(dim3(link.VolumeCB(), 2, 4)),
       link(link),
       u(u),
-      coeff(coeff),
-      threads(link.VolumeCB(), 2, 4)
+      coeff(coeff)
     {
       if (u.StaggeredPhase() != QUDA_STAGGERED_PHASE_MILC && u.Reconstruct() != QUDA_RECONSTRUCT_NO)
         errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
@@ -47,23 +45,22 @@ namespace quda {
   };
 
   template <int dir, typename Arg>
-  __device__ void longLinkDir(Arg &arg, int idx, int parity) {
+  __device__ void longLinkDir(const Arg &arg, int idx, int parity) {
     int x[4];
     int dx[4] = {0, 0, 0, 0};
 
-    auto y = arg.u.coords;
     getCoords(x, idx, arg.X, parity);
     for (int d=0; d<4; d++) x[d] += arg.border[d];
 
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
 
-    Link a = arg.u(dir, linkIndex(y, x, arg.E), parity);
+    Link a = arg.u(dir, linkIndex(x, arg.E), parity);
 
     dx[dir]++;
-    Link b = arg.u(dir, linkIndexShift(y, x, dx, arg.E), 1-parity);
+    Link b = arg.u(dir, linkIndexShift(x, dx, arg.E), 1-parity);
 
     dx[dir]++;
-    Link c = arg.u(dir, linkIndexShift(y, x, dx, arg.E), parity);
+    Link c = arg.u(dir, linkIndexShift(x, dx, arg.E), parity);
     dx[dir]-=2;
 
     arg.link(dir, idx, parity) = arg.coeff * a * b * c;
@@ -71,8 +68,8 @@ namespace quda {
 
   template <typename Arg> struct ComputeLongLink
   {
-    Arg &arg;
-    constexpr ComputeLongLink(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeLongLink(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
@@ -88,13 +85,13 @@ namespace quda {
 
   template <typename Arg> struct ComputeOneLink
   {
-    Arg &arg;
-    constexpr ComputeOneLink(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeOneLink(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
     {
-      auto x = arg.u.coords;
+      int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int d=0; d<4; d++) x[d] += arg.border[d];
 
@@ -106,14 +103,13 @@ namespace quda {
   };
 
   template <typename Float_, int nColor_, QudaReconstructType recon, QudaReconstructType recon_mu, bool save_staple_>
-  struct StapleArg {
+  struct StapleArg : kernel_param<> {
     using Float = Float_;
     using Link = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     using MuLink = typename gauge_mapper<Float, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool save_staple = save_staple_;
-    dim3 threads;
 
     int_fastdiv X[4];
     int_fastdiv E[4];
@@ -139,7 +135,13 @@ namespace quda {
 
     StapleArg(GaugeField &fat, GaugeField &staple, const GaugeField &mulink, const GaugeField &u,
               Float coeff, int nu, int mu_map[4]) :
-      threads(1, 2, 1), fat(fat), staple(staple), mulink(mulink), u(u), coeff(coeff), nu(nu),
+      kernel_param(dim3(1, 2, 1)),
+      fat(fat),
+      staple(staple),
+      mulink(mulink),
+      u(u),
+      coeff(coeff),
+      nu(nu),
       odd_bit( (commDimPartitioned(0)+commDimPartitioned(1) +
                 commDimPartitioned(2)+commDimPartitioned(3))%2 )
     {
@@ -147,22 +149,22 @@ namespace quda {
         X[d] = (fat.X()[d] + u.X()[d]) / 2;
         E[d] = u.X()[d];
         border[d] = (E[d] - X[d]) / 2;
-        threads.x *= X[d];
+        this->threads.x *= X[d];
 
         inner_X[d] = fat.X()[d];
         inner_border[d] = (E[d] - inner_X[d]) / 2;
 
         this->mu_map[d] = mu_map[d];
       }
-      threads.x /= 2; // account for parity in y dimension
+      this->threads.x /= 2; // account for parity in y dimension
     }
   };
 
   template <int mu, int nu, typename Arg>
-  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, Arg &arg, int x[], int parity)
+  __device__ inline void computeStaple(Matrix<complex<typename Arg::Float>, Arg::nColor> &staple, const Arg &arg, int x[], int parity)
   {
     using Link = Matrix<complex<typename Arg::Float>, Arg::nColor>;
-    int *y = arg.u.coords, *y_mu = arg.mulink.coords, dx[4] = {0, 0, 0, 0};
+    int dx[4] = {0, 0, 0, 0};
 
     /* Computes the upper staple :
      *                 mu (B)
@@ -173,16 +175,16 @@ namespace quda {
      */
     {
       /* load matrix A*/
-      Link a = arg.u(nu, linkIndex(y, x, arg.E), parity);
+      Link a = arg.u(nu, linkIndex(x, arg.E), parity);
 
       /* load matrix B*/
       dx[nu]++;
-      Link b = arg.mulink(mu, linkIndexShift(y_mu, x, dx, arg.E), 1-parity);
+      Link b = arg.mulink(mu, linkIndexShift(x, dx, arg.E), 1-parity);
       dx[nu]--;
 
       /* load matrix C*/
       dx[mu]++;
-      Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
+      Link c = arg.u(nu, linkIndexShift(x, dx, arg.E), 1-parity);
       dx[mu]--;
 
       staple = a * b * conj(c);
@@ -198,14 +200,14 @@ namespace quda {
     {
       /* load matrix A*/
       dx[nu]--;
-      Link a = arg.u(nu, linkIndexShift(y, x, dx, arg.E), 1-parity);
+      Link a = arg.u(nu, linkIndexShift(x, dx, arg.E), 1-parity);
 
       /* load matrix B*/
-      Link b = arg.mulink(mu, linkIndexShift(y_mu, x, dx, arg.E), 1-parity);
+      Link b = arg.mulink(mu, linkIndexShift(x, dx, arg.E), 1-parity);
 
       /* load matrix C*/
       dx[mu]++;
-      Link c = arg.u(nu, linkIndexShift(y, x, dx, arg.E), parity);
+      Link c = arg.u(nu, linkIndexShift(x, dx, arg.E), parity);
       dx[mu]--;
       dx[nu]++;
 
@@ -215,8 +217,8 @@ namespace quda {
 
   template <typename Arg> struct ComputeStaple
   {
-    Arg &arg;
-    constexpr ComputeStaple(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeStaple(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity, int mu_idx)
