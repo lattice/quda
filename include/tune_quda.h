@@ -595,7 +595,7 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
