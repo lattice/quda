@@ -17,9 +17,32 @@ namespace quda
     using Dslash = Dslash<domainWall4DFusedM5, Arg>;
     using Dslash::arg;
     using Dslash::in;
+    using Dslash::aux_base;
+
+    inline std::string get_app_base()
+    {
+      switch (Arg::dslash5_type) {
+        case Dslash5Type::DSLASH5_MOBIUS_PRE:
+          return ",fused_type=m5pre";
+        case Dslash5Type::DSLASH5_MOBIUS:
+          return ",fused_type=m5mob";
+        case Dslash5Type::M5_INV_MOBIUS:
+          return ",fused_type=m5inv";
+        case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+          return ",fused_type=m5inv_m5pre";
+        case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
+          return ",fused_type=m5pre_m5inv";
+        case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
+          return ",fused_type=m5inv_m5inv";
+        case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
+          return ",fused_type=m5pre_m5mob";
+        default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
+          return ",fused_type=unknown_type";
+      }
+    }
 
   public:
-    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in, get_app_base())
     {
       TunableKernel3D::resizeVector(in.X(4), arg.nParity);
       TunableKernel3D::resizeStep(in.X(4), 1);
@@ -58,7 +81,7 @@ namespace quda
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
-      return n * (8ll * bulk + 10ll * wall + 14ll * in.Volume() + (arg.xpay ? 8ll * in.Volume() : 0));
+      return n * (8ll * bulk + 10ll * wall + 6ll * in.Volume());
     }
 
     long long m5mob_flops() const
@@ -67,16 +90,14 @@ namespace quda
       long long bulk = (Ls - 2) * (in.Volume() / Ls);
       long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
-      return n * (8ll * bulk + 10ll * wall + 8ll * in.Volume() + (arg.xpay ? 8ll * in.Volume() : 0));
+      return n * (8ll * bulk + 10ll * wall + 4ll * in.Volume());
     }
 
     long long m5inv_flops() const
     {
       long long Ls = in.X(4);
-      long long bulk = (Ls - 2) * (in.Volume() / Ls);
-      long long wall = 2 * in.Volume() / Ls;
       long long n = in.Ncolor() * in.Nspin();
-      return ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * in.Volume();
+      return (12ll * n * Ls) * in.Volume();
     }
 
     long long flops() const

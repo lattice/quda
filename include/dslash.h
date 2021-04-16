@@ -50,7 +50,7 @@ namespace quda
        @brief Set the base strings used by the different dslash kernel
        types for autotuning.
     */
-    inline void fillAuxBase()
+    inline void fillAuxBase(const std::string &app_base)
     {
       char comm[5];
       comm[0] = (arg.commDim[0] ? '1' : '0');
@@ -60,6 +60,8 @@ namespace quda
       comm[4] = '\0';
       strcpy(aux_base, ",commDim=");
       strcat(aux_base, comm);
+
+      strcat(aux_base, app_base.c_str());
 
       if (arg.xpay) strcat(aux_base, ",xpay");
       if (arg.dagger) strcat(aux_base, ",dagger");
@@ -324,7 +326,7 @@ namespace quda
 
     Arg &dslashParam; // temporary addition for policy compatibility
 
-    Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in, const std::string &app_base = "") :
       TunableKernel3D(in, 1, arg.nParity),
       arg(arg),
       out(out),
@@ -338,7 +340,7 @@ namespace quda
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
       // strcpy(aux, in.AuxString());
-      fillAuxBase();
+      fillAuxBase(app_base);
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
       fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
