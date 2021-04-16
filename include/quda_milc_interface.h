@@ -57,7 +57,6 @@ extern "C" {
     QudaPrecision  prec_ritz;
     int nev;
     int max_search_dim;
-    int deflation_grid;
     double tol_restart;
 
     int eigcg_max_restarts;

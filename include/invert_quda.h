@@ -1380,8 +1380,7 @@ public:
     void LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanzos_offdiag, const double &beta,
                                  const double &resnorm);
     // Pipelined routines:
-    void PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanzos_offdiag, const double &beta,
-                                    const double &resnorm);
+    void PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanzos_offdiag, const double &resnorm);
     // legacy EigCG solver:
     int EigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     // communation optimized version

@@ -620,8 +620,7 @@ namespace quda {
     return;
   }
 
-  void IncEigCG::PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag,
-                                            const double &beta, const double &normr)
+  void IncEigCG::PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &normr)
   {
     constexpr bool is_pipelined = true;
 
@@ -1299,7 +1298,7 @@ namespace quda {
 
     while ((!converged && k < param.maxiter) || (args.restarts < search_space_restarts[args.logical_rhs_id] )) {
       // Update search space
-      PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
+      PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, sqrt(nu));
 
       alpha_old_inv = alpha_inv;
       beta_old = beta;

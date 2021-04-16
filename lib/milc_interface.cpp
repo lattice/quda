@@ -848,9 +848,8 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 }
 
 void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz, QudaMemoryType mem_type_ritz,
-                       QudaExtLibType deflation_ext_lib, char vec_infile[], char vec_outfile[], QudaEigParam *df_param)
+                       char vec_infile[], char vec_outfile[], QudaEigParam *df_param)
 {
-#if 0	
   df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   df_param->cuda_prec_ritz = ritz_prec;
@@ -859,11 +858,11 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
 
   df_param->run_verify     = QUDA_BOOLEAN_FALSE;
 
-  df_param->nk = df_param->invert_param->n_ev;
-  df_param->np = df_param->invert_param->n_ev * df_param->invert_param->deflation_grid;
+  df_param->nk     = df_param->invert_param->n_ev;
+  df_param->n_conv = df_param->invert_param->n_conv;
 
-  df_param->extlib_type = deflation_ext_lib;
-#endif
+  //df_param->extlib_type = deflation_ext_lib;
+
   // set file i/o parameters
   strcpy(df_param->vec_infile, vec_infile);
   strcpy(df_param->vec_outfile, vec_outfile);
@@ -1187,6 +1186,7 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   qudamilc_called<false>(__func__, verbosity);
 } // qudaInvert
 
+#if 0
 void qudaEigCGInvert(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                      double target_residual, double target_fermilab_residual, const void *const fatlink,
                      const void *const longlink,
@@ -1196,8 +1196,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
                      const int rhs_idx,       // current rhs
                      const int last_rhs_flag, // is this the last rhs to solve
                      double *const final_residual, double *const final_fermilab_residual, int *num_iters)
-{
-#if 0	
+{	
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1281,8 +1280,9 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   if (!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
-#endif
+
 } // qudaEigCGInvert
+#endif
 
 // Structure used to handle loading from input file
 struct mgInputStruct {
@@ -2518,6 +2518,7 @@ void qudaCloverInvert(int external_precision,
   qudamilc_called<false>(__func__);
 } // qudaCloverInvert
 
+#if 0
 void qudaEigCGCloverInvert(int external_precision, int quda_precision, double kappa, double clover_coeff,
                            QudaInvertArgs_t inv_args, double target_residual, double target_fermilab_residual,
                            const void *link,
@@ -2529,8 +2530,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
                            const int rhs_idx,       // current rhs
                            const int last_rhs_flag, // is this the last rhs to solve?
                            double *const final_residual, double *const final_fermilab_residual, int *num_iters)
-{
-#if 0	
+{	
   qudamilc_called<true>(__func__);
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaCloverInvert: requesting zero residual\n");
 
@@ -2596,9 +2596,9 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
-#endif
-} // qudaEigCGCloverInvert
 
+} // qudaEigCGCloverInvert
+#endif
 
 void qudaCloverMultishiftInvert(int external_precision,
                                 int quda_precision,

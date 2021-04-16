@@ -346,7 +346,6 @@ extern "C" {
     QudaPrecision cuda_prec_ritz;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
-    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
     /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
