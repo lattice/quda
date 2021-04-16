@@ -1371,17 +1371,19 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename T1, typename T2, typename T3>
   __host__ __device__ inline auto cmac(const T1 &x, const T2 &y, const T3 &z)
   {
-    static_assert(std::is_same<decltype(x.real()), decltype(y.real())>::value &&
-                  std::is_same<decltype(x.real()), decltype(z.real())>::value,
+    static_assert(std::is_same<typename T1::value_type, typename T2::value_type>::value &&
+                  std::is_same<typename T1::value_type, typename T3::value_type>::value,
                   "precisions do not match");
 
-    using real = decltype(x.real());
-    complex<real> w = z;
-    w.x += x.real() * y.real();
-    w.x -= x.imag() * y.imag();
-    w.y += x.imag() * y.real();
-    w.y += x.real() * y.imag();
-    return w;
+    using real = typename T1::value_type;
+    complex<real> X = x;
+    complex<real> Y = y;
+    complex<real> Z = z;
+    Z.real(Z.real() + X.real() * Y.real());
+    Z.real(Z.real() - X.imag() * Y.imag());
+    Z.imag(Z.imag() + X.imag() * Y.real());
+    Z.imag(Z.imag() + X.real() * Y.imag());
+    return Z;
   }
 
   template <typename real> __host__ __device__ inline complex<real> i_(const complex<real> &a)

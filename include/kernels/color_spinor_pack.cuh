@@ -180,8 +180,6 @@ namespace quda {
     if (Arg::nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
     else getCoords(x, x_cb, arg.X, parity);
 
-    const auto &rhs = arg.field;
-
     {
       real max = 1.0;
       if (Arg::block_float) {
@@ -197,7 +195,7 @@ namespace quda {
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
             arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-              = rhs(spinor_parity, x_cb, s, c);
+              = arg.field(spinor_parity, x_cb, s, c);
           }
 	}
       }
@@ -210,7 +208,7 @@ namespace quda {
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
             arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-                = rhs(spinor_parity, x_cb, s, c);
+                = arg.field(spinor_parity, x_cb, s, c);
           }
 	}
       }
