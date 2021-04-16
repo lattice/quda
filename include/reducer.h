@@ -12,11 +12,13 @@ namespace quda {
 
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
+    using reducer_t = maximum<T>;
     __device__ __host__ T operator()(T a, T b) const { return a > b ? a : b; }
   };
 
   template <typename T> struct minimum {
     static constexpr bool do_sum = false;
+    using reducer_t = minimum<T>;
     __device__ __host__ T operator()(T a, T b) const { return a < b ? a : b; }
   };
 

@@ -1003,10 +1003,10 @@ namespace quda {
       norm_type max_[length / 2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i = 0; i < length / 2; i++) max_[i] = quda::max(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+      for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
       norm_type scale = 0.0;
 #pragma unroll
-      for (int i = 0; i < length / 2; i++) scale = quda::max(max_[i], scale);
+      for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
@@ -1071,11 +1071,11 @@ namespace quda {
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++)
-        max_[i] = quda::max( (norm_type)fabsf( (norm_type)v[i] ),
+        max_[i] = fmaxf( (norm_type)fabsf( (norm_type)v[i] ),
                          (norm_type)fabsf( (norm_type)v[i + length_ghost / 2] ) );
       norm_type scale = 0.0;
 #pragma unroll
-      for (int i = 0; i < length_ghost / 2; i++) scale = quda::max(max_[i], scale);
+      for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);

@@ -10,7 +10,6 @@ namespace quda {
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePlaqArg : public ReduceArg<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
-    using reducer = ReduceArg<reduce_t>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");

@@ -1,6 +1,7 @@
 #pragma once
 #include <device.h>
 #include <tune_quda.h>
+#include <kernel_helper.h>
 #include <utility>
 
 namespace quda {

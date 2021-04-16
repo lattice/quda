@@ -122,7 +122,7 @@ namespace quda {
       if(fabs(cosTheta) >= 1.0){
 	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
       }else{
-	theta = sycl::acos(cosTheta); // this is the primary performance limiter
+	theta = acos(cosTheta); // this is the primary performance limiter
       }
 
       const real sqrt_s = s*rsqrt_s;
@@ -136,9 +136,9 @@ namespace quda {
       //g[2] = c[0]*one_third + 2*sqrt_s*(ac*cos(2*FL_UNITARIZE_PI23) - as*sin(2*FL_UNITARIZE_PI23));
       g[2] = c[0]*one_third + 2*sqrt_s*(-0.5*ac + as*0.8660254037844386467637);
 #else
-      g[0] = c[0]*one_third + 2*sqrt_s*sycl::cos( theta*one_third );
-      g[1] = c[0]*one_third + 2*sqrt_s*sycl::cos( theta*one_third + FL_UNITARIZE_PI23 );
-      g[2] = c[0]*one_third + 2*sqrt_s*sycl::cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
+      g[0] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third );
+      g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + FL_UNITARIZE_PI23 );
+      g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
 #endif
     }
 
@@ -150,7 +150,7 @@ namespace quda {
 
     // At this point we have finished with the c's
     // use these to store sqrt(g)
-    for(int i=0; i<3; ++i) c[i] = sycl::sqrt(g[i]);
+    for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
 
     // done with the g's, use these to store u, v, w
     g[0] = c[0]+c[1]+c[2];

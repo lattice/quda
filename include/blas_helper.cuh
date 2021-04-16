@@ -4,7 +4,6 @@
 #include <reduce_helper.h>
 #include <load_store.h>
 #include <convert.h>
-#include <math_helper.cuh>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -123,10 +122,10 @@ namespace quda
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-        for (int i = 0; i < n; i++) max_[i] = quda::max(fabs((norm_t)v[i].real()), fabs((norm_t)v[i].imag()));
+        for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
         norm_t scale = 0.0;
 #pragma unroll
-        for (int i = 0; i < n; i++) scale = quda::max(max_[i], scale);
+        for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         norm[x + parity * cb_norm_offset] = scale;
 
         return fdividef(fixedMaxValue<store_t>::value, scale);

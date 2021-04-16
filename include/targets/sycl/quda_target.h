@@ -31,15 +31,6 @@ using cudaStream_t = int;
 #define __shared__
 #define __shfl_down_sync(m, x, o) x
 
-//#define rsqrt(x) (1/sqrt(x))
-//inline float rsqrt(float x) { return 1.0f/sqrt(x); }
-//inline void sincos(float x, float *s, float *c)
-//{
-  //*s = sin(x);
-  //*c = cos(x);
-  //*s = sycl::sincos(x, c);
-//}
-
 inline std::string str(dim3 x)
 {
   std::ostringstream ss;
@@ -188,3 +179,18 @@ namespace quda
 #define qudaLaunchKernel(a,b,c,...) \
   qudaLaunchKernel_(__FILE__,__LINE__,__func__,#a)
 
+
+///// MATH
+
+#include <math_helper.cuh>
+
+//#define rsqrt(x) (1/sqrt(x))
+//inline float rsqrt(float x) { return 1.0f/sqrt(x); }
+//inline void sincos(float x, float *s, float *c)
+//{
+  //*s = sin(x);
+  //*c = cos(x);
+  //*s = sycl::sincos(x, c);
+//}
+
+inline float fdividef(float a, float b) { return quda::fdividef(a,b); }

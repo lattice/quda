@@ -56,7 +56,6 @@ namespace quda {
   template<typename T>
   inline __host__ __device__ T rsqrt(T a)
   {
-    //return ::rsqrt(a);
     return sycl::rsqrt(a);
   }
 
@@ -127,9 +126,14 @@ namespace quda {
     return a / b;
   }
 
-  template <typename real> inline real fdividef(real a, real b)
+  inline float fdividef(float a, float b)
   {
     return a / b;
+  }
+
+  inline float fmaxf(float a, float b)
+  {
+    return sycl::max(a,b);
   }
 
 }
