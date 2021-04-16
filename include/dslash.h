@@ -299,7 +299,9 @@ namespace quda
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
+#ifdef NVSHMEM_COMMS
         case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
+#endif
         case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
         case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
         case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
@@ -552,8 +554,8 @@ namespace quda
         flops_ = (ghost_flops + (arg.xpay ? xpay_flops : xpay_flops / 2)) * ghost_sites;
         break;
       }
-      case UBER_KERNEL:
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
         if (arg.pack_threads) { flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
