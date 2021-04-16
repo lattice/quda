@@ -7,7 +7,7 @@ namespace quda {
   using namespace gauge;
 
   template <typename Gauge, int dim_, bool extract_>
-  struct ExtractGhostExArg {
+  struct ExtractGhostExArg : kernel_param<> {
     static constexpr int nDim = 4;
     static constexpr int dim = dim_;
     static constexpr bool extract = extract_;
@@ -27,10 +27,9 @@ namespace quda {
     int fBody[nDim][nDim];
     int fBuf[nDim][nDim];
     int localParity[nDim];
-    dim3 threads;
     ExtractGhostExArg(const GaugeField &u, const int *R_, void **ghost) :
-      u(u, 0, reinterpret_cast<typename Gauge::store_t**>(ghost)),
-      threads(0, 2, 2)
+      kernel_param(dim3(0, 2, 2)),
+      u(u, 0, reinterpret_cast<typename Gauge::store_t**>(ghost))
     {
       for (int d=0; d<nDim; d++) {
 	E[d] = u.X()[d];
@@ -67,7 +66,7 @@ namespace quda {
       auto dA = A1[dim]-A0[dim];
       auto dB = B1[dim]-B0[dim];
       auto dC = C1[dim]-C0[dim];
-      threads.x = R[dim]*dA*dB*dC*u.Geometry();
+      this->threads.x = R[dim]*dA*dB*dC*u.Geometry();
 
       int fBody_[nDim][nDim] = {
         {E[2]*E[1]*E[0], E[1]*E[0], E[0],              1},
@@ -90,7 +89,7 @@ namespace quda {
   };
 
   template <typename Arg>
-  __device__ __host__ void extractor(Arg &arg, int dir, int a, int b,
+  __device__ __host__ void extractor(const Arg &arg, int dir, int a, int b,
 				     int c, int d, int g, int parity)
   {
     auto dim = Arg::dim;
@@ -110,7 +109,7 @@ namespace quda {
 
 
   template <typename Arg>
-  __device__ __host__ void injector(Arg &arg, int dir, int a, int b,
+  __device__ __host__ void injector(const Arg &arg, int dir, int a, int b,
 				    int c, int d, int g, int parity)
   {
     auto dim = Arg::dim;
@@ -137,8 +136,8 @@ namespace quda {
      FIXME this implementation will have two-way warp divergence
   */
   template <typename Arg> struct GhostExtractorEx {
-    Arg &arg;
-    constexpr GhostExtractorEx(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractorEx(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int parity, int dir)

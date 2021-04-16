@@ -58,7 +58,7 @@ namespace quda {
   }
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
-  struct PackGhostArg {
+  struct PackGhostArg : kernel_param<> {
     static constexpr bool block_float_requested = sizeof(store_t) == QUDA_SINGLE_PRECISION &&
       isFixed<ghost_store_t>::value;
 
@@ -82,17 +82,16 @@ namespace quda {
     const int dagger;
     const QudaPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
-    dim3 threads;
 
     PackGhostArg(const ColorSpinorField &a, void **ghost, int parity, int nFace, int dagger) :
+      kernel_param(dim3(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())),
       field(a, nFace, 0, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),
       nParity(a.SiteSubset()),
       dagger(dagger),
-      pc_type(a.PCType()),
-      threads(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())
+      pc_type(a.PCType())
     {
       if (block_float_requested && nColor_ > max_block_float_nc)
         errorQuda("Block-float format not supported for Nc = %d", nColor_);
@@ -145,7 +144,7 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
   */
   template <typename Arg>
-  __device__ __host__ inline auto compute_site_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  __device__ __host__ inline auto compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -171,7 +170,7 @@ namespace quda {
   }
 
   template <int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  __device__ __host__ inline void packGhost(const Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -219,8 +218,8 @@ namespace quda {
   }
 
   template <typename Arg> struct GhostPacker {
-    Arg &arg;
-    constexpr GhostPacker(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int spin_color_block, int parity_dir)

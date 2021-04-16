@@ -7,7 +7,8 @@
 namespace quda
 {
 
-  template <class Field_, class Element_, class Accessor_, QudaPCType pc_type_ = QUDA_4D_PC> struct CopyFieldOffsetArg {
+  template <class Field_, class Element_, class Accessor_, QudaPCType pc_type_ = QUDA_4D_PC>
+  struct CopyFieldOffsetArg : kernel_param<> {
 
     static constexpr int nDim = 4; // No matter what the underlying field is, the dimension is 4
     static constexpr QudaPCType pc_type = pc_type_;
@@ -40,8 +41,6 @@ namespace quda
     int Ls; // The fifth dimension size
 
     QudaOffsetCopyMode mode;
-
-    dim3 threads;
 
     CopyFieldOffsetArg(Accessor &out_accessor, Field &out_field, const Accessor &in_accessor, const Field &in_field,
                        CommKey offset) :
@@ -85,14 +84,14 @@ namespace quda
       volume_4d_cb_out = volume_cb_out / Ls;
       volume_4d_cb = volume_cb / Ls;
 
-      threads = dim3(volume_4d_cb, Ls, nParity);
+      this->threads = dim3(volume_4d_cb, Ls, nParity);
     }
   };
 
   template <class Arg>
   __device__ __host__ inline
     typename std::enable_if<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>::type
-    copy_field(int out, int in, int parity, Arg &arg)
+    copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
 
@@ -102,7 +101,7 @@ namespace quda
 
   template <class Arg>
   __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, CloverField>::value, void>::type
-  copy_field(int out, int in, int parity, Arg &arg)
+  copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
     constexpr int length = 72;
@@ -115,7 +114,7 @@ namespace quda
 
   template <class Arg>
   __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, GaugeField>::value, void>::type
-  copy_field(int out, int in, int parity, Arg &arg)
+  copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
 #pragma unroll
@@ -127,8 +126,8 @@ namespace quda
 
   template <typename Arg> struct copy_field_offset
   {
-    Arg &arg;
-    constexpr copy_field_offset(Arg &arg) : arg(arg) { }
+    const Arg &arg;
+    constexpr copy_field_offset(const Arg &arg) : arg(arg) { }
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int s, int parity)

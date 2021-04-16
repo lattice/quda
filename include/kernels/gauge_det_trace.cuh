@@ -16,13 +16,12 @@ namespace quda {
     int X[4]; // grid dimensions
     int border[4];
     Gauge u;
-    dim3 threads; // number of active threads required
 
     KernelArg(const GaugeField &u) :
       ReduceArg<reduce_t>(),
-      u(u),
-      threads(u.LocalVolumeCB(), 2, 1)
+      u(u)
     {
+      this->threads = dim3(u.LocalVolumeCB(), 2, 1);
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];
         X[dir] = u.X()[dir] - border[dir]*2;
@@ -36,8 +35,8 @@ namespace quda {
     using reduce_t = vector_type<double, 2>;
     using reducer_t = plus<reduce_t>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr DetTrace(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DetTrace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the determinant or trace at site (x_cb, parity)

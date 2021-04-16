@@ -118,7 +118,7 @@ namespace quda
       }
 
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -142,7 +142,7 @@ namespace quda
       void set(const ColorSpinorField &) {}
       __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
       template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int)
+      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int) const
       {
         return 1.0;
       }
@@ -204,7 +204,7 @@ namespace quda
       }
 
       template <typename real, int n>
-      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0)
+      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
         vector_type<real, len> v_;
