@@ -1115,7 +1115,7 @@ TEST_P(BlasTest, verify)
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
   double deviation = test(kernel);
-  // printfQuda("%-35s error = %e\n", names[kernel], deviation);
+  //warningQuda("%-35s error: %e (0x%lx)\n",kernel_map.at(kernel).c_str(),deviation,*(long*)&deviation);
   double tol_x
     = (prec_pair.first == QUDA_DOUBLE_PRECISION ?
          1e-12 :
@@ -1126,7 +1126,8 @@ TEST_P(BlasTest, verify)
          (prec_pair.second == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.second == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
   double tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
-  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  //EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  EXPECT_GE(tol, deviation) << "CPU and CUDA implementations do not agree";//GE fails on nan, unlike LE
 }
 
 TEST_P(BlasTest, benchmark)

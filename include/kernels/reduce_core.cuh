@@ -49,8 +49,7 @@ namespace quda
     */
     template <typename Arg> struct Reduce_ : plus<typename Arg::Reducer::reduce_t> {
       using reduce_t = typename Arg::Reducer::reduce_t;
-      using reducer_t = plus<reduce_t>;
-      using reducer_t::operator();
+      using plus<reduce_t>::operator();
       Arg &arg;
       constexpr Reduce_(Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }

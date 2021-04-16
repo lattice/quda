@@ -60,8 +60,7 @@ namespace quda {
 
   template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
-    using reducer_t = plus<reduce_t>;
-    using reducer_t::operator();
+    using plus<reduce_t>::operator();
     Arg &arg;
     constexpr Plaquette(Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

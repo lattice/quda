@@ -183,5 +183,3 @@ namespace quda {
   };
 
 }
-
-#include <stream.h>

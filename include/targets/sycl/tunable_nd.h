@@ -26,7 +26,7 @@ namespace quda {
        use grid-size tuning, so disable this, and we mark as final to
        prevent a derived class from accidentally switching it on.
     */
-    bool tuneGridDim() const final { return grid_stride; }
+    virtual bool tuneGridDim() const { return grid_stride; }
 
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream,

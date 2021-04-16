@@ -169,9 +169,6 @@ namespace quda {
 	errorQuda("Unsupported memory type %d", mem_type);
       }
       alloc = true;
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	warningQuda("v: %p\n", v);
-      }
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {

@@ -39,9 +39,11 @@ namespace quda {
    *
    */
   template<typename T>
-  inline __host__ __device__ void sincos(const T& a, T* s, T* c)
+  inline void sincos(const T a, T* s, T* c)
   {
-    *s = sycl::sincos(a, c);
+    //*s = sycl::sincos(a, c);
+    *s = sin(a);
+    *c = cos(a);
   }
 
   /**
@@ -54,7 +56,8 @@ namespace quda {
   template<typename T>
   inline __host__ __device__ T rsqrt(T a)
   {
-    return ::rsqrt(a);
+    //return ::rsqrt(a);
+    return sycl::rsqrt(a);
   }
 
   /**

@@ -319,7 +319,8 @@ TEST_P(BLASTest, verify)
   case 1:
   case 3: tol = 10 * std::numeric_limits<double>::epsilon(); break;
   }
-  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  //EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  EXPECT_GE(tol, deviation) << "CPU and CUDA implementations do not agree";//GE fails on nan, unlike LE
 }
 
 // Helper function to construct the test name

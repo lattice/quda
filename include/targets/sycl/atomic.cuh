@@ -207,3 +207,19 @@ static inline float atomicAbsMax(float *addr, float val){
   uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
   return atomicMax(addr_, val_);
 }
+
+/**
+   @brief atomic_fetch_add function performs similarly as atomic_ref::fetch_add
+   @param[in,out] addr The memory address of the variable we are
+   updating atomically
+   @param[in] val The value we summing to the value at addr
+ */
+template <typename T> inline void atomic_fetch_add(T *addr, T val)
+{
+  atomicAdd(addr, val);
+}
+
+template <typename T, int n> void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
+{
+  for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
+}

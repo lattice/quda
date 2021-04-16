@@ -13,11 +13,14 @@ namespace quda {
 #else
   using rng_state_t = curandStateMRG32k3a;
 #endif
-#endif
   using rng_state_t = int;
+#endif
 
   struct RNGState {
-    rng_state_t state;
+    //rng_state_t state;
+    unsigned long long seed;
+    unsigned long long sequence;
+    unsigned long long offset;
   };
 
   /**
@@ -30,6 +33,9 @@ namespace quda {
   inline void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
   {
     //curand_init(seed, sequence, offset, &state.state);
+    state.seed = seed;
+    state.sequence = sequence;
+    state.offset = offset;
   }
 
   template<class Real>
@@ -43,7 +49,10 @@ namespace quda {
      */
     static inline float rand(RNGState &state)
     {
-      return 0.0; //curand_uniform(&state.state);
+      //return 0.0; //curand_uniform(&state.state);
+      state.sequence += state.offset;
+      state.seed += state.sequence;
+      return ((float)(state.seed & 0xffffffff))*(1.0f/((float)(0x100000000)));
     }
 
     /**
@@ -54,7 +63,7 @@ namespace quda {
      */
     static inline float rand(RNGState &state, float a, float b)
     {
-      return a + (b - a) * rand(state); //curand_uniform(&state.state);
+      return a + (b - a) * rand(state);
     }
 
   };
@@ -67,7 +76,10 @@ namespace quda {
      */
     static inline double rand(RNGState &state)
     {
-      return 0.0; //curand_uniform_double(&state.state);
+      //return 0.0; //curand_uniform_double(&state.state);
+      state.sequence += state.offset;
+      state.seed += state.sequence;
+      return ((double)(state.seed & 0xffffffff))*(1.0f/((double)(0x100000000)));
     }
 
     /**
@@ -78,7 +90,7 @@ namespace quda {
      */
     static inline double rand(RNGState &state, double a, double b)
     {
-      return a + (b - a) * rand(state); //curand_uniform_double(&state.state);
+      return a + (b - a) * rand(state);
     }
   };
 
@@ -93,7 +105,8 @@ namespace quda {
      */
     static inline float rand(RNGState &state)
     {
-      return 0.0; //curand_normal(&state.state);
+      //return 0.0; //curand_normal(&state.state);
+      return uniform<float>::rand(state, -1.0f, 1.0f);
     }
   };
 
@@ -105,7 +118,8 @@ namespace quda {
      */
     static inline double rand(RNGState &state)
     {
-      return 0.0; //curand_normal_double(&state.state);
+      //return 0.0; //curand_normal_double(&state.state);
+      return uniform<double>::rand(state, -1.0, 1.0);
     }
   };
 
