@@ -101,38 +101,6 @@ namespace quda
           out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
         }
 
-        /******
-         *  First apply M5inv, and then M5pre
-         */
-        if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
-          // Apply the m5inv.
-          constexpr bool sync_m5inv = false;
-          out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
-              arg, stencil_out, my_spinor_parity, 0, s);
-          // Apply the m5pre.
-#if 0
-          // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
-          // But obviously this does not work when kappa ~ 0
-          out = arg.alpha * out + arg.beta * stencil_out;
-#else
-          constexpr bool sync_m5pre = true;
-          out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
-#endif
-        }
-
-        /******
-         *  First apply M5pre, and then M5inv
-         */
-        if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
-          // Apply the m5pre.
-          constexpr bool sync_m5pre = false;
-          out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
-          // Apply the m5inv.
-          constexpr bool sync_m5inv = true;
-          out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
-              arg, out, my_spinor_parity, 0, s);
-        }
-
       }
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
@@ -209,14 +177,12 @@ namespace quda
 
       } else {
 
-        if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS && active) {
+        if ((Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS || Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) && active) {
           out = stencil_out;
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x(xs, my_spinor_parity);
-          // XXX: if xpay + Dslash5Type::M5_INV_MOBIUS, a Dslash5Type::DSLASH5_MOBIUS + appropieate coeff setting is needed
-          // However currently xpay + Dslash5Type::M5_INV_MOBIUS is never used, so we don't add the code here.
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.out(xs, my_spinor_parity);
@@ -227,11 +193,46 @@ namespace quda
          *  Apply M5inv
          */
         bool complete = isComplete<mykernel_type>(arg, coord);
-        if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS && complete && active) {
-          // Apply the m5inv.
-          constexpr bool sync = false;
-          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(
-              arg, stencil_out, my_spinor_parity, 0, s);
+        if (complete && active) {
+
+          if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
+            // Apply the m5inv.
+            constexpr bool sync = false;
+            out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(
+                arg, stencil_out, my_spinor_parity, 0, s);
+          }
+
+          /******
+           *  First apply M5inv, and then M5pre
+           */
+          if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
+            // Apply the m5inv.
+            constexpr bool sync_m5inv = false;
+            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
+                arg, out, my_spinor_parity, 0, s);
+            // Apply the m5pre.
+#if 0
+            // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
+            // But obviously this does not work when kappa ~ 0
+            out = arg.alpha * out + arg.beta * stencil_out;
+#else
+            constexpr bool sync_m5pre = true;
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+#endif
+          }
+
+          /******
+           *  First apply M5pre, and then M5inv
+           */
+          if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+            // Apply the m5pre.
+            constexpr bool sync_m5pre = false;
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+            // Apply the m5inv.
+            constexpr bool sync_m5inv = true;
+            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(
+                arg, out, my_spinor_parity, 0, s);
+          }
         }
 
       }
