@@ -16,6 +16,9 @@ namespace quda
                                 TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
+    if (a != 0) {
+      errorQuda("Fused type Dslash5Type::M5_INV_MOBIUS + xpay does not work yet. Let us know if you think this is needed. :)");
+    }
     auto dummy_list = Dslash5TypeList<Dslash5Type::M5_INV_MOBIUS>();
     instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
                                           dummy_list, profile);
