@@ -42,6 +42,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += clover_flops * in.Volume();
 
@@ -61,6 +62,7 @@ namespace quda
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
       default: break;
       }
