@@ -558,7 +558,7 @@ namespace quda {
   }
 
   template <typename Float_, int nColor_, QudaReconstructType recon, bool heatbath_>
-  struct MonteArg {
+  struct MonteArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     using Gauge = typename gauge_mapper<Float, recon>::type;
@@ -571,13 +571,12 @@ namespace quda {
     RNGState *rng;
     int mu;
     int parity;
-    dim3 threads;   // number of active threads required
     MonteArg(GaugeField &data, Float Beta, RNGState *rng, int mu, int parity) :
+      kernel_param(dim3(data.LocalVolumeCB(), 1, 1)),
       dataOr(data),
       rng(rng),
       mu(mu),
-      parity(parity),
-      threads(data.LocalVolumeCB(), 1, 1)
+      parity(parity)
     {
       BetaOverNc = Beta / (Float)nColor;
       for (int dir = 0; dir < 4; dir++) {
@@ -589,8 +588,8 @@ namespace quda {
 
   template <typename Arg> struct HB
   {
-    Arg &arg;
-    constexpr HB(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr HB(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb)

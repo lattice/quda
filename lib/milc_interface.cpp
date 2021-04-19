@@ -1321,6 +1321,33 @@ struct mgInputStruct {
   double deflate_a_min; // ignored if no polynomial acceleration
   int deflate_poly_deg; // ignored if no polynomial acceleration
 
+  void setArrayDefaults()
+  {
+    // set dummy values so all elements are initialized
+    // some of these values get immediately overriden in the
+    // constructor, in some cases with identical values:
+    // this is to separate "initializing" with "best practices"
+    for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+      nvec[i] = 24;
+      setup_inv[i] = QUDA_CGNR_INVERTER;
+      setup_tol[i] = 1e-5;
+      setup_maxiter[i] = 500;
+      mg_vec_infile[i][0] = 0;
+      mg_vec_outfile[i][0] = 0;
+      for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
+
+      coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+      coarse_solver[i] = QUDA_GCR_INVERTER;
+      coarse_solver_tol[i] = 0.25;
+      coarse_solver_maxiter[i] = 16;
+      smoother_type[i] = QUDA_CA_GCR_INVERTER;
+      nu_pre[i] = 0;
+      nu_post[i] = 2;
+
+      mg_verbosity[i] = QUDA_SUMMARIZE;
+    }
+  }
+
   // set defaults
   mgInputStruct() :
     mg_levels(4),
@@ -1334,6 +1361,10 @@ struct mgInputStruct {
     deflate_a_min(1e-2),
     deflate_poly_deg(50)
   {
+    /* initialize internal arrays */
+    setArrayDefaults();
+
+    /* required or best-practice values for typical solves */
     nvec[0] = 24;             // must be this
     geo_block_size[0][0] = 2; // must be this...
     geo_block_size[0][1] = 2; // "

@@ -14,25 +14,24 @@
 namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct InitGaugeColdArg {
+  struct InitGaugeColdArg : kernel_param<> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
     Gauge U;
-    dim3 threads; // number of active threads required
     InitGaugeColdArg(const GaugeField &U) :
-      U(U),
-      threads(U.VolumeCB(), 2, 1)
+      kernel_param(dim3(U.VolumeCB(), 2, 1)),
+      U(U)
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = U.X()[dir];
     }
   };
 
   template <typename Arg> struct ColdStart {
-    Arg &arg;
-    constexpr ColdStart(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColdStart(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -44,7 +43,7 @@ namespace quda {
   };
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct InitGaugeHotArg {
+  struct InitGaugeHotArg : kernel_param<> {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     using real = typename mapper<Float>::type;
@@ -53,13 +52,12 @@ namespace quda {
     Gauge U;
     RNGState *rng;
     int border[4];
-    dim3 threads; // number of active threads required
     InitGaugeHotArg(const GaugeField &U, RNGState *rng) :
-      U(U),
-      rng(rng),
       //the optimal number of RNG states in rngstate array must be equal to half the lattice volume
       //this number is the same used in heatbath...
-      threads(U.LocalVolumeCB(), 1, 1)
+      kernel_param(dim3(U.LocalVolumeCB(), 1, 1)),
+      U(U),
+      rng(rng)
     {
       for (int dir = 0; dir < 4; dir++) {
         border[dir] = U.R()[dir];
@@ -201,8 +199,8 @@ namespace quda {
   }
 
   template<typename Arg> struct HotStart {
-    Arg &arg;
-    constexpr HotStart(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr HotStart(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb)
