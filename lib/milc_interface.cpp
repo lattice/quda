@@ -858,8 +858,8 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
 
   df_param->run_verify     = QUDA_BOOLEAN_FALSE;
 
-  df_param->nk     = df_param->invert_param->n_ev;
-  df_param->n_conv = df_param->invert_param->n_conv;
+//df_param->n_kr     = df_param->invert_param->n_ev;
+//df_param->n_conv = df_param->invert_param->n_conv;
 
   //df_param->extlib_type = deflation_ext_lib;
 
