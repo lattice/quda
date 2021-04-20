@@ -35,8 +35,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct wilsonClover : dslash_default {
 
-    Arg &arg;
-    constexpr wilsonClover(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr wilsonClover(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**

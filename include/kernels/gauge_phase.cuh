@@ -7,7 +7,7 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, QudaStaggeredPhase phase_>
-  struct GaugePhaseArg {
+  struct GaugePhaseArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -17,13 +17,12 @@ namespace quda {
 
     Gauge u;
     int X[4];
-    dim3 threads;
     Float tBoundary;
     Float i_mu;
     complex<Float> i_mu_phase;
     GaugePhaseArg(GaugeField &u) :
+      kernel_param(dim3(u.VolumeCB(), 2, 1)),
       u(u),
-      threads(u.VolumeCB(), 2, 1),
       i_mu(u.iMu())
     {
       // if staggered phases are applied, then we are removing them
@@ -42,7 +41,7 @@ namespace quda {
   };
 
   // FIXME need to check this with odd local volumes
-  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, Arg &arg) {
+  template <int dim, typename Arg> constexpr auto getPhase(int x, int y, int z, int t, const Arg &arg) {
     typename Arg::Float phase = 1.0;
     if (Arg::phase == QUDA_STAGGERED_PHASE_MILC) {
       if (dim==0) {
@@ -80,7 +79,7 @@ namespace quda {
   }
 
   template <int dim, typename Arg>
-  __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg) {
+  __device__ __host__ void gaugePhase(int indexCB, int parity, const Arg &arg) {
     typedef typename mapper<typename Arg::Float>::type real;
 
     int x[4];
@@ -98,8 +97,8 @@ namespace quda {
 
   template <typename Arg> struct GaugePhase
   {
-    Arg &arg;
-    constexpr GaugePhase(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaugePhase(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

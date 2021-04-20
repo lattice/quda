@@ -11,6 +11,18 @@ namespace quda {
       name(name) {}
   };
 
+  template <bool use_kernel_arg_ = true>
+  struct kernel_param {
+    static constexpr bool use_kernel_arg = use_kernel_arg_;
+    dim3 threads; /** number of active threads required */
+
+    constexpr kernel_param() = default;
+
+    constexpr kernel_param(dim3 threads) :
+      threads(threads)
+    { }
+  };
+
 #ifdef JITIFY
 #define KERNEL(kernel) kernel_t(nullptr, #kernel)
 #else

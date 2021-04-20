@@ -6,7 +6,7 @@ namespace quda {
 
   template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_,
             typename coarseGauge, typename fineGauge, bool kd_build_x_ = false>
-  struct CalculateStaggeredYArg {
+  struct CalculateStaggeredYArg : kernel_param<1> {
 
     using real = typename mapper<Float_>::type;
     static constexpr int coarseSpin = coarseSpin_;
@@ -34,18 +34,17 @@ namespace quda {
     const int coarseVolumeCB; /** Coarse grid volume */
 
     static constexpr int coarse_color = coarseColor;
-    dim3 threads;
 
     CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X, const fineGauge &U, double mass,
                            const int *x_size_, const int *xc_size_, int *geo_bs_ = nullptr) :
+      kernel_param(dim3(U.VolumeCB(), fineColor * fineColor, 2)),
       Y(Y),
       X(X),
       U(U),
       spin_map(),
       mass(static_cast<real>(mass)),
       fineVolumeCB(U.VolumeCB()),
-      coarseVolumeCB(X.VolumeCB()),
-      threads(U.VolumeCB(), fineColor * fineColor, 2)
+      coarseVolumeCB(X.VolumeCB())
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
@@ -58,8 +57,8 @@ namespace quda {
 
   template <typename Arg>
   struct ComputeStaggeredVUV {
-    Arg &arg;
-    constexpr ComputeStaggeredVUV(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeStaggeredVUV(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int c, int parity)
