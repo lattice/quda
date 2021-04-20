@@ -11,7 +11,8 @@ namespace quda
   // FIXME - make this multi-RHS once we have the multi-RHS framework developed
 #define MAX_NVECTOR 1
 
-  template <typename Float, int nColor_, int nvector_> struct CloverSigmaOprodArg {
+  template <typename Float, int nColor_, int nvector_>
+  struct CloverSigmaOprodArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
@@ -23,15 +24,14 @@ namespace quda
     const F inA[nvector];
     const F inB[nvector];
     real coeff[nvector][2];
-    dim3 threads;
 
     CloverSigmaOprodArg(GaugeField &oprod, const std::vector<ColorSpinorField*> &inA,
                         const std::vector<ColorSpinorField*> &inB,
                         const std::vector<std::vector<double>> &coeff_) :
+      kernel_param(dim3(oprod.VolumeCB(), 2, 6)),
       oprod(oprod),
       inA{*inA[0]},
-      inB{*inB[0]},
-      threads(oprod.VolumeCB(), 2, 6)
+      inB{*inB[0]}
     {
       for (int i = 0; i < nvector; i++) {
         coeff[i][0] = coeff_[i][0];
@@ -41,7 +41,7 @@ namespace quda
   };
 
   template <int mu, int nu, typename Arg>
-  inline __device__ void sigmaOprod(Arg &arg, int x_cb, int parity)
+  inline __device__ void sigmaOprod(const Arg &arg, int x_cb, int parity)
   {
     using Spinor = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
@@ -62,8 +62,8 @@ namespace quda
   }
 
   template <typename Arg> struct SigmaOprod {
-    Arg &arg;
-    constexpr SigmaOprod(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr SigmaOprod(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int mu_nu)

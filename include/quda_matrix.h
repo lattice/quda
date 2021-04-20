@@ -56,7 +56,7 @@ namespace quda {
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
   template<typename Float, typename T> struct clover_wrapper;
-  template<typename T, int N> class HMatrix;
+  template <typename T, int N> class HMatrix;
 
   template<class T, int N>
     class Matrix
@@ -674,8 +674,8 @@ namespace quda {
   template <class T, class U, int N>
   __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
                                                                                      const Matrix<U, N> &b)
-  {
-    Matrix<typename PromoteTypeId<T, U>::type, N> result;
+    {
+      Matrix<typename PromoteTypeId<T, U>::type, N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll
@@ -690,21 +690,33 @@ namespace quda {
       return result;
     }
   
-  template<class T, int N>
+  template<class T>
     __device__ __host__ inline
-    Matrix<T,N> conj(const Matrix<T,N> & other){
-      Matrix<T,N> result;
-#pragma unroll
-      for (int i=0; i<N; ++i){
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          result(i,j) = conj( other(j,i) );
-        }
-      }
+    Matrix<T,2> operator*(const Matrix<T,2> & a, const Matrix<T,2> & b)
+    {
+      Matrix<T,2> result;
+      result(0,0) = a(0,0)*b(0,0) + a(0,1)*b(1,0);
+      result(0,1) = a(0,0)*b(0,1) + a(0,1)*b(1,1);
+      result(1,0) = a(1,0)*b(0,0) + a(1,1)*b(1,0);
+      result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1);
       return result;
     }
   
-
+  template<class T, int N>
+    __device__ __host__ inline
+    Matrix<T,N> conj(const Matrix<T,N> & other){
+    Matrix<T,N> result;
+#pragma unroll
+    for (int i=0; i<N; ++i){
+#pragma unroll
+      for (int j=0; j<N; ++j){
+	result(i,j) = conj( other(j,i) );
+      }
+    }
+    return result;
+  }
+  
+  
   template<class T>
     __device__  __host__ inline
     Matrix<T,1> inverse(const Matrix<T,1> &u)

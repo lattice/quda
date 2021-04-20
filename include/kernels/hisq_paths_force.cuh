@@ -70,12 +70,11 @@ namespace quda {
     };
 
     template <typename real_, int nColor_, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct BaseForceArg {
+    struct BaseForceArg : kernel_param<> {
       using real = real_;
       static constexpr int nColor = nColor_;
       typedef typename gauge_mapper<real,reconstruct>::type G;
       const G link;
-      dim3 threads;
       int X[4]; // regular grid dims
       int D[4]; // working set grid dims
       int E[4]; // extended grid dims
@@ -91,7 +90,9 @@ namespace quda {
          @param[in] link Gauge field
          @param[in] overlap Radius of additional redundant computation to do
        */
-      BaseForceArg(const GaugeField &link, int overlap) : link(link), threads(1, 2, 1),
+      BaseForceArg(const GaugeField &link, int overlap) :
+        kernel_param(dim3(1, 2, 1)),
+        link(link),
         commDim{ comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3) }
       {
         for (int d=0; d<4; d++) {
@@ -100,9 +101,9 @@ namespace quda {
           X[d] = E[d] - 2*border[d];
           D[d] = comm_dim_partitioned(d) ? X[d]+overlap*2 : X[d];
           base_idx[d] = comm_dim_partitioned(d) ? border[d]-overlap : 0;
-          threads.x *= D[d];
+          this->threads.x *= D[d];
         }
-        threads.x /= 2;
+        this->threads.x /= 2;
         oddness_change = (base_idx[0] + base_idx[1] + base_idx[2] + base_idx[3])&1;
       }
     };
@@ -179,7 +180,7 @@ namespace quda {
 
     template <typename Arg_, int mu_positive_ = 0, int sig_positive_ = 0,
               bool pMu_ = false, bool qMu_ = false, bool qPrev_ = false>
-    struct FatLinkParam {
+    struct FatLinkParam : kernel_param<> {
       static constexpr int mu_positive = mu_positive_;
       static constexpr int sig_positive = sig_positive_;
       static constexpr bool pMu = pMu_;
@@ -187,15 +188,15 @@ namespace quda {
       static constexpr bool qPrev = qPrev_;
       using Arg = Arg_;
       Arg arg;
-      dim3 threads;
-      FatLinkParam(Arg &arg) : arg(arg), threads(arg.threads) {}
+      FatLinkParam(Arg &arg) :
+        arg(arg) {}
     };
 
     template <typename Arg> struct OneLinkTerm
     {
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
-      constexpr OneLinkTerm(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr OneLinkTerm(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity, int sig)
@@ -240,11 +241,11 @@ namespace quda {
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
+      const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
       static constexpr int sig_positive = Param::sig_positive;
 
-      constexpr AllLink(Param &param) : arg(param.arg) {}
+      constexpr AllLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity, int)
@@ -354,14 +355,14 @@ namespace quda {
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
+      const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
       static constexpr int sig_positive = Param::sig_positive;
       static constexpr bool pMu = Param::pMu;
       static constexpr bool qMu = Param::qMu;
       static constexpr bool qPrev = Param::qPrev;
 
-      constexpr MiddleLink(Param &param) : arg(param.arg) {}
+      constexpr MiddleLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity, int)
@@ -478,10 +479,10 @@ namespace quda {
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
+      const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
 
-      constexpr SideLink(Param &param) : arg(param.arg) {}
+      constexpr SideLink(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity, int)
@@ -540,10 +541,10 @@ namespace quda {
     {
       using Arg = typename Param::Arg;
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
+      const Arg &arg;
       static constexpr int mu_positive = Param::mu_positive;
 
-      constexpr SideLinkShort(Param &param) : arg(param.arg) {}
+      constexpr SideLinkShort(const Param &param) : arg(param.arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity, int)
@@ -596,8 +597,8 @@ namespace quda {
     template <typename Arg> struct CompleteForce
     {
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
-      constexpr CompleteForce(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr CompleteForce(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       // Flops count: 4 matrix multiplications per lattice site = 792 Flops per site
@@ -641,8 +642,8 @@ namespace quda {
     template <typename Arg> struct LongLink
     {
       using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
-      Arg &arg;
-      constexpr LongLink(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr LongLink(const Arg &arg) : arg(arg) {}
       constexpr static const char *filename() { return KERNEL_FILE; }
 
       // Flops count, in two-number pair (matrix_mult, matrix_add)

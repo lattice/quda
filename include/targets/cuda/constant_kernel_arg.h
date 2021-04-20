@@ -1,3 +1,7 @@
+#pragma once
+
+#include <util_quda.h>
+#include <quda_api.h>
 #include <target_device.h>
 
 /**
@@ -15,10 +19,12 @@ namespace quda {
   namespace device {
     
     /**
-       @brief The __constant__ buffer userd for kernel parameters
+       @brief The __constant__ buffer used for kernel parameters
     */
-#ifdef _NVHPC_CUDA // temporary workaround
-    static __constant__ char buffer[max_constant_size()];
+#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE) // what is the equivalent macro for nvc++?
+    // rdc is enabled when NVSHMEM is enabled, so we need to make the
+    // buffer as extern and define it in one place only
+    extern __constant__ char buffer[max_constant_size()];
 #else
     __constant__ char buffer[max_constant_size()];
 #endif

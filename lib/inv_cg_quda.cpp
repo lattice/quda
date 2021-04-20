@@ -237,6 +237,9 @@ namespace quda {
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
 
+    // Detect whether this is a pure double solve or not; informs the necessity of some stability checks
+    bool is_pure_double = (param.precision == QUDA_DOUBLE_PRECISION && param.precision_sloppy == QUDA_DOUBLE_PRECISION);
+
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
@@ -327,13 +330,9 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = param.precision_sloppy == 8 ?
-      std::numeric_limits<double>::epsilon() / 2. :
-      param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
-    const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-                                                param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                                                       param.precision == 2 ? pow(2., -13) : pow(2., -6);
+    const double u = precisionEpsilon(param.precision_sloppy);
+    const double uhigh = precisionEpsilon(); // solver precision
+
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
     double d_new = 0;
@@ -352,6 +351,13 @@ namespace quda {
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
     }
+
+    // for detecting HQ residual stalls
+    // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
+    // with the intent of letting the solve grind as long as possible before
+    // triggering a `NaN`. Ignored for pure double solves because if
+    // pure double has stability issues, bigger problems are at hand.
+    const double hq_res_stall_check = is_pure_double ? 0. : uhigh * uhigh * 1e-60;
 
     // compute initial residual
     double r2 = 0.0;
@@ -419,7 +425,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha[Np];
+    std::unique_ptr<double[]> alpha(new double[Np]);
     double pAp;
     int rUpdate = 0;
 
@@ -536,8 +542,11 @@ namespace quda {
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
 
-      // For heavy-quark inversion force a reliable update if we continue after
-      if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol ) {
+      // For heavy-quark inversion force a reliable update if we continue after,
+      // or if r2/b2 has fictitiously dropped too far below precision epsilon
+      if (use_heavy_quark_res and L2breakdown
+          and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check)
+          and param.delta >= param.tol) {
         updateX = 1;
       }
 
@@ -560,7 +569,7 @@ namespace quda {
 	    if ( (j+1)%Np == 0 ) {
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-              blas::axpy(alpha, p, x_);
+              blas::axpy(alpha.get(), p, x_);
             }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
@@ -570,16 +579,16 @@ namespace quda {
 
         if (use_heavy_quark_res && k % heavy_quark_check == 0) {
           if (&x != &xSloppy) {
-	    blas::copy(tmp,y);
+            blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-	  } else {
-	    blas::copy(r, rSloppy);
+          } else {
+            blas::copy(r, rSloppy);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
-	  }
+          }
         }
 
         // alternative reliable updates
-	if (alternative_reliable) {
+        if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
@@ -596,7 +605,7 @@ namespace quda {
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-          blas::axpy(alpha, p_, x_);
+          blas::axpy(alpha.get(), p_, x_);
         }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
@@ -731,7 +740,7 @@ namespace quda {
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-        blas::axpy(alpha, p_, x_);
+        blas::axpy(alpha.get(), p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j

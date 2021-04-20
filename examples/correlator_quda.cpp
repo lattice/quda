@@ -217,8 +217,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // Loop over spin X color dilution positions, construct the sources and invert
     for (int i = 0; i < cs_param.nSpin * cs_param.nColor; i++) {
       // FIXME add the smearing
-      constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
-                                 gauge_param.X, i, source);
+      constructPointSpinorSource(source_array_ptr[i], inv_param.cpu_prec, gauge_param.X, i, source);
 
       // Gaussian smear the source.
       performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
@@ -363,9 +362,8 @@ int main(int argc, char **argv)
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
-  setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
-  // Allocate memory on host for one source for each of the 12x12 color+spinor combinations
+  // Allocate memory on host for one source for each of the (nColor * nSpin) x (nColor * nSpin) color+spinor combinations
   size_t bytes_per_float = sizeof(double);
   auto *source_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
   auto *prop_array = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);

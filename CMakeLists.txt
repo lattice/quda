@@ -108,7 +108,7 @@ endif(GIT_FOUND)
 
 project(
   "QUDA"
-  VERSION 1.0.0
+  VERSION 1.1.0
   LANGUAGES)
 
 if(DEFINED ENV{QUDA_GPU_ARCH})
@@ -131,6 +131,10 @@ if(QUDA_N_COLORS LESS 1)
   message(SEND_ERROR "Minimum QUDA_N_COLORS is 1.")
 endif()
 
+set(QUDA_GPU_ARCH  
+  ${QUDA_DEFAULT_GPU_ARCH}
+  CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -146,11 +150,6 @@ message(STATUS "SU(N): ${QUDA_N_COLORS}")
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
 
-set(QUDA_GPU_ARCH  
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
-  set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
-  
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -174,6 +173,7 @@ option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
 option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
+option(QUDA_LAPLACE "build laplace operator" OFF)
 # Dynamic inversion saves memory but decreases the flops
 option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
@@ -199,6 +199,7 @@ option(QUDA_INTERFACE_CPS "build cps interface" OFF)
 option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
 option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
 option(QUDA_INTERFACE_TIFR "build tifr interface" OFF)
+option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various interfaces" OFF)
 
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
@@ -260,9 +261,12 @@ if(NOT QUDA_RECONSTRUCT STREQUAL 4 AND NOT QUDA_N_COLORS STREQUAL 3)
   message(SEND_ERROR "Gauge reconstruction not enabled for Nc != 3. Please reconfigure with QUDA_RECONSTRUCT 4")
 endif()
 
-  
+set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
+set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
+
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
+option(QUDA_CTEST_DISABLE_BENCHMARKS "Disable benchmark test" ON)
 
 option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
 option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
@@ -292,6 +296,10 @@ option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / Q
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
+option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
+set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
+set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
+
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -318,8 +326,12 @@ mark_as_advanced(QUDA_BACKWARDS)
 
 mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
+mark_as_advanced(QUDA_GDRCOPY_HOME)
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
+mark_as_advanced(QUDA_INTERFACE_ALL)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
@@ -336,6 +348,12 @@ if(QUDA_MPI AND QUDA_QMP)
   message(
     SEND_ERROR
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
+message(
+  SEND_ERROR
+    "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -480,11 +498,15 @@ endif()
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
-if(QUDA_HETEROGENEOUS_ATOMIC AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support SANITIZE build)")
+if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
 endif()
 if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
+endif()
+
+if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
+  message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
 endif()
 
 
@@ -569,6 +591,41 @@ if(QUDA_DOWNLOAD_USQCD)
   find_program(INSTALL_EXE NAMES install)
   find_program(AUTORECONF_EXE NAMES autoreconf)
 endif()
+
+if(QUDA_NVSHMEM)
+  if(QUDA_DOWNLOAD_NVSHMEM)
+    ExternalProject_Add(NVSHMEM
+                        URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
+                        PREFIX nvshmem
+                        CONFIGURE_COMMAND ""
+                        BUILD_IN_SOURCE ON
+                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${QUDA_GDRCOPY_HOME} install
+                        INSTALL_COMMAND ""
+                        LOG_INSTALL ON
+                        LOG_BUILD ON
+                        LOG_DOWNLOAD ON
+                        )
+    ExternalProject_Get_Property(NVSHMEM INSTALL_DIR)
+    set(QUDA_NVSHMEM_HOME ${INSTALL_DIR} CACHE PATH "path to NVSHMEM" FORCE)
+    set(NVSHMEM_LIBS  ${INSTALL_DIR}/lib/libnvshmem.a)
+    set(NVSHMEM_INCLUDE ${INSTALL_DIR}/include/)   
+  else()
+    if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
+      message( FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set" )
+    endif()
+      find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/"  )
+      find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" )
+  endif()
+    
+  mark_as_advanced(NVSHMEM_LIBS)
+  mark_as_advanced(NVSHMEM_INCLUDE)
+  add_library(nvshmem_lib STATIC IMPORTED)
+  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
+  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
+  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
+endif()
+
 
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
@@ -660,7 +717,7 @@ if(QUDA_QIO)
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
                         --enable-largefile --disable-qmp-route --enable-dml-output-buffering
       BUILD_COMMAND make
       INSTALL_COMMAND make install
@@ -837,8 +894,8 @@ if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
     backward-cpp
-    GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
-    GIT_TAG v1.4
+    GIT_REPOSITORY https://github.com/bombela/backward-cpp.git
+    GIT_TAG v1.5
     GIT_SHALLOW ON)
   FetchContent_GetProperties(backward-cpp)
   if(NOT backward-cpp_POPULATED)
