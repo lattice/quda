@@ -11,9 +11,9 @@ namespace quda
   //   i.e. out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // ... and then m5pre + m5
   void ApplyDomainWall4DM5preM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                                double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
-                                ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
-                                TimeProfile &profile)
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB>();

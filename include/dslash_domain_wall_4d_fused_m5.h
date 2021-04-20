@@ -6,7 +6,8 @@
 #include <dslash.h>
 
 /**
-   This is the templated gauged domain-wall 4-d preconditioned operator, but fused with immediately followed fifth dimension operators.
+   This is the templated gauged domain-wall 4-d preconditioned operator, but fused with immediately followed fifth
+   dimension operators.
 */
 
 namespace quda
@@ -16,33 +17,28 @@ namespace quda
   {
     using Dslash = Dslash<domainWall4DFusedM5, Arg>;
     using Dslash::arg;
-    using Dslash::in;
     using Dslash::aux_base;
+    using Dslash::in;
 
     inline std::string get_app_base()
     {
       switch (Arg::dslash5_type) {
-        case Dslash5Type::DSLASH5_MOBIUS_PRE:
-          return ",fused_type=m5pre";
-        case Dslash5Type::DSLASH5_MOBIUS:
-          return ",fused_type=m5mob";
-        case Dslash5Type::M5_INV_MOBIUS:
-          return ",fused_type=m5inv";
-        case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
-          return ",fused_type=m5inv_m5pre";
-        case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
-          return ",fused_type=m5pre_m5inv";
-        case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
-          return ",fused_type=m5inv_m5inv";
-        case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
-          return ",fused_type=m5pre_m5mob";
-        default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
-          return ",fused_type=unknown_type";
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: return ",fused_type=m5pre";
+      case Dslash5Type::DSLASH5_MOBIUS: return ",fused_type=m5mob";
+      case Dslash5Type::M5_INV_MOBIUS: return ",fused_type=m5inv";
+      case Dslash5Type::M5_INV_MOBIUS_M5_PRE: return ",fused_type=m5inv_m5pre";
+      case Dslash5Type::M5_PRE_MOBIUS_M5_INV: return ",fused_type=m5pre_m5inv";
+      case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG: return ",fused_type=m5inv_m5inv";
+      case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB: return ",fused_type=m5pre_m5mob";
+      default:
+        errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
+        return ",fused_type=unknown_type";
       }
     }
 
   public:
-    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in, get_app_base())
+    DomainWall4DFusedM5(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+      Dslash(arg, out, in, get_app_base())
     {
       TunableKernel3D::resizeVector(in.X(4), arg.nParity);
       TunableKernel3D::resizeStep(in.X(4), 1);
@@ -52,7 +48,6 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      typedef typename mapper<typename Arg::Float>::type real;
       Dslash::template instantiate<packShmem>(tp, stream);
     }
 
@@ -104,20 +99,14 @@ namespace quda
     {
       long long flops_ = 0;
       switch (Arg::dslash5_type) {
-        case Dslash5Type::DSLASH5_MOBIUS_PRE:
-          flops_ = m5pre_flops(); break;
-        case Dslash5Type::DSLASH5_MOBIUS:
-          flops_ = m5mob_flops(); break;
-        case Dslash5Type::M5_INV_MOBIUS:
-          flops_ = m5inv_flops(); break;
-        case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
-        case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
-          flops_ = m5inv_flops() + m5pre_flops(); break;
-        case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG:
-          flops_ = m5inv_flops() + m5inv_flops(); break;
-        case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
-          flops_ = m5pre_flops() + m5mob_flops(); break;
-        default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: flops_ = m5pre_flops(); break;
+      case Dslash5Type::DSLASH5_MOBIUS: flops_ = m5mob_flops(); break;
+      case Dslash5Type::M5_INV_MOBIUS: flops_ = m5inv_flops(); break;
+      case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
+      case Dslash5Type::M5_PRE_MOBIUS_M5_INV: flops_ = m5inv_flops() + m5pre_flops(); break;
+      case Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG: flops_ = m5inv_flops() + m5inv_flops(); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB: flops_ = m5pre_flops() + m5mob_flops(); break;
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(Arg::dslash5_type));
       }
 
       return flops_ + Dslash::flops();
@@ -152,10 +141,9 @@ namespace quda
       DomainWall4DFusedM5<Arg> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(
-          dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+        dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     }
-
   };
 
 } // namespace quda
