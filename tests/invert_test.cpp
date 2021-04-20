@@ -267,13 +267,10 @@ int main(int argc, char **argv)
   std::vector<quda::ColorSpinorField *> in(Nsrc);
   std::vector<quda::ColorSpinorField *> out(Nsrc);
   std::vector<quda::ColorSpinorField *> out_multishift(multishift * Nsrc);
-  quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
-
+  quda::ColorSpinorField *check = quda::ColorSpinorField::Create(cs_param);
+  
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-  auto in = quda::ColorSpinorField::Create(cs_param);
-  auto out = quda::ColorSpinorField::Create(cs_param);
-  auto check = quda::ColorSpinorField::Create(cs_param);
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
 
   // QUDA host array for internal checks and malloc
