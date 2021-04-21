@@ -5,6 +5,7 @@
 *.a
 *~
 tests/*_test
+tests/*_ctest
 make.inc
 milc_interface/*
 *#*
