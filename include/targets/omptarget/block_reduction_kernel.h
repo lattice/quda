@@ -42,7 +42,7 @@ namespace quda {
      thread dimension is a trivial vectorizable dimension.
   */
   template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-  __launch_bounds__(Arg::launch_bounds || block_size > 512 ? block_size : 0) __global__ void BlockKernel2D(Arg arg)
+  __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     QUDA_RT_CONSTS;
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
@@ -52,6 +52,20 @@ namespace quda {
 
     Transformer<block_size, Arg> t(arg);
     t(block_idx, thread_idx);
+  }
+
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    __launch_bounds__(Arg::launch_bounds || block_size > 512 ? block_size : 0)
+    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
+  {
+    BlockKernel2D_impl<block_size, Transformer, Arg>(arg);
+  }
+
+  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
+    __launch_bounds__(Arg::launch_bounds || block_size > 512 ? block_size : 0)
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
+  {
+    BlockKernel2D_impl<block_size, Transformer, Arg>(device::get_arg<Arg>());
   }
 
 }

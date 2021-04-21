@@ -4,6 +4,7 @@
 #include <reduce_helper.h>
 #include <load_store.h>
 #include <convert.h>
+#include <math_helper.cuh>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM

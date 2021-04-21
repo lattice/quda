@@ -86,8 +86,6 @@ namespace quda {
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
 #ifdef QUDA_BACKEND_OMPTARGET
-      for (unsigned int i = 0; i < param.size(); i++)
-        qudaMemcpyAsync(param[i].device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
       ompwip("OFFLOADING...");
       const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
       const int ld = tp.block.x*tp.block.y*tp.grid.z;

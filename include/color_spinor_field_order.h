@@ -750,7 +750,7 @@ namespace quda {
       {
         return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(ghost[2*dim+dir],
                                                                                 ghostAccessor.index(dim,parity,x_cb,s,c,n),
-                                                                                block_float_ghost ? fdividef(1.f, max) : ghost_scale,
+                                                                                block_float_ghost ? fdividef((Float)1., max) : ghost_scale,
                                                                                 block_float_ghost ? max : ghost_scale_inv,
                                                                                 ghost_norm[2 * dim + dir],
                                                                                 parity*ghostAccessor.faceVolumeCB[dim] + x_cb,

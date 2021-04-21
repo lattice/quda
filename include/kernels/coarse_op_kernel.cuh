@@ -787,6 +787,7 @@ namespace quda {
     template <typename VUV, typename Pack, typename Arg>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg)
     {
+      QUDA_RT_CONSTS;
       using Float = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;

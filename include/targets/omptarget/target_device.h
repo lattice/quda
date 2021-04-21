@@ -46,13 +46,16 @@ namespace quda {
     __device__ __host__ inline dim3 block_dim()
     {
       return dim3(omp_get_num_threads());
-/*
-#ifdef __CUDA_ARCH__
-      return dim3(blockDim.x, blockDim.y, blockDim.z);
-#else
-      return dim3(1, 1, 1);
-#endif
-*/
+    }
+
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    __device__ __host__ inline dim3 grid_dim()
+    {
+      return dim3(omp_get_num_teams());
     }
 
     /**
@@ -63,13 +66,6 @@ namespace quda {
     __device__ __host__ inline dim3 block_idx()
     {
       return dim3(omp_get_team_num(),0,0);
-/*
-#ifdef __CUDA_ARCH__
-      return dim3(blockIdx.x, blockIdx.y, blockIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-*/
     }
 
     /**
@@ -80,13 +76,6 @@ namespace quda {
     __device__ __host__ inline dim3 thread_idx()
     {
       return dim3(omp_get_thread_num(),0,0);
-/*
-#ifdef __CUDA_ARCH__
-      return dim3(threadIdx.x, threadIdx.y, threadIdx.z);
-#else
-      return dim3(0, 0, 0);
-#endif
-*/
     }
 
   }
@@ -145,10 +134,10 @@ namespace quda {
 
     /**
        @brief Helper function that returns the maximum size of a
-       constant_param_t buffer on the target architecture.  For CUDA,
-       this corresponds to the maximum __constant__ buffer size.
+       __constant__ buffer on the target architecture.  For CUDA,
+       this is set to the somewhat arbitrary limit of 32 KiB for now.
     */
-    constexpr size_t max_constant_param_size() { return 8192; }
+    constexpr size_t max_constant_size() { return 32768; }
 
     /**
        @brief Helper function that returns the maximum static size of
@@ -162,6 +151,34 @@ namespace quda {
        shared memory bank width on the target architecture.
     */
     constexpr int shared_memory_bank_width() { return 32; }
+
+    /**
+       @brief Helper function that returns true if we are to pass the
+       kernel parameter struct to the kernel as an explicit kernel
+       argument.  Otherwise the parameter struct is explicitly copied
+       to the device prior to kernel launch.
+    */
+    template <typename Arg> constexpr bool use_kernel_arg()
+    {
+      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+    }
+
+    /**
+       @brief Helper function that returns kernel argument from
+       __constant__ memory.  Note this is the dummy implementation,
+       and is present only to keep the compiler happy in the
+       translation units where constant memory is not used.
+     */
+    template <typename Arg>
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+
+    /**
+       @brief Helper function that returns a pointer to the
+       __constant__ memory buffer.  Note this is the dummy
+       implementation, and is present only to keep the compiler happy
+       in the translation units where constant memory is not used.
+     */
+    template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
 
   }
 

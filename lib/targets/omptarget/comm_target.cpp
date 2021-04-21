@@ -2,6 +2,7 @@
 #include <quda_api.h>
 #include <quda_cuda_api.h>
 #include <algorithm>
+#include <shmem_helper.cuh>
 
 #define CHECK_CUDA_ERROR(func)                                          \
   quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -77,9 +78,10 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
     if (comm_dim(dim)==1) continue;
     // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-    for (int dir=0; dir<num_dir; ++dir) {
+    for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
-      if (comm_peer2peer_enabled(dir,dim)) CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
@@ -106,7 +108,7 @@ void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
   } // iterate over dim
 */
 }
-  
+
 void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
 {
   ompwip("unimplemented");
