@@ -199,6 +199,109 @@ namespace quda {
 
     };
 
+    /**
+       @brief Compute eigen decomposition of A.  
+       @tparam Mat The Matrix container class type.  This can either
+       be a general Matrix (quda::Matrix) or a Hermitian matrix
+       (quda::HMatrix).
+
+       @tparam T The underlying type.
+       @tparam N The size of the linear system we are solving
+       @tparam tol The tolerance of the QR solver
+       
+    */
+    template <template<typename,int> class Mat, typename T, int N, bool from_upper=false>
+    class Eigensolve {
+      
+      //! The eigen decomposition
+      Mat<T,N> evecs_;
+      //! The triangular decomposition
+      Mat<T,N> tri_;
+      
+    public:
+      /**
+	 @brief Constructor that computes the eigen decomposition
+	 @param[in] A Input matrix we are decomposing
+      */
+      __device__ __host__ inline Eigensolve(const Mat<T,N> &A) {
+	const Mat<T,N> &evecs = evecs_;
+	
+      }
+
+      /**
+	 @brief Return the eigenvalue element of the eigen decomposition Tri(i,i)
+	 @param[in] i Index
+	 @return Element at Tri(i,i)
+      */
+      __device__ __host__ inline const T eval(int i) const {
+	const auto &tri = tri_;
+	return tri(i,i);
+      }
+
+      /**
+	 @brief Compute the upper Hessenberg reduction of A 
+	 @return Matrix inverse
+      */
+      __device__ __host__ inline Mat<T,N> upperHessReduction(const Mat<T,N> &A) {
+	typedef decltype(A(0,0).x) Real;
+	
+	Mat<T,N> &tri = tri_;
+	tri = A; // Copy A into tri, upper hess reduce, then make triangular
+
+	Mat<T,N> P; // Stores the reflector
+	T P_elem;
+	Real col_norm;
+	T rho, sub_d_elem;
+	int m = N;
+	ColorSpinor<T,1,N> v; // vector of length (1 x N)
+	
+	for(int i = 0; i < m - 2; i++) {
+	  
+	  // get (partial) dot product of ith column vector
+	  col_norm = static_cast<T>(0.0);
+#pragma unroll
+	  for(int j = i+1; j < m; j++) {
+	    col_norm += tri(j,i).real() * tri(j,i).real();
+	    col_norm += tri(j,i).imag() * tri(j,i).imag();
+	  }
+	  col_norm = sqrt(col_norm);
+	  
+	  rho = tri(i+1,i) / sqrt(tri(i+1,i).real() * tri(i+1,i).real() + tri(i+1,i).imag() * tri(i+1,i).imag());
+	  v(i+1) = tri(i+1,i) - rho * col_norm;
+
+	  // reuse col_norm
+	  col_norm = v(i+1).real() * v(i+1).real() + v(i+1).imag() * v(i+1).imag();
+
+	  // copy the rest of the column
+#pragma unroll
+	  for(int j = i + 2; j < m; j++ ) {
+	    v(j) = tri(j,i);
+	    col_norm += v(j).real() * v(j).real() + v(j).imag() * v(j).imag();
+	  }
+	  col_norm = sqrt(col_norm);
+	  
+	  // Normalise the column
+#pragma unroll
+	  for(int j = i + 1; j < m; j++) v(j) = col_norm;
+	  
+	  // Construct the householder matrix P = I - 2 U U*T
+	  setIdentity(&P);       
+	  for(int j = i + 1; j < m; j++ ) {
+	    for(int k = i + 1; k < m; k++ ) {
+	      P_elem.x  = v(j).real() * v(k).real();
+	      P_elem.x += v(j).imag() * v(k).conj();
+	      P_elem.y  = v(j).conj() * v(k).real();
+	      P_elem.y -= v(j).real() * v(k).conj();
+	      P(j,k) -= static_cast<T>(2.0) * P_elem;
+	    }	    
+	  }
+
+	  // Transform as PHP
+	  tri = P * tri * P;
+	}	
+      }
+    };
+    
   } // namespace linalg
 
 } // namespace quda
