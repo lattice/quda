@@ -249,9 +249,8 @@ namespace quda {
 	tri = A; // Copy A into tri, upper hess reduce, then make triangular
 
 	Mat<T,N> P; // Stores the reflector
-	T P_elem;
+	T rho;
 	Real col_norm;
-	T rho, sub_d_elem;
 	int m = N;
 	ColorSpinor<T,1,N> v; // vector of length (1 x N)
 	
@@ -285,17 +284,19 @@ namespace quda {
 	  for(int j = i + 1; j < m; j++) v(j) = col_norm;
 	  
 	  // Construct the householder matrix P = I - 2 U U*T
-	  setIdentity(&P);       
+	  setIdentity(&P);
+#pragma unroll
 	  for(int j = i + 1; j < m; j++ ) {
 	    for(int k = i + 1; k < m; k++ ) {
+	      T P_elem;
 	      P_elem.x  = v(j).real() * v(k).real();
 	      P_elem.x += v(j).imag() * v(k).conj();
-	      P_elem.y  = v(j).conj() * v(k).real();
+	      P_elem.y  = v(j).imag() * v(k).real();
 	      P_elem.y -= v(j).real() * v(k).conj();
 	      P(j,k) -= static_cast<T>(2.0) * P_elem;
 	    }	    
 	  }
-
+	  
 	  // Transform as PHP
 	  tri = P * tri * P;
 	}	
