@@ -120,7 +120,7 @@ namespace quda
      @param[in] stream Stream identifier
   */
   template <typename T, typename... Arg>
-  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &...arg)
+  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
   {
     ompwip("directly calling qudaLaunchKernel is unsupported");
     const void *args[] = {&arg...};

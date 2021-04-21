@@ -119,7 +119,7 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
       @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+    void axpy(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
 
     /**
        @brief This is a wrapper for calling the block "axpy" with a

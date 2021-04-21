@@ -3,6 +3,8 @@
 #include <quda_internal.h>
 #include <lattice_field.h>
 
+#include <comm_key.h>
+
 namespace quda {
 
   namespace clover
@@ -44,6 +46,8 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
+    QudaFieldLocation location;
+
     /**
        @brief Helper function for setting the precision and corresponding
        field order for QUDA internal fields.
@@ -62,15 +66,35 @@ namespace quda {
       }
     }
 
-    CloverFieldParam() :  LatticeFieldParam(),
-      direct(true), inverse(true), clover(nullptr), norm(nullptr),
-      cloverInv(nullptr), invNorm(nullptr), twisted(false), mu2(0.0), rho(0.0) { }
+    CloverFieldParam() :
+      LatticeFieldParam(),
+      direct(true),
+      inverse(true),
+      clover(nullptr),
+      norm(nullptr),
+      cloverInv(nullptr),
+      invNorm(nullptr),
+      twisted(false),
+      mu2(0.0),
+      rho(0.0),
+      location(QUDA_INVALID_FIELD_LOCATION)
+    {
+    }
 
-    CloverFieldParam(const CloverFieldParam &param) :  LatticeFieldParam(param),
-      direct(param.direct), inverse(param.inverse),
-      clover(param.clover), norm(param.norm),
-      cloverInv(param.cloverInv), invNorm(param.invNorm),
-      twisted(param.twisted), mu2(param.mu2), rho(param.rho) { }
+    CloverFieldParam(const CloverFieldParam &param) :
+      LatticeFieldParam(param),
+      direct(param.direct),
+      inverse(param.inverse),
+      clover(param.clover),
+      norm(param.norm),
+      cloverInv(param.cloverInv),
+      invNorm(param.invNorm),
+      twisted(param.twisted),
+      mu2(param.mu2),
+      rho(param.rho),
+      location(param.location)
+    {
+    }
 
     CloverFieldParam(const CloverField &field);
   };
@@ -111,10 +135,17 @@ namespace quda {
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
 
+    static CloverField *Create(const CloverFieldParam &param);
+
     void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
     void* Norm(bool inverse=false) { return inverse ? invNorm : norm; }
     const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
     const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
+
+    /**
+     * Define the parameter type for this field.
+     */
+    using param_type = CloverFieldParam;
 
     /**
        @return True if the field is stored in an internal field order
@@ -141,6 +172,16 @@ namespace quda {
        @return The size of the norm allocation
      */
     size_t NormBytes() const { return norm_bytes; }
+
+    /**
+       @return The total bytes of allocation
+     */
+    size_t TotalBytes() const
+    {
+      int direct = V(false) ? 1 : 0;
+      int inverse = V(true) ? 1 : 0;
+      return (direct + inverse) * (bytes + norm_bytes);
+    }
 
     /**
        @return Number of colors
@@ -212,6 +253,8 @@ namespace quda {
        @brief Restores the CloverField
     */
     void restore() const;
+
+    virtual int full_dim(int d) const { return x[d]; }
   };
 
   class cudaCloverField : public CloverField {
@@ -273,6 +316,18 @@ namespace quda {
     void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                   QudaParity parity = QUDA_INVALID_PARITY) const;
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     friend class DiracClover;
     friend class DiracCloverPC;
     friend class DiracTwistedClover;
@@ -288,6 +343,18 @@ namespace quda {
   public:
     cpuCloverField(const CloverFieldParam &param);
     virtual ~cpuCloverField();
+
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
   };
 
   /**
@@ -348,7 +415,6 @@ namespace quda {
      @param[in] coefft Clover coefficient
   */
   void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
-
 
   /**
      @brief This generic function is used for copying the clover field where
@@ -441,6 +507,16 @@ namespace quda {
      @param parity The field parity we are working on 
    */
   void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
+
+  /**
+    @brief This function is used for copying from a source clover field to a destination clover field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
+ */
+  void copyFieldOffset(CloverField &out, const CloverField &in, CommKey offset, QudaPCType pc_type);
 
   /**
      @brief Helper function that returns whether we have enabled

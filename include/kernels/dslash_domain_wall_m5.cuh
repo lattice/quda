@@ -70,7 +70,8 @@ namespace quda
   /**
      @brief Parameter structure for applying the Dslash
    */
-  template <typename Float, int nColor_, bool dagger_, bool xpay_, Dslash5Type type_> struct Dslash5Arg {
+  template <typename Float, int nColor_, bool dagger_, bool xpay_, Dslash5Type type_>
+  struct Dslash5Arg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool dagger = dagger_;
@@ -95,10 +96,9 @@ namespace quda
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
-    dim3 threads;
-
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
                const Complex *b_5_, const Complex *c_5_, double a_) :
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),
         in(in),
         x(x),
@@ -108,8 +108,7 @@ namespace quda
         Ls(in.X(4)),
         m_f(m_f),
         m_5(m_5),
-        a(a_),
-        threads(volume_4d_cb, Ls, nParity)
+        a(a_)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
@@ -169,8 +168,8 @@ namespace quda
   };
 
   template <typename Arg> struct dslash5 {
-    Arg &arg;
-    constexpr dslash5(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr dslash5(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -250,7 +249,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector constantInv(const Arg &arg, int parity, int x_cb, int s_)
   {
     QUDA_RT_CONSTS;
     using real = typename Arg::real;
@@ -306,7 +305,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, int parity, int x_cb, int s_)
   {
     QUDA_RT_CONSTS;
     constexpr int nSpin = 4;
@@ -382,8 +381,8 @@ namespace quda
      @param[in] arg Argument struct containing any meta data and accessors
   */
   template <typename Arg> struct dslash5inv {
-    Arg &arg;
-    constexpr dslash5inv(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr dslash5inv(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**

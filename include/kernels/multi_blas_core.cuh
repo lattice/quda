@@ -1,10 +1,9 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
-
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
+#include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
 
@@ -28,7 +27,7 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
-    struct MultiBlasArg :    
+    struct MultiBlasArg : kernel_param<>,
       SpinorXZ<NXZ_, store_t, N, Functor_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
       using real = real_;
@@ -39,13 +38,12 @@ namespace quda
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
-      dim3 threads;
       MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                    Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x[0]->SiteSubset())),
         NYW(NYW),
-        f(f),
-        threads(length * warp_split, NYW, x[0]->SiteSubset())
+        f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
@@ -73,8 +71,8 @@ namespace quda
        (input/output fields, functor, etc.)
     */
     template <typename Arg> struct MultiBlas_ {
-      Arg &arg;
-      constexpr MultiBlas_(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int i, int k, int parity)
@@ -122,13 +120,13 @@ namespace quda
     };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor : MultiBlasParam<coeff_t_> {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_, false, multi_1d_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**
@@ -144,7 +142,7 @@ namespace quda
       using MultiBlasFunctor<real>::a;
       multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
@@ -166,7 +164,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
@@ -188,7 +186,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -218,7 +216,7 @@ namespace quda
       real c[N];
       multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -247,7 +245,7 @@ namespace quda
       multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
 
       // i loops over NYW, j loops over NXZ
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

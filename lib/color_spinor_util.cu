@@ -228,20 +228,20 @@ namespace quda {
 
 	for (int s=0; s<u.Nspin(); s++) {
 	  for (int c=0; c<u.Ncolor(); c++) {
-	    for (int z=0; z<2; z++) {
-	      int j = (s*u.Ncolor() + c)*2+z;
+            complex<double> u_ = static_cast<complex<double>>(u(parity, x_cb, s, c));
+            complex<double> v_ = v(parity, x_cb, s, c);
 
-	      double diff = z==0 ? fabs(u(parity,x_cb,s,c,z).real() - v(parity,x_cb,s,c,z).real()) :
-		fabs(u(parity,x_cb,s,c).imag() - v(parity,x_cb,s,c).imag());
+            double diff_real = fabs(u_.real() - v_.real());
+            double diff_imag = fabs(u_.imag() - v_.imag());
 
-	      for (int f=0; f<fail_check; f++) {
-		if (diff > pow(10.0,-(f+1)/(double)tol)) {
-		  fail[f]++;
-		}
-	      }
+            for (int f=0; f<fail_check; f++) {
+              if (diff_real > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
+              if (diff_imag > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
+            }
 
-	      if (diff > 1e-3) iter[j]++;
-	    }
+            int j = (s * u.Ncolor() + c) * 2;
+            if (diff_real > 1e-3) iter[j+0]++;
+            if (diff_imag > 1e-3) iter[j+1]++;
 	  }
 	}
       }
@@ -351,19 +351,19 @@ namespace quda {
 
 
   template <class Order>
-  void print_vector(const Order &o, unsigned int x) {
-
+  void print_vector(const Order &o, unsigned int x)
+  {
     int x_cb = x / o.Nparity();
-    int parity = x%o.Nparity();
+    int parity = x % o.Nparity();
 
-    for (int s=0; s<o.Nspin(); s++) {
+    for (int s = 0; s < o.Nspin(); s++) {
       printfQuda("x = %u, s = %d, { ", x_cb, s);
-      for (int c=0; c<o.Ncolor(); c++) {
-        printfQuda("(%f,%f) ", o(parity, x_cb, s, c).real(), o(parity, x_cb, s, c).imag());
+      for (int c = 0; c < o.Ncolor(); c++) {
+        auto value = complex<double>(o(parity, x_cb, s, c));
+        printfQuda("(%f,%f) ", value.real(), value.imag());
       }
       printfQuda("}\n");
     }
-
   }
 
   // print out the vector at volume point x

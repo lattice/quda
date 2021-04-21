@@ -41,7 +41,7 @@ template <typename sFloat, typename gFloat>
 void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField, 
 		     int oddBit, int daggerBit, int mu) 
 {
-  for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
+  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   
@@ -51,9 +51,9 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = my_spinor_site_size * sid;
+    int offset = spinor_site_size * sid;
 
-    sFloat gaugedSpinor[my_spinor_site_size];
+    sFloat gaugedSpinor[spinor_site_size];
 
     gFloat *lnk    = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, 1);
     sFloat *spinor = spinorNeighbor(sid, mu, oddBit, spinorField, 1);
@@ -66,7 +66,7 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
         su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
     }
 
-    sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor, spinor_site_size);
   } // 4-d volume
 }
 
@@ -94,9 +94,9 @@ template <typename sFloat, typename gFloat>
 void Mat(sFloat *out, gFloat **link, sFloat *in, int daggerBit, int mu) 
 {
   sFloat *inEven = in;
-  sFloat *inOdd = in + Vh * my_spinor_site_size;
+  sFloat *inOdd = in + Vh * spinor_site_size;
   sFloat *outEven = out;
-  sFloat *outOdd = out + Vh * my_spinor_site_size;
+  sFloat *outOdd = out + Vh * spinor_site_size;
 
   // full dslash operator
   covdevReference(outOdd,  link, inEven, 1, daggerBit, mu);
@@ -179,7 +179,7 @@ template <typename sFloat, typename gFloat>
 void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFloat *spinorField,
                             sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit, int mu)
 {
-  for (int i = 0; i < Vh * my_spinor_site_size; i++) res[i] = 0.0;
+  for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   gFloat *ghostLinkEven[4], *ghostLinkOdd[4];
@@ -193,12 +193,12 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFlo
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = my_spinor_site_size * sid;
+    int offset = spinor_site_size * sid;
 
     gFloat *lnk    = gaugeLink_mg4dir(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
     sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 1);
 
-    sFloat gaugedSpinor[my_spinor_site_size];
+    sFloat gaugedSpinor[spinor_site_size];
 
     if (daggerBit) {
       for (int s = 0; s < 4; s++)
@@ -207,7 +207,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFlo
       for (int s = 0; s < 4; s++)
         su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
     }
-    sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor, spinor_site_size);
   } // 4-d volume
 }
 

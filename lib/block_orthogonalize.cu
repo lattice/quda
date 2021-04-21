@@ -6,8 +6,8 @@
 #include <assert.h>
 #include <utility>
 
-#include <tunable_block_reduction.h>
 #include <kernels/block_orthogonalize.cuh>
+#include <tunable_block_reduction.h>
 
 namespace quda {
 

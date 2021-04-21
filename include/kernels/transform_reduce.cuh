@@ -15,7 +15,6 @@ namespace quda {
     reduce_t init_value;
     transformer h;
     reducer r;
-    dim3 threads;
 
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init_value, reducer r) :
       ReduceArg<reduce_t>(v.size()),
@@ -23,13 +22,13 @@ namespace quda {
       n_batch(v.size()),
       init_value(init_value),
       h(h),
-      r(r),
-      threads(n_items, n_batch, 1)
+      r(r)
     {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
       if (n_items > std::numeric_limits<count_t>::max())
         errorQuda("Requested size %lu greater than max supported %lu",
                   (uint64_t)n_items, (uint64_t)std::numeric_limits<count_t>::max());
+      this->threads = dim3(n_items, n_batch, 1);
       memcpy(this->v, v.data(), v.size() * sizeof(T*));
     }
 
@@ -40,9 +39,9 @@ namespace quda {
     using count_t = decltype(Arg::n_items);
     using reduce_t = decltype(Arg::init_value);
 
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr transform_reducer(Arg &arg) : arg(arg) {}
+    constexpr transform_reducer(const Arg &arg) : arg(arg) {}
 
     static constexpr bool do_sum = Arg::reducer::do_sum;
 

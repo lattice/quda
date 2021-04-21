@@ -16,8 +16,6 @@ extern "C" {
   /* defined in quda.h; redefining here to avoid circular references */
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
-  /* implemented in comm_common.cpp */
-
   char *comm_hostname(void);
   double comm_drand(void);
   Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
@@ -48,6 +46,16 @@ extern "C" {
      @return Coordinate of this process
    */
   int comm_coord(int dim);
+
+  /**
+   * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes);
+
+  /**
+   * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
+   */
+  MsgHandle *comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes);
 
   /**
      Create a persistent message handler for a relative send.  This
@@ -154,7 +162,8 @@ extern "C" {
   /**
      @brief Initialize the communications, implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp
   */
-  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
+                 bool user_set_comm_handle = false, void *user_comm = nullptr);
 
   /**
      @brief Initialize the communications common to all communications abstractions
@@ -165,6 +174,12 @@ extern "C" {
      @return Rank id of this process
   */
   int comm_rank(void);
+
+  /**
+     @return the default rank id of this process.
+     This doesn't go through the communicator route, so it can be called without initializing the communicator stack.
+  */
+  int comm_rank_global(void);
 
   /**
      @return Number of processes
@@ -314,7 +329,12 @@ extern "C" {
   bool comm_gdr_enabled();
 
   /**
-     @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+     @brief Query if NVSHMEM communication is enabled (global setting)
+  */
+  bool comm_nvshmem_enabled();
+
+  /**
+      @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
   */
   bool comm_gdr_blacklist();
 

@@ -159,11 +159,11 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
 	v_h = mapped_malloc(bytes);
-	v = get_mapped_device_pointer(v_h);
-	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+        v = get_mapped_device_pointer(v_h);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  norm_h = mapped_malloc(norm_bytes);
-	  norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
-	}
+          norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
+        }
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -215,7 +215,8 @@ namespace quda {
         // check for special metadata wrapper (look at reference comments in
         // createTexObject() below)
         if (!((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
-              || (precision == QUDA_HALF_PRECISION && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()) )) {
+              || (precision == QUDA_HALF_PRECISION
+                  && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()))) {
           (dynamic_cast<cudaColorSpinorField *>(odd))->v = (void *)((char *)v + bytes / 2);
           if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
             (dynamic_cast<cudaColorSpinorField *>(odd))->norm = (void *)((char *)norm + norm_bytes / 2);
@@ -473,7 +474,7 @@ namespace quda {
 
       if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
-	void *dest_d = get_mapped_device_pointer(dest.V());
+        void *dest_d = get_mapped_device_pointer(dest.V());
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
         void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
@@ -515,15 +516,29 @@ namespace quda {
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger,
                                        qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM],
-                                       MemoryLocation location_label, bool spin_project, double a, double b, double c)
+                                       MemoryLocation location_label, bool spin_project,
+                                       double a, double b, double c, int shmem)
   {
-    void *packBuffer[2 * QUDA_MAX_DIM] = {};
+    void *packBuffer[4 * QUDA_MAX_DIM] = {};
 
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
-	switch(location[2*dim+dir]) {
-	case Device: // pack to local device buffer
-	  packBuffer[2*dim+dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+        switch (location[2 * dim + dir]) {
+
+        case Device: // pack to local device buffer
+          packBuffer[2 * dim + dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
+          break;
+        case Shmem:
+          // this is the remote buffer when using shmem ...
+          // if the ghost_remote_send_buffer_d exists we can directly use it
+          // - else we need pack locally and send data to the recv buffer
+          packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
+            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
+            my_face_dim_dir_d[bufferIndex][dim][dir];
+          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
+            nullptr :
+            static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
           break;
 	case Host:   // pack to zero-copy memory
 	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
@@ -533,11 +548,11 @@ namespace quda {
             = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
           break;
 	default: errorQuda("Undefined location %d", location[2*dim+dir]);
-	}
+        }
       }
     }
 
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, stream);
+    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
   }
  
   // send the ghost zone to the host
@@ -651,11 +666,11 @@ namespace quda {
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, const qudaStream_t &stream,
                                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                                  bool spin_project, double a, double b, double c)
+                                  bool spin_project, double a, double b, double c, int shmem)
   {
     createComms(nFace, spin_project); // must call this first
 
-    packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c);
+    packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
   }
 
   void cudaColorSpinorField::gather(int nFace, int dagger, int dir, const qudaStream_t &stream)
@@ -1229,6 +1244,22 @@ namespace quda {
       return ghost_recv_buffer_d[bufferIndex];
     } else {
       return ghost_pinned_recv_buffer_hd[bufferIndex%2];
+    }
+  }
+
+  void cudaColorSpinorField::copy_to_buffer(void *buffer) const
+  {
+    qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
+    }
+  }
+
+  void cudaColorSpinorField::copy_from_buffer(void *buffer)
+  {
+    qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
+    if (precision < QUDA_SINGLE_PRECISION) {
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
     }
   }
 

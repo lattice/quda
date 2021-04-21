@@ -322,7 +322,7 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
 
-      using vector_type = typename vector<store_type, 2>::type;
+      using vector_type = vector_type<store_type, 2>;
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
@@ -339,22 +339,22 @@ namespace quda
         vector_type value;
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
-            value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
-            value.y = -static_cast<store_type>(__half2float(i2.x) * scale);
+            value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
+            value[1] = -static_cast<store_type>(__half2float(i2.x) * scale);
             atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
-            value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
-            value.y = -static_cast<store_type>(__half2float(i2.y) * scale);
+            value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
+            value[1] = -static_cast<store_type>(__half2float(i2.y) * scale);
             atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
-            value.x = +static_cast<store_type>(__half2float(r2.x) * scale);
-            value.y = +static_cast<store_type>(__half2float(i2.x) * scale);
+            value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
+            value[1] = +static_cast<store_type>(__half2float(i2.x) * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
-            value.x = +static_cast<store_type>(__half2float(r2.y) * scale);
-            value.y = +static_cast<store_type>(__half2float(i2.y) * scale);
+            value[0] = +static_cast<store_type>(__half2float(r2.y) * scale);
+            value[1] = +static_cast<store_type>(__half2float(i2.y) * scale);
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }
@@ -373,7 +373,7 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
 
-      using vector_type = typename vector<store_type, 2>::type;
+      using vector_type = vector_type<store_type, 2>;
       auto ptr = reinterpret_cast<vector_type *>(cc.data());
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
@@ -388,22 +388,22 @@ namespace quda
         auto scale = fixed ? cc.scale : 1.0f;
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
-            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
-            value.y = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
+            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
+            value[1] = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
             atomic_fetch_add(&ptr[(n_index + 0) * ldc + m_index], value);
 
-            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
-            value.y = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
+            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
+            value[1] = -static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
             atomic_fetch_add(&ptr[(n_index + 1) * ldc + m_index], value);
           }
         } else {
           if (!check_bounds || (m_index < M && n_index < N)) {
-            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
-            value.y = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
+            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 0] * scale));
+            value[1] = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 0] * scale));
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 0)], value);
 
-            value.x = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
-            value.y = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
+            value[0] = +static_cast<store_type>(round(op_c_real.reg[i * 2 + 1] * scale));
+            value[1] = +static_cast<store_type>(round(op_c_imag.reg[i * 2 + 1] * scale));
             atomic_fetch_add(&ptr[m_index * ldc + (n_index + 1)], value);
           }
         }

@@ -5,10 +5,14 @@
    get_coords()    gives lattice coords from node & index
 */
 
+// for int max
+#include <limits>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <qmp.h>
 #include <layout_hyper.h>
+#include <util_quda.h>
 
 /* The following globals are required:
    QMP_get_logical_topology()
@@ -20,8 +24,8 @@
 static int *squaresize = nullptr; /* dimensions of hypercubes */
 static int *nsquares = nullptr;   /* number of hypercubes in each direction */
 static int ndim;
-static int *size1[2] = {nullptr, nullptr}, *size2 = nullptr;
-static int sites_on_node;
+static size_t *size1[2] = {nullptr, nullptr}, *size2 = nullptr;
+static size_t sites_on_node;
 static int *mcoord = nullptr;
 static bool single_parity = false;
 
@@ -54,11 +58,11 @@ int quda_setup_layout(int len[], int nd, int, int single_parity_)
   for (int i = 0; i < ndim; ++i) { sites_on_node *= squaresize[i]; }
 
   if (size1[0]) free(size1[0]);
-  size1[0] = (int *)malloc(2 * (ndim + 1) * sizeof(int));
+  size1[0] = (size_t *)malloc(2 * (ndim + 1) * sizeof(size_t));
   size1[1] = size1[0] + ndim + 1;
 
   if (size2) free(size2);
-  size2 = (int *)malloc((ndim + 1) * sizeof(int));
+  size2 = (size_t *)malloc((ndim + 1) * sizeof(size_t));
 
   size1[0][0] = 1;
   size1[1][0] = 0;
@@ -78,9 +82,17 @@ int quda_node_number(const int x[])
   return QMP_get_node_number_from(mcoord);
 }
 
-int quda_node_index(const int x[])
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+int quda_node_number_ext(const int x[], void *arg)
 {
-  int r = 0, p = 0;
+  (void)arg;
+  return quda_node_number(x);
+}
+#endif // QIO_HAS_EXTENDED_LAYOUT
+
+size_t quda_node_index_helper(const int x[])
+{
+  size_t r = 0, p = 0;
 
   for (int i = ndim - 1; i >= 0; --i) {
     r = r * squaresize[i] + (x[i] % squaresize[i]);
@@ -98,12 +110,30 @@ int quda_node_index(const int x[])
   return r;
 }
 
-void quda_get_coords(int x[], int node, int index)
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+QIO_Index quda_node_index_ext(const int x[], void *arg)
 {
-  int si = index;
+  (void)arg;
+  return static_cast<QIO_Index>(quda_node_index_helper(x));
+}
+#else
+int quda_node_index(const int x[])
+{
+  size_t node_idx = quda_node_index_helper(x);
+
+  if (node_idx > static_cast<size_t>(std::numeric_limits<int>::max()) || node_idx < 0)
+    errorQuda("Invalid node_idx %lu", node_idx);
+
+  return static_cast<int>(node_idx);
+}
+#endif // QIO_HAS_EXTENDED_LAYOUT
+
+void quda_get_coords_helper(int x[], int node, size_t index)
+{
+  size_t si = index;
   int *m = QMP_get_logical_coordinates_from(node);
 
-  int s = 0;
+  size_t s = 0;
   for (int i = 0; i < ndim; ++i) {
     x[i] = m[i] * squaresize[i];
     s += x[i];
@@ -139,11 +169,18 @@ void quda_get_coords(int x[], int node, int index)
   free(m);
 
   /* Check the result */
-  if (quda_node_index(x) != si) {
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+  size_t node_index = quda_node_index_ext(x, NULL);
+#else
+  size_t node_index = static_cast<size_t>(quda_node_index(x));
+#endif
+  if (node_index != si) {
     if (quda_this_node == 0) {
       fprintf(stderr, "get_coords: error in layout!\n");
-      for (int i = 0; i < ndim; i++) { fprintf(stderr, "%i\t%i\t%i\n", size1[0][i], size1[1][i], size2[i]); }
-      fprintf(stderr, "%i\tindex=%i\tx=(", node, si);
+      for (int i = 0; i < ndim; i++) {
+        fprintf(stderr, "%lu\t%lu\t%lu\n", (size_t)size1[0][i], (size_t)size1[1][i], (size_t)size2[i]);
+      }
+      fprintf(stderr, "%i\tindex=%lu\tx=(", node, (size_t)si);
       for (int i = 0; i < ndim; i++) fprintf(stderr, i < ndim - 1 ? "%i, " : "%i)\n", x[i]);
     }
     QMP_abort(1);
@@ -151,5 +188,31 @@ void quda_get_coords(int x[], int node, int index)
   }
 }
 
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+void quda_get_coords_ext(int x[], int node, QIO_Index index, void *arg)
+{
+  (void)arg;
+
+  if (index > static_cast<QIO_Index>(std::numeric_limits<int>::max()) || index < 0)
+    errorQuda("Invalid index %lu", index);
+  quda_get_coords_helper(x, node, static_cast<size_t>(index));
+}
+#else
+void quda_get_coords(int x[], int node, int index) { quda_get_coords_helper(x, node, static_cast<size_t>(index)); }
+#endif // QIO_HAS_EXTENDED_LAYOUT
+
 /* The number of sites on the specified node */
-int quda_num_sites(int) { return sites_on_node; }
+#ifdef QIO_HAS_EXTENDED_LAYOUT
+QIO_Index quda_num_sites_ext(int, void *)
+{
+  return sites_on_node;
+}
+#else
+int quda_num_sites(int)
+{
+  if (sites_on_node > static_cast<size_t>(std::numeric_limits<int>::max()))
+    errorQuda("Invalid sites_on_node %lu", sites_on_node);
+
+  return static_cast<int>(sites_on_node);
+}
+#endif // QIO_HAS_EXTENDED_LAYOUT

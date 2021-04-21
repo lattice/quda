@@ -6,7 +6,7 @@
 namespace quda
 {
 
-  template <typename Float, QudaReconstructType recon> struct CloverDerivArg {
+  template <typename Float, QudaReconstructType recon> struct CloverDerivArg : kernel_param<> {
     using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     using Gauge = typename gauge_mapper<Float, recon>::type;
@@ -16,16 +16,15 @@ namespace quda
     int border[4];
     real coeff;
     int parity;
-    dim3 threads;
 
     Force force;
     Gauge gauge;
     Oprod oprod;
 
     CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff, int parity) :
+      kernel_param(dim3(force.VolumeCB(), 2, 4)),
       coeff(coeff),
       parity(parity),
-      threads(force.VolumeCB(), 2, 4),
       force(force),
       gauge(gauge),
       oprod(oprod)
@@ -39,7 +38,7 @@ namespace quda
   };
 
   template <typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(Link &force, Arg &arg, int xIndex, int yIndex)
+  __device__ __forceinline__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex)
   {
     int otherparity = (1 - arg.parity);
 
@@ -227,8 +226,8 @@ namespace quda
 
   template <typename Arg> struct CloverDerivative
   {
-    Arg &arg;
-    constexpr CloverDerivative(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CloverDerivative(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __host__ __device__ void operator()(int x_cb, int parity, int mu)

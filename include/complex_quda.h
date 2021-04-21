@@ -33,7 +33,7 @@ namespace quda {
   }
 
   namespace colorspinor {
-    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+    template<typename Float, typename storeFloat, bool block_float, typename norm_t> struct fieldorder_wrapper;
   }
 }
 
@@ -121,11 +121,9 @@ namespace quda
     inline ValueType abs(ValueType x){
     return std::abs(x);
   }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType conj(ValueType x){
-    return x;
-  }
+
+  __host__ __device__ inline float conj(float x) { return x; }
+  __host__ __device__ inline double conj(double x) { return x; }
 
   template <typename ValueType> struct complex;
   //template <> struct complex<float>;
@@ -307,7 +305,7 @@ namespace quda
     {
       os << '(' << z.real() << ',' << z.imag() << ')';
       return os;
-    };
+    }
 
   template<typename ValueType, typename charT, class traits>
     std::basic_istream<charT, traits>&
@@ -557,17 +555,6 @@ public:
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<float>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<float>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template<>
@@ -689,17 +676,6 @@ public:
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<double>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template <> struct complex<int8_t> : public char2 {
@@ -714,8 +690,8 @@ public:
     imag(im);
   }
 
-  __host__ __device__ complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
-  __host__ __device__ complex<int8_t>& operator=(const complex<int8_t> &z)
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ inline complex<int8_t>& operator=(const complex<int8_t> &z)
     {
       x = z.x;
       y = z.y;
@@ -1392,6 +1368,24 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     w.y += x.imag() * y.real();
     w.y += x.real() * y.imag();
     return w;
+  }
+
+  template <typename T1, typename T2, typename T3>
+  __host__ __device__ inline auto cmac(const T1 &x, const T2 &y, const T3 &z)
+  {
+    static_assert(std::is_same<typename T1::value_type, typename T2::value_type>::value &&
+                  std::is_same<typename T1::value_type, typename T3::value_type>::value,
+                  "precisions do not match");
+
+    using real = typename T1::value_type;
+    complex<real> X = x;
+    complex<real> Y = y;
+    complex<real> Z = z;
+    Z.real(Z.real() + X.real() * Y.real());
+    Z.real(Z.real() - X.imag() * Y.imag());
+    Z.imag(Z.imag() + X.imag() * Y.real());
+    Z.imag(Z.imag() + X.real() * Y.imag());
+    return Z;
   }
 
   template <typename real> __host__ __device__ inline complex<real> i_(const complex<real> &a)

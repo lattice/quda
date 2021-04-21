@@ -38,7 +38,6 @@ namespace quda
 
       const int length_cb;
       const int nParity;
-      dim3 threads;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
@@ -48,9 +47,9 @@ namespace quda
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
-        nParity(nParity),
-        threads(length, NYW, 1)
+        nParity(nParity)
       {
+        this->threads = dim3(length, NYW, 1);
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
@@ -81,11 +80,11 @@ namespace quda
       using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
       using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
       using plus<reduce_t>::operator();
-      Arg &arg;
-      constexpr MultiReduce_(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int)
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int) const
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;
@@ -119,14 +118,15 @@ namespace quda
        @tparam reduce_t The fundamental reduction type
        @tparam coeff_t The type of any coefficients we multiply by
     */
-    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor : MultiBlasParam<coeff_t_> {
+    template <typename reduce_t_, typename coeff_t_>
+    struct MultiReduceFunctor : MultiBlasParam<coeff_t_, true, false> {
       using reduce_t = reduce_t_;
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
       static constexpr bool multi_1d = false;
 
-      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t>(NXZ, NYW) {}
+      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**
@@ -147,7 +147,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
@@ -178,7 +178,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
@@ -196,7 +196,7 @@ namespace quda
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

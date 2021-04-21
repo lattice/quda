@@ -10,7 +10,7 @@ namespace quda {
      Kernel argument struct
    */
   template <typename store_out_t, typename store_in_t, int length_, typename OutOrder, typename InOrder>
-  struct CopyGaugeArg {
+  struct CopyGaugeArg : kernel_param<> {
     using real_out_t  = typename mapper<store_out_t>::type;
     using real_in_t  = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
@@ -23,11 +23,15 @@ namespace quda {
     int_fastdiv geometry;
     int out_offset;
     int in_offset;
-    dim3 threads;
-    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta)
-      : out(out), in(in), volume(meta.Volume()), nDim(meta.Ndim()),
-        geometry(meta.Geometry()), out_offset(0), in_offset(0),
-        threads(1, 1, meta.Geometry() * 2) // FIXME - need to set .x and .y components
+    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta) :
+      kernel_param(dim3(1, 1, meta.Geometry() * 2)), // FIXME - need to set .x and .y components
+      out(out),
+      in(in),
+      volume(meta.Volume()),
+      nDim(meta.Ndim()),
+      geometry(meta.Geometry()),
+      out_offset(0),
+      in_offset(0)
     {
       for (int d=0; d<nDim; d++) faceVolumeCB[d] = meta.SurfaceCB(d) * meta.Nface();
     }
@@ -37,7 +41,7 @@ namespace quda {
      Check whether the field contains Nans
   */
   template <typename Arg>
-  void checkNan(Arg &arg)
+  void checkNan(const Arg &arg)
   {
     for (int parity=0; parity<2; parity++) {
 
@@ -47,15 +51,15 @@ namespace quda {
 	  for (int i=0; i<Arg::nColor; i++)
 	    for (int j=0; j<Arg::nColor; j++) {
               complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
-	      if (isnan(u.real()))
+	      if (std::isnan(u.real()))
 	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
-	      if (isnan(u.imag()))
+	      if (std::isnan(u.imag()))
 		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
             }
 #else
 	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);
 	  for (int i=0; i<Arg::length/2; i++)
-	    if (isnan(u(i).real()) || isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+	    if (std::isnan(u(i).real()) || std::isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
 #endif
 	}
       }
@@ -68,8 +72,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGauge_ {
-    Arg &arg;
-    constexpr CopyGauge_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGauge_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int, int parity_d)
@@ -87,8 +91,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGaugeFineGrained_ {
-    Arg &arg;
-    constexpr CopyGaugeFineGrained_(Arg &arg) :arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGaugeFineGrained_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)
@@ -104,8 +108,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGhost_ {
-    Arg &arg;
-    constexpr CopyGhost_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGhost_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int, int parity_d)
@@ -126,8 +130,8 @@ namespace quda {
   */
   template <typename Arg>
   struct CopyGhostFineGrained_ {
-    Arg &arg;
-    constexpr CopyGhostFineGrained_(Arg &arg) :arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGhostFineGrained_(const Arg &arg) :arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int i, int parity_d)

@@ -1,11 +1,11 @@
 #pragma once
 
 #include <algorithm>
-#ifdef __NVCOMPILER
+#ifdef _NVHPC_CUDA
 #include <nv/target>
 #endif
 
-#if defined(__CUDACC__) ||  defined(__NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
+#if defined(__CUDACC__) ||  defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
 #define QUDA_CUDA_CC
 #endif
 
@@ -13,16 +13,16 @@ namespace quda {
 
   namespace target {
 
-#ifdef __NVHPC_CUDA
+#ifdef _NVHPC_CUDA
 
     // nvc++: run-time dispatch using if target
     template <template <bool, typename ...> class f, typename ...Args>
     __host__ __device__ auto dispatch(Args &&... args)
     {
       if target (nv::target::is_device) {
-          return f<true>()(args...);
+        return f<true>()(args...);
       } else if target (nv::target::is_host) {
-          return f<false>()(args...);
+        return f<false>()(args...);
       }
     }
 
@@ -72,6 +72,19 @@ namespace quda {
        whereas on the host this returns (1, 1, 1).
     */
     __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+
+    template <bool is_device> struct grid_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct grid_dim_impl<true> { __device__ dim3 operator()() { return dim3(gridDim.x, gridDim.y, gridDim.z); } };
+#endif
+
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    __device__ __host__ inline dim3 grid_dim() { return dispatch<grid_dim_impl>(); }
 
 
     template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
@@ -156,10 +169,10 @@ namespace quda {
 
     /**
        @brief Helper function that returns the maximum size of a
-       constant_param_t buffer on the target architecture.  For CUDA,
-       this corresponds to the maximum __constant__ buffer size.
+       __constant__ buffer on the target architecture.  For CUDA,
+       this is set to the somewhat arbitrary limit of 32 KiB for now.
     */
-    constexpr size_t max_constant_param_size() { return 8192; }
+    constexpr size_t max_constant_size() { return 32768; }
 
     /**
        @brief Helper function that returns the maximum static size of
@@ -173,6 +186,34 @@ namespace quda {
        shared memory bank width on the target architecture.
     */
     constexpr int shared_memory_bank_width() { return 32; }
+
+    /**
+       @brief Helper function that returns true if we are to pass the
+       kernel parameter struct to the kernel as an explicit kernel
+       argument.  Otherwise the parameter struct is explicitly copied
+       to the device prior to kernel launch.
+    */
+    template <typename Arg> constexpr bool use_kernel_arg()
+    {
+      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+    }
+
+    /**
+       @brief Helper function that returns kernel argument from
+       __constant__ memory.  Note this is the dummy implementation,
+       and is present only to keep the compiler happy in the
+       translation units where constant memory is not used.
+     */
+    template <typename Arg>
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+
+    /**
+       @brief Helper function that returns a pointer to the
+       __constant__ memory buffer.  Note this is the dummy
+       implementation, and is present only to keep the compiler happy
+       in the translation units where constant memory is not used.
+     */
+    template <typename Arg> constexpr std::enable_if_t<use_kernel_arg<Arg>(), void *> get_constant_buffer() { return nullptr; }
 
   }
 
