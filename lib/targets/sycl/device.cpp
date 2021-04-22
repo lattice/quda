@@ -1,5 +1,6 @@
 #include <util_quda.h>
 #include <quda_internal.h>
+#include <algorithm>
 
 static sycl::device myDevice;
 static sycl::queue *streams;
@@ -89,6 +90,20 @@ namespace quda
       printfQuda("  max_constant_args: %u\n", myDevice.get_info<sycl::info::device::max_constant_args>());
       printfQuda("  local_mem_size: %lu\n", myDevice.get_info<sycl::info::device::local_mem_size>());
       printfQuda("  error_correction_support: %s\n", myDevice.get_info<sycl::info::device::error_correction_support>()?"true":"false");
+
+      bool err = false;
+      auto warps = myDevice.get_info<sycl::info::device::sub_group_sizes>();
+      if(std::find(warps.begin(), warps.end(), QUDA_WARP_SIZE) == warps.end()) {
+	err = true;
+	warningQuda("Warp size %d not in sub group sizes %s", QUDA_WARP_SIZE,
+		    str(warps).c_str());
+      }
+      //myDevice.get_info<sycl::info::device::max_parameter_size>();
+      //myDevice.get_info<sycl::info::device::max_work_group_size>();
+      if(err) {
+	errorQuda("Device checks failed");
+      }
+
     }
 
     int get_device_count()
@@ -270,15 +285,17 @@ namespace quda
     }
 
     unsigned int max_threads_per_block() {
-      //auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
-      auto val = 128;
+      auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      //auto val = 128;
       return val;
     }
 
     unsigned int max_threads_per_processor() { // not in portable SYCL
-      //auto val = myDevice.get_info<sycl::info::device::max_work_group_size>();
-      auto val = 128;
-      return 2*val;
+      //auto mcu = myDevice.get_info<sycl::info::device::max_compute_units>();
+      auto mwgs = myDevice.get_info<sycl::info::device::max_work_group_size>();
+      //auto val = 2*128;
+      auto val = 2*mwgs;
+      return val;
     }
 
     unsigned int max_threads_per_block_dim(int i) {
@@ -287,8 +304,10 @@ namespace quda
     }
 
     unsigned int max_grid_size(int i) { // not in portable SYCL?
-      auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
-      return val[i];
+      //auto val = myDevice.get_info<sycl::info::device::max_work_item_sizes>();
+      //return val[i];
+      // FIXME: address_bits / mwgs(i) ?
+      return 65536;
     }
 
     unsigned int processor_count() {

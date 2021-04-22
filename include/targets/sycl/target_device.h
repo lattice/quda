@@ -1,5 +1,16 @@
 #pragma once
 
+#ifndef QUDA_WARP_SIZE
+#define QUDA_WARP_SIZE 8
+#endif
+#ifndef QUDA_MAX_BLOCK_SIZE
+#define QUDA_MAX_BLOCK_SIZE 512
+#endif
+#ifndef QUDA_MAX_ARGUMENT_SIZE
+#define QUDA_MAX_ARGUMENT_SIZE 2048
+#endif
+
+
 namespace quda {
 
   namespace target {
@@ -82,7 +93,7 @@ namespace quda {
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return 8; }
+    constexpr int warp_size() { return QUDA_WARP_SIZE; }
 
     /**
        @brief Return the thread mask for a converged warp.
@@ -96,7 +107,8 @@ namespace quda {
     template <int block_size_y = 1, int block_size_z = 1>
       constexpr unsigned int max_block_size()
       {
-        return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
+        //return std::max(warp_size(), 1024 / (block_size_y * block_size_z));
+        return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
       }
 
     /**
@@ -140,14 +152,15 @@ namespace quda {
        constant_param_t buffer on the target architecture.  For CUDA,
        this corresponds to the maximum __constant__ buffer size.
     */
-    constexpr size_t max_constant_param_size() { return 8192; }
+    //constexpr size_t max_constant_param_size() { return 8192; }
+    constexpr size_t max_constant_param_size() { return 32768; }
 
     /**
        @brief Helper function that returns the maximum static size of
        the kernel arguments passed to a kernel on the target
        architecture.
     */
-    constexpr size_t max_kernel_arg_size() { return 4096; }
+    constexpr size_t max_kernel_arg_size() { return QUDA_MAX_ARGUMENT_SIZE; }
 
     /**
        @brief Helper function that returns the bank width of the
