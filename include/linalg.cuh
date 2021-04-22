@@ -207,10 +207,8 @@ namespace quda {
 
        @tparam T The underlying type.
        @tparam N The size of the linear system we are solving
-       @tparam tol The tolerance of the QR solver
-       
     */
-    template <template<typename,int> class Mat, typename T, int N, bool from_upper=false>
+    template <template<typename,int> class Mat, typename T, int N>
     class Eigensolve {
       
       //! The eigen decomposition
@@ -223,15 +221,15 @@ namespace quda {
 	 @brief Constructor that computes the eigen decomposition
 	 @param[in] A Input matrix we are decomposing
       */
-      __device__ __host__ inline Eigensolve(const Mat<T,N> &A) {
+      __device__ __host__ inline Eigensolve(const Mat<T,N> &A, bool from_upper_hessenberg=false) {
 	const Mat<T,N> &evecs = evecs_;
-	
+	if(!from_upper_hessenberg) upperHessReduction(A);
       }
-
+      
       /**
-	 @brief Return the eigenvalue element of the eigen decomposition Tri(i,i)
+	 @brief Return the eigenvalue element of the eigen decomposition tri(i,i)
 	 @param[in] i Index
-	 @return Element at Tri(i,i)
+	 @return Element at tri(i,i)
       */
       __device__ __host__ inline const T eval(int i) const {
 	const auto &tri = tri_;
@@ -242,7 +240,7 @@ namespace quda {
 	 @brief Compute the upper Hessenberg reduction of A 
 	 @return Matrix inverse
       */
-      __device__ __host__ inline Mat<T,N> upperHessReduction(const Mat<T,N> &A) {
+      __device__ __host__ inline void upperHessReduction(const Mat<T,N> &A) {
 	typedef decltype(A(0,0).x) Real;
 	
 	Mat<T,N> &tri = tri_;
@@ -297,7 +295,7 @@ namespace quda {
 	    }	    
 	  }
 	  
-	  // Transform as PHP
+	  // Similarity transform
 	  tri = P * tri * P;
 	}	
       }
