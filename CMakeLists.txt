@@ -618,6 +618,12 @@ if(QUDA_QDPJIT)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
+# We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not wotrk if not set on the initial run
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/usqcd CACHE PATH "..." FORCE)
+endif()
+
+
 if(QUDA_QMP)
   message(STATUS "Looking for QMP")
   find_package(QMP QUIET) 

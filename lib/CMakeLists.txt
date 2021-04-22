@@ -625,27 +625,11 @@ install(EXPORT QUDATargets
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
-# If the USQCD stack was automatically downloaded, this will copy the usqcd library
-# to the usqcd directory and include in the install. This is hacky as hell ...
-if(QMP_ADDED)
-  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QMP_BINARY_DIR} ${CMAKE_BINARY_DIR}/usqcd)
-  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QMP_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/usqcd/include)
-endif()
-if(QMP_ADDED)
-  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QIO_BINARY_DIR} ${CMAKE_BINARY_DIR}/usqcd)
-  add_custom_command(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${QIO_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/usqcd/include)
-endif()
-if(QMP_ADDED OR QIO_ADDED)
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ".")
-  endif()
-
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
-
-
 
 add_custom_target(
   mpi_nvtx
