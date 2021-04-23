@@ -46,7 +46,7 @@ namespace quda {
       case QUDA_CONTRACT_TYPE_OPEN_SUM_Z: strcat(aux, "open-sum-z,"); break;
       case QUDA_CONTRACT_TYPE_DR_FT_T: strcat(aux, "degrand-rossi-ft-t,"); break;
       case QUDA_CONTRACT_TYPE_DR_FT_Z: strcat(aux, "degrand-rossi-ft-z,"); break;
-      case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: strcat(aux, "staggered-ft-z,"); break;
+      case QUDA_CONTRACT_TYPE_STAGGERED_FT_T: strcat(aux, "staggered-ft-t,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       apply(device::get_default_stream());
@@ -123,6 +123,7 @@ namespace quda {
     }
   };
   
+#define GPU_CONTRACT 1
 #ifdef GPU_CONTRACT
   void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y,
 			  std::vector<Complex> &result_global,
