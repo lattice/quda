@@ -1114,13 +1114,13 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
 
   opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
-                      "Set the number of source smearing steps (default 50)");
+                      "Set the number of source smearing steps (default 0)");
 
   opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
                       "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
-                      "Set the number of sink smearing steps (default 50)");
+                      "Set the number of sink smearing steps (default 0)");
 
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
