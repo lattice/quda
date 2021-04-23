@@ -639,6 +639,7 @@ if(QUDA_QIO)
     # message(STATUS "QIO Found")
   # else() 
     # message(STATUS "QIO Not Found")
+  #endif()
 #TODO: Think about logic here 
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     CPMAddPackage(
@@ -651,7 +652,6 @@ if(QUDA_QIO)
         "QIO_ENABLE_OUTPUT_BUFFERING ON" 
         "QIO_DML_BUF_BYTES 33554432"
     )
-    endif()
   endif()
 endif()
 
