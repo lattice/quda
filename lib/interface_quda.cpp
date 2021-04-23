@@ -5952,6 +5952,48 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &inv_param4D, const int *X, const size_t single_spinorsize_in_floats){ //, QudaInvertParam *inv_param5D,
+  //! give in4D_ptr to the parameter class, from which we then construct a ColorSpinorField
+  ColorSpinorParam cpuParam4D((void *)in4D_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorField *h_4D_pointsource = ColorSpinorField::Create(cpuParam4D);
+
+  //! 5D source constructed from a 4D pointsource only contains non-zero entries in the
+  //! 5th dimension for the first and last entry, the others are 0
+
+  //! construct CSF for the projected 4D point source
+  auto* h_4D_temp_ptr = (double *)malloc(single_spinorsize_in_floats);
+  ColorSpinorParam cpuParam4D_temp((void *)h_4D_temp_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorField *h_4D_temp = ColorSpinorField::Create(cpuParam4D);
+  qudaMemsetAsync(h_4D_temp->V(), 0, single_spinorsize_in_floats, device::get_default_stream());
+
+  //! construct CSF for the first entry of the fifth dimension
+  auto* h_4D_out_new_ptr = (double *)malloc(single_spinorsize_in_floats);
+  ColorSpinorParam cpuParam4D_out_new_ptr((void *)h_4D_temp_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorField *h_4D_out_new = ColorSpinorField::Create(cpuParam4D);
+  qudaMemsetAsync(h_4D_out_new->V(), 0, single_spinorsize_in_floats, device::get_default_stream());
+
+  //! first entry
+
+  //! P_R 4Dsrc
+  ApplyChiralProj(*h_4D_temp, *h_4D_pointsource, 1);
+
+  //TODO check if all of these parameter things here are correct
+  DiracParam mydiracparam;
+  setDiracParam(mydiracparam, &inv_param4D, false);
+  DiracMobius myMobius(mydiracparam);
+  myMobius.Dslash4(*h_4D_out_new, *h_4D_temp, QUDA_INVALID_PARITY);//TODO what parity ???
+
+
+  //! note c_5 has many entries but they are presumably all the same, so we use the first one, c_5[0]
+  double myc_5 = reinterpret_cast<double *>(&inv_param4D.c_5)[0];
+  blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D.m5) * 2, *h_4D_temp);
+  blas::ax(0.5, *h_4D_out_new);
+  blas::xpy(*h_4D_out_new,*h_4D_temp);
+
+  //! second entry
+
+}
+
 void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                         const int *X)
 {

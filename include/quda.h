@@ -1571,7 +1571,14 @@ extern "C" {
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
 
-  
+  /**
+  * Convert a 4D point source to a 5D one
+  * @param in4D_ptr    Contains 4D pointsource
+  * @param out5D_ptr   5D source is written here
+  * @param X           an int array that contains Nx Ny Nz Nt
+  */
+  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &inv_param4D, const int *X, const size_t single_spinorsize_in_floats);
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
