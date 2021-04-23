@@ -5797,7 +5797,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   ColorSpinorParam cudaParam(*cs_param);
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not relevent for staggered
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not relevant for staggered
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   
   std::vector<ColorSpinorField *> d_prop1, d_prop2;
