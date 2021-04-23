@@ -127,31 +127,28 @@ int test(int contractionType, QudaPrecision test_prec)
     break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
-  int my_spinor_site_size = nSpin * 3 * 2;
 
   ColorSpinorParam cs_param;
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-  QudaInvertParam inv_param = newQudaInvertParam();
-  setContractInvertParam(inv_param);
-  inv_param.cpu_prec = test_prec;
-  inv_param.cuda_prec = test_prec;
-  inv_param.cuda_prec_sloppy = test_prec;
-  inv_param.cuda_prec_precondition = test_prec;
-  if ( nSpin == 1 ) {
-    inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
-    constructStaggeredSpinorParam(&cs_param, &inv_param, &gauge_param);
-  } else {
-    inv_param.dslash_type = QUDA_WILSON_DSLASH;
-    constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-  }
 
+  cs_param.nColor = 3;
+  cs_param.nSpin = nSpin;
+  cs_param.nDim = 4;
+  for(int i = 0; i < 4; i++)
+    cs_param.x[i] = X[i];
+  cs_param.x[4] = 1;
+  cs_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  cs_param.setPrecision(test_prec);
+  cs_param.pad = 0;
+  cs_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  cs_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  cs_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
+  cs_param.create = QUDA_ZERO_FIELD_CREATE;
+  cs_param.location = QUDA_CPU_FIELD_LOCATION;
+
+  int my_spinor_site_size = nSpin * 3 * 2;
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  int src_colors = 2; // source color (dilutions)
+  int src_colors = 1; // source color (dilutions)
   int const nprops = nSpin * src_colors;
   size_t spinor_field_floats = V * my_spinor_site_size * 2;
   void *buffX = malloc(nprops * spinor_field_floats * data_size);
@@ -261,4 +258,7 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
 }
 
 // Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(0, NcontractType)), getContractName);
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(2, NcontractType)), getContractName);
+
+
+
