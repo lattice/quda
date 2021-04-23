@@ -104,7 +104,8 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n", get_string(dtest_type_map, dtest_type).c_str());
+      errorQuda("Test type %s is not supported for the Laplace operator.\n",
+                get_string(dtest_type_map, dtest_type).c_str());
     }
   }
 

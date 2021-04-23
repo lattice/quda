@@ -98,9 +98,9 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  host_free(topo->ranks);
-  host_free(topo->coords);
-  host_free(topo);
+  delete [] topo->ranks;
+  delete [] topo->coords;
+  delete topo;
 }
 
 inline int comm_ndim(const Topology *topo) { return topo->ndim; }
@@ -635,19 +635,10 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
-                         comm_dim_override[0]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(1) ? '0' :
-                         comm_dim_override[1]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(2) ? '0' :
-                         comm_dim_override[2]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(3) ? '0' :
-                         comm_dim_override[3]   ? '1' :
-                                                  '0'),
-                      '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;
@@ -699,18 +690,18 @@ struct Communicator {
 
 #if defined(QMP_COMMS)
   QMP_comm_t QMP_COMM_HANDLE;
-  
+
   /**
-  * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
-  * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
-  */
+   * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
+   * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
+   */
   bool is_qmp_handle_default;
 #endif
 
   int rank = -1;
   int size = -1;
 
-  Communicator() { }
+  Communicator() {}
 
   Communicator(Communicator &other, const int *comm_split);
 

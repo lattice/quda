@@ -1971,8 +1971,8 @@ public:
   {
 
   public:
-    DiracM(const Dirac &d) : DiracMatrix(d) { }
-    DiracM(const Dirac *d) : DiracMatrix(d) { }
+    DiracM(const Dirac &d) : DiracMatrix(d) {}
+    DiracM(const Dirac *d) : DiracMatrix(d) {}
 
     /**
        @brief apply operator and potentially a shift
@@ -2087,8 +2087,8 @@ public:
   {
 
   public:
-    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
-    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
 
@@ -2304,8 +2304,8 @@ public:
   {
 
   public:
-    DiracG5M(const Dirac &d) : DiracMatrix(d) { }
-    DiracG5M(const Dirac *d) : DiracMatrix(d) { }
+    DiracG5M(const Dirac &d) : DiracMatrix(d) {}
+    DiracG5M(const Dirac *d) : DiracMatrix(d) {}
 
     /**
       @brief Left-apply gamma5 as appropriate for the operator

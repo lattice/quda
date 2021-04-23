@@ -393,10 +393,10 @@ namespace quda
                     "QUDA_RESOURCE_PATH environment variable to point to a new path.",
                     cache_path.c_str());
 #else
-      if (version_check && token.compare(quda_version))
-        errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
-                  "QUDA_RESOURCE_PATH environment variable to point to a new path.",
-                  cache_path.c_str());
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #endif
         ls >> token;
         if (version_check && token.compare(quda_hash))
@@ -481,7 +481,7 @@ namespace quda
 #ifdef GITVERSION
       cache_file << "\t" << gitversion;
 #else
-    cache_file << "\t" << quda_version;
+      cache_file << "\t" << quda_version;
 #endif
       cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << std::setw(16) << "volume"
@@ -603,7 +603,7 @@ namespace quda
 #ifdef GITVERSION
       profile_file << "\t" << gitversion;
 #else
-    profile_file << "\t" << quda_version;
+      profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       profile_file << std::setw(12) << "total time"
@@ -617,7 +617,7 @@ namespace quda
 #ifdef GITVERSION
       async_profile_file << "\t" << gitversion;
 #else
-    async_profile_file << "\t" << quda_version;
+      async_profile_file << "\t" << quda_version;
 #endif
       async_profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       async_profile_file << std::setw(12) << "total time"
@@ -638,7 +638,7 @@ namespace quda
 #ifdef GITVERSION
         trace_file << "\t" << gitversion;
 #else
-      trace_file << "\t" << quda_version;
+        trace_file << "\t" << quda_version;
 #endif
         trace_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
 

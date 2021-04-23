@@ -164,7 +164,7 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
   // Print the XML string.
   // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
-  // Tracked on github via #936 
+  // Tracked on github via #936
   if (len != 18 && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
 
   // Get total size. Could probably check the filesize better, but tbd.

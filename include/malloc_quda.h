@@ -93,7 +93,8 @@ namespace quda {
   quda::device_comms_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define get_mapped_device_pointer(ptr)                                                                                 \
+  quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 namespace quda {
 

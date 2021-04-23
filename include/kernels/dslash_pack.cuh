@@ -73,7 +73,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
-            double b, double c, int shmem_ = 0) :
+            double b, double c, int shmem_) :
       in_pack(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       dagger(dagger),
@@ -363,7 +363,7 @@ namespace quda
     }
     // if we are not in the uber kernel
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
-      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
           nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, getNeighborRank(2 * dim + dir, arg));
       }

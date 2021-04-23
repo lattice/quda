@@ -90,8 +90,9 @@ public:
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool defaulted = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {

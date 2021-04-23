@@ -303,7 +303,7 @@ protected:
   int param;
 
 public:
-  virtual ~BLASTest() { }
+  virtual ~BLASTest() {}
   virtual void SetUp() { param = GetParam(); }
 };
 
