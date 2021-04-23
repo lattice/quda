@@ -410,7 +410,7 @@ namespace quda
       for(int i=0; i<4; i++) {
 	source_position[i] = arg.source_position[i];
 	mom_mode[i] = arg.mom_mode[i];
-	fft_type[i] = arg.fft_type[i],
+	fft_type[i] = arg.fft_type[i];
 	offsets[i] = arg.offsets[i];
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
@@ -460,7 +460,7 @@ namespace quda
 	  phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
 	}
       
-      // Staggered only uses the first element of result_all_channels
+      // Staggered uses only the first element of result_all_channels
       result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
       result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
       for(int i=1; i<max_contract_results; ++i) // zero unused elements
