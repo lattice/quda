@@ -28,30 +28,36 @@ void display_test_info()
   switch (test_type) {
   case 0:
     printfQuda("\nAPE smearing\n");
-    printfQuda(" - rho %f\n", ape_smear_rho);
+    printfQuda(" - rho %e\n", ape_smear_rho);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 1:
     printfQuda("\nStout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - rho %e\n", stout_smear_rho);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 2:
     printfQuda("\nOver-Improved Stout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
-    printfQuda(" - epsilon %f\n", stout_smear_epsilon);
+    printfQuda(" - rho %e\n", stout_smear_rho);
+    printfQuda(" - epsilon %e\n", stout_smear_epsilon);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 3:
     printfQuda("\nWilson Flow\n");
-    printfQuda(" - epsilon %f\n", wflow_epsilon);
+    printfQuda(" - epsilon %e\n", wflow_epsilon);
     printfQuda(" - Wilson flow steps %d\n", wflow_steps);
     printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
+  case 4:
+    printfQuda("\nFundamental Rep\n");
+    printfQuda(" - QR tolerance %e\n", wflow_epsilon);
+    printfQuda(" - QR max iterations %d\n", wflow_steps);
+    break;
+    
   default: errorQuda("Undefined test type %d given", test_type);
   }
 
@@ -102,9 +108,9 @@ int main(int argc, char **argv)
 
   auto app = make_app();
   add_su3_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
+  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}, {"Fundamental Rep", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-
+  
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -235,9 +241,20 @@ int main(int argc, char **argv)
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Wilson Flow = %g secs\n", time0);
     break;
+  case 4:
+    // Compute the fundamental representation
+    // Start the timer
+    time0 = -((double)clock());
+    computeGaugeFundamental(su3_qr_tol, su3_qr_maxiter, su3_taylor_N);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Fundamental Rep = %g secs\n", time0);
+    break;
+    
   default: errorQuda("Undefined test type %d given", test_type);
   }
-
+  
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif

@@ -212,7 +212,8 @@ namespace quda {
     class Eigensolve {
 
       //! The eigenvalues
-      ColorSpinor<T,1,N> eval_; 
+      using Real = typename RealType<T>::type;
+      ColorSpinor<Real,1,N> eval_; 
       //! The eigen decomposition of input matrix A
       Mat<T,N> E_;
       //! The upper Hessenberg decomposition of A
@@ -223,6 +224,16 @@ namespace quda {
       Mat<T,N> Q_;
       //! QR tolerance
       double tol_;
+      //! QR max iterations
+      int max_iter_;
+
+      // diagnostics
+      //! QR iterations
+      int iter_;
+      //! QR iterations
+      bool converged_;      
+      //! The A matrix
+      Mat<T,N> A_;
       
     public:
       /**
@@ -232,27 +243,29 @@ namespace quda {
 	 @param[in] from_upper_hessenberg If true, omit the upper 
 	 Hessenberg decomposition
       */
-      __device__ __host__ inline Eigensolve(const Mat<T,N> &A, double tol, bool from_upper_hessenberg=false)
+      __device__ __host__ inline Eigensolve(const Mat<T,N> &A, const double tol, const int max_iter, bool from_upper_hessenberg=false)
       {
 	Mat<T,N> &H = H_;
 	Mat<T,N> &P = P_;
 	Mat<T,N> &Q = Q_;
 	Mat<T,N> &E = E_;
-	ColorSpinor<T,1,N> &eval = eval_;
+	A_ = A;
+	ColorSpinor<Real,1,N> &eval = eval_;	
 	tol_ = tol;
-	
+	max_iter_ = max_iter;
+		
 	// Reduce A to upper Hessenberg in H
 	H = A;
 	setIdentity(&P);
 	if(!from_upper_hessenberg) upperHessReduction(A, H, P);
 	
 	// QR the upper Hessenberg matrix into upper triangular form;
-	qrUpperHess(Q, H);
+	iter_ = qrUpperHess(Q, H);
 	// Accumulate rotations
 	P = P * Q;
 	
 	// eigensolve the upper triangular matrix by back substitution
-	eigensolveUpperTri(E, H);	
+	converged_ = eigensolveUpperTri(E, H);	
 	// Rotate the eigenvectors
 	E = P * E;
 	
@@ -290,31 +303,74 @@ namespace quda {
       }
 
       /**
-	 @brief Return the exponent S of A: a = exp(iS)
+	 @brief Return the the L2 deviation from the SU(3) manifold.
+	 @return error The L2 deviation from the SU(3) manifold;
+      */
+      __device__ __host__ inline Real checkEigenvectors() {
+	const auto &E = E_;
+	return ErrorSU3(E);
+      }
+
+      /**
+	 @brief Return the the L2 deviation from the SU(3) manifold.
+	 @return error The L2 deviation from the SU(3) manifold;
+      */
+      __device__ __host__ inline Real checkEigendecomposition(int i) {
+	const auto &E = E_;
+	const auto &A = A_;
+	
+	ColorSpinor<Real,1,N> evec;
+	for (int j=0; j<N; j++)
+	  for (int k=0; k<N; k++)
+	    evec(j) += A(j,k) * E(k,i);
+	
+	Real diff = 0.0;
+	for (int j=0; j<N; j++) diff += abs(eval(i) * E(j,i) - evec(j));
+	return diff;
+      }
+
+      
+      /**
+	 @brief Return the QR iterations
+      */
+      __device__ __host__ inline int queryQR() {
+	return iter_;
+      }
+
+      /**
+	 @brief Return the upper tri eigendecomposition status
+      */
+      __device__ __host__ inline bool queryTriSolver() {
+	return converged_;
+      }
+      
+      /**
+	 @brief Return the exponent H of A: a = exp(iH)
 	 If the input matrix is a unitary gauge field link and we want
 	 the coefficients of the fundamental representation
 	 we must take the log of the matrix.
-	 @return S The matrix exponent
+	 @return H The hermitian matrix exponent
       */
-      __device__ __host__ inline const Mat<T,N> exponent() const
+      __device__ __host__ inline Mat<T,N> exponent() 
       {
-	// Reuse P and Q.
-	Mat<T,N> &P = P_;
 	Mat<T,N> &E = E_;
-	Mat<T,N> ret;	
-	typedef decltype(P(0,0).x) Real;
-	
-	// Place evals of S in P.
-	setIdentity(&P);
+	Mat<T,N> ret;
+	ColorSpinor<Real,1,N> &eval = eval_;
+
+	Mat<T,N> Sigma;
+	setZero(&Sigma);
+#pragma unroll
 	for(int i=0; i<N; i++) {
-	  Real sigma = atan(eval(i).imag() / eval(i).real());	  
-	  eval(i).real() = sigma;
-	  eval(i).imag() = 0.0;
-	  P(i,i) = eval(i);
+	  Sigma(i,i).x = atan2(eval(i).imag(), eval(i).real());
+	  if(is_nan(Sigma(i,i).x)) printf("nan found in Eigensolve\n");
 	}
-	// S = V * Sigma * V^{\dag}
-	ret = E * P * E.conj();
-	return ret;	
+	// H = V * Sigma * V^{\dag}
+	ret = E;
+	ret = ret * Sigma;
+	ret = ret * conj(E);
+	for(int i=0; i<N; i++) 
+	  for(int j=0; j<N; j++) if(is_nan(ret(i,j).x) || is_nan(ret(i,j).y)) printf("nan found in Eigensolve\n");
+	return ret;
       }
       
       /**
@@ -325,50 +381,50 @@ namespace quda {
       */
       __device__ __host__ inline void upperHessReduction(const Mat<T,N> &A, Mat<T,N> &H, Mat<T,N> &P)
       {
-	typedef decltype(A(0,0).x) Real;	
 	Mat<T,N> Pi;      // reflector at iteration i
 	
 	Real col_norm, col_norm_inv;
-	ColorSpinor<T,1,N> v; // vector of length (1 x N)
+	Real tol = tol_;
 	
 	for(int i = 0; i < N - 2; i++) {
 	  
 	  // get (partial) dot product of ith column vector
 	  col_norm = 0.0;
 #pragma unroll
-	  for(int j = i+1; j < N; j++) {
-	    col_norm += H(j,i).real() * H(j,i).real();
-	    col_norm += H(j,i).imag() * H(j,i).imag();
-	  }
+	  for(int j = i+1; j < N; j++) col_norm += norm(H(j,i));
 	  col_norm = sqrt(col_norm);
 	  
-	  v(i+1) = H(i+1,i) - (static_cast<T>(col_norm) * H(i+1,i)) / sqrt(H(i+1,i).real() * H(i+1,i).real() + H(i+1,i).imag() * H(i+1,i).imag());
+	  ColorSpinor<Real,1,N> v; // vector of length (1 x N)
+	  T rho = static_cast<T>(1.0);
+	  Real abs_elem = abs(H(i+1,i));
+	  if(abs_elem > tol) rho = -H(i+1)/static_cast<T>(abs_elem);	  
+	  v(i+1) = H(i+1,i) - static_cast<T>(col_norm) * rho;
 	  
 	  // reuse col_norm
-	  col_norm = v(i+1).real() * v(i+1).real() + v(i+1).imag() * v(i+1).imag();
-
+	  col_norm = norm(v(i+1));
+	  
 	  // copy the rest of the column
 #pragma unroll
 	  for(int j = i + 2; j < N; j++ ) {
 	    v(j) = H(j,i);
-	    col_norm += v(j).real() * v(j).real() + v(j).imag() * v(j).imag();
+	    col_norm += norm(v(j));
 	  }
-	  col_norm_inv = 1.0/sqrt(col_norm);
+	  col_norm_inv = 1.0/max(sqrt(col_norm), 1e-30);
 	  
 	  // Normalise the column
 #pragma unroll
-	  for(int j = i + 1; j < N; j++) v(j) *= col_norm_inv;
+	  for(int j = i + 1; j < N; j++) v(j) *= static_cast<T>(col_norm_inv);
 	  
-	  // Construct the householder matrix P = I - 2 U U*T
+	  // Construct the householder matrix P = I - 2 v * v^{\dag}
 	  setIdentity(&Pi);
 #pragma unroll
 	  for(int j = i + 1; j < N; j++ ) {
 	    for(int k = i + 1; k < N; k++ ) {
 	      T P_elem;
 	      P_elem.x  = v(j).real() * v(k).real();
-	      P_elem.x += v(j).imag() * v(k).conj();
+	      P_elem.x += v(j).imag() * v(k).imag();
 	      P_elem.y  = v(j).imag() * v(k).real();
-	      P_elem.y -= v(j).real() * v(k).conj();
+	      P_elem.y -= v(j).real() * v(k).imag();
 	      Pi(j,k) -= static_cast<T>(2.0) * P_elem;
 	    }	    
 	  }
@@ -387,22 +443,21 @@ namespace quda {
       */
       __device__ __host__ inline void qrIteration(Mat<T,N> &Q, Mat<T,N> &R)
       {
-	typedef decltype(Q(0,0).x) Real;
 	T T11, T12, T21, T22, U1, U2;
 	Real dV;
 	Real tol = tol_;
 	
 	// Allocate the rotation matrices.
-	ColorSpinor<T,1,N-1> R11;
-	ColorSpinor<T,1,N-1> R12;
-	ColorSpinor<T,1,N-1> R21;
-	ColorSpinor<T,1,N-1> R22;
+	ColorSpinor<Real,1,N-1> R11;
+	ColorSpinor<Real,1,N-1> R12;
+	ColorSpinor<Real,1,N-1> R21;
+	ColorSpinor<Real,1,N-1> R22;
 	
 	for (int i = 0; i < N - 1; i++) {
 	  
 	  // If the sub-diagonal element is numerically
 	  // small enough, floor it to 0
-	  if (abs(R(i + 1,i)) < tol) {
+	  if (abs(R(i + 1,i)) < 1e-30) {
 	    R(i + 1,i) = static_cast<T>(0.0);
 	    continue;
 	  }
@@ -410,7 +465,7 @@ namespace quda {
 	  U1 = R(i,i);
 	  dV = sqrt(norm(R(i,i)) + norm(R(i + 1,i)));
 	  dV = (U1.real() > 0) ? dV : -dV;
-	  U1 += dV;
+	  U1 += static_cast<T>(dV);
 	  U2 = R(i + 1,i);
 	  
 	  T11 = conj(U1) / dV;
@@ -465,11 +520,11 @@ namespace quda {
 	 @param[in] Q The accumulated reflectors
 	 @param[in] UH The upper Hessenberg matrix
       */
-      __device__ __host__ inline void qrUpperHess(Mat<T,N> &Q, Mat<T,N> &UH)
+      __device__ __host__ inline int qrUpperHess(Mat<T,N> &Q, Mat<T,N> &UH)
       {
 	setIdentity(&Q);
 	double tol = tol_;
-	int max_iter = 100000;
+	int max_iter = max_iter_;
 	int iter = 0;
 	
 	T temp, discriminant, sol1, sol2, eval;
@@ -483,11 +538,11 @@ namespace quda {
 	      // Compute the 2 eigenvalues via the quadratic formula
 	      //----------------------------------------------------
 	      // The discriminant
-	      temp = (UH(i,i) - UH(i + 1,i + 1)) * (UH(i,i) - UH(i + 1,i + 1)) / 4.0;
+	      temp = (UH(i,i) - UH(i + 1,i + 1)) * (UH(i,i) - UH(i + 1,i + 1)) / static_cast<T>(4.0);
 	      discriminant = sqrt(UH(i + 1,i) * UH(i,i + 1) + temp);
 	      
 	      // Reuse temp
-	      temp = (UH(i,i) + UH(i + 1,i + 1)) / 2.0;
+	      temp = (UH(i,i) + UH(i + 1,i + 1)) / static_cast<T>(2.0);
 	      
 	      sol1 = temp - UH(i + 1,i + 1) + discriminant;
 	      sol2 = temp - UH(i + 1,i + 1) - discriminant;
@@ -495,13 +550,13 @@ namespace quda {
 	      
 	      // Deduce the better eval to shift
 	      eval = UH(i + 1,i + 1) + (norm(sol1) < norm(sol2) ? sol1 : sol2);
-	      
+	      if(abs(eval) < tol) eval = static_cast<T>(1.0);
 	      // Shift the eigenvalue
 #pragma unroll
 	      for (int j = 0; j < N; j++) UH(j,j) -= eval;
 	      
 	      // Do the QR iteration
-	      //qrIteration(Q, UH);
+	      qrIteration(Q, UH);
 	      
 	      // Shift back
 #pragma unroll
@@ -509,7 +564,8 @@ namespace quda {
 	    }
 	    iter++;
 	  }
-	}	
+	}
+	return iter;
       }
       
       /**
@@ -517,16 +573,18 @@ namespace quda {
 	 @param[in] E The eigenvectors 
 	 @param[in] UT The upper triangular matrix
       */
-      __device__ __host__ inline void eigensolveUpperTri(Mat<T,N> &E, const Mat<T,N> &UT) {
-	typedef decltype(E(0,0).x) Real;
+      __device__ __host__ inline bool eigensolveUpperTri(Mat<T,N> &E, const Mat<T,N> &UT)
+      {
 	Real tol = tol_;
 	Real vnorm, vnorm_inv;
+	bool converged = true;
 	
 	// Temp matrix storage
 	Mat<T,N> UTt;
+	setZero(&E);
 	
 	for (int i = N - 1; i >= 0; i--) {
-	  ColorSpinor<T,1,N> V;
+	  ColorSpinor<Real,1,N> V;
 	  T lambda = UT(i,i);
 #pragma unroll
 	  for (int j = 0; j < N; j++ ) UTt(j,j) = UT(j,j) - lambda; 
@@ -542,17 +600,18 @@ namespace quda {
 	    
 	    if (abs(UTt(j,j)) < tol) {
 	      // Degeneracy detected in upper triangular eigensolve
-	      // What do...?
+	      converged = false;
 	    } else V(j) = V(j) / UTt(j,j);
 	  }
 	  // Normalise
 	  vnorm = 0.0;
 #pragma unroll
-	  for (int j=0; j<N; j++) vnorm += (V(j).x * V(j).x + V(j).y * V(j).y);
-	  vnorm_inv = sqrt(vnorm);
+	  for (int j=0; j < N; j++) vnorm += norm(V(j));
+	  vnorm_inv = 1.0/sqrt(vnorm);
 #pragma unroll
-	  for (int j = 0; j <= i; j++ ) E(j,i) = V(j) * static_cast<T>(vnorm_inv);
+	  for (int j = 0; j<=i; j++ ) E(j,i) = V(j) * static_cast<T>(vnorm_inv);
 	}
+	return converged;
       }
     };
     

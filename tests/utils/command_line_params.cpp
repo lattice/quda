@@ -235,6 +235,9 @@ double eofa_mq1 = 1.0;
 double eofa_mq2 = 0.085;
 double eofa_mq3 = 1.0;
 
+double su3_qr_tol = 1e-6;
+int su3_qr_maxiter = 100;
+int su3_taylor_N = 25;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -1009,10 +1012,15 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
-
+  
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-qr-tol", su3_qr_tol, "Tolerance on the link QR solver (default 1e-6)");
+  
+  opgroup->add_option("--su3-qr-maxiter", su3_qr_maxiter, "Maximum iterations of the link QR solver (default 100)");
+
+  opgroup->add_option("--su3-taylor-N", su3_taylor_N, "The degree of the link Taylor expansion of exp(iH) (default 25)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

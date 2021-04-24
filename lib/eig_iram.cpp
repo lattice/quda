@@ -288,7 +288,7 @@ namespace quda
 #ifdef _OPENMP
 #pragma omp parallel
         {
-#pragma omp for schedule(static, 32) nowait
+#pragma omp for schedule(static, 32) 
 #endif
           for (int i = 0; i < j + 2; i++) {
             Complex temp = R[i][j];
@@ -296,7 +296,7 @@ namespace quda
             R[i][j + 1] -= (R21[j] * temp + R22[j] * R[i][j + 1]);
           }
 #ifdef _OPENMP
-#pragma omp for schedule(static, 32) nowait
+#pragma omp for schedule(static, 32) 
 #endif
           for (int i = 0; i < n_kr; i++) {
             Complex temp = Q[i][j];
@@ -413,7 +413,7 @@ namespace quda
 
       // rotate eigenvectors
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static, 32) nowait
+#pragma omp parallel for schedule(static, 32) 
 #endif
       for (int i = 0; i < n_kr; i++) 
 	for (int j = 0; j < n_kr; j++) 
@@ -467,7 +467,7 @@ namespace quda
 	
 	// Exit if degenerate
 	if (abs(TT[j][j]) < tol) {
-	  errorQuda("Degeneracy detected in upper triangular eigensolve");
+	  errorQuda("Degeneracy detected in upper triangular eigensolve, likely due to the eig_qr_tol value being too high.");
 	} else V[j] = V[j] / TT[j][j];
       }
       // Normalise
