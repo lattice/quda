@@ -165,17 +165,25 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
                                QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
                                void *clover_inv)
 {
+
+  int vol = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);
+  if( dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH ){
+    if( inv_param.twist_flavor != QUDA_TWIST_SINGLET ){
+      vol *= 2;
+    }
+  }
+
   if (multishift > 1) {
+    
     // ONLY WILSON/CLOVER/TWISTED TYPES
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
     }
 
-    // V instead Vh to support two-flavour twisted mass / twisted clover operators
-    void *spinorTmp = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    void *spinorTmp = malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
     printfQuda("Host residuum checks: \n");
     for (int i = 0; i < inv_param.num_offset; i++) {
-      ax(0, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
+      ax(0, spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
@@ -218,10 +226,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         exit(-1);
       }
 
-      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
-      mxpy(spinorIn, spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
-      double nrm2 = norm_2(spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
-      double src2 = norm_2(spinorIn, Vh * spinor_site_size, inv_param.cpu_prec);
+      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
+      mxpy(spinorIn, spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
+      double nrm2 = norm_2(spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
+      double src2 = norm_2(spinorIn, vol * spinor_site_size, inv_param.cpu_prec);
       double l2r = sqrt(nrm2 / src2);
 
       printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", i,
@@ -256,14 +264,9 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       } else {
         errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
       }
+
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if ( (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) && 
-             (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ) {
-          ax(0.5 / inv_param.kappa, spinorCheck, 2 * V * spinor_site_size, inv_param.cpu_prec);
-          // CAREFULL
-        } else {
-          ax(0.5 / inv_param.kappa, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
-        }
+        ax(0.5 / inv_param.kappa, spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
       }
 
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
@@ -295,18 +298,13 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if ( (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) && 
-             (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ) {
-          ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, 2 * Vh * spinor_site_size, inv_param.cpu_prec);
-        } else { 
-          ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
-        }
+        ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
       }
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
-      void *spinorTmp = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-      ax(0, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
+      void *spinorTmp = malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+      ax(0, spinorCheck, vol * spinor_site_size, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
@@ -354,7 +352,6 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       errorQuda("Solution type %s not implemented", get_solution_str(inv_param.solution_type));
     }
 
-    int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
     mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
     double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
