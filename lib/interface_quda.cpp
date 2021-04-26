@@ -5952,9 +5952,10 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &inv_param4D, const int *X, const size_t single_spinorsize_in_floats){ //, QudaInvertParam *inv_param5D,
+void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param4D, const int *X, const size_t single_spinorsize_in_floats){ //, QudaInvertParam *inv_param5D,
   //! give in4D_ptr to the parameter class, from which we then construct a ColorSpinorField
-  ColorSpinorParam cpuParam4D((void *)in4D_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorParam cpuParam4D((void *)in4D_ptr, *inv_param4D, X, false, inv_param4D->input_location);
+
   ColorSpinorField *h_4D_pointsource = ColorSpinorField::Create(cpuParam4D);
 
   //! 5D source constructed from a 4D pointsource only contains non-zero entries in the
@@ -5962,13 +5963,13 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &
 
   //! construct CSF for the projected 4D point source
   auto* h_4D_temp_ptr = (double *)malloc(single_spinorsize_in_floats);
-  ColorSpinorParam cpuParam4D_temp((void *)h_4D_temp_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorParam cpuParam4D_temp((void *)h_4D_temp_ptr, *inv_param4D, X, false, inv_param4D->input_location);
   ColorSpinorField *h_4D_temp = ColorSpinorField::Create(cpuParam4D);
   qudaMemsetAsync(h_4D_temp->V(), 0, single_spinorsize_in_floats, device::get_default_stream());
 
   //! construct CSF for the first entry of the fifth dimension
   auto* h_4D_out_new_ptr = (double *)malloc(single_spinorsize_in_floats);
-  ColorSpinorParam cpuParam4D_out_new_ptr((void *)h_4D_temp_ptr, inv_param4D, X, false, inv_param4D.input_location);
+  ColorSpinorParam cpuParam4D_out_new_ptr((void *)h_4D_temp_ptr, *inv_param4D, X, false, inv_param4D->input_location);
   ColorSpinorField *h_4D_out_new = ColorSpinorField::Create(cpuParam4D);
   qudaMemsetAsync(h_4D_out_new->V(), 0, single_spinorsize_in_floats, device::get_default_stream());
 
@@ -5979,14 +5980,14 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &
 
   //TODO check if all of these parameter things here are correct
   DiracParam mydiracparam;
-  setDiracParam(mydiracparam, &inv_param4D, false);
+  setDiracParam(mydiracparam, inv_param4D, false);
   DiracMobius myMobius(mydiracparam);
   myMobius.Dslash4(*h_4D_out_new, *h_4D_temp, QUDA_INVALID_PARITY);//TODO what parity ???
 
 
   //! note c_5 has many entries but they are all the same in this case, so we just use the first one, c_5[0]
-  double myc_5 = reinterpret_cast<double *>(&inv_param4D.c_5)[0];
-  blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D.m5) * 2, *h_4D_temp);
+  double myc_5 = reinterpret_cast<double *>(&inv_param4D->c_5)[0];
+  blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D->m5) * 2, *h_4D_temp);
   blas::ax(0.5, *h_4D_out_new);
   blas::xpy(*h_4D_out_new,*h_4D_temp);
 
