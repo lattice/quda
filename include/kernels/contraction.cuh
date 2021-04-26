@@ -317,7 +317,7 @@ namespace quda
       int s1 = arg.s1;
       int b1 = arg.b1;
       int mom_mode[4];
-      QudaFFTSymmType fft_type[4];
+      //QudaFFTSymmType fft_type[4]; DMH: to suppress warnings
       int source_position[4];
       int offsets[4];
       int NxNyNzNt[4];
@@ -325,7 +325,7 @@ namespace quda
 	source_position[i] = arg.source_position[i];
 	offsets[i] = arg.offsets[i];
 	mom_mode[i] = arg.mom_mode[i];
-	fft_type[i] = arg.fft_type[i];
+	//fft_type[i] = arg.fft_type[i]; DMH: to suppress warnings
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
       

@@ -5775,7 +5775,6 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   auto cs_param = (ColorSpinorParam *)cs_param_ptr;
   const size_t nSpin = cs_param->nSpin;
   const size_t src_nColor = src_colors;
-  printfQuda("nSpin = %lu, src_nColor = %lu\n", nSpin, src_nColor);
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
   
@@ -5825,16 +5824,11 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   profileContractFT.TPSTOP(QUDA_PROFILE_INIT);
 
-  printfQuda("here 1\n");
-
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
-  for(int i=0; i<nSpin*src_nColor; i++) {
-    printfQuda("here 2a %d\n", i);
+  for(size_t i=0; i<nSpin*src_nColor; i++) {
     *d_prop1[i] = *h_prop1[i];
-    printfQuda("here 2b %d\n", i);
     *d_prop2[i] = *h_prop2[i];
-    printfQuda("here 2c %d\n", i);
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -5870,23 +5864,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
     }
   }
 
-  printfQuda("Contraction complete\n");
-  
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
   for(size_t i=0; i<nSpin*src_nColor; i++) {
-    printfQuda("Contraction complete 1\n");
     delete h_prop1[i];
-    printfQuda("Contraction complete 2\n");
     delete h_prop2[i];
-    printfQuda("Contraction complete 3\n");
     delete d_prop1[i];
-    printfQuda("Contraction complete 4\n");
     delete d_prop2[i];
-    printfQuda("Contraction complete 5\n");
   }
-
-  
   
   profileContractFT.TPSTOP(QUDA_PROFILE_FREE);
   profileContractFT.TPSTOP(QUDA_PROFILE_TOTAL);

@@ -113,17 +113,17 @@ int test(int contractionType, QudaPrecision test_prec)
   case 0:
     cType = QUDA_CONTRACT_TYPE_DR_FT_T;
     nSpin = 4;
-    red_size = X[3];
+    red_size = comm_dim(3)*X[3]; //DMH: total temporal dim
     break;
   case 1:
     cType = QUDA_CONTRACT_TYPE_DR_FT_Z;
     nSpin = 4;
-    red_size = X[2];
+    red_size = comm_dim(2)*X[2]; //DMH total Z dim
     break;
   case 2:
     cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
     nSpin = 1;
-    red_size = X[3];
+    red_size = comm_dim(3)*X[3]; //DMH total temporal dim
     break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
@@ -145,12 +145,12 @@ int test(int contractionType, QudaPrecision test_prec)
   cs_param.create = QUDA_ZERO_FIELD_CREATE;
   cs_param.location = QUDA_CPU_FIELD_LOCATION;
 
-  int my_spinor_site_size = nSpin * 3;
+  int my_spinor_site_size = nSpin * 3; //DMH: nSpin X nColor 
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   int src_colors = 1; // source color (dilutions)
   int const nprops = nSpin * src_colors;
-  size_t spinor_field_floats = V * my_spinor_site_size * 2; //DMH ? 
+  size_t spinor_field_floats = V * my_spinor_site_size * 2; // DMH: Vol * spinor elems * 2(re,im) 
   void *buffX = malloc(nprops * spinor_field_floats * data_size);
   void *buffY = malloc(nprops * spinor_field_floats * data_size);
 
@@ -162,8 +162,8 @@ int test(int contractionType, QudaPrecision test_prec)
     }
   } else {
     for (size_t i = 0; i < spinor_field_floats * nprops; i++) {
-      ((double *)buffX)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
-      ((double *)buffY)[i] = 2.*(rand() / (float)RAND_MAX) - 1.;
+      ((double *)buffX)[i] = 2.*(rand() / (double)RAND_MAX) - 1.;
+      ((double *)buffY)[i] = 2.*(rand() / (double)RAND_MAX) - 1.;
     }
   }
 

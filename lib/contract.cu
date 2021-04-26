@@ -112,7 +112,7 @@ namespace quda {
       }
     }
     
-    long long flops()
+    long long flops() const //DMH: Restore const qualifier for warning suppression
     {
       return ((x.Nspin() * x.Nspin() * x.Ncolor() * 6ll) + (x.Nspin() * x.Nspin() * (x.Nspin() + x.Nspin()*x.Ncolor()))) * x.Volume();
     }
@@ -123,7 +123,6 @@ namespace quda {
     }
   };
   
-#define GPU_CONTRACT 1
 #ifdef GPU_CONTRACT
   void contractSummedQuda(const ColorSpinorField &x, const ColorSpinorField &y,
 			  std::vector<Complex> &result_global,
