@@ -225,18 +225,15 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
           convert4Dto5DpointSource(source_array_ptr[i], source5D, &inv_param, gauge_param.X, single_spinorsize_in_floats);
       }
-      //! Gaussian smear the source.
+      //! Gaussian smear the source. The default setting is to not smear.
       performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
 
-      // TODO this should work for 5D without changes
-
-
+      //! swap to 5D source if using DWF
       void* invert_input;
       invert_input = source_array_ptr[i];
       if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
         invert_input = source5D;
       }
-      //! TODO make sure inv_param is correct from our cmd line arguments
       invertQuda(prop_array_ptr_2[i], invert_input, &inv_param);
 
       //! Gaussian smear the sink.
@@ -369,7 +366,7 @@ int main(int argc, char **argv)
 
   //! Wilson ColorSpinorParams
   quda::ColorSpinorParam cs_param;
-  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param); //TODO this actually already support DWF
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
 
   //! Allocate memory on host for one source for each of the 12x12 color+spinor combinations
