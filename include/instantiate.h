@@ -131,7 +131,11 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
+#if (QUDA_PRECISION & 8) || (QUDA_PRECISION & 4)
   constexpr void instantiate(G &U, Args &&... args)
+#else
+  constexpr void instantiate(G &U, Args &&...)
+#endif
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
