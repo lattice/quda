@@ -5775,9 +5775,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   auto cs_param = (ColorSpinorParam *)cs_param_ptr;
   const size_t nSpin = cs_param->nSpin;
   const size_t src_nColor = src_colors;
+  printfQuda("nSpin = %lu, src_nColor = %lu\n", nSpin, src_nColor);
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
-
+  
   // max results set by contraction kernel and sized for nSpin**2 = 16
   const int max_contract_results = 16;
   // The number of contraction results expected in the output
@@ -5786,6 +5787,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   //FIXME can we merge the two propagators if they are the same to save mem?
   // wrap CPU host side pointers
   std::vector<ColorSpinorField*> h_prop1, h_prop2;
+  h_prop1.reserve(nSpin*src_nColor);
+  h_prop2.reserve(nSpin*src_nColor);
   for(size_t i=0; i<nSpin*src_nColor; i++) {
     cs_param->v = prop_array_flavor_1[i];
     h_prop1.push_back(ColorSpinorField::Create(*cs_param));
@@ -5801,6 +5804,8 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   cudaParam.setPrecision(cs_param->Precision(), cs_param->Precision(), true);
   
   std::vector<ColorSpinorField *> d_prop1, d_prop2;
+  d_prop1.reserve(nSpin*src_nColor);
+  d_prop2.reserve(nSpin*src_nColor);
   for(size_t i=0; i<nSpin*src_nColor; i++) {
     d_prop1.push_back(ColorSpinorField::Create(cudaParam));
     d_prop2.push_back(ColorSpinorField::Create(cudaParam));
@@ -5820,11 +5825,16 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 
   profileContractFT.TPSTOP(QUDA_PROFILE_INIT);
 
+  printfQuda("here 1\n");
+
   // Transfer data from host to device
   profileContractFT.TPSTART(QUDA_PROFILE_H2D);
-  for(size_t i=0; i<nSpin*src_nColor; i++) {
+  for(int i=0; i<nSpin*src_nColor; i++) {
+    printfQuda("here 2a %d\n", i);
     *d_prop1[i] = *h_prop1[i];
+    printfQuda("here 2b %d\n", i);
     *d_prop2[i] = *h_prop2[i];
+    printfQuda("here 2c %d\n", i);
   }
   profileContractFT.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -5859,15 +5869,24 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
       }
     }
   }
+
+  printfQuda("Contraction complete\n");
   
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
   for(size_t i=0; i<nSpin*src_nColor; i++) {
-    delete d_prop1[i];
-    delete d_prop2[i];
+    printfQuda("Contraction complete 1\n");
     delete h_prop1[i];
+    printfQuda("Contraction complete 2\n");
     delete h_prop2[i];
+    printfQuda("Contraction complete 3\n");
+    delete d_prop1[i];
+    printfQuda("Contraction complete 4\n");
+    delete d_prop2[i];
+    printfQuda("Contraction complete 5\n");
   }
+
+  
   
   profileContractFT.TPSTOP(QUDA_PROFILE_FREE);
   profileContractFT.TPSTOP(QUDA_PROFILE_TOTAL);

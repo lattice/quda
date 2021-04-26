@@ -145,12 +145,12 @@ int test(int contractionType, QudaPrecision test_prec)
   cs_param.create = QUDA_ZERO_FIELD_CREATE;
   cs_param.location = QUDA_CPU_FIELD_LOCATION;
 
-  int my_spinor_site_size = nSpin * 3 * 2;
+  int my_spinor_site_size = nSpin * 3;
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   int src_colors = 1; // source color (dilutions)
   int const nprops = nSpin * src_colors;
-  size_t spinor_field_floats = V * my_spinor_site_size * 2;
+  size_t spinor_field_floats = V * my_spinor_site_size * 2; //DMH ? 
   void *buffX = malloc(nprops * spinor_field_floats * data_size);
   void *buffY = malloc(nprops * spinor_field_floats * data_size);
 
@@ -170,10 +170,11 @@ int test(int contractionType, QudaPrecision test_prec)
   // array of spinor field for each source spin and color
   void* spinorX[nprops];
   void* spinorY[nprops];
-  { size_t off=0; for(int s=0; s<nprops; ++s, off += spinor_field_floats * data_size) {
-      spinorX[s] = (void*)((uintptr_t)buffX + off);
-      spinorY[s] = (void*)((uintptr_t)buffY + off);
-    }}
+  size_t off=0; 
+  for(int s=0; s<nprops; ++s, off += spinor_field_floats * data_size) {
+    spinorX[s] = (void*)((uintptr_t)buffX + off);
+    spinorY[s] = (void*)((uintptr_t)buffY + off);
+  }
 
   const int source_position[4]{0,0,0,0};
   const int n_mom = 1;
