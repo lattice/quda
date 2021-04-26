@@ -223,7 +223,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
 
       //! convert to 5D
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-          convert4Dto5DpointSource(source_array_ptr[i], source5D, inv_param, gauge_param.X, single_spinorsize_in_floats);
+          convert4Dto5DpointSource(source_array_ptr[i], source5D, &inv_param, gauge_param.X, single_spinorsize_in_floats);
       }
       //! Gaussian smear the source.
       performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
