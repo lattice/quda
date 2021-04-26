@@ -5984,7 +5984,7 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam &
   myMobius.Dslash4(*h_4D_out_new, *h_4D_temp, QUDA_INVALID_PARITY);//TODO what parity ???
 
 
-  //! note c_5 has many entries but they are presumably all the same, so we use the first one, c_5[0]
+  //! note c_5 has many entries but they are all the same in this case, so we just use the first one, c_5[0]
   double myc_5 = reinterpret_cast<double *>(&inv_param4D.c_5)[0];
   blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D.m5) * 2, *h_4D_temp);
   blas::ax(0.5, *h_4D_out_new);
