@@ -22,21 +22,25 @@
 
 namespace quda {
 
+  /* This is checked in the tuner */
   static qudaError_t last_error = QUDA_SUCCESS;
+
+  /* This is only ever printed */
   static std::string last_error_str{"HIP_SUCCESS"};
 
+  /* For the tuner to operat correctly we need to clear the last error */
   qudaError_t qudaGetLastError()
   {
     auto rtn = last_error;
-    last_error = QUDA_SUCCESS;
+    last_error = QUDA_SUCCESS;  // Clear the error prior to returning 
     return rtn;
   }
 
   std::string qudaGetLastErrorString()
   {
     auto rtn = last_error_str;
-    last_error_str = "QUDA_SUCCESS";
-    return rtn;
+    last_error_str = "HIP_SUCCESS"; // Clear the error prior to returning.
+    return rtn;  
   }
 
   namespace hip {
@@ -45,19 +49,24 @@ namespace quda {
                            bool allow_error = false)
     {
       if (error == hipSuccess) return;
-      last_error = error == hipSuccess ? QUDA_SUCCESS : QUDA_ERROR;
+      last_error = QUDA_ERROR;
       last_error_str = hipGetErrorString(error);
-      if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, hipGetErrorString(error), file, line, func);
+      if (!allow_error) {
+	      errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
+      }
+      else qudaGetLastError(); // Clear the error 
     }
 
     void set_driver_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
                           bool allow_error = false)
     {
-      if (error == HIP_SUCCESS) return;
-      last_error = error == HIP_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-      const char *str = hipGetErrorName(error);
-      last_error_str = str;
-      if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, str, file, line, func);
+      if (error == hipSuccess) return;
+      last_error = QUDA_ERROR;
+      last_error_str  = hipGetErrorString(error);
+      if (!allow_error) {
+	errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
+      }
+      else qudaGetLastError();
     }
 
   }
@@ -336,13 +345,49 @@ namespace quda {
   }
 
 
-  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line)
-   {
-     PROFILE(hipError_t error = hipEventQuery(reinterpret_cast<hipEvent_t&>(event.event)), QUDA_PROFILE_EVENT_QUERY);
+#if 0
+  bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
+  {
+    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    switch (error) {
+    case CUDA_SUCCESS: return true;
+    case CUDA_ERROR_NOT_READY: return false;
+    default: set_driver_error(error, __func__, func, file, line);
+    }
+#else
+    PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    switch (error) {
+    case cudaSuccess: return true;
+    case cudaErrorNotReady: return false;
+    default: set_runtime_error(error, __func__, func, file, line);
+    }
+#endif
+    return false;
+  }
+
+  void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
+  {
+    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
+    set_driver_error(error, __func__, func, file, line);
+#else
+    PROFILE(cudaError_t error = cudaEventRecord(event, device::get_cuda_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
+    set_runtime_error(error, __func__, func, file, line);
+#endif
+  }
+#endif
+
+  bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
+   { 
+     hipEvent_t &event = reinterpret_cast<hipEvent_t&>(quda_event.event);
+     PROFILE(hipError_t error = hipEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
      switch (error) {
      case hipSuccess: return true;
      case hipErrorNotReady: return false;
-     default: set_runtime_error(error, "hipEventQuery", func, file, line);
+     default: set_runtime_error(error, __func__, func, file, line);
      }
      return false;
    }
@@ -411,12 +456,15 @@ namespace quda {
    void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
    {
      PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+     error=hipGetLastError();
      set_runtime_error(error, "hipStreamSynchronize", func, file, line);
+     
    }
 
    void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
    {
      PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+     error=hipGetLastError();
      set_runtime_error(error, "hipDeviceSynchronize", func, file, line);
    }
 

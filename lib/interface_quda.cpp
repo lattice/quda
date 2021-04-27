@@ -562,6 +562,7 @@ void initQuda(int dev)
 
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
+  printfQuda("Max grid sizes=(%d, %d, %d\n", device::max_grid_size(0), device::max_grid_size(1), device::max_grid_size(2));
 }
 
 // This is a flag used to signal when we have downloaded new gauge
