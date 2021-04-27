@@ -54,7 +54,7 @@ namespace quda {
       if (!allow_error) {
 	      errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
       }
-      else qudaGetLastError(); // Clear the error 
+      else hipGetLastError(); // Clear the error 
     }
 
     void set_driver_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
@@ -66,7 +66,7 @@ namespace quda {
       if (!allow_error) {
 	errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
       }
-      else qudaGetLastError();
+      else hiphiGetLastError();
     }
 
   }
@@ -179,11 +179,12 @@ namespace quda {
         }
       } else {
         switch(kind) {
-        case hipMemcpyDeviceToHost:   name = "cudaMemcpyAsyncDeviceToHost";   break;
-        case hipMemcpyHostToDevice:   name = "cudaMemcpyAsyncHostToDevice";   break;
-        case hipMemcpyHostToHost:     name = "cudaMemcpyAsyncHostToHost";     break;
-        case hipMemcpyDeviceToDevice: name = "cudaMemcpyAsyncDeviceToDevice"; break;
-        case hipMemcpyDefault:        name = "cudaMemcpyAsyncDefault";        break;
+        case hipMemcpyDeviceToHost:   name = "hipMemcpyAsyncDeviceToHost";   break;
+        case hipMemcpyHostToDevice:   name = "hipMemcpyAsyncHostToDevice";   break;
+        case hipMemcpyHostToHost:     name = "hipMemcpyAsyncHostToHost";     break;
+        case hipMemcpyDeviceToDevice: name = "hipMemcpyAsyncDeviceToDevice"; break;
+        case hipMemcpyDefault:        name = "hipMemcpyAsyncDefault";        break;
+
         default: errorQuda("Unsupported hipMemcpyKind %d", kind);
         }
       }
