@@ -966,13 +966,8 @@ namespace quda
     std::vector<ColorSpinorField *> temp;
     std::vector<ColorSpinorField *> evecs_ptr;
     evecs_ptr.reserve(size);
-    //if(compressed_mode) {
-    //ColorSpinorParam cs_param_fine(*fine_vector[0]);
-    //temp.push_back(ColorSpinorField::Create(cs_param_fine));
-    //} else {
     ColorSpinorParam cs_param_fine(*r[0]);
     temp.push_back(ColorSpinorField::Create(cs_param_fine));
-    //}
     
     for (int i = 0; i < size; i++) {      
       // r = A * v_i      
@@ -1026,21 +1021,35 @@ namespace quda
     // no extra memory is allocated.
     std::vector<ColorSpinorField *> eig_vecs;
     eig_vecs.reserve(n_defl);
-    for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
-
+    for (int i = 0; i < n_defl; i++) {
+      eig_vecs.push_back(evecs[i]);
+    }
+    
     // 1. Take block inner product: (V_i)^dag * vec = A_i
     std::vector<Complex> s(n_defl * src.size());
     std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
     blas::cDotProduct(s.data(), eig_vecs, src_);
-
+    
+    
+    if(compressed_mode) {
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      promoteVectors(fine_vector, evecs, 0, i, 1);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      evecs_ptr.push_back(fine_vector[0]);
+    } else {
+      evecs_ptr.push_back(evecs[i]);
+    }
+    
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
+    for (int i = 0; i < n_defl; i++) {
+      s[i] /= evals[i].real(); 
+    }
+    
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate)
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
-
+    
     // Save Deflation tuning
     saveTuneCache();
   }
