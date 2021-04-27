@@ -18,6 +18,8 @@
 #include <queue>
 #include <functional>
 
+#include <communicator_quda.h>
+
 //#define LAUNCH_TIMER
 extern char *gitversion;
 
@@ -288,18 +290,18 @@ namespace quda
     std::stringstream serialized;
     size_t size;
 
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
       serializeTuneCache(serialized);
       size = serialized.str().length();
     }
-    comm_broadcast(&size, sizeof(size_t));
+    comm_broadcast_global(&size, sizeof(size_t));
 
     if (size > 0) {
-      if (comm_rank() == 0) {
-        comm_broadcast(const_cast<char *>(serialized.str().c_str()), size);
+      if (comm_rank_global() == 0) {
+        comm_broadcast_global(const_cast<char *>(serialized.str().c_str()), size);
       } else {
         char *serstr = new char[size + 1];
-        comm_broadcast(serstr, size);
+        comm_broadcast_global(serstr, size);
         serstr[size] = '\0'; // null-terminate
         serialized.str(serstr);
         deserializeTuneCache(serialized);
@@ -347,7 +349,7 @@ namespace quda
     }
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
 #endif
 
       cache_path = resource_path;
@@ -428,7 +430,7 @@ namespace quda
       //       ever support different subvolumes per GPU (as might be convenient for lattice volumes that don't divide evenly).
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) {
 #endif
 
       if (tunecache.size() == initial_cache_size && !error) return;
@@ -491,6 +493,11 @@ namespace quda
 
   void setPolicyTuning(bool policy_tuning_) { policy_tuning = policy_tuning_; }
 
+  static bool uber_tuning = false;
+  bool uberTuning() { return uber_tuning; }
+
+  void setUberTuning(bool uber_tuning_) { uber_tuning = uber_tuning_; }
+
   // flush profile, setting counts to zero
   void flushProfile()
   {
@@ -512,7 +519,7 @@ namespace quda
     if (resource_path.empty()) return;
 
 #ifdef MULTI_GPU
-    if (comm_rank() == 0) {
+    if (comm_rank_global() == 0) { // Make sure only one rank is writing to disk
 #endif
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
@@ -662,7 +669,7 @@ namespace quda
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam &tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -672,7 +679,6 @@ namespace quda
     TuneKey key = tunable.tuneKey();
     if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
-    static TuneParam param;
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTOP(QUDA_PROFILE_INIT);
@@ -690,11 +696,11 @@ namespace quda
       launchTimer.TPSTART(QUDA_PROFILE_COMPUTE);
 #endif
 
-      TuneParam &param = it->second;
+      TuneParam &param_tuned = it->second;
 
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Launching %s with %s at vol=%s with %s\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param).c_str());
+                   tunable.paramString(param_tuned).c_str());
       }
 
 #ifdef LAUNCH_TIMER
@@ -702,10 +708,10 @@ namespace quda
       launchTimer.TPSTART(QUDA_PROFILE_EPILOGUE);
 #endif
 
-      tunable.checkLaunchParam(param);
+      tunable.checkLaunchParam(param_tuned);
 
       // we could be tuning outside of the current scope
-      if (!tuning && profile_count) param.n_calls++;
+      if (!tuning && profile_count) param_tuned.n_calls++;
 
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_EPILOGUE);
@@ -713,11 +719,11 @@ namespace quda
 #endif
 
       if (traceEnabled() >= 2) {
-        TraceKey trace_entry(key, param.time);
+        TraceKey trace_entry(key, param_tuned.time);
         trace_list.push_back(trace_entry);
       }
 
-      return param;
+      return param_tuned;
     }
 
 #ifdef LAUNCH_TIMER
@@ -725,19 +731,24 @@ namespace quda
     launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
+    static TuneParam param;
+
     if (enabled == QUDA_TUNE_NO) {
-      tunable.defaultTuneParam(param);
-      tunable.checkLaunchParam(param);
+      TuneParam param_default;
+      tunable.defaultTuneParam(param_default);
+      tunable.checkLaunchParam(param_default);
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
         printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n", key.name, key.aux, key.volume,
-                   tunable.paramString(param).c_str());
+                   tunable.paramString(param_default).c_str());
       }
+
+      return param_default;
     } else if (!tuning) {
 
       /* As long as global reductions are not disabled, only do the
          tuning on node 0, else do the tuning on all nodes since we
          can't guarantee that all nodes are partaking */
-      if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
+      if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
         float best_time;
         time_t now;
@@ -824,7 +835,7 @@ namespace quda
         param = best_param;
         tunecache[key] = best_param;
       }
-      if (commGlobalReduction() || policyTuning()) broadcastTuneCache();
+      if (commGlobalReduction() || policyTuning() || uberTuning()) { broadcastTuneCache(); }
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {

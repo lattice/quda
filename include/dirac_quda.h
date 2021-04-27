@@ -125,6 +125,7 @@ namespace quda {
   class DiracMdagMLocal;
   class DiracMMdag;
   class DiracMdag;
+  class DiracG5M;
   //Forward declaration of multigrid Transfer class
   class Transfer;
 
@@ -137,6 +138,7 @@ namespace quda {
     friend class DiracMdagMLocal;
     friend class DiracMMdag;
     friend class DiracMdag;
+    friend class DiracG5M;
 
   protected:
     cudaGaugeField *gauge;
@@ -233,6 +235,17 @@ namespace quda {
     }
 
     /**
+       @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
+              boundary condition to MdagM on each rank. Depending on the number of
+              stencil steps of the fermion type, this may require additional effort
+              to include the terms that hop out of the boundary and then hop back.
+    */
+    virtual void Dslash4(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
+    {
+      errorQuda("Not implemented!\n");
+    }
+
+    /**
         @brief Apply Mdag (daggered operator of M
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -270,22 +283,22 @@ namespace quda {
 
     // Dirac operator factory
     /**
-        @brief Creates a subclass from parameters
+       @brief Creates a subclass from parameters
     */
     static Dirac* create(const DiracParam &param);
 
     /**
-        @brief accessor for Kappa (mass parameter)
+       @brief accessor for Kappa (mass parameter)
     */
     double Kappa() const { return kappa; }
 
     /**
-        @brief accessor for Mass (in case of a factor of 2 for staggered)
+       @brief accessor for Mass (in case of a factor of 2 for staggered)
     */
     virtual double Mass() const { return mass; } // in case of factor of 2 convention for staggered
 
     /**
-        @brief accessor for twist parameter -- overrride can return better value
+       @brief accessor for twist parameter -- overrride can return better value
     */
     virtual double Mu() const { return 0.; }
 
@@ -295,9 +308,14 @@ namespace quda {
     virtual double MuFactor() const { return 0.; }
 
     /**
-        @brief  returns and then zeroes flopcount
+       @brief  returns and then zeroes flopcount
     */
-    unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
+    unsigned long long Flops() const
+    {
+      unsigned long long rtn = flops;
+      flops = 0;
+      return rtn;
+    }
 
     /**
        @brief returns preconditioning type
@@ -305,17 +323,23 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return matpcType; }
 
     /**
-        @brief  I have no idea what this does
+       @brief  I have no idea what this does
     */
     int getStencilSteps() const;
 
-    /** sets whether operator is daggered or not */
+    /**
+       @brief sets whether operator is daggered or not
+    */
     void Dagger(QudaDagType dag) const { dagger = dag; }
 
-    /** Flips value of daggered */
+    /**
+       @brief Flips value of daggered
+    */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
-    /** @return is operator hermitian */
+    /**
+       @brief is operator hermitian
+    */
     virtual bool hermitian() const { return false; }
 
     /** @brief returns the Dirac type
@@ -908,6 +932,8 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
+
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
@@ -1867,27 +1893,62 @@ public:
     virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
-    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
-			    ColorSpinorField &tmp) const = 0;
-    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
-			    ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const = 0;
+    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const = 0;
+    virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1,
+                            ColorSpinorField &Tmp2) const = 0;
 
     unsigned long long flops() const { return dirac->Flops(); }
 
-
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
-    virtual int getStencilSteps() const = 0; 
+    virtual int getStencilSteps() const = 0;
 
     std::string Type() const { return typeid(*dirac).name(); }
-    
-    bool isStaggered() const {
+
+    /**
+       @brief return if the operator is a Wilson-type 4-d operator
+    */
+    bool isWilsonType() const
+    {
+      return (Type() == typeid(DiracWilson).name() || Type() == typeid(DiracWilsonPC).name()
+              || Type() == typeid(DiracClover).name() || Type() == typeid(DiracCloverPC).name()
+              || Type() == typeid(DiracCloverHasenbuschTwist).name()
+              || Type() == typeid(DiracCloverHasenbuschTwistPC).name() || Type() == typeid(DiracTwistedMass).name()
+              || Type() == typeid(DiracTwistedMassPC).name() || Type() == typeid(DiracTwistedClover).name()
+              || Type() == typeid(DiracTwistedCloverPC).name()) ?
+        true :
+        false;
+    }
+
+    /**
+       @brief return if the operator is a staggered operator
+    */
+    bool isStaggered() const
+    {
       return (Type() == typeid(DiracStaggeredPC).name() || Type() == typeid(DiracStaggered).name()
               || Type() == typeid(DiracImprovedStaggeredPC).name() || Type() == typeid(DiracImprovedStaggered).name()
               || Type() == typeid(DiracStaggeredKD).name() || Type() == typeid(DiracImprovedStaggeredKD).name()) ?
         true :
         false;
     }
+
+    /**
+       @brief return if the operator is a domain wall operator, that is, 5-dimensional
+    */
+    bool isDwf() const
+    {
+      return (Type() == typeid(DiracDomainWall).name() || Type() == typeid(DiracDomainWallPC).name()
+              || Type() == typeid(DiracDomainWall4D).name() || Type() == typeid(DiracDomainWall4DPC).name()
+              || Type() == typeid(DiracMobius).name() || Type() == typeid(DiracMobiusPC).name()
+              || Type() == typeid(DiracMobiusEofa).name() || Type() == typeid(DiracMobiusEofaPC).name()) ?
+        true :
+        false;
+    }
+
+    /**
+       @brief return if the operator is a coarse operator
+    */
+    bool isCoarse() const { return dirac->isCoarse(); }
 
     virtual bool hermitian() const { return dirac->hermitian(); }
 
@@ -1897,19 +1958,20 @@ public:
     double shift;
   };
 
-  class DiracM : public DiracMatrix {
+  class DiracM : public DiracMatrix
+  {
 
   public:
-  DiracM(const Dirac &d) : DiracMatrix(d) { }
-  DiracM(const Dirac *d) : DiracMatrix(d) { }
+    DiracM(const Dirac &d) : DiracMatrix(d) {}
+    DiracM(const Dirac *d) : DiracMatrix(d) {}
 
-  /**
-     @brief apply operator and potentially a shift
-  */
-  void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    dirac->M(out, in);
-    if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+    /**
+       @brief apply operator and potentially a shift
+    */
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
     }
 
     /**
@@ -2016,8 +2078,8 @@ public:
   {
 
   public:
-    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
-    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
 
@@ -2223,6 +2285,161 @@ public:
     int getStencilSteps() const
     {
       return mat.getStencilSteps(); 
+    }
+  };
+
+  /**
+     Gloms onto a DiracMatrix and provides an operator() for its G5M method
+  */
+  class DiracG5M : public DiracMatrix
+  {
+
+  public:
+    DiracG5M(const Dirac &d) : DiracMatrix(d) {}
+    DiracG5M(const Dirac *d) : DiracMatrix(d) {}
+
+    /**
+      @brief Left-apply gamma5 as appropriate for the operator
+
+      @param vec[in,out] vector to which gamma5 is applied in place
+    */
+    void applyGamma5(ColorSpinorField &vec) const
+    {
+      auto dirac_type = dirac->getDiracType();
+      auto pc_type = dirac->getMatPCType();
+      switch (dirac_type) {
+      case QUDA_WILSON_DIRAC:
+      case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
+      case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_TWISTED_CLOVER_DIRAC:
+        // while the twisted ops don't have a Hermitian indefinite spectrum, they
+        // do have a spectrum of the form (real) + i mu
+        gamma5(vec, vec);
+        break;
+      case QUDA_WILSONPC_DIRAC:
+      case QUDA_CLOVERPC_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
+      case QUDA_TWISTED_MASSPC_DIRAC:
+      case QUDA_TWISTED_CLOVERPC_DIRAC:
+        if (pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || pc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+          gamma5(vec, vec);
+        } else {
+          errorQuda("Invalid matpc type for Hermitian gamma5 version of %d", dirac_type);
+        }
+        break;
+      case QUDA_DOMAIN_WALL_DIRAC:
+      case QUDA_DOMAIN_WALLPC_DIRAC:
+      case QUDA_DOMAIN_WALL_4D_DIRAC:
+      case QUDA_DOMAIN_WALL_4DPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
+        // needs 5th dimension reversal, Mobius needs that inversion...
+        errorQuda("Support for Hermitian DWF operator %d does not exist yet", dirac_type);
+        break;
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
+        // Gamma5 is (-1)^(x+y+z+t)
+        blas::ax(-1.0, vec.Odd());
+        break;
+      case QUDA_STAGGEREDPC_DIRAC:
+      case QUDA_ASQTADPC_DIRAC:
+        // even is unchanged
+        if (pc_type == QUDA_MATPC_ODD_ODD || pc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+          blas::ax(-1.0, vec); // technically correct
+        } else if (pc_type == QUDA_MATPC_INVALID) {
+          errorQuda("Invalid pc_type %d for operator %d", pc_type, dirac_type);
+        }
+        break;
+      case QUDA_STAGGEREDKD_DIRAC:
+      case QUDA_ASQTADKD_DIRAC:
+        errorQuda("Kahler-Dirac preconditioned type %d does not have a Hermitian g5 operator", dirac_type);
+        break;
+      case QUDA_COARSE_DIRAC:
+      case QUDA_COARSEPC_DIRAC:
+        // more complicated, need to see if it's a repeated coarsening
+        // of the coarse op
+        errorQuda("Support for Hermitian coarse operator %d does not exist yet", dirac_type);
+        break;
+      case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_LAPLACEPC_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
+        // do nothing, technically correct, there is no gamma5
+        break;
+      default: errorQuda("Invalid Dirac type %d", dirac_type);
+      }
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      applyGamma5(out);
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      bool reset1 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
+      dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      applyGamma5(out);
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &Tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &Tmp2;
+        reset2 = true;
+      }
+      dirac->M(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      applyGamma5(out);
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
+    }
+
+    int getStencilSteps() const { return dirac->getStencilSteps(); }
+
+    /**
+       @brief return if the operator is HPD
+    */
+    virtual bool hermitian() const
+    {
+      auto dirac_type = dirac->getDiracType();
+      auto pc_type = dirac->getMatPCType();
+
+      if (dirac_type == QUDA_GAUGE_LAPLACE_DIRAC || dirac_type == QUDA_GAUGE_LAPLACEPC_DIRAC
+          || dirac_type == QUDA_GAUGE_COVDEV_DIRAC)
+        return true;
+
+      // subtle: odd operator gets a minus sign
+      if ((dirac_type == QUDA_STAGGEREDPC_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
+          && (pc_type == QUDA_MATPC_EVEN_EVEN || pc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC))
+        return true;
+
+      return false;
     }
   };
 

@@ -148,7 +148,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)
+#if (defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)) && defined(GPU_LAPLACE)
     inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
                         double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
@@ -158,7 +158,7 @@ namespace quda
 #endif
     {
       if (in.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
@@ -168,10 +168,10 @@ namespace quda
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
-        errorQuda("nSpin=%d Laplace operator required staggered dslash to be enabled", in.Nspin());
+        errorQuda("nSpin=%d Laplace operator required staggered dslash and laplace to be enabled", in.Nspin());
 #endif
       } else if (in.Nspin() == 4) {
-#ifdef GPU_WILSON_DIRAC
+#if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
@@ -181,7 +181,7 @@ namespace quda
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
-        errorQuda("nSpin=%d Laplace operator required wilson dslash to be enabled", in.Nspin());
+        errorQuda("nSpin=%d Laplace operator required wilson dslash and laplace to be enabled", in.Nspin());
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());

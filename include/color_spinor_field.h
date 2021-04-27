@@ -7,6 +7,8 @@
 #include <quda.h>
 #include <lattice_field.h>
 
+#include <comm_key.h>
+
 namespace quda {
 
   namespace colorspinor
@@ -42,7 +44,7 @@ namespace quda {
 
   } // namespace colorspinor
 
-  enum MemoryLocation { Device = 1, Host = 2, Remote = 4 };
+  enum MemoryLocation { Device = 1, Host = 2, Remote = 4, Shmem = 8 };
 
   struct FullClover;
 
@@ -452,7 +454,9 @@ namespace quda {
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
+    size_t TotalBytes() const { return bytes + norm_bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
+    size_t GhostFaceBytes(int i) const { return ghost_face_bytes[i]; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
@@ -461,6 +465,13 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
     virtual const void* Ghost2() const { return nullptr; }
+
+    virtual int full_dim(int d) const { return (d == 0 && siteSubset == 1) ? x[d] * 2 : x[d]; }
+
+    /**
+     * Define the parameter type for this field.
+     */
+    using param_type = ColorSpinorParam;
 
     /**
        Do the exchange between neighbouring nodes of the data in
@@ -596,7 +607,7 @@ namespace quda {
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
-    ColorSpinorField* CreateAlias(const ColorSpinorParam &param);
+    ColorSpinorField *CreateAlias(const ColorSpinorParam &param);
 
     /**
        @brief Create a coarse color-spinor field, using this field to set the meta data
@@ -681,6 +692,18 @@ namespace quda {
 
     void copy(const cudaColorSpinorField &);
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void switchBufferPinned();
 
     /**
@@ -715,7 +738,7 @@ namespace quda {
       */
     void packGhost(const int nFace, const QudaParity parity, const int dagger,
                    qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                   bool spin_project, double a = 0, double b = 0, double c = 0);
+                   bool spin_project, double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -755,7 +778,7 @@ namespace quda {
        @param[in] c Used for twisted mass (flavor twist factor)
     */
     void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
-              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
+              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     /**
        @brief Copies the ghost to the host from the device, prior to
@@ -951,6 +974,18 @@ namespace quda {
     void zero();
 
     /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
+    /**
        @brief This is a unified ghost exchange function for doing a complete
        halo exchange regardless of the type of field.  All dimensions
        are exchanged and no spin projection is done in the case of
@@ -984,6 +1019,16 @@ namespace quda {
       void *dstNorm=0, void*srcNorm=0);
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
+
+  /**
+    @brief This function is used for copying from a source colorspinor field to a destination field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
+  */
+  void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
 
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);

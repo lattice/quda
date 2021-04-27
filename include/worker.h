@@ -10,4 +10,4 @@ namespace quda {
     virtual void apply(const qudaStream_t stream = device::get_default_stream()) = 0;
   };
 
-};
+}
