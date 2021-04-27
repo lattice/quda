@@ -39,9 +39,9 @@ namespace quda
   NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
     Dslash(arg, out, in),
       shared(arg.asymmetric || !arg.dagger)
-      {
-      TunableVectorYZ::resizeVector(2, arg.nParity);
-      if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
+    {
+      TunableKernel3D::resizeVector(2, arg.nParity);
+      if (shared) TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
 
     void apply(const qudaStream_t &stream)

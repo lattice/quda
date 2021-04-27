@@ -6,7 +6,7 @@
 namespace quda {
 
   template <typename Float, QudaReconstructType recon_>
-  struct GaugeFixUnPackArg {
+  struct GaugeFixUnPackArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr QudaReconstructType recon = recon_;
     int_fastdiv X[4]; // grid dimensions
@@ -19,7 +19,6 @@ namespace quda {
     int dir;
     int borderid;
     bool pack;
-    dim3 threads;
     GaugeFixUnPackArg(GaugeField &U) :
       U(U)
     {
@@ -31,8 +30,8 @@ namespace quda {
   };
 
   template <typename Arg> struct unpacker {
-    Arg &arg;
-    constexpr unpacker(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr unpacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int idx)

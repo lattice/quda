@@ -8,24 +8,23 @@ namespace quda {
   using namespace colorspinor;
 
   template <int nSpin_, int nColor_, typename OutOrder, typename InOrder>
-  struct CopyArg {
+  struct CopyArg : kernel_param<> {
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     OutOrder out;
     const InOrder in;
-    dim3 threads;
 
     template <typename T1, typename T2>
     CopyArg(ColorSpinorField &out, const ColorSpinorField &in, T1 *Out, T2 *In) :
+      kernel_param(in.VolumeCB()),
       out(out, 1, Out),
-      in(in, 1, In),
-      threads(in.VolumeCB())
+      in(in, 1, In)
     {}
   };
 
   template <typename Arg> struct CopySpinor_ {
-    Arg &arg;
-    constexpr CopySpinor_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopySpinor_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

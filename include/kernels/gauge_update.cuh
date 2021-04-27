@@ -7,7 +7,7 @@ namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m,
             int N_, bool conj_mom_, bool exact_>
-  struct UpdateGaugeArg {
+  struct UpdateGaugeArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int N = N_;
@@ -20,14 +20,17 @@ namespace quda {
     Gauge in;
     Mom mom;
     real dt;
-    dim3 threads;
-    UpdateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &mom, real dt)
-      : out(out), in(in), mom(mom), dt(dt), threads(in.VolumeCB(), 2, in.Geometry()) { }
+    UpdateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &mom, real dt) :
+      kernel_param(dim3(in.VolumeCB(), 2, in.Geometry())),
+      out(out),
+      in(in),
+      mom(mom),
+      dt(dt) { }
   };
 
   template <typename Arg> struct UpdateGauge {
-    Arg &arg;
-    constexpr UpdateGauge(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr UpdateGauge(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x, int parity, int dir)

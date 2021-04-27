@@ -22,7 +22,7 @@ namespace quda {
   */
   template <typename Float, typename vFloat, int fineSpin_, int fineColor_,
 	    int coarseSpin_, int coarseColor_, QudaFieldOrder order>
-  struct RestrictArg {
+  struct RestrictArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int fineColor = fineColor_;
@@ -50,16 +50,15 @@ namespace quda {
     static constexpr bool launch_bounds = false;
     dim3 grid_dim;
     dim3 block_dim;
-    dim3 threads;
 
     RestrictArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
-		const int *fine_to_coarse, const int *coarse_to_fine, int parity)
-      : out(out), in(in), V(V),
-        aggregate_size(in.Volume()/out.Volume()),
-        aggregate_size_cb(in.VolumeCB()/out.Volume()),
-        fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-	spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle_factor(1),
-        threads(aggregate_size, coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), 1)
+		const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
+      kernel_param(dim3(in.Volume()/out.Volume(), coarseColor/coarse_colors_per_thread<fineColor, coarseColor>(), 1)),
+      out(out), in(in), V(V),
+      aggregate_size(in.Volume()/out.Volume()),
+      aggregate_size_cb(in.VolumeCB()/out.Volume()),
+      fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      spin_map(), parity(parity), nParity(in.SiteSubset()), swizzle_factor(1)
     { }
   };
 
@@ -108,8 +107,8 @@ namespace quda {
   template <int block_size, typename Arg> struct Restrictor {
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
-    Arg &arg;
-    constexpr Restrictor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
