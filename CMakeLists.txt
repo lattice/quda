@@ -898,7 +898,7 @@ if(QUDA_ZFP)
       GIT_REPOSITORY https://github.com/LLNL/zfp.git
       GIT_TAG 0.5.5
       GIT_SHALLOW YES
-      PREFIX 0.5.5
+      PREFIX zfp
       CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(ZFP INSTALL_DIR)

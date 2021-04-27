@@ -192,9 +192,8 @@ TEST_F(GaugeAlgTest, Generation)
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   const int reunit_interval = 10;
-  double *link_trace = new double[1];
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1, link_trace);
+  gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -203,9 +202,8 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   const int reunit_interval = 10;
-  double *link_trace = new double[1];
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1, link_trace);
+  gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
