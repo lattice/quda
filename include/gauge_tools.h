@@ -142,7 +142,7 @@ namespace quda
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-		      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta, double *link_trace);
+		      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

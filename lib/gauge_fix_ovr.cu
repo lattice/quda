@@ -221,7 +221,7 @@ namespace quda {
   template <typename Float, QudaReconstructType recon, int gauge_dir>
   void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
                       const double relax_boost, const double tolerance,
-                      const int reunit_interval, const int stopWtheta, double *link_trace)
+                      const int reunit_interval, const int stopWtheta)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
@@ -406,7 +406,6 @@ namespace quda {
 
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      link_trace[0] = action;
       if ((iter % verbose_interval) == (verbose_interval - 1))
         printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
@@ -430,7 +429,6 @@ namespace quda {
       flop += (double)GaugeFixQuality.flops();
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
-      link_trace[0] = action;
       double diff = abs(action0 - action);
       printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
@@ -467,14 +465,14 @@ namespace quda {
   
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
   GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                 const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta, double *link_trace)
+                 const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
         printfQuda("Starting Landau gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, link_trace);
+        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
         printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, link_trace);
+        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
@@ -494,9 +492,9 @@ namespace quda {
    */
 #ifdef GPU_GAUGE_ALG
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-			const double tolerance, const int reunit_interval, const int stopWtheta, double *link_trace)
+			const double tolerance, const int reunit_interval, const int stopWtheta)
   {
-    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, link_trace);
+    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
   }
 #else
   void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const int, double *)
