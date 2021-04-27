@@ -200,7 +200,6 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
   //! allocate memory for the 4D source
   size_t spinor4D_size_in_floats = cs_param.nSpin * cs_param.nColor * V * 2 * sizeof(double);
-  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) { spinor4D_size_in_floats *= Lsdim; }
   auto *source = (double *)malloc(spinor4D_size_in_floats);
 
   //! when using DWF: allocate memory for the 5D source and propagator
@@ -258,7 +257,7 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 int main(int argc, char **argv)
 {
   setQudaDefaultMgTestParams();
-  auto app = make_app();   //! Parameter class that reads cmdline arguments. It modifies global variables.
+  auto app = make_app();   //! Parameter class that reads cmdline arguments.
   add_multigrid_option_group(app);
   add_eigen_option_group(app);
   add_propagator_option_group(app);
@@ -266,28 +265,28 @@ int main(int argc, char **argv)
   add_su3_option_group(app);
   //TODO add option to choose whether to compute midpoint (for residual mass) or chiral propagators (for physics)
   try {
-    app->parse(argc, argv);
+    app->parse(argc, argv); //! read in the cmd line arguments and modify the corresponding global parameters
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-  setQudaPrecisions();
+  setQudaPrecisions(); //! modify some global parameters related to precision based on cmd-line precision settings
 
-  // init QUDA
+  //! initialize QMP
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // Run-time parameter checks
+  //! Run-time parameter checks
   {
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH && dslash_type != QUDA_MOBIUS_DWF_DSLASH) { //TODO which is the on we want?
       if (comm_rank() == 0) printf("dslash_type %d not supported\n", dslash_type);
       exit(0);
     }
     if (inv_multigrid) {
-      // Only these fermions are supported with MG
+      //! Only these fermions are supported with MG
       if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
         if (comm_rank() == 0) printf("dslash_type %d not supported for MG\n", dslash_type);
         exit(0);
       }
-      // Only these solve types are supported with MG
+      //! Only these solve types are supported with MG
       if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
         if (comm_rank() == 0) printf("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
                                      solve_type);
@@ -298,7 +297,9 @@ int main(int argc, char **argv)
 
   initQuda(device_ordinal);
 
-  // Invert Parameters
+  //! Wrap global parameters in C structs. First some default parameters are set using new*Param(), then set*Param(&myparam)
+  //! is used to set the values inside of the struct to the globally set parameters which came from the cmd line.
+  //! Invert parameters
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
@@ -337,11 +338,11 @@ int main(int argc, char **argv)
     }
   }
 
-  // Gauge Parameters
-  QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold parameters
-  setWilsonGaugeParam(gauge_param); // set the content of this instance to the currently set global values
+  //! Gauge parameters
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
 
-  // set parameters for the reference Dslash, and prepare fields to be loaded
+  //! Set lattice dimensions
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
@@ -349,7 +350,7 @@ int main(int argc, char **argv)
     setDims(gauge_param.X);
   }
 
-  // allocate and load gaugefield on host
+  //! allocate and load gaugefield on host
   void *gauge[4];
   for (auto &dir : gauge) dir = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
@@ -368,7 +369,7 @@ int main(int argc, char **argv)
   }
   if (comm_rank() == 0) printf("-----------------------------------------------------------------------------------\n");
 
-  // compute plaquette
+  //! compute plaquette
   double plaq[3];
   plaqQuda(plaq);
   if (comm_rank() == 0) printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
@@ -376,14 +377,15 @@ int main(int argc, char **argv)
   //! Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
 
-  //! Wilson ColorSpinorParams
+  //! Now we set up parameters for the ColorSpinorFields. For that we use a C++ class, which is why this code differs
+  //! from the parameter structs used for inverter and gauge above, as the class has a default constructor.
+  //! We use the inverter and gauge parameter structs to deduce the parameters we need for the ColorSpinorFields.
   quda::ColorSpinorParam cs_param;
-  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param); //! Only reads from inv_param and gauge_param.
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
 
-  //! Allocate memory on host for one source for each of the 12x12 color+spinor combinations
-  size_t bytes_per_float = sizeof(double);
-  size_t propagatorsize_in_floats = spinor_dim * spinor_dim * V * 2 * bytes_per_float;
+  //! Allocate memory on host for the propagators for all of the 12x12 color+spinor combinations
+  size_t propagatorsize_in_floats = spinor_dim * spinor_dim * V * 2 * sizeof(double);
   auto *prop_array = (double *)malloc(propagatorsize_in_floats);
   //! C array of pointers to the memory allocated above of the colorspinorfields (later ColorSpinorField->V())
   void *prop_array_ptr[spinor_dim];
@@ -407,7 +409,7 @@ int main(int argc, char **argv)
   } else {
     if (comm_rank() == 0) errorQuda("Unsupported contraction type %d given", contract_type);
   }
-  // some lengths and sizes
+  //! some lengths and sizes
   corr_param.local_corr_length = gauge_param.X[corr_param.corr_dim];
   corr_param.global_corr_length = corr_param.local_corr_length * comm_dim(corr_param.corr_dim);
   corr_param.n_numbers_per_slice = 2 * cs_param.nSpin * cs_param.nSpin;
@@ -422,22 +424,22 @@ int main(int argc, char **argv)
                       gauge_param, inv_param);
 
   if (open_flavor) {
-    // we need one more color-spinor-field array
-    auto *prop_array_open = (double *)malloc(spinor_dim * spinor_dim * V * 2 * bytes_per_float);
+    //! we need space for one more propagator array
+    auto *prop_array_open = (double *)malloc(propagatorsize_in_floats);
     void *prop_array_ptr_open[spinor_dim];
     for (int i = 0; i < spinor_dim; i++) {
       int offset = i * V * spinor_dim * 2;
       prop_array_ptr_open[i] = prop_array_open + offset;
     }
 
-    // first we calculate heavy-light correlators
+    //! first we calculate heavy-light correlators
     construct_operator(kappa_array[0], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
                         cs_param, gauge_param, inv_param);
 
-    // then we calculate heavy-strange correlators
+    //! then we calculate heavy-strange correlators
     construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QS;
@@ -447,7 +449,7 @@ int main(int argc, char **argv)
     free(prop_array_open);
   }
 
-  //clean up
+  //! clean up
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
