@@ -193,7 +193,7 @@ namespace quda {
     QudaTwistGamma5Type twist;
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
-	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
+	      int parity, real kappa=0.0, real mu=0.0, real epsilon = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
       out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
       cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
