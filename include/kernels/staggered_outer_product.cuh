@@ -8,7 +8,8 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, int dim_ = -1> struct StaggeredOprodArg {
+  template <typename Float, int nColor_, int dim_ = -1>
+  struct StaggeredOprodArg : kernel_param<> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -28,10 +29,10 @@ namespace quda {
     real coeff[2];
     int X[4];
     bool partitioned[4];
-    dim3 threads;
 
     StaggeredOprodArg(GaugeField &U, GaugeField &L, const ColorSpinorField &inA, const ColorSpinorField &inB,
                       int parity, int displacement, int nFace, const real coeff[2]) :
+      kernel_param(dim3(dim == -1 ? inB.VolumeCB() : displacement * inB.GhostFaceCB()[dim])),
       U(U),
       L(L),
       inA(inA),
@@ -39,8 +40,7 @@ namespace quda {
       parity(parity),
       displacement(displacement),
       nFace(nFace),
-      coeff{coeff[0], coeff[1]},
-      threads(dim == -1 ? inB.VolumeCB() : displacement * inB.GhostFaceCB()[dim])
+      coeff{coeff[0], coeff[1]}
     {
       for (int i = 0; i < 4; ++i) this->X[i] = U.X()[i];
       for (int i = 0; i < 4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
@@ -49,8 +49,8 @@ namespace quda {
 
   template <typename Arg> struct Interior
   {
-    Arg &arg;
-    constexpr Interior(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Interior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)
@@ -91,8 +91,8 @@ namespace quda {
   };
 
   template <typename Arg> struct Exterior {
-    Arg &arg;
-    constexpr Exterior(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Exterior(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb)

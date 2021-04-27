@@ -40,8 +40,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedMassPreconditioned : dslash_default {
 
-    Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
