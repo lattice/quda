@@ -66,7 +66,7 @@ namespace quda {
       if (!allow_error) {
 	errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
       }
-      else hiphiGetLastError();
+      else hipGetLastError();
     }
 
   }
