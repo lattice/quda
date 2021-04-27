@@ -21,7 +21,7 @@ namespace quda {
     cloverInv(nullptr),
     invNorm(nullptr),
     csw(a.Csw()),
-    twisted(a.Twisted()),
+    twist_flavor(a.TwistFlavor()),
     mu2(a.Mu2()),
     epsilon2(a.Epsilon2()),
     rho(a.Rho()),
@@ -56,7 +56,7 @@ namespace quda {
       if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
     //for twisted mass only:
-    twist = QUDA_TWIST_NO;//param.twist;
+    twist_flavor = QUDA_TWIST_NO;
     mu2 = 0.0; //param.mu2;
     epsilon2 = 0.0;
 
@@ -215,7 +215,7 @@ namespace quda {
       oddInvNorm = oddNorm;
     }
 
-    twist = param.twist;
+    twist_flavor = param.twist_flavor;
     mu2 = param.mu2;
     epsilon2 = param.epsilon2;
   }
@@ -502,19 +502,19 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param)
   {
     output << static_cast<const LatticeFieldParam&>(param);
-    output << "direct = "    << param.direct << std::endl;
-    output << "inverse = "   << param.inverse << std::endl;
-    output << "clover = "    << param.clover << std::endl;
-    output << "norm = "      << param.norm << std::endl;
-    output << "cloverInv = " << param.cloverInv << std::endl;
-    output << "invNorm = "   << param.invNorm << std::endl;
-    output << "csw = "       << param.csw << std::endl;
-    output << "twist = "     << param.twist << std::endl;
-    output << "mu2 = "       << param.mu2 << std::endl;
-    output << "epsilon2 = "  << param.epsilon2 << std::endl;
-    output << "rho = "       << param.rho << std::endl;
-    output << "order = "     << param.order << std::endl;
-    output << "create = "    << param.create << std::endl;
+    output << "direct = "           << param.direct << std::endl;
+    output << "inverse = "          << param.inverse << std::endl;
+    output << "clover = "           << param.clover << std::endl;
+    output << "norm = "             << param.norm << std::endl;
+    output << "cloverInv = "        << param.cloverInv << std::endl;
+    output << "invNorm = "          << param.invNorm << std::endl;
+    output << "csw = "              << param.csw << std::endl;
+    output << "twist_flavor = "     << param.twist_flavor << std::endl;
+    output << "mu2 = "              << param.mu2 << std::endl;
+    output << "epsilon2 = "         << param.epsilon2 << std::endl;
+    output << "rho = "              << param.rho << std::endl;
+    output << "order = "            << param.order << std::endl;
+    output << "create = "           << param.create << std::endl;
     return output;  // for multiple << operators.
   }
 

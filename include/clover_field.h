@@ -39,7 +39,7 @@ namespace quda {
     void *cloverInv;
     void *invNorm;
     double csw;  //! Clover coefficient
-    QudaTwistFlavorType twist;
+    QudaTwistFlavorType twist_flavor;
     double mu2;
     double epsilon2;
     double rho;
@@ -75,7 +75,7 @@ namespace quda {
       norm(nullptr),
       cloverInv(nullptr),
       invNorm(nullptr),
-      twisted(false),
+      twist_flavor(QUDA_TWIST_NO),
       mu2(0.0),
       epsilon2(0.0),
       rho(0.0),
@@ -91,7 +91,7 @@ namespace quda {
       norm(param.norm),
       cloverInv(param.cloverInv),
       invNorm(param.invNorm),
-      twisted(param.twisted),
+      twist_flavor(param.twist_flavor),
       mu2(param.mu2),
       epsilon2(param.epsilon2),
       rho(param.rho),
@@ -123,7 +123,7 @@ namespace quda {
     double mu2; // chiral twisted mass squared
     double epsilon2; // flavour twisted mass squared
     double rho;
-    QudaTwistFlavorType twist;
+    QudaTwistFlavorType twist_flavor;
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
@@ -203,9 +203,9 @@ namespace quda {
     double Csw() const { return csw; }
 
     /**
-       @return If the clover field is associated with twisted-clover fermions
+       @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
     */
-    QudaTwistFlavorType Twist() const { return twist; }
+    QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
 
     /**
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
