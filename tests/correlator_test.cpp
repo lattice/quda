@@ -203,15 +203,16 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
   auto *source = (double *)malloc(spinor4D_size_in_floats);
 
   //! when using DWF: allocate memory for the 5D source and propagator
-  double *source5D;
-  double *prop5D;
+  double *source5D = nullptr;
+  double *prop5D = nullptr;
   if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH){ source5D = (double *)malloc(spinor4D_size_in_floats *Lsdim); }
   if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH){ prop5D = (double *)malloc(spinor4D_size_in_floats * cs_param.nSpin * cs_param.nColor *Lsdim); }
 
   //! Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
-  for (int n = 0; n < prop_n_sources; n++) {    
+  for (int n = 0; n < prop_n_sources; n++) {
     const int source_pos[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
+
     if (comm_rank() == 0) printf("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                                  prop_source_position[n][2], prop_source_position[n][3]);
 
@@ -220,11 +221,14 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
     //! Loop over spin X color dilution positions, construct the sources and invert
     for (int i = 0; i < cs_param.nSpin * cs_param.nColor; i++) {
+
       constructPointSpinorSource(source, inv_param.cpu_prec, gauge_param.X, i, source_pos);
+
       //! when using DWF: convert to 5D
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-          printQudaInvertParam(&inv_param);
-          convert4Dto5DpointSource(source, source5D, &inv_param, gauge_param.X, spinor4D_size_in_floats);
+        std::cout << "There is segmentation fault in the next line" << std::endl;
+        convert4Dto5DpointSource(source, source5D, &inv_param, gauge_param.X, spinor4D_size_in_floats);
+        std::cout << "The code fails before this is written out" << std::endl;
       }
       //! Gaussian smear the source. The default setting is to not smear.
       performGaussianSmearNStep(source, &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
@@ -243,11 +247,11 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
       //! Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
-    
+
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
-    
+
     //! Print and save correlators for this source
     if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
@@ -418,7 +422,7 @@ int main(int argc, char **argv)
 
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
-  //calculate correlators
+  //! calculate correlators
   construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
   invert_and_contract(prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
                       gauge_param, inv_param);

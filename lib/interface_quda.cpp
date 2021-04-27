@@ -5954,14 +5954,8 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 
 void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param4D, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
 
-  //! zero out 5D memory
+  //! zero out memory reserved for 5D source
   std::memset(out5D_ptr, 0, spinor4D_size_in_floats *inv_param4D->Ls);
-
-  //! CSF host&device: original 4D pointsource
-  //! CSF device: projected 4D pointsource
-  //! CSF host&device: D_ P+/- 4D pointsource (first/last entry of 5D source)
-
-
 
   //! collection of setting for the spinorfields. is modified as needed throughout this function.
   ColorSpinorParam cpuParam4D(nullptr, *inv_param4D, X, false, inv_param4D->input_location);
@@ -5976,12 +5970,12 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   cpuParam4D.v = (void *)in4D_ptr; //! We want to construct a ColorSpinorField around already existing memory.
   cpuParam4D.create = QUDA_REFERENCE_FIELD_CREATE;
   h_4Dpointsource = ColorSpinorField::Create(cpuParam4D);
-
+  std::cout << "There is an error below" << std::endl;
   //d_4Dpointsource
   ColorSpinorParam cudaParam(cpuParam4D, *inv_param4D);
   cudaParam.create = QUDA_COPY_FIELD_CREATE; //! we want to copy the memory
   d_4Dpointsource = ColorSpinorField::Create(*h_4Dpointsource, cudaParam);
-
+  std::cout << "There is an error above" << std::endl;
   //d_4Dprojsource
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out
   d_4Dprojsource = ColorSpinorField::Create(cudaParam);
@@ -5992,7 +5986,6 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   //h_4Dentryin5Dsource
   cpuParam4D.create = QUDA_ZERO_FIELD_CREATE;
   h_4Dentryin5Dsource = ColorSpinorField::Create(cpuParam4D);
-
 
   DiracParam mydiracparam;
   setDiracParam(mydiracparam, inv_param4D, false);
@@ -6025,7 +6018,7 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   std::memcpy(&out5D_ptr_double[inv_param4D->Ls-1], d_4Dentryin5Dsource->V(), spinor4D_size_in_floats);
 
   //! release temp memory
-  delete h_4Dpointsource; 
+  delete h_4Dpointsource;
   delete d_4Dpointsource;
   delete d_4Dprojsource;
   delete d_4Dentryin5Dsource;
