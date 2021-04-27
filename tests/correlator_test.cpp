@@ -189,52 +189,57 @@ void construct_operator(const double new_kappa, QudaInvertParam &inv_param, Quda
 
 // Calculate propagator from source_array_ptr, save it in prop_array_ptr_2. Then contract propagators stored
 // in prop_array_ptr_1 and prop_array_ptr_2.
-void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void **prop_array_ptr_2,
+void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
                          void *correlation_function_sum, CorrelatorParam &corr_param,
-                         quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param,
-                         const size_t single_spinorsize_in_floats)
+                         quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
 {
   QudaInvertParam source_smear_param = newQudaInvertParam();
-  setFermionSmearParam(source_smear_param, prop_source_smear_coeff, prop_source_smear_steps);
-
   QudaInvertParam sink_smear_param = newQudaInvertParam();
+  setFermionSmearParam(source_smear_param, prop_source_smear_coeff, prop_source_smear_steps);
   setFermionSmearParam(sink_smear_param, prop_sink_smear_coeff, prop_sink_smear_steps);
 
+  //! allocate memory for the 4D source
+  size_t spinor4D_size_in_floats = cs_param.nSpin * cs_param.nColor * V * 2 * sizeof(double);
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) { spinor4D_size_in_floats *= Lsdim; }
+  auto *source = (double *)malloc(spinor4D_size_in_floats);
+
+  //! when using DWF: allocate memory for the 5D source and propagator
   double *source5D;
-  if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH){
-      source5D = (double *)malloc(single_spinorsize_in_floats*Lsdim);
-  }
+  double *prop5D;
+  if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH){ source5D = (double *)malloc(spinor4D_size_in_floats *Lsdim); }
+  if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH){ prop5D = (double *)malloc(spinor4D_size_in_floats * cs_param.nSpin * cs_param.nColor *Lsdim); }
 
   //! Loop over the number of sources to use. Default is prop_n_sources=1 and source position = 0 0 0 0
   for (int n = 0; n < prop_n_sources; n++) {    
-    const int source[4]
+    const int source_pos[4]
       = {prop_source_position[n][0], prop_source_position[n][1], prop_source_position[n][2], prop_source_position[n][3]};
-    
     if (comm_rank() == 0) printf("Source position: %d %d %d %d\n", prop_source_position[n][0], prop_source_position[n][1],
                                  prop_source_position[n][2], prop_source_position[n][3]);
-    
+
     //! The overall shift of the position of the corr. need this when the source is not at origin.
-    corr_param.overall_shift_dim = source[corr_param.corr_dim];
+    corr_param.overall_shift_dim = source_pos[corr_param.corr_dim];
 
     //! Loop over spin X color dilution positions, construct the sources and invert
     for (int i = 0; i < cs_param.nSpin * cs_param.nColor; i++) {
-
-      constructPointSpinorSource(source_array_ptr[i], inv_param.cpu_prec, gauge_param.X, i, source);
-
-      //! convert to 5D
+      constructPointSpinorSource(source, inv_param.cpu_prec, gauge_param.X, i, source_pos);
+      //! when using DWF: convert to 5D
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-          convert4Dto5DpointSource(source_array_ptr[i], source5D, &inv_param, gauge_param.X, single_spinorsize_in_floats);
+          printQudaInvertParam(&inv_param);
+          convert4Dto5DpointSource(source, source5D, &inv_param, gauge_param.X, spinor4D_size_in_floats);
       }
       //! Gaussian smear the source. The default setting is to not smear.
-      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
+      performGaussianSmearNStep(source, &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
+      //! when using DWF: swap to 5D source
+      void* invert_input = source;
+      void* invert_output = prop_array_ptr_2[i];
+      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){ invert_input = source5D; invert_output = prop5D; }
+      invertQuda(invert_output, invert_input, &inv_param);
 
-      //! swap to 5D source if using DWF
-      void* invert_input;
-      invert_input = source_array_ptr[i];
-      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
-        invert_input = source5D;
-      }
-      invertQuda(prop_array_ptr_2[i], invert_input, &inv_param);
+      //TODO convert back to 4D
+      //TODO what is the difference between inv_param4d and inv_param5d?
+//      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+//        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
+//      }
 
       //! Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
@@ -242,7 +247,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
-                   (void *)&cs_param, gauge_param.X, source, momentum.begin());
+                   (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
     
     //! Print and save correlators for this source
     if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
@@ -276,7 +281,7 @@ int main(int argc, char **argv)
       if (comm_rank() == 0) printf("dslash_type %d not supported\n", dslash_type);
       exit(0);
     }
-    if (inv_multigrid) { //TODO can we use the dslash type with multigrid?
+    if (inv_multigrid) {
       // Only these fermions are supported with MG
       if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH) {
         if (comm_rank() == 0) printf("dslash_type %d not supported for MG\n", dslash_type);
@@ -292,11 +297,6 @@ int main(int argc, char **argv)
   }
 
   initQuda(device_ordinal);
-
-  // Gauge Parameters
-  QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold parameters
-  setWilsonGaugeParam(gauge_param); // set the content of this instance to the currently set global values
-  setDims(gauge_param.X);
 
   // Invert Parameters
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -337,6 +337,18 @@ int main(int argc, char **argv)
     }
   }
 
+  // Gauge Parameters
+  QudaGaugeParam gauge_param = newQudaGaugeParam(); // create an instance of a class that can hold parameters
+  setWilsonGaugeParam(gauge_param); // set the content of this instance to the currently set global values
+
+  // set parameters for the reference Dslash, and prepare fields to be loaded
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    dw_setDims(gauge_param.X, inv_param.Ls);
+  } else {
+    setDims(gauge_param.X);
+  }
+
   // allocate and load gaugefield on host
   void *gauge[4];
   for (auto &dir : gauge) dir = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -371,23 +383,12 @@ int main(int argc, char **argv)
 
   //! Allocate memory on host for one source for each of the 12x12 color+spinor combinations
   size_t bytes_per_float = sizeof(double);
-  size_t spinorsize_in_floats = spinor_dim * spinor_dim * V * 2 * bytes_per_float;
-  size_t single_spinorsize_in_floats = spinor_dim * V * 2 * bytes_per_float;
-//  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-//      spinorsize_in_floats *= Lsdim;
-//  }
-  auto *source_array = (double *)malloc(spinorsize_in_floats);
-  auto *prop_array = (double *)malloc(spinorsize_in_floats);
+  size_t propagatorsize_in_floats = spinor_dim * spinor_dim * V * 2 * bytes_per_float;
+  auto *prop_array = (double *)malloc(propagatorsize_in_floats);
   //! C array of pointers to the memory allocated above of the colorspinorfields (later ColorSpinorField->V())
-  void *source_array_ptr[spinor_dim];
   void *prop_array_ptr[spinor_dim];
-  //! TODO source_array_ptr and source_array don't need to exist, we don't need to store all sources in memory at the same time, just move this to the loop where the inversion happens
   for (int i = 0; i < spinor_dim; i++) {
     int offset = i * V * spinor_dim * 2;
-//    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-//          offset *= Lsdim;
-//    }
-    source_array_ptr[i] = source_array + offset;
     prop_array_ptr[i] = prop_array + offset;
   }
 
@@ -417,8 +418,8 @@ int main(int argc, char **argv)
 
   //calculate correlators
   construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
-  invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
-                      gauge_param, inv_param, spinorsize_in_floats);
+  invert_and_contract(prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
+                      gauge_param, inv_param);
 
   if (open_flavor) {
     // we need one more color-spinor-field array
@@ -433,15 +434,15 @@ int main(int argc, char **argv)
     construct_operator(kappa_array[0], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QL;
-    invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
-                        cs_param, gauge_param, inv_param, spinorsize_in_floats);
+    invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
+                        cs_param, gauge_param, inv_param);
 
     // then we calculate heavy-strange correlators
     construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QS;
-    invert_and_contract(source_array_ptr, prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
-                        cs_param, gauge_param, inv_param, spinorsize_in_floats);
+    invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
+                        cs_param, gauge_param, inv_param);
 
     free(prop_array_open);
   }
@@ -450,8 +451,7 @@ int main(int argc, char **argv)
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   freeGaugeQuda();
   for (auto &dir : gauge) free(dir);
-  
-  free(source_array);
+
   free(prop_array);
   free(correlation_function_sum);
   if (comm_rank() == 0) printf("----------------------------------------------------------------------------------\n");

@@ -5952,24 +5952,24 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param4D, const int *X, const size_t single_spinorsize_in_floats){ //, QudaInvertParam *inv_param5D,
+void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param4D, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
 
   //! zero out 5D memory
-  std::memset(out5D_ptr, 0, single_spinorsize_in_floats*inv_param4D->Ls);
+  std::memset(out5D_ptr, 0, spinor4D_size_in_floats *inv_param4D->Ls);
 
   QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION;
 
-  //! give in4D_ptr to the parameter class, from which we then construct a ColorSpinorField
+  //! wrap host source into a ColorSpinorField
   ColorSpinorParam cpuParam4D((void *)in4D_ptr, *inv_param4D, X, false, location);
   ColorSpinorField *h_4D_pointsource = ColorSpinorField::Create(cpuParam4D);
 
   //! construct temp CSF. will be used to temporarily save some projected 4D point source
-  auto* h_4D_temp_ptr = (double *)malloc(single_spinorsize_in_floats);
+  auto* h_4D_temp_ptr = (double *)malloc(spinor4D_size_in_floats);
   ColorSpinorParam cpuParam4D_temp((void *)h_4D_temp_ptr, *inv_param4D, X, false, location);
   ColorSpinorField *h_4D_temp = ColorSpinorField::Create(cpuParam4D);
 
   //! construct temp CSF which will hold the first/last entry of the fifth dimension
-  auto* h_4D_out_new_ptr = (double *)malloc(single_spinorsize_in_floats);
+  auto* h_4D_out_new_ptr = (double *)malloc(spinor4D_size_in_floats);
   ColorSpinorParam cpuParam4D_out_new_ptr((void *)h_4D_temp_ptr, *inv_param4D, X, false, location);
   ColorSpinorField *h_4D_out_new = ColorSpinorField::Create(cpuParam4D);
 
@@ -5983,8 +5983,8 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   double myc_5 = reinterpret_cast<double *>(&inv_param4D->c_5)[0];
 
   //! first entry
-  std::memset(h_4D_temp->V(), 0, single_spinorsize_in_floats);
-  std::memset(h_4D_out_new->V(), 0, single_spinorsize_in_floats);
+  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
+  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*h_4D_temp, *h_4D_pointsource, 1);
   myMobius.Dslash4(*h_4D_out_new, *h_4D_temp, QUDA_INVALID_PARITY);//TODO what parity ???
   blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D->m5) * 2, *h_4D_temp); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
@@ -5992,18 +5992,18 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   blas::xpy(*h_4D_out_new,*h_4D_temp);
 
   auto out5D_ptr_double = (double*)out5D_ptr;
-  std::memcpy(&out5D_ptr_double[0], h_4D_out_new->V(), single_spinorsize_in_floats);
+  std::memcpy(&out5D_ptr_double[0], h_4D_out_new->V(), spinor4D_size_in_floats);
 
   //! second entry
-  std::memset(h_4D_temp->V(), 0, single_spinorsize_in_floats); // set to zero
-  std::memset(h_4D_out_new->V(), 0, single_spinorsize_in_floats);
+  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats); // set to zero
+  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*h_4D_temp, *h_4D_pointsource, -1);
   myMobius.Dslash4(*h_4D_out_new, *h_4D_temp, QUDA_INVALID_PARITY);//TODO what parity ???
   blas::xpay(*h_4D_out_new, -myc_5 * (4 + inv_param4D->m5) * 2, *h_4D_temp);
   blas::ax(0.5, *h_4D_out_new);
   blas::xpy(*h_4D_out_new,*h_4D_temp);
 
-  std::memcpy(&out5D_ptr_double[inv_param4D->Ls-1], h_4D_out_new->V(), single_spinorsize_in_floats);
+  std::memcpy(&out5D_ptr_double[inv_param4D->Ls-1], h_4D_out_new->V(), spinor4D_size_in_floats);
 
   //! release temp memory
   delete h_4D_temp_ptr;
