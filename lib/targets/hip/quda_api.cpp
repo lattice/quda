@@ -457,7 +457,6 @@ namespace quda {
    void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
    {
      PROFILE(hipError_t error = hipStreamSynchronize(device::get_cuda_stream(stream)), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-     error=hipGetLastError();
      set_runtime_error(error, "hipStreamSynchronize", func, file, line);
      
    }
@@ -465,7 +464,6 @@ namespace quda {
    void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
    {
      PROFILE(hipError_t error = hipDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-     error=hipGetLastError();
      set_runtime_error(error, "hipDeviceSynchronize", func, file, line);
    }
 
