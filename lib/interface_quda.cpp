@@ -5952,14 +5952,14 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
+void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
 
   //! zero out memory reserved for 5D source
   std::memset(out5D_ptr, 0, spinor4D_size_in_floats * inv_param->Ls);
 
   //! collection of setting for the spinorfields. is modified as needed throughout this function.
-  ColorSpinorParam cpuParam4D(nullptr, *inv_param, X, false, inv_param->input_location);
-  cpuParam4D.nDim = 4;
+  ColorSpinorParam cpuParam4D((void *)in4D_ptr, *inv_param4D, X, false, QUDA_CPU_FIELD_LOCATION);
+//  cpuParam4D.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; //TODO does changing this here break anything further down the line??
 
   ColorSpinorField *h_4Dpointsource = nullptr;
   ColorSpinorField *d_4Dpointsource = nullptr;
@@ -5968,15 +5968,18 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   ColorSpinorField *h_4Dentryin5Dsource = nullptr;
 
   //h_4Dpointsource
-  cpuParam4D.v = (void *)in4D_ptr; //! We want to construct a ColorSpinorField around already existing memory.
+  //! We want to construct a ColorSpinorField around already existing memory.
   cpuParam4D.create = QUDA_REFERENCE_FIELD_CREATE;
   h_4Dpointsource = ColorSpinorField::Create(cpuParam4D);
 
   //d_4Dpointsource
-  ColorSpinorParam cudaParam(cpuParam4D, *inv_param);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE; //! we want to copy the memory
-  d_4Dpointsource = ColorSpinorField::Create(*h_4Dpointsource,cudaParam);
-
+  ColorSpinorParam cudaParam(cpuParam4D);
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  d_4Dpointsource = ColorSpinorField::Create(cudaParam);
+  std::cout << "debug1" << std::endl;
+  *d_4Dprojsource = *h_4Dpointsource; //! we want to copy the memory
+  std::cout << "debug2" << std::endl;
   //d_4Dprojsource
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out
   d_4Dprojsource = ColorSpinorField::Create(cudaParam);
@@ -5990,8 +5993,12 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
 
   DiracParam mydiracparam;
   setDiracParam(mydiracparam, inv_param, false);
-  DiracMobius myMobius(mydiracparam);
 
+  DiracParam diracparam4D;
+  setDiracParam(diracparam4D, inv_param4D, false);
+
+  DiracMobius myMobius(mydiracparam);
+  DiracWilson myWilson(diracparam4D);
   //! note: c_5 has many entries but they are all the same in this case, so we just use the first one, c_5[0]
   double myc_5 = reinterpret_cast<double *>(&inv_param->c_5)[0];
 
@@ -5999,10 +6006,10 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
 //  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
 //  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*d_4Dprojsource, *d_4Dpointsource, 1);
-  myMobius.Dslash4(*h_4Dentryin5Dsource, *d_4Dprojsource, QUDA_INVALID_PARITY);//TODO what parity ???
-  blas::xpay(*h_4Dentryin5Dsource, -myc_5 * (4 + inv_param->m5) * 2, *d_4Dprojsource); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
-  blas::ax(0.5, *h_4Dentryin5Dsource);
-  blas::xpy(*h_4Dentryin5Dsource,*d_4Dprojsource);
+  myWilson.M(*d_4Dentryin5Dsource, *d_4Dprojsource);//TODO what parity ???
+  blas::xpay(*d_4Dentryin5Dsource, -myc_5 * (4 + inv_param->m5) * 2, *d_4Dprojsource); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
+  blas::ax(0.5, *d_4Dentryin5Dsource);
+  blas::xpy(*d_4Dentryin5Dsource,*d_4Dprojsource);
 
   auto out5D_ptr_double = (double*)out5D_ptr;
   std::memcpy(&out5D_ptr_double[0], h_4Dentryin5Dsource->V(), spinor4D_size_in_floats);
@@ -6011,7 +6018,7 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   qudaMemset(d_4Dprojsource->V(), 0, spinor4D_size_in_floats);
   qudaMemset(d_4Dentryin5Dsource->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*d_4Dprojsource, *h_4Dpointsource, -1);
-  myMobius.Dslash4(*d_4Dentryin5Dsource, *d_4Dprojsource, QUDA_INVALID_PARITY);//TODO what parity ???
+  myWilson.M(*d_4Dentryin5Dsource, *d_4Dprojsource);//TODO what parity ???
   blas::xpay(*d_4Dentryin5Dsource, -myc_5 * (4 + inv_param->m5) * 2, *d_4Dprojsource);
   blas::ax(0.5, *d_4Dentryin5Dsource);
   blas::xpy(*d_4Dentryin5Dsource,*d_4Dprojsource);

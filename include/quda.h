@@ -1577,7 +1577,7 @@ extern "C" {
   * @param out5D_ptr   5D source is written here
   * @param X           an int array that contains Nx Ny Nz Nt
   */
-  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, const int *X, size_t spinor4D_size_in_floats);
+  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, size_t spinor4D_size_in_floats);
 
   /**
    * @brief Flush the chronological history for the given index
