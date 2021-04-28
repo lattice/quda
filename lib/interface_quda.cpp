@@ -5952,13 +5952,14 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param4D, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
+void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, const int *X, const size_t spinor4D_size_in_floats){ //, QudaInvertParam *inv_param5D,
 
   //! zero out memory reserved for 5D source
-  std::memset(out5D_ptr, 0, spinor4D_size_in_floats *inv_param4D->Ls);
+  std::memset(out5D_ptr, 0, spinor4D_size_in_floats * inv_param->Ls);
 
   //! collection of setting for the spinorfields. is modified as needed throughout this function.
-  ColorSpinorParam cpuParam4D(nullptr, *inv_param4D, X, false, inv_param4D->input_location);
+  ColorSpinorParam cpuParam4D(nullptr, *inv_param, X, false, inv_param->input_location);
+  cpuParam4D.nDim = 4;
 
   ColorSpinorField *h_4Dpointsource = nullptr;
   ColorSpinorField *d_4Dpointsource = nullptr;
@@ -5970,12 +5971,12 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   cpuParam4D.v = (void *)in4D_ptr; //! We want to construct a ColorSpinorField around already existing memory.
   cpuParam4D.create = QUDA_REFERENCE_FIELD_CREATE;
   h_4Dpointsource = ColorSpinorField::Create(cpuParam4D);
-  std::cout << "There is an error below" << std::endl;
+
   //d_4Dpointsource
-  ColorSpinorParam cudaParam(cpuParam4D, *inv_param4D);
+  ColorSpinorParam cudaParam(cpuParam4D, *inv_param);
   cudaParam.create = QUDA_COPY_FIELD_CREATE; //! we want to copy the memory
-  d_4Dpointsource = ColorSpinorField::Create(*h_4Dpointsource, cudaParam);
-  std::cout << "There is an error above" << std::endl;
+  d_4Dpointsource = ColorSpinorField::Create(*h_4Dpointsource,cudaParam);
+
   //d_4Dprojsource
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out
   d_4Dprojsource = ColorSpinorField::Create(cudaParam);
@@ -5988,18 +5989,18 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   h_4Dentryin5Dsource = ColorSpinorField::Create(cpuParam4D);
 
   DiracParam mydiracparam;
-  setDiracParam(mydiracparam, inv_param4D, false);
+  setDiracParam(mydiracparam, inv_param, false);
   DiracMobius myMobius(mydiracparam);
 
   //! note: c_5 has many entries but they are all the same in this case, so we just use the first one, c_5[0]
-  double myc_5 = reinterpret_cast<double *>(&inv_param4D->c_5)[0];
+  double myc_5 = reinterpret_cast<double *>(&inv_param->c_5)[0];
 
   //! first entry
 //  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
 //  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*d_4Dprojsource, *d_4Dpointsource, 1);
   myMobius.Dslash4(*h_4Dentryin5Dsource, *d_4Dprojsource, QUDA_INVALID_PARITY);//TODO what parity ???
-  blas::xpay(*h_4Dentryin5Dsource, -myc_5 * (4 + inv_param4D->m5) * 2, *d_4Dprojsource); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
+  blas::xpay(*h_4Dentryin5Dsource, -myc_5 * (4 + inv_param->m5) * 2, *d_4Dprojsource); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
   blas::ax(0.5, *h_4Dentryin5Dsource);
   blas::xpy(*h_4Dentryin5Dsource,*d_4Dprojsource);
 
@@ -6011,11 +6012,11 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   qudaMemset(d_4Dentryin5Dsource->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*d_4Dprojsource, *h_4Dpointsource, -1);
   myMobius.Dslash4(*d_4Dentryin5Dsource, *d_4Dprojsource, QUDA_INVALID_PARITY);//TODO what parity ???
-  blas::xpay(*d_4Dentryin5Dsource, -myc_5 * (4 + inv_param4D->m5) * 2, *d_4Dprojsource);
+  blas::xpay(*d_4Dentryin5Dsource, -myc_5 * (4 + inv_param->m5) * 2, *d_4Dprojsource);
   blas::ax(0.5, *d_4Dentryin5Dsource);
   blas::xpy(*d_4Dentryin5Dsource,*d_4Dprojsource);
 
-  std::memcpy(&out5D_ptr_double[inv_param4D->Ls-1], d_4Dentryin5Dsource->V(), spinor4D_size_in_floats);
+  std::memcpy(&out5D_ptr_double[inv_param->Ls-1], d_4Dentryin5Dsource->V(), spinor4D_size_in_floats);
 
   //! release temp memory
   delete h_4Dpointsource;
