@@ -251,7 +251,7 @@ int main(int argc, char **argv)
   // and real diagonal.
   
   int Nc = 3;
-  for(int dim=0; dim<4; dim++) {
+  for(int dim=0; dim<3; dim++) {
     for(int t=0; t<tdim; t++) {
       for(int elem = 0; elem < 2*Nc*Nc; elem++) {
 	
@@ -331,12 +331,12 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for compression and decompression = %g\n", time0);
-  printfQuda("Total compression ratio = %f (%.2fx)\n", comp_ratio/(4 * 18 * tdim), 1.0/(comp_ratio/(4 * 18 * tdim)));
+  printfQuda("Total time for compression and decompression = %g (%g per link)\n", time0, time0/(3 * spatial_block_size));
+  printfQuda("Total compression ratio = %f (%.2fx)\n", comp_ratio/(4 * 18 * tdim), 1.0/(comp_ratio/(3 * 18 * tdim)));
   
   // Reload the gauge to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
-
+  
   // Compute differences of gauge obserables using the reconstructed field
   double plaq_recon[3];
   plaqQuda(plaq_recon);  
