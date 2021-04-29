@@ -366,6 +366,8 @@ extern double eofa_mq3;
 extern double su3_qr_tol;
 extern int su3_qr_maxiter;
 extern int su3_taylor_N;
+extern int su3_comp_block_size;
+extern double su3_comp_tol;
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
 extern double ape_smear_rho;

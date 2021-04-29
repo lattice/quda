@@ -239,6 +239,8 @@ double eofa_mq3 = 1.0;
 double su3_qr_tol = 1e-6;
 int su3_qr_maxiter = 100;
 int su3_taylor_N = 25;
+int su3_comp_block_size = 4;
+double su3_comp_tol = 1e-6;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -1025,6 +1027,10 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-qr-maxiter", su3_qr_maxiter, "Maximum iterations of the link QR solver (default 100)");
 
   opgroup->add_option("--su3-taylor-N", su3_taylor_N, "The degree of the link Taylor expansion of exp(iH) (default 25)");
+
+  opgroup->add_option("--su3-comp-tol", su3_comp_tol, "The tolerance of the ZFP lossy link compression (default 1e-6)");
+  
+  opgroup->add_option("--su3-comp-block-size", su3_comp_block_size, "The block size of the ZFP lossy link compression (default 4)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
