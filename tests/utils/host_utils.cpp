@@ -181,6 +181,14 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
   }
 }
 
+void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision)
+{  
+  if (precision == QUDA_DOUBLE_PRECISION)
+    expsuNTaylor((double **)gauge, m);
+  else
+    expsuNTaylor((float **)gauge, m); 
+}
+
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
   // 0 = unit gauge
@@ -1028,7 +1036,6 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
   }
 }
 
-// static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
 {
   Float *resOdd[4], *resEven[4];
@@ -1212,9 +1219,52 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
   }
 }
 
-//template void constructFundamentalGaugeField(float **res);
-//template void constructFundamentalGaugeField(double **res);
+template <typename Float> void constructFundamentalGaugeField(Float **res)
+{
+  Float *resOut[4];
+  for (int dir = 0; dir < 4; dir++) resOut[dir] = res[dir];
+  
+  int Nc = 3;
+  
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < V; n++) {
+      
+      // Populate unitary matrix
+      MatrixXcd U = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      Eigen::ComplexEigenSolver<MatrixXcd> eig;
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      MatrixXcd E = eig.eigenvectors();
+      // Get eigenvalues
+      MatrixXcd S = MatrixXcd::Identity(Nc, Nc);
+      for(int i=0; i<Nc; i++) S(i,i).real(std::atan2(eig.eigenvalues()[i].imag(), eig.eigenvalues()[i].real()));
+      // Construct H
+      MatrixXcd H = E * S * E.adjoint();
+      
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
 
+/*
 template <typename Float> void constructFundamentalGaugeField(Float **res)
 {
   Float *resOdd[4], *resEven[4];
@@ -1288,7 +1338,7 @@ template <typename Float> void constructFundamentalGaugeField(Float **res)
     }
   }
 }
-
+*/
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
@@ -1504,6 +1554,77 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
 
   return accuracy_level;
 }
+
+// Port of the CHROMA implementation
+// In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/m!)*(q)^m 
+template <class Float > static void expsuNTaylor(Float **res, int m)
+{
+  Float *res_out[4];
+  for (int dir = 0; dir < 4; dir++) res_out[dir] = res[dir];
+  
+  int Nc = 3;
+
+  MatrixXcd H = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp1 = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp2 = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp3 = MatrixXcd::Zero(Nc, Nc);
+
+  // The constant Identity 
+  MatrixXcd Id = MatrixXcd::Identity(Nc, Nc);
+  
+  // The constant Identity * i matrix
+  MatrixXcd I = MatrixXcd::Zero(Nc, Nc);
+  for (int i = 0; i < Nc; i++) {
+    for (int j = 0; j < Nc; j++) {
+      I(i,j).real(0);
+      I(i,j).imag(1.0);
+    }
+  }
+  
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < V; n++) {
+      
+      
+      // Populate H matrix
+      H = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  H(i,j).real(res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  H(i,j).imag(res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      H *= I;  
+      temp1 = H;
+      temp2 = H;
+      
+      // The first two terms...
+      H += Id;
+      
+      // ...of an mth order expansion
+      for(int i = 2; i <= m; i++) {
+	
+	double coeff = 1.0/i;
+	
+	temp3 = temp2 * temp1;
+	temp2 = temp3 * coeff;
+	H += temp2;
+      }
+      
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
+
 
 static int compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {

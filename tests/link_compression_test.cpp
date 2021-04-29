@@ -168,10 +168,10 @@ int main(int argc, char **argv)
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
 
-  void *gauge[4], *new_gauge[4];
+  void *gauge[4], *gauge_orig[4];
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    gauge_orig[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device_ordinal);
@@ -185,11 +185,11 @@ int main(int argc, char **argv)
   initRand();
 
   constructHostGaugeField(gauge, gauge_param, argc, argv);
-  // Load the gauge field to the device
+  constructHostGaugeField(gauge_orig, gauge_param, argc, argv);
+  if(fund_gauge) exponentiateHostGaugeField(gauge, su3_taylor_N, prec);
+  
+  // Load the exponentiated gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
-
-  // Save the gauge into a CPU array
-  saveGaugeQuda(new_gauge, &gauge_param);
 
   double plaq[3];
   plaqQuda(plaq);
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
   // Loop over dimensions, time slices, and fundamental coeffs.
   // For the purposes of testing, we loop over all 18 real
   // coeffs of the hermitian matrix. In practise, we need
-  // only perfrom the compression on the upper traingular
+  // only perform the compression on the upper traingular
   // and real diagonal.
   
   int Nc = 3;
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
 	    for (x = 0; x < nx; x++) {      
 	      int idx = x + nx*y + nx*ny*z;
 	      int parity = idx % 2;
-	      double u = ((double *)gauge[dim])[Vh * gauge_site_size * parity + (idx + t*spatial_block_size)/2 * gauge_site_size + elem];
+	      double u = ((double *)gauge_orig[dim])[Vh * gauge_site_size * parity + (idx + t*spatial_block_size)/2 * gauge_site_size + elem];
 	      array[idx] = u;
 	      orig[idx] = u;
 	    }
@@ -320,7 +320,7 @@ int main(int argc, char **argv)
 	    for (x = 0; x < nx; x++) {      
 	      idx = x + nx*y + nx*ny*z;
 	      int parity = idx % 2;
-	      ((double *)gauge[dim])[Vh * gauge_site_size * parity + (t*spatial_block_size + idx)/2 * gauge_site_size + elem] = array[idx];
+	      ((double *)gauge_orig[dim])[Vh * gauge_site_size * parity + (t*spatial_block_size + idx)/2 * gauge_site_size + elem] = array[idx];
 	    }
 	  }
 	}
@@ -328,6 +328,9 @@ int main(int argc, char **argv)
     }
   }
 
+  // Exponentiate the reconstructed links
+  if(fund_gauge) exponentiateHostGaugeField(gauge_orig, su3_taylor_N, prec);
+  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
@@ -335,7 +338,7 @@ int main(int argc, char **argv)
   printfQuda("Total compression ratio = %f (%.2fx)\n", comp_ratio/(3 * 18 * tdim), 1.0/(comp_ratio/(3 * 18 * tdim)));
   
   // Reload the gauge to the device
-  loadGaugeQuda((void *)gauge, &gauge_param);
+  loadGaugeQuda((void *)gauge_orig, &gauge_param);
   
   // Compute differences of gauge obserables using the reconstructed field
   double plaq_recon[3];
@@ -360,7 +363,7 @@ int main(int argc, char **argv)
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
 
-  if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+  if (verify_results) check_gauge(gauge, gauge_orig, 1e-3, gauge_param.cpu_prec);
 
   freeGaugeQuda();
   endQuda();
@@ -368,7 +371,7 @@ int main(int argc, char **argv)
   // release memory
   for (int dir = 0; dir < 4; dir++) {
     free(gauge[dir]);
-    free(new_gauge[dir]);
+    free(gauge_orig[dir]);
   }
 
   finalizeComms();
