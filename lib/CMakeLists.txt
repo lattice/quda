@@ -530,6 +530,18 @@ if(QUDA_OPENBLAS)
   endif()
 endif()
 
+
+if(QUDA_ZFP)
+  target_compile_definitions(quda PRIVATE ZFP_LIB)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_ZFP_HOME}/include>)
+  if(QUDA_DOWLOAD_ZFP)
+    target_link_libraries(quda PUBLIC zfp)
+    target_link_libraries(quda_cpp PUBLIC zfp)
+  else()
+    target_link_libraries(quda INTERFACE ${ZFP})
+  endif()
+endif()
+
 if(QUDA_USE_EIGEN)
   target_compile_definitions(quda PRIVATE EIGEN)
 endif()

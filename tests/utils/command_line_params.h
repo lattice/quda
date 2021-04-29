@@ -177,6 +177,7 @@ extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern char latfile[256];
 extern bool unit_gauge;
+extern bool fund_gauge;
 extern double gaussian_sigma;
 extern char gauge_outfile[256];
 extern int Nsrc;

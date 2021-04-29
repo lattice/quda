@@ -24,6 +24,9 @@
 
 template <typename T> using complex = std::complex<T>;
 
+#include <Eigen/Dense>
+using namespace Eigen;
+
 #define XUP 0
 #define YUP 1
 #define ZUP 2
@@ -149,34 +152,59 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
     else
       constructUnitGaugeField((float **)gauge, param);
   } else if (type == 1) {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      constructRandomGaugeField((double **)gauge, param);
+      constructFundamentalGaugeField((double **)gauge);
+    } else { 
+      constructRandomGaugeField((float **)gauge, param);
+      constructFundamentalGaugeField((float **)gauge);
+    }
+  } else if (type == 2) {
     if (precision == QUDA_DOUBLE_PRECISION)
       constructRandomGaugeField((double **)gauge, param);
     else
       constructRandomGaugeField((float **)gauge, param);
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION)
+  } else if (type == 3) {
+    if (precision == QUDA_DOUBLE_PRECISION) {
       applyGaugeFieldScaling((double **)gauge, Vh, param);
-    else
+    } else {
       applyGaugeFieldScaling((float **)gauge, Vh, param);
+    }
+  } else if (type == 4) {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      constructFundamentalGaugeField((double **)gauge);
+      applyGaugeFieldScaling((double **)gauge, Vh, param);
+    } else {
+      constructFundamentalGaugeField((float **)gauge);
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
+    }
   }
 }
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
   // 0 = unit gauge
-  // 1 = random SU(3)
-  // 2 = supplied field
+  // 1 = fundamental SU(3)
+  // 2 = random SU(3)
+  // 3 = supplied field
+  // 4 = supplied field in fundamental
+  // Sanity check. DMH Make a gauge type enum? UNIT FUND RAND LOAD
+  if(unit_gauge && fund_gauge) errorQuda("Unit gauge and fundamental gauge requested simultaneoulsy. Only one option may be supplied");
+  
   int construct_type = 0;
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_type = 2;
+    construct_type = 3;
+    if(fund_gauge) construct_type = 4;
   } else {
     if (unit_gauge)
       construct_type = 0;
-    else
+    else if(fund_gauge)
       construct_type = 1;
+    else
+      construct_type = 2;
   }
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
@@ -1183,6 +1211,84 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
     }
   }
 }
+
+//template void constructFundamentalGaugeField(float **res);
+//template void constructFundamentalGaugeField(double **res);
+
+template <typename Float> void constructFundamentalGaugeField(Float **res)
+{
+  Float *resOdd[4], *resEven[4];
+  for (int dir = 0; dir < 4; dir++) {
+    resEven[dir] = res[dir];
+    resOdd[dir] = res[dir] + Vh * gauge_site_size;
+  }
+
+  int Nc = 3;
+  
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < Vh; n++) {
+      
+      // Populate unitary matrix
+      MatrixXcd U = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      Eigen::ComplexEigenSolver<MatrixXcd> eig;
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      MatrixXcd E = eig.eigenvectors();
+      // Get eigenvalues
+      MatrixXcd S = MatrixXcd::Identity(Nc, Nc);
+      for(int i=0; i<Nc; i++) S(i,i).real(std::atan2(eig.eigenvalues()[i].imag(), eig.eigenvalues()[i].real()));
+      // Construct H
+      MatrixXcd H = E * S * E.adjoint();
+      
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+
+      // Populate unitary matrix
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      E = eig.eigenvectors();
+      // Get eigenvalues
+      for(int i=0; i<Nc; i++) S(i,i) = eig.eigenvalues()[i];
+      // Construct H
+      H = E * S * E.adjoint();
+
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
+
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
