@@ -5961,15 +5961,14 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   ColorSpinorField *h_4D_point_source = nullptr;
   ColorSpinorField *d_4D_point_source = nullptr;
   ColorSpinorField *d_4D_proj_source = nullptr;
-  ColorSpinorField *d_4D_entry_in_5D_source = nullptr;
+  ColorSpinorField *d_4D_temp = nullptr;
+  ColorSpinorField *d_4D_hopping_term = nullptr;
   ColorSpinorField *h_4D_entry_in_5D_source = nullptr;
 
   //h_4Dpointsource
   //! We want to construct a ColorSpinorField around already existing memory.
   //! 1. create collection of settings for this. This object is just a placeholder and modified as needed throughout this function.
   ColorSpinorParam cpuParam4D(in4D_ptr, *inv_param4D, X, false, QUDA_CPU_FIELD_LOCATION);
-//  cpuParam4D.gammaBasis = QUDA_UKQCD_GAMMA_BASIS; //TODO does changing this here break anything further down the line??
-//  cpuParam4D.create = QUDA_REFERENCE_FIELD_CREATE;
   //! 2. call create
   h_4D_point_source = ColorSpinorField::Create(cpuParam4D);
 
@@ -5977,10 +5976,11 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   ColorSpinorParam cudaParam(cpuParam4D, *inv_param4D);
   d_4D_point_source = ColorSpinorField::Create(*h_4D_point_source, cudaParam);
 
-  //d_4Dprojsource & d_4Dentryin5Dsource
+  //d_4Dprojsource & d_4Dentryin5Dsource & d_4D_temp
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out here
   d_4D_proj_source = ColorSpinorField::Create(cudaParam);
-  d_4D_entry_in_5D_source = ColorSpinorField::Create(cudaParam);
+  d_4D_hopping_term = ColorSpinorField::Create(cudaParam);
+  d_4D_temp = ColorSpinorField::Create(cudaParam);
 
   //h_4Dentryin5Dsource
   cpuParam4D.create = QUDA_ZERO_FIELD_CREATE;
@@ -5995,27 +5995,40 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   double myc_5 = reinterpret_cast<double *>(&inv_param->c_5)[0];
 
   //! first entry
-//  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
-//  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
-  ApplyChiralProj(*d_4D_proj_source, *d_4D_point_source, 1);
-  myWilson.M(*d_4D_entry_in_5D_source, *d_4D_proj_source);//TODO what parity ???
-  blas::xpay(*d_4D_entry_in_5D_source, -myc_5 * (4 + inv_param->m5) * 2, *d_4D_proj_source); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
-  blas::ax(0.5, *d_4D_entry_in_5D_source);
-  blas::xpy(*d_4D_entry_in_5D_source,*d_4D_proj_source);
-  *h_4D_entry_in_5D_source = *d_4D_entry_in_5D_source;
+  std::cout << "norm d_4D_point_source=" << blas::norm2(*d_4D_point_source) << std::endl;
+  ApplyChiralProj(*d_4D_temp, *d_4D_point_source, 1); // ApplyChiralProj(out,in,proj){ out = P_L/R(proj) in }
+  std::cout << "norm d_4D_point_source=" << blas::norm2(*d_4D_point_source) << std::endl;
+  std::cout << "norm d_4D_temp=" << blas::norm2(*d_4D_temp) << std::endl;
+  *d_4D_proj_source = *d_4D_temp; // save this for later
+
+  myWilson.M(*d_4D_hopping_term, *d_4D_temp); // M(out,in){ out = M in } (M is hopping term)
+  std::cout << "norm d_4D_hopping_term=" << blas::norm2(*d_4D_hopping_term) << std::endl;
+  blas::xpay(*d_4D_hopping_term, -myc_5 * (4 + inv_param->m5) * 2, *d_4D_temp); //xpay(x, a, y){ y=x+a*y }
+  std::cout << "norm d_4D_temp=" << blas::norm2(*d_4D_temp) << std::endl;
+  blas::ax(0.5, *d_4D_temp); // ax(a,x){x=ax}
+  std::cout << "norm d_4D_temp=" << blas::norm2(*d_4D_temp) << std::endl;
+
+  blas::xpy(*d_4D_proj_source,*d_4D_temp); // xpy(x,y){ y=x+y }
+  std::cout << "norm d_4D_temp=" << blas::norm2(*d_4D_temp) << std::endl;
+
+  *h_4D_entry_in_5D_source = *d_4D_temp;
 
   auto out5D_ptr_double = (double*)out5D_ptr;
   std::memcpy(&out5D_ptr_double[0], h_4D_entry_in_5D_source->V(), spinor4D_size_in_floats);
 
   //! second entry
   qudaMemset(d_4D_proj_source->V(), 0, spinor4D_size_in_floats);
-  qudaMemset(d_4D_entry_in_5D_source->V(), 0, spinor4D_size_in_floats);
-  ApplyChiralProj(*d_4D_proj_source, *d_4D_point_source, -1);
-  myWilson.M(*d_4D_entry_in_5D_source, *d_4D_proj_source);//TODO what parity ???
-  blas::xpay(*d_4D_entry_in_5D_source, -myc_5 * (4 + inv_param->m5) * 2, *d_4D_proj_source);
-  blas::ax(0.5, *d_4D_entry_in_5D_source);
-  blas::xpy(*d_4D_entry_in_5D_source,*d_4D_proj_source);
-  *h_4D_entry_in_5D_source = *d_4D_entry_in_5D_source;
+  qudaMemset(d_4D_hopping_term->V(), 0, spinor4D_size_in_floats);
+  qudaMemset(d_4D_temp->V(), 0, spinor4D_size_in_floats);
+  ApplyChiralProj(*d_4D_temp, *d_4D_point_source, -1); // ApplyChiralProj(out,in,proj){ out = P_L/R(proj) in }
+  *d_4D_proj_source = *d_4D_temp; // save this for later
+
+  myWilson.M(*d_4D_hopping_term, *d_4D_temp); // M(out,in){ out = M in } (M is hopping term)
+  blas::xpay(*d_4D_hopping_term, -myc_5 * (4 + inv_param->m5) * 2, *d_4D_temp); //xpay(x, a, y){ y=x+a*y }
+  blas::ax(0.5, *d_4D_temp); // ax(a,x){x=ax}
+
+  blas::xpy(*d_4D_proj_source,*d_4D_temp); // xpy(x,y){ y=x+y }
+  *h_4D_entry_in_5D_source = *d_4D_temp;
 
   std::memcpy(&out5D_ptr_double[inv_param->Ls-1], h_4D_entry_in_5D_source->V(), spinor4D_size_in_floats);
 
@@ -6023,7 +6036,8 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   delete h_4D_point_source;
   delete d_4D_point_source;
   delete d_4D_proj_source;
-  delete d_4D_entry_in_5D_source;
+  delete d_4D_hopping_term;
+  delete d_4D_temp;
   delete h_4D_entry_in_5D_source;
 }
 
