@@ -899,14 +899,13 @@ if(QUDA_ZFP)
       GIT_TAG 0.5.5
       GIT_SHALLOW YES
       PREFIX zfp
-      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=ON -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(ZFP INSTALL_DIR)
     set(QUDA_ZFP_HOME ${INSTALL_DIR})
     add_library(zfp STATIC IMPORTED)
     add_dependencies(zfp ZFP)
-    set_target_properties(zfp PROPERTIES IMPORTED_LOCATION
-      ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
+    set_target_properties(zfp PROPERTIES IMPORTED_LOCATION ${QUDA_ZFP_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
   else(QUDA_DOWNLOAD_ZFP)
     find_package(PkgConfig REQUIRED)
 

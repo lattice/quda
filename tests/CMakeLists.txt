@@ -12,23 +12,19 @@ add_subdirectory(utils)
 add_subdirectory(host_reference)
 
 if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
 
 if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
-endif()
-
-if(QUDA_ZFP AND QUDA_DOWNLOAD_ZFP)
-  add_dependencies(quda_test ZFP)
 endif()
 
 set(TEST_LIBS quda_test)
@@ -42,14 +38,14 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   endif()
 
   if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
-
+  
   if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
@@ -64,6 +60,11 @@ if(QUDA_ARPACK)
     list(APPEND TEST_LIBS ${PARPACK})
   endif()
 endif()
+
+if(QUDA_ZFP)
+  list(APPEND TEST_LIBS zfp)
+endif()
+
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
