@@ -332,7 +332,7 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for compression and decompression = %g (%g per link)\n", time0, time0/(3 * spatial_block_size));
-  printfQuda("Total compression ratio = %f (%.2fx)\n", comp_ratio/(4 * 18 * tdim), 1.0/(comp_ratio/(3 * 18 * tdim)));
+  printfQuda("Total compression ratio = %f (%.2fx)\n", comp_ratio/(3 * 18 * tdim), 1.0/(comp_ratio/(3 * 18 * tdim)));
   
   // Reload the gauge to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
