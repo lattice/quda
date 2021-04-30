@@ -257,7 +257,7 @@ int main(int argc, char **argv)
     gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     gauge_orig[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     gauge_new[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    for(size_t i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[dir])[i] = 0.0;
+    for(int i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[dir])[i] = 0.0;
   }
    
   constructHostGaugeField(gauge, gauge_param, argc, argv);
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
   uint blocks3D = bx * by * bz;
   size_t x, y, z, t, idx;
   size_t i, j, k, l, b;
-  double L2 = 0.0, diff = 0.0, comp_ratio = 0.0;
+  double comp_ratio = 0.0;
   
   array4D = (double*)malloc(n4D * sizeof(double));
   orig4D = (double*)malloc(n4D * sizeof(double));
@@ -342,10 +342,10 @@ int main(int argc, char **argv)
     printfQuda("size of buffer = %lu\n", blocks4D * block_dim4D * sizeof(double));
   }
   
-  // Loop over dimensions, time slices, and fundamental coeffs.
+  // Loop over dimensions and fundamental coeffs.
   // For the purposes of testing, we loop over all 18 real
   // coeffs of the hermitian matrix. In practise, we need
-  // only perform the compression on the upper traingular
+  // only perform the compression on the upper triangular
   // and real diagonal.
   
   int Nc = 3;
@@ -384,7 +384,8 @@ int main(int argc, char **argv)
 
       // Apply compression
       comp_ratio += process4D(buffer4D, blocks4D, tolerance, block_size);
-      if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", 2*Nc*Nc * dim + elem, comp_ratio); 
+      if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", 2*Nc*Nc * dim + elem, comp_ratio);
+      
       // Reorganise blocks into array 
       idx = 0;
       for (b = 0; b < blocks4D; b++) {
@@ -395,22 +396,6 @@ int main(int argc, char **argv)
 		array4D[idx] = buffer4D[i + block_size * (j + block_size * (k + block_size * (l + block_size * b)))];
 		idx++;
 	      }
-	    }
-	  }
-	}
-      }
-	
-      // Diff of modified array with original 
-      diff = 0.0;
-      L2 = 0.0;
-      idx = 0;
-      for (t = 0; t < nt; t++) {
-	for (z = 0; z < nz; z++) {
-	  for (y = 0; y < ny; y++) {
-	    for (x = 0; x < nx; x++) {
-	      diff = array4D[x + nx*y + nx*ny*z + nx*ny*nz*t] - orig4D[x + nx*y + nx*ny*z + nx*ny*nz*t];
-	      L2 += diff*diff;
-	      idx++;
 	    }
 	  }
 	}
@@ -469,15 +454,14 @@ int main(int argc, char **argv)
   free(array4D);
   free(orig4D);
 
-  L2 = 0.0;
-  diff = 0.0;
+  time0 = -((double)clock());
   comp_ratio = 0.0;
   
   array3D = (double*)malloc(n3D * sizeof(double));
   orig3D = (double*)malloc(n3D * sizeof(double));
   buffer3D = (double*)malloc(blocks3D * block_dim3D * sizeof(double));
   for(int d = 0; d<4; d++)
-    for(size_t i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[d])[i] = 0.0;
+    for(int i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[d])[i] = 0.0;
 
   if(verbosity >= QUDA_DEBUG_VERBOSE) {
     printfQuda("size of ntot = %u\n", n3D);
@@ -521,11 +505,11 @@ int main(int argc, char **argv)
 	    }
 	  }
 	}
-	
-	
+		
 	// Apply compression
 	comp_ratio += process3D(buffer3D, blocks3D, tolerance, block_size);
-	if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", 2*Nc*Nc * dim + elem, comp_ratio); 
+	if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", 2*Nc*Nc * dim + elem, comp_ratio);
+	
 	// Reorganise blocks into array 
 	idx = 0;
 	for (b = 0; b < blocks3D; b++) {
@@ -535,20 +519,6 @@ int main(int argc, char **argv)
 		array3D[idx] = buffer3D[i + block_size * (j + block_size * (k + block_size * b))];
 		idx++;
 	      }
-	    }
-	  }
-	}
-	
-	// Diff of modified array with original 
-	diff = 0.0;
-	L2 = 0.0;
-	idx = 0;
-	for (z = 0; z < nz; z++) {
-	  for (y = 0; y < ny; y++) {
-	    for (x = 0; x < nx; x++) {
-	      diff = array3D[x + nx*y + nx*ny*z] - orig3D[x + nx*y + nx*ny*z];
-	      L2 += diff*diff;
-	      idx++;
 	    }
 	  }
 	}
@@ -567,7 +537,7 @@ int main(int argc, char **argv)
     }
   }
 
-  // Replace temporal links
+  // Replace all temporal links
   for(int elem = 0; elem < 2*Nc*Nc; elem++) {
     for(int t=0; t<tdim; t++) {
       for (z = 0; z < nz; z++) {
