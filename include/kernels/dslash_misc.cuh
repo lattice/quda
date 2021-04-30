@@ -331,7 +331,7 @@ namespace quda {
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
     using Mat = HMatrix<typename Arg::real, N>;
     Arg &arg;
-    constexpr NdegTwistCloverApply(Arg &arg) : arg(arg) {}
+    constexpr NdegTwistCloverApply(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
