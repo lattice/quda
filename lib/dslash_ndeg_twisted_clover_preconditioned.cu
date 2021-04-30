@@ -31,9 +31,9 @@ namespace quda
                                     const ColorSpinorField &in) :
       Dslash(arg, out, in)
       {
-        TunableVector3D::resizeVector(2, arg.nParity);
+        TunableKernel3D::resizeVector(2, arg.nParity);
         // this will force flavor to be contained in the block
-        TunableVector3D::resizeStep(2, 1); 
+        TunableKernel3D::resizeStep(2, 1); 
       }
       
       void apply(const qudaStream_t &stream)
