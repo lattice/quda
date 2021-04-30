@@ -38,8 +38,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
     struct nDegTwistedClover : dslash_default {
     
-    Arg &arg;
-    constexpr nDegTwistedClover(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr nDegTwistedClover(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     
     /**

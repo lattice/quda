@@ -42,8 +42,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
     struct nDegTwistedCloverPreconditioned : dslash_default {
     
-    Arg &arg;
-    constexpr nDegTwistedCloverPreconditioned(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr nDegTwistedCloverPreconditioned(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
   
