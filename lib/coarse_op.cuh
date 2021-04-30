@@ -249,7 +249,7 @@ namespace quda {
         errorQuda("Twisted clover dslash has not been built");
 #endif
 
-      } else if (type == COMPUTE_CLOVER_INV_MAX || COMPUTE_TWISTED_CLOVER_INV_MAX) {
+      } else if (type == COMPUTE_CLOVER_INV_MAX || type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
         if (from_coarse) errorQuda("compute_clover_inv_max should only be called from the fine grid");
         arg.max_site = static_cast<Float*>(safe_malloc(2 * arg.fineVolumeCB *sizeof(Float)));
         arg.twist = (type == COMPUTE_TWISTED_CLOVER_INV_MAX);

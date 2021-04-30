@@ -1031,7 +1031,6 @@ namespace quda {
         int block_idx_z = c_row_block_idx_z / arg.vuvTile.M_tiles;
         c_col = blockDim.z*block_idx_z + threadIdx.z; // coarse color col index
       } else {
-        int parity_c_row = blockDim.y*blockIdx.y + threadIdx.y;
         c_row  = arg.parity_flip ? (parity_c_row % arg.vuvTile.M_tiles) : (parity_c_row / 2); // coarse color row index
         parity = arg.parity_flip ? (parity_c_row / arg.vuvTile.M_tiles) : (parity_c_row % 2); // coarse color row index
         c_col = blockDim.z*blockIdx.z + threadIdx.z; // coarse color col index
