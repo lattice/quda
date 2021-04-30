@@ -24,7 +24,7 @@ namespace quda
     public:
     NdegTwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
         {
-          TunableVectorYZ::resizeVector(2, arg.nParity);
+          TunableVector3D::resizeVector(2, arg.nParity);
         }
       
       void apply(const qudaStream_t &stream)
@@ -84,17 +84,22 @@ namespace quda
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     }
   };
-  
+
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
   void ApplyNdegTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                               double a, double b,
                               double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                               TimeProfile &profile)
   {
-#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
     instantiate<NdegTwistedCloverApply>(out, in, U, A, a, b, c, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Non-degenerate twisted-clover dslash has not been built");
-#endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
   }
+#else
+  void ApplyNdegTwistedClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
+                              double, double, double, const ColorSpinorField &, int, bool, const int *,
+                              TimeProfile &)
+  {
+    errorQuda("Non-degenerate twisted-clover dslash has not been built");
+  }
+#endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
   
 } // namespace quda

@@ -23,7 +23,7 @@ namespace quda
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       if(in.Ndim() == 5) {
-        TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
+        TunableVector3D::resizeVector(in.X(4), arg.nParity);
       }
     }
 

@@ -31,9 +31,9 @@ namespace quda
                                     const ColorSpinorField &in) :
       Dslash(arg, out, in)
       {
-        TunableVectorYZ::resizeVector(2, arg.nParity);
+        TunableVector3D::resizeVector(2, arg.nParity);
         // this will force flavor to be contained in the block
-        TunableVectorY::resizeStep(2); 
+        TunableVector3D::resizeStep(2, 1); 
       }
       
       void apply(const qudaStream_t &stream)
@@ -114,18 +114,23 @@ namespace quda
     }
   };
   
+#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
   void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in,
                                             const GaugeField &U, const CloverField &A,
                                             double a, double b, double c, bool xpay,
                                             const ColorSpinorField &x, int parity, bool dagger,
                                             const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_NDEG_TWISTED_CLOVER_DIRAC
     instantiate<NdegTwistedCloverPreconditionedApply>(out, in, U, A, a, b, c, xpay, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Non-degenerate preconditioned twisted-clover dslash has not been built");
-#endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
   }
+#else
+  void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, const CloverField &,
+                                            double, double, double, bool, const ColorSpinorField &, int, bool,
+                                            const int *, TimeProfile &)
+  {
+    errorQuda("Non-degenerate preconditioned twisted-clover dslash has not been built");
+  }
+#endif // GPU_NDEG_TWISTED_CLOVER_DIRAC
   
 } // namespace quda
 
