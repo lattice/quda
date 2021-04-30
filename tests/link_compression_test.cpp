@@ -252,23 +252,23 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();  
   
-  void *gauge[4], *gauge_orig[4], *gauge_new[4];
+  void *gauge[4], *gauge_fund[4], *gauge_new[4];
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    gauge_orig[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    gauge_fund[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     gauge_new[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     for(int i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[dir])[i] = 0.0;
   }
    
   constructHostGaugeField(gauge, gauge_param, argc, argv);
-  constructHostGaugeField(gauge_orig, gauge_param, argc, argv);
+  constructHostGaugeField(gauge_fund, gauge_param, argc, argv);
 
-  // Exponentiate the gauge field for measurements.
-  if(fund_gauge) exponentiateHostGaugeField(gauge, su3_taylor_N, prec);
-  
-  // Load the exponentiated gauge field to the device
+  // Load the original gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
+  // Do a fundamental docomposition on the gauge field for compression
+  if(fund_gauge) fundamentalHostGaugeField(gauge_fund, prec);
+  
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 	    for (x = 0; x < nx; x++) {      
 	      size_t idx = x + nx*y + nx*ny*z + nx*ny*nz*t;
 	      size_t parity = idx % 2;
-	      double u = ((double *)gauge_orig[dim])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem];
+	      double u = ((double *)gauge_fund[dim])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem];
 	      array4D[idx] = u;
 	      orig4D[idx] = u;
 	    }
@@ -460,9 +460,15 @@ int main(int argc, char **argv)
   array3D = (double*)malloc(n3D * sizeof(double));
   orig3D = (double*)malloc(n3D * sizeof(double));
   buffer3D = (double*)malloc(blocks3D * block_dim3D * sizeof(double));
+
+  // Reset the new field
   for(int d = 0; d<4; d++)
     for(int i = 0; i < V * gauge_site_size; i++) ((double*)gauge_new[d])[i] = 0.0;
 
+  // Reconstruct the fundamental
+  constructHostGaugeField(gauge_fund, gauge_param, argc, argv);
+  if(fund_gauge) fundamentalHostGaugeField(gauge_fund, prec);  
+  
   if(verbosity >= QUDA_DEBUG_VERBOSE) {
     printfQuda("size of ntot = %u\n", n3D);
     printfQuda("size of array = %lu\n", n3D * sizeof(double));
@@ -486,7 +492,7 @@ int main(int argc, char **argv)
 	    for (x = 0; x < nx; x++) {      
 	      int idx = x + nx*y + nx*ny*z;
 	      int parity = idx % 2;
-	      double u = ((double *)gauge_orig[dim])[Vh * gauge_site_size * parity + ((t*n3D + idx)/2) * gauge_site_size + elem];
+	      double u = ((double *)gauge_fund[dim])[Vh * gauge_site_size * parity + ((t*n3D + idx)/2) * gauge_site_size + elem];
 	      array3D[idx] = u;
 	      orig3D[idx] = u;
 	    }
@@ -545,7 +551,7 @@ int main(int argc, char **argv)
 	  for (x = 0; x < nx; x++) {      
 	    idx = x + nx*y + nx*ny*z + nx*ny*nz*t;
 	    int parity = idx % 2;
-	    ((double *)gauge_new[3])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem] = ((double *)gauge_orig[3])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem];
+	    ((double *)gauge_new[3])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem] = ((double *)gauge_fund[3])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem];
 	  }
 	}
       }
@@ -592,7 +598,7 @@ int main(int argc, char **argv)
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
 
-  if (verify_results) check_gauge(gauge, gauge_orig, 1e-3, gauge_param.cpu_prec);
+  if (verify_results) check_gauge(gauge, gauge_new, 1e-3, gauge_param.cpu_prec);
 
   freeGaugeQuda();
   endQuda();
@@ -600,7 +606,7 @@ int main(int argc, char **argv)
   // release memory
   for (int dir = 0; dir < 4; dir++) {
     free(gauge[dir]);
-    free(gauge_orig[dir]);
+    free(gauge_fund[dir]);
     free(gauge_new[dir]);
   }
 

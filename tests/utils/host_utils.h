@@ -92,6 +92,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision);
+void fundamentalHostGaugeField(void **gauge, QudaPrecision precision);
 
 template <typename Float> void constructFundamentalGaugeField(Float **res);
 template <typename Float> void expsuNTaylor(Float **res, int m);
