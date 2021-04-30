@@ -781,14 +781,16 @@ namespace quda
         // as well as copying to the correct location this also changes basis if necessary
         *tmp1 = *param.B[i];
 
-        transfer->R(*r_coarse, *tmp1);
-        transfer->P(*tmp2, *r_coarse);
+        transfer->R(*r_coarse, *tmp1); // <-- This is what seems to go wrong  r_coarse <- R ( tmp1 ) = P^\dagger tmp1 
+        transfer->P(*tmp2, *r_coarse); // <--      tmp2 <- P R
+
+	auto norm_tmp2_pre_xmy = norm2(*tmp2);
         deviation = sqrt(xmyNorm(*tmp1, *tmp2) / norm2(*tmp1));
 
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda(
-            "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
-            i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2), deviation);
+            "Vector %d: norms v_k = %e P^\\dagger v_k = %e PP^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
+            i, norm2(*tmp1), norm2(*r_coarse), norm_tmp2_pre_xmy, norm2(*tmp2), deviation);
         if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
       }
 

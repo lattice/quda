@@ -131,14 +131,23 @@ namespace quda
       return true;
     }
 
-    size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock; } 
+#if 0
+    size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock-1; } 
 
     size_t max_dynamic_shared_memory()
     {
       static int max_shared_bytes = 0;
       if (!max_shared_bytes) hipDeviceGetAttribute(&max_shared_bytes,  hipDeviceAttributeMaxSharedMemoryPerBlock, comm_gpuid());
-      return max_shared_bytes;
+      return max_shared_bytes-1;
     }
+#else
+    size_t max_default_shared_memory() { return 8192; }
+
+    size_t max_dynamic_shared_memory()
+    {
+      return 16000;
+    }
+#endif
 
     unsigned int max_threads_per_block() { 
 	return deviceProp.maxThreadsPerBlock; 
