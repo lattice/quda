@@ -11,26 +11,10 @@ namespace quda {
       kappa5(0.5 / (5.0 + m5)),
       Ls(param.Ls)
   {
-  }
-
-  DiracDomainWall::DiracDomainWall(const DiracDomainWall &dirac) :
-      DiracWilson(dirac),
-      m5(dirac.m5),
-      kappa5(0.5 / (5.0 + m5)),
-      Ls(dirac.Ls)
-  {
-  }
-
-  DiracDomainWall::~DiracDomainWall() { }
-
-  DiracDomainWall& DiracDomainWall::operator=(const DiracDomainWall &dirac)
-  {
-    if (&dirac != this) {
-      DiracWilson::operator=(dirac);
-      m5 = dirac.m5;
-      kappa5 = dirac.kappa5;
+    for (int s = 0; s < Ls; s++) {
+      b[s] = 1.0;
+      c[s] = 0.0;
     }
-    return *this;
   }
 
   void DiracDomainWall::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
@@ -116,26 +100,6 @@ namespace quda {
     : DiracDomainWall(param)
   {
 
-  }
-
-  DiracDomainWallPC::DiracDomainWallPC(const DiracDomainWallPC &dirac) 
-    : DiracDomainWall(dirac)
-  {
-
-  }
-
-  DiracDomainWallPC::~DiracDomainWallPC()
-  {
-
-  }
-
-  DiracDomainWallPC& DiracDomainWallPC::operator=(const DiracDomainWallPC &dirac)
-  {
-    if (&dirac != this) {
-      DiracDomainWall::operator=(dirac);
-    }
-
-    return *this;
   }
 
   // Apply the even-odd preconditioned clover-improved Dirac operator

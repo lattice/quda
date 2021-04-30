@@ -7,8 +7,10 @@ namespace quda {
 
   DiracMobius::DiracMobius(const DiracParam &param) : DiracDomainWall(param), zMobius(false)
   {
-    memcpy(b_5, param.b_5, sizeof(Complex) * param.Ls);
-    memcpy(c_5, param.c_5, sizeof(Complex) * param.Ls);
+    for (int s = 0; s < Ls; s++) {
+      b_5[s] = param.b_5[s];
+      c_5[s] = param.c_5[s];
+    }
 
     double b = b_5[0].real();
     double c = c_5[0].real();
@@ -744,14 +746,11 @@ namespace quda {
     if (dagger == QUDA_DAG_NO) {
       ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(*tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     } else {
       ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       ApplyDslash5(*tmp, out, out, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
-      mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     }
+    m5_eofa(out, in);
     blas::axpy(-mobius_kappa_b, *tmp, out);
 
     long long Ls = in.X(4);
@@ -955,34 +954,4 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void
-  DiracMobiusEofaPC::full_dslash(ColorSpinorField &out,
-                                 const ColorSpinorField &in) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
-  {
-    checkFullSpinor(out, in);
-    bool reset1 = newTmp(&tmp1, in.Odd());
-    bool reset2 = newTmp(&tmp2, in.Odd());
-    if (!dagger) {
-      // Even
-      m5_eofa(*tmp1, in.Even());
-      Dslash4pre(*tmp2, in.Odd());
-      Dslash4Xpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1.);
-      // Odd
-      m5_eofa(*tmp1, in.Odd());
-      Dslash4pre(*tmp2, in.Even());
-      Dslash4Xpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1.);
-    } else {
-      printfQuda("Quda EOFA full dslash dagger=yes\n");
-      // Even
-      m5_eofa(*tmp1, in.Even());
-      Dslash4(*tmp2, in.Odd(), QUDA_EVEN_PARITY);
-      Dslash4preXpay(out.Even(), *tmp2, *tmp1, -1. / mobius_kappa_b);
-      // Odd
-      m5_eofa(*tmp1, in.Odd());
-      Dslash4(*tmp2, in.Even(), QUDA_ODD_PARITY);
-      Dslash4preXpay(out.Odd(), *tmp2, *tmp1, -1. / mobius_kappa_b);
-    }
-    deleteTmp(&tmp1, reset1);
-    deleteTmp(&tmp2, reset2);
-  }
 } // namespace quda

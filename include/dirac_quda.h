@@ -712,11 +712,11 @@ namespace quda {
     int Ls; // length of the fifth dimension
     void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
-public:
+    Complex b[QUDA_MAX_DWF_LS];
+    Complex c[QUDA_MAX_DWF_LS];
+
+  public:
     DiracDomainWall(const DiracParam &param);
-    DiracDomainWall(const DiracDomainWall &dirac);
-    virtual ~DiracDomainWall();
-    DiracDomainWall& operator=(const DiracDomainWall &dirac);
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 		const QudaParity parity) const;
@@ -742,9 +742,6 @@ public:
 
   public:
     DiracDomainWallPC(const DiracParam &param);
-    DiracDomainWallPC(const DiracDomainWallPC &dirac);
-    virtual ~DiracDomainWallPC();
-    DiracDomainWallPC& operator=(const DiracDomainWallPC &dirac);
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -764,9 +761,6 @@ public:
 
   public:
     DiracDomainWall4D(const DiracParam &param);
-    DiracDomainWall4D(const DiracDomainWall4D &dirac);
-    virtual ~DiracDomainWall4D();
-    DiracDomainWall4D &operator=(const DiracDomainWall4D &dirac);
 
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -790,9 +784,6 @@ public:
 
   public:
     DiracDomainWall4DPC(const DiracParam &param);
-    DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
-    virtual ~DiracDomainWall4DPC();
-    DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
     void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -808,15 +799,17 @@ public:
 		     const QudaSolutionType) const;
 
     virtual QudaDiracType getDiracType() const { return QUDA_DOMAIN_WALL_4DPC_DIRAC; }
+
+    void Dslash4M5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
+
   };
 
   // Full Mobius
   class DiracMobius : public DiracDomainWall {
 
   protected:
-    //Mobius coefficients
-      Complex b_5[QUDA_MAX_DWF_LS];
-      Complex c_5[QUDA_MAX_DWF_LS];
 
       /**
          Whether we are using classical Mobius with constant real-valued
@@ -825,15 +818,16 @@ public:
       */
       bool zMobius;
 
+      //Mobius coefficients
+      Complex b_5[QUDA_MAX_DWF_LS];
+      Complex c_5[QUDA_MAX_DWF_LS];
+
       double mobius_kappa_b;
       double mobius_kappa_c;
       double mobius_kappa;
 
     public:
       DiracMobius(const DiracParam &param);
-      // DiracMobius(const DiracMobius &dirac);
-      // virtual ~DiracMobius();
-      // DiracMobius& operator=(const DiracMobius &dirac);
 
       void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
       void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -864,8 +858,8 @@ public:
   public:
     DiracMobiusPC(const DiracParam &param);
     DiracMobiusPC(const DiracMobiusPC &dirac);
-    virtual ~DiracMobiusPC();
-    DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
+    ~DiracMobiusPC();
+    DiracMobiusPC &operator=(const DiracMobiusPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
     void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -932,13 +926,10 @@ public:
 
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                         double a = -1.) const;
+                         double a) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-
-    void full_dslash(ColorSpinorField &out,
-                     const ColorSpinorField &in) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
 
     void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
                  const QudaSolutionType) const;

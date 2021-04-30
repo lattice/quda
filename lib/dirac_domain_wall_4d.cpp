@@ -7,17 +7,6 @@ namespace quda {
 
   DiracDomainWall4D::DiracDomainWall4D(const DiracParam &param) : DiracDomainWall(param) {}
 
-  DiracDomainWall4D::DiracDomainWall4D(const DiracDomainWall4D &dirac) : DiracDomainWall(dirac) {}
-
-  DiracDomainWall4D::~DiracDomainWall4D() {}
-
-  DiracDomainWall4D &DiracDomainWall4D::operator=(const DiracDomainWall4D &dirac)
-  {
-    if (&dirac != this) { DiracDomainWall::operator=(dirac); }
-
-    return *this;
-  }
-
 // Modification for the 4D preconditioned domain wall operator
   void DiracDomainWall4D::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
@@ -116,17 +105,6 @@ namespace quda {
   // Modification for the 4D preconditioned domain wall operator
   DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracParam &param) : DiracDomainWall4D(param) {}
 
-  DiracDomainWall4DPC::DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac) : DiracDomainWall4D(dirac) {}
-
-  DiracDomainWall4DPC::~DiracDomainWall4DPC() {}
-
-  DiracDomainWall4DPC &DiracDomainWall4DPC::operator=(const DiracDomainWall4DPC &dirac)
-  {
-    if (&dirac != this) { DiracDomainWall4D::operator=(dirac); }
-
-    return *this;
-  }
-
   void DiracDomainWall4DPC::M5inv(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkDWF(in, out);
@@ -151,6 +129,46 @@ namespace quda {
     flops += (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);
   }
 
+  void DiracDomainWall4DPC::Dslash4M5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5inv(out, in, *gauge, 0.0, m5, b, c, in, out, parity, dagger, commDim, mass, profile);
+
+    flops += 1320LL * (long long)in.Volume();
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+  }
+
+  void DiracDomainWall4DPC::Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(out, in);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5inv(out, in, *gauge, a, m5, b, c, x, out, parity, dagger, commDim, mass, profile);
+
+    flops += (1320LL + 48LL) * (long long)in.Volume();
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+  }
+
+  void DiracDomainWall4DPC::Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a, ColorSpinorField &y) const
+  {
+    checkDWF(out, in);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5invM5inv(out, in, *gauge, a, m5, b, c, x, y, parity, dagger, commDim, mass, profile);
+
+    flops += (1320LL + 48LL) * (long long)in.Volume();
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+  }
+
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
   void DiracDomainWall4DPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
@@ -165,20 +183,34 @@ namespace quda {
 
     if (symmetric && !dagger) {
       // 1 - k^2 M5^-1 D4 M5^-1 D4
-      Dslash4(*tmp1, in, parity[0]);
-      M5inv(out, *tmp1);
-      Dslash4(*tmp1, out, parity[1]);
-      M5invXpay(out, *tmp1, in, -kappa2);
+      if (this->use_mobius_fused_kernel) {
+        Dslash4M5inv(*tmp1, in, parity[0]);
+        Dslash4M5invXpay(out, *tmp1, parity[1], in, -1.0);
+      } else {
+        Dslash4(*tmp1, in, parity[0]);
+        M5inv(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        M5invXpay(out, *tmp1, in, -kappa2);
+      }
     } else if (symmetric && dagger) {
       // 1 - k^2 D4 M5^-1 D4 M5^-1
       M5inv(*tmp1, in);
-      Dslash4(out, *tmp1, parity[0]);
-      M5inv(*tmp1, out);
+      if (this->use_mobius_fused_kernel) {
+        out = *tmp1;
+        Dslash4M5inv(*tmp1, out, parity[0]);
+      } else {
+        Dslash4(out, *tmp1, parity[0]);
+        M5inv(*tmp1, out);
+      }
       Dslash4Xpay(out, *tmp1, parity[1], in, -kappa2);
     } else {
       // 1 - k D5 - k^2 D4 M5^-1 D4_oe
-      Dslash4(*tmp1, in, parity[0]);
-      M5inv(out, *tmp1);
+      if (this->use_mobius_fused_kernel) {
+        Dslash4M5inv(out, in, parity[0]);
+      } else {
+        Dslash4(*tmp1, in, parity[0]);
+        M5inv(out, *tmp1);
+      }
       Dslash4Xpay(*tmp1, out, parity[1], in, -kappa2);
       Dslash5Xpay(out, in, *tmp1, -kappa5);
     }
@@ -189,8 +221,25 @@ namespace quda {
   void DiracDomainWall4DPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+    if (symmetric && this->use_mobius_fused_kernel) {
+      bool reset1 = newTmp(&tmp1, in);
+
+      Dslash4M5inv(*tmp1, in, parity[0]);
+      Dslash4M5invXpayM5inv(out, *tmp1, parity[1], in, -1.0, *tmp2);
+
+      dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
+      Dslash4M5inv(*tmp1, out, parity[0]);
+      Dslash4Xpay(out, *tmp1, parity[1], *tmp2, -kappa5 * kappa5);
+      dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
+
+      deleteTmp(&tmp1, reset1);
+    } else {
+      M(*tmp2, in);
+      Mdag(out, *tmp2);
+    }
     deleteTmp(&tmp2, reset);
   }
 
