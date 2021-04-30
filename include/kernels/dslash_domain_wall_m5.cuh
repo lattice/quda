@@ -212,7 +212,7 @@ namespace quda
   };
 
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
-    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s) {
+    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s, bool thread_active = true) {
 
       using real = typename Arg::real;
       constexpr bool is_variable = true;
@@ -221,97 +221,109 @@ namespace quda
       Vector out;
 
       if (mobius_m5::use_half_vector()) {
-      // if using shared-memory caching then load spinor field for my site into cache
-      typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
-      SharedMemoryCache<HalfVector> cache(target::block_dim());
+        // if using shared-memory caching then load spinor field for my site into cache
+        typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
+        SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-      { // forwards direction
-        constexpr int proj_dir = dagger ? +1 : -1;
-        if (shared) {
-          if (sync) { cache.sync(); }
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
-        }
-        const int fwd_s = (s + 1) % arg.Ls;
-        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
-        HalfVector half_in;
-        if (shared) {
-          half_in = cache.load(threadIdx.x, fwd_s, parity);
-        } else {
-          Vector full_in = arg.in(fwd_idx, parity);
-          half_in = full_in.project(4, proj_dir);
-        }
-        if (s == arg.Ls - 1) {
-          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
-        } else {
-          out += half_in.reconstruct(4, proj_dir);
-        }
-      }
+        { // forwards direction
+          constexpr int proj_dir = dagger ? +1 : -1;
+          if (shared) {
+            if (sync) { cache.sync(); }
+            if (thread_active) { cache.save(in.project(4, proj_dir)); }
+            cache.sync();
+          }
 
-      { // backwards direction
-        constexpr int proj_dir = dagger ? -1 : +1;
-        if (shared) {
-          cache.sync();
-          cache.save(in.project(4, proj_dir));
-          cache.sync();
+          if (thread_active) {
+            const int fwd_s = (s + 1) % arg.Ls;
+            const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+            HalfVector half_in;
+            if (shared) {
+              half_in = cache.load(threadIdx.x, fwd_s, parity);
+            } else {
+              Vector full_in = arg.in(fwd_idx, parity);
+              half_in = full_in.project(4, proj_dir);
+            }
+            if (s == arg.Ls - 1) {
+              out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+            } else {
+              out += half_in.reconstruct(4, proj_dir);
+            }
+          } // thread_active
         }
-        const int back_s = (s + arg.Ls - 1) % arg.Ls;
-        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
-        HalfVector half_in;
-        if (shared) {
-          half_in = cache.load(threadIdx.x, back_s, parity);
-        } else {
-          Vector full_in = arg.in(back_idx, parity);
-          half_in = full_in.project(4, proj_dir);
+
+        { // backwards direction
+          constexpr int proj_dir = dagger ? -1 : +1;
+          if (shared) {
+            cache.sync();
+            if (thread_active) { cache.save(in.project(4, proj_dir)); }
+            cache.sync();
+          }
+
+          if (thread_active) {
+            const int back_s = (s + arg.Ls - 1) % arg.Ls;
+            const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+            HalfVector half_in;
+            if (shared) {
+              half_in = cache.load(threadIdx.x, back_s, parity);
+            } else {
+              Vector full_in = arg.in(back_idx, parity);
+              half_in = full_in.project(4, proj_dir);
+            }
+            if (s == 0) {
+              out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
+            } else {
+              out += half_in.reconstruct(4, proj_dir);
+            }
+          } // thread_active
         }
-        if (s == 0) {
-          out += (-arg.m_f * half_in).reconstruct(4, proj_dir);
-        } else {
-          out += half_in.reconstruct(4, proj_dir);
-        }
-      }
 
       } else { // use_half_vector
 
-      // if using shared-memory caching then load spinor field for my site into cache
-      SharedMemoryCache<Vector> cache(target::block_dim());
-      if (shared) {
-        if (sync) { cache.sync(); }
-        cache.save(in);
-        cache.sync();
-      }
-
-      { // forwards direction
-        const int fwd_s = (s + 1) % arg.Ls;
-        const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
-        const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
-        constexpr int proj_dir = dagger ? +1 : -1;
-        if (s == arg.Ls - 1) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        // if using shared-memory caching then load spinor field for my site into cache
+        SharedMemoryCache<Vector> cache(target::block_dim());
+        if (shared) {
+          if (sync) { cache.sync(); }
+          if (thread_active) { cache.save(in); }
+          cache.sync();
         }
-      }
 
-      { // backwards direction
-        const int back_s = (s + arg.Ls - 1) % arg.Ls;
-        const int back_idx = back_s * arg.volume_4d_cb + x_cb;
-        const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
-        constexpr int proj_dir = dagger ? -1 : +1;
-        if (s == 0) {
-          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-        } else {
-          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
-        }
-      }
+        if (thread_active) {
+          { // forwards direction
+            const int fwd_s = (s + 1) % arg.Ls;
+            const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
+            const Vector in = shared ? cache.load(threadIdx.x, fwd_s, parity) : arg.in(fwd_idx, parity);
+            constexpr int proj_dir = dagger ? +1 : -1;
+            if (s == arg.Ls - 1) {
+              out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            } else {
+              out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+            }
+          }
+
+          { // backwards direction
+            const int back_s = (s + arg.Ls - 1) % arg.Ls;
+            const int back_idx = back_s * arg.volume_4d_cb + x_cb;
+            const Vector in = shared ? cache.load(threadIdx.x, back_s, parity) : arg.in(back_idx, parity);
+            constexpr int proj_dir = dagger ? -1 : +1;
+            if (s == 0) {
+              out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+            } else {
+              out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+            }
+          }
+        } // thread_active
       } // use_half_vector
 
-      if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
-        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-      } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
-        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.kappa(s) * out + diagonal;
+      if (thread_active) {
+        if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+          Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+          out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
+        } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
+          Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+          out = coeff.kappa(s) * out + diagonal;
+        }
+      } else {
+        out = in;
       }
 
       return out;
@@ -429,7 +441,7 @@ namespace quda
      @param[in] s_ Ls dimension coordinate
   */
   template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, bool thread_active = true)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
@@ -438,109 +450,120 @@ namespace quda
     Vector out;
 
     if (mobius_m5::use_half_vector()) {
-    SharedMemoryCache<HalfVector> cache(target::block_dim());
+      SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-    { // first do R
-      constexpr int proj_dir = dagger ? -1 : +1;
+      { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
+        if (shared) {
+          if (sync) { cache.sync(); }
+          if (thread_active) { cache.save(in.project(4, proj_dir)); }
+          cache.sync();
+        }
+
+        if (thread_active) {
+          int s = s_;
+          auto R = coeff.inv();
+          HalfVector r;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+            if (shared) {
+              r += factorR * cache.load(threadIdx.x, s, parity);
+            } else {
+              Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+              r += factorR * in.project(4, proj_dir);
+            }
+
+            R *= coeff.kappa(s);
+            s = (s + arg.Ls - 1) % arg.Ls;
+          }
+
+          out += r.reconstruct(4, proj_dir);
+        } // thread_active
+      }
+
+      { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (shared) {
+          cache.sync(); // ensure we finish R before overwriting cache
+          if (thread_active) { cache.save(in.project(4, proj_dir)); }
+          cache.sync();
+        }
+
+        if (thread_active) {
+          int s = s_;
+          auto L = coeff.inv();
+          HalfVector l;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorL = (s_ > s ? -arg.m_f * L : L);
+
+            if (shared) {
+              l += factorL * cache.load(threadIdx.x, s, parity);
+            } else {
+              Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+              l += factorL * in.project(4, proj_dir);
+            }
+
+            L *= coeff.kappa(s);
+            s = (s + 1) % arg.Ls;
+          }
+
+          out += l.reconstruct(4, proj_dir);
+        } // thread_active
+      }
+
+      if (!thread_active) { out = in; }
+
+    } else { // use_half_vector
+      SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
         if (sync) { cache.sync(); }
-        cache.save(in.project(4, proj_dir));
+        if (thread_active) { cache.save(in); }
         cache.sync();
       }
 
-      int s = s_;
-      auto R = coeff.inv();
-      HalfVector r;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorR = (s_ < s ? -arg.m_f * R : R);
+      if (thread_active) {
+        { // first do R
+          constexpr int proj_dir = dagger ? -1 : +1;
 
-        if (shared) {
-          r += factorR * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-          r += factorR * in.project(4, proj_dir);
+          int s = s_;
+          auto R = coeff.inv();
+          HalfVector r;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+            Vector in =  shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            r += factorR * in.project(4, proj_dir);
+
+            R *= coeff.kappa(s);
+            s = (s + arg.Ls - 1) % arg.Ls;
+          }
+
+          out += r.reconstruct(4, proj_dir);
         }
 
-        R *= coeff.kappa(s);
-        s = (s + arg.Ls - 1) % arg.Ls;
-      }
+        { // second do L
+          constexpr int proj_dir = dagger ? +1 : -1;
 
-      out += r.reconstruct(4, proj_dir);
-    }
+          int s = s_;
+          auto L = coeff.inv();
+          HalfVector l;
+          for (int s_count = 0; s_count < arg.Ls; s_count++) {
+            auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-    { // second do L
-      constexpr int proj_dir = dagger ? +1 : -1;
-      if (shared) {
-        cache.sync(); // ensure we finish R before overwriting cache
-        cache.save(in.project(4, proj_dir));
-        cache.sync();
-      }
+            Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            l += factorL * in.project(4, proj_dir);
 
-      int s = s_;
-      auto L = coeff.inv();
-      HalfVector l;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorL = (s_ > s ? -arg.m_f * L : L);
+            L *= coeff.kappa(s);
+            s = (s + 1) % arg.Ls;
+          }
 
-        if (shared) {
-          l += factorL * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-          l += factorL * in.project(4, proj_dir);
+          out += l.reconstruct(4, proj_dir);
         }
-
-        L *= coeff.kappa(s);
-        s = (s + 1) % arg.Ls;
+      } else { // thread_active
+        out = in;
       }
-
-      out += l.reconstruct(4, proj_dir);
-    }
-    } else { // use_half_vector
-    SharedMemoryCache<Vector> cache(target::block_dim());
-    if (shared) {
-      if (sync) { cache.sync(); }
-      cache.save(in);
-      cache.sync();
-    }
-
-    { // first do R
-      constexpr int proj_dir = dagger ? -1 : +1;
-
-      int s = s_;
-      auto R = coeff.inv();
-      HalfVector r;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorR = (s_ < s ? -arg.m_f * R : R);
-
-        Vector in =  shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        r += factorR * in.project(4, proj_dir);
-
-        R *= coeff.kappa(s);
-        s = (s + arg.Ls - 1) % arg.Ls;
-      }
-
-      out += r.reconstruct(4, proj_dir);
-    }
-
-    { // second do L
-      constexpr int proj_dir = dagger ? +1 : -1;
-
-      int s = s_;
-      auto L = coeff.inv();
-      HalfVector l;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorL = (s_ > s ? -arg.m_f * L : L);
-
-        Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        l += factorL * in.project(4, proj_dir);
-
-        L *= coeff.kappa(s);
-        s = (s + 1) % arg.Ls;
-      }
-
-      out += l.reconstruct(4, proj_dir);
-    }
     } // use_half_vector
 
     return out;

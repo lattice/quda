@@ -50,13 +50,7 @@ namespace quda
       for (int s = 0; s < Ls; s++) {
         auto kappa_b_s = 0.5 / (b_5[s] * (m_5 + 4.0) + 1.0);
         a_5[s] = a * kappa_b_s * kappa_b_s;
-#if 0
-        auto kappa_c_s = 0.5 / (c_5[s] * (m_5 + 4.0) - 1.0);
-        auto kappa_s = kappa_b_s / kappa_c_s;
-        alpha = b_5[s] - c_5[s] / kappa_s;
-        beta = c_5[s] / kappa_s;
-#endif
-      }; // 4-d Mobius
+      }
     }
   };
 
@@ -99,11 +93,22 @@ namespace quda
           constexpr bool sync = false;
           out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
         }
+
+        /******
+         *  Apply M5inv
+         */
+        if (xpay && Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
+          // Apply the m5inv.
+          constexpr bool sync = false;
+          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out,
+              my_spinor_parity, 0, s);
+        }
+
       }
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
       if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_INV_DAG) {
-#if 1
+
         /******
          *  Apply the two M5inv's:
          *    this is actually   y = 1 * x - kappa_b^2 * m5inv * D4 * in
@@ -112,7 +117,7 @@ namespace quda
         if (active) {
           constexpr bool sync = false;
           out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
-                                                                                    0, s);
+              0, s);
         }
 
         Vector aggregate_external;
@@ -134,71 +139,27 @@ namespace quda
 
         bool complete = isComplete<mykernel_type>(arg, coord);
 
-        if (complete && active) {
-          constexpr bool sync = true;
-          constexpr bool this_dagger = true;
-          // Then we apply the second m5inv-dag
-          out
-            = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
-        }
-#else
-        /******
-         *  Apply the two M5inv's:
-         *    this is actually   y = 1 * x - kappa_b^2 * m5inv * D4 * in
-         *                     out = m5inv-dagger * y
-         *    Rewrite this into  y = m5inv * (m5 * x - kappa_b^2 * D4 * in),
-         *
-         *    which enables us to only perform the two m5inv's in the final (`complete`) exterior part for boundary threads
-         */
+        constexpr bool sync = true;
+        constexpr bool this_dagger = true;
+        // Then we apply the second m5inv-dag
+        out
+          = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
 
-        out = stencil_out;
-
-        bool complete = isComplete<mykernel_type>(arg, coord);
-
-        if (xpay && mykernel_type == INTERIOR_KERNEL) {
-          Vector x = arg.x(xs, my_spinor_parity);
-          x = d5<true, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(
-            arg, x, my_spinor_parity, 0, s);
-          out = x + arg.a_5[s] * out;
-        } else if (mykernel_type != INTERIOR_KERNEL && active) {
-          Vector y = arg.y(xs, my_spinor_parity);
-          out = y + (xpay ? arg.a_5[s] * out : out);
-        }
-
-        if (complete && active) {
-          // Apply the m5inv.
-          constexpr bool sync = true;
-          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
-        }
-
-        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.y(xs, my_spinor_parity) = out;
-
-        if (complete && active) {
-          constexpr bool this_sync = true;
-          constexpr bool this_dagger = true;
-          // Then we apply the second m5inv-dag
-          out = variableInv<this_sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out,
-                                                                                              my_spinor_parity, 0, s);
-        } else {
-          return; // If not active, don't need to write to out.
-        }
-#endif
       } else if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS
-                 || Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
+          || Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
 
         /******
          *  Apply M5mob:
          *    this is actually out = m5mob * x - kappa_b^2 * D4 * in (Dslash5Type::DSLASH5_MOBIUS)
          *    or               out = m5mob * x - kappa_b^2 * m5pre *D4 * in (Dslash5Type::DSLASH5_PRE_MOBIUS_M5_MOBIUS)
          */
-
         if (active) {
           if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS) { out = stencil_out; }
 
           if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
             constexpr bool sync = false;
             out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
-              arg, stencil_out, my_spinor_parity, 0, s);
+                arg, stencil_out, my_spinor_parity, 0, s);
           }
         }
 
@@ -206,7 +167,7 @@ namespace quda
           Vector x = arg.x(xs, my_spinor_parity);
           constexpr bool sync_m5mob = Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS ? false : true;
           x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(
-            arg, x, my_spinor_parity, 0, s);
+              arg, x, my_spinor_parity, 0, s);
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.out(xs, my_spinor_parity);
@@ -215,8 +176,7 @@ namespace quda
 
       } else {
 
-        if ((Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS || Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
-             || Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV)
+        if ((Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV || (!xpay && Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS))
             && active) {
           out = stencil_out;
         }
@@ -229,50 +189,48 @@ namespace quda
           out = x + (xpay ? arg.a_5[s] * out : out);
         }
 
+        bool complete = isComplete<mykernel_type>(arg, coord);
+
         /******
          *  Apply M5inv
          */
-        bool complete = isComplete<mykernel_type>(arg, coord);
-        if (complete && active) {
+        if (!xpay && Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
+          // Apply the m5inv.
+          constexpr bool sync = false;
+          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out,
+              my_spinor_parity, 0, s, complete && active);
+        }
 
-          if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
-            // Apply the m5inv.
-            constexpr bool sync = false;
-            out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out,
-                                                                                      my_spinor_parity, 0, s);
-          }
-
-          /******
-           *  First apply M5inv, and then M5pre
-           */
-          if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
-            // Apply the m5inv.
-            constexpr bool sync_m5inv = false;
-            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s);
-            // Apply the m5pre.
+        /******
+         *  First apply M5inv, and then M5pre
+         */
+        if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE) {
+          // Apply the m5inv.
+          constexpr bool sync_m5inv = false;
+          out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
+              0, s, complete && active);
+          // Apply the m5pre.
 #if 0
-            // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
-            // But obviously this does not work when kappa ~ 0
-            out = arg.alpha * out + arg.beta * stencil_out;
+          // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
+          // But obviously this does not work when kappa ~ 0
+          out = arg.alpha * out + arg.beta * stencil_out;
 #else
-            constexpr bool sync_m5pre = true;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+          constexpr bool sync_m5pre = true;
+          out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
 #endif
-          }
+        }
 
-          /******
-           *  First apply M5pre, and then M5inv
-           */
-          if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
-            // Apply the m5pre.
-            constexpr bool sync_m5pre = false;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
-            // Apply the m5inv.
-            constexpr bool sync_m5inv = true;
-            out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s);
-          }
+        /******
+         *  First apply M5pre, and then M5inv
+         */
+        if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+          // Apply the m5pre.
+          constexpr bool sync_m5pre = false;
+          out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, complete && active);
+          // Apply the m5inv.
+          constexpr bool sync_m5inv = true;
+          out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
+              0, s, complete && active);
         }
       }
       if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
