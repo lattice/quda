@@ -5812,7 +5812,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
                               double *timeinfo)
 {
   profileGaugeFixOVR.TPSTART(QUDA_PROFILE_TOTAL);
-  
+
   checkGaugeParam(param);
 
   profileGaugeFixOVR.TPSTART(QUDA_PROFILE_INIT);
@@ -5850,7 +5850,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
 
     copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
   }
-  
+
   // Copy the gauge field back to the host
   profileGaugeFixOVR.TPSTART(QUDA_PROFILE_D2H);
   cudaInGauge->saveCPUField(*cpuGauge);
@@ -5894,7 +5894,6 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   gParam.setPrecision(gParam.Precision(), true);
   auto *cudaInGauge = new cudaGaugeField(gParam);
 
-
   profileGaugeFixFFT.TPSTOP(QUDA_PROFILE_INIT);
 
   profileGaugeFixFFT.TPSTART(QUDA_PROFILE_H2D);
@@ -5923,7 +5922,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   } else {
     delete cudaInGauge;
   }
-  
+
   if (timeinfo) {
     timeinfo[0] = profileGaugeFixFFT.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = profileGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);

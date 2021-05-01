@@ -25,7 +25,7 @@ using namespace quda;
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
@@ -36,18 +36,15 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-
-void SetReunitarizationConsts(){
+void SetReunitarizationConsts()
+{
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
   const int reunit_allow_svd = 1;
-  const int reunit_svd_only  = 0;
+  const int reunit_svd_only = 0;
   const double svd_rel_error = 1e-6;
   const double svd_abs_error = 1e-6;
-  setUnitarizeLinksConstants(unitarize_eps, max_error,
-			     reunit_allow_svd, reunit_svd_only,
-			     svd_rel_error, svd_abs_error);
-  
+  setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
 }
 
 bool checkDimsPartitioned()
@@ -60,8 +57,8 @@ bool checkDimsPartitioned()
 bool comparePlaquette(double3 a, double3 b)
 {
   printfQuda("Plaq:    %.16e, %.16e, %.16e\n", a.x, a.y, a.z);
-  printfQuda("Plaq_gf: %.16e, %.16e, %.16e\n", b.x, b.y, b.z);   
-  double a0,a1,a2;
+  printfQuda("Plaq_gf: %.16e, %.16e, %.16e\n", b.x, b.y, b.z);
+  double a0, a1, a2;
   a0 = std::abs(a.x - b.x);
   a1 = std::abs(a.y - b.y);
   a2 = std::abs(a.z - b.z);
@@ -80,7 +77,7 @@ bool checkDeterminant(double2 detu)
 
 int main(int argc, char **argv)
 {
-  // command line options  
+  // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);
   add_heatbath_option_group(app);
@@ -117,9 +114,9 @@ int main(int argc, char **argv)
   int novrsteps = heatbath_num_overrelax_per_step;
   bool coldstart = heatbath_coldstart;
   double beta_value = heatbath_beta_value;
-  
-  RNG * randstates;
-  
+
+  RNG *randstates;
+
   // Setup gauge container.
   param.cpu_prec = prec;
   param.cpu_prec = prec;
@@ -127,142 +124,143 @@ int main(int argc, char **argv)
   param.reconstruct = link_recon;
   param.cuda_prec_sloppy = prec;
   param.reconstruct_sloppy = link_recon;
-  
+
   param.type = QUDA_WILSON_LINKS;
   param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  
+
   param.X[0] = xdim;
   param.X[1] = ydim;
   param.X[2] = zdim;
   param.X[3] = tdim;
   setDims(param.X);
-  
-  param.anisotropy = 1.0;  //don't support anisotropy for now!!!!!!
+
+  param.anisotropy = 1.0; // don't support anisotropy for now!!!!!!
   param.t_boundary = QUDA_PERIODIC_T;
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   param.ga_pad = 0;
-  
+
   GaugeFieldParam gParam(0, param);
   gParam.pad = 0;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = param.type;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type = param.type;
   gParam.reconstruct = param.reconstruct;
   gParam.setPrecision(gParam.Precision(), true);
-  
+
   int y[4];
-  int R[4] = {0,0,0,0};
-  for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
-  for(int dir=0; dir<4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
+  int R[4] = {0, 0, 0, 0};
+  for (int dir = 0; dir < 4; ++dir)
+    if (comm_dim_partitioned(dir)) R[dir] = 2;
+  for (int dir = 0; dir < 4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
   int pad = 0;
-  GaugeFieldParam gParamEx(y, prec, link_recon,
-			   pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+  GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gParam.order;
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParamEx.t_boundary = gParam.t_boundary;
   gParamEx.nFace = 1;
-  for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+  for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
   U = new cudaGaugeField(gParamEx);
 
   // CURAND random generator initialization
   randstates = new RNG(gParam, 1234);
   randstates->Init();
-    
+
   int *num_failures_h = (int *)mapped_malloc(sizeof(int));
   int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
-  
+
   if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
     InitGaugeField(*U);
   else
     InitGaugeField(*U, *randstates);
-  
+
   // Reunitarization setup
   SetReunitarizationConsts();
   plaquette(*U);
-  
-  for(int step=1; step<=nsteps; ++step){
-    printfQuda("Step %d\n",step);
+
+  for (int step = 1; step <= nsteps; ++step) {
+    printfQuda("Step %d\n", step);
     Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
-    
-    //Reunitarize gauge links...
+
+    // Reunitarize gauge links...
     *num_failures_h = 0;
     unitarizeLinks(*U, num_failures_d);
     qudaDeviceSynchronize();
     if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
-    
+
     plaquette(*U);
   }
-  
+
   plaq = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-  
+
   host_free(num_failures_h);
 
   // Gauge Fixing Routines
   //---------------------------------------------------------------------------
   switch (test_type) {
-  case 0:  
+  case 0:
     printfQuda("%s gauge fixing with overrelaxation\n", gf_gauge_dir == 4 ? "Landau" : "Coulomb");
-    gaugeFixingOVR(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval, gf_theta_condition);
+    gaugeFixingOVR(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance,
+                   gf_reunit_interval, gf_theta_condition);
     comparePlaquette(plaq, plaquette(*U));
     break;
-    
+
   case 1:
     if (!checkDimsPartitioned()) {
       printfQuda("%s gauge fixing with steepest descent method with FFTs\n", gf_gauge_dir == 4 ? "Landau" : "Coulomb");
-      gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance, gf_theta_condition);
+      gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+                     gf_theta_condition);
       comparePlaquette(plaq, plaquette(*U));
     } else {
       errorQuda("FFT gauge fixing not supported for multi GPU geometry");
     }
     break;
-    
-  default:
-    errorQuda("Unknown test type %d", test_type);
+
+  default: errorQuda("Unknown test type %d", test_type);
   }
 
   double2 link_trace = getLinkTrace(*U);
-  printfQuda("Tr: %.16e:%.16e\n", link_trace.x/3.0, link_trace.y/3.0);
+  printfQuda("Tr: %.16e:%.16e\n", link_trace.x / 3.0, link_trace.y / 3.0);
 
   // Save if output string is specified
-  if (strcmp(gauge_outfile,"")) {
-    
+  if (strcmp(gauge_outfile, "")) {
+
     printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
 
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
-    
+
     void *cpu_gauge[4];
     for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-    
+
     cudaGaugeField *gauge;
     gauge = new cudaGaugeField(gParam);
-    
+
     // copy into regular field
-    copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);    
-    saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
-    
+    copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);
+    saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
+
     // Write to disk
-    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-    
-    for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+
+    for (int dir = 0; dir < 4; dir++) free(cpu_gauge[dir]);
     delete gauge;
   } else {
     printfQuda("No output file specified.\n");
-  }  
-  
+  }
+
   delete U;
-  
-  //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+
+  // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
   PGaugeExchangeFree();
-  
+
   randstates->Release();
   delete randstates;
-  
-  freeGaugeQuda();    
+
+  freeGaugeQuda();
   endQuda();
   finalizeComms();
-  
+
   return 0;
 }
