@@ -85,35 +85,28 @@ int main(int argc, char **argv)
   setWilsonGaugeParam(gauge_param);
   gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
-
+  
+  // All user inputs now defined
+  display_test_info();
+  
+  // *** QUDA parameters begin here.  
   void *gauge[4], *new_gauge[4];
-
   for (int dir = 0; dir < 4; dir++) {
     gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
     new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-
-  initQuda(device_ordinal);
-
-  setVerbosity(verbosity);
-
-  // call srand() with a rank-dependent seed
-  initRand();
-
+  
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
-
+  
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
              plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
-
-  // All user inputs now defined
-  display_test_info();
 
   // Topological charge and gauge energy
   double q_charge_check = 0.0;

@@ -329,50 +329,32 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
   }
 }
 
-TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
+bool checkDimsPartitioned()
 {
-  if (execute) {
-    printfQuda("Coulomb gauge fixing with overrelaxation\n");
-    gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
-                   gf_theta_condition);
-    auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-    saveTuneCache();
-  }
+  if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
+    return true;
+  return false;
 }
 
-TEST_F(GaugeAlgTest, Landau_FFT)
+bool comparePlaquette(double3 a, double3 b)
 {
-  if (execute) {
-    if (!comm_partitioned()) {
-      printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-                     gf_theta_condition);
-      auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-      saveTuneCache();
-    }
-  }
+  printfQuda("Plaq:    %.16e, %.16e, %.16e\n", a.x, a.y, a.z);
+  printfQuda("Plaq_gf: %.16e, %.16e, %.16e\n", b.x, b.y, b.z);   
+  double a0,a1,a2;
+  a0 = std::abs(a.x - b.x);
+  a1 = std::abs(a.y - b.y);
+  a2 = std::abs(a.z - b.z);
+  double prec_val = 1.0e-5;
+  if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+  return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
 }
 
-TEST_F(GaugeAlgTest, Coulomb_FFT)
+bool checkDeterminant(double2 detu)
 {
-  if (execute) {
-    if (!comm_partitioned()) {
-      printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-                     gf_theta_condition);
-      auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-      saveTuneCache();
-    }
-  }
+  printfQuda("Det: %.16e: %.16e\n", detu.x, detu.y);
+  double prec_val = 5e-8;
+  if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+  return std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val;
 }
 
 int main(int argc, char **argv)
@@ -443,4 +425,5 @@ int main(int argc, char **argv)
   finalizeComms();
 
   return test_rc;
+
 }
