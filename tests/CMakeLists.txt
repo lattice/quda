@@ -239,6 +239,10 @@ if(QUDA_GAUGE_ALG)
   add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
   quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
+
+  add_executable(gauge_alg_ctest gauge_alg_ctest.cpp)
+  target_link_libraries(gauge_alg_ctest ${TEST_LIBS})
+  quda_checkbuildtest(gauge_alg_ctest QUDA_BUILD_ALL_TESTS)
   install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(heatbath_test heatbath_test.cpp)
