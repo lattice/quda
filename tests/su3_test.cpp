@@ -114,43 +114,40 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
-    link_recon_sloppy = link_recon;
-
-  setGaugeParam(gauge_param);
-  setDims(gauge_param.X);
-
-  void *gauge[4], *new_gauge[4];
-
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-  }
-
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+ 
   initQuda(device_ordinal);
-
   setVerbosity(verbosity);
 
   // call srand() with a rank-dependent seed
   initRand();
 
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setGaugeParam(gauge_param);
+  setDims(gauge_param.X);
+  
+  // All user inputs now defined
+  display_test_info();
+  
+  // *** QUDA parameters begin here.  
+  void *gauge[4], *new_gauge[4];
+  for (int dir = 0; dir < 4; dir++) {
+    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  }
+  
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
-
+  
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
              plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
-
-  // All user inputs now defined
-  display_test_info();
 
   // Topological charge and gauge energy
   double q_charge_check = 0.0;
