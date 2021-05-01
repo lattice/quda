@@ -11,6 +11,7 @@
 #include <command_line_params.h>
 #include <misc.h>
 #include <timer.h>
+
 #include <gauge_tools.h>
 #include <tune_quda.h>
 
@@ -422,8 +423,7 @@ int main(int argc, char **argv)
 
   endQuda();
 
-  finalizeComms();
-
-  return test_rc;
-
+  finalizeComms()
+  
+  return test_rc;  
 }
