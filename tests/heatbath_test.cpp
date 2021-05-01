@@ -53,7 +53,7 @@ void display_test_info()
 }
 
 int main(int argc, char **argv)
-{  
+{
   // command line options
   auto app = make_app();
   add_heatbath_option_group(app);

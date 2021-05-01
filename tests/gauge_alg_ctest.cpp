@@ -22,12 +22,11 @@
 using namespace quda;
 
 class GaugeAlgTest : public ::testing::Test
-{  
- protected:
-
+{
+protected:
   QudaGaugeParam param;
-  
-  Timer a0,a1;
+
+  Timer a0, a1;
   double2 detu;
   double3 plaq;
   cudaGaugeField *U;
@@ -37,20 +36,17 @@ class GaugeAlgTest : public ::testing::Test
   bool coldstart;
   double beta_value;
 
-  RNG * randstates;
+  RNG *randstates;
 
-  
-  void SetReunitarizationConsts(){
+  void SetReunitarizationConsts()
+  {
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
-    const int reunit_svd_only  = 0;
+    const int reunit_svd_only = 0;
     const double svd_rel_error = 1e-6;
     const double svd_abs_error = 1e-6;
-    setUnitarizeLinksConstants(unitarize_eps, max_error,
-                               reunit_allow_svd, reunit_svd_only,
-                               svd_rel_error, svd_abs_error);
-
+    setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
   }
 
   bool checkDimsPartitioned()
@@ -60,8 +56,9 @@ class GaugeAlgTest : public ::testing::Test
     return false;
   }
 
-  bool comparePlaquette(double3 a, double3 b){
-    double a0,a1,a2;
+  bool comparePlaquette(double3 a, double3 b)
+  {
+    double a0, a1, a2;
     a0 = std::abs(a.x - b.x);
     a1 = std::abs(a.y - b.y);
     a2 = std::abs(a.z - b.z);
@@ -71,14 +68,16 @@ class GaugeAlgTest : public ::testing::Test
     return false;
   }
 
-  bool CheckDeterminant(double2 detu){
+  bool CheckDeterminant(double2 detu)
+  {
     double prec_val = 5e-8;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
     if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
     return false;
   }
 
-  virtual void SetUp() {
+  virtual void SetUp()
+  {
     setVerbosity(QUDA_VERBOSE);
 
     param = newQudaGaugeParam();
@@ -100,7 +99,7 @@ class GaugeAlgTest : public ::testing::Test
     param.X[3] = tdim;
     setDims(param.X);
 
-    param.anisotropy = 1.0;  //don't support anisotropy for now!!!!!!
+    param.anisotropy = 1.0; // don't support anisotropy for now!!!!!!
     param.t_boundary = QUDA_PERIODIC_T;
     param.gauge_fix = QUDA_GAUGE_FIXED_NO;
     param.ga_pad = 0;
@@ -108,25 +107,25 @@ class GaugeAlgTest : public ::testing::Test
     GaugeFieldParam gParam(0, param);
     gParam.pad = 0;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    gParam.create      = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type   = param.type;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type = param.type;
     gParam.reconstruct = param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
 
 #ifdef MULTI_GPU
     int y[4];
-    int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
-    for(int dir=0; dir<4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
+    int R[4] = {0, 0, 0, 0};
+    for (int dir = 0; dir < 4; ++dir)
+      if (comm_dim_partitioned(dir)) R[dir] = 2;
+    for (int dir = 0; dir < 4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
     int pad = 0;
-    GaugeFieldParam gParamEx(y, prec, link_recon,
-                             pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = gParam.order;
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
-    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
     U = new cudaGaugeField(gParamEx);
 #else
     U = new cudaGaugeField(gParam);
@@ -156,11 +155,11 @@ class GaugeAlgTest : public ::testing::Test
     SetReunitarizationConsts();
     plaquette(*U);
 
-    for(int step=1; step<=nsteps; ++step){
-      printfQuda("Step %d\n",step);
+    for (int step = 1; step <= nsteps; ++step) {
+      printfQuda("Step %d\n", step);
       Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
 
-      //Reunitarize gauge links...
+      // Reunitarize gauge links...
       *num_failures_h = 0;
       unitarizeLinks(*U, num_failures_d);
       qudaDeviceSynchronize();
@@ -177,14 +176,15 @@ class GaugeAlgTest : public ::testing::Test
     host_free(num_failures_h);
   }
 
-  virtual void TearDown() {
+  virtual void TearDown()
+  {
     detu = getLinkDeterminant(*U);
     double2 tru = getLinkTrace(*U);
     printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
-    printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
+    printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
 
     delete U;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
     a0.Stop(__func__, __FILE__, __LINE__);
@@ -203,7 +203,8 @@ TEST_F(GaugeAlgTest, Generation)
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval, gf_theta_condition);
+  gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+                 gf_theta_condition);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -212,7 +213,8 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval, gf_theta_condition);
+  gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+                 gf_theta_condition);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -222,7 +224,8 @@ TEST_F(GaugeAlgTest, Landau_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance, gf_theta_condition);
+    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+                   gf_theta_condition);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -233,7 +236,8 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance, gf_theta_condition);
+    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+                   gf_theta_condition);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -246,9 +250,9 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;
-  xdim=ydim=zdim=tdim=32;
+  xdim = ydim = zdim = tdim = 32;
 
-  // command line options  
+  // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);
   add_heatbath_option_group(app);

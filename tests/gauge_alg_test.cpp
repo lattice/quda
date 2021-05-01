@@ -340,8 +340,8 @@ bool checkDimsPartitioned()
 bool comparePlaquette(double3 a, double3 b)
 {
   printfQuda("Plaq:    %.16e, %.16e, %.16e\n", a.x, a.y, a.z);
-  printfQuda("Plaq_gf: %.16e, %.16e, %.16e\n", b.x, b.y, b.z);   
-  double a0,a1,a2;
+  printfQuda("Plaq_gf: %.16e, %.16e, %.16e\n", b.x, b.y, b.z);
+  double a0, a1, a2;
   a0 = std::abs(a.x - b.x);
   a1 = std::abs(a.y - b.y);
   a2 = std::abs(a.z - b.z);
