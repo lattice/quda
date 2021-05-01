@@ -67,6 +67,13 @@ namespace quda
   void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);
 
   /**
+     @brief Apply a gauge transformation on gauge.
+     @param[in] gauge The gauge field to transform
+     @param[in] transform The gauge transformations
+  */
+  void gaugeTransform(GaugeField &gauge, const GaugeField &transform);
+  
+  /**
      @brief Perform an eigendecomposition on the links and then create 
      an hermitian matrix from which the fundamental representation
      can be read, assuming Gell-Mann matricies tau.

@@ -229,10 +229,10 @@ namespace quda {
     double flop = 0;
     double byte = 0;
 
-    printfQuda("\tOverrelaxation boost parameter: %lf\n", relax_boost);
-    printfQuda("\tStop criterium: %lf\n", tolerance);
-    if ( stopWtheta ) printfQuda("\tStop criterium method: theta\n");
-    else printfQuda("\tStop criterium method: Delta\n");
+    printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
+    printfQuda("\tStop criterion: %e\n", tolerance);
+    if ( stopWtheta ) printfQuda("\tStop criterion method: theta\n");
+    else printfQuda("\tStop criterion method: Delta\n");
     printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
     printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
     printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
@@ -488,7 +488,7 @@ namespace quda {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
 #ifdef GPU_GAUGE_ALG
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,

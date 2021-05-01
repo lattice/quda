@@ -211,6 +211,9 @@ set(QUDA_ARPACK_HOME
 set(QUDA_OPENBLAS_HOME
     ""
     CACHE PATH "path to OpenBLAS")
+set(QUDA_ZFP_HOME
+    ""
+    CACHE PATH "path to ZFP")
 set(QUDA_MAGMAHOME
     ""
     CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
@@ -890,8 +893,11 @@ if(QUDA_BACKWARDS)
 endif()
 
 # ZFP
-if(QUDA_ZFP)  
-  if(QUDA_DOWNLOAD_ZFP)
+if(QUDA_ZFP)
+  find_library(ZFP_FOUND zfp HINTS ${QUDA_ZFP_HOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(ZFP_FOUND)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ZFP_FOUND})
+  if(QUDA_DOWNLOAD_ZFP AND NOT ZFP_FOUND)
     include(GNUInstallDirs)
     ExternalProject_Add(
       ZFP
@@ -905,11 +911,11 @@ if(QUDA_ZFP)
     set(QUDA_ZFP_HOME ${INSTALL_DIR})
     add_library(zfp STATIC IMPORTED)
     add_dependencies(zfp ZFP)
+    # prefer static library
     set_target_properties(zfp PROPERTIES IMPORTED_LOCATION ${QUDA_ZFP_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
-  else(QUDA_DOWNLOAD_ZFP)
+  else()
     find_package(PkgConfig REQUIRED)
 
-    # We always need the serial library
     pkg_check_modules(ZFP QUIET zfp)
     if(NOT ZFP_FOUND OR QUDA_ZFP_HOME)
       find_library(ZFP zfp PATH ${QUDA_ZFP_HOME})
@@ -917,7 +923,7 @@ if(QUDA_ZFP)
       find_library(ZFP ${ZFP_LIBRARIES} PATH ${ZFP_LIBRARY_DIRS})
     endif()
     
-  endif(QUDA_DOWNLOAD_ZFP)
+  endif()
 endif(QUDA_ZFP)
 
 

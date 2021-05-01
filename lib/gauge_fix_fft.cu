@@ -195,7 +195,7 @@ namespace quda {
     else std::cout << "\tAuto tune active: no" << std::endl;
     std::cout << "\tStop criterion: " << tolerance << std::endl;
     if ( stopWtheta ) std::cout << "\tStop criterion method: theta" << std::endl;
-    else std::cout << "\tStop criterium method: Delta" << std::endl;
+    else std::cout << "\tStop criterion method: Delta" << std::endl;
     std::cout << "\tMaximum number of iterations: " << Nsteps << std::endl;
     std::cout << "\tPrint convergence results at every " << verbose_interval << " steps" << std::endl;
 
