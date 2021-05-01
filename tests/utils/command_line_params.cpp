@@ -223,18 +223,18 @@ quda::mgarray<QudaPrecision> mg_eig_save_prec = {};
 bool mg_eig_coarse_guess = false;
 bool mg_eig_preserve_deflation = false;
 
+int eofa_pm = 1;
+double eofa_shift = -1.2345;
+double eofa_mq1 = 1.0;
+double eofa_mq2 = 0.085;
+double eofa_mq3 = 1.0;
+
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
 int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
-
-int eofa_pm = 1;
-double eofa_shift = -1.2345;
-double eofa_mq1 = 1.0;
-double eofa_mq2 = 0.085;
-double eofa_mq3 = 1.0;
 
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
@@ -504,18 +504,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   ;
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
                        "Width of the Gaussian noise used for random gauge field contruction (default 0.2)");
-
-  quda_app->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
-  quda_app->add_option("--heatbath-coldstart", heatbath_coldstart,
-                       "Whether to use a cold or hot start in heatbath test (default false)");
-  quda_app->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
-                       "Number of heatbath hits per heatbath step (default 5)");
-  quda_app->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
-                       "Number of overrelaxation hits per heatbath step (default 5)");
-  quda_app->add_option("--heatbath-num-steps", heatbath_num_steps,
-                       "Number of measurement steps in heatbath test (default 10)");
-  quda_app->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
-                       "Number of warmup steps in heatbath test (default 10)");
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));

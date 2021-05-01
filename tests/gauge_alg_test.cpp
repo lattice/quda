@@ -380,7 +380,7 @@ int main(int argc, char **argv)
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
 
-  // command line options
+  // command line options  
   auto app = make_app();
   add_gaugefix_option_group(app);
   add_heatbath_option_group(app);
@@ -388,6 +388,7 @@ int main(int argc, char **argv)
   test_type = 0;
   CLI::TransformPairs<int> test_type_map {{"Google", 0}, {"OVR", 1}, {"FFT", 2}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
