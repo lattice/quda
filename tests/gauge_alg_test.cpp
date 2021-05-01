@@ -21,8 +21,25 @@
 
 using namespace quda;
 
-class GaugeAlgTest : public ::testing::Test {
+class GaugeAlgTest : public ::testing::Test
+{  
  protected:
+
+  QudaGaugeParam param;
+  
+  Timer a0,a1;
+  double2 detu;
+  double3 plaq;
+  cudaGaugeField *U;
+  int nsteps;
+  int nhbsteps;
+  int novrsteps;
+  bool coldstart;
+  double beta_value;
+
+  RNG * randstates;
+
+  
   void SetReunitarizationConsts(){
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -118,11 +135,11 @@ class GaugeAlgTest : public ::testing::Test {
     randstates = new RNG(gParam, 1234);
     randstates->Init();
 
-    nsteps = 10;
-    nhbsteps = 4;
-    novrsteps = 4;
-    coldstart = false;
-    beta_value = 6.2;
+    nsteps = heatbath_num_steps;
+    nhbsteps = heatbath_num_heatbath_per_step;
+    novrsteps = heatbath_num_overrelax_per_step;
+    coldstart = heatbath_coldstart;
+    beta_value = heatbath_beta_value;
 
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);
@@ -175,38 +192,18 @@ class GaugeAlgTest : public ::testing::Test {
     randstates->Release();
     delete randstates;
   }
-
-  QudaGaugeParam param;
-
-  Timer a0,a1;
-  double2 detu;
-  double3 plaq;
-  cudaGaugeField *U;
-  int nsteps;
-  int nhbsteps;
-  int novrsteps;
-  bool coldstart;
-  double beta_value;
-  RNG * randstates;
-
 };
 
 TEST_F(GaugeAlgTest, Generation)
 {
   detu = getLinkDeterminant(*U);
-  plaq = plaquette(*U);
-  bool testgen = false;
-  //check plaquette value for beta = 6.2
-  if (plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
-
-  if (testgen) { ASSERT_TRUE(CheckDeterminant(detu)); }
+  ASSERT_TRUE(CheckDeterminant(detu));
 }
 
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
-  const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval, gf_theta_condition);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -214,9 +211,8 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 
 TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
-  const int reunit_interval = 10;
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1);
+  gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval, gf_theta_condition);
   auto plaq_gf = plaquette(*U);
   printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
   ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -226,7 +222,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 4, 100, 10, 0.08, 0, 0, 1);
+    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance, gf_theta_condition);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -237,7 +233,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
   if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 3, 100, 10, 0.08, 0, 0, 1);
+    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance, gf_theta_condition);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
     ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -252,8 +248,10 @@ int main(int argc, char **argv)
   int test_rc = 0;
   xdim=ydim=zdim=tdim=32;
 
-  // command line options
+  // command line options  
   auto app = make_app();
+  add_gaugefix_option_group(app);
+  add_heatbath_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
