@@ -14,7 +14,6 @@ namespace quda {
     int X_global[QUDA_MAX_DIM];
     RNGState *state;
     unsigned long long seed;
-    dim3 threads;
     rngArg(RNGState *state, unsigned long long seed, const LatticeField &meta) :
       kernel_param(dim3(meta.VolumeCB(), meta.SiteSubset(), 1)),
       state(state),
