@@ -538,8 +538,6 @@ struct StaggeredDslashTestWrapper {
     DslashTime dslash_time = dslashCUDA(niter);
     *spinorOut = *cudaSpinorOut;
 
-    staggeredDslashRef();
-
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
 

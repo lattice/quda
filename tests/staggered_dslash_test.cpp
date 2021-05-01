@@ -10,7 +10,7 @@ static int dslashTest()
   int test_rc = 0;
   dslash_test_wrapper.init_test();
 
-  wrapper.dslashRef();
+  dslash_test_wrapper.staggeredDslashRef();
   int attempts = 1;
   for (int i = 0; i < attempts; i++) {
     dslash_test_wrapper.run_test(niter, /**print_metrics =*/true);
