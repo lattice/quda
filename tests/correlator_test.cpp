@@ -191,7 +191,7 @@ void construct_operator(const double new_kappa, QudaInvertParam &inv_param, Quda
 // in prop_array_ptr_1 and prop_array_ptr_2.
 void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
                          void *correlation_function_sum, CorrelatorParam &corr_param,
-                         quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param)
+                         quda::ColorSpinorParam &cs_param, const QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, QudaInvertParam &inv_param4D)
 {
   QudaInvertParam source_smear_param = newQudaInvertParam();
   QudaInvertParam sink_smear_param = newQudaInvertParam();
@@ -226,9 +226,7 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
       //! when using DWF: convert to 5D
       if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-        std::cout << "There is segmentation fault in the next line" << std::endl;
-        convert4Dto5DpointSource(source, source5D, &inv_param, gauge_param.X, spinor4D_size_in_floats);
-        std::cout << "The code fails before this is written out" << std::endl;
+        convert4Dto5DpointSource(source, source5D, &inv_param, &inv_param4D, gauge_param.X, spinor4D_size_in_floats);
       }
       //! Gaussian smear the source. The default setting is to not smear.
       performGaussianSmearNStep(source, &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
@@ -342,6 +340,16 @@ int main(int argc, char **argv)
     }
   }
 
+  //! set up additional 4D parameter to use for MDWF 4D->5D source conversion
+  QudaInvertParam inv_param4D = newQudaInvertParam();
+  if ( dslash_type == QUDA_MOBIUS_DWF_DSLASH ){
+    QudaDslashType backupdslashtype = dslash_type;
+    dslash_type = QUDA_WILSON_DSLASH;
+    setInvertParam(inv_param4D);
+    inv_param4D.mass = m5; //m5 should be negative
+    dslash_type = backupdslashtype;
+  }
+
   //! Gauge parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -425,7 +433,7 @@ int main(int argc, char **argv)
   //! calculate correlators
   construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
   invert_and_contract(prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
-                      gauge_param, inv_param);
+                      gauge_param, inv_param, inv_param4D);
 
   if (open_flavor) {
     //! we need space for one more propagator array
@@ -441,14 +449,14 @@ int main(int argc, char **argv)
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QL;
     invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
-                        cs_param, gauge_param, inv_param);
+                        cs_param, gauge_param, inv_param, inv_param4D);
 
     //! then we calculate heavy-strange correlators
     construct_operator(kappa_array[1], inv_param, mg_param, mg_inv_param, mg_preconditioner);
     constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
     corr_param.corr_flavors = CORRELATOR_QS;
     invert_and_contract(prop_array_ptr, prop_array_ptr_open, correlation_function_sum, corr_param,
-                        cs_param, gauge_param, inv_param);
+                        cs_param, gauge_param, inv_param, inv_param4D);
 
     free(prop_array_open);
   }
