@@ -1054,7 +1054,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
   
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gaueg field in the T dim prior to inversion (default false)");
+  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
   
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 

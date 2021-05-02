@@ -5970,12 +5970,12 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   cpuParam4D.v = (void *)in4D_ptr; //! We want to construct a ColorSpinorField around already existing memory.
   cpuParam4D.create = QUDA_REFERENCE_FIELD_CREATE;
   h_4Dpointsource = ColorSpinorField::Create(cpuParam4D);
-  std::cout << "There is an error below" << std::endl;
+  
   //d_4Dpointsource
-  ColorSpinorParam cudaParam(cpuParam4D, *inv_param4D);
-  cudaParam.create = QUDA_COPY_FIELD_CREATE; //! we want to copy the memory
-  d_4Dpointsource = ColorSpinorField::Create(*h_4Dpointsource, cudaParam);
-  std::cout << "There is an error above" << std::endl;
+  ColorSpinorParam cudaParam(cpuParam4D);
+  d_4Dpointsource = ColorSpinorField::Create(cudaParam);
+  *d_4Dpointsource = *h_4Dpointsource; // Copy from host to device
+  
   //d_4Dprojsource
   cudaParam.create = QUDA_ZERO_FIELD_CREATE; //! we want new memory which is zeroed out
   d_4Dprojsource = ColorSpinorField::Create(cudaParam);
@@ -5995,8 +5995,8 @@ void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *
   double myc_5 = reinterpret_cast<double *>(&inv_param4D->c_5)[0];
 
   //! first entry
-//  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
-//  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
+  //  std::memset(h_4D_temp->V(), 0, spinor4D_size_in_floats);
+  //  std::memset(h_4D_out_new->V(), 0, spinor4D_size_in_floats);
   ApplyChiralProj(*d_4Dprojsource, *d_4Dpointsource, 1);
   myMobius.Dslash4(*h_4Dentryin5Dsource, *d_4Dprojsource, QUDA_INVALID_PARITY);//TODO what parity ???
   blas::xpay(*h_4Dentryin5Dsource, -myc_5 * (4 + inv_param4D->m5) * 2, *d_4Dprojsource); //TODO maybe use DiracMobius::Dlash4Xpay instead of this
