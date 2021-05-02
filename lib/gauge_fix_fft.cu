@@ -635,16 +635,13 @@ namespace quda {
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
     Float alpha = alpha0;
-    std::cout << "\tAlpha parameter of the Steepest Descent Method: " << alpha << std::endl;
-    if ( autotune ) std::cout << "\tAuto tune active: yes" << std::endl;
-    else std::cout << "\tAuto tune active: no" << std::endl;
-    std::cout << "\tStop criterium: " << tolerance << std::endl;
-    if ( stopWtheta ) std::cout << "\tStop criterium method: theta" << std::endl;
-    else std::cout << "\tStop criterium method: Delta" << std::endl;
-    std::cout << "\tMaximum number of iterations: " << Nsteps << std::endl;
-    std::cout << "\tPrint convergence results at every " << verbose_interval << " steps" << std::endl;
-
-
+    printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha);
+    printfQuda("\tAuto tune active: %s\n", autotune ? "yes" : "no");
+    printfQuda("\tStop criterion: %e\n", tolerance);
+    printfQuda("\tStop criterion method: %s\n", stopWtheta ? "theta" : "delta");
+    printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+    printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+    
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4( data.X()[0], data.X()[1], data.X()[2], data.X()[3] );
     cufftHandle plan_xy;
