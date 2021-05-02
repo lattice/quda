@@ -97,7 +97,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   corr_file.open(filepath.str());
 
   const int src_width = 6, mom_width = 3, precision = 8;
-  const int float_width = precision+9; //for scientific notation
+  const int float_width = precision+16; //for scientific notation
   corr_file << "#"
             << std::setw(src_width) << "src_x"
             << std::setw(src_width) << "src_y"
@@ -135,9 +135,9 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
                         << std::setw(mom_width) << pt
                         << std::setw(src_width) << CorrelatorChannels[G_idx].c_str()
                         << std::setw(src_width) << t
-                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::setw(float_width) << std::setprecision(precision + 5)
                         << std::scientific << ((double *)correlation_function_sum)[index_real] * sign
-                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::setw(float_width) << std::setprecision(precision + 5)
                         << std::scientific << ((double *)correlation_function_sum)[index_imag] * sign
                         << std::endl;
             }
