@@ -3223,7 +3223,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);
     double nh_x = blas::norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+    printfQuda("Reconstructed: CUDA solution = %.16e, CPU copy = %.16e\n", nx, nh_x);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -5770,12 +5770,12 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
   int verbose_interval = 50;
   double relax_boost = 1.5;
   double tolerance = 1e-15;
-  int reunit_interval = 5;
+  int reunit_interval = 1;
   double stopWtheta = 0;
 
-  int iter = 100;
+  int iter = 200;
   unsigned long long seed = 1234;
-  double sigma = 1.0;
+  double sigma = 1.5;
   
   double2 link_trace;
   double action;
@@ -5785,11 +5785,14 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
 
-  copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  // Perform FC decomposition on the gauge
+  profileGaugeFundamental.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeFundamentalRep(*gaugeFundamental, *gaugePrecise, qr_tol, qr_max_iter, taylor_N);
+  profileGaugeFundamental.TPSTOP(QUDA_PROFILE_COMPUTE);
   
   for(int i=0; i<iter; i++) {
-    
-    gaugeFixingOVR(*gaugeFixed, 3, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+
+    gaugeFixingOVR(*gaugeFixed, 4, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
 		   stopWtheta);
     
     //gaugeFixingFFT(*gaugeFixed, 4, Nsteps, verbose_interval, relax_boost, 1, tolerance, stopWtheta);
@@ -5825,7 +5828,7 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
     param.geometry = QUDA_SCALAR_GEOMETRY;
     cudaGaugeField transform(param);    
     profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-    quda::gaugeGauss(transform, seed + i, sigma);    
+    quda::gaugeGauss(transform, clock() + i, sigma);    
     copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
     quda::gaugeTransform(*gaugeFixed, transform);
     profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);

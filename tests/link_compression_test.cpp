@@ -10,6 +10,7 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 #include <misc.h>
+#include <qio_field.h>
 
 #include <zfp.h>
 
@@ -449,6 +450,26 @@ int main(int argc, char **argv)
              plaq[2] - plaq_recon[2]);
   printfQuda("Etot, Es, Et, Q diff is\n%.16e %.16e, %.16e %.16e\n", param.energy[0] - param_recon.energy[0],
              param.energy[1] - param_recon.energy[1], param.energy[2] - param_recon.energy[2], param.qcharge - param_recon.qcharge);
+
+  // Save if output string is specified
+  if (strcmp(gauge_outfile,"")) {
+    
+    printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+    
+    void *cpu_gauge[4];
+    for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+    
+    // Copy device field to CPU field
+    saveGaugeQuda(cpu_gauge, &gauge_param);    
+    
+    // Write to disk
+    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+    
+    for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+  } else {
+    printfQuda("No output file specified.\n");
+  }
+
   
   free(buffer4D);
   free(array4D);

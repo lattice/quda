@@ -65,7 +65,7 @@ namespace quda
       // Place V S V^{\dag} in the out field
       Link H = eigensolve.exponent();
       
-      if(x[3] == 0 && x[1] == 0 && x[2] == 0 && dir == 0) {
+      if(x[0] == 0 && x[1] == 0 && x[2] == 0 && dir == 3) {
 	printf("FUNDAMENTALS %d %d %d %d %d: %+.8e %+.8e %+.8e %+.8e %+.8e %+.8e %+.8e %+.8e\n",
 	       x[0], x[1], x[2], x[3], dir,
 	       H(0,1).real(), H(0,1).imag(),

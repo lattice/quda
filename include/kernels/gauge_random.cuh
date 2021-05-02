@@ -88,6 +88,7 @@ namespace quda {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+      
       int dim_max = (arg.geom == QUDA_SCALAR_GEOMETRY ? 1 :
 		     arg.geom == QUDA_VECTOR_GEOMETRY ? 4 :
 		     arg.geom == QUDA_TENSOR_GEOMETRY ? 6 : 8);
@@ -105,7 +106,7 @@ namespace quda {
           Link u = gauss_su3<real, Link>(localState);
           if (arg.group) {
             u = arg.sigma * u;
-            expsuNTaylor(u, 20);
+            expsuNTaylor(u, 25);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
 	  
