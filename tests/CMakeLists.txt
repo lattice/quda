@@ -236,14 +236,10 @@ if(QUDA_FORCE_GAUGE)
 endif()
 
 if(QUDA_GAUGE_ALG)
-  add_executable(gauge_alg_test gauge_alg_test.cpp)
-  target_link_libraries(gauge_alg_test ${TEST_LIBS})
-  quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
-
   add_executable(gauge_alg_ctest gauge_alg_ctest.cpp)
   target_link_libraries(gauge_alg_ctest ${TEST_LIBS})
   quda_checkbuildtest(gauge_alg_ctest QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(TARGETS gauge_alg_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(heatbath_test heatbath_test.cpp)
   target_link_libraries(heatbath_test ${TEST_LIBS})
@@ -809,7 +805,7 @@ foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_GAUGE_ALG)
     add_test(NAME gauge_alg_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg ctest> ${MPIEXEC_POSTFLAGS}
                      --dim 2 4 6 8 --prec ${prec}
                      --gtest_output=xml:gauge_arg_test_${prec}.xml)
   endif()

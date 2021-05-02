@@ -9,6 +9,7 @@
 #include <comm_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
+#include <misc.h>
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
@@ -20,6 +21,42 @@
 #include <gtest/gtest.h>
 
 using namespace quda;
+
+//***********************************************************//
+// This boolean controls whether or not the full Google test //
+// is done. If the user passes a value of 1 or 2 to --test   //
+// then a single instance of OVR or FFT gauge fixing is done //
+// and the value of this bool is set to false. Otherwise the //
+// Google tests are performed.                               //
+//***********************************************************//
+bool execute = true;
+
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+
+  switch (test_type) {
+  case 0:
+    printfQuda("\n Google testing\n");
+    break;
+  case 1:
+    printfQuda("\nOVR gauge fix\n");
+    break;
+  case 2:
+    printfQuda("\nFFT gauge fix\n");
+    break;
+  default: errorQuda("Undefined test type %d given", test_type);
+  }
+  
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+}
 
 class GaugeAlgTest : public ::testing::Test
 {
@@ -35,7 +72,9 @@ protected:
   int novrsteps;
   bool coldstart;
   double beta_value;
-
+  
+  bool unit_test;
+  
   RNG *randstates;
 
   void SetReunitarizationConsts()
@@ -64,45 +103,195 @@ protected:
     a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val)) return true;
-    return false;
+    return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
   bool CheckDeterminant(double2 detu)
   {
     double prec_val = 5e-8;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
-    return false;
+    return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
   virtual void SetUp()
   {
-    setVerbosity(QUDA_VERBOSE);
+    if(execute) {
+      setVerbosity(QUDA_VERBOSE);
+      param = newQudaGaugeParam();
+      
+      // Setup gauge container.
+      param.cpu_prec = prec;
+      param.cpu_prec = prec;
+      param.cuda_prec = prec;
+      param.reconstruct = link_recon;
+      param.cuda_prec_sloppy = prec;
+      param.reconstruct_sloppy = link_recon;
+      
+      param.type = QUDA_WILSON_LINKS;
+      param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+      
+      param.X[0] = xdim;
+      param.X[1] = ydim;
+      param.X[2] = zdim;
+      param.X[3] = tdim;
+      setDims(param.X);
+      
+      param.anisotropy = 1.0; // don't support anisotropy for now!!!!!!
+      param.t_boundary = QUDA_PERIODIC_T;
+      param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+      param.ga_pad = 0;
+      
+      GaugeFieldParam gParam(0, param);
+      gParam.pad = 0;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.create = QUDA_NULL_FIELD_CREATE;
+      gParam.link_type = param.type;
+      gParam.reconstruct = param.reconstruct;
+      gParam.setPrecision(gParam.Precision(), true);
+      
+#ifdef MULTI_GPU
+      int y[4];
+      int R[4] = {0, 0, 0, 0};
+      for (int dir = 0; dir < 4; ++dir)
+	if (comm_dim_partitioned(dir)) R[dir] = 2;
+      for (int dir = 0; dir < 4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
+      int pad = 0;
+      GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+      gParamEx.order = gParam.order;
+      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gParamEx.t_boundary = gParam.t_boundary;
+      gParamEx.nFace = 1;
+      for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
+      U = new cudaGaugeField(gParamEx);
+#else
+      U = new cudaGaugeField(gParam);
+#endif
+      // CURAND random generator initialization
+      randstates = new RNG(gParam, 1234);
+      randstates->Init();
+      
+      nsteps = heatbath_num_steps;
+      nhbsteps = heatbath_num_heatbath_per_step;
+      novrsteps = heatbath_num_overrelax_per_step;
+      coldstart = heatbath_coldstart;
+      beta_value = heatbath_beta_value;
+      
+      a0.Start(__func__, __FILE__, __LINE__);
+      a1.Start(__func__, __FILE__, __LINE__);
+      
+      int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+      int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
+      
+      if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+	InitGaugeField(*U);
+      else
+	InitGaugeField(*U, *randstates);
+      
+      // Reunitarization setup
+      SetReunitarizationConsts();
+      plaquette(*U);
+      
+      for (int step = 1; step <= nsteps; ++step) {
+	printfQuda("Step %d\n", step);
+	Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
+	
+	// Reunitarize gauge links...
+	*num_failures_h = 0;
+	unitarizeLinks(*U, num_failures_d);
+	qudaDeviceSynchronize();
+	if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+	
+	plaquette(*U);
+      }
+      a1.Stop(__func__, __FILE__, __LINE__);
+      
+      printfQuda("Time Monte -> %.6f s\n", a1.Last());
+      plaq = plaquette(*U);
+      printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+      
+      host_free(num_failures_h);
 
-    param = newQudaGaugeParam();
+      // If a specific test type is requested, perfrom it now and then
+      // turn off all Google tests in the tear down.
+      switch (test_type) {
+      case 0:
+	// Do the Google testing
+	break;
+      case 1:
+	run_ovr();
+	break;
+      case 2:
+	run_fft();
+	break;    
+      default:
+	errorQuda("Invalid test type %d ", test_type);
+      }
+    }
+  }
+  
+  virtual void TearDown()
+  {
+    if(execute) {
+      detu = getLinkDeterminant(*U);
+      double2 tru = getLinkTrace(*U);
+      printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
+      printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
+      
+      delete U;
+      // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+      PGaugeExchangeFree();
+      
+      a0.Stop(__func__, __FILE__, __LINE__);
+      printfQuda("Time -> %.6f s\n", a0.Last());
+      randstates->Release();
+      delete randstates;      
+    }
+    // If we performed a specific instance, switch off the
+    // Google testing.
+    if(test_type != 0) execute = false;
+  }
+  
+  virtual void run_ovr()
+  {
+    if(execute) {
+      gaugeFixingOVR(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+		     gf_theta_condition);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+      // Save if output string is specified
+      if (strcmp(gauge_outfile, "")) save_gauge();
+    }
+  }
+  virtual void run_fft()
+  {
+    if(execute) {
+      if (!checkDimsPartitioned()) {
+	printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
+	gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+		       gf_theta_condition);
+	
+	auto plaq_gf = plaquette(*U);	
+	printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+	ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+	// Save if output string is specified
+	if (strcmp(gauge_outfile, "")) save_gauge();
+      } else {
+	errorQuda("Cannot perform FFT gauge fixing with MPI partitions.");
+      }
+    }
+  }
 
-    // Setup gauge container.
-    param.cpu_prec = prec;
-    param.cpu_prec = prec;
-    param.cuda_prec = prec;
-    param.reconstruct = link_recon;
-    param.cuda_prec_sloppy = prec;
-    param.reconstruct_sloppy = link_recon;
-
-    param.type = QUDA_WILSON_LINKS;
-    param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-
-    param.X[0] = xdim;
-    param.X[1] = ydim;
-    param.X[2] = zdim;
-    param.X[3] = tdim;
-    setDims(param.X);
-
-    param.anisotropy = 1.0; // don't support anisotropy for now!!!!!!
-    param.t_boundary = QUDA_PERIODIC_T;
-    param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-    param.ga_pad = 0;
+  virtual void save_gauge() {
+    
+    printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+    
+    QudaGaugeParam gauge_param = newQudaGaugeParam();
+    setWilsonGaugeParam(gauge_param);
+    
+    void *cpu_gauge[4];
+    for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
     GaugeFieldParam gParam(0, param);
     gParam.pad = 0;
@@ -111,168 +300,124 @@ protected:
     gParam.link_type = param.type;
     gParam.reconstruct = param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
-
-#ifdef MULTI_GPU
-    int y[4];
-    int R[4] = {0, 0, 0, 0};
-    for (int dir = 0; dir < 4; ++dir)
-      if (comm_dim_partitioned(dir)) R[dir] = 2;
-    for (int dir = 0; dir < 4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
-    int pad = 0;
-    GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
-    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-    gParamEx.order = gParam.order;
-    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParamEx.t_boundary = gParam.t_boundary;
-    gParamEx.nFace = 1;
-    for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
-    U = new cudaGaugeField(gParamEx);
-#else
-    U = new cudaGaugeField(gParam);
-#endif
-    // CURAND random generator initialization
-    randstates = new RNG(gParam, 1234);
-    randstates->Init();
-
-    nsteps = heatbath_num_steps;
-    nhbsteps = heatbath_num_heatbath_per_step;
-    novrsteps = heatbath_num_overrelax_per_step;
-    coldstart = heatbath_coldstart;
-    beta_value = heatbath_beta_value;
-
-    a0.Start(__func__, __FILE__, __LINE__);
-    a1.Start(__func__, __FILE__, __LINE__);
-
-    int *num_failures_h = (int *)mapped_malloc(sizeof(int));
-    int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
-
-    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
-      InitGaugeField(*U);
-    else
-      InitGaugeField(*U, *randstates);
-
-    // Reunitarization setup
-    SetReunitarizationConsts();
-    plaquette(*U);
-
-    for (int step = 1; step <= nsteps; ++step) {
-      printfQuda("Step %d\n", step);
-      Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
-
-      // Reunitarize gauge links...
-      *num_failures_h = 0;
-      unitarizeLinks(*U, num_failures_d);
-      qudaDeviceSynchronize();
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
-
-      plaquette(*U);
-    }
-    a1.Stop(__func__, __FILE__, __LINE__);
-
-    printfQuda("Time Monte -> %.6f s\n", a1.Last());
-    plaq = plaquette(*U);
-    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-
-    host_free(num_failures_h);
-  }
-
-  virtual void TearDown()
-  {
-    detu = getLinkDeterminant(*U);
-    double2 tru = getLinkTrace(*U);
-    printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
-    printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
-
-    delete U;
-    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
-    PGaugeExchangeFree();
-
-    a0.Stop(__func__, __FILE__, __LINE__);
-    printfQuda("Time -> %.6f s\n", a0.Last());
-    randstates->Release();
-    delete randstates;
+  
+    cudaGaugeField *gauge;
+    gauge = new cudaGaugeField(gParam);
+    
+    // copy into regular field
+    copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);
+    saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
+      
+    // Write to disk
+    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+    
+    for (int dir = 0; dir < 4; dir++) free(cpu_gauge[dir]);
+    delete gauge;
   }
 };
-
+  
 TEST_F(GaugeAlgTest, Generation)
 {
-  detu = getLinkDeterminant(*U);
-  ASSERT_TRUE(CheckDeterminant(detu));
+  if(execute) {
+    detu = getLinkDeterminant(*U);
+    ASSERT_TRUE(CheckDeterminant(detu));
+  }
 }
 
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
-  printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
-                 gf_theta_condition);
-  auto plaq_gf = plaquette(*U);
-  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  if(execute) {
+    printfQuda("Landau gauge fixing with overrelaxation\n");
+    gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+		   gf_theta_condition);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  }
 }
 
 TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
-  printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
-                 gf_theta_condition);
-  auto plaq_gf = plaquette(*U);
-  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  if(execute) {
+    printfQuda("Coulomb gauge fixing with overrelaxation\n");
+    gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+		   gf_theta_condition);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  }
 }
 
 TEST_F(GaugeAlgTest, Landau_FFT)
 {
-  if (!checkDimsPartitioned()) {
-    printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-                   gf_theta_condition);
-    auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  if(execute) {
+    if (!checkDimsPartitioned()) {
+      printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
+      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+		     gf_theta_condition);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+    }
   }
 }
 
 TEST_F(GaugeAlgTest, Coulomb_FFT)
 {
-  if (!checkDimsPartitioned()) {
-    printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-                   gf_theta_condition);
-    auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+  if(execute) {
+    if (!checkDimsPartitioned()) {
+      printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
+      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+		     gf_theta_condition);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+    }
   }
 }
 
 int main(int argc, char **argv)
 {
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
-  // return code for google test
-  int test_rc = 0;
-  xdim = ydim = zdim = tdim = 32;
-
   // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);
   add_heatbath_option_group(app);
+  
+  test_type = 0;
+  CLI::TransformPairs<int> test_type_map {{"Google", 0}, {"OVR", 1}, {"FFT", 2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)  
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // call srand() with a rank-dependent seed
+  initRand();
+  
+  display_test_info();
+
+  // initialize the QUDA library
+  initQuda(device_ordinal);
+
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
-  initQuda(device_ordinal);
-  test_rc = RUN_ALL_TESTS();
-  endQuda();
-
+  // return code for google test
+  int test_rc = RUN_ALL_TESTS();
+  
+  endQuda();  
   finalizeComms();
-
+  
   return test_rc;
 }
