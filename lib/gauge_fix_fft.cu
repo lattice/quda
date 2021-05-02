@@ -193,7 +193,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("\tAuto tune active: %s\n", autotune ? "true" : "false");      
       printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha0);
-      printfQuda("\tTolerance: %lf\n", tolerance);
+      printfQuda("\tTolerance: %e\n", tolerance);
       printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
       printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
       printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
