@@ -27,7 +27,7 @@ namespace quda {
     template <class storage_type_, int nColor_, QudaReconstructType recon_, int Ls_, MdwfFusedDslashType type_,
               int block_dim_x_, int min_blocks_per_SM, bool reload_>
     // storage_type is the usual "Float" in other places in QUDA
-    struct FusedDslashArg {
+    struct FusedDslashArg : kernel_param<> {
       using storage_type = storage_type_;
       using real = typename mapper<storage_type>::type; // the compute type for the in kernel computation
       static constexpr int nColor = nColor_;

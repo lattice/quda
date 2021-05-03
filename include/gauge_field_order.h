@@ -176,7 +176,7 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
-        using type = Float;
+        using value_type = Float;
         using store_type = storeFloat;
         complex<storeFloat> *v;
         const int idx;
@@ -205,7 +205,8 @@ namespace quda {
         */
         __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat> &a)
         {
-          v[idx] = fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : a.v[a.idx];
+          complex<Float> in = a;
+          v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : a.v[a.idx];
         }
 
         /**
@@ -243,16 +244,6 @@ namespace quda {
           } else {
             return complex<Float>(tmp.x,tmp.y);
           }
-        }
-
-        __device__ __host__ inline Float real() const
-        {
-          return fixed ? scale_inv * static_cast<Float>(v[idx].real()) : v[idx].real();
-        }
-
-        __device__ __host__ inline Float imag() const
-        {
-          return fixed ? scale_inv * static_cast<Float>(v[idx].imag()) : v[idx].imag();
         }
 
         /**

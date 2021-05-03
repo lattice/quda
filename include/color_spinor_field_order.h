@@ -423,7 +423,7 @@ namespace quda {
         /**
          * computing type and storage types that can be inferred from this object.
          */
-        using type = Float;
+        using value_type = Float;
         using store_type = storeFloat;
         complex<storeFloat> *v;
         const int idx;
@@ -455,29 +455,6 @@ namespace quda {
         fieldorder_wrapper(fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &&a) = default;
 
         /**
-           @brief Assignment operator with fieldorder_wrapper instance as input
-           @param a fieldorder_wrapper we are copying from
-        */
-        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &a) const
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          complex<Float> in = a;
-          v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : complex<storeFloat>(in.real(), in.imag());
-        }
-
-        /**
-           @brief Assignment operator with fieldorder_wrapper instance as input
-           @param a fieldorder_wrapper we are copying from
-        */
-        template <typename theirFloat, typename theirStoreFloat, bool their_block_float, typename their_norm_t>
-        __device__ __host__ inline void operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat, their_block_float, their_norm_t> &a) const
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          complex<theirFloat> in = a;
-          v[idx] = fixed ? complex<storeFloat>(round(scale * in.real()), round(scale * in.imag())) : complex<storeFloat>(in.real(), in.imag());
-        }
-
-        /**
            @brief Assignment operator with complex number instance as input
            @param a Complex number we want to store in this accessor
         */
@@ -493,11 +470,33 @@ namespace quda {
         }
 
         /**
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<Float, storeFloat, block_float_, norm_t> &a) const
+        {
+          *this = complex<Float>(a);
+        }
+
+        /**
+           @brief Assignment operator with fieldorder_wrapper instance as input
+           @param a fieldorder_wrapper we are copying from
+        */
+        template <typename theirFloat, typename theirStoreFloat, bool their_block_float, typename their_norm_t>
+        __device__ __host__ inline void operator=(const fieldorder_wrapper<theirFloat, theirStoreFloat, their_block_float, their_norm_t> &a) const
+        {
+          *this = complex<Float>(a);
+        }
+
+        /**
            @brief Assignment operator with real number instance as input
            @param a real number we want to store in this accessor
         */
         template<typename theirFloat>
-        __device__ __host__ inline void operator=(const theirFloat &a) const { *this = complex<Float>(static_cast<Float>(a), static_cast<Float>(0.0)); }
+        __device__ __host__ inline void operator=(const theirFloat &a) const
+        {
+          *this = complex<Float>(static_cast<Float>(a), static_cast<Float>(0.0));
+        }
 
         /**
            @brief complex cast operator
@@ -513,28 +512,14 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline Float real() const
+        /**
+           @brief complex cast operator to a different precision
+        */
+        template <typename theirFloat>
+        __device__ __host__ inline operator complex<theirFloat>() const
         {
-          static_assert(!block_float, "Routine does not support block_float");
-          return fixed ? scale_inv*static_cast<Float>(v[idx].real()) : v[idx].real();
-        }
-
-        __device__ __host__ inline Float imag() const
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          return fixed ? scale_inv*static_cast<Float>(v[idx].imag()) : v[idx].imag();
-        }
-
-        __device__ __host__ inline void real(const Float &a)
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          return fixed ? v[idx].real(storeFloat(round(scale * a))) : v[idx].real(storeFloat(a));
-        }
-
-        __device__ __host__ inline void imag(const Float &a)
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          return fixed ? v[idx].imag(storeFloat(round(scale * a))) : v[idx].imag(storeFloat(a));
+          auto out = static_cast<complex<Float>>(*this);
+          return complex<theirFloat>(out.real(), out.imag());
         }
 
         /**
@@ -543,28 +528,13 @@ namespace quda {
         __device__ __host__ inline auto data() const { return &v[idx]; }
 
         /**
-           @brief negation operator
-           @return negation of this complex number
-        */
-        __device__ __host__ inline complex<Float> operator-() const
-        {
-          static_assert(!block_float, "Routine does not support block_float");
-          return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
-        }
-
-        /**
            @brief Operator+= with complex number instance as input
            @param a Complex number we want to add to this accessor
         */
         template<typename theirFloat>
         __device__ __host__ inline void operator+=(const complex<theirFloat> &a) const
         {
-          static_assert(!block_float, "Routine does not support block_float");
-          if (match<storeFloat,theirFloat>()) {
-            v[idx] += complex<storeFloat>(a.real(), a.imag());
-          } else {
-            v[idx] += fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : complex<storeFloat>(a.real(), a.imag());
-          }
+          *this = complex<Float>(*this) + complex<Float>(a);
         }
 
         /**
@@ -574,12 +544,7 @@ namespace quda {
         template<typename theirFloat>
         __device__ __host__ inline void operator-=(const complex<theirFloat> &a) const
         {
-          static_assert(!block_float, "Routine does not support block_float");
-          if (match<storeFloat,theirFloat>()) {
-            v[idx] -= complex<storeFloat>(a.real(), a.imag());
-          } else {
-            v[idx] -= fixed ? complex<storeFloat>(round(scale * a.real()), round(scale * a.imag())) : complex<storeFloat>(a.real(), a.imag());
-          }
+          *this += (-a);
         }
 
       };
@@ -757,9 +722,8 @@ namespace quda {
       }
 
       /**
-       * Complex-member accessor function.  The last
-       * parameter n is only used for indexed into the packed
-       * null-space vectors.
+       * Complex-member accessor function.  The parameter n is only
+       * used for indexed into the packed null-space vectors.
        * @param x 1-d checkerboard site index
        * @param s spin index
        * @param c color index
@@ -773,8 +737,8 @@ namespace quda {
 
 #ifndef DISABLE_GHOST
       /**
-       * Complex-member accessor function for the ghost zone.
-       * The last parameter n is only used for indexed into the packed
+       * Complex-member accessor function for the ghost zone.  The
+       * parameter n is only used for indexed into the packed
        * null-space vectors.
        * @param x 1-d checkerboard site index
        * @param s spin index

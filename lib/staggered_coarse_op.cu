@@ -260,7 +260,8 @@ namespace quda {
     const double kappa = -1.; // cancels a minus sign factor for kappa w/in the dslash application
     const double mu_dummy = 0.; 
     const double mu_factor_dummy = 0.;
-
+    constexpr bool use_mma = false;
+    
     bool need_bidirectional = false;
     if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) need_bidirectional = true;
 
@@ -294,9 +295,9 @@ namespace quda {
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarseAtomic yAccessorAtomic(*Yatomic);
       gCoarseAtomic xAccessorAtomic(*Xatomic);
-
+      
       // the repeated xinvAccessor is intentional
-      calculateY<QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor, xinvAccessor, xinvAccessor,
         Y, X, *Yatomic, *Xatomic, *uv, *av, v, g, *dummyClover(), kappa, mass, mu_dummy,
         mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
@@ -329,7 +330,7 @@ namespace quda {
       gCoarseAtomic xAccessorAtomic(*Xatomic);
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
-      calculateY<QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
         xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v, g, *dummyClover(),
         kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
