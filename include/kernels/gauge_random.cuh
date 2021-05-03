@@ -6,7 +6,8 @@
 
 namespace quda {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, bool group_> struct GaugeGaussArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, bool group_>
+  struct GaugeGaussArg : kernel_param<> {
     using Float = Float_;
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
@@ -21,13 +22,12 @@ namespace quda {
     Gauge U;
     RNGState *rng;
     real sigma; // where U = exp(sigma * H)
-    dim3 threads; // number of active threads required
 
     GaugeGaussArg(const GaugeField &U, RNGState *rng, double sigma) :
+      kernel_param(dim3(U.LocalVolumeCB(), 2, 1)),
       U(U),
       rng(rng),
-      sigma(sigma),
-      threads(U.LocalVolumeCB(), 2, 1)
+      sigma(sigma)
     {
       int R = 0;
       for (int dir = 0; dir < 4; ++dir) {
@@ -74,8 +74,8 @@ namespace quda {
 
   template <typename Arg> struct GaussGauge
   {
-    Arg &arg;
-    constexpr GaussGauge(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaussGauge(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

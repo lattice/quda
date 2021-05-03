@@ -11,7 +11,8 @@ namespace quda
 #define  DOUBLE_TOL	1e-15
 #define  SINGLE_TOL	2e-6
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_> struct GaugeAPEArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int apeDim_>
+  struct GaugeAPEArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -22,16 +23,15 @@ namespace quda
     Gauge out;
     const Gauge in;
 
-    dim3 threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
     const Float alpha;
     const Float tolerance;
 
     GaugeAPEArg(GaugeField &out, const GaugeField &in, double alpha) :
+      kernel_param(dim3(in.LocalVolumeCB(), 2, apeDim)),
       out(out),
       in(in),
-      threads(in.LocalVolumeCB(), 2, apeDim),
       alpha(alpha),
       tolerance(in.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL)
     {
@@ -43,8 +43,8 @@ namespace quda
   };
   
   template <typename Arg> struct APE {
-    Arg &arg;
-    constexpr APE(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr APE(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

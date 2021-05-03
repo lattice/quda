@@ -17,7 +17,7 @@ namespace quda
   // Smear FLOPs = 2 * (4*(6*3 + 4)*9 + 2*18) = 1656
   // Smear version uses forward paths
   template <typename Arg, typename Link, typename Int>
-  __host__ __device__ inline void computeStaple(Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
+  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
   {
     setZero(&staple);
     int dx[4] = { };
@@ -148,7 +148,7 @@ namespace quda
   // Smear FLOPS = 2 * (28*(6*3 + 4)*9 + 8*18) = 11,160
   // Smear version uses forward paths
   template <typename Arg, typename Link, typename Int>
-  __host__ __device__ inline void computeStapleRectangle(Arg &arg, const int *x, const Int *X, const int parity, const int nu,
+  __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
                                                          Link &staple, Link &rectangle, const int dir_ignore)
   {
     setZero(&staple);

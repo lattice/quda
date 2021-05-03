@@ -10,7 +10,7 @@
 namespace quda
 {
 
-    using spinor_array = vector_type<double2, 16>;
+  using spinor_array = vector_type<double2, 16>;
   
   template <typename real> class DRGammaMatrix
   {
@@ -381,7 +381,7 @@ namespace quda
     }
   };
   
-  template <typename Float, int nColor_> struct ContractionArg {
+  template <typename Float, int nColor_> struct ContractionArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     int X[4];    // grid dimensions
 
@@ -396,21 +396,20 @@ namespace quda
     F x;
     F y;
     matrix_field<complex<Float>, nSpin> s;
-    dim3 threads;
 
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *s) :
+      kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),
-      s(s, x.VolumeCB()),
-      threads(x.VolumeCB(), 2)
+      s(s, x.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
 
   template <typename Arg> struct ColorContract {
-    Arg &arg;
-    constexpr ColorContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -438,8 +437,8 @@ namespace quda
   };
 
   template <typename Arg> struct DegrandRossiContract {
-    Arg &arg;
-    constexpr DegrandRossiContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

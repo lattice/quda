@@ -1,9 +1,11 @@
 #pragma once
 
+#include <kernel_helper.h>
+
 namespace quda {
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __forceinline__ __device__ void Kernel1D_impl(Arg &arg)
+  __forceinline__ __device__ void Kernel1D_impl(const Arg &arg)
   {
     Functor<Arg> f(arg);
 
@@ -23,7 +25,7 @@ namespace quda {
 
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __forceinline__ __device__ void Kernel2D_impl(Arg &arg)
+  __forceinline__ __device__ void Kernel2D_impl(const Arg &arg)
   {
     Functor<Arg> f(arg);
 
@@ -45,7 +47,7 @@ namespace quda {
 
 
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-  __forceinline__ __device__ void Kernel3D_impl(Arg &arg)
+  __forceinline__ __device__ void Kernel3D_impl(const Arg &arg)
   {
     Functor<Arg> f(arg);
 

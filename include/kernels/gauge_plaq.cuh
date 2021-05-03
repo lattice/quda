@@ -16,7 +16,6 @@ namespace quda {
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    dim3 threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
     int border[4];
@@ -33,14 +32,14 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads.x = X[0]*X[1]*X[2]*X[3]/2;
+      this->threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
     __device__ __host__ reduce_t init() const { return reduce_t(); }
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>,3>;
 
@@ -60,8 +59,8 @@ namespace quda {
   template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr Plaquette(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Plaquette(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)

@@ -54,15 +54,26 @@ namespace quda
 
         using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z>;
 
-        if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
+        if (dir == QUDA_IN_PLACE) {
+
+          for (int s_col = 0; s_col < fineSpin; s_col++) {
+
+            auto a = arg.C(0, parity, x_cb, 0, s_col, 0, 0);
+            auto b = Wacc(parity, x_cb, s_col, 0, 0);
+            auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
+
+            Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+          }
+
+        } else if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
 
           int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
 
           for (int s_col = 0; s_col < fineSpin; s_col++) {
 
-            auto a = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
-            auto b = Wacc.wrap_ghost(dim, 1, (parity + 1) & 1, ghost_idx, s_col);
-            auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
+            auto a = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col, 0, 0);
+            auto b = Wacc.Ghost(dim, 1, (parity + 1) & 1, ghost_idx, s_col, 0, 0);
+            auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
             Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
           }
@@ -73,9 +84,9 @@ namespace quda
 
           for (int s_col = 0; s_col < fineSpin; s_col++) {
 
-            auto a = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
-            auto b = Wacc.wrap((parity + 1) & 1, y_cb, s_col);
-            auto c = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
+            auto a = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col, 0, 0);
+            auto b = Wacc((parity + 1) & 1, y_cb, s_col, 0, 0);
+            auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
             Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
           }
@@ -92,7 +103,7 @@ namespace quda
 
       int parity = blockIdx.y;
 
-      if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
+      if (dir == QUDA_FORWARDS || dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV
         impl::computeUV<dim, dir, bM, bN, bK, block_y, block_z>(arg, arg.V, parity, x_cb);
       else
         impl::computeUV<dim, dir, bM, bN, bK, block_y, block_z>(arg, arg.AV, parity, x_cb);
@@ -114,10 +125,11 @@ namespace quda
         getCoords(coord, x_cb, arg.x_size, parity);
         for (int d = 0; d < nDim; d++) coord_coarse[d] = coord[d] / arg.geo_bs[d];
 
+        constexpr bool isFromCoarseClover = dir == QUDA_IN_PLACE;
+
         // Check to see if we are on the edge of a block.  If adjacent site
         // is in same block, M = X, else M = Y
-        const bool isDiagonal
-          = ((coord[dim] + 1) % arg.x_size[dim]) / arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
+        const bool isDiagonal = isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, dim, arg);
 
         int coarse_parity = 0;
 
@@ -175,7 +187,7 @@ namespace quda
         // Not unrolling to lift regiter pressure
         for (int s = 0; s < fineSpin; s++) {
 
-          auto a = arg.AV.wrap(parity, x_cb, s);
+          auto a = arg.AV(parity, x_cb, s, 0, 0);
 
           __syncthreads();
           a_loader.template g2r<Config::lda, a_dagger>(a, m_offset, 0);
@@ -184,7 +196,7 @@ namespace quda
 
           for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
 
-            auto b = arg.UV.wrap(parity, x_cb, s_col * fineSpin + s);
+            auto b = arg.UV(parity, x_cb, s_col * fineSpin + s, 0, 0);
 
             __syncthreads();
             b_loader.template g2r<Config::ldb, b_dagger>(b, n_offset, 0);
@@ -211,26 +223,35 @@ namespace quda
               int warp_m_offset = warp_row * MMA_M + m_offset;
               int warp_n_offset = warp_col * MMA_N + n_offset;
 
-              if (!isDiagonal) {
+              if (dir == QUDA_IN_PLACE) {
+
+                auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
+                constexpr bool atomic_dagger = false;
+                store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
+                                                                        op_c_real, op_c_imag);
+
+              } else if (!isDiagonal) {
 
                 int dim_index = arg.dim_index % arg.Y_atomic.geometry;
-                auto cc = arg.Y_atomic.wrap(dim_index, coarse_parity, coarse_x_cb, s, s_col);
+                auto cc = arg.Y_atomic(dim_index, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                 constexpr bool atomic_dagger = false;
                 store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
                                                                         op_c_real, op_c_imag);
 
               } else {
 
-                op_c_real.ax(-arg.kappa);
-                op_c_imag.ax(-arg.kappa);
+                if (!isFromCoarseClover) {
+                  op_c_real.ax(-arg.kappa);
+                  op_c_imag.ax(-arg.kappa);
+                }
 
                 if (dir == QUDA_BACKWARDS) {
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s_col, s);
+                  auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s_col, s, 0, 0);
                   constexpr bool atomic_dagger = true;
                   store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
                                                                           op_c_real, op_c_imag);
                 } else {
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
+                  auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                   constexpr bool atomic_dagger = false;
                   store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
                                                                           op_c_real, op_c_imag);
@@ -242,7 +263,7 @@ namespace quda
                     op_c_imag.ax(static_cast<float>(-1.0));
                   }
                   constexpr bool atomic_dagger = false;
-                  auto cc = arg.X_atomic.wrap(0, coarse_parity, coarse_x_cb, s, s_col);
+                  auto cc = arg.X_atomic(0, coarse_parity, coarse_x_cb, s, s_col, 0, 0);
                   store_complex_atomic<M, N, N * fineSpin, atomic_dagger>(warp_m_offset, warp_n_offset, wrm, cc,
                                                                           op_c_real, op_c_imag);
                 }

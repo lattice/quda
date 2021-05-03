@@ -29,8 +29,8 @@ namespace quda {
      @param dx 4-d shift index
      @param X Full lattice dimensions
    */
-  template <typename I, typename J, typename K>
-  __device__ __host__ inline int linkIndexShift(I y[], const I x[], const J dx[], const K X[4]) {
+  template <typename I, typename J, typename K, typename L>
+  __device__ __host__ inline int linkIndexShift(I &y, const J &x, const K &dx, const L &X) {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -44,8 +44,8 @@ namespace quda {
      @param x 4-d lattice index
      @param X Full lattice dimensions
    */
-  template <typename I>
-  __device__ __host__ inline int linkIndex(const int x[], const I X[4]) {
+  template <typename I, typename J>
+  __device__ __host__ inline int linkIndex(const I &x, const J &X) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     return idx;
   }
@@ -58,8 +58,8 @@ namespace quda {
      @param x 4-d lattice index
      @param X Full lattice dimensions
    */
-  template <typename I>
-  __device__ __host__ inline int linkIndex(int y[], const int x[], const I X[4]) {
+  template <typename I, typename J, typename K>
+  __device__ __host__ inline int linkIndex(I &y, const J &x, const K &X) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     y[0] = x[0]; y[1] = x[1]; y[2] = x[2]; y[3] = x[3];
     return idx;

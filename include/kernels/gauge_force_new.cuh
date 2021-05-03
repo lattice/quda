@@ -9,7 +9,7 @@
 namespace quda {
   
   template <typename Float_, int nColor_, QudaReconstructType recon_in, int paths_ = 1>
-  struct GaugeForceNewArg {
+  struct GaugeForceNewArg : kernel_param<> {
     // The number of paths corresponds to the gauge action type
     // 1: Wilson
     // 2: Symanzik
@@ -49,7 +49,7 @@ namespace quda {
 
 
   template <typename Arg, int dir>
-  __device__ __host__ inline void GaugeForceKernelNew(Arg &arg, int idx, int parity)
+  __device__ __host__ inline void GaugeForceKernelNew(const Arg &arg, int idx, int parity)
   {
     using real = typename Arg::Float;
     typedef Matrix<complex<real>,Arg::nColor> Link;
@@ -94,8 +94,8 @@ namespace quda {
   
   template <typename Arg> struct GaugeForceNew
   {
-    Arg &arg;
-    constexpr GaugeForceNew(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GaugeForceNew(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }    
     
     __device__ __host__ void operator()(int x_cb, int parity, int dir)
