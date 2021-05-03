@@ -10,6 +10,55 @@
 namespace quda {
 
   /**
+     @brief Parameter structure for driving init_dslash_atomic
+  */
+  template <typename T_> struct init_dslash_atomic_arg {
+    using T = T_;
+    T *count;
+    dim3 threads;
+
+    init_dslash_atomic_arg(T *count, unsigned int size) :
+      count(count),
+      threads(size, 1, 1) { }
+  };
+
+  /**
+     @brief Functor that uses placement new constructor to initialize
+     the atomic counters
+  */
+  template <typename Arg> struct init_dslash_atomic {
+    Arg &arg;
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    constexpr init_dslash_atomic(Arg &arg) : arg(arg) { }
+    __device__ void operator()(int i) { new (arg.count + i) typename Arg::T {0}; }
+  };
+
+  /**
+     @brief Parameter structure for driving init_dslash_arr
+  */
+  template <typename T_> struct init_arr_arg {
+    using T = T_;
+    T *arr;
+    T val;
+    dim3 threads;
+
+    init_arr_arg(T *arr, T val, unsigned int size) :
+      arr(arr),
+      val(val),
+      threads(size, 1, 1) { }
+  };
+
+  /**
+     @brief Functor to initialize the arrive signal
+  */
+  template <typename Arg> struct init_sync_arr {
+    Arg &arg;
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    constexpr init_sync_arr(Arg &arg) : arg(arg) { }
+    __device__ void operator()(int i) { *(arg.arr + i) = arg.val; }
+  };
+
+  /**
      @brief Parameter structure for driving the Gamma operator
    */
   template <typename Float, int nColor_>

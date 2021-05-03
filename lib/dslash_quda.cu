@@ -104,16 +104,47 @@ namespace quda {
     Worker *aux_worker;
   }
 
-  // need to use placement new constructor to initialize the atomic counters
-  template <typename T> __global__ void init_dslash_atomic(T *counter, int max)
-  {
-    for (int i = 0; i < max; i++) new (counter + i) T {0};
-  }
-  // need to use placement new constructor to initialize the atomic counters
-  template <typename T> __global__ void init_sync_arr(T *arr, T val, int max)
-  {
-    for (int i = 0; i < max; i++) *(arr + i) = val;
-  }
+  template <typename T>
+  struct init_dslash : public TunableKernel1D {
+    T *counter;
+    unsigned int size;
+    long long bytes() const { return size * sizeof(T); }
+    unsigned int minThreads() const { return size; }
+
+    init_dslash(T *counter, unsigned int size) :
+      TunableKernel1D(size),
+      counter(counter),
+      size(size)
+    { apply(device::get_default_stream()); }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch_device<init_dslash_atomic>(tp, stream, init_dslash_atomic_arg<T>(counter, size));
+    }
+  };
+
+  template <typename T>
+  struct init_arr : public TunableKernel1D {
+    T *counter;
+    T val;
+    unsigned int size;
+    long long bytes() const { return size * sizeof(T); }
+    unsigned int minThreads() const { return size; }
+
+    init_arr(T *counter, T val, unsigned int size) :
+      TunableKernel1D(size),
+      counter(counter),
+      val(val),
+      size(size)
+    { apply(device::get_default_stream()); }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch_device<init_sync_arr>(tp, stream, init_arr_arg<T>(counter, val, size));
+    }
+  };
 
   void createDslashEvents()
   {
@@ -128,28 +159,25 @@ namespace quda {
     }
 #ifdef NVSHMEM_COMMS
     sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
-    TuneParam tp;
-    tp.grid = dim3(1, 1, 1);
-    tp.block = dim3(1, 1, 1);
 
-    /* initialize to 9 here so in cases where we need to do tuning we can skip the wait if necessary
-    by using smaller values */
-    auto stream = device::get_default_stream();
-    qudaLaunchKernel(init_sync_arr<shmem_sync_t>, tp, stream, sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    // initialize to 9 here so where we need to do tuning we can skip
+    // the wait if necessary by using smaller values
+    init_arr<shmem_sync_t>(sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
     sync_counter = 10;
 
     // atomic for controlling signaling in nvshmem packing
     _retcount_intra
       = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_intra_t>, tp, stream, _retcount_intra, 2 * QUDA_MAX_DIM);
+    init_dslash<shmem_retcount_intra_t>(_retcount_intra, 2 * QUDA_MAX_DIM);
     _retcount_inter
       = static_cast<shmem_retcount_inter_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_retcount_inter_t>, tp, stream, _retcount_inter, 2 * QUDA_MAX_DIM);
+    init_dslash<shmem_retcount_inter_t>(_retcount_inter, 2 * QUDA_MAX_DIM);
+
     // workspace for interior done sync in uber kernel
     _interior_done = static_cast<shmem_interior_done_t *>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_interior_done_t>, tp, stream, _interior_done, 1);
+    init_dslash<shmem_interior_done_t>(_interior_done, 1);
     _interior_count = static_cast<shmem_interior_count_t *>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
-    qudaLaunchKernel(init_dslash_atomic<shmem_interior_count_t>, tp, stream, _interior_count, 1);
+    init_dslash<shmem_interior_count_t>(_interior_count, 1);
 #endif
 
     aux_worker = NULL;

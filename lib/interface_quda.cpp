@@ -6296,7 +6296,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   
   // Download any data from the host.
   *source = *host_source;
-
+  /*
   // Create the dirac operator and operators for sloppy, precondition,
   // and an eigensolver. We muct do this each time a gauge field is
   // updated.
@@ -6329,7 +6329,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   }
 
   // Rescale further dependening on kappa or mass normalisation
-  massRescale(*static_cast<cudaColorSpinorField *>(source), *inv_param, false);
+  //massRescale(*static_cast<cudaColorSpinorField *>(source), *inv_param, false);
   // If requesting a preconditioned solve, we must prepare the vectors
   // with the red-black preconditioning.
   dirac.prepare(in, out, *solution, *source, inv_param->solution_type);
@@ -6355,7 +6355,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   std::vector<ColorSpinorField*> quarkX, quarkP;
   quarkX.push_back(ColorSpinorField::Create(quark_param));
   quarkP.push_back(ColorSpinorField::Create(quark_param));
-  
+  */  
   //---------------------------------------------------------------------
     
   // Start HMC 
@@ -6384,15 +6384,15 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   // Measure the gauge action
   double gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
   // Measure the fermion action
-  createCloverQuda(inv_param); // Create a clover and inverse clover field if using clover
+  //createCloverQuda(inv_param); // Create a clover and inverse clover field if using clover
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  (*solve)(*out, *in);
-  solverParam.updateInvertParam(*inv_param);
+  //(*solve)(*out, *in);
+  //solverParam.updateInvertParam(*inv_param);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);  
-  dirac.reconstruct(*solution, *source, inv_param->solution_type);
-  delete solve;
+  //dirac.reconstruct(*solution, *source, inv_param->solution_type);
+  //delete solve;
   
-  double fermion_action = blas::norm2(*solution);  
+  double fermion_action = 0.0;//blas::norm2(*solution);  
 
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Pre  step %d: gauge action %.16e momentum action %.16e fermion_action %.16e Q charge %.16e plaq = %.16e\n",
 						 step, gauge_action, momentum_action, fermion_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
@@ -6412,7 +6412,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     
     // We just evolved the gauge field, so we must recompute the fermion fields
     // and invert to calculate the impulse on the fermion.
-
+    /*
     // Create a solver
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre), mEig(diracEig);
     SolverParam solverParam(*inv_param);
@@ -6451,7 +6451,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     updateMomentum(*device_mom, -1.0, *force, "wilson");
     // DMH FIXME amalgamate these two functions.
     profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-    
+    */
     profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
     gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_param->beta*epsilon/3.0, path_coeff);
@@ -6476,8 +6476,8 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  (*solve)(*solution, *source);
-  solverParam.updateInvertParam(*inv_param);
+  //(*solve)(*solution, *source);
+  //solverParam.updateInvertParam(*inv_param);
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
 
   
@@ -6493,7 +6493,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
 
   double post_gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
 
-  double post_fermion_action = blas::norm2(*source);  
+  double post_fermion_action = 0.0;//blas::norm2(*source);  
   
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Post step %d: gauge action %.16e momentum action %.16e fermion_action %.16e Q charge %+.16e plaq = %.16e\n",
 						 step, post_gauge_action, post_momentum_action, fermion_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
@@ -6527,10 +6527,12 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   }
 
   delete gaugeTemp;
+  /*
   delete d;
   delete dSloppy;
   delete dPre;
   delete dEig;
+  */
   delete source;
   delete solution;
   delete host_source;
