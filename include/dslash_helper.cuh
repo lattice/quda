@@ -471,7 +471,7 @@ namespace quda
    */
   template <KernelType kernel_type, typename Arg> void __device__ inline shmem_signalinterior(const Arg &arg)
   {
-    if (kernel_type == INTERIOR_KERNEL && (arg.shmem & 64)) {
+    if (kernel_type == UBER_KERNEL) {
       __syncthreads();
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
         int amlast = arg.interior_count.fetch_add(1, cuda::std::memory_order_acq_rel); // ensure that my block is done
@@ -484,124 +484,125 @@ namespace quda
     }
   }
 
-  template <class D, typename Arg, int nParity>
+  template <KernelType kernel_type, class D, typename Arg, int nParity>
   void __device__ __forceinline__ shmem_exterior(D &dslash, Arg &arg, int s)
   {
     // shmem exterior kernel with grid-strided loop
+    if (kernel_type == UBER_KERNEL || kernel_type == EXTERIOR_KERNEL_ALL) {
+      // figure out some details on blocks
+      const bool shmem_interiordone = (arg.shmem & 64);
+      const int myblockidx = arg.exterior_blocks > 0 ? blockIdx.x - (gridDim.x - arg.exterior_blocks) : blockIdx.x;
+      const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
+      const int blocks_per_dim = (arg.exterior_blocks > 0 ? arg.exterior_blocks : gridDim.x) / (nComm);
+      const int blocks_per_dir = blocks_per_dim / 2;
 
-    // figure out some details on blocks
-    const bool shmem_interiordone = (arg.shmem & 64);
-    const int myblockidx = arg.exterior_blocks > 0 ? blockIdx.x - (gridDim.x - arg.exterior_blocks) : blockIdx.x;
-    const int nComm = arg.commDim[0] + arg.commDim[1] + arg.commDim[2] + arg.commDim[3];
-    const int blocks_per_dim = (arg.exterior_blocks > 0 ? arg.exterior_blocks : gridDim.x) / (nComm);
-    const int blocks_per_dir = blocks_per_dim / 2;
-
-    int dir = (myblockidx % blocks_per_dim) / (blocks_per_dir);
-    // this is the dimdir we are working on ...
-    int dim;
-    int threadl;
-    int threads_my_dir;
-    switch (myblockidx / blocks_per_dim) {
-    case 0: dim = arg.dim_map[0]; break;
-    case 1: dim = arg.dim_map[1]; break;
-    case 2: dim = arg.dim_map[2]; break;
-    case 3: dim = arg.dim_map[3]; break;
-    default: dim = -1;
-    }
-
-    switch (dim) {
-    case 0:
-      threads_my_dir = (arg.threadDimMapUpper[0] - arg.threadDimMapLower[0]) / 2;
-      threadl = arg.threadDimMapLower[0];
-      break;
-    case 1:
-      threads_my_dir = (arg.threadDimMapUpper[1] - arg.threadDimMapLower[1]) / 2;
-      threadl = arg.threadDimMapLower[1];
-      break;
-    case 2:
-      threads_my_dir = (arg.threadDimMapUpper[2] - arg.threadDimMapLower[2]) / 2;
-      threadl = arg.threadDimMapLower[2];
-      break;
-    case 3:
-      threads_my_dir = (arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]) / 2;
-      threadl = arg.threadDimMapLower[3];
-      break;
-    default: threadl = 0; threads_my_dir = 0;
-    }
-    int dimdir = 2 * dim + dir;
-
-    constexpr bool shmembarrier = true; // always true for now (arg.shmem & 16);
-
-    if (shmembarrier) {
-
-      if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
-        auto tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
-        while (tst_val < arg.counter - 1) {
-          arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
-                                                    cuda::std::memory_order_relaxed);
-        }
-        arg.interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
+      int dir = (myblockidx % blocks_per_dim) / (blocks_per_dir);
+      // this is the dimdir we are working on ...
+      int dim;
+      int threadl;
+      int threads_my_dir;
+      switch (myblockidx / blocks_per_dim) {
+      case 0: dim = arg.dim_map[0]; break;
+      case 1: dim = arg.dim_map[1]; break;
+      case 2: dim = arg.dim_map[2]; break;
+      case 3: dim = arg.dim_map[3]; break;
+      default: dim = -1;
       }
 
-      if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {
-        /* the first 8 threads of each block are used for spinning on halo data coming
-           in from the 4*2 (dim*dir) neighbors. We figure out next on which neighbors the
-           block actually needs to wait
-        */
+      switch (dim) {
+      case 0:
+        threads_my_dir = (arg.threadDimMapUpper[0] - arg.threadDimMapLower[0]) / 2;
+        threadl = arg.threadDimMapLower[0];
+        break;
+      case 1:
+        threads_my_dir = (arg.threadDimMapUpper[1] - arg.threadDimMapLower[1]) / 2;
+        threadl = arg.threadDimMapLower[1];
+        break;
+      case 2:
+        threads_my_dir = (arg.threadDimMapUpper[2] - arg.threadDimMapLower[2]) / 2;
+        threadl = arg.threadDimMapLower[2];
+        break;
+      case 3:
+        threads_my_dir = (arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]) / 2;
+        threadl = arg.threadDimMapLower[3];
+        break;
+      default: threadl = 0; threads_my_dir = 0;
+      }
+      int dimdir = 2 * dim + dir;
 
-        // for now we can only spin per dimdir for 4d indexing as it ensure unique block->dimdir assignment
-        bool spin = (dslash.pc_type() == QUDA_5D_PC) || (threadIdx.x == dimdir);
-        // figure out which other directions also to spin for (to make corners work)
-        switch (dim) {
-        case 3:
-          if (arg.commDim[3]) {
-            spin = threadIdx.x / 2 < 3 ? arg.commDim[2] : spin;
-            spin = threadIdx.x / 2 < 2 ? arg.commDim[1] : spin;
-            spin = threadIdx.x / 2 < 1 ? arg.commDim[0] : spin;
-          } else {
-            spin = false;
+      constexpr bool shmembarrier = true; // always true for now (arg.shmem & 16);
+
+      if (shmembarrier) {
+
+        if (shmem_interiordone && threadIdx.x == blockDim.x - 1 && threadIdx.y == 0 && threadIdx.z == 0) {
+          auto tst_val = arg.interior_done.load(cuda::std::memory_order_relaxed);
+          while (tst_val < arg.counter - 1) {
+            arg.interior_done.compare_exchange_strong(tst_val, arg.counter - 1, cuda::std::memory_order_relaxed,
+                                                      cuda::std::memory_order_relaxed);
           }
-          break;
-        case 2:
-          if (arg.commDim[2]) {
-            if (arg.commDim[1]) spin = threadIdx.x / 2 < 2 ? true : spin;
-            if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
-          }
-          break;
-        case 1:
-          if (arg.commDim[1]) {
-            if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
-          }
-          break;
-        case 0: break;
+          arg.interior_done.wait(arg.counter - 1, cuda::std::memory_order_acquire);
         }
 
-        if (getNeighborRank(threadIdx.x, arg) >= 0) {
-          if (spin) { nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter); }
+        if (threadIdx.x < 8 && threadIdx.y == 0 && threadIdx.z == 0) {
+          /* the first 8 threads of each block are used for spinning on halo data coming
+            in from the 4*2 (dim*dir) neighbors. We figure out next on which neighbors the
+            block actually needs to wait
+          */
+
+          // for now we can only spin per dimdir for 4d indexing as it ensure unique block->dimdir assignment
+          bool spin = (dslash.pc_type() == QUDA_5D_PC) || (threadIdx.x == dimdir);
+          // figure out which other directions also to spin for (to make corners work)
+          switch (dim) {
+          case 3:
+            if (arg.commDim[3]) {
+              spin = threadIdx.x / 2 < 3 ? arg.commDim[2] : spin;
+              spin = threadIdx.x / 2 < 2 ? arg.commDim[1] : spin;
+              spin = threadIdx.x / 2 < 1 ? arg.commDim[0] : spin;
+            } else {
+              spin = false;
+            }
+            break;
+          case 2:
+            if (arg.commDim[2]) {
+              if (arg.commDim[1]) spin = threadIdx.x / 2 < 2 ? true : spin;
+              if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            }
+            break;
+          case 1:
+            if (arg.commDim[1]) {
+              if (arg.commDim[0]) spin = threadIdx.x / 2 < 1 ? true : spin;
+            }
+            break;
+          case 0: break;
+          }
+
+          if (getNeighborRank(threadIdx.x, arg) >= 0) {
+            if (spin) { nvshmem_signal_wait_until((arg.sync_arr + threadIdx.x), NVSHMEM_CMP_GE, arg.counter); }
+          }
         }
+
+        // wait for all threads here as not all threads spin
+        __syncthreads();
+        // do exterior
       }
 
-      // wait for all threads here as not all threads spin
-      __syncthreads();
-      // do exterior
-    }
+      int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
+      int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
 
-    int local_tid = threadIdx.x + blockDim.x * (myblockidx % (blocks_per_dir)); // index within the block
-    int tid = local_tid + threadl + dir * threads_my_dir; // global index corresponfing to local_tid
-
-    while (local_tid < threads_my_dir) {
-      // for full fields set parity from z thread index else use arg setting
-      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+      while (local_tid < threads_my_dir) {
+        // for full fields set parity from z thread index else use arg setting
+        int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 #ifdef QUDA_DSLASH_FAST_COMPILE
-      dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
+        dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, parity);
 #else
-      switch (parity) {
-      case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
-      case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
-      }
+        switch (parity) {
+        case 0: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 0); break;
+        case 1: dslash.template operator()<EXTERIOR_KERNEL_ALL>(tid, s, 1); break;
+        }
 #endif
-      local_tid += blockDim.x * blocks_per_dir;
-      tid += blockDim.x * blocks_per_dir;
+        local_tid += blockDim.x * blocks_per_dir;
+        tid += blockDim.x * blocks_per_dir;
+      }
     }
   }
 #endif
@@ -630,7 +631,7 @@ namespace quda
     // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+    if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) && blockIdx.x < arg.pack_blocks) {
       // first few blocks do packing kernel
       P<dagger, dslash.pc_type(), Arg> packer;
       packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
@@ -641,25 +642,26 @@ namespace quda
 #ifdef NVSHMEM_COMMS
     } else if (arg.shmem > 0
                && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
-                   || (kernel_type == INTERIOR_KERNEL && arg.exterior_blocks > 0
+                   || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
                        && blockIdx.x >= (gridDim.x - arg.exterior_blocks)))) {
-      shmem_exterior<D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
+      shmem_exterior<kernel_type, D<nParity, dagger, xpay, kernel_type, Arg>, Arg, nParity>(dslash, arg, s);
 #endif
     } else {
-      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+      const int dslash_block_offset
+        = ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) ? arg.pack_blocks : 0);
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
 #ifdef QUDA_DSLASH_FAST_COMPILE
-      dslash(x_cb, s, parity);
+      dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, parity);
 #else
       switch (parity) {
-      case 0: dslash(x_cb, s, 0); break;
-      case 1: dslash(x_cb, s, 1); break;
+      case 0: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 0); break;
+      case 1: dslash.template operator()<kernel_type == UBER_KERNEL ? INTERIOR_KERNEL : kernel_type>(x_cb, s, 1); break;
       }
 #endif
 #ifdef NVSHMEM_COMMS
-      shmem_signalinterior<kernel_type, Arg>(arg);
+      if (kernel_type == UBER_KERNEL) shmem_signalinterior<kernel_type, Arg>(arg);
 #endif
     }
   }

@@ -76,6 +76,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (2 * num_dir * mv_flops + // SU(3) matrix-vector multiplies
@@ -118,6 +119,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * (gauge_bytes_fat + gauge_bytes_long) + // gauge reads
