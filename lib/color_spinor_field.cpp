@@ -15,12 +15,22 @@ namespace quda {
     field.fill(*this);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
-      bytes(0), norm_bytes(0), even(0), odd(0),
-      composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
-      components(0)
+  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
+    LatticeField(param),
+    init(false),
+    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    v(nullptr),
+    norm(nullptr),
+    ghost(),
+    ghostNorm(),
+    ghostFace(),
+    dslash_constant(std::make_unique<DslashConstant>()),
+    bytes(0),
+    norm_bytes(0),
+    even(nullptr),
+    odd(nullptr),
+    composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
+    components()
   {
     if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
@@ -28,11 +38,22 @@ namespace quda {
            param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
-      bytes(0), norm_bytes(0), even(0), odd(0),
-     composite_descr(field.composite_descr), components(0)
+  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) :
+    LatticeField(field),
+    init(false),
+    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    v(nullptr),
+    norm(nullptr),
+    ghost(),
+    ghostNorm(),
+    ghostFace(),
+    dslash_constant(std::make_unique<DslashConstant>()),
+    bytes(0),
+    norm_bytes(0),
+    even(nullptr),
+    odd(nullptr),
+    composite_descr(field.composite_descr),
+    components()
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
@@ -742,6 +763,31 @@ namespace quda {
     return field;
   }
 
+  std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateUnique(const ColorSpinorParam &param)
+  {
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      return std::make_unique<cpuColorSpinorField>(param);
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
+      return std::make_unique<cudaColorSpinorField>(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+      return std::unique_ptr<ColorSpinorField>();
+    }
+  }
+
+  std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateUnique(const ColorSpinorField &src,
+                                                                   const ColorSpinorParam &param)
+  {
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      return std::make_unique<cpuColorSpinorField>(src, param);
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
+      return std::make_unique<cudaColorSpinorField>(src, param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+      return std::unique_ptr<ColorSpinorField>();
+    }
+  }
+
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
     if (param_.Precision() > precision)
@@ -776,11 +822,12 @@ namespace quda {
     return alias;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+  ColorSpinorField *ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
-                                                   QudaMemoryType new_mem_type) {
+                                                   QudaMemoryType new_mem_type)
+  {
     ColorSpinorParam coarseParam(*this);
-    for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
+    for (int d = 0; d < nDim; d++) coarseParam.x[d] = x[d] / geoBlockSize[d];
 
     int geoBlockVolume = 1;
     for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
@@ -805,19 +852,22 @@ namespace quda {
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
     // for GPU fields, always use native ordering to ensure coalescing
-    if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    else coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    if (new_location == QUDA_CUDA_FIELD_LOCATION)
+      coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    else
+      coarseParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
     coarseParam.setPrecision(new_precision);
 
     // set where we allocate the field
-    coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+    coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ?
+      new_mem_type :
       (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
     ColorSpinorField *coarse = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {
       coarse = new cpuColorSpinorField(coarseParam);
-    } else if (new_location== QUDA_CUDA_FIELD_LOCATION) {
+    } else if (new_location == QUDA_CUDA_FIELD_LOCATION) {
       coarse = new cudaColorSpinorField(coarseParam);
     } else {
       errorQuda("Invalid field location %d", new_location);
@@ -826,11 +876,12 @@ namespace quda {
     return coarse;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
+  ColorSpinorField *ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                  QudaPrecision new_precision, QudaFieldLocation new_location,
-                                                 QudaMemoryType new_mem_type) {
+                                                 QudaMemoryType new_mem_type)
+  {
     ColorSpinorParam fineParam(*this);
-    for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
+    for (int d = 0; d < nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
@@ -840,7 +891,7 @@ namespace quda {
     new_precision = (new_precision == QUDA_INVALID_PRECISION) ? Precision() : new_precision;
 
     // if new location is not set, use this->location
-    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location() : new_location;
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
@@ -851,7 +902,8 @@ namespace quda {
     }
 
     // set where we allocate the field
-    fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
+    fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ?
+      new_mem_type :
       (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
     ColorSpinorField *fine = NULL;
@@ -865,13 +917,14 @@ namespace quda {
     return fine;
   }
 
-  std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
+  std::ostream &operator<<(std::ostream &out, const ColorSpinorField &a)
+  {
     out << "typedid = " << typeid(a).name() << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
     out << "nDim = " << a.nDim << std::endl;
-    for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
+    for (int d = 0; d < a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;
     out << "pc_type = " << a.pc_type << std::endl;
     out << "suggested_parity = " << a.suggested_parity << std::endl;
@@ -888,15 +941,14 @@ namespace quda {
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
     out << "Is composite = " << a.composite_descr.is_composite << std::endl;
-    if(a.composite_descr.is_composite)
-    {
+    if (a.composite_descr.is_composite) {
       out << "Composite Dim = " << a.composite_descr.dim << std::endl;
       out << "Composite Volume = " << a.composite_descr.volume << std::endl;
       out << "Composite Stride = " << a.composite_descr.stride << std::endl;
       out << "Composite Length = " << a.composite_descr.length << std::endl;
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
-    if(a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
+    if (a.composite_descr.is_composite) out << "Component ID = " << a.composite_descr.id << std::endl;
     out << "pc_type = " << a.pc_type << std::endl;
     return out;
   }

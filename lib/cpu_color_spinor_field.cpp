@@ -118,7 +118,8 @@ namespace quda {
     return *this;
   }
 
-  void cpuColorSpinorField::create(const QudaFieldCreate create) {
+  void cpuColorSpinorField::create(const QudaFieldCreate create)
+  {
     // these need to be reset to ensure no ghost zones for the cpu
     // fields since we can't determine during the parent's constructor
     // whether the field is a cpu or cuda field
@@ -128,73 +129,77 @@ namespace quda {
     // means a ghost zone is set.  So we unset it here.  This will be
     // fixed when clean up the ghost code with the peer-2-peer branch
     bytes = length * precision;
-    if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    if (isNative())
+      bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ?
+        2 * ALIGNMENT_ADJUST(bytes / 2) :
+        ALIGNMENT_ADJUST(bytes);
 
     if (pad != 0) errorQuda("Non-zero pad not supported");
     if (precision < QUDA_SINGLE_PRECISION) errorQuda("Fixed-point precision not supported");
 
-    if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
-	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
-	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER  &&
-	fieldOrder != QUDA_QDPJIT_FIELD_ORDER           &&
-	fieldOrder != QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
+    if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER
+        && fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER && fieldOrder != QUDA_QDPJIT_FIELD_ORDER
+        && fieldOrder != QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
       errorQuda("Field order %d not supported", fieldOrder);
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       // array of 4-d fields
-      if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-        int Ls = x[nDim-1];
-        v = (void**)safe_malloc(Ls * sizeof(void*));
-        for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
-      } else {
-        v = safe_malloc(bytes);
-      }
+      auto deleter = [](char *ptr) {
+        std::cout << "Call free\n";
+        host_free(ptr);
+      };
+      // if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+      //   int Ls = x[nDim - 1];
+      //   v = (void **)safe_malloc(Ls * sizeof(void *));
+      //   for (int i = 0; i < Ls; i++) {
+      //     auto ptr= safe_malloc(bytes / Ls);
+      //     ((void **)v)[i] = ptr;
+      //     _vdwf.emplace_back(std::shared_ptr<char[]>(static_cast<char *>(ptr), deleter));
+      //   }
+      // } else {
+      v = safe_malloc(bytes);
+      _v = std::shared_ptr<char[]>(static_cast<char *>(v), deleter);
+      // }
+
       init = true;
     }
- 
+
     if (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
       ColorSpinorParam param(*this);
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       param.nDim = nDim;
-      memcpy(param.x, x, nDim*sizeof(int));
+      memcpy(param.x, x, nDim * sizeof(int));
       param.x[0] /= 2;
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
-      param.is_composite  = false;
+      param.is_composite = false;
       param.composite_dim = 0;
-      param.is_component  = composite_descr.is_component;
-      param.component_id  = composite_descr.id;
-      even = new cpuColorSpinorField(*this, param);
-      odd = new cpuColorSpinorField(*this, param);
+      param.is_component = composite_descr.is_component;
+      param.component_id = composite_descr.id;
+      even = std::make_unique<cpuColorSpinorField>(*this, param);
+      odd = std::make_unique<cpuColorSpinorField>(*this, param);
 
       // need this hackery for the moment (need to locate the odd pointers half way into the full field)
-      (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
+      (dynamic_cast<cpuColorSpinorField *>(odd.get()))->v = (void *)((char *)v + bytes / 2);
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+        (dynamic_cast<cpuColorSpinorField *>(odd.get()))->norm = (void *)((char *)norm + norm_bytes / 2);
 
-      if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
-	errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n",
-		  bytes, even->Bytes(), odd->Bytes());
+      if (bytes != 2 * even->Bytes() || bytes != 2 * odd->Bytes())
+        errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n", bytes,
+                  even->Bytes(), odd->Bytes());
     }
-
   }
 
-  void cpuColorSpinorField::destroy() {
-  
+  void cpuColorSpinorField::destroy()
+  {
     if (init) {
-      if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	for (int i=0; i<x[nDim-1]; i++) host_free(((void**)v)[i]);
-      host_free(v);
+      if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) _vdwf.clear();
+      //   for (int i = 0; i < x[nDim - 1]; i++) host_free(((void **)v)[i]);
+      // // host_free(v);
       init = false;
     }
-
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      if (even) delete even;
-      if (odd) delete odd;
-    }
-
   }
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
@@ -209,31 +214,25 @@ namespace quda {
     }
   }
 
-  void cpuColorSpinorField::backup() const {
+  void cpuColorSpinorField::backup() const
+  {
     if (backed_up) errorQuda("Field already backed up");
-
-    backup_h = new char[bytes];
-    memcpy(backup_h, v, bytes);
-
+    _backup_h = std::make_unique<char[]>(bytes);
+    memcpy(_backup_h.get(), v, bytes);
     if (norm_bytes) {
-      backup_norm_h = new char[norm_bytes];
+      _backup_norm_h = std::make_unique<char[]>(norm_bytes);
       memcpy(backup_norm_h, norm, norm_bytes);
     }
-
     backed_up = true;
   }
 
   void cpuColorSpinorField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-
-    memcpy(v, backup_h, bytes);
-    delete []backup_h;
-    if (norm_bytes) {
-      memcpy(norm, backup_norm_h, norm_bytes);
-      delete []backup_norm_h;
-    }
-
+    memcpy(v, _backup_h.get(), bytes);
+    if (norm_bytes) { memcpy(norm, _backup_norm_h.get(), norm_bytes); }
+    _backup_h.reset();
+    _backup_norm_h.reset();
     backed_up = false;
   }
 

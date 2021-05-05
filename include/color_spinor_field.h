@@ -384,6 +384,11 @@ namespace quda {
     void *v_h; // the field elements
     void *norm_h; // the normalization field
 
+    std::shared_ptr<void> _v;
+    std::shared_ptr<void> _norm;
+    mutable std::unique_ptr<char[]> _backup_h;
+    mutable std::unique_ptr<char[]> _backup_norm_h;
+
     // multi-GPU parameters
 
     void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
@@ -405,8 +410,8 @@ namespace quda {
     QudaGammaBasis gammaBasis;
 
     // in the case of full fields, these are references to the even / odd sublattices
-    ColorSpinorField *even;
-    ColorSpinorField *odd;
+    std::unique_ptr<ColorSpinorField> even;
+    std::unique_ptr<ColorSpinorField> odd;
 
     //! used for deflation eigenvector sets etc.:
     CompositeColorSpinorFieldDescriptor composite_descr;//containes info about the set
@@ -460,9 +465,9 @@ namespace quda {
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    void* V() {return v;}
-    const void* V() const {return v;}
-    void* Norm(){return norm;}
+    void *V() { return v; } // TODO: check if this should be exposed here
+    const void *V() const { return v; }
+    void *Norm() { return norm; } // TODO: check if this should be exposed here
     const void* Norm() const {return norm;}
     virtual const void* Ghost2() const { return nullptr; }
 
@@ -596,8 +601,10 @@ namespace quda {
      */
     void OffsetIndex(int &i, int *y) const;
 
-    static ColorSpinorField* Create(const ColorSpinorParam &param);
-    static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
+    static ColorSpinorField *Create(const ColorSpinorParam &param);                              // deprecate this
+    static ColorSpinorField *Create(const ColorSpinorField &src, const ColorSpinorParam &param); // deprecate this
+    static std::unique_ptr<ColorSpinorField> CreateUnique(const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateUnique(const ColorSpinorField &src, const ColorSpinorParam &param);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -925,11 +932,12 @@ namespace quda {
     private:
     //void *v; // the field elements
     //void *norm; // the normalization field
-    bool init;
-    bool reference; // whether the field is a reference or not
+      std::vector<std::shared_ptr<void>> _vdwf;
+      bool init;
+      bool reference; // whether the field is a reference or not
 
-    void create(const QudaFieldCreate);
-    void destroy();
+      void create(const QudaFieldCreate);
+      void destroy();
 
     public:
     //cpuColorSpinorField();
@@ -1012,6 +1020,29 @@ namespace quda {
        @brief Restores the cpuColorSpinorField
     */
     void restore() const;
+  };
+
+  // this is the interface used by multi-blas.
+  // this is non-owning ...
+  using ColorSpinorFieldVector = std::vector<ColorSpinorField *>;
+
+  // this is owning
+  // would require some convenient way to get a non-owning version
+  class ColorSpinorFieldVectorU : public std::vector<std::unique_ptr<ColorSpinorField>>
+  {
+
+  public:
+    ColorSpinorFieldVector get()
+    {
+      ColorSpinorFieldVector res;
+      for (auto &x : *this) res.emplace_back(x.get());
+      return res;
+    }
+    // call case class constructor
+    ColorSpinorFieldVectorU() : std::vector<std::unique_ptr<ColorSpinorField>>() {};
+
+    // we cannot support all cases here, probably does not make sense to use that for
+    ColorSpinorFieldVectorU(ColorSpinorParam param, size_t size);
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
