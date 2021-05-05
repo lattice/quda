@@ -495,10 +495,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+    set(DIRAC_NAME twisted-mass)
     # symmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
@@ -512,7 +513,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     # asymmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
