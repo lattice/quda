@@ -51,7 +51,7 @@ namespace quda {
           gauge[d] = nbytes ? safe_malloc(nbytes) : nullptr;
           if (create == QUDA_ZERO_FIELD_CREATE && nbytes) memset(gauge[d], 0, nbytes);
         } else if (create == QUDA_REFERENCE_FIELD_CREATE) {
-          gauge[d] = ((void**)param.gauge)[d];
+          gauge[d] = ((void **)param.gauge)[d];
         } else {
           errorQuda("Unsupported creation type %d", create);
         }
@@ -381,6 +381,46 @@ namespace quda {
       memset(gauge, 0, bytes);
     } else {
       for (int g=0; g<geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
+    }
+  }
+
+  void cpuGaugeField::copy_to_buffer(void *buffer) const
+  {
+
+    if (Order() == QUDA_QDP_GAUGE_ORDER || Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+      void *const *p = static_cast<void *const *>(Gauge_p());
+      int dbytes = Bytes() / 4;
+      static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
+      char *dst_buffer = reinterpret_cast<char *>(buffer);
+      for (int d = 0; d < 4; d++) { std::memcpy(&dst_buffer[d * dbytes], p[d], dbytes); }
+    } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
+               || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
+               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+      const void *p = Gauge_p();
+      int bytes = Bytes();
+      std::memcpy(buffer, p, bytes);
+    } else {
+      errorQuda("Unsupported order = %d\n", Order());
+    }
+  }
+
+  void cpuGaugeField::copy_from_buffer(void *buffer)
+  {
+
+    if (Order() == QUDA_QDP_GAUGE_ORDER || Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+      void **p = static_cast<void **>(Gauge_p());
+      size_t dbytes = Bytes() / 4;
+      static_assert(sizeof(char) == 1, "Assuming sizeof(char) == 1");
+      const char *dst_buffer = reinterpret_cast<const char *>(buffer);
+      for (int d = 0; d < 4; d++) { std::memcpy(p[d], &dst_buffer[d * dbytes], dbytes); }
+    } else if (Order() == QUDA_CPS_WILSON_GAUGE_ORDER || Order() == QUDA_MILC_GAUGE_ORDER
+               || Order() == QUDA_MILC_SITE_GAUGE_ORDER || Order() == QUDA_BQCD_GAUGE_ORDER
+               || Order() == QUDA_TIFR_GAUGE_ORDER || Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+      void *p = Gauge_p();
+      size_t bytes = Bytes();
+      std::memcpy(p, buffer, bytes);
+    } else {
+      errorQuda("Unsupported order = %d\n", Order());
     }
   }
 

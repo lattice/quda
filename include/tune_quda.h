@@ -77,7 +77,7 @@ namespace quda {
         param.grid.x += step;
         if (param.grid.x > maxGridSize()) {
           param.grid.x = minGridSize();
-	  return false;
+          return false;
         } else {
           return true;
         }
@@ -127,8 +127,8 @@ namespace quda {
         const auto max_blocks = device::max_grid_size(0);
 
         // ensure the blockDim is large enough given the limit on gridDim
-        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+        param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
+        param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
       }
@@ -408,6 +408,7 @@ namespace quda {
 
   class TunableVectorYZ : public TunableVectorY {
 
+  protected:
     mutable unsigned vector_length_z;
     mutable unsigned step_z;
     bool tune_block_y;
@@ -503,6 +504,21 @@ namespace quda {
    * @brief Enable / disable whether are tuning a policy
    */
   void setPolicyTuning(bool);
+
+  /**
+   * @brief Query whether we are currently tuning a policy
+   */
+  bool policyTuning();
+
+  /**
+   * @brief Enable / disable whether we are tuning an uber kernel
+   */
+  void setUberTuning(bool);
+
+  /**
+   * @brief Query whether we are tuning an uber kernel
+   */
+  bool uberTuning();
 
 } // namespace quda
 

@@ -42,7 +42,7 @@ bool getRankVerbosity() {
       if (rank_list.peek() == ',') rank_list.ignore();
     }
   } else if (!init) {
-    rank_verbosity = comm_rank() == 0 ? true : false; // default is process 0 only
+    rank_verbosity = comm_rank_global() == 0 ? true : false; // default is process 0 only
   }
   init = true;
 
@@ -147,7 +147,7 @@ char* getOmpThreadStr() {
 void errorQuda_(const char *func, const char *file, int line, ...)
 {
   fprintf(getOutputFile(), " (rank %d, host %s, %s:%d in %s())\n",
-          comm_rank(), comm_hostname(), file, line, func);
+          comm_rank_global(), comm_hostname(), file, line, func);
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n",
 	  getOutputPrefix(), quda::getLastTuneKey().name,
 	  quda::getLastTuneKey().volume, quda::getLastTuneKey().aux);

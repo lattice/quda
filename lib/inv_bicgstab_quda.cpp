@@ -16,7 +16,8 @@ namespace quda {
 
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    init(false)
   {
   }
 

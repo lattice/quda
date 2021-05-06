@@ -6,30 +6,29 @@ namespace quda {
   /**< Print out the profile information */
   void TimeProfile::Print() {
     if (profile[QUDA_PROFILE_TOTAL].time > 0.0) {
-      printfQuda("\n   %20s Total time = %g secs\n", fname.c_str(),
-		 profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("\n   %20s Total time = %9.3f secs\n", fname.c_str(), profile[QUDA_PROFILE_TOTAL].time);
     }
 
     double accounted = 0.0;
     for (int i=0; i<QUDA_PROFILE_COUNT-1; i++) {
       if (profile[i].count > 0) {
-        printfQuda("     %20s     = %f secs (%6.3g%%),\t with %8d calls at %e us per call\n", (const char *)&pname[i][0],
-                   profile[i].time, 100 * profile[i].time / profile[QUDA_PROFILE_TOTAL].time, profile[i].count,
-                   1e6 * profile[i].time / profile[i].count);
+        printfQuda("     %20s     = %9.3f secs (%7.3f%%),\t with %8d calls at %6.3e us per call\n",
+                   (const char *)&pname[i][0], profile[i].time, 100 * profile[i].time / profile[QUDA_PROFILE_TOTAL].time,
+                   profile[i].count, 1e6 * profile[i].time / profile[i].count);
         accounted += profile[i].time;
       }
     }
     if (accounted > 0.0) {
       double missing = profile[QUDA_PROFILE_TOTAL].time - accounted;
-      printfQuda("        total accounted       = %f secs (%6.3g%%)\n",
-		 accounted, 100*accounted/profile[QUDA_PROFILE_TOTAL].time);
-      printfQuda("        total missing         = %f secs (%6.3g%%)\n",
-		 missing, 100*missing/profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("        total accounted       = %9.3f secs (%7.3f%%)\n", accounted,
+                 100 * accounted / profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("        total missing         = %9.3f secs (%7.3f%%)\n", missing,
+                 100 * missing / profile[QUDA_PROFILE_TOTAL].time);
     }
 
     if (accounted > profile[QUDA_PROFILE_TOTAL].time) {
-      warningQuda("Accounted time %f secs in %s is greater than total time %f secs",
-		  accounted, (const char*)&fname[0], profile[QUDA_PROFILE_TOTAL].time);
+      warningQuda("Accounted time %9.3f secs in %s is greater than total time %9.3f secs", accounted,
+                  (const char *)&fname[0], profile[QUDA_PROFILE_TOTAL].time);
     }
 
   }
@@ -84,8 +83,7 @@ namespace quda {
 
   void TimeProfile::PrintGlobal() {
     if (global_profile[QUDA_PROFILE_TOTAL].time > 0.0) {
-      printfQuda("\n   %20s Total time = %g secs\n", "QUDA",
-                 global_profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("\n   %20s Total time = %9.3f secs\n", "QUDA", global_profile[QUDA_PROFILE_TOTAL].time);
     }
 
     double accounted = 0.0;
@@ -93,7 +91,7 @@ namespace quda {
     for (int i=0; i<QUDA_PROFILE_LOWER_LEVEL; i++) { // we do not want to print detailed lower level timers
       if (global_profile[i].count > 0) {
         if (print_timer)
-          printfQuda("     %20s     = %f secs (%6.3g%%),\t with %8d calls at %e us per call\n",
+          printfQuda("     %20s     = %9.3f secs (%7.3f%%),\t with %8d calls at %6.3e us per call\n",
                      (const char *)&pname[i][0], global_profile[i].time,
                      100 * global_profile[i].time / global_profile[QUDA_PROFILE_TOTAL].time, global_profile[i].count,
                      1e6 * global_profile[i].time / global_profile[i].count);
@@ -102,17 +100,16 @@ namespace quda {
     }
     if (accounted > 0.0) {
       double missing = global_profile[QUDA_PROFILE_TOTAL].time - accounted;
-      printfQuda("        total accounted       = %f secs (%6.3g%%)\n",
-                 accounted, 100*accounted/global_profile[QUDA_PROFILE_TOTAL].time);
-      printfQuda("        total missing         = %f secs (%6.3g%%)\n",
-                 missing, 100*missing/global_profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("        total accounted       = %9.3f secs (%7.3f%%)\n", accounted,
+                 100 * accounted / global_profile[QUDA_PROFILE_TOTAL].time);
+      printfQuda("        total missing         = %9.3f secs (%7.3f%%)\n", missing,
+                 100 * missing / global_profile[QUDA_PROFILE_TOTAL].time);
     }
 
     if (accounted > global_profile[QUDA_PROFILE_TOTAL].time) {
-      warningQuda("Accounted time %f secs in %s is greater than total time %f secs\n",
-                  accounted, "QUDA", global_profile[QUDA_PROFILE_TOTAL].time);
+      warningQuda("Accounted time %9.3f secs in %s is greater than total time %9.3f secs\n", accounted, "QUDA",
+                  global_profile[QUDA_PROFILE_TOTAL].time);
     }
-
   }
 
 }

@@ -4,7 +4,6 @@
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <color_spinor.h>
-#include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <gauge_field.h>
 
