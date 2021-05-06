@@ -983,8 +983,43 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
+  
+  /**
+     @brief Perform a 12th order Taylor expansion of exp(iQ=q) to approximate SU(N) matrix 
+     exponentiation. The argument q must be anti hermitian.
+     @param[in/out] q The matrix to be exponentiated
+  */  
+  template <class T, int N> __device__ __host__ void expsuNTaylor(Matrix<T, N> &q, int m)
+  {
+    // Port of the CHROMA implementation
+    // In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/n!)*(q)^n up to n = 12
+    typedef decltype(q(0, 0).x) RealType;
 
-    template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
+    T I(0.0,1.0);
+    q *= I;
+    
+    Matrix<T,N> temp1 = q;
+    Matrix<T,N> temp2 = q;
+    Matrix<T,N> temp3;
+    Matrix<T,N> Id;
+    setIdentity(&Id);
+    
+    // The first two terms...
+    q += Id;
+    
+    // ...of a 12th order expansion
+    for(int i = 2; i <= m; i++) {
+      
+      RealType coeff = 1.0/i;
+      
+      temp3 = temp2 * temp1;
+      temp2 = temp3 * coeff;
+      q += temp2;
+    }
+  }
+
+  
+  template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -1010,7 +1045,7 @@ namespace quda {
       temp1 = temp1 * Q;
       Tr_re = getTrace(temp1).x;
       c1 = 0.5*Tr_re;
-
+      
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
@@ -1049,6 +1084,8 @@ namespace quda {
       }
       else sinc_w = sin(w_p)/w_p;
 
+      sinc_w = sin(w_p)/w_p;
+      
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {

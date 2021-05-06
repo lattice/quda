@@ -18,11 +18,15 @@
 #include <staggered_gauge_utils.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-
 #include <misc.h>
+
 #include <qio_field.h>
+#include <zfp.h>
 
 template <typename T> using complex = std::complex<T>;
+
+#include <Eigen/Dense>
+using namespace Eigen;
 
 #define XUP 0
 #define YUP 1
@@ -149,23 +153,45 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
     else
       constructUnitGaugeField((float **)gauge, param);
   } else if (type == 1) {
-    if (precision == QUDA_DOUBLE_PRECISION)
+    if (precision == QUDA_DOUBLE_PRECISION) {
       constructRandomGaugeField((double **)gauge, param);
-    else
+    } else { 
       constructRandomGaugeField((float **)gauge, param);
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION)
+    }
+  } else if (type == 2) {
+    if (precision == QUDA_DOUBLE_PRECISION) {
       applyGaugeFieldScaling((double **)gauge, Vh, param);
-    else
+    } else {
       applyGaugeFieldScaling((float **)gauge, Vh, param);
+    }
   }
 }
+
+void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision)
+{  
+  if (precision == QUDA_DOUBLE_PRECISION)
+    expsuNTaylor((double **)gauge, m);
+  else
+    expsuNTaylor((float **)gauge, m); 
+}
+
+void fundamentalHostGaugeField(void **gauge, QudaPrecision precision)
+{  
+  if (precision == QUDA_DOUBLE_PRECISION)
+    constructFundamentalGaugeField((double **)gauge); 
+  else
+    constructFundamentalGaugeField((float **)gauge); 
+}
+
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
   // 0 = unit gauge
   // 1 = random SU(3)
   // 2 = supplied field
+  // Sanity check. DMH Make a gauge type enum? UNIT FUND RAND LOAD
+  if(unit_gauge && fund_gauge) errorQuda("Unit gauge and fundamental gauge requested simultaneoulsy. Only one option may be supplied");
+  
   int construct_type = 0;
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
@@ -1077,7 +1103,6 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
   }
 }
 
-// static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
 {
   Float *resOdd[4], *resEven[4];
@@ -1260,6 +1285,127 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
     }
   }
 }
+
+template <typename Float> void constructFundamentalGaugeField(Float **res)
+{
+  Float *resOut[4];
+  for (int dir = 0; dir < 4; dir++) resOut[dir] = res[dir];
+  
+  int Nc = 3;
+  
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < V; n++) {
+      
+      // Populate unitary matrix
+      MatrixXcd U = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      Eigen::ComplexEigenSolver<MatrixXcd> eig;
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      MatrixXcd E = eig.eigenvectors();
+      // Get eigenvalues
+      MatrixXcd S = MatrixXcd::Identity(Nc, Nc);
+      for(int i=0; i<Nc; i++) S(i,i).real(std::atan2(eig.eigenvalues()[i].imag(), eig.eigenvalues()[i].real()));
+      // Construct H
+      MatrixXcd H = E * S * E.adjoint();
+
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resOut[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
+
+/*
+template <typename Float> void constructFundamentalGaugeField(Float **res)
+{
+  Float *resOdd[4], *resEven[4];
+  for (int dir = 0; dir < 4; dir++) {
+    resEven[dir] = res[dir];
+    resOdd[dir] = res[dir] + Vh * gauge_site_size;
+  }
+
+  int Nc = 3;
+  
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < Vh; n++) {
+      
+      // Populate unitary matrix
+      MatrixXcd U = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      Eigen::ComplexEigenSolver<MatrixXcd> eig;
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      MatrixXcd E = eig.eigenvectors();
+      // Get eigenvalues
+      MatrixXcd S = MatrixXcd::Identity(Nc, Nc);
+      for(int i=0; i<Nc; i++) S(i,i).real(std::atan2(eig.eigenvalues()[i].imag(), eig.eigenvalues()[i].real()));
+      // Construct H
+      MatrixXcd H = E * S * E.adjoint();
+      
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+
+      // Populate unitary matrix
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  U(i,j).real(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  U(i,j).imag(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+      
+      // Eigensolve the link
+      eig.compute(U);
+      
+      // Get the eigendecomposion
+      E = eig.eigenvectors();
+      // Get eigenvalues
+      for(int i=0; i<Nc; i++) S(i,i) = eig.eigenvalues()[i];
+      // Construct H
+      H = E * S * E.adjoint();
+
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
+*/
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
@@ -1475,6 +1621,75 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
 
   return accuracy_level;
 }
+
+// Port of the CHROMA implementation
+// In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/m!)*(q)^m 
+template <class Float > static void expsuNTaylor(Float **res, int m)
+{
+  Float *res_out[4];
+  for (int dir = 0; dir < 4; dir++) res_out[dir] = res[dir];
+  
+  int Nc = 3;
+
+  MatrixXcd H = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp1 = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp2 = MatrixXcd::Zero(Nc, Nc);
+  MatrixXcd temp3 = MatrixXcd::Zero(Nc, Nc);
+
+  // The constant Identity 
+  MatrixXcd Id = MatrixXcd::Identity(Nc, Nc);
+  
+  // The constant Identity * i matrix
+  MatrixXcd I = MatrixXcd::Zero(Nc, Nc);
+  for (int i = 0; i < Nc; i++) {
+    for (int j = 0; j < Nc; j++) {
+      if(i == j) I(i,i).imag(1.0);
+    }
+  }
+  
+#ifdef _OPENMP
+  //#pragma omp parallel for schedule(static, 32)
+#endif
+  for (int dir = 0; dir < 4; dir++) {
+    for (int n = 0; n < V; n++) {
+            
+      // Populate H matrix
+      H = MatrixXcd::Zero(Nc, Nc);
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  H(i,j).real(res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
+	  H(i,j).imag(res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
+	}
+      }
+
+      H *= I;
+      temp1 = H;
+      temp2 = H;
+
+      // The first two terms...
+      H += Id;
+      
+      // ...of an mth order expansion
+      for(int i = 2; i <= m; i++) {
+	
+	double coeff = 1.0/i;
+	
+	temp3 = temp2 * temp1;
+	temp2 = temp3 * coeff;
+	H += temp2;
+      }
+
+      // Populate array
+      for (int i = 0; i < Nc; i++) {
+	for (int j = 0; j < Nc; j++) {
+	  res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
+	  res_out[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
+	}
+      }
+    }
+  }
+}
+
 
 static int compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
@@ -1722,4 +1937,266 @@ void performanceStats(std::vector<double> &time, std::vector<double> &gflops, st
   printfQuda("%d solves, mean iteration count %g (stddev = %g), with mean solve time %g (stddev = %g), mean GFLOPS %g "
              "(stddev = %g) [excluding first solve]\n",
              Nsrc, mean_iter, stddev_iter, mean_time, stddev_time, mean_gflops, stddev_gflops);
+}
+
+// compress and decompress contiguous blocks
+double process4D(double* buffer, uint blocks, double tolerance, uint block_size)
+{
+  zfp_stream* zfp;   /* compressed stream */
+  bitstream* stream; /* bit stream to write to or read from */
+  size_t* offset;    /* per-block bit offset in compressed stream */
+  double* ptr;       /* pointer to block being processed */
+  size_t bufsize;    /* byte size of uncompressed storage */
+  size_t zfpsize;    /* byte size of compressed stream */
+  uint minbits;      /* min bits per block */
+  uint maxbits;      /* max bits per block */
+  uint maxprec;      /* max precision */
+  int minexp;        /* min bit plane encoded */
+  uint bits;         /* size of compressed block */
+  uint i;
+  uint block_dim = block_size * block_size * block_size * block_size;
+  
+  /* maintain offset to beginning of each variable-length block */
+  offset = (size_t*)malloc(blocks * sizeof(size_t));
+
+  /* associate bit stream with same storage as input */
+  bufsize = blocks * block_dim * sizeof(*buffer);
+  stream = stream_open(buffer, bufsize);
+
+  /* allocate meta data for a compressed stream */
+  zfp = zfp_stream_open(stream);
+
+  /* set tolerance for fixed-accuracy mode */
+  zfp_stream_set_accuracy(zfp, tolerance);
+
+  /* set maxbits to guard against prematurely overwriting the input */
+  zfp_stream_params(zfp, &minbits, &maxbits, &maxprec, &minexp);
+  maxbits = block_dim * sizeof(*buffer) * CHAR_BIT;
+  zfp_stream_set_params(zfp, minbits, maxbits, maxprec, minexp);
+
+  /* compress one block at a time in sequential order */
+  ptr = buffer;
+  for (i = 0; i < blocks; i++) {
+    offset[i] = stream_wtell(stream);
+    bits = zfp_encode_block_double_4(zfp, ptr);
+    if (!bits) {
+      fprintf(stderr, "compression failed\n");
+      return 0;
+    }
+    if(verbosity >= QUDA_DEBUG_VERBOSE) printf("block #%u offset=%4u size=%4u\n", i, (uint)offset[i], bits);
+    ptr += block_dim;
+  }
+  /* important: flush any buffered compressed bits */
+  stream_flush(stream);
+
+  /* print out size */
+  zfpsize = stream_size(stream);
+  if(verbosity >= QUDA_DEBUG_VERBOSE) printf("compressed %u bytes to %u bytes\n", (uint)bufsize, (uint)zfpsize);
+
+  /* decompress one block at a time in reverse order */
+  for (i = blocks; i--;) {
+    ptr -= block_dim;
+    stream_rseek(stream, offset[i]);
+    if (!zfp_decode_block_double_4(zfp, ptr)) {
+      fprintf(stderr, "decompression failed\n");
+      return 0;
+    }
+  }
+  
+  /* clean up */
+  zfp_stream_close(zfp);
+  stream_close(stream);
+  free(offset);
+  
+  return (1.0*((uint)zfpsize))/(uint)bufsize;
+}
+
+// compress and decompress contiguous blocks
+double process3D(double* buffer, uint blocks, double tolerance, uint block_size)
+{
+  zfp_stream* zfp;   /* compressed stream */
+  bitstream* stream; /* bit stream to write to or read from */
+  size_t* offset;    /* per-block bit offset in compressed stream */
+  double* ptr;       /* pointer to block being processed */
+  size_t bufsize;    /* byte size of uncompressed storage */
+  size_t zfpsize;    /* byte size of compressed stream */
+  uint minbits;      /* min bits per block */
+  uint maxbits;      /* max bits per block */
+  uint maxprec;      /* max precision */
+  int minexp;        /* min bit plane encoded */
+  uint bits;         /* size of compressed block */
+  uint i;
+  uint block_dim = block_size * block_size * block_size;
+  
+  /* maintain offset to beginning of each variable-length block */
+  offset = (size_t*)malloc(blocks * sizeof(size_t));
+
+  /* associate bit stream with same storage as input */
+  bufsize = blocks * block_dim * sizeof(*buffer);
+  stream = stream_open(buffer, bufsize);
+
+  /* allocate meta data for a compressed stream */
+  zfp = zfp_stream_open(stream);
+
+  /* set tolerance for fixed-accuracy mode */
+  zfp_stream_set_accuracy(zfp, tolerance);
+
+  /* set maxbits to guard against prematurely overwriting the input */
+  zfp_stream_params(zfp, &minbits, &maxbits, &maxprec, &minexp);
+  maxbits = block_dim * sizeof(*buffer) * CHAR_BIT;
+  zfp_stream_set_params(zfp, minbits, maxbits, maxprec, minexp);
+
+  /* compress one block at a time in sequential order */
+  ptr = buffer;
+  for (i = 0; i < blocks; i++) {
+    offset[i] = stream_wtell(stream);
+    bits = zfp_encode_block_double_3(zfp, ptr);
+    if (!bits) {
+      fprintf(stderr, "compression failed\n");
+      return 0;
+    }
+    if(verbosity >= QUDA_DEBUG_VERBOSE && bits > 1) printf("block #%u offset=%4u size=%4u\n", i, (uint)offset[i], bits);
+    ptr += block_dim;
+  }
+  /* important: flush any buffered compressed bits */
+  stream_flush(stream);
+
+  /* print out size */
+  zfpsize = stream_size(stream);
+  if(verbosity >= QUDA_DEBUG_VERBOSE) printf("compressed %u bytes to %u bytes\n", (uint)bufsize, (uint)zfpsize);
+
+  /* decompress one block at a time in reverse order */
+  for (i = blocks; i--;) {
+    ptr -= block_dim;
+    stream_rseek(stream, offset[i]);
+    if (!zfp_decode_block_double_3(zfp, ptr)) {
+      fprintf(stderr, "decompression failed\n");
+      return 0;
+    }
+  }
+
+  /* clean up */
+  zfp_stream_close(zfp);
+  stream_close(stream);
+  free(offset);
+  
+  return (1.0*((uint)zfpsize))/(uint)bufsize;
+}
+
+double zfp_compress_decompress_link(void **gauge_in, void **gauge_out)
+{
+  double tolerance = su3_comp_tol;  
+  double* array;
+  double* buffer;
+
+  uint block_size = su3_comp_block_size;
+  uint block_dim = block_size * block_size * block_size * block_size;
+  uint bx = xdim / block_size;
+  uint by = ydim / block_size;
+  uint bz = zdim / block_size;
+  uint bt = tdim / block_size;
+  uint nx = block_size * bx;
+  uint ny = block_size * by;
+  uint nz = block_size * bz;
+  uint nt = block_size * bt;
+  uint n = nx * ny * nz * nt;
+  uint blocks = bx * by * bz * bt;
+  size_t x, y, z, t, block_idx, idx, parity;
+  size_t i, j, k, l, b;
+  double comp_ratio = 0.0;
+  
+  array = (double*)malloc(n * sizeof(double));
+  buffer = (double*)malloc(blocks * block_dim * sizeof(double));
+  
+  if(verbosity >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("blocks * block_dim = %u * %u = %u\n", blocks, block_dim, blocks * block_dim);
+    printfQuda("size of ntot = %u\n", n);
+    printfQuda("size of array = %lu\n", n * sizeof(double));
+    printfQuda("size of buffer = %lu\n", blocks * block_dim * sizeof(double));
+  }
+  
+  // Loop over dimensions and fundamental coeffs.
+  // For the purposes of testing, we loop over all 18 real
+  // coeffs of the hermitian matrix. In practise, we need
+  // only perform the compression on the upper triangular
+  // and real diagonal.
+  
+  for(int dim=0; dim<4; dim++) {
+    for(int elem = 0; elem < gauge_site_size; elem++) {
+      
+      // Initialize array to be compressed
+      idx = 0;
+      for (t = 0; t < nt; t++) {
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {
+	      parity = idx % 2;
+	      array[idx] = ((double *)gauge_in[dim])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem];
+	      idx++;
+	    }
+	  }
+	}
+      }
+      
+      // Reorganise array into NxNxN(xN) blocks   
+      idx = 0;
+      for (b = 0; b < blocks; b++) {
+	for (l = 0; l < block_size; l++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {
+		block_idx = (i + block_size * 
+			     (j + block_size * 
+			      (k + block_size * 
+			       (l + block_size * b))));
+		
+		buffer[block_idx] = array[idx];
+		idx++;
+	      }
+	    }
+	  }
+	}
+      }
+
+      // Apply 4D compression to links
+      comp_ratio += process4D(buffer, blocks, tolerance, block_size);
+      
+      if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", gauge_site_size * dim + elem, comp_ratio);
+      
+      // Reorganise blocks into array 
+      idx = 0;
+      for (b = 0; b < blocks; b++) {
+	for (l = 0; l < block_size; l++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {
+		block_idx = (i + block_size * 
+			     (j + block_size * 
+			      (k + block_size * 
+			       (l + block_size * b))));
+		
+		array[idx] = buffer[block_idx];
+		idx++;
+	      }
+	    }
+	  }
+	}
+      }
+      
+      // Replace gauge_in data with decompressed data
+      idx = 0;
+      for (t = 0; t < nt; t++) {
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {      
+	      parity = idx % 2;
+	      ((double *)gauge_out[dim])[Vh * gauge_site_size * parity + (idx/2) * gauge_site_size + elem] = array[idx];
+	      idx++;
+	    }
+	  }
+	}
+      }
+    }
+  }
+  return comp_ratio;
 }

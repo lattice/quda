@@ -299,6 +299,7 @@ extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern char latfile[256];
 extern bool unit_gauge;
+extern bool fund_gauge;
 extern double gaussian_sigma;
 extern char gauge_outfile[256];
 extern int Nsrc;
@@ -509,6 +510,11 @@ extern int prop_n_sources;
 extern QudaPrecision prop_save_prec;
 
 // SU(3) smearing options
+extern double su3_qr_tol;
+extern int su3_qr_maxiter;
+extern int su3_taylor_N;
+extern int su3_comp_block_size;
+extern double su3_comp_tol;
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;
 extern double ape_smear_rho;

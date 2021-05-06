@@ -1418,6 +1418,25 @@ extern "C" {
   void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
+     @brief Perform an eigendecomposition on the links and then create 
+     an hermitian matrix from which the fundamental representation
+     can be read, assuming Gell-Mann matricies tau. The compute
+     is performed on gaugePrecise and teh result is stored in 
+     gaugeFundamental.
+
+     The Algorithm
+     U = exp(iH) where H = sum_{i=1..N^2-1} \alpha_i \tau_i  
+     UV = lambdaV = exp(i sigma)V,
+     HV = sigmaV,
+     hence H = V S V^{\dag} | S = diag(sigma_1, sigma_2, ... , sigma_N) 
+     
+     @param[in] qr_tol The tolerance on the QR solver
+     @param[in] qr_max_iter The maximum number of iterations in the QR
+     @param[in] taylor_N The number of terms in the Taylor expansion of exp(iH) 
+  */
+  void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const int taylor_N);
+  
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */

@@ -35,6 +35,7 @@ set (QUDA_OBJS
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_fundamental.cu gauge_transform.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
@@ -526,6 +527,18 @@ if(QUDA_OPENBLAS)
     target_link_libraries(quda_cpp PUBLIC openblas)
   else()
     target_link_libraries(quda INTERFACE ${OPENBLAS})
+  endif()
+endif()
+
+
+if(QUDA_ZFP)
+  target_compile_definitions(quda PRIVATE ZFP_LIB)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_ZFP_HOME}/include>)
+  if(QUDA_DOWLOAD_ZFP)
+    target_link_libraries(quda PUBLIC zfp)
+    target_link_libraries(quda_cpp PUBLIC zfp)
+  else()
+    target_link_libraries(quda INTERFACE ${ZFP})
   endif()
 endif()
 
