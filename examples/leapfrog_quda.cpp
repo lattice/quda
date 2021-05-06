@@ -138,6 +138,7 @@ int main(int argc, char **argv)
   delete in;
   delete out;
   delete check;
+  delete rng;
   
   // Finalize the QUDA library
   endQuda();  
