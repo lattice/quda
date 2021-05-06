@@ -225,12 +225,12 @@ namespace quda {
 		fabs(u(parity,x_cb,s,c).imag() - v(parity,x_cb,s,c).imag());
 
 	      for (int f=0; f<fail_check; f++) {
-		if (diff > pow(10.0,-(f+1)/(double)tol)) {
+		if (diff > pow(10.0,-(f+1)/(double)tol) || std::isnan(diff)) {
 		  fail[f]++;
 		}
 	      }
 
-	      if (diff > 1e-3) iter[j]++;
+	      if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
 	    }
 	  }
 	}
