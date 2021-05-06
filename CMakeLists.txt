@@ -283,6 +283,7 @@ option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / Q
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_DOWNLOAD_ZFP "Download zfp software as requested by QUDA_ZFP" OFF)
+option(QUDA_CUDA_ZFP "Build ZFP with CUDA support" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
@@ -905,7 +906,7 @@ if(QUDA_ZFP)
       GIT_TAG 0.5.5
       GIT_SHALLOW YES
       PREFIX zfp
-      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=${QUDA_CUDA_ZFP} -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(ZFP INSTALL_DIR)
     set(QUDA_ZFP_HOME ${INSTALL_DIR})

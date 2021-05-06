@@ -17,7 +17,7 @@ check_language(CUDA)
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
-
+  
 # CUDA Wrapper for finding libs etc
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
