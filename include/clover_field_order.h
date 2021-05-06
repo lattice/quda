@@ -33,7 +33,7 @@ namespace quda {
   */
   template <typename Float, typename T>
     struct clover_wrapper {
-      T &field;
+      const T &field;
       const int x_cb;
       const int parity;
       const int chirality;
@@ -45,7 +45,7 @@ namespace quda {
 	 @param[in] parity Parity we are accessing
 	 @param[in] chirality Chirality we are accessing
       */
-      __device__ __host__ inline clover_wrapper<Float,T>(T &field, int x_cb, int parity, int chirality)
+      __device__ __host__ inline clover_wrapper<Float,T>(const T &field, int x_cb, int parity, int chirality)
 	: field(field), x_cb(x_cb), parity(parity), chirality(chirality) { }
 
       /**
@@ -53,7 +53,7 @@ namespace quda {
 	 @param[in] C ColorSpinor we want to store in this accessor
       */
       template<typename C>
-      __device__ __host__ inline void operator=(const C &a) {
+      __device__ __host__ inline void operator=(const C &a) const {
         field.save(a.data, x_cb, parity, chirality);
       }
     };
@@ -467,33 +467,33 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm suared of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
-	 * @return L1 norm
-	 */
-	__host__ double norm2(int =-1, bool global=true) const {
+         * @brief Returns the L2 norm squared of the field
+         * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
+         * @return L1 norm
+         */
+        __host__ double norm2(int =-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int =-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field
+         * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int =-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int =-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
@@ -550,7 +550,7 @@ namespace quda {
           norm_bytes(clover.NormBytes()),
           backup_h(nullptr),
           backup_norm_h(nullptr)
-	{
+        {
           if (clover.Order() != N) {
             errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           }
@@ -561,35 +561,19 @@ namespace quda {
 	bool Twisted() const { return twisted; }
 	real Mu2() const { return mu2; }
 
-	/**
-	   @brief This accessor routine returns a clover_wrapper to this object,
+        /**
+	   @brief This accessor routine returns a const clover_wrapper to this object,
 	   allowing us to overload various operators for manipulating at
 	   the site level interms of matrix operations.
 	   @param[in] x_cb Checkerboarded space-time index we are requesting
 	   @param[in] parity Parity we are requesting
 	   @param[in] chirality Chirality we are requesting
-	   @return Instance of a colorspinor_wrapper that curries in access to
+	   @return Instance of a clover_wrapper that curries in access to
 	   this field at the above coordinates.
 	*/
-        __device__ __host__ inline clover_wrapper<real, Accessor> operator()(int x_cb, int parity, int chirality)
+        __device__ __host__ inline auto operator()(int x_cb, int parity, int chirality) const
         {
           return clover_wrapper<real, Accessor>(*this, x_cb, parity, chirality);
-        }
-
-        /**
-	   @brief This accessor routine returns a const colorspinor_wrapper to this object,
-	   allowing us to overload various operators for manipulating at
-	   the site level interms of matrix operations.
-	   @param[in] x_cb Checkerboarded space-time index we are requesting
-	   @param[in] parity Parity we are requesting
-	   @param[in] chirality Chirality we are requesting
-	   @return Instance of a colorspinor_wrapper that curries in access to
-	   this field at the above coordinates.
-	*/
-        __device__ __host__ inline const clover_wrapper<real, Accessor> operator()(
-            int x_cb, int parity, int chirality) const
-        {
-          return clover_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity, chirality);
         }
 
         /**
@@ -622,7 +606,7 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void save(const real v[block], int x, int parity, int chirality)
+	__device__ __host__ inline void save(const real v[block], int x, int parity, int chirality) const
         {
           real tmp[block];
 
@@ -670,7 +654,7 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void save(const real v[length], int x, int parity) {
+	__device__ __host__ inline void save(const real v[length], int x, int parity) const {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
         }
@@ -744,7 +728,7 @@ namespace quda {
           for (int i=0; i<length; i++) v[i] = 0.5*v_[i];
 	}
   
-	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
           Float v_[length];
           for (int i=0; i<length; i++) v_[i] = 2.0*v[i];
           block_store<Float, length>(&clover[parity*offset + x*length], v_);
@@ -798,7 +782,7 @@ namespace quda {
 	  }
 	}
   
-	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
 	  // the factor of 2.0 comes from undoing the basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
@@ -878,7 +862,7 @@ namespace quda {
 	}
   
 	// FIXME implement the save routine for BQCD ordered fields
-	__device__ __host__ inline void save(RegType [length], int, int) { }
+	__device__ __host__ inline void save(RegType [length], int, int) const { }
 
 	size_t Bytes() const { return length*sizeof(Float); }
       };

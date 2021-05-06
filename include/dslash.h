@@ -3,11 +3,11 @@
 #include <typeinfo>
 
 #include <color_spinor_field.h>
-#include <tune_quda.h>
 #include <dslash_quda.h>
 #include <dslash_helper.cuh>
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <instantiate.h>
+#include <instantiate_dslash.h>
 
 namespace quda
 {
@@ -28,7 +28,7 @@ namespace quda
      defined in the same file is the corresponding argument class.
   */
   template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
-  class Dslash : public TunableVectorYZ
+  class Dslash : public TunableKernel3D
   {
 
   protected:
@@ -41,11 +41,11 @@ namespace quda
     char aux_base[TuneKey::aux_n - 32];
     char aux[8][TuneKey::aux_n];
     char aux_pack[TuneKey::aux_n];
+    char aux_barrier[TuneKey::aux_n];
 
     // pointers to ghost buffers we are packing to
-    void *packBuffer[2 * QUDA_MAX_DIM];
+    void *packBuffer[4 * QUDA_MAX_DIM];
 
-    std::string kernel_file;
     /**
        @brief Set the base strings used by the different dslash kernel
        types for autotuning.
@@ -77,8 +77,35 @@ namespace quda
       strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
     }
 
-    virtual bool tuneGridDim() const { return false; }
-    virtual unsigned int minThreads() const { return arg.threads; }
+    virtual bool tuneGridDim() const override { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
+    virtual unsigned int minThreads() const override { return arg.threads; }
+
+    virtual unsigned int minGridSize() const override
+    {
+      /* when using nvshmem we perform the exterior Dslash using a grid strided loop and uniquely assign communication
+       * directions to CUDA block and have all communication directions resident. We therefore figure out the number of
+       * communicating dimensions and make sure that the number of blocks is a multiple of the communicating directions (2*dim)
+       */
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
+      } else {
+        return TunableKernel3D::minGridSize();
+      }
+    }
+
+    virtual int gridStep() const override
+    {
+      /* see comment for minGridSize above for gridStep choice when using nvshmem */
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
+      } else {
+        return TunableKernel3D::gridStep();
+      }
+    }
 
     inline void setParam(TuneParam &tp)
     {
@@ -107,30 +134,66 @@ namespace quda
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
-        arg.setPack(true); // need to recompute for updated block_per_dir
-        arg.in.resetGhost(this->packBuffer);
+        arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
+        arg.in_pack.resetGhost(this->packBuffer);
         tp.grid.x += arg.pack_blocks;
+        arg.counter = dslash::get_shmem_sync_counter();
+      }
+      if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        // if we are doing tuning we should not wait on the sync_arr to be set.
+        arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
+      }
+      if (arg.shmem > 0 && arg.kernel_type == INTERIOR_KERNEL) {
+        arg.counter = activeTuning() ?
+          (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
+          dslash::get_shmem_sync_counter();
+        arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
+          (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) : 0;
+        tp.grid.x += arg.exterior_blocks;
       }
     }
 
-    virtual int tuningIter() const { return 10; }
+    virtual int tuningIter() const override { return 10; }
 
-    virtual int blockStep() const { return 16; }
-    virtual int blockMin() const { return 16; }
+    virtual int blockStep() const override { return 16; }
+    virtual int blockMin() const override { return 16; }
 
-    unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
+    unsigned int maxSharedBytesPerBlock() const override { return maxDynamicSharedBytesPerBlock(); }
 
-    virtual bool advanceAux(TuneParam &param) const
+    virtual bool advanceAux(TuneParam &param) const override
     {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
-        // if doing the fused kernel we tune how many blocks to use for
-        // communication
-        constexpr int max_blocks_per_dir = 4;
-        if (param.aux.x + 1 <= max_blocks_per_dir) {
+
+        int max_threads_per_dir = 0;
+        for (int i = 0; i < 4; ++i) {
+          max_threads_per_dir = std::max(max_threads_per_dir, (arg.threadDimMapUpper[i] - arg.threadDimMapLower[i]) / 2);
+        }
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+
+        /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
+        // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
+        const int max_blocks_per_dir = std::max(device::processor_count() / (8 * nDimComms), 4u);
+        if (param.aux.x + 1 <= max_blocks_per_dir
+            && (param.aux.x + 1) * param.block.x < (max_threads_per_dir + param.block.x - 1)) {
           param.aux.x++;
           return true;
         } else {
           param.aux.x = 1;
+          if (arg.exterior_dims > 0 && arg.shmem & 64) {
+            /* if doing a fused interior+exterior kernel we use aux.y to control the number of blocks we add for the
+             * exterior. We make sure to use multiple blocks per communication direction.
+             */
+            if (param.aux.y < 4) {
+              param.aux.y++;
+              return true;
+            } else {
+              param.aux.y = 1;
+              return false;
+            }
+          }
           return false;
         }
       } else {
@@ -138,16 +201,37 @@ namespace quda
       }
     }
 
-    virtual void initTuneParam(TuneParam &param) const
+    virtual bool advanceTuneParam(TuneParam &param) const override
     {
-      TunableVectorYZ::initTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      return advanceAux(param) || advanceSharedBytes(param) || advanceBlockDim(param) || advanceGridDim(param);
     }
 
-    virtual void defaultTuneParam(TuneParam &param) const
+    virtual void initTuneParam(TuneParam &param) const override
     {
-      TunableVectorYZ::defaultTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
+      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
+       * z components explicitly */
+      if (arg.shmem & 64) {
+        step_y = vector_length_y;
+        step_z = vector_length_z;
+      }
+      TunableKernel3D::initTuneParam(param);
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
+    }
+
+    virtual void defaultTuneParam(TuneParam &param) const override
+    {
+      /* for nvshmem uber kernels the current synchronization requires use to keep the y and z dimension local to the
+       * block. This can be removed when we introduce a finer grained synchronization which takes into account the y and
+       * z components explicitly. */
+      if (arg.shmem & 64) {
+        step_y = vector_length_y;
+        step_z = vector_length_z;
+      }
+      TunableKernel3D::defaultTuneParam(param);
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
+      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
     /**
@@ -160,35 +244,8 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
-      qudaLaunchKernel(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream, arg);
+      launch_device<dslash_functor>(tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
-
-#ifdef JITIFY
-    /**
-       @brief Return a jitify kernel instance
-    */
-    template <template <bool, QudaPCType, typename> class P> auto kernel_instance()
-    {
-      if (!program) errorQuda("Jitify program has not been created");
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      // Since we pass the operator and packer classes as strings to
-      // jitify, we need to handle the reflection for all other
-      // template parameters here as well as opposed to leaving this
-      // to jitify.
-      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect(arg.nParity), reflect(arg.dagger),
-                                                           reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
-
-      return instance;
-    }
-#endif
 
   public:
     /**
@@ -203,10 +260,6 @@ namespace quda
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
-#ifdef JITIFY
-        auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
-        Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
@@ -220,7 +273,6 @@ namespace quda
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
 #endif
         }
-#endif // JITIFY
       }
     }
 
@@ -233,15 +285,10 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
-      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
       if (arg.dagger)
         instantiate<P, nParity, true, xpay>(tp, stream);
       else
         instantiate<P, nParity, false, xpay>(tp, stream);
-#endif
     }
 
     /**
@@ -253,16 +300,11 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
-      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
       switch (arg.nParity) {
       case 1: instantiate<P, 1, xpay>(tp, stream); break;
       case 2: instantiate<P, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
-#endif
     }
 
     /**
@@ -274,21 +316,16 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P>
     inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
     {
-#ifdef JITIFY
-      auto error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream)).launch(arg);
-      Tunable::launch_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
       if (arg.xpay)
         instantiate<P, true>(tp, stream);
       else
         instantiate<P, false>(tp, stream);
-#endif
     }
 
     Arg &dslashParam; // temporary addition for policy compatibility
 
     Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      TunableVectorYZ(1, arg.nParity),
+      TunableKernel3D(in, 1, arg.nParity),
       arg(arg),
       out(out),
       in(in),
@@ -300,7 +337,6 @@ namespace quda
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
-
       // strcpy(aux, in.AuxString());
       fillAuxBase();
 #ifdef MULTI_GPU
@@ -315,20 +351,29 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
-      // extract the filename from the template template class (do
-      // this regardless of jitify to ensure a build error if filename
-      // helper isn't defined)
-      using D_ = D<0, false, false, INTERIOR_KERNEL, Arg>;
-      kernel_file = std::string("kernels/") + D_::filename();
-#ifdef JITIFY
-      create_jitify_program(kernel_file);
-#endif
+      strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
+      strcat(aux_barrier, ",shmem");
     }
+
+#ifdef NVSHMEM_COMMS
+    void setShmem(int shmem)
+    {
+      arg.shmem = shmem;
+      setUberTuning(arg.shmem & 64);
+    }
+#else
+    void setShmem(int)
+    {
+      setUberTuning(arg.shmem & 64);
+    }
+#endif
 
     void setPack(bool pack, MemoryLocation location)
     {
-      arg.setPack(pack);
-      if (!pack) return;
+      if (!pack) {
+        arg.setPack(pack, packBuffer);
+        return;
+      }
 
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
@@ -336,12 +381,23 @@ namespace quda
             packBuffer[2 * dim + dir] = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
+          } else if (location & Shmem) {
+            // we check whether we can directly pack into the in.remoteFace_d(dir, dim) buffer on the remote GPU
+            // pack directly into remote or local memory
+            packBuffer[2 * dim + dir] = in.remoteFace_d(dir, dim) ?
+              static_cast<char *>(in.remoteFace_d(dir, dim)) + in.GhostOffset(dim, 1 - dir) :
+              in.myFace_d(dir, dim);
+            // whether we need to shmem_putmem into the receiving buffer
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = in.remoteFace_d(dir, dim) ?
+              nullptr :
+              static_cast<char *>(in.remoteFace_r()) + in.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory
             packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
           }
         }
       }
 
+      arg.setPack(pack, packBuffer);
       // set the tuning string for the fused interior + packer kernel
       strcpy(aux_pack, aux[arg.kernel_type]);
       strcat(aux_pack, "");
@@ -353,6 +409,11 @@ namespace quda
       case Host | Remote: strcat(aux_pack, ",host-remote"); break;
       case Device: strcat(aux_pack, ",device-device"); break;
       case Host: strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
+      case Shmem:
+        strcat(aux_pack, arg.exterior_dims > 0 ? ",shmemuber" : ",shmem");
+        strcat(aux_pack, (arg.shmem & 1 && arg.shmem & 2) ? "3" : "1");
+        break;
+
       default: errorQuda("Unknown pack target location %d\n", location);
       }
     }
@@ -369,9 +430,11 @@ namespace quda
 
     void augmentAux(KernelType type, const char *extra) { strcat(aux[type], extra); }
 
-    virtual TuneKey tuneKey() const
+    virtual TuneKey tuneKey() const override
     {
-      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        aux_pack :
+        ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
       return TuneKey(in.VolString(), typeid(*this).name(), aux_);
     }
 
@@ -379,7 +442,7 @@ namespace quda
        @brief Save the output field since the output field is both
        read from and written to in the exterior kernels
      */
-    virtual void preTune()
+    virtual void preTune() override
     {
       if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.backup();
     }
@@ -387,7 +450,7 @@ namespace quda
     /**
        @brief Restore the output field if doing exterior kernel
      */
-    virtual void postTune()
+    virtual void postTune() override
     {
       if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore();
     }
@@ -408,7 +471,7 @@ namespace quda
 
       For Wilson this should give 1344 for Nc=3,Ns=2 and 1368 for the xpay equivalent
     */
-    virtual long long flops() const
+    virtual long long flops() const override
     {
       int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
@@ -459,7 +522,7 @@ namespace quda
       return flops_;
     }
 
-    virtual long long bytes() const
+    virtual long long bytes() const override
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
@@ -502,140 +565,5 @@ namespace quda
       return bytes_;
     }
   };
-
-  /**
-     @brief This instantiate function is used to instantiate the reconstruct types used
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-            typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (U.Reconstruct() == Recon::recon[0]) {
-#if QUDA_RECONSTRUCT & 4
-      Apply<Float, nColor, Recon::recon[0]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
-#endif
-    } else if (U.Reconstruct() == Recon::recon[1]) {
-#if QUDA_RECONSTRUCT & 2
-      Apply<Float, nColor, Recon::recon[1]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
-#endif
-    } else if (U.Reconstruct() == Recon::recon[2]) {
-#if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
-#else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
-#endif
-    } else {
-      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
-    }
-  }
-
-  /**
-     @brief This instantiate function is used to instantiate the colors
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (in.Ncolor() == 3) {
-      instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
-    }
-  }
-
-  /**
-     @brief This instantiate function is used to instantiate the precisions
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
-  {
-    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
-      instantiate<Apply, Recon, double>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      instantiate<Apply, Recon, float>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-
-  /**
-     @brief This instantiatePrecondtiioner function is used to
-     instantiate the precisions for a preconditioner.  This is the
-     same as the instantiate helper above, except it only handles half
-     and quarter precision.
-     @param[out] out Output result field
-     @param[in] in Input field
-     @param[in] U Gauge field
-     @param[in] args Additional arguments for different dslash kernels
-  */
-#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                        Args &&... args)
-  {
-    if (U.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      instantiate<Apply, Recon, short>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      instantiate<Apply, Recon, int8_t>(out, in, U, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-#else
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
-  {
-    if (U.Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-    } else {
-      errorQuda("Unsupported precision %d\n", U.Precision());
-    }
-  }
-#endif
 
 } // namespace quda

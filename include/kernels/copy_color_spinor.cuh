@@ -16,7 +16,7 @@ namespace quda {
   using namespace colorspinor;
 
   template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In, template <int, int> class Basis_>
-  struct CopyColorSpinorArg {
+  struct CopyColorSpinorArg : kernel_param<> {
     using Basis = Basis_<nSpin_, nColor_>;
     using realOut = typename mapper<FloatOut>::type;
     using realIn = typename mapper<FloatIn>::type;
@@ -26,14 +26,13 @@ namespace quda {
     const In in;
     const int outParity;
     const int inParity;
-    dim3 threads;
     CopyColorSpinorArg(ColorSpinorField &out, const ColorSpinorField &in,
                        FloatOut* Out_, FloatIn *In_, float *outNorm, float *inNorm) :
+      kernel_param(dim3(in.VolumeCB(), in.SiteSubset(), 1)),
       out(out, 1, Out_, outNorm),
       in(in, 1, In_, inNorm),
       outParity(out.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
-      inParity(in.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
-      threads(in.VolumeCB(), in.SiteSubset(), 1)
+      inParity(in.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0)
     { }
   };
 
@@ -115,8 +114,8 @@ namespace quda {
   };
 
   template <typename Arg> struct CopyColorSpinor_ {
-    Arg &arg;
-    constexpr CopyColorSpinor_(Arg &arg): arg(arg) {}
+    const Arg &arg;
+    constexpr CopyColorSpinor_(const Arg &arg): arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

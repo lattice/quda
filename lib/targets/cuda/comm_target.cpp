@@ -2,6 +2,7 @@
 #include <quda_api.h>
 #include <quda_cuda_api.h>
 #include <algorithm>
+#include <shmem_helper.cuh>
 
 #define CHECK_CUDA_ERROR(func)                                          \
   quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
@@ -64,17 +65,26 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 
   // open the remote memory handles and set the send ghost pointers
   for (int dim=0; dim<4; ++dim) {
+#ifndef NVSHMEM_COMMS
+    // TODO: We maybe can force loopback comms to use the IB path here
     if (comm_dim(dim)==1) continue;
+#endif
     // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-    for (int dir=0; dir<num_dir; ++dir) {
+    for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
-      if (comm_peer2peer_enabled(dir,dim)) CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+#ifndef NVSHMEM_COMMS
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
+      CHECK_CUDA_ERROR(cudaIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], cudaIpcMemLazyEnablePeerAccess));
+#else
+      remote[dim][dir] = nvshmem_ptr(static_cast<char *>(local), comm_neighbor_rank(dir, dim));
+#endif
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
 }
 
+#ifndef NVSHMEM_COMMS
 void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
 {
   for (int dim=0; dim<4; ++dim) {
@@ -92,7 +102,10 @@ void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
     }
   } // iterate over dim
 }
-  
+#else
+void comm_destroy_neighbor_memory(void *[QUDA_MAX_DIM][2]) { }
+#endif
+
 void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
 {
   // handles for obtained events

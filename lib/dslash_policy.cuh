@@ -25,7 +25,6 @@ namespace quda
     extern bool dslash_exterior_compute;
     extern bool dslash_comms;
     extern bool dslash_copy;
-
     static cudaColorSpinorField *inSpinor;
 
     /**
@@ -92,6 +91,7 @@ namespace quda
         prev = i;
       }
 
+      param.exterior_threads = param.threads;
       param.kernel_type = EXTERIOR_KERNEL_ALL;
     }
 
@@ -135,7 +135,8 @@ namespace quda
      @param[in] packIndex Stream index where the packing kernel will run
   */
   template <typename Dslash>
-  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex)
+  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location,
+                        int packIndex, int shmem = 0)
   {
     auto &arg = dslash.dslashParam;
     if ( (location & Device) & Host) errorQuda("MemoryLocation cannot be both Device and Host");
@@ -150,9 +151,11 @@ namespace quda
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
-        if ( (location & Remote) && comm_peer2peer_enabled(dir,dim) ) {
+        if ((location & Shmem)) {
+          pack_dest[2 * dim + dir] = Shmem; // pack to p2p remote
+        } else if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) {
           pack_dest[2*dim+dir] = Remote; // pack to p2p remote
-        } else if ( location & Host && !comm_peer2peer_enabled(dir,dim) ) {
+        } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) {
           pack_dest[2*dim+dir] = Host;   // pack to cpu memory
         } else {
           pack_dest[2*dim+dir] = Device; // pack to local gpu memory
@@ -160,9 +163,8 @@ namespace quda
       }
     }
     if (pack) {
-      PROFILE(if (dslash_pack_compute)
-                in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), device::get_stream(packIndex), pack_dest,
-                        location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c),
+      PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), device::get_stream(packIndex), pack_dest,
+                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c, shmem),
               profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
@@ -359,6 +361,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -449,7 +452,75 @@ namespace quda
     }
   };
 
-/**
+  /**
+     Generic shmem dslash
+      // shmem bitfield encodes
+      // 0 - no shmem
+      // 1 - pack P2P (merged in interior)
+      // 2 - pack IB (merged in interior)
+      // 3 - pack P2P + IB (merged in interior)
+      // 8 - barrier part I (packing) (merged in interior, only useful if packing) -- currently required
+      // 16 - barrier part II (spin exterior) (merged in exterior) -- currently required
+      // 32 - use packstream -- not used
+      // 64 - use uber kernel (merge exterior)
+  */
+  template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
+
+#ifdef NVSHMEM_COMMS
+    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+                    TimeProfile &profile)
+    {
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
+
+      auto &dslashParam = dslash.dslashParam;
+      setFusedParam(dslashParam, dslash, faceVolumeCB);
+
+      DslashCommsPattern pattern(dslashParam.commDim);
+      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.threads = volume;
+      dslash.setShmem(shmem);
+      dslashParam.setExteriorDims(shmem & 64);
+
+      // record start of the dslash
+      const int packIndex = device::get_default_stream_idx();
+      constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
+
+      if (!((shmem & 2) and (shmem & 1))) {
+        issuePack(*in, dslash, 1 - dslashParam.parity, location, packIndex, shmem);
+      }
+
+      dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
+
+      PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+      dslash.setPack(false, location); // disable fused kernel packing
+      if (aux_worker) aux_worker->apply(device::get_default_stream());
+
+      if (pattern.commDimTotal) {
+        setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
+        if (!(shmem & 64)) {
+          PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
+        }
+      }
+
+      dslash::inc_shmem_sync_counter();
+      in->bufferIndex = (1 - in->bufferIndex);
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+    }
+#else
+    void operator()(Dslash &, cudaColorSpinorField *, const int, const int *, TimeProfile &)
+    {
+      errorQuda("NVSHMEM Dslash policies not built.");
+    }
+#endif
+  };
+
+  template <typename Dslash> using DslashShmemUberPackIntra = DslashShmemGeneric<Dslash, 64 + 16 + 8 + 1>;
+  template <typename Dslash> using DslashShmemUberPackFull = DslashShmemGeneric<Dslash, 64 + 16 + 8 + 2 + 1>;
+  template <typename Dslash> using DslashShmemPackIntra = DslashShmemGeneric<Dslash, 16 + 8 + 1>;
+  template <typename Dslash> using DslashShmemPackFull = DslashShmemGeneric<Dslash, 16 + 8 + 2 + 1>;
+
+  /**
    Standard dslash parallelization with host staging for send and receive, and fused halo update kernel
  */
   template <typename Dslash> struct DslashFusedExterior : DslashPolicyImp<Dslash> {
@@ -463,6 +534,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -552,6 +624,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       issueRecv(*in, dslash, true); // Prepost receives
 
@@ -635,6 +708,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       issueRecv(*in, dslash, true); // Prepost receives
 
@@ -711,6 +785,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -794,6 +869,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -872,6 +948,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -974,6 +1051,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1069,6 +1147,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1160,6 +1239,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1245,6 +1325,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1336,6 +1417,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1423,6 +1505,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1514,6 +1597,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslash.setShmem(0);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], device::get_default_stream()), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1606,6 +1690,10 @@ namespace quda
     QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH,
     QUDA_DSLASH_FUSED_PACK,
     QUDA_DSLASH_FUSED_PACK_FUSED_HALO,
+    QUDA_SHMEM_UBER_PACKINTRA_DSLASH,
+    QUDA_SHMEM_UBER_PACKFULL_DSLASH,
+    QUDA_SHMEM_PACKINTRA_DSLASH,
+    QUDA_SHMEM_PACKFULL_DSLASH,
     QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
   };
 
@@ -1676,6 +1764,10 @@ namespace quda
       case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH: result = new DslashFusedZeroCopy<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK: result = new DslashFusedPack<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO: result = new DslashFusedPackFusedHalo<Dslash>; break;
+      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH: result = new DslashShmemUberPackIntra<Dslash>; break;
+      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH: result = new DslashShmemUberPackFull<Dslash>; break;
+      case QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH: result = new DslashShmemPackIntra<Dslash>; break;
+      case QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH: result = new DslashShmemPackFull<Dslash>; break;
       default: errorQuda("Dslash policy %d not recognized", static_cast<int>(dslashPolicy)); break;
       }
       return result; // default
@@ -1752,6 +1844,17 @@ namespace quda
               errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", static_cast<int>(dslash_policy));
             }
 
+            // check valid policy for nvshmem
+            if (dslash_policy == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH
+                || dslash_policy == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH
+                || dslash_policy == QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH
+                || dslash_policy == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH) {
+#ifndef NVSHMEM_COMMS
+              errorQuda("Cannot select a NVSHMEM policy %d when QUDA is not build with QUDA_NVSHMEM enabled.",
+                        static_cast<int>(dslash_policy));
+#endif
+            }
+
             enable_policy(static_cast<QudaDslashPolicy>(policy_));
             first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
             if (policy_list.peek() == ',') policy_list.ignore();
@@ -1785,8 +1888,13 @@ namespace quda
 
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK);
           enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO);
+          if (comm_nvshmem_enabled()) {
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH);
+            enable_policy(QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH);
+          }
         }
-
         // construct string specifying which policies have been enabled
         for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
           strcat(policy_string, (int)policies[i] == i ? "1" : "0");
@@ -1854,7 +1962,11 @@ namespace quda
                         || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
                         || i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK
-                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO)
+                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO
+                        || i == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH
+                        || i == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH
+                        || i == QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH
+                        || i == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH)
                        || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH)
                            && dslashParam.remote_write)) {
               // these dslash policies all must have kernel packing enabled
@@ -1931,6 +2043,9 @@ namespace quda
          || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
          || p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
          || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO
+         || p == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH
+         || p == QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH || p == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH
+         || p == QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH
          || dslashParam.remote_write // always use kernel packing if remote writing
      ) {
        setKernelPackT(true);
@@ -1947,7 +2062,7 @@ namespace quda
      popKernelPackT();
    }
 
-   int tuningIter() const { return 10; }
+   int tuningIter() const { return 20; }
 
    // Find the best dslash policy
    bool advanceAux(TuneParam &param) const
@@ -2012,7 +2127,11 @@ namespace quda
 
    void preTune() { dslash.preTune(); }
 
-   void postTune() { dslash.postTune(); }
+   void postTune()
+   {
+     saveTuneCache();
+     dslash.postTune();
+   }
   };
 
   } // namespace dslash

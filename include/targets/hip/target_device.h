@@ -5,7 +5,6 @@
 
 namespace quda {
 
-  // Target device merge
   namespace target {
 
   // hip-clang: compile-time dispatch
@@ -50,6 +49,18 @@ namespace quda {
      whereas on the host this returns (1, 1, 1).
   */
   __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+
+   template <bool is_device> struct grid_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef __HIP__
+    template <> struct grid_dim_impl<true> { __device__ dim3 operator()() { return dim3(gridDim.x, gridDim.y, gridDim.z); } };
+#endif
+
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    __device__ __host__ inline dim3 grid_dim() { return dispatch<grid_dim_impl>(); }
 
 
   template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
@@ -158,7 +169,11 @@ namespace quda {
        argument.  Otherwise the parameter struct is explicitly copied
        to the device prior to kernel launch.
     */
-    template <typename Arg> constexpr bool use_kernel_arg() { return sizeof(Arg) <= device::max_kernel_arg_size(); }
+    template <typename Arg> constexpr bool use_kernel_arg() 
+    { 
+    	return sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg;
+   	}
+    	
 
     /**
        @brief Helper function that returns kernel argument from
@@ -167,7 +182,7 @@ namespace quda {
        translation units where constant memory is not used.
      */
     template <typename Arg>
-      constexpr std::enable_if_t<use_kernel_arg<Arg>(), Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
 
     /**
        @brief Helper function that returns a pointer to the

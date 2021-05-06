@@ -76,7 +76,7 @@ namespace quda
           break;
         default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
         }
-      } else {
+      } else if (arg.dir == QUDA_FORWARDS) {
         switch (arg.dim) {
         case 0:
           launch_compute_uv_kernel<from_coarse, 0, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads,
@@ -96,6 +96,11 @@ namespace quda
           break;
         default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
         }
+      } else if (arg.dir == QUDA_IN_PLACE) {
+        launch_compute_uv_kernel<from_coarse, 0, QUDA_IN_PLACE, bM, bN, bK, block_y, block_z>(tp, arg, min_threads,
+                                                                                              stream);
+      } else {
+        errorQuda("arg.dir(=%d) is not supported", arg.dir);
       }
     }
 
@@ -373,7 +378,7 @@ namespace quda
           break;
         default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
         }
-      } else {
+      } else if (arg.dir == QUDA_FORWARDS) {
         switch (arg.dim) {
         case 0:
           launch_compute_vuv_kernel<from_coarse, 0, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads,
@@ -393,7 +398,13 @@ namespace quda
           break;
         default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
         }
+      } else if (arg.dir == QUDA_IN_PLACE) {
+        launch_compute_vuv_kernel<from_coarse, 0, QUDA_IN_PLACE, bM, bN, bK, block_y, block_z>(tp, arg, min_threads,
+                                                                                               stream);
+      } else {
+        errorQuda("arg.dir(=%d) is not supported", arg.dir);
       }
+
     }
 
     template <bool from_coarse, bool query_max = false, class Arg>

@@ -36,6 +36,7 @@ namespace quda
 
     F out;      /** output vector field */
     const F in; /** input vector field */
+    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const F x;  /** input vector when doing xpay */
     const GU U; /** the gauge field */
     const GL L; /** the long gauge field */
@@ -54,6 +55,7 @@ namespace quda
                              comm_override),
       out(out),
       in(in, improved_ ? 3 : 1),
+      in_pack(in, improved_ ? 3 : 1),
       x(x),
       U(U),
       L(L),
@@ -83,7 +85,7 @@ namespace quda
      @param[in] x_cb The checkerboarded site index
   */
   template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord & coord, int parity,
+  __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord & coord, int parity,
                                                  int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
@@ -170,37 +172,38 @@ namespace quda
   template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
-    Arg &arg;
-    constexpr staggered(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr staggered(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    template <KernelType mykernel_type = kernel_type>
+    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, 1>;
 
       bool active
-        = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      auto coord = arg.improved ? getCoords<QUDA_4D_PC, kernel_type, Arg, 3>(arg, idx, s, parity, thread_dim) :
-        getCoords<QUDA_4D_PC, kernel_type, Arg, 1>(arg, idx, s, parity, thread_dim);
+      auto coord = arg.improved ? getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim) :
+                                  getCoords<QUDA_4D_PC, mykernel_type, Arg, 1>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
-      applyStaggered<nParity, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyStaggered<nParity, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       out *= arg.dagger_scale;
 
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * x - out;
-      } else if (kernel_type != INTERIOR_KERNEL) {
+      } else if (mykernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? -out : out);
       }
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

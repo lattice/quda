@@ -131,7 +131,11 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
+#if (QUDA_PRECISION & 8) || (QUDA_PRECISION & 4)
   constexpr void instantiate(G &U, Args &&... args)
+#else
+  constexpr void instantiate(G &U, Args &&...)
+#endif
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -192,8 +196,7 @@ namespace quda
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int> class Apply, typename store_t, typename F,
-            typename... Args>
+  template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
   constexpr void instantiate(F &field, Args &&... args)
   {
     if (field.Ncolor() == 3) {
@@ -253,7 +256,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecision(F &field, Args &&...args)
+  constexpr void instantiatePrecision(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -298,7 +301,7 @@ namespace quda
      computation at hand
   */
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
-  constexpr void instantiatePrecision2(F &field, Args &&...args)
+  constexpr void instantiatePrecision2(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -334,7 +337,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecisionMG(F &field, Args &&...args)
+  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
