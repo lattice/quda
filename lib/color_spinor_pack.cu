@@ -67,7 +67,7 @@ namespace quda {
   public:
     PackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
               int nFace, int dagger, MemoryLocation *destination) :
-      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), a.SiteSubset()),
+      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), 2 * a.SiteSubset()), // factor of 2 is dimension
       ghost(ghost),
       a(a),
       parity(parity),
@@ -114,7 +114,6 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      tp.grid.z *= 2; // add direction
       if (a.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (a.Ndim() == 5) launch_host<GhostPacker>(tp, stream, Arg<5>(a, ghost, parity, nFace, dagger));
         else               launch_host<GhostPacker>(tp, stream, Arg<4>(a, ghost, parity, nFace, dagger));
