@@ -145,10 +145,7 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       // array of 4-d fields
-      auto deleter = [](char *ptr) {
-        std::cout << "Call free\n";
-        host_free(ptr);
-      };
+      auto deleter = [](char *ptr) { host_free(ptr); };
       // if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       //   int Ls = x[nDim - 1];
       //   v = (void **)safe_malloc(Ls * sizeof(void *));

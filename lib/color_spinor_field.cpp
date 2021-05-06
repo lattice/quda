@@ -917,6 +917,18 @@ namespace quda {
     return fine;
   }
 
+
+    // we cannot support all cases here, probably does not make sense to use that for
+    ColorSpinorFieldVectorU::ColorSpinorFieldVectorU(const ColorSpinorParam &param, const size_t size){
+      for(size_t i=0; i < size; i++)
+        this->emplace_back(ColorSpinorField::CreateUnique(param));
+    }
+
+    ColorSpinorFieldVectorU::ColorSpinorFieldVectorU(const ColorSpinorFieldVector & src, const ColorSpinorParam &param){
+       for(auto x: src)
+        this->emplace_back(ColorSpinorField::CreateUnique(*x, param));
+    }
+
   std::ostream &operator<<(std::ostream &out, const ColorSpinorField &a)
   {
     out << "typedid = " << typeid(a).name() << std::endl;

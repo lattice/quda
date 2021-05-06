@@ -1024,6 +1024,7 @@ namespace quda {
 
   // this is the interface used by multi-blas.
   // this is non-owning ...
+  // as this should never be used to create field it is sufficient to be able to add pointers to the underlying vector
   using ColorSpinorFieldVector = std::vector<ColorSpinorField *>;
 
   // this is owning
@@ -1038,11 +1039,13 @@ namespace quda {
       for (auto &x : *this) res.emplace_back(x.get());
       return res;
     }
-    // call case class constructor
+    // call base class constructor
     ColorSpinorFieldVectorU() : std::vector<std::unique_ptr<ColorSpinorField>>() {};
 
     // we cannot support all cases here, probably does not make sense to use that for
-    ColorSpinorFieldVectorU(ColorSpinorParam param, size_t size);
+    ColorSpinorFieldVectorU(const ColorSpinorParam &param, const size_t size);
+
+    ColorSpinorFieldVectorU(const ColorSpinorFieldVector & src, const ColorSpinorParam &param);
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
