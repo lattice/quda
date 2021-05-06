@@ -76,7 +76,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -106,8 +105,6 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
-  int X[4] = {xdim, ydim, zdim, tdim};
-
   QudaInvertParam inv_param = newQudaInvertParam();
   setContractInvertParam(inv_param);
   inv_param.cpu_prec = test_prec;

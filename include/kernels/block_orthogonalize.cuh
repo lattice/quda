@@ -6,6 +6,7 @@
 
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
+#include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduction_kernel.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
@@ -27,10 +28,11 @@ namespace quda {
   /**
       Kernel argument struct
   */
-  template <typename vFloat, typename Rotator, typename Vector, int fineSpin_, int nColor_, int coarseSpin_, int nVec_>
-  struct BlockOrthoArg {
+  template <bool is_device_, typename vFloat, typename Rotator, typename Vector, int fineSpin_, int nColor_, int coarseSpin_, int nVec_>
+  struct BlockOrthoArg : kernel_param<> {
     using sum_t = double;
     using real = typename mapper<vFloat>::type;
+    static constexpr bool is_device = is_device_;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int nColor = nColor_;
     static constexpr int coarseSpin = coarseSpin_;
@@ -55,11 +57,11 @@ namespace quda {
     static constexpr bool launch_bounds = true;
     dim3 grid_dim;
     dim3 block_dim;
-    dim3 threads;
 
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
                   const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
+      kernel_param(dim3(meta.VolumeCB() * (fineSpin > 1 ? meta.SiteSubset() : 1), chiral_blocks, 1)),
       V(V),
       fine_to_coarse(fine_to_coarse),
       coarse_to_fine(coarse_to_fine),
@@ -70,8 +72,7 @@ namespace quda {
       fineVolumeCB(meta.VolumeCB()),
       B{*B...},
       grid_dim(),
-      block_dim(),
-      threads(fineVolumeCB * (fineSpin > 1 ? nParity : 1), chiral_blocks, 1)
+      block_dim()
     {
       int aggregate_size = 1;
       for (int d = 0; d < V.Ndim(); d++) aggregate_size *= geo_bs[d];
@@ -82,16 +83,16 @@ namespace quda {
   };
 
   template <int block_size, typename Arg> struct BlockOrtho_ {
-    Arg &arg;
+    const Arg &arg;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;
 
     // on the device we rely on thread parallelism, where as on the host we assign a vector of block_size to each thread
-    static constexpr int n_sites_per_thread = device::is_device() ? 1 : block_size;
+    static constexpr int n_sites_per_thread = Arg::is_device ? 1 : block_size;
 
     // on the device we expect number of active threads equal to block_size, and on the host just a single thread
-    static constexpr int n_threads_per_block = device::is_device() ? block_size : 1;
+    static constexpr int n_threads_per_block = Arg::is_device ? block_size : 1;
 
     static_assert(n_sites_per_thread * n_threads_per_block == block_size,
                   "Product of n_sites_per_thread and n_threads_per_block must equal block_size");
@@ -104,7 +105,7 @@ namespace quda {
     using dot_t = vector_type<complex<sum_t>, mVec>;
     using real = typename Arg::real;
 
-    constexpr BlockOrtho_(Arg &arg) : arg(arg) {}
+    constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void load(ColorSpinor<real, nColor, spinBlock> &v, int parity, int x_cb, int chirality, int i)

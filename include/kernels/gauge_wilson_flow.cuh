@@ -16,7 +16,7 @@ namespace quda
 
   template <typename Float, int nColor_, QudaReconstructType recon_, int wflow_dim_,
             QudaWFlowType wflow_type_, WFlowStepType step_type_>
-  struct GaugeWFlowArg {
+  struct GaugeWFlowArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -37,16 +37,15 @@ namespace quda
     const real epsilon;
     const real coeff1x1;
     const real coeff2x1;
-    dim3 threads; // number of active threads required
 
     GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const real epsilon) :
+      kernel_param(dim3(in.LocalVolumeCB(), 2, wflow_dim)),
       out(out),
       temp(temp),
       in(in),
       epsilon(epsilon),
       coeff1x1(5.0/3.0),
-      coeff2x1(-1.0/12.0),
-      threads(in.LocalVolumeCB(), 2, wflow_dim)
+      coeff2x1(-1.0/12.0)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -57,7 +56,7 @@ namespace quda
   };
 
   template <typename Arg>
-  __host__ __device__ inline auto computeStaple(Arg &arg, const int *x, int parity, int dir)
+  __host__ __device__ inline auto computeStaple(const Arg &arg, const int *x, int parity, int dir)
   {
     using real = typename Arg::real;
     using Link = Matrix<complex<real>, Arg::nColor>;
@@ -81,28 +80,28 @@ namespace quda
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeW1Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW1Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z0
     Link Z0 = computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z0 *= conj(U);
     arg.temp(dir, x_cb, parity) = Z0;
-    Z0 *= (1.0 / 4.0) * arg.epsilon;
+    Z0 *= static_cast<typename Arg::real>(1.0 / 4.0) * arg.epsilon;
     return Z0;
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeW2Step(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeW2Step(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z1
-    Link Z1 = (8.0/9.0) * computeStaple(arg, x, parity, dir);
+    Link Z1 = static_cast<typename Arg::real>(8.0 / 9.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z1 *= conj(U);
 
     // Retrieve Z0, (8/9 Z1 - 17/36 Z0) stored in temp
     Link Z0 = arg.temp(dir, x_cb, parity);
-    Z0 *= (17.0 / 36.0);
+    Z0 *= static_cast<typename Arg::real>(17.0 / 36.0);
     Z1 = Z1 - Z0;
     arg.temp(dir, x_cb, parity) = Z1;
     Z1 *= arg.epsilon;
@@ -110,10 +109,10 @@ namespace quda
   }
 
   template <typename Link, typename Arg>
-  __host__ __device__ inline auto computeVtStep(Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
+  __host__ __device__ inline auto computeVtStep(const Arg &arg, Link &U, const int *x, const int parity, const int x_cb, const int dir)
   {
     // Compute staples and Z2
-    Link Z2 = (3.0/4.0) * computeStaple(arg, x, parity, dir);
+    Link Z2 = static_cast<typename Arg::real>(3.0/4.0) * computeStaple(arg, x, parity, dir);
     U = arg.in(dir, linkIndex(x, arg.E), parity);
     Z2 *= conj(U);
 
@@ -127,8 +126,8 @@ namespace quda
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   template <typename Arg> struct WFlow
   {
-    Arg &arg;
-    constexpr WFlow(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr WFlow(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int dir)

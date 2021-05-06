@@ -1,18 +1,6 @@
 #pragma once
 
-#include <target_device.h>
-
 namespace quda {
-
-  struct constant_param_t {
-    static constexpr size_t max_size = device::max_constant_param_size();
-    size_t bytes;
-    alignas(16) char host[max_size];
-    void *device_ptr;
-    char device_name[128];
-  };
-
-  static std::vector<constant_param_t> dummy_param;
 
   struct kernel_t {
     const void *func;
@@ -21,6 +9,18 @@ namespace quda {
     kernel_t(const void *func, const char *name) :
       func(func),
       name(name) {}
+  };
+
+  template <bool use_kernel_arg_ = true>
+  struct kernel_param {
+    static constexpr bool use_kernel_arg = use_kernel_arg_;
+    dim3 threads; /** number of active threads required */
+
+    constexpr kernel_param() = default;
+
+    constexpr kernel_param(dim3 threads) :
+      threads(threads)
+    { }
   };
 
 #ifdef JITIFY

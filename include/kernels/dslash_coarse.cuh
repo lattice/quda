@@ -18,7 +18,7 @@ namespace quda {
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  struct DslashCoarseArg {
+  struct DslashCoarseArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
@@ -48,10 +48,10 @@ namespace quda {
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
-    dim3 threads;
 
     inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                            const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread()))),
       out(const_cast<ColorSpinorField &>(out)),
       inA(const_cast<ColorSpinorField &>(inA)),
       inB(const_cast<ColorSpinorField &>(inB)),
@@ -64,8 +64,7 @@ namespace quda {
       X0h(((3 - nParity) * out.X(0)) / 2),
       dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out.VolumeCB() / dim[4]),
-      threads(color_stride * X.VolumeCB(), nParity, 2 * dim_stride * 2 * (nColor / colors_per_thread()))
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {  }
   };
 
@@ -108,7 +107,7 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   template <int Mc, int thread_dir, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
+  __device__ __host__ inline void applyDslash(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -116,9 +115,9 @@ namespace quda {
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
 
-    SharedMemoryCache<V> cache(device::block_dim());
+    SharedMemoryCache<V> cache(target::block_dim());
 
-    if (!thread_dir || device::is_host()) {
+    if (!thread_dir || target::is_host()) {
 
       //Forward gather - compute fwd offset for spinor fetch
 #pragma unroll
@@ -173,10 +172,10 @@ namespace quda {
       } // nDim
 
       // only need to write to shared memory if not master thread
-      if (device::is_device() && thread_dim > 0) cache.save(out);
+      if (target::is_device() && thread_dim > 0) cache.save(out);
     }
 
-    if (thread_dir || device::is_host()) {
+    if (thread_dir || target::is_host()) {
 
       //Backward gather - compute back offset for spinor and gauge fetch
 #pragma unroll
@@ -227,30 +226,30 @@ namespace quda {
 
       } //nDim
 
-      if (device::is_device()) cache.save(out);
+      if (target::is_device()) cache.save(out);
     } // forwards / backwards thread split
 
-    if (device::is_device()) cache.sync(); // device path has to recombine the foward and backward results
+    if (target::is_device()) cache.sync(); // device path has to recombine the foward and backward results
 
     // (colorspin * dim_stride + dim * 2 + dir)
-    if (device::is_device() && thread_dim == 0 && thread_dir == 0) {
+    if (target::is_device() && thread_dim == 0 && thread_dir == 0) {
 
       // full split over dimension and direction
 #pragma unroll
       for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward fathers (if any)
 	// 4-way 1,2,3  (stride = 4)
 	// 2-way 1      (stride = 2)
-        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
+        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
       }
 
 #pragma unroll
       for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
-        out += cache.load_z((device::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
+        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
       }
 
       out *= -arg.kappa;
 
-    } else if (device::is_host()) {
+    } else if (target::is_host()) {
 
       out *= -arg.kappa;
 
@@ -268,7 +267,7 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   template <int Mc, typename V, typename Arg>
-  __device__ __host__ inline void applyClover(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
+  __device__ __host__ inline void applyClover(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
@@ -296,7 +295,7 @@ namespace quda {
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template <int Mc, int dir, int dim, typename Arg>
-  __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
+  __device__ __host__ inline void coarseDslash(const Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
   {
     constexpr int src_idx = 0;
     vector_type<complex <typename Arg::real>, Mc> out;
@@ -323,22 +322,21 @@ namespace quda {
   }
 
   template <typename Arg> struct CoarseDslash {
-    Arg &arg;
-    constexpr CoarseDslash(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
     {
-      using namespace device;
       int x_cb = x_cb_color_offset;
       int color_offset = 0;
 
-      if (is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
-        const int lane_id = thread_idx().x % warp_size();
-        const int warp_id = thread_idx().x / warp_size();
-        const int vector_site_width = warp_size() / Arg::color_stride; // number of sites per warp
+      if (target::is_device() && Arg::color_stride > 1) { // on the device we support warp fission of the inner product
+        const int lane_id = target::thread_idx().x % device::warp_size();
+        const int warp_id = target::thread_idx().x / device::warp_size();
+        const int vector_site_width = device::warp_size() / Arg::color_stride; // number of sites per warp
 
-        x_cb = block_idx().x * (block_dim().x / Arg::color_stride) + warp_id * (warp_size() / Arg::color_stride) + lane_id % vector_site_width;
+        x_cb = target::block_idx().x * (target::block_dim().x / Arg::color_stride) + warp_id * (device::warp_size() / Arg::color_stride) + lane_id % vector_site_width;
         color_offset = lane_id / vector_site_width;
       }
 

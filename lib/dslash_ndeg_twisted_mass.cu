@@ -23,7 +23,7 @@ namespace quda
   public:
     NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableVectorYZ::resizeVector(2, arg.nParity);
+      TunableKernel3D::resizeVector(2, arg.nParity);
     }
 
     void apply(const qudaStream_t &stream)
@@ -41,6 +41,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;

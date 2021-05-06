@@ -40,8 +40,8 @@ namespace quda
       Dslash(arg, out, in),
       shared(arg.asymmetric || !arg.dagger)
     {
-      TunableVectorYZ::resizeVector(2, arg.nParity);
-      if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
+      TunableKernel3D::resizeVector(2, arg.nParity);
+      if (shared) TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
 
     void apply(const qudaStream_t &stream)
@@ -82,6 +82,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;

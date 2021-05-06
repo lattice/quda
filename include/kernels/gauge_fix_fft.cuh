@@ -23,16 +23,15 @@ namespace quda {
 #endif
 
   template <typename Float, int dir_>
-  struct GaugeFixFFTRotateArg {
+  struct GaugeFixFFTRotateArg : kernel_param<> {
     static constexpr int dir = dir_;
     int_fastdiv X[4];     // grid dimensions
     complex<Float> *tmp0;
     complex<Float> *tmp1;
-    dim3 threads;  // number of active threads required
     GaugeFixFFTRotateArg(const GaugeField &data, complex<Float> *tmp0, complex<Float> *tmp1) :
+      kernel_param(dim3(data.Volume(), 1, 1)),
       tmp0(tmp0),
-      tmp1(tmp1),
-      threads(data.Volume(), 1, 1)
+      tmp1(tmp1)
     {
       for (int d = 0; d < 4; d++) X[d] = data.X()[d];
     }
@@ -40,8 +39,8 @@ namespace quda {
 
   template <typename Arg> struct FFTrotate
   {
-    Arg &arg;
-    constexpr FFTrotate(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr FFTrotate(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int id)
@@ -71,7 +70,7 @@ namespace quda {
   };
 
   template <typename store_t, QudaReconstructType recon>
-  struct GaugeFixArg {
+  struct GaugeFixArg : kernel_param<> {
     using Float = typename mapper<store_t>::type;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
     static constexpr int elems = recon / 2;
@@ -82,13 +81,12 @@ namespace quda {
     complex<Float> *gx;
     Float alpha;
     int volume;
-    dim3 threads;     // number of active threads required
 
     GaugeFixArg(GaugeField &data, double alpha) :
+      kernel_param(dim3(data.VolumeCB(), 2, 1)),
       data(data),
       alpha(static_cast<Float>(alpha)),
-      volume(data.Volume()),
-      threads(data.VolumeCB(), 2, 1)
+      volume(data.Volume())
     {
       for (int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       invpsq = (Float*)device_malloc(sizeof(Float) * volume);
@@ -110,8 +108,8 @@ namespace quda {
 
   template <typename Arg> struct set_invpsq
   {
-    Arg &arg;
-    constexpr set_invpsq(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr set_invpsq(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -137,8 +135,8 @@ namespace quda {
 
   template <typename Arg> struct mult_norm_2d
   {
-    Arg &arg;
-    constexpr mult_norm_2d(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr mult_norm_2d(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
     __device__ __host__ inline void operator()(int x_cb, int parity)
     {
@@ -151,7 +149,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityFFTArg : public ReduceArg<double2> {
+  struct GaugeFixQualityFFTArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -160,31 +159,30 @@ namespace quda {
     int_fastdiv X[4];     // grid dimensions
     Gauge data;
     complex<real> *delta;
-    double2 result;
+    reduce_t result;
     int volume;
-    dim3 threads;     // number of active threads required
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
-      ReduceArg<double2>(1, true), // reset = true
+      ReduceArg<reduce_t>(1, true), // reset = true
       data(data),
       delta(delta),
-      volume(data.Volume()),
-      threads(data.VolumeCB(), 2, 1)
+      volume(data.Volume())
     {
+      this->threads = dim3(data.VolumeCB(), 2, 1);
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ double2 init() const { return zero<double2>(); }
-    double getAction() { return result.x; }
-    double getTheta() { return result.y; }
+    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    double getAction() { return result[0]; }
+    double getTheta() { return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityFFT : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct FixQualityFFT : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
+    const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr FixQualityFFT(Arg &arg) : arg(arg) {}
+    constexpr FixQualityFFT(const Arg &arg) : arg(arg) {}
 
     /**
      * @brief Measure gauge fixing quality
@@ -203,7 +201,7 @@ namespace quda {
         delta -= U;
       }
       //18*gauge_dir
-      data.x = -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
+      data[0] = -delta(0, 0).real() - delta(1, 1).real() - delta(2, 2).real();
       //2
       for (int mu = 0; mu < Arg::gauge_dir; mu++) {
         matrix U = arg.data(mu, linkIndexM1(x, arg.X, mu), 1 - parity);
@@ -225,7 +223,7 @@ namespace quda {
       arg.delta[idx + 5 * arg.volume] = delta(2,2);
 
       //12
-      data.y = getRealTraceUVdagger(delta, delta);
+      data[1] = getRealTraceUVdagger(delta, delta);
 
       //35
       //T=36*gauge_dir+65
@@ -274,8 +272,8 @@ namespace quda {
   }
 
   template <typename Arg> struct U_EO_NEW {
-    Arg &arg;
-    constexpr U_EO_NEW(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr U_EO_NEW(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -340,8 +338,8 @@ namespace quda {
   };
 
   template <typename Arg> struct GX {
-    Arg &arg;
-    constexpr GX(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GX(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -383,8 +381,8 @@ namespace quda {
   };
 
   template <typename Arg> struct U_EO {
-    Arg &arg;
-    constexpr U_EO(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr U_EO(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

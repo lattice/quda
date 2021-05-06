@@ -184,8 +184,8 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityOVR>(arg.result, tp, stream, arg);
       if (!activeTuning()) {
-        arg.result.x /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result.y /= (double)(3 * 2 * arg.threads.x * comm_size());
+        arg.result[0] /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+        arg.result[1] /= (double)(3 * 2 * arg.threads.x * comm_size());
       }
     }
 

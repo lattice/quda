@@ -5,7 +5,7 @@
 namespace quda {
 
   template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __global__ void Reduction2D(Arg arg)
+  __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
@@ -25,7 +25,20 @@ namespace quda {
   }
 
   template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __global__ void MultiReduction(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
+  {
+    Reduction2D_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg);
+  }
+
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+  {
+    Reduction2D_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
+  }
+
+
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
@@ -45,6 +58,18 @@ namespace quda {
 
     // perform final inter-block reduction and write out result
     reduce<block_size_x, block_size_y>(arg, t, value, j);
+  }
+
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
+  {
+    MultiReduction_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg);
+  }
+
+  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+  {
+    MultiReduction_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
   }
 
 }

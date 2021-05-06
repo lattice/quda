@@ -8,21 +8,21 @@
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<double2> {
+  struct GaugePlaqArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    dim3 threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
     int border[4];
     Gauge U;
 
     GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<double2>(),
+      ReduceArg<reduce_t>(),
       U(U_)
     {
       int R = 0;
@@ -32,14 +32,14 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads.x = X[0]*X[1]*X[2]*X[3]/2;
+      this->threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
-    __device__ __host__ double2 init() const { return zero<double2>(); }
+    __device__ __host__ reduce_t init() const { return reduce_t(); }
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>,3>;
 
@@ -56,17 +56,17 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template <typename Arg> struct Plaquette : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using plus<reduce_t>::operator();
-    Arg &arg;
-    constexpr Plaquette(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Plaquette(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     // return the plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaq = zero<reduce_t>();
+      reduce_t plaq;
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
@@ -77,10 +77,10 @@ namespace quda {
       for (int mu = 0; mu < 3; mu++) {
 #pragma unroll
         for (int nu = 0; nu < 3; nu++) {
-          if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
+          if (nu >= mu + 1) plaq[0] += plaquette(arg, x, parity, mu, nu);
         }
 
-        plaq.y += plaquette(arg, x, parity, mu, 3);
+        plaq[1] += plaquette(arg, x, parity, mu, 3);
       }
 
       return plus::operator()(plaq, value);

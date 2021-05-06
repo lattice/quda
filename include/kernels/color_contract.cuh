@@ -2,6 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <fast_intdiv.h>
 #include <quda_matrix.h>
 #include <matrix_field.h>
 #include <kernel.h>
@@ -9,7 +10,7 @@
 
 namespace quda {
   
-  template <typename Float, int nColor_> struct ColorContractArg 
+  template <typename Float, int nColor_> struct ColorContractArg : kernel_param<> 
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
@@ -24,14 +25,13 @@ namespace quda {
     F y;
     complex<Float> *s;
 
-    dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
     ColorContractArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *s) :
+      kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),
-      s(s),
-      threads(x.VolumeCB())
+      s(s)
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -41,8 +41,8 @@ namespace quda {
 
 
   template <typename Arg> struct ColorContraction {
-    Arg &arg;
-    constexpr ColorContraction(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorContraction(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -62,7 +62,7 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor_> struct ColorCrossArg 
+  template <typename Float, int nColor_> struct ColorCrossArg : kernel_param<>
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
@@ -77,14 +77,13 @@ namespace quda {
     F y;
     F result;
 
-    dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
     ColorCrossArg(const ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &result) :
+      kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),
-      result(result),
-      threads(x.VolumeCB())
+      result(result)
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -93,8 +92,8 @@ namespace quda {
   };
 
   template <typename Arg> struct ColorCrossCompute {
-    Arg &arg;
-    constexpr ColorCrossCompute(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorCrossCompute(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

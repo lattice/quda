@@ -10,28 +10,27 @@ namespace quda {
   using namespace gauge;
 
   template <typename Float, int nColor_, typename Gauge, bool extract_>
-  struct ExtractGhostArg {
+  struct ExtractGhostArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nDim = 4;
     static constexpr int nColor = nColor_;
     static constexpr bool extract = extract_;
     Gauge u;
-    const unsigned char nFace;
-    unsigned short X[nDim];
-    unsigned short A[nDim];
-    unsigned short B[nDim];
-    unsigned short C[nDim];
+    const int nFace;
+    int X[nDim];
+    int A[nDim];
+    int B[nDim];
+    int C[nDim];
     int f[nDim][nDim];
     bool localParity[nDim];
     int faceVolumeCB[nDim];
     int comm_dim[QUDA_MAX_DIM];
     const int offset;
-    dim3 threads;
     ExtractGhostArg(const GaugeField &u, Float **Ghost, int offset, uint64_t size) :
+      kernel_param(dim3(size, 1, 1)),
       u(u, 0, Ghost),
       nFace(u.Nface()),
-      offset(offset),
-      threads(size, 1, 1)
+      offset(offset)
     {
       for (int d=0; d<nDim; d++) {
 	X[d] = u.X()[d];
@@ -67,8 +66,8 @@ namespace quda {
   };
 
   template <typename Arg> struct GhostExtractor {
-    Arg &arg;
-    constexpr GhostExtractor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int, int parity_dim)
@@ -117,8 +116,8 @@ namespace quda {
      FIXME this implementation will have two-way warp divergence
   */
   template <typename Arg> struct GhostExtractorFineGrained {
-    Arg &arg;
-    constexpr GhostExtractorFineGrained(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostExtractorFineGrained(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int X, int i, int parity_dim)

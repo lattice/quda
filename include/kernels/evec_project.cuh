@@ -2,6 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <fast_intdiv.h>
 #include <quda_matrix.h>
 #include <matrix_field.h>
 #include <kernel.h>
@@ -46,8 +47,8 @@ namespace quda {
   template <typename Arg> struct EvecProjection : plus<spinor_array> {
     using reduce_t = spinor_array;
     using plus<reduce_t>::operator();    
-    Arg &arg;
-    constexpr EvecProjection(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr EvecProjection(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
     // Final param is unused in the MultiReduce functor in this use case.

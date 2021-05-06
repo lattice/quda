@@ -303,7 +303,7 @@ protected:
   int param;
 
 public:
-  virtual ~BLASTest() { }
+  virtual ~BLASTest() {}
   virtual void SetUp() { param = GetParam(); }
 };
 
@@ -366,7 +366,6 @@ int main(int argc, char **argv)
   initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
 
   int result = 0;

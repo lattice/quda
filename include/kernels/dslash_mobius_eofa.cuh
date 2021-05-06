@@ -5,6 +5,7 @@
 #include <math_helper.cuh>
 #include <domain_wall_helper.h>
 #include <kernel.h>
+#include <dslash_quda.h>
 
 namespace quda
 {
@@ -20,7 +21,8 @@ namespace quda
       real y[QUDA_MAX_DWF_LS];
     };
 
-    template <typename storage_type, int nColor_, bool pm_, bool dagger_, bool xpay_, Dslash5Type type_> struct Dslash5Arg {
+    template <typename storage_type, int nColor_, bool pm_, bool dagger_, bool xpay_, Dslash5Type type_>
+    struct Dslash5Arg : kernel_param<> {
       static constexpr int nColor = nColor_;
       static constexpr bool pm = pm_;
       static constexpr bool dagger = dagger_;
@@ -50,11 +52,10 @@ namespace quda
 
       eofa_coeff<real> coeff;
 
-      dim3 threads;
-
       Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f_,
                  const double m_5_, const Complex */*b_5_*/, const Complex */*c_5_*/, double a_, double inv_, double kappa_,
                  const double *eofa_u, const double *eofa_x, const double *eofa_y, double sherman_morrison_) :
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),
         in(in),
         x(x),
@@ -67,8 +68,7 @@ namespace quda
         a(a_),
         kappa(kappa_),
         inv(inv_),
-        sherman_morrison(sherman_morrison_),
-        threads(volume_4d_cb, Ls, nParity)
+        sherman_morrison(sherman_morrison_)
       {
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
         if (!in.isNative() || !out.isNative())
@@ -98,8 +98,8 @@ namespace quda
       @param[in] s      Ls dimension coordinate
      */
     template <typename Arg> struct eofa_dslash5 {
-      Arg &arg;
-      constexpr eofa_dslash5(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr eofa_dslash5(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)
@@ -107,7 +107,7 @@ namespace quda
         using real = typename Arg::real;
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-        SharedMemoryCache<Vector> cache(device::block_dim());
+        SharedMemoryCache<Vector> cache(target::block_dim());
 
         Vector out;
         cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
@@ -175,8 +175,8 @@ namespace quda
       @param[in] s      Ls dimension coordinate
      */
     template <typename Arg> struct eofa_dslash5inv {
-      Arg &arg;
-      constexpr eofa_dslash5inv(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr eofa_dslash5inv(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ inline void operator()(int x_cb, int s, int parity)
@@ -185,7 +185,7 @@ namespace quda
         typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
         const auto sherman_morrison = arg.sherman_morrison;
-        SharedMemoryCache<Vector> cache(device::block_dim());
+        SharedMemoryCache<Vector> cache(target::block_dim());
         cache.save(arg.in(s * arg.volume_4d_cb + x_cb, parity));
         cache.sync();
 

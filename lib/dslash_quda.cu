@@ -7,6 +7,9 @@
 #include <tunable_nd.h>
 #include <instantiate.h>
 #include <kernels/dslash_misc.cuh>
+#ifdef NVSHMEM_COMMS
+#include <cuda/atomic>
+#endif
 
 namespace quda {
 
@@ -55,6 +58,24 @@ namespace quda {
     qudaEvent_t scatterEnd[nStream];
     qudaEvent_t dslashStart[2];
 
+    // for shmem lightweight sync
+    shmem_sync_t sync_counter = 10;
+    shmem_sync_t get_shmem_sync_counter() { return sync_counter; }
+    shmem_sync_t set_shmem_sync_counter(shmem_sync_t count) { return sync_counter = count; }
+    shmem_sync_t inc_shmem_sync_counter() { return sync_counter++; }
+#ifdef NVSHMEM_COMMS
+    shmem_sync_t *sync_arr = nullptr;
+    shmem_retcount_intra_t *_retcount_intra = nullptr;
+    shmem_retcount_inter_t *_retcount_inter = nullptr;
+    shmem_interior_done_t *_interior_done = nullptr;
+    shmem_interior_count_t *_interior_count = nullptr;
+    shmem_sync_t *get_shmem_sync_arr() { return sync_arr; }
+    shmem_retcount_intra_t *get_shmem_retcount_intra() { return _retcount_intra; }
+    shmem_retcount_inter_t *get_shmem_retcount_inter() { return _retcount_inter; }
+    shmem_interior_done_t *get_shmem_interior_done() { return _interior_done; }
+    shmem_interior_count_t *get_shmem_interior_count() { return _interior_count; }
+#endif
+
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
     bool dslash_interior_compute;
@@ -83,6 +104,48 @@ namespace quda {
     Worker *aux_worker;
   }
 
+  template <typename T>
+  struct init_dslash : public TunableKernel1D {
+    T *counter;
+    unsigned int size;
+    long long bytes() const { return size * sizeof(T); }
+    unsigned int minThreads() const { return size; }
+
+    init_dslash(T *counter, unsigned int size) :
+      TunableKernel1D(size),
+      counter(counter),
+      size(size)
+    { apply(device::get_default_stream()); }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch_device<init_dslash_atomic>(tp, stream, init_dslash_atomic_arg<T>(counter, size));
+    }
+  };
+
+  template <typename T>
+  struct init_arr : public TunableKernel1D {
+    T *counter;
+    T val;
+    unsigned int size;
+    long long bytes() const { return size * sizeof(T); }
+    unsigned int minThreads() const { return size; }
+
+    init_arr(T *counter, T val, unsigned int size) :
+      TunableKernel1D(size),
+      counter(counter),
+      val(val),
+      size(size)
+    { apply(device::get_default_stream()); }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch_device<init_sync_arr>(tp, stream, init_arr_arg<T>(counter, val, size));
+    }
+  };
+
   void createDslashEvents()
   {
     using namespace dslash;
@@ -94,6 +157,28 @@ namespace quda {
       packEnd[i] = qudaEventCreate();
       dslashStart[i] = qudaEventCreate();
     }
+#ifdef NVSHMEM_COMMS
+    sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
+
+    // initialize to 9 here so where we need to do tuning we can skip
+    // the wait if necessary by using smaller values
+    init_arr<shmem_sync_t>(sync_arr, static_cast<shmem_sync_t>(9), 2 * QUDA_MAX_DIM);
+    sync_counter = 10;
+
+    // atomic for controlling signaling in nvshmem packing
+    _retcount_intra
+      = static_cast<shmem_retcount_intra_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_intra_t)));
+    init_dslash<shmem_retcount_intra_t>(_retcount_intra, 2 * QUDA_MAX_DIM);
+    _retcount_inter
+      = static_cast<shmem_retcount_inter_t *>(device_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_retcount_inter_t)));
+    init_dslash<shmem_retcount_inter_t>(_retcount_inter, 2 * QUDA_MAX_DIM);
+
+    // workspace for interior done sync in uber kernel
+    _interior_done = static_cast<shmem_interior_done_t *>(device_pinned_malloc(sizeof(shmem_interior_done_t)));
+    init_dslash<shmem_interior_done_t>(_interior_done, 1);
+    _interior_count = static_cast<shmem_interior_count_t *>(device_pinned_malloc(sizeof(shmem_interior_count_t)));
+    init_dslash<shmem_interior_count_t>(_interior_count, 1);
+#endif
 
     aux_worker = NULL;
 
@@ -131,6 +216,13 @@ namespace quda {
       qudaEventDestroy(packEnd[i]);
       qudaEventDestroy(dslashStart[i]);
     }
+#ifdef NVSHMEM_COMMS
+    device_comms_pinned_free(sync_arr);
+    device_pinned_free(_retcount_intra);
+    device_pinned_free(_retcount_inter);
+    device_pinned_free(_interior_done);
+    device_pinned_free(_interior_count);
+#endif
   }
 
   template <typename Float, int nColor> class GammaApply : public TunableKernel2D {

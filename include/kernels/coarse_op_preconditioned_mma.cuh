@@ -50,9 +50,9 @@ namespace quda
 
           const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
-          auto a = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
-          auto b = arg.Xinv.wrap(0, parity, x_cb);
-          auto c = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
+          auto a = arg.Y.Ghost(d, 1 - parity, ghost_idx, 0, 0);
+          auto b = arg.Xinv(0, parity, x_cb, 0, 0);
+          auto c = arg.Yhat.Ghost(d, 1 - parity, ghost_idx, 0, 0);
 
           yHatMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n);
 
@@ -60,18 +60,18 @@ namespace quda
 
           const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-          auto a = arg.Y.wrap(d, 1 - parity, back_idx);
-          auto b = arg.Xinv.wrap(0, parity, x_cb);
-          auto c = arg.Yhat.wrap(d, 1 - parity, back_idx);
+          auto a = arg.Y(d, 1 - parity, back_idx, 0, 0);
+          auto b = arg.Xinv(0, parity, x_cb, 0, 0);
+          auto c = arg.Yhat(d, 1 - parity, back_idx, 0, 0);
 
           yHatMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, m, n);
         }
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
-        auto a = arg.Xinv.wrap(0, parity, x_cb);
-        auto b = arg.Y.wrap(d + 4, parity, x_cb);
-        auto c = arg.Yhat.wrap(d + 4, parity, x_cb);
+        auto a = arg.Xinv(0, parity, x_cb, 0, 0);
+        auto b = arg.Y(d + 4, parity, x_cb, 0, 0);
+        auto c = arg.Yhat(d + 4, parity, x_cb, 0, 0);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;

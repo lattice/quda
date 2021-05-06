@@ -188,6 +188,7 @@ double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be c
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
+bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
@@ -275,6 +276,7 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
 QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
 QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
@@ -698,10 +700,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       int p;
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
-        if (p & (1 << j)) {
-          commDimPartitionedSet(j);
-          dim_partitioned[j] = 1;
-        }
+        if (p & (1 << j)) { dim_partitioned[j] = 1; }
       }
       return retval;
     },
@@ -736,6 +735,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
+
+  opgroup->add_option("--eig-compute-gamma5", eig_compute_gamma5,
+                      "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
+
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
@@ -759,8 +762,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
 
-  opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
-                      "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
+  opgroup->add_option(
+    "--eig-io-parity-inflate", eig_io_parity_inflate,
+    "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
 
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,
@@ -901,7 +905,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
-  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,
+                      "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
@@ -1116,7 +1121,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
                       "Set the number of sink smearing steps (default 50)");
-
+  
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 
@@ -1149,5 +1154,11 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
-    
+}
+
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup
+    = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
+  opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }

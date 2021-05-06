@@ -1,6 +1,12 @@
 #include <gauge_field.h>
-#include <dslash.h>
+#include <gauge_field_order.h>
+
+#include <typeinfo>
+
+#include <color_spinor_field.h>
 #include <tunable_nd.h>
+#include <dslash_quda.h>
+#include <instantiate_dslash.h>
 #include <kernels/mdw_fused_dslash.cuh>
 
 namespace quda

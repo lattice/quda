@@ -5,6 +5,10 @@
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
 
+#ifndef QUDA_FAST_COMPILE_DSLASH
+#define QUDA_FAST_COMPILE_DSLASH
+#endif
+
 namespace quda {
 
   template <typename Float, typename yFloat, typename ghostFloat, int Ns, int Nc, bool dslash, bool clover, bool dagger, DslashType type>
@@ -163,7 +167,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
@@ -434,11 +438,11 @@ namespace quda {
   // string used as a tunekey to ensure we retune if the dslash policy env changes
   static char policy_string[TuneKey::aux_n];
 
-  static void enable_policy(DslashCoarsePolicy p) {
+  static inline void enable_policy(DslashCoarsePolicy p) {
     policies[static_cast<std::size_t>(p)] = p;
   }
 
-  static void disable_policy(DslashCoarsePolicy p) {
+  static inline void disable_policy(DslashCoarsePolicy p) {
     policies[static_cast<std::size_t>(p)] = DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED;
   }
 
