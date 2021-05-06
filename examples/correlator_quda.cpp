@@ -12,150 +12,6 @@
 
 #include <zfp.h>
 
-// compress and decompress contiguous blocks
-static double process4D(double* buffer, uint blocks, double tolerance, uint block_size)
-{
-  zfp_stream* zfp;   /* compressed stream */
-  bitstream* stream; /* bit stream to write to or read from */
-  size_t* offset;    /* per-block bit offset in compressed stream */
-  double* ptr;       /* pointer to block being processed */
-  size_t bufsize;    /* byte size of uncompressed storage */
-  size_t zfpsize;    /* byte size of compressed stream */
-  uint minbits;      /* min bits per block */
-  uint maxbits;      /* max bits per block */
-  uint maxprec;      /* max precision */
-  int minexp;        /* min bit plane encoded */
-  uint bits;         /* size of compressed block */
-  uint i;
-  uint block_dim = block_size * block_size * block_size * block_size;
-  
-  /* maintain offset to beginning of each variable-length block */
-  offset = (size_t*)malloc(blocks * sizeof(size_t));
-
-  /* associate bit stream with same storage as input */
-  bufsize = blocks * block_dim * sizeof(*buffer);
-  stream = stream_open(buffer, bufsize);
-
-  /* allocate meta data for a compressed stream */
-  zfp = zfp_stream_open(stream);
-
-  /* set tolerance for fixed-accuracy mode */
-  zfp_stream_set_accuracy(zfp, tolerance);
-
-  /* set maxbits to guard against prematurely overwriting the input */
-  zfp_stream_params(zfp, &minbits, &maxbits, &maxprec, &minexp);
-  maxbits = block_dim * sizeof(*buffer) * CHAR_BIT;
-  zfp_stream_set_params(zfp, minbits, maxbits, maxprec, minexp);
-
-  /* compress one block at a time in sequential order */
-  ptr = buffer;
-  for (i = 0; i < blocks; i++) {
-    offset[i] = stream_wtell(stream);
-    bits = zfp_encode_block_double_4(zfp, ptr);
-    if (!bits) {
-      fprintf(stderr, "compression failed\n");
-      return 0;
-    }
-    if(verbosity >= QUDA_DEBUG_VERBOSE) printf("block #%u offset=%4u size=%4u\n", i, (uint)offset[i], bits);
-    ptr += block_dim;
-  }
-  /* important: flush any buffered compressed bits */
-  stream_flush(stream);
-
-  /* print out size */
-  zfpsize = stream_size(stream);
-  if(verbosity >= QUDA_DEBUG_VERBOSE) printf("compressed %u bytes to %u bytes\n", (uint)bufsize, (uint)zfpsize);
-
-  /* decompress one block at a time in reverse order */
-  for (i = blocks; i--;) {
-    ptr -= block_dim;
-    stream_rseek(stream, offset[i]);
-    if (!zfp_decode_block_double_4(zfp, ptr)) {
-      fprintf(stderr, "decompression failed\n");
-      return 0;
-    }
-  }
-  
-  /* clean up */
-  zfp_stream_close(zfp);
-  stream_close(stream);
-  free(offset);
-  
-  return (1.0*((uint)zfpsize))/(uint)bufsize;
-}
-
-// compress and decompress contiguous blocks
-static double process3D(double* buffer, uint blocks, double tolerance, uint block_size)
-{
-  zfp_stream* zfp;   /* compressed stream */
-  bitstream* stream; /* bit stream to write to or read from */
-  size_t* offset;    /* per-block bit offset in compressed stream */
-  double* ptr;       /* pointer to block being processed */
-  size_t bufsize;    /* byte size of uncompressed storage */
-  size_t zfpsize;    /* byte size of compressed stream */
-  uint minbits;      /* min bits per block */
-  uint maxbits;      /* max bits per block */
-  uint maxprec;      /* max precision */
-  int minexp;        /* min bit plane encoded */
-  uint bits;         /* size of compressed block */
-  uint i;
-  uint block_dim = block_size * block_size * block_size;
-  
-  /* maintain offset to beginning of each variable-length block */
-  offset = (size_t*)malloc(blocks * sizeof(size_t));
-
-  /* associate bit stream with same storage as input */
-  bufsize = blocks * block_dim * sizeof(*buffer);
-  stream = stream_open(buffer, bufsize);
-
-  /* allocate meta data for a compressed stream */
-  zfp = zfp_stream_open(stream);
-
-  /* set tolerance for fixed-accuracy mode */
-  zfp_stream_set_accuracy(zfp, tolerance);
-
-  /* set maxbits to guard against prematurely overwriting the input */
-  zfp_stream_params(zfp, &minbits, &maxbits, &maxprec, &minexp);
-  maxbits = block_dim * sizeof(*buffer) * CHAR_BIT;
-  zfp_stream_set_params(zfp, minbits, maxbits, maxprec, minexp);
-
-  /* compress one block at a time in sequential order */
-  ptr = buffer;
-  for (i = 0; i < blocks; i++) {
-    offset[i] = stream_wtell(stream);
-    bits = zfp_encode_block_double_3(zfp, ptr);
-    if (!bits) {
-      fprintf(stderr, "compression failed\n");
-      return 0;
-    }
-    if(verbosity >= QUDA_DEBUG_VERBOSE && bits > 1) printf("block #%u offset=%4u size=%4u\n", i, (uint)offset[i], bits);
-    ptr += block_dim;
-  }
-  /* important: flush any buffered compressed bits */
-  stream_flush(stream);
-
-  /* print out size */
-  zfpsize = stream_size(stream);
-  if(verbosity >= QUDA_DEBUG_VERBOSE) printf("compressed %u bytes to %u bytes\n", (uint)bufsize, (uint)zfpsize);
-
-  /* decompress one block at a time in reverse order */
-  for (i = blocks; i--;) {
-    ptr -= block_dim;
-    stream_rseek(stream, offset[i]);
-    if (!zfp_decode_block_double_3(zfp, ptr)) {
-      fprintf(stderr, "decompression failed\n");
-      return 0;
-    }
-  }
-
-  /* clean up */
-  zfp_stream_close(zfp);
-  stream_close(stream);
-  free(offset);
-  
-  return (1.0*((uint)zfpsize))/(uint)bufsize;
-}
-
 // Local Enum type for IO
 typedef enum CorrelatorFlavors_s {
   CORRELATOR_QQ,
@@ -355,279 +211,66 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
 
     double time0 = 0.0;
-    double stability_factor = 1e10;
-    bool fourD = false;
     double ave_comp_ratio = 0.0;
-    double tolerance = su3_comp_tol;
+    bool zfp_4D = false;
 
     // Loop over spin X color dilution positions, construct the sources and invert
     for (int prop = 0; prop < cs_param.nSpin * cs_param.nColor; prop++) {
       // FIXME add the smearing
       constructPointSpinorSource(source_array_ptr[prop], inv_param.cpu_prec, gauge_param.X, prop, source);
-
+      
       // Gaussian smear the source.
       performGaussianSmearNStep(source_array_ptr[prop], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
       
       invertQuda(prop_array_ptr_2[prop], source_array_ptr[prop], &inv_param);
-      //inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      //invertQuda(prop_array_ptr_2[prop], source_array_ptr[prop], &inv_param);
-      //inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;      
 
+      // We can now run CG on the reconstrcuted prop. It should give us back the 
+      // source provided there was no sink smearing
+      //------------------------------------------------------------------------
+      size_t bytes_per_float = sizeof(double);
+      int n_elems = V * spinor_site_size;
+      auto *prop_array_zfp = (double *)malloc(n_elems * bytes_per_float);     
+      time0 = -((double)clock());        
+      ave_comp_ratio += zfp_compress_decompress_prop(prop_array_ptr_2[prop], prop_array_zfp, zfp_4D);
+      // stop the timer
+      time0 += clock();
+      time0 /= CLOCKS_PER_SEC;
+
+      // Collect data on the element by element differences. Replace 
+      // prop_array_ptr_2[prop] with teh zfp version for further testing
+      double L2norm = 0.0;
+      double diff = 0.0;
+      for(int i=0; i<n_elems; i++) {
+	diff = ((double*)prop_array_zfp)[i] - ((double*)prop_array_ptr_2[prop])[i];
+	((double*)prop_array_ptr_2[prop])[i] = ((double*)prop_array_zfp)[i];
+	L2norm += diff*diff;
+      }
+      L2norm /= n_elems;
+
+      // Use prop_array_zfp as an initial guess to a solve
+      inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      invertQuda(prop_array_zfp, source_array_ptr[prop], &inv_param);
+      inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+      
+      if(!zfp_4D) {
+	printf("L2 norm (prop_zfp - prop_true) MPI RANK %03d = %e\n", tdim * comm_coord(3), sqrt(L2norm));
+	fflush(stdout);
+      }
+      // Continue with measurements using the ZFP array
+      //------------------------------------------------------------------------
+      
       // Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[prop], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
-
-      time0 = -((double)clock()); 
-      
-      double* array4D;
-      double* buffer4D;
-
-      double* array3D;
-      double* buffer3D;
-      
-      uint block_size = su3_comp_block_size;
-      uint block_dim4D = block_size * block_size * block_size * block_size;
-      uint block_dim3D = block_size * block_size * block_size;
-      uint bx = xdim / block_size;
-      uint by = ydim / block_size;
-      uint bz = zdim / block_size;
-      uint bt = tdim / block_size;
-      uint nx = block_size * bx;
-      uint ny = block_size * by;
-      uint nz = block_size * bz;
-      uint nt = block_size * bt;
-      uint n4D = nx * ny * nz * nt;
-      uint blocks4D = bx * by * bz * bt;
-
-      uint n3D = nx * ny * nz;
-      uint blocks3D = bx * by * bz;
-
-      size_t x, y, z, t, idx;
-      size_t i, j, k, l, b;
-
-      if(fourD) {
-	double comp_ratio = 0.0;
-	array4D = (double*)malloc(n4D * sizeof(double));
-	buffer4D = (double*)malloc(blocks4D * block_dim4D * sizeof(double));
-	
-	if(verbosity >= QUDA_DEBUG_VERBOSE) {
-	  printfQuda("blocks4D * block_dim4D = %u * %u = %u\n", blocks4D , block_dim4D, blocks4D * block_dim4D);
-	  printfQuda("size of ntot = %u\n", n4D);
-	  printfQuda("size of array = %lu\n", n4D * sizeof(double));
-	  printfQuda("size of orig = %lu\n", n4D * sizeof(double));
-	  printfQuda("size of buffer = %lu\n", blocks4D * block_dim4D * sizeof(double));
-	}
-	
-	// Loop over dimensions and fundamental coeffs.
-	// For the purposes of testing, we loop over all 18 real
-	// coeffs of the hermitian matrix. In practise, we need
-	// only perform the compression on the upper triangular
-	// and real diagonal.
-	
-	int Nc = 3;
-	for(int elem = 0; elem < spinor_site_size; elem++) {
-	  
-	  // Initialize array to be compressed
-	  for (t = 0; t < nt; t++) {
-	    for (z = 0; z < nz; z++) {
-	      for (y = 0; y < ny; y++) {
-		for (x = 0; x < nx; x++) {      
-		  idx = x + nx*y + nx*ny*z + nx*ny*nz*t;
-		  size_t parity = idx % 2;
-		  double u = ((double *)prop_array_ptr_2[prop])[Vh * spinor_site_size * parity + (idx/2) * spinor_site_size + elem];
-		  array4D[idx] = stability_factor*u;
-		}
-	      }
-	    }
-	  }
-	  
-	  // Reorganise array into NxNxNxN blocks   
-	  idx = 0;
-	  for (b = 0; b < blocks4D; b++) {
-	    for (l = 0; l < block_size; l++) {
-	      for (k = 0; k < block_size; k++) {
-		for (j = 0; j < block_size; j++) {
-		  for (i = 0; i < block_size; i++) {	  
-		    buffer4D[i + block_size * (j + block_size * (k + block_size * (l + block_size * b)))] = array4D[idx];
-		    idx++;	  
-		  }
-		}
-	      }
-	    }
-	  }
-	  
-	  // Apply compression
-	  comp_ratio += process4D(buffer4D, blocks4D, tolerance, block_size);
-	  if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", elem, comp_ratio);
-	  
-	  // Reorganise blocks into array 
-	  idx = 0;
-	  for (b = 0; b < blocks4D; b++) {
-	    for (l = 0; l < block_size; l++) {
-	      for (k = 0; k < block_size; k++) {
-		for (j = 0; j < block_size; j++) {
-		  for (i = 0; i < block_size; i++) {	    
-		    array4D[idx] = buffer4D[i + block_size * (j + block_size * (k + block_size * (l + block_size * b)))];
-		    idx++;
-		  }
-		}
-	      }
-	    }
-	  }
-	  
-	  // Replace gauge data with decompressed data
-	  for (t = 0; t < nt; t++) {
-	    for (z = 0; z < nz; z++) {
-	      for (y = 0; y < ny; y++) {
-		for (x = 0; x < nx; x++) {      
-		  idx = x + nx*y + nx*ny*z +nx*ny*nz*t;
-		  int parity = idx % 2;
-		  ((double *)prop_array_ptr_2[prop])[Vh * spinor_site_size * parity + (idx/2) * spinor_site_size + elem] = array4D[idx]/stability_factor;
-		}
-	      }
-	    }
-	  }
-	}
-
-	int norm = spinor_site_size * tdim;    
-	if (comm_rank() == 0) {
-	  printfQuda("Total time for compression and decompression = %g (%g per lattice)\n", time0, time0/(xdim*ydim*zdim*tdim));
-	  printfQuda("Average compression ratio = %f (%.2fx)\n", comp_ratio/(norm), 1.0/(comp_ratio/(norm)));
-	}
-	
-	// stop the timer
-	time0 += clock();
-	time0 /= CLOCKS_PER_SEC;
-	
-	free(buffer4D);
-	free(array4D);
-
-      } else {
-
-	array3D = (double*)malloc(n3D * sizeof(double));
-	buffer3D = (double*)malloc(blocks3D * block_dim3D * sizeof(double));
-	
-	if(verbosity >= QUDA_DEBUG_VERBOSE) {
-	  printfQuda("blocks3D * block_dim3D = %u * %u = %u\n", blocks3D , block_dim3D, blocks3D * block_dim3D);
-	  printfQuda("size of ntot = %u\n", n3D);
-	  printfQuda("size of array = %lu\n", n3D * sizeof(double));
-	  printfQuda("size of orig = %lu\n", n3D * sizeof(double));
-	  printfQuda("size of buffer = %lu\n", blocks3D * block_dim3D * sizeof(double));
-	}
-	
-	// Loop over dimensions and fundamental coeffs.
-	// For the purposes of testing, we loop over all 18 real
-	// coeffs of the hermitian matrix. In practise, we need
-	// only perform the compression on the upper triangular
-	// and real diagonal.
-	
-	int Nc = 3;
-	for(t = 0; t < nt; t++) {
-
-	  double comp_ratio = 0.0;
-	  int global_t_idx = comm_coord(3) * tdim + t;
-	  int global_T = comm_dim(3)*tdim;
-	  
-	  for(int elem = 0; elem < spinor_site_size; elem++) {
-	    
-	    // Initialize array to be compressed
-	    for (z = 0; z < nz; z++) {
-	      for (y = 0; y < ny; y++) {
-		for (x = 0; x < nx; x++) {      
-		  idx = x + nx*y + nx*ny*z;
-		  size_t parity = idx % 2;
-		  double u = ((double *)prop_array_ptr_2[prop])[Vh * spinor_site_size * parity + ((idx+nx*ny*nz*t)/2) * spinor_site_size + elem];
-		  array3D[idx] = stability_factor*u;
-		}
-	      }
-	    }
-	  
-	    // Reorganise array into NxNxNxN blocks   
-	    idx = 0;
-	    for (b = 0; b < blocks3D; b++) {
-	      for (k = 0; k < block_size; k++) {
-		for (j = 0; j < block_size; j++) {
-		  for (i = 0; i < block_size; i++) {	  
-		    buffer3D[i + block_size * (j + block_size * (k + block_size * b))] = array3D[idx];
-		    idx++;
-		  }
-		}
-	      }
-	    }	    
-	  
-	    // Apply compression
-	    comp_ratio += process3D(buffer3D, blocks3D, tolerance, block_size);
-	    if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", elem, comp_ratio);
-	    
-	    // Reorganise blocks into array 
-	    idx = 0;
-	    for (b = 0; b < blocks3D; b++) {
-	      for (k = 0; k < block_size; k++) {
-		for (j = 0; j < block_size; j++) {
-		  for (i = 0; i < block_size; i++) {	    
-		    array3D[idx] = buffer3D[i + block_size * (j + block_size * (k + block_size * b))];
-		    idx++;
-		  }
-		}
-	      }
-	    }
-	  
-	    // Replace gauge data with decompressed data
-	    for (z = 0; z < nz; z++) {
-	      for (y = 0; y < ny; y++) {
-		for (x = 0; x < nx; x++) {      
-		  idx = x + nx*y + nx*ny*z;
-		  int parity = idx % 2;
-		  ((double *)prop_array_ptr_2[prop])[Vh * spinor_site_size * parity + ((idx + nx*ny*nz*t)/2) * spinor_site_size + elem] = array3D[idx]/stability_factor;
-		}
-	      }
-	    }
-	  }
-
-	  int norm = spinor_site_size;    
-	  printf("Average compression ratio MPI RANK %d t %d  = %f (%.2fx)\n", comm_rank(), global_t_idx, comp_ratio/(norm), 1.0/(comp_ratio/(norm)));
-	  ave_comp_ratio += comp_ratio;
-	}
-
-	// We can now run CG on the reconstrcuted prop. It should give us back the source
-	size_t bytes_per_float = sizeof(double);
-	int n_elems = V * spinor_site_size;
-	auto *prop_array_recon = (double *)malloc(n_elems * bytes_per_float);
-
-	for(int i=0; i<n_elems; i++) ((double*)prop_array_recon)[i] = ((double*)prop_array_ptr_2[prop])[i];
-	
-	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	invertQuda(prop_array_recon, source_array_ptr[prop], &inv_param);
-	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-	
-	double L2norm = 0.0;
-	double block_norm = 0.0;
-	double diff = 0.0;
-	for(int i=0; i<n_elems; i++) {
-	  diff = ((double*)prop_array_recon)[i] - ((double*)prop_array_ptr_2[prop])[i];
-	  L2norm += diff*diff;
-	  block_norm += ((double*)prop_array_ptr_2[prop])[i];
-	}
-
-	L2norm /= n_elems;
-	block_norm /= n_elems;
-	
-	printf("L2 norm MPI RANK %d = %e\n", tdim * comm_rank(), sqrt(L2norm));
-	
-	// stop the timer
-	time0 += clock();
-	time0 /= CLOCKS_PER_SEC;
-	
-	free(buffer3D);
-	free(array3D);
-
-      }
     }
     
     // Get global compression average
     comm_allreduce(&ave_comp_ratio);
-    int norm = spinor_site_size * tdim * comm_dim(3) * spinor_site_size/2;    
-    printf("Average compression total ratio = %f (%.2fx)\n", ave_comp_ratio/(norm), 1.0/(ave_comp_ratio/(norm)));
-        
+    int norm = spinor_site_size * (zfp_4D ? 1 : (tdim * comm_dim(3))) * spinor_site_size/2; 
+    if (comm_rank() == 0) {
+      printf("Average compression total ratio = %f (%.2fx)\n", ave_comp_ratio/(norm), 1.0/(ave_comp_ratio/(norm)));
+      fflush(stdout);
+    }
+
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());

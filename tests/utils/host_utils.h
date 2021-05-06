@@ -290,3 +290,4 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
 double process3D(double* buffer, uint blocks, double tolerance, uint block_size);
 double process4D(double* buffer, uint blocks, double tolerance, uint block_size);
 double zfp_compress_decompress_link(void **array_in, void **array_out);
+double zfp_compress_decompress_prop(void *prop_in, void *prop_out, bool zfp_4D);

@@ -2200,3 +2200,211 @@ double zfp_compress_decompress_link(void **gauge_in, void **gauge_out)
   }
   return comp_ratio;
 }
+
+double zfp_compress_decompress_prop(void *prop_in, void *prop_out, bool zfp_4D)
+{
+  double* array4D;
+  double* buffer4D;
+  
+  double* array3D;
+  double* buffer3D;
+  
+  double stability_factor = 1e10;
+  double tolerance = su3_comp_tol;
+  double comp_ratio = 0.0;
+  
+  uint block_size = su3_comp_block_size;
+  uint block_dim4D = block_size * block_size * block_size * block_size;
+  uint block_dim3D = block_size * block_size * block_size;
+  uint bx = xdim / block_size;
+  uint by = ydim / block_size;
+  uint bz = zdim / block_size;
+  uint bt = tdim / block_size;
+  uint nx = block_size * bx;
+  uint ny = block_size * by;
+  uint nz = block_size * bz;
+  uint nt = block_size * bt;
+  uint n4D = nx * ny * nz * nt;
+  uint blocks4D = bx * by * bz * bt;
+  
+  uint n3D = nx * ny * nz;
+  uint blocks3D = bx * by * bz;
+  
+  size_t x, y, z, t, idx;
+  size_t i, j, k, l, b;
+  
+  if(zfp_4D) {
+    double comp_ratio = 0.0;
+    array4D = (double*)malloc(n4D * sizeof(double));
+    buffer4D = (double*)malloc(blocks4D * block_dim4D * sizeof(double));
+    
+    if(verbosity >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("blocks4D * block_dim4D = %u * %u = %u\n", blocks4D , block_dim4D, blocks4D * block_dim4D);
+      printfQuda("size of ntot = %u\n", n4D);
+      printfQuda("size of array = %lu\n", n4D * sizeof(double));
+      printfQuda("size of orig = %lu\n", n4D * sizeof(double));
+      printfQuda("size of buffer = %lu\n", blocks4D * block_dim4D * sizeof(double));
+    }
+	
+    // Loop over dimensions and fundamental coeffs.
+    // For the purposes of testing, we loop over all 18 real
+    // coeffs of the hermitian matrix. In practise, we need
+    // only perform the compression on the upper triangular
+    // and real diagonal.
+	
+
+    for(int elem = 0; elem < spinor_site_size; elem++) {
+	  
+      // Initialize array to be compressed
+      for (t = 0; t < nt; t++) {
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {      
+	      idx = x + nx*y + nx*ny*z + nx*ny*nz*t;
+	      size_t parity = idx % 2;
+	      double u = ((double *)prop_in)[Vh * spinor_site_size * parity + (idx/2) * spinor_site_size + elem];
+	      array4D[idx] = stability_factor*u;
+	    }
+	  }
+	}
+      }
+	  
+      // Reorganise array into NxNxNxN blocks   
+      idx = 0;
+      for (b = 0; b < blocks4D; b++) {
+	for (l = 0; l < block_size; l++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {	  
+		buffer4D[i + block_size * (j + block_size * (k + block_size * (l + block_size * b)))] = array4D[idx];
+		idx++;	  
+	      }
+	    }
+	  }
+	}
+      }
+	  
+      // Apply compression
+      comp_ratio += process4D(buffer4D, blocks4D, tolerance, block_size);
+      if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", elem, comp_ratio);
+	  
+      // Reorganise blocks into array 
+      idx = 0;
+      for (b = 0; b < blocks4D; b++) {
+	for (l = 0; l < block_size; l++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {	    
+		array4D[idx] = buffer4D[i + block_size * (j + block_size * (k + block_size * (l + block_size * b)))];
+		idx++;
+	      }
+	    }
+	  }
+	}
+      }
+	  
+      // Replace gauge data with decompressed data
+      for (t = 0; t < nt; t++) {
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {      
+	      idx = x + nx*y + nx*ny*z +nx*ny*nz*t;
+	      int parity = idx % 2;
+	      ((double *)prop_out)[Vh * spinor_site_size * parity + (idx/2) * spinor_site_size + elem] = array4D[idx]/stability_factor;
+	    }
+	  }
+	}
+      }
+    }
+	
+    free(buffer4D);
+    free(array4D);
+
+  } else {
+
+    array3D = (double*)malloc(n3D * sizeof(double));
+    buffer3D = (double*)malloc(blocks3D * block_dim3D * sizeof(double));
+	
+    if(verbosity >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("blocks3D * block_dim3D = %u * %u = %u\n", blocks3D , block_dim3D, blocks3D * block_dim3D);
+      printfQuda("size of ntot = %u\n", n3D);
+      printfQuda("size of array = %lu\n", n3D * sizeof(double));
+      printfQuda("size of orig = %lu\n", n3D * sizeof(double));
+      printfQuda("size of buffer = %lu\n", blocks3D * block_dim3D * sizeof(double));
+    }
+	
+    // Loop over dimensions and fundamental coeffs.
+    // For the purposes of testing, we loop over all 18 real
+    // coeffs of the hermitian matrix. In practise, we need
+    // only perform the compression on the upper triangular
+    // and real diagonal.
+	
+    for(t = 0; t < nt; t++) {
+      
+      double t_comp_ratio = 0.0;
+      int global_t_idx = comm_coord(3) * tdim + t;
+	  
+      for(int elem = 0; elem < spinor_site_size; elem++) {
+	    
+	// Initialize array to be compressed
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {      
+	      idx = x + nx*y + nx*ny*z;
+	      size_t parity = idx % 2;
+	      double u = ((double *)prop_in)[Vh * spinor_site_size * parity + ((idx+nx*ny*nz*t)/2) * spinor_site_size + elem];
+	      array3D[idx] = stability_factor*u;
+	    }
+	  }
+	}
+	  
+	// Reorganise array into NxNxNxN blocks   
+	idx = 0;
+	for (b = 0; b < blocks3D; b++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {	  
+		buffer3D[i + block_size * (j + block_size * (k + block_size * b))] = array3D[idx];
+		idx++;
+	      }
+	    }
+	  }
+	}	    
+	  
+	// Apply compression
+	t_comp_ratio += process3D(buffer3D, blocks3D, tolerance, block_size);
+	if(verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("comp_ratio %d = %e\n", elem, t_comp_ratio);
+	    
+	// Reorganise blocks into array 
+	idx = 0;
+	for (b = 0; b < blocks3D; b++) {
+	  for (k = 0; k < block_size; k++) {
+	    for (j = 0; j < block_size; j++) {
+	      for (i = 0; i < block_size; i++) {	    
+		array3D[idx] = buffer3D[i + block_size * (j + block_size * (k + block_size * b))];
+		idx++;
+	      }
+	    }
+	  }
+	}
+	  
+	// Replace gauge data with decompressed data
+	for (z = 0; z < nz; z++) {
+	  for (y = 0; y < ny; y++) {
+	    for (x = 0; x < nx; x++) {      
+	      idx = x + nx*y + nx*ny*z;
+	      int parity = idx % 2;
+	      ((double *)prop_out)[Vh * spinor_site_size * parity + ((idx + nx*ny*nz*t)/2) * spinor_site_size + elem] = array3D[idx]/stability_factor;
+	    }
+	  }
+	}
+      }
+      
+      int norm = spinor_site_size;    
+      printf("Average compression ratio MPI RANK %03d t %03d  = %f (%.2fx)\n", comm_rank(), global_t_idx, t_comp_ratio/(norm), 1.0/(t_comp_ratio/(norm)));
+      fflush(stdout);
+      comp_ratio += t_comp_ratio;
+    }
+  }
+  return comp_ratio;
+}
