@@ -344,8 +344,6 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
-  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n";
@@ -383,8 +381,6 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
-  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n\n";

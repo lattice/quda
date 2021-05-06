@@ -142,8 +142,8 @@ namespace quda {
      @brief Application of chiral projection to a color spinor field
   */
   template <typename Arg> struct ChiralProject {
-    Arg &arg;
-    constexpr ChiralProject(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ChiralProject(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)
@@ -171,7 +171,7 @@ namespace quda {
   };
   
   /**
-     @brief Application of twist to a color spinor field 
+     @brief Application of twist to a color spinor field
   */
   template <typename Arg> struct TwistGamma {
     using fermion_t = ColorSpinor<typename Arg::real, Arg::nColor, 4>;

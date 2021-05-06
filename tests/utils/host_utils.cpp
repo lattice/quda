@@ -281,7 +281,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
-void constructPointSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+void constructPointSpinorSource(void *v, QudaPrecision precision, const int *const x,
                                 const int dil, const int *const source_position)
 {
   int X[4] = {x[0], x[1], x[2], x[3]};
