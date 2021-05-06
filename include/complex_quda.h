@@ -451,7 +451,7 @@ template<>
 {
 public:
   typedef float value_type;
-  __host__ __device__ inline complex<float>() : float2() {};
+  __host__ __device__ inline complex<float>() {};
   __host__ __device__
     inline complex<float>(const float & re, const float& im = float())
     {
@@ -559,7 +559,7 @@ template<>
 {
 public:
   typedef double value_type;
-  __host__ __device__ inline complex<double>() : double2() {};
+  __host__ __device__ inline complex<double>() {};
   __host__ __device__
     inline complex<double>(const double & re, const double& im = double())
     {
@@ -731,7 +731,7 @@ struct complex <short> : public short2
 public:
   typedef short value_type;
 
-  __host__ __device__ inline complex<short>() : short2() {};
+  __host__ __device__ inline complex<short>() {};
 
   __host__ __device__ inline complex<short>(const short & re, const short& im = float())
     {
@@ -783,7 +783,7 @@ struct complex <int> : public int2
 public:
   typedef int value_type;
 
-  __host__ __device__ inline complex<int>() : int2() {};
+  __host__ __device__ inline complex<int>() {};
 
   __host__ __device__ inline complex<int>(const int& re, const int& im = float())
     {
