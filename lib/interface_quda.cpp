@@ -6271,19 +6271,10 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   // check the gauge fields have been created
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
-  bool pc_solution = false;
-  bool pc_solve = false; 
-  bool mat_solution = true;
-
-  inv_param->secs = 0;
-  inv_param->gflops = 0;
-  inv_param->iter = 0;
-
   // Define gauge coefficients
   QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
   double path_coeff[3] = {1.0, 1.0, 1.0};
   double epsilon = (hmc_param->traj_length/(1.0*hmc_param->traj_steps));
-  double eps_scaled = epsilon * hmc_param->beta/3.0;
   //---------------------------------------------------------------------
 
   // Create a new gauge field and copy gauge precise. We will evolve this
@@ -6346,13 +6337,15 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   QudaGaugeObservableParam gauge_obs_param = newQudaGaugeObservableParam();
   gauge_obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;
   gauge_obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;  
-  gaugeObservablesQuda(&gauge_obs_param);  
+  gaugeObservablesQuda(&gauge_obs_param);
+  
   // Measure momentum action
   profileMomAction.TPSTART(QUDA_PROFILE_TOTAL);
   profileMomAction.TPSTART(QUDA_PROFILE_COMPUTE);
   double momentum_action = computeMomAction(*device_mom);
   profileMomAction.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
+  
   // Measure the gauge action
   double gauge_action = 6.0 * (1.0 - gauge_obs_param.plaquette[0]) * gaugeTemp->Volume() * hmc_param->beta;
 
