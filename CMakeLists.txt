@@ -633,130 +633,14 @@ if(QUDA_QDPJIT)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
+
 if(QUDA_QMP)
-  find_library(QMP_FOUND qmp HINTS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
-  mark_as_advanced(QMP_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    ExternalProject_Add(
-      QMP
-      GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-      GIT_TAG qmp2-5-2
-      GIT_SHALLOW YES
-      PREFIX usqcd
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-      BUILD_COMMAND ${MAKE_EXE}
-      INSTALL_COMMAND ${MAKE_EXE} install
-      LOG_INSTALL ON
-      LOG_BUILD ON
-      LOG_DOWNLOAD ON)
+ find_package(QMP REQUIRED)
 
-    ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QMPHOME
-      ${INSTALL_DIR}
-      CACHE PATH "path to QMP" FORCE)
-    set(QUDA_QMP_LDFLAGS
-      "-L${QUDA_QMPHOME}/lib"
-      CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS
-      "-lqmp"
-      CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-    ExternalProject_Add_Step(
-      QMP reconf
-      COMMAND ${AUTORECONF_EXE} -fi
-      WORKING_DIRECTORY <SOURCE_DIR>
-      DEPENDERS configure
-      DEPENDEES download)
-
-  else()
-    if("${QUDA_QMPHOME}" STREQUAL "")
-      message(FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF")
-    endif()
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    set(QUDA_QMP_LDFLAGS
-      ${QUDA_QMP_LDFLAGS_INTERNAL}
-      CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS
-      ${QUDA_QMP_LIBS_INTERNAL}
-      CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  endif()
 endif()
 
 if(QUDA_QIO)
-  if(NOT QUDA_QMP)
-    message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
-  endif()
-  find_library(QIO_FOUND qio HINTS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
-  mark_as_advanced(QIO_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    set(QIO_BRANCH
-        "extended")
-    if(QUDA_DOWNLOAD_QIO_LEGACY)
-      set(QIO_BRANCH
-          "qio2-5-0")
-    endif()
-    ExternalProject_Add(
-      QIO
-      GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-      GIT_TAG "${QIO_BRANCH}"
-      GIT_SHALLOW YES
-      PREFIX usqcd
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
-                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
-      BUILD_COMMAND make
-      INSTALL_COMMAND make install
-      DEPENDS QMP
-      LOG_INSTALL ON
-      LOG_BUILD ON
-      LOG_DOWNLOAD ON)
-    ExternalProject_Get_Property(QIO INSTALL_DIR)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QIOHOME
-      ${INSTALL_DIR}
-      CACHE PATH "path to QIO" FORCE)
-    set(QUDA_LIMEHOME
-      ${INSTALL_DIR}
-      CACHE PATH "path to LIME" FORCE)
-    ExternalProject_Add_Step(
-      QIO reconf
-      COMMAND ${AUTORECONF_EXE} -fi
-      WORKING_DIRECTORY <SOURCE_DIR>
-      DEPENDERS configure
-      DEPENDEES download)
-    set(QUDA_QIO_LDFLAGS
-      "-L${QUDA_QIOHOME}/lib"
-      CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS
-      "-lqio -llime"
-      CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-
-  else()
-    if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
-      message(
-        FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF")
-    endif()
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    set(QUDA_QIO_LDFLAGS
-      ${QUDA_QIO_LDFLAGS_INTERNAL}
-      CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS
-      ${QUDA_QIO_LIBS_INTERNAL}
-      CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  endif()
+ find_package(QIO REQUIRED)
 endif()
 
 if(QUDA_OPENMP)

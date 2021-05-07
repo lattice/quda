@@ -64,7 +64,9 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+
       if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
         Arg<QUDA_FLOAT2_FIELD_ORDER> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         arg.swizzle_factor = tp.aux.x;
