@@ -3734,7 +3734,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // cudaColorSpinorField *b = nullptr;   // Cuda RHS
   ColorSpinorFieldVector x; // Cuda Solutions, might be resident
   x.resize(param->num_offset);
-  ColorSpinorFieldVector p;
+  ColorSpinorFieldVectorU p;
   auto r2_old = std::make_unique<double[]>(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
@@ -3928,7 +3928,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         {
           CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam, profileMulti);
           if (i == 0)
-            cg(*x[i], *b, p[i], r2_old[i]);
+            cg(*x[i], *b, p[i].get(), r2_old[i]);
           else
             cg(*x[i], *b);
         }
@@ -3989,7 +3989,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   delete dRefine;
-  for (auto &pp : p) delete pp;
 
   profileMulti.TPSTOP(QUDA_PROFILE_FREE);
 

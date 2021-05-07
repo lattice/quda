@@ -1269,7 +1269,7 @@ public:
      * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
      * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
      */
-    void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
+    void operator()(ColorSpinorFieldVector &x, ColorSpinorField &b, ColorSpinorFieldVectorU &p, double* r2_old_array );
 
     /**
      * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
@@ -1279,11 +1279,11 @@ public:
      */
     void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
       std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
-      std::vector<ColorSpinorField*> p;
+      ColorSpinorFieldVectorU p;
 
       (*this)(out, in, p, r2_old.get());
 
-      for (auto &pp : p) delete pp;
+      // for (auto &pp : p) delete pp;
     }
 
   };

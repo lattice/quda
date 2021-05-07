@@ -49,8 +49,8 @@ namespace quda {
   class ShiftUpdate : public Worker {
 
     ColorSpinorField *r;
-    std::vector<ColorSpinorField*> p;
-    std::vector<ColorSpinorField*> x;
+    ColorSpinorFieldVector p;
+    ColorSpinorFieldVector x;
 
     double *alpha;
     double *beta;
@@ -152,7 +152,7 @@ namespace quda {
     }  
   }
 
-  void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array )
+  void MultiShiftCG::operator()(ColorSpinorFieldVector &x, ColorSpinorField &b, ColorSpinorFieldVectorU &p, double* r2_old_array )
   {
     if (checkLocation(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -186,7 +186,7 @@ namespace quda {
     const double sloppy_tol= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() :
       ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() : pow(2.,-17));
     const double fine_tol = pow(10.,(-2*(int)b.Precision()+1));
-    std::unique_ptr<double[]> prec_tol(new double[num_offset]);
+    auto prec_tol = std::make_unique<double[]>(num_offset);
 
     prec_tol[0] = mixed ? sloppy_tol : fine_tol;
     for (int i=1; i<num_offset; i++) {
@@ -212,60 +212,63 @@ namespace quda {
       if (param.tol_offset[j] < param.delta) reliable = true;
 
 
-    auto *r = new cudaColorSpinorField(b);
-    std::vector<ColorSpinorField*> x_sloppy;
-    x_sloppy.resize(num_offset);
-    std::vector<ColorSpinorField*> y;
+    auto r = std::make_unique<cudaColorSpinorField>(b);
+    
+    // sloppy fields may alias, hence we use _field with unique ptrs to hold allocations for mixed precisions and use raw ptr to field
+    std::unique_ptr<ColorSpinorField> _r_sloppy;
+    ColorSpinorField *r_sloppy; // think about using a refernce here ?
+    ColorSpinorFieldVectorU _x_sloppy;
+    ColorSpinorFieldVector x_sloppy;
+    // for reliable updates
+    ColorSpinorFieldVectorU y;
   
+
+    
     ColorSpinorParam csParam(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
     if (reliable) {
-      y.resize(num_offset);
-      for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
+      for (int i=0; i<num_offset; i++) y.emplace_back(std::make_unique<cudaColorSpinorField>(*r, csParam));
     }
 
     csParam.setPrecision(param.precision_sloppy);
   
-    cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x[0]->Precision()) {
-      r_sloppy = r;
+      r_sloppy = r.get();
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(*r, csParam);
+      r_sloppy = (_r_sloppy = std::make_unique<cudaColorSpinorField>(*r, csParam)).get();
     }
-  
-    if (param.precision_sloppy == x[0]->Precision() ||
-	!param.use_sloppy_partial_accumulator) {
-      for (int i=0; i<num_offset; i++){
-	x_sloppy[i] = x[i];
-	blas::zero(*x_sloppy[i]);
+
+    if (param.precision_sloppy == x[0]->Precision() || !param.use_sloppy_partial_accumulator) {
+      x_sloppy.resize(num_offset);
+      for (int i = 0; i < num_offset; i++) {  
+        x_sloppy[i] = x[i];
+        blas::zero(*x_sloppy[i]);
       }
     } else {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      for (int i=0; i<num_offset; i++)
-	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
+      for (int i = 0; i < num_offset; i++)  _x_sloppy.emplace_back(std::make_unique<cudaColorSpinorField>(*x[i], csParam));
+      x_sloppy = _x_sloppy.get();
     }
-  
-    p.resize(num_offset);
-    for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
-  
+    
+    // p contains unique ptrs, is passed in by reference and owned by calling function in interface
+    for (int i = 0; i < num_offset; i++) p.emplace_back(std::make_unique<cudaColorSpinorField>(*r_sloppy));
+
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    auto* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
-  
-    cudaColorSpinorField tmp1(*Ap, csParam);
+    auto Ap = std::make_unique<cudaColorSpinorField>(*r_sloppy, csParam);
+
+    std::unique_ptr<cudaColorSpinorField> tmp1_p = std::make_unique<cudaColorSpinorField>(*Ap, csParam);
+    cudaColorSpinorField &tmp1 = *tmp1_p; 
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
-      new cudaColorSpinorField(*Ap, csParam) : &tmp1;
-    cudaColorSpinorField &tmp2 = *tmp2_p;
+    std::unique_ptr<cudaColorSpinorField> tmp2_p;
+    cudaColorSpinorField &tmp2 = !mat.isStaggered() ? *(tmp2_p = std::make_unique<cudaColorSpinorField>(*Ap, csParam)) : *tmp1_p;
 
     // additional high-precision temporary if Wilson and mixed-precision
     csParam.setPrecision(param.precision);
-    cudaColorSpinorField *tmp3_p =
-      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-      new cudaColorSpinorField(*r, csParam) : &tmp1;
-    cudaColorSpinorField &tmp3 = *tmp3_p;
+    std::unique_ptr<cudaColorSpinorField> tmp3_p;
+    cudaColorSpinorField &tmp3 = (param.precision != param.precision_sloppy && !mat.isStaggered()) ? *(tmp3_p=std::make_unique<cudaColorSpinorField>(*r, csParam)) : *tmp1_p;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -316,7 +319,7 @@ namespace quda {
     bool aux_update = false;
 
     // now create the worker class for updating the shifted solutions and gradient vectors
-    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
+    ShiftUpdate shift_update(r_sloppy, p.get(), x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
     
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -501,16 +504,22 @@ namespace quda {
     if (param.compute_true_res){
       // only allocate temporaries if necessary
       csParam.setPrecision(param.precision);
-      ColorSpinorField *tmp4_p = reliable ? y[0] : tmp1.Precision() == x[0]->Precision() ? &tmp1 : ColorSpinorField::Create(csParam);
-      ColorSpinorField *tmp5_p = mat.isStaggered() ? tmp4_p :
-      reliable ? y[1] : (tmp2.Precision() == x[0]->Precision() && &tmp1 != tmp2_p) ? tmp2_p : ColorSpinorField::Create(csParam);
+      
+      // TODOL maybe better to use a shared ptr here?
+      std::unique_ptr<ColorSpinorField> _tmp4 ;
+      std::unique_ptr<ColorSpinorField> _tmp5;
+      
+      ColorSpinorField &tmp4_p = reliable ? *y[0] : 
+        tmp1.Precision() == x[0]->Precision() ? tmp1 : *(_tmp4 = ColorSpinorField::CreateUnique(csParam));
+      ColorSpinorField &tmp5_p = mat.isStaggered() ? tmp4_p :
+      reliable ? *y[1] : (tmp2.Precision() == x[0]->Precision() && tmp2_p != nullptr) ? *tmp2_p : *(_tmp5= ColorSpinorField::CreateUnique(csParam));
 
       for (int i = 0; i < num_offset; i++) {
         // only calculate true residual if we need to:
         // 1.) For higher shifts if we did not use mixed precision
         // 2.) For shift 0 if we did not exit early  (we went to the full solution)
         if ( (i > 0 and not mixed) or (i == 0 and not exit_early) ) {
-          mat(*r, *x[i], *tmp4_p, *tmp5_p);
+          mat(*r, *x[i], tmp4_p, tmp5_p);
           if (r->Nspin() == 4) {
             blas::axpy(offset[i], *x[i], *r); // Offset it.
           } else if (i != 0) {
@@ -539,9 +548,6 @@ namespace quda {
           }
         }
       }
-
-      if (tmp5_p != tmp4_p && tmp5_p != tmp2_p && (reliable ? tmp5_p != y[1] : 1)) delete tmp5_p;
-      if (tmp4_p != &tmp1 && (reliable ? tmp4_p != y[0] : 1)) delete tmp4_p;
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE)
       {
@@ -560,22 +566,8 @@ namespace quda {
     matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if (&tmp3 != &tmp1) delete tmp3_p;
-    if (&tmp2 != &tmp1) delete tmp2_p;
-
-    if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
-    for (int i=0; i<num_offset; i++) 
-       if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
-  
-    delete r;
-
-    if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
-
-    delete Ap;
-  
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    // profile.TPSTART(QUDA_PROFILE_FREE);  
+    // profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }
