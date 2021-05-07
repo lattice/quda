@@ -90,7 +90,7 @@ namespace quda
        */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
         return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableVectorYZ::minGridSize();
@@ -102,7 +102,7 @@ namespace quda
       /* see comment for minGridSize above for gridStep choice when using nvshmem */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
         return ((deviceProp.multiProcessorCount) / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableVectorYZ::gridStep();
@@ -142,8 +142,6 @@ namespace quda
         arg.counter = dslash::get_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
-        int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
         // if we are doing tuning we should not wait on the sync_arr to be set.
         arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
       }
@@ -174,7 +172,7 @@ namespace quda
           max_threads_per_dir = std::max(max_threads_per_dir, (arg.threadDimMapUpper[i] - arg.threadDimMapLower[i]) / 2);
         }
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
