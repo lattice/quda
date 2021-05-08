@@ -12,6 +12,7 @@
 #include <qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <blas_quda_3d.h>
 #include <util_quda.h>
 #include <tune_quda.h>
 #include <vector_io.h>
@@ -19,7 +20,6 @@
 
 namespace quda
 {
-
   // Eigensolver class
   //-----------------------------------------------------------------------------
   EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
@@ -117,6 +117,10 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param, profile);
       break;
+    case QUDA_EIG_TR_LANCZOS_3D:
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating 3D TR Lanczos eigensolver\n");
+      eig_solver = new TRLM3D(mat, eig_param, profile);
+      break;
     default: errorQuda("Invalid eig solver type");
     }
 
@@ -169,7 +173,7 @@ namespace quda
     }
     if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
   }
-
+  
   void EigenSolver::checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace)
   {
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
@@ -375,7 +379,6 @@ namespace quda
 
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
   {
-
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
@@ -407,7 +410,7 @@ namespace quda
     // Increase final result by 10% for safety
     return result * 1.10;
   }
-
+  
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
   {
     bool orthed = true;
@@ -482,7 +485,7 @@ namespace quda
     // Save orthonormalisation tuning
     saveTuneCache();
   }
-
+  
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
   {
     std::vector<int> pivots(size);

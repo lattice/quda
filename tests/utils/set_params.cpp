@@ -291,11 +291,24 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS || eig_type == QUDA_EIG_TR_LANCZOS_3D)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
 
+  if (eig_type == QUDA_EIG_TR_LANCZOS_3D &&
+      dslash_type != QUDA_LAPLACE_DSLASH && 
+      laplace3D > 3) errorQuda("3D TRLM must be used with Laplace type operator with one dimension omitted");
+  
+  eig_param.ortho_dim = laplace3D;
+  switch (laplace3D) {
+  case 3: eig_param.ortho_dim_size = tdim; break;
+  case 2: eig_param.ortho_dim_size = zdim; break;
+  case 1: eig_param.ortho_dim_size = ydim; break;
+  case 0: eig_param.ortho_dim_size = xdim; break;
+  default: eig_param.ortho_dim_size = 0;
+  }    
+  
   // The solver will exit when n_conv extremal eigenpairs have converged
   if (eig_n_conv < 0) {
     eig_param.n_conv = eig_n_ev;
@@ -314,7 +327,7 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   eig_param.block_size
-    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
+    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
@@ -729,6 +742,10 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
+  if (mg_eig_type[level] == QUDA_EIG_TR_LANCZOS_3D) {
+    errorQuda("Only 4D eigensolvers may be used in MG");
+  }
+  
   mg_eig_param.block_size
     = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
     1 :

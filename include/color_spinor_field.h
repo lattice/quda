@@ -157,7 +157,7 @@ namespace quda {
     int composite_dim;    //e.g., number of eigenvectors in the set
     bool is_component;
     int component_id;          //eigenvector index
-
+    
     /**
        If using CUDA native fields, this function will ensure that the
        field ordering is appropriate for the new precision setting to
@@ -328,7 +328,11 @@ namespace quda {
       //! for deflation etc.
       if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
-
+    
+    void change_dim(int D, int d) {
+      x[D] = d;
+    }
+    
     virtual ~ColorSpinorParam() {
     }
 
@@ -458,7 +462,7 @@ namespace quda {
     size_t GhostFaceBytes(int i) const { return ghost_face_bytes[i]; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
-
+    
     void* V() {return v;}
     const void* V() const {return v;}
     void* Norm(){return norm;}

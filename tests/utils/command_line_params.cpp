@@ -391,6 +391,7 @@ namespace
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
+						 {"trlm3D", QUDA_EIG_TR_LANCZOS_3D},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 

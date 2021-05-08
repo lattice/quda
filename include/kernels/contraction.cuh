@@ -11,7 +11,7 @@
 namespace quda {
    
   template <typename Float, int nColor_, int reduction_dim_ = 3>
-  struct ContractionSummedArg :  public ReduceArg<spinor_matrix>
+  struct ContractionSummedArg : public ReduceArg<spinor_matrix>
   {
     // This the direction we are performing reduction on. default to 3.
     static constexpr int reduction_dim = reduction_dim_; 

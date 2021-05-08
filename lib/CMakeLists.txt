@@ -30,7 +30,7 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp eig_trlm_3d.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -56,7 +56,7 @@ set (QUDA_OBJS
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu blas_quda_3d.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
