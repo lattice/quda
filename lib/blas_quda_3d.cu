@@ -3,7 +3,8 @@
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
-#include <kernels/blas_3d.cuh>
+#include <kernels/blas_quda_3d.cuh>
+#include <blas_quda_3d.h>
 
 namespace quda {
 
@@ -12,20 +13,20 @@ namespace quda {
     template <typename Float, int nColor> class copy3D : TunableKernel2D
     {
     protected:
+      ColorSpinorField &y;
       ColorSpinorField &x;
-      const ColorSpinorField &y;
-      const int reduction_dim;
-      const int dim_slice;
+      const int t_slice;
+      const copy3dType type;
       
       unsigned int minThreads() const { return x.VolumeCB(); }
       
     public:
-      copy3D(ColorSpinorField &x, const ColorSpinorField &y, const int reduction_dim, const int dim_slice) :
-	TunableKernel2D(x, x.SiteSubset()),
-	x(x),
+      copy3D(ColorSpinorField &y, ColorSpinorField &x, const int t_slice, const copy3dType type) :
+	TunableKernel2D(y, y.SiteSubset()),
 	y(y),
-	reduction_dim(reduction_dim),
-	dim_slice(dim_slice)
+	x(x),
+	t_slice(t_slice),
+	type(type)
       {
 	apply(device::get_default_stream());
       }
@@ -33,29 +34,22 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	switch (reduction_dim) {
-	case 3:
-	  launch<copy3d>(tp, stream, copy3dArg<Float, nColor, 3>(x, y, dim_slice));
-	  break;
-	case 2:
-	  launch<copy3d>(tp, stream, copy3dArg<Float, nColor, 2>(x, y, dim_slice));
-	  break;
-	case 1:
-	  launch<copy3d>(tp, stream, copy3dArg<Float, nColor, 1>(x, y, dim_slice));
-	  break;
-	case 0:
-	  launch<copy3d>(tp, stream, copy3dArg<Float, nColor, 0>(x, y, dim_slice));
-	  break;
-	default: errorQuda("Undefined reduction dim %d", reduction_dim);
+	switch(type) {
+	case COPY_TO_3D:
+	  launch<copyTo3d>(tp, stream, copy3dArg<Float, nColor>(y, x, t_slice)); break;
+	case COPY_FROM_3D:
+	  launch<copyFrom3d>(tp, stream, copy3dArg<Float, nColor>(y, x, t_slice)); break;
+	default:
+	  errorQuda("Unknown 3D copy type");
 	}
       }
-    
+      
       long long flops() const
       {
 	// 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
 	return 4 * 3 * 6ll * x.Volume();
       }
-    
+      
       long long bytes() const
       {
 	return x.Bytes() + y.Bytes();
@@ -63,7 +57,7 @@ namespace quda {
     };
     
     //#ifdef GPU_BLAS_3D
-    void copy(const int dim, const int slice, ColorSpinorField &x, const ColorSpinorField &y)
+    void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y)
     {      
       checkPrecision(x, y);
       
@@ -73,14 +67,14 @@ namespace quda {
       // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
       
-      // Check reduction dim
-      if (x.X()[dim] != 1) errorQuda("Unexpected dimensions in x[%d]=%d", dim, x.X()[dim]);
-
-      // Check slice value
-      if (slice >= y.X()[dim]) errorQuda("Unexpected slice in y[%d]=%d", dim, y.X()[dim]);
+      // Check orth dim
+      if (x.X()[3] != 1) errorQuda("Unexpected dimensions in x[3]=%d", x.X()[3]);
       
-      // We must give a Lattice field as the first argument
-      instantiate<copy3D>(x, y, dim, slice);
+      // Check slice value
+      if (slice >= y.X()[3]) errorQuda("Unexpected slice %d", slice);
+      
+      // We must give a 4D Lattice field as the first argument
+      instantiate<copy3D>(y, x, slice, type);
     }
     
     // #else
@@ -98,46 +92,30 @@ namespace quda {
       ColorSpinorField &y;
       void *a;
       void *b;
-      const int reduction_dim;
       
       unsigned int minThreads() const { return x.VolumeCB(); }
       
     public:
-      axpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b, const int reduction_dim) :
+      axpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b) :
 	TunableKernel2D(x, x.SiteSubset()),
 	x(x),
 	y(y),
 	a(a),
-	b(b),
-	reduction_dim(reduction_dim)
+	b(b)
       {
 	apply(device::get_default_stream());
       }
       
       void apply(const qudaStream_t &stream)
       {
-	size_t data_bytes = x.X()[reduction_dim] *  x.Precision();
+	size_t data_bytes = x.X()[3] *  x.Precision();
 	void *d_a = pool_device_malloc(data_bytes);
 	void *d_b = pool_device_malloc(data_bytes);
 	qudaMemcpy(d_a, a, data_bytes, qudaMemcpyHostToDevice);
 	qudaMemcpy(d_b, b, data_bytes, qudaMemcpyHostToDevice);
 	
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	switch (reduction_dim) {
-	case 3:
-	  launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor, 3>((Float*)d_a, x, (Float*)d_b, y));
-	  break;
-	case 2:
-	  launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor, 2>((Float*)d_a, x, (Float*)d_b, y));
-	  break;
-	case 1:
-	  launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor, 1>((Float*)d_a, x, (Float*)d_b, y));
-	  break;
-	case 0:
-	  launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor, 0>((Float*)d_a, x, (Float*)d_b, y));
-	  break;
-	default: errorQuda("Undefined reduction dim %d", reduction_dim);
-	}
+	launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor>((Float*)d_a, x, (Float*)d_b, y));
 	
 	qudaMemcpy(a, d_a, data_bytes, qudaMemcpyDeviceToHost);
 	qudaMemcpy(b, d_b, data_bytes, qudaMemcpyDeviceToHost);
@@ -158,7 +136,7 @@ namespace quda {
     };
     
     //#ifdef GPU_BLAS_3D
-    void axpby(const int dim, std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y)
+    void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y)
     {
       
       checkPrecision(x, y);
@@ -169,14 +147,11 @@ namespace quda {
       // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     
-      // Check reduction dim
-      if (x.X()[dim] != y.X()[dim]) errorQuda("Unexpected dimensions in x[%d]=%d and y[%d]=%d", dim, x.X()[dim], dim, y.X()[dim]);
-
       // Check coefficients
-      if (a.size() != b.size() && a.size() != (unsigned int)x.X()[dim]) errorQuda("Unexpected coeff array sizes a=%lu b=%lu", a.size(), b.size());
+      if (a.size() != b.size() && a.size() != (unsigned int)x.X()[3]) errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
       
       // We must give a Lattice field as the first argument
-      instantiate<axpby3D>(x, y, a.data(), b.data(), dim);
+      instantiate<axpby3D>(x, y, a.data(), b.data());
     }
     
     // #else
@@ -193,46 +168,30 @@ namespace quda {
       ColorSpinorField &y;
       void *a;
       void *b;
-      const int reduction_dim;
       
       unsigned int minThreads() const { return x.VolumeCB(); }
       
     public:
-      caxpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b, const int reduction_dim) :
+      caxpby3D(ColorSpinorField &x, ColorSpinorField &y, void *a, void *b) :
 	TunableKernel2D(x, x.SiteSubset()),
 	x(x),
 	y(y),
 	a(a),
-	b(b),
-	reduction_dim(reduction_dim)
+	b(b)
       {
 	apply(device::get_default_stream());
       }
       
       void apply(const qudaStream_t &stream)
       {
-	size_t data_bytes = 2 * x.X()[reduction_dim] *  x.Precision();
+	size_t data_bytes = 2 * x.X()[3] *  x.Precision();
 	void *d_a = pool_device_malloc(data_bytes);
 	void *d_b = pool_device_malloc(data_bytes);
 	qudaMemcpy(d_a, a, data_bytes, qudaMemcpyHostToDevice);
 	qudaMemcpy(d_b, b, data_bytes, qudaMemcpyHostToDevice);
 	
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	switch (reduction_dim) {
-	case 3:
-	  launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor, 3>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
-	  break;
-	case 2:
-	  launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor, 2>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
-	  break;
-	case 1:
-	  launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor, 1>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
-	  break;
-	case 0:
-	  launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor, 0>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
-	  break;
-	default: errorQuda("Undefined reduction dim %d", reduction_dim);
-	}
+	launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
 	
 	qudaMemcpy(a, d_a, data_bytes, qudaMemcpyDeviceToHost);
 	qudaMemcpy(b, d_b, data_bytes, qudaMemcpyDeviceToHost);
@@ -253,7 +212,7 @@ namespace quda {
     };
     
     //#ifdef GPU_BLAS_3D
-    void caxpby(const int dim, std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y)
+    void caxpby(std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y)
     {
       
       checkPrecision(x, y);
@@ -264,14 +223,11 @@ namespace quda {
       // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     
-      // Check reduction dim
-      if (x.X()[dim] != y.X()[dim]) errorQuda("Unexpected dimensions in x[%d]=%d and y[%d]=%d", dim, x.X()[dim], dim, y.X()[dim]);
-
       // Check coefficients
-      if (a.size() != b.size() && a.size() != (unsigned int)x.X()[dim]) errorQuda("Unexpected coeff array sizes a=%lu b=%lu", a.size(), b.size());
+      if (a.size() != b.size() && a.size() != (unsigned int)x.X()[3]) errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
       
       // We must give a Lattice field as the first argument
-      instantiate<caxpby3D>(x, y, a.data(), b.data(), dim);
+      instantiate<caxpby3D>(x, y, a.data(), b.data());
     }
     
     // #else
@@ -289,17 +245,14 @@ namespace quda {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
       std::vector<double> &result;
-      const int reduction_dim;
       
     public:
       reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		     std::vector<double> &result,
-		     const int reduction_dim) :
-	TunableMultiReduction(x, x.X()[reduction_dim]),
+		     std::vector<double> &result) :
+	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result),
-	reduction_dim(reduction_dim)
+	result(result)
       {
 	apply(device::get_default_stream());
       }
@@ -309,19 +262,16 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	
 	// Zero out the local results.
-	std::vector<double> result_local(x.X()[reduction_dim]);
-	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[reduction_dim]; i++) result_local[i] = 0.0;
-	}
+	std::vector<double> result_local(x.X()[3]);
+	if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
 	
-	// Pass the integer value of the redection dim as a template arg
-	reDotProduct3dArg<Float, nColor, 3> arg(x, y);
+	reDotProduct3dArg<Float, nColor> arg(x, y);
 	launch<reDotProduct3d>(result_local, tp, stream, arg);
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[reduction_dim]; i++) {
-	    result[comm_coord(reduction_dim) * x.X()[reduction_dim] + i] = result_local[i];
+	  for(int i=0; i<x.X()[3]; i++) {
+	    result[comm_coord(3) * x.X()[3] + i] = result_local[i];
 	  }
 	}
       }
@@ -338,7 +288,7 @@ namespace quda {
     };
     
     //#ifdef GPU_CONTRACT
-    void reDotProduct(const int dim, std::vector<double> &result, const ColorSpinorField &x, const ColorSpinorField &y)
+    void reDotProduct(std::vector<double> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       // Check spins
       if (x.Nspin() != y.Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
@@ -346,14 +296,11 @@ namespace quda {
       // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
       
-      // Check reduction dim
-      if (x.X()[dim] != y.X()[dim]) errorQuda("Unexpected dimensions in x[%d]=%d and y[%d]=%d", dim, x.X()[dim], dim, y.X()[dim]);
-      
       // Check coefficients
-      if (result.size() != (unsigned int)x.X()[dim]) errorQuda("Unexpected coeff array size a=%lu", result.size());
+      if (result.size() != (unsigned int)x.X()[3]) errorQuda("Unexpected coeff array size a=%lu, x[3]=%d", result.size(), x.X()[3]);
       
       // We must give a Lattice field as the first argument
-      instantiate<reDotProduct3D>(x, y, result, dim);
+      instantiate<reDotProduct3D>(x, y, result);
     }
     // #else
     //     void reDotProduct(const int, std::vector<double> &, const ColorSpinorField &, void *, const ColorSpinorField &) 
@@ -375,17 +322,14 @@ namespace quda {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
       std::vector<Complex> &result;
-      const int reduction_dim;
       
     public:
       cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		    std::vector<Complex> &result,
-		    const int reduction_dim) :
-	TunableMultiReduction(x, x.X()[reduction_dim]),
+		    std::vector<Complex> &result) :
+	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result),
-	reduction_dim(reduction_dim)
+	result(result)
       {
 	apply(device::get_default_stream());
       }
@@ -395,23 +339,22 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	
 	// Zero out the local results.
-	std::vector<double> result_local(2*x.X()[reduction_dim]);
+	std::vector<double> result_local(2*x.X()[3]);
 	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[reduction_dim]; i++) {
+	  for(int i=0; i<x.X()[3]; i++) {
 	    result_local[2*i] = 0.0;
 	    result_local[2*i+1] = 0.0;
 	  }
 	}
 	
-	// Pass the integer value of the redection dim as a template arg
-	cDotProduct3dArg<Float, nColor, 3> arg(x, y);
+	cDotProduct3dArg<Float, nColor> arg(x, y);
 	launch<cDotProduct3d>(result_local, tp, stream, arg);
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[reduction_dim]; i++) {
-	    result[comm_coord(reduction_dim) * x.X()[reduction_dim] + i].real(result_local[2*i]);
-	    result[comm_coord(reduction_dim) * x.X()[reduction_dim] + i].imag(result_local[2*i+1]);
+	  for(int i=0; i<x.X()[3]; i++) {
+	    result[comm_coord(3) * x.X()[3] + i].real(result_local[2*i]);
+	    result[comm_coord(3) * x.X()[3] + i].imag(result_local[2*i+1]);
 	  }
 	}
       }
@@ -428,7 +371,7 @@ namespace quda {
     };
     
     //#ifdef GPU_CONTRACT
-    void cDotProduct(const int dim, std::vector<Complex> &result, const ColorSpinorField &x, const ColorSpinorField &y)
+    void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       // Check spins
       if (x.Nspin() != y.Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
@@ -436,14 +379,11 @@ namespace quda {
       // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
       
-      // Check reduction dim
-      if (x.X()[dim] != y.X()[dim]) errorQuda("Unexpected dimensions in x[%d]=%d and y[%d]=%d", dim, x.X()[dim], dim, y.X()[dim]);
-      
       // Check coefficients
-      if (result.size() != (unsigned int)x.X()[dim]) errorQuda("Unexpected coeff array size a=%lu", result.size());
+      if (result.size() != (unsigned int)x.X()[3]) errorQuda("Unexpected coeff array size a=%lu, x[3]=%d", result.size(), x.X()[3]);
       
       // We must give a Lattice field as the first argument
-      instantiate<cDotProduct3D>(x, y, result, dim);
+      instantiate<cDotProduct3D>(x, y, result);
     }
     
   } // blas3d

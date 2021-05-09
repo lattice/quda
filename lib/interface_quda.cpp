@@ -2470,10 +2470,12 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Ensure device vectors qre in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
-  std::vector<Complex> evals(eig_param->n_conv, 0.0);
+  int n_evals = eig_param->n_conv;
+  if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= X[3];
+  std::vector<Complex> evals(n_evals, 0.0);
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
-
+  
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
   if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
@@ -2491,6 +2493,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     }
   }
 
+  // Computation of 3D eigenvalues not supported by ARPACK interface
+  if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D && eig_param->arpack_check) {
+    errorQuda("Computation of 3D eigenvalues not supported by ARPACK interface");
+  }
+  
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
@@ -2543,7 +2550,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
+  for (int i = 0; i < n_evals; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the

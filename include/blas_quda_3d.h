@@ -7,11 +7,16 @@ namespace quda {
 
   namespace blas3d {
 
-    void copy(const int dim, const int slice, ColorSpinorField &x, const ColorSpinorField &y);
-    void reDotProduct(const int dim, std::vector<double> &result, const ColorSpinorField &a, const ColorSpinorField &b);
-    void cDotProduct(const int dim, std::vector<Complex> &result, const ColorSpinorField &a, const ColorSpinorField &b);
-    
-    void axpby(const int dim, std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y);
-    void caxpby(const int dim, std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y);
+    // Local enum for the 3D copy type
+    enum copy3dType { COPY_TO_3D, COPY_FROM_3D };    
+    void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y);
+
+    // Reductions 
+    void reDotProduct(std::vector<double> &result, const ColorSpinorField &a, const ColorSpinorField &b);
+    void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &a, const ColorSpinorField &b);
+
+    // (c)axpby
+    void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y);
+    void caxpby(std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y);
   }
 }

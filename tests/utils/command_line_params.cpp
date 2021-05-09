@@ -750,7 +750,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
                       "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
-  opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
+  opgroup->add_option("--eig-poly-deg", eig_poly_deg, "The degree of the Chebyshev polynomial (default 100)");
   opgroup->add_option(
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");

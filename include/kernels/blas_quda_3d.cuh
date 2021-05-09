@@ -10,40 +10,65 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_, int dim_> struct copy3dArg : kernel_param<> 
+  template <typename Float, int nColor_> struct copy3dArg : kernel_param<> 
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
     static constexpr int nSpin = 1;    
-    static constexpr int dim = dim_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
+    F y;
     F x;
-    const F y;
     const int slice;
     
     int_fastdiv X[4]; // grid dimensions
     
-    copy3dArg(ColorSpinorField &x, const ColorSpinorField &y, const int slice) :
-      kernel_param(dim3(x.VolumeCB()/x.X()[dim], 2, 1)),
-      x(x),
+    copy3dArg(ColorSpinorField &y, ColorSpinorField &x, const int slice) :
+      kernel_param(dim3(y.VolumeCB(), 2, 1)),
       y(y),
+      x(x),
       slice(slice)
     {
       for(int i=0; i<4; i++) {
-	X[i] = x.X()[i];
+	X[i] = y.X()[i];
       }      
     }
   };
   
   
-  template <typename Arg> struct copy3d {
+  template <typename Arg> struct copyTo3d {
     const Arg &arg;
-    constexpr copy3d(const Arg &arg) : arg(arg) {}
+    constexpr copyTo3d(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      using real = typename Arg::real;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+      
+      int X[4];
+      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
+      int idx[4];
+      getCoords(idx, x_cb, X, parity);
+
+      // Isolate the slice of the 4D array
+      if(idx[3] == arg.slice) {
+	// Get 4D data
+	Vector data = arg.y(x_cb, parity);
+	// Write to 3D
+	int idx_3d = ((idx[2]) * X[1] + idx[1]) * X[0] + idx[0];
+	arg.x(idx_3d/2, idx_3d%2) = data;
+      }
+    }
+  };
+
+  template <typename Arg> struct copyFrom3d {
+    const Arg &arg;
+    constexpr copyFrom3d(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -56,21 +81,23 @@ namespace quda {
       int idx[4];
       getCoords(idx, x_cb, X, parity);
 
-      if(idx[Arg::dim] == arg.slice) {
-	//Vector x = arg.y(x_cb, parity);
-	// Write to x
-	//arg.x(x_cb, parity) = x;
+      // Isolate the slice of the 4D array
+      if(idx[3] == arg.slice) {
+	// Get 3D data
+	int idx_3d = ((idx[2]) * X[1] + idx[1]) * X[0] + idx[0];
+	Vector data = arg.x(idx_3d/2, idx_3d%2);
+	// Write to 4D
+	arg.y(x_cb, parity) = data;
       }
     }
   };
 
   
-  template <typename Float, int nColor_, int dim_> struct axpby3dArg : kernel_param<> 
+  template <typename Float, int nColor_> struct axpby3dArg : kernel_param<> 
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
     static constexpr int nSpin = 1;
-    static constexpr int dim = dim_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
@@ -112,13 +139,15 @@ namespace quda {
       for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int idx[4];
       getCoords(idx, x_cb, X, parity);
+
+      //printf("axpby %d %d %d %d\n", idx[0], idx[1], idx[2], idx[3]);
       
       Vector x = arg.x(x_cb, parity);
       Vector y = arg.y(x_cb, parity);
 
       // Get the coeffs for this dim slice
-      real a = arg.a[idx[Arg::dim]];
-      real b = arg.b[idx[Arg::dim]];
+      real a = arg.a[idx[3]];
+      real b = arg.b[idx[3]];
       
       // Compute the axpby      
       Vector out = a * x + b * y;
@@ -128,12 +157,11 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor_, int dim_> struct caxpby3dArg : kernel_param<> 
+  template <typename Float, int nColor_> struct caxpby3dArg : kernel_param<> 
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
     static constexpr int nSpin = 1;
-    static constexpr int dim = dim_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
@@ -180,8 +208,8 @@ namespace quda {
       Vector y = arg.y(x_cb, parity);
 
       // Get the coeffs for this dim slice
-      complex<real> a = arg.a[idx[Arg::dim]];
-      complex<real> b = arg.b[idx[Arg::dim]];
+      complex<real> a = arg.a[idx[3]];
+      complex<real> b = arg.b[idx[3]];
       
       // Compute the caxpby      
       Vector out = a * x + b * y;
@@ -191,12 +219,11 @@ namespace quda {
     }
   };
 
-  template <typename Float, int nColor_, int dim_> struct reDotProduct3dArg : public ReduceArg<double>
+  template <typename Float, int nColor_> struct reDotProduct3dArg : public ReduceArg<double>
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
     static constexpr int nSpin = 1;
-    static constexpr int dim = dim_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
@@ -210,11 +237,11 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     reDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double>(x.X()[dim]),
+      ReduceArg<double>(x.X()[3]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[dim], x.X()[dim])
+      threads(x.Volume()/x.X()[3], x.X()[3])
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -238,7 +265,7 @@ namespace quda {
 
       // Collect vector data
       int parity = 0;
-      int idx = idx_from_t_xyz<Arg::dim>(t, xyz, arg.X);
+      int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
      
       Vector x = arg.x(idx_cb, parity);
@@ -248,17 +275,16 @@ namespace quda {
       // Get the inner product
       for (int s = 0; s < Arg::nSpin; s++) sum += innerProduct(x, y, s, s).real();
       
-      // Apply reduction to dim bucket
+      // Apply reduction to t bucket
       return plus::operator()(sum, result);
     }
   };
 
-  template <typename Float, int nColor_, int dim_> struct cDotProduct3dArg : public ReduceArg<double2>
+  template <typename Float, int nColor_> struct cDotProduct3dArg : public ReduceArg<double2>
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
     static constexpr int nSpin = 1;
-    static constexpr int dim = dim_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
@@ -272,11 +298,11 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double2>(x.X()[dim]),
+      ReduceArg<double2>(x.X()[3]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[dim], x.X()[dim])
+      threads(x.Volume()/x.X()[3], x.X()[3])
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -300,7 +326,7 @@ namespace quda {
 
       // Collect vector data
       int parity = 0;
-      int idx = idx_from_t_xyz<Arg::dim>(t, xyz, arg.X);
+      int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
      
       Vector x = arg.x(idx_cb, parity);

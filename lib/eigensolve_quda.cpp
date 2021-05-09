@@ -251,8 +251,8 @@ namespace quda
     // Resize Krylov Space
     for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(n_conv);
-    evals.resize(n_conv);
-
+    evals.resize(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D ? kSpace[0]->X()[3] * n_conv : n_conv);
+    
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");

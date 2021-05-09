@@ -577,7 +577,7 @@ namespace quda
 
     // Arrays for 3D residua
     std::vector<std::vector<double>> residua_3D;
-    
+
     // Tridiagonal/Arrow matrices, fixed size (for the 3D problem)
     double **alpha_3D;
     double **beta_3D;
@@ -632,7 +632,7 @@ namespace quda
        orthonormalise
        @param[in] kSpace The Krylov space vectors
     */
-    void prepareInitialGuess3D(std::vector<ColorSpinorField *> &kSpace, int ortho_dim, int ortho_dim_size);
+    void prepareInitialGuess3D(std::vector<ColorSpinorField *> &kSpace, int ortho_dim_size);
     
     /**
        @brief Estimate the spectral radius of the operator for the max value of the
