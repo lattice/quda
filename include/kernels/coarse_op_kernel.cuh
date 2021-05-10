@@ -1027,6 +1027,7 @@ namespace quda {
     template <typename Arg> __device__ inline void operator()(int &parity_coarse, int &x_coarse_cb, int &parity, int &x_cb,
                                                               int &parity_c_row, int &c_row, int &c_col, const Arg &arg)
     {
+      QUDA_RT_CONSTS;
       if (arg.coarse_color_wave) {
         int parity_c_row_block_idx_z = blockDim.y*blockIdx.x + threadIdx.y;
         int c_row_block_idx_z = arg.parity_flip ? (parity_c_row_block_idx_z % arg.coarse_color_grid_z ) : (parity_c_row_block_idx_z / 2); // coarse color row index
