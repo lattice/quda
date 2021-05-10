@@ -85,45 +85,7 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-#ifdef QUDA_BACKEND_OMPTARGET
-      ompwip("OFFLOADING...");
-      const int gd = tp.grid.x*tp.grid.y*tp.grid.z;
-      const int ld = tp.block.x*tp.block.y*tp.grid.z;
-      const int tx = arg.threads.x;
-      const int ty = arg.threads.y;
-      printf("launch parameter: gd %d ld %d tx %d ty %d\n", gd, ld, tx, ty);
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-      reduce_t value = arg.init();
-
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
-
-      Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
-      // printf("dparg %p\n", dparg);
-      omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
-      Transformer<Arg> t(*dparg);
-#pragma omp target teams distribute parallel for simd collapse(2) num_teams(gd) thread_limit(ld) num_threads(ld) reduction(OMPReduce_:value)
-      for (int j = 0; j < ty; j++) {
-        for (int i = 0; i < tx; i++) {
-          value = t(value, i, j);
-        }
-      }
-      omp_target_free(dparg, omp_get_default_device());
-      int input_size = vec_length<reduce_t>::value;
-      int output_size = result.size() * vec_length<T>::value;
-      if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
-
-      // copy element by element to output vector
-      for (int i = 0; i < output_size; i++) {
-        std::cerr << "launch_device: reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[" << i << "]: " << reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i] << std::endl;
-        reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
-          reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
-      }
-
-      if (!activeTuning() && commGlobalReduction()) {
-        // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-        comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
-      }
-#else
+      ompwip("Multireduction on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg);
 #else
@@ -138,7 +100,6 @@ namespace quda {
           comm_allreduce_array((double*)result.data(), result.size() * sizeof(T) / sizeof(double));
         }
       }
-#endif
     }
 
     template <template <typename> class Transformer, typename Arg, typename T>
@@ -345,7 +306,7 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      ompwip("unimplemented multireduction");
+      ompwip("Multireduction on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg);
 #else

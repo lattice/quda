@@ -67,7 +67,10 @@ namespace quda
     friend __device__  void reduce(Arg&, const Reducer &, const I &, const int);
     qudaError_t launch_error; // only do complete if no launch error to avoid hang
 
+#ifndef QUDA_BACKEND_OMPTARGET
+  /** Workaround compiler limitations.  We have to inline parallel regions with target teams.  We need public access. **/
   private:
+#endif
     const int n_reduce; // number of reductions of length n_item
     bool reset = false; // reset the counter post completion (required for multiple calls with the same arg instance
 #ifdef HETEROGENEOUS_ATOMIC
@@ -179,7 +182,13 @@ namespace quda
       const int n_element = n_reduce * sizeof(T) / sizeof(device_t);
       if (result.size() != (unsigned)n_element)
         errorQuda("result vector length %lu does not match n_reduce %d", result.size(), n_element);
+#ifdef QUDA_BACKEND_OMPTARGET
+      omp_target_memcpy(result_h, result_d, n_element*sizeof(device_t), 0, 0, omp_get_initial_device(), omp_get_default_device());
+#endif
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
+#ifdef QUDA_BACKEND_OMPTARGET
+      for (int i = 0; i < n_element; i++) std::cerr << "complete: result[" << i << "] = " << result[i] << std::endl;
+#endif
     }
 #endif
   };
@@ -266,7 +275,50 @@ namespace quda
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
 #ifdef QUDA_BACKEND_OMPTARGET
-      ompwip("unimplemented");
+      const dim3
+        blockDim=launch_param.block,
+        gridDim=launch_param.grid,
+        blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
+
+      // In OpenMP, this runs in the main thread of each team, and `in` is already the block reduction value.
+      bool isLastBlockDone;
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      { // This is the main thread per team
+        arg.partial[idx * gridDim.x + blockIdx.x] = in;
+
+        // increment global block counter
+        // auto value = atomicInc(&arg.count[idx], gridDim.x);
+        int value = 0;
+        #pragma omp atomic capture
+        { value = arg.count[idx]; arg.count[idx] = ((arg.count[idx] >= gridDim.x) ? 0 : (arg.count[idx]+1)); }
+
+        // determine if last block
+        isLastBlockDone = (value == (gridDim.x - 1));
+      }
+      // finish the reduction if last block
+      if (isLastBlockDone) {
+        T sum = arg.init();
+        const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
+#pragma omp declare reduction(OMPReduce_ : T : omp_out=Reducer::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Reducer::init_omp())
+        #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
+        {
+          dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
+          auto i = threadIdx.y * block_size_x + threadIdx.x;
+          while (i < gridDim.x) {
+            sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * gridDim.x + i]));
+            i += block_size_x * block_size_y;
+          }
+        }
+
+        // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+
+        // write out the final reduced value
+        // if (threadIdx.y * block_size_x + threadIdx.x == 0)
+        { // This is the main thread per team
+          arg.result_d[idx] = sum;
+          arg.count[idx] = 0; // set to zero for next time
+        }
+      }
 #else
       using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
