@@ -13,7 +13,12 @@
 
 #define CUDA_SUCCESS QUDA_SUCCESS
 
-#define QUDA_RT_CONSTS ompwip();const dim3 threadIdx(omp_get_thread_num(),0,0),blockDim(omp_get_num_threads()),blockIdx(omp_get_team_num(),0,0),gridDim(omp_get_num_teams())
+#define QUDA_RT_CONSTS \
+  const dim3\
+    blockDim=launch_param.block,\
+    gridDim=launch_param.grid,\
+    threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y)),\
+    blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y))
 
 #include <functional>
 #include <iostream>
@@ -68,7 +73,11 @@ ompwip_(const char * const file, const size_t line, const char * const func, std
 using cudaStream_t = int;  // device.h:/cudaStream_t
 using CUresult = int;  // ../lib/coarse_op.cuh:/CUresult
 
-#else // QUDA_BACKEND_OMPTARGET
+struct LaunchParam{
+  dim3 block;
+  dim3 grid;
+};
+extern LaunchParam launch_param;
 
 #endif // QUDA_BACKEND_OMPTARGET
 
@@ -111,6 +120,19 @@ namespace quda
   */
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
 
+  template <typename... Arg>
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
+  {
+#ifdef QUDA_BACKEND_OMPTARGET
+    extern void qudaSetupLaunchParameter(const TuneParam &tp);
+    qudaSetupLaunchParameter(tp);
+    reinterpret_cast<void(*)(Arg...)>(const_cast<void*>(func))(arg...);
+    return QUDA_SUCCESS;
+#else
+    const void *args[] = {&arg...};
+    return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
+#endif
+  }
   /**
      @brief Templated wrapper around qudaLaunchKernel which can accept
      a templated kernel, and expects a kernel with a single Arg argument
@@ -122,9 +144,15 @@ namespace quda
   template <typename T, typename... Arg>
   qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
   {
-    ompwip("directly calling qudaLaunchKernel is unsupported");
+#ifdef QUDA_BACKEND_OMPTARGET
+    extern void qudaSetupLaunchParameter(const TuneParam &tp);
+    qudaSetupLaunchParameter(tp);
+    func(arg...);
+    return QUDA_SUCCESS;
+#else
     const void *args[] = {&arg...};
     return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
+#endif
   }
 
   /**

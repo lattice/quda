@@ -45,7 +45,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 block_dim()
     {
-      return dim3(omp_get_num_threads());
+      return launch_param.block;
     }
 
     /**
@@ -55,7 +55,7 @@ namespace quda {
     */
     __device__ __host__ inline dim3 grid_dim()
     {
-      return dim3(omp_get_num_teams());
+      return launch_param.grid;
     }
 
     /**
@@ -65,7 +65,8 @@ namespace quda {
     */
     __device__ __host__ inline dim3 block_idx()
     {
-      return dim3(omp_get_team_num(),0,0);
+      const int n = omp_get_team_num();
+      return dim3(n%launch_param.grid.x, (n/launch_param.grid.x)%launch_param.grid.y, n/(launch_param.grid.x*launch_param.grid.y));
     }
 
     /**
@@ -75,7 +76,8 @@ namespace quda {
     */
     __device__ __host__ inline dim3 thread_idx()
     {
-      return dim3(omp_get_thread_num(),0,0);
+      const int n = omp_get_thread_num();
+      return dim3(n%launch_param.block.x, (n/launch_param.block.x)%launch_param.block.y, n/(launch_param.block.x*launch_param.block.y));
     }
 
   }

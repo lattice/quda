@@ -157,6 +157,9 @@ enum {cudaEventDisableTiming};
 #define PROFILE(f, idx) f;
 #endif
 
+LaunchParam launch_param;
+#pragma omp declare target to(launch_param)
+
 namespace quda
 {
 
@@ -175,6 +178,14 @@ namespace quda
     auto rtn = last_error_str;
     last_error_str = QUDA_SUCCESS;
     return rtn;
+  }
+
+  void qudaSetupLaunchParameter(const TuneParam &tp)
+  {
+    ompwip("set up global parameter");
+    launch_param.grid = tp.grid;
+    launch_param.block = tp.block;
+    #pragma omp target update to(launch_param)
   }
 
   namespace cuda {
