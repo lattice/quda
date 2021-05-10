@@ -271,7 +271,8 @@ namespace quda {
 	// Copy results back to host array
 	if(!activeTuning()) {
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[comm_coord(3) * x.X()[3] + i] = result_local[i];
+	    //result[comm_coord(3) * x.X()[3] + i] = result_local[i];
+	    result[i] = result_local[i];
 	  }
 	}
       }
@@ -353,8 +354,8 @@ namespace quda {
 	// Copy results back to host array
 	if(!activeTuning()) {
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[comm_coord(3) * x.X()[3] + i].real(result_local[2*i]);
-	    result[comm_coord(3) * x.X()[3] + i].imag(result_local[2*i+1]);
+	    result[i].real(result_local[2*i]);
+	    result[i].imag(result_local[2*i+1]);
 	  }
 	}
       }

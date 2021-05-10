@@ -109,45 +109,55 @@ namespace quda
       // mat_norm is updated. Find the smallest mat norm accross t, the largest
       // within each t
       double mat_norm_floor = 1e10;
+      int t_last_man = 0;
       for (int t = 0; t < ortho_dim_size; t++) {
 	for (int i = num_locked; i < n_kr; i++) {
 	  if (fabs(alpha_3D[t][i]) > mat_norm) mat_norm = fabs(alpha_3D[t][i]);
 	}
-	if(mat_norm < mat_norm_floor) mat_norm_floor = mat_norm;
+	if(mat_norm < mat_norm_floor) {
+	  mat_norm_floor = mat_norm;
+	  t_last_man = t;
+	}
       }
       mat_norm = mat_norm_floor;
-      
+      int t = t_last_man;
       // Locking check
       iter_locked = 0;
-      for (int t = 0; t < ortho_dim_size; t++) {
+      double iter_locked_min = n_kr;
+      //for (int t = 0; t < ortho_dim_size; t++) {	
 	for (int i = 1; i < (n_kr - num_locked); i++) {
 	  if (residua_3D[t][i + num_locked] < epsilon * mat_norm) {
 	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	      printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked],
 			 epsilon * mat_norm);
-	    iter_locked = i;
+	    iter_locked = i;	    
 	  } else {
-	    // Unlikely to find new locked pairs
+	    if(iter_locked < iter_locked_min) iter_locked_min = iter_locked;
+	    // Unlikely to find new locked pairs	    
 	    break;
 	  }
 	}
-      }
+	//}
+      iter_locked = iter_locked_min;
 
       // Convergence check
       iter_converged = iter_locked;
-      for (int t = 0; t < ortho_dim_size; t++) {
+      double iter_converged_min = n_kr;
+      //for (int t = 0; t < ortho_dim_size; t++) {
 	for (int i = iter_locked + 1; i < n_kr - num_locked; i++) {
 	  if (residua_3D[t][i + num_locked] < tol * mat_norm) {
 	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	      printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked], tol * mat_norm);
 	    iter_converged = i;	    
 	  } else {
+	    if(iter_converged < iter_converged_min) iter_converged_min = iter_converged;
 	    // Unlikely to find new converged pairs
 	    break;
 	  }
 	}
-      }
-
+	//}
+      iter_converged = iter_converged_min;
+      
       iter_keep = std::min(iter_converged + (n_kr - num_converged) / 2, n_kr - num_locked - 12);
 
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -167,11 +177,11 @@ namespace quda
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	  for (int t = 0; t < ortho_dim_size; t++) {
+	  //for (int t = 0; t < ortho_dim_size; t++) {
 	    for (int i = 0; i < n_kr; i++) {
 	      printfQuda("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t, i, alpha_3D[t][i], i, residua_3D[t][i]);
 	    }
-	  }
+	    //}
 	}
       }
 
@@ -297,7 +307,48 @@ namespace quda
   
   void TRLM3D::reorder3D(std::vector<ColorSpinorField *> &kSpace)
   {
+    std::vector<ColorSpinorField *> vecs_ptr_t;
+    vecs_ptr_t.reserve(2);    
+    ColorSpinorParam csParamClone(*kSpace[0]);
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    csParamClone.change_dim(ortho_dim, 1);
     
+    for(int i=0; i<2; i++) vecs_ptr_t.push_back(ColorSpinorField::Create(csParamClone));    
+    
+    for(int t=0; t<ortho_dim_size; t++) {      
+      int i = 0;
+      if (reverse) {
+	while (i < n_kr) {
+	  if ((i == 0) || (alpha_3D[t][i - 1] >= alpha_3D[t][i]))
+	    i++;
+	  else {
+	    std::swap(alpha_3D[t][i], alpha_3D[t][i - 1]);
+	    blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_ptr_t[0], *kSpace[i]);	    
+	    blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_ptr_t[1], *kSpace[i-1]);
+	    blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_ptr_t[0], *kSpace[i-1]);	    
+	    blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_ptr_t[1], *kSpace[i]);	    	    
+	    //std::swap(kSpace[i], kSpace[i - 1]);	    
+	    i--;
+	  }
+	}
+      } else {
+	while (i < n_kr) {
+	  if ((i == 0) || (alpha_3D[t][i - 1] <= alpha_3D[t][i]))
+	    i++;
+	  else {
+	    std::swap(alpha_3D[t][i], alpha_3D[t][i - 1]);
+	    blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_ptr_t[0], *kSpace[i]);	    
+	    blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_ptr_t[1], *kSpace[i-1]);
+	    blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_ptr_t[0], *kSpace[i-1]);	    
+	    blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_ptr_t[1], *kSpace[i]);	    	    
+	    //std::swap(kSpace[i], kSpace[i - 1]);
+	    i--;
+	  }
+	}
+      }
+    }
+    delete vecs_ptr_t[0];
+    delete vecs_ptr_t[1];
   }
 
   void TRLM3D::eigensolveFromArrowMat3D()
@@ -410,11 +461,14 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     std::vector<ColorSpinorField *> vecs_ptr_t;
     vecs_ptr_t.reserve(vecs_ptr.size());
+    
     std::vector<ColorSpinorField *> kSpace_ptr_t;
     kSpace_ptr_t.reserve(kSpace_ptr.size());
+    
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    csParamClone.change_dim(ortho_dim, 1);    
+    csParamClone.change_dim(ortho_dim, 1);
+    
     for(unsigned int i=0; i<vecs_ptr.size(); i++) vecs_ptr_t.push_back(ColorSpinorField::Create(csParamClone));    
     for(unsigned int i=0; i<kSpace_ptr.size(); i++) kSpace_ptr_t.push_back(ColorSpinorField::Create(csParamClone));
     
@@ -462,11 +516,10 @@ namespace quda
       for(int t=0; t<ortho_dim_size; t++) s_t[t] *= -1.0;
       
       // Block orthogonalise
-      blas3d::caxpby(s_t, *vec_ptr[0], unit, *rvecs[0]);
-      
-      // Save orthonormalisation tuning
-      saveTuneCache();
+      blas3d::caxpby(s_t, *vec_ptr[0], unit, *rvecs[0]);      
     }
+    // Save orthonormalisation tuning
+    saveTuneCache();      
   }
 
   void TRLM3D::prepareInitialGuess3D(std::vector<ColorSpinorField *> &kSpace, int ortho_dim_size)
@@ -561,7 +614,7 @@ namespace quda
     std::vector<std::vector<Complex>> evals_t(size, std::vector<Complex>(ortho_dim_size, 0.0));
     std::vector<double> norms(ortho_dim_size, 0.0);
     std::vector<Complex> unit(ortho_dim_size, 1.0);
-    std::vector<Complex> n_unit(ortho_dim_size, -1.0);
+    std::vector<Complex> n_unit(ortho_dim_size, {-1.0, 0.0});
     
     for (int i = 0; i < size; i++) {
       // r = A * v_i
@@ -583,7 +636,7 @@ namespace quda
     if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv)
       for(int t=0; t<ortho_dim_size; t++)
 	for (int i = 0; i < size; i++) {
-	  printfQuda("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i, evals_t[i][t].real(), evals_t[i][t].imag(), residua_3D[t][i]);
+	  if(residua_3D[t][i] > tol) printfQuda("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i, evals_t[i][t].real(), evals_t[i][t].imag(), residua_3D[t][i]);
 	  // Transfer evals to eval array
 	  evals.resize(size * evecs[0]->X()[3]);
 	  evals[t*size + i] = evals_t[i][t];

@@ -140,8 +140,6 @@ namespace quda {
       int idx[4];
       getCoords(idx, x_cb, X, parity);
 
-      //printf("axpby %d %d %d %d\n", idx[0], idx[1], idx[2], idx[3]);
-      
       Vector x = arg.x(x_cb, parity);
       Vector y = arg.y(x_cb, parity);
 
