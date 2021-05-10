@@ -473,7 +473,7 @@ namespace quda
       setFusedParam(dslashParam, dslash, faceVolumeCB);
 
       DslashCommsPattern pattern(dslashParam.commDim);
-      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.kernel_type = (shmem & 64) ? UBER_KERNEL : INTERIOR_KERNEL;
       dslashParam.threads = volume;
       dslash.setShmem(shmem);
       dslashParam.setExteriorDims(shmem & 64);

@@ -167,7 +167,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)

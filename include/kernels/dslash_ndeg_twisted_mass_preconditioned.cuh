@@ -94,14 +94,16 @@ namespace quda
         Vector x = arg.out(my_flavor_idx, my_spinor_parity);
         out += x;
       }
-
-      if (isComplete<mykernel_type>(arg, coord) && active) {
-        if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-          SharedMemoryCache<Vector> cache(target::block_dim());
+      
+      if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
+        SharedMemoryCache<Vector> cache(target::block_dim());
+        if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
-          cache.sync(); // safe to sync in here since other threads will exit
+        }
 
+        cache.sync(); // safe to sync in here since other threads will exit
+        if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
             out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load(threadIdx.x, 1, threadIdx.z));
           else

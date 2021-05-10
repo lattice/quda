@@ -509,6 +509,7 @@ namespace quda {
     EXTERIOR_KERNEL_Y = 1,
     EXTERIOR_KERNEL_Z = 2,
     EXTERIOR_KERNEL_T = 3,
+    UBER_KERNEL = 4,
     KERNEL_POLICY = 7
   };
 
