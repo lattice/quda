@@ -163,6 +163,134 @@ namespace quda {
     return v;
   }
 
+  template <> __device__ __host__ inline vector_type<double2, 1> zero<vector_type<double2, 1>>()
+  {
+    vector_type<double2, 1> v;
+#pragma unroll
+    for (int i = 0; i < 1; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 2> zero<vector_type<double2, 2>>()
+  {
+    vector_type<double2, 2> v;
+#pragma unroll
+    for (int i = 0; i < 2; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 3> zero<vector_type<double2, 3>>()
+  {
+    vector_type<double2, 3> v;
+#pragma unroll
+    for (int i = 0; i < 3; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 4> zero<vector_type<double2, 4>>()
+  {
+    vector_type<double2, 4> v;
+#pragma unroll
+    for (int i = 0; i < 4; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 5> zero<vector_type<double2, 5>>()
+  {
+    vector_type<double2, 5> v;
+#pragma unroll
+    for (int i = 0; i < 5; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 6> zero<vector_type<double2, 6>>()
+  {
+    vector_type<double2, 6> v;
+#pragma unroll
+    for (int i = 0; i < 6; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 7> zero<vector_type<double2, 7>>()
+  {
+    vector_type<double2, 7> v;
+#pragma unroll
+    for (int i = 0; i < 7; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 8> zero<vector_type<double2, 8>>()
+  {
+    vector_type<double2, 8> v;
+#pragma unroll
+    for (int i = 0; i < 8; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 9> zero<vector_type<double2, 9>>()
+  {
+    vector_type<double2, 9> v;
+#pragma unroll
+    for (int i = 0; i < 9; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 10> zero<vector_type<double2, 10>>()
+  {
+    vector_type<double2, 10> v;
+#pragma unroll
+    for (int i = 0; i < 10; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 11> zero<vector_type<double2, 11>>()
+  {
+    vector_type<double2, 11> v;
+#pragma unroll
+    for (int i = 0; i < 11; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 12> zero<vector_type<double2, 12>>()
+  {
+    vector_type<double2, 12> v;
+#pragma unroll
+    for (int i = 0; i < 12; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 13> zero<vector_type<double2, 13>>()
+  {
+    vector_type<double2, 13> v;
+#pragma unroll
+    for (int i = 0; i < 13; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 14> zero<vector_type<double2, 14>>()
+  {
+    vector_type<double2, 14> v;
+#pragma unroll
+    for (int i = 0; i < 14; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 15> zero<vector_type<double2, 15>>()
+  {
+    vector_type<double2, 15> v;
+#pragma unroll
+    for (int i = 0; i < 15; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
+  template <> __device__ __host__ inline vector_type<double2, 16> zero<vector_type<double2, 16>>()
+  {
+    vector_type<double2, 16> v;
+#pragma unroll
+    for (int i = 0; i < 16; i++) v.data[i] = zero<double2>();
+    return v;
+  }
+
   template <typename scalar, int n>
   __device__ __host__ inline vector_type<scalar, n> operator+(const vector_type<scalar, n> &a,
                                                               const vector_type<scalar, n> &b)
