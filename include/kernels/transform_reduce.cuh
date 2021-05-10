@@ -45,6 +45,11 @@ namespace quda {
 
     static constexpr bool do_sum = Arg::reducer::do_sum;
 
+#ifdef QUDA_BACKEND_OMPTARGET
+    static reduce_t reduce_omp(reduce_t a, reduce_t b) { return Arg::reducer::reduce_omp(a, b); }
+    static reduce_t init_omp() { return Arg::reducer::init_omp(); }
+#endif
+
     __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return arg.r(a, b); }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, count_t i, int j, int)
