@@ -206,13 +206,14 @@ namespace quda {
     } else {
       // 1 - k D5 - k^2 D4 M5^-1 D4_oe
       if (this->use_mobius_fused_kernel) {
-        Dslash4M5inv(out, in, parity[0]);
+        Dslash4M5inv(*tmp1, in, parity[0]);
+        ApplyDomainWall4DM5mob(out, *tmp1, *gauge, -1.0, m5, b, c, in, out, parity[1], dagger, commDim, mass, profile);
       } else {
         Dslash4(*tmp1, in, parity[0]);
         M5inv(out, *tmp1);
+        Dslash4Xpay(*tmp1, out, parity[1], in, -kappa2);
+        Dslash5Xpay(out, in, *tmp1, -kappa5);
       }
-      Dslash4Xpay(*tmp1, out, parity[1], in, -kappa2);
-      Dslash5Xpay(out, in, *tmp1, -kappa5);
     }
 
     deleteTmp(&tmp1, reset1);
