@@ -88,7 +88,7 @@ namespace quda
        */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
         return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableKernel3D::minGridSize();
@@ -100,7 +100,7 @@ namespace quda
       /* see comment for minGridSize above for gridStep choice when using nvshmem */
       if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
         return (device::processor_count() / (2 * nDimComms)) * (2 * nDimComms);
       } else {
         return TunableKernel3D::gridStep();
@@ -124,7 +124,7 @@ namespace quda
           // so we set all ghost pointers else if doing exterior
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
-          if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
+          if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL) {
             ghost[2 * dim + dir] = (typename Arg::Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir));
           }
         }
@@ -132,7 +132,7 @@ namespace quda
 
       arg.in.resetGhost(ghost);
 
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
+      if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.blocks_per_dir = tp.aux.x;
         arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
         arg.in_pack.resetGhost(this->packBuffer);
@@ -140,12 +140,10 @@ namespace quda
         arg.counter = dslash::get_shmem_sync_counter();
       }
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
-        int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
         // if we are doing tuning we should not wait on the sync_arr to be set.
         arg.counter = (activeTuning() && !policyTuning()) ? 2 : dslash::get_shmem_sync_counter();
       }
-      if (arg.shmem > 0 && arg.kernel_type == INTERIOR_KERNEL) {
+      if (arg.shmem > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
         arg.counter = activeTuning() ?
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
@@ -164,14 +162,14 @@ namespace quda
 
     virtual bool advanceAux(TuneParam &param) const override
     {
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
+      if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) {
 
         int max_threads_per_dir = 0;
         for (int i = 0; i < 4; ++i) {
           max_threads_per_dir = std::max(max_threads_per_dir, (arg.threadDimMapUpper[i] - arg.threadDimMapLower[i]) / 2);
         }
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
@@ -216,8 +214,9 @@ namespace quda
         step_z = vector_length_z;
       }
       TunableKernel3D::initTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
-      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
+      if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
+        param.aux.x = 1;                                                        // packing blocks per direction
+      if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
     virtual void defaultTuneParam(TuneParam &param) const override
@@ -230,8 +229,9 @@ namespace quda
         step_z = vector_length_z;
       }
       TunableKernel3D::defaultTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1;  // packing blocks per direction
-      if (arg.exterior_dims && arg.kernel_type == INTERIOR_KERNEL) param.aux.y = 1; // exterior blocks
+      if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
+        param.aux.x = 1;                                                        // packing blocks per direction
+      if (arg.exterior_dims && arg.kernel_type == UBER_KERNEL) param.aux.y = 1; // exterior blocks
     }
 
     /**
@@ -263,6 +263,9 @@ namespace quda
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
+#ifdef NVSHMEM_COMMS
+        case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
+#endif
         case EXTERIOR_KERNEL_X: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
         case EXTERIOR_KERNEL_Y: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
         case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
@@ -341,6 +344,7 @@ namespace quda
       fillAuxBase();
 #ifdef MULTI_GPU
       fillAux(INTERIOR_KERNEL, "policy_kernel=interior");
+      fillAux(UBER_KERNEL, "policy_kernel=uber");
       fillAux(EXTERIOR_KERNEL_ALL, "policy_kernel=exterior_all");
       fillAux(EXTERIOR_KERNEL_X, "policy_kernel=exterior_x");
       fillAux(EXTERIOR_KERNEL_Y, "policy_kernel=exterior_y");
@@ -432,7 +436,7 @@ namespace quda
 
     virtual TuneKey tuneKey() const override
     {
-      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+      auto aux_ = (arg.pack_blocks > 0 && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL)) ?
         aux_pack :
         ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) ? aux_barrier : aux[arg.kernel_type]);
       return TuneKey(in.VolString(), typeid(*this).name(), aux_);
@@ -444,7 +448,8 @@ namespace quda
      */
     virtual void preTune() override
     {
-      if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.backup();
+      if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != UBER_KERNEL && arg.kernel_type != KERNEL_POLICY)
+        out.backup();
     }
 
     /**
@@ -452,7 +457,8 @@ namespace quda
      */
     virtual void postTune() override
     {
-      if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != KERNEL_POLICY) out.restore();
+      if (arg.kernel_type != INTERIOR_KERNEL && arg.kernel_type != UBER_KERNEL && arg.kernel_type != KERNEL_POLICY)
+        out.restore();
     }
 
     /*
@@ -498,7 +504,10 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
+        if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
+          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
                   num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
@@ -545,7 +554,10 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
+        if (arg.pack_threads && (arg.kernel_type == INTERIOR_KERNEL || arg.kernel_type == UBER_KERNEL))
+          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
         if (arg.xpay) bytes_ += spinor_bytes;

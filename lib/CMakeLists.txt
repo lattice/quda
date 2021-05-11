@@ -25,7 +25,7 @@ endif()
 set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
-  coarse_op.cu coarsecoarse_op.cu
+  coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp

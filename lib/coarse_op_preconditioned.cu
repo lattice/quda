@@ -227,9 +227,13 @@ namespace quda
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
+      {
+        if (use_mma && X.Location() == QUDA_CUDA_FIELD_LOCATION)
+          warningQuda("There is a known issue with Yhat norms 0 through 3 for CUDA+MMA builds. These are harmless and will be addressed in the future.\n");
         for (int d = 0; d < 8; d++)
           printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d), Yhat.abs_max(d),
                      Y.abs_max(d) * Xinv.abs_max(0), Y.abs_max(d), Xinv.abs_max(0));
+      }
     }
 
     // fill back in the bulk of Yhat so that the backward link is updated on the previous node
