@@ -85,7 +85,7 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      ompwip("Multireduction on device");
+      ompwip("Reduction2D on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg);
 #else
@@ -306,7 +306,7 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      ompwip("Multireduction on device");
+      ompwip("MultiReduction on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg);
 #else
