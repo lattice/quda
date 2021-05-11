@@ -174,7 +174,6 @@ namespace quda {
       }
       // perform final inter-block reduction and write out result
       Transformer<Arg> t(*dparg);
-      auto j = blockIdx.y * blockDim.y;
       // reduce<block_size_x, block_size_y>(*dparg, t, value);
       // ../../reduce_helper.h:/reduce
       {
