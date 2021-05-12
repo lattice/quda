@@ -52,7 +52,8 @@ namespace quda
        out(x) = M*in = a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == false )
        out(x) = M*in = in + a*(C + i*b*gamma_5*tau_3 + c*tau_1)/(C^2 + b^2 - c^2)*D*x ( xpay == true )
   */
-    __device__ __host__ inline void operator()(int idx, int flavor, int parity)
+    template <KernelType mykernel_type = kernel_type>
+    __device__ __host__ __forceinline__ void operator()(int idx, int flavor, int parity)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;
@@ -62,25 +63,25 @@ namespace quda
       typedef HMatrix<real, n> HMat;
 
       bool active
-        = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
-      if (kernel_type != INTERIOR_KERNEL && active) {
+      if (mykernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
         Vector x = arg.out(my_flavor_idx, my_spinor_parity);
         out += x;
       }
 
-      if (isComplete<kernel_type>(arg, coord) && active) {
+      if (isComplete<mykernel_type>(arg, coord) && active) {
         out.toRel();
 
         // single write and sync to shared memory instead of 
@@ -127,7 +128,7 @@ namespace quda
         }
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
   };
 } // namespace quda
