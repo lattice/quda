@@ -515,40 +515,24 @@ namespace quda
   
   void TRLM3D::computeKeptRitz3D(std::vector<ColorSpinorField *> &kSpace)
   {
-    int offset = n_kr + 1;
-
     // Multi-BLAS friendly array to store part of Ritz matrix we want
     double **ritz_mat_keep = (double **)safe_malloc((ortho_dim_size) * sizeof(double));
-    
+
+    std::vector<ColorSpinorField *> vecs_t;
+    std::vector<ColorSpinorField *> kSpace_t;
+
     for(int t=0; t<ortho_dim_size && !converged_3D[t]; t++) {
-      //printfQuda("slice %d is Ritz rotated\n", t);      
       int dim = n_kr - num_locked_3D[t];
-      ritz_mat_keep[t] = (double *)safe_malloc((dim * iter_keep_3D[t]) * sizeof(double));
-      for (int j = 0; j < dim; j++) {
-	for (int i = 0; i < iter_keep_3D[t]; i++) { ritz_mat_keep[t][j * iter_keep_3D[t] + i] = ritz_mat_3D[t][i * dim + j]; }
-      }
+      int keep = iter_keep_3D[t];
       
-      if ((int)kSpace.size() < offset + iter_keep_3D[t]) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep_3D[t]);
-	kSpace.reserve(offset + iter_keep_3D[t]);
-	for (int i = kSpace.size(); i < offset + iter_keep_3D[t]; i++) {
-	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
-	}
+      ritz_mat_keep[t] = (double *)safe_malloc((dim * keep) * sizeof(double));
+      for (int j = 0; j < dim; j++) {
+	for (int i = 0; i < keep; i++) { ritz_mat_keep[t][j * keep + i] = ritz_mat_3D[t][i * dim + j]; }
       }
 
       // Pointers to the relevant vectors
       std::vector<ColorSpinorField *> vecs_ptr;
-      std::vector<ColorSpinorField *> kSpace_ptr;
-
-      // Alias the extra space vectors, zero the workspace
-      kSpace_ptr.reserve(iter_keep_3D[t]);
-      for (int i = 0; i < iter_keep_3D[t]; i++) {
-	kSpace_ptr.push_back(kSpace[offset + i]);
-	blas::zero(*kSpace_ptr[i]);
-      }
-    
+      
       // Alias the vectors we wish to keep.
       vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[num_locked_3D[t] + j]);
@@ -556,53 +540,54 @@ namespace quda
       // multiBLAS axpy. Create 3D vectors so that we may perform all t independent
       // vector rotations.
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      std::vector<ColorSpinorField *> vecs_t;
-      vecs_t.reserve(vecs_ptr.size());
-    
-      std::vector<ColorSpinorField *> kSpace_t;
-      kSpace_t.reserve(kSpace_ptr.size());
+
+      vecs_t.reserve(dim);
+      kSpace_t.reserve(keep);
       
       ColorSpinorParam csParamClone(*kSpace[0]);
       csParamClone.create = QUDA_ZERO_FIELD_CREATE;
       csParamClone.change_dim(ortho_dim, 1);
 
       // Create 3D arrays
-      for(unsigned int i=0; i<vecs_ptr.size(); i++) vecs_t.push_back(ColorSpinorField::Create(csParamClone));    
-      for(unsigned int i=0; i<kSpace_ptr.size(); i++) kSpace_t.push_back(ColorSpinorField::Create(csParamClone));
+      for(int i=vecs_t.size(); i<dim; i++) vecs_t.push_back(ColorSpinorField::Create(csParamClone));    
+      for(int i=kSpace_t.size(); i<keep; i++) kSpace_t.push_back(ColorSpinorField::Create(csParamClone));
     
-      // Copy to data to 3D array, zero out workspace
-      for(unsigned int i=0; i<vecs_ptr.size(); i++) blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i], *vecs_ptr[i]);
-      for(unsigned int i=0; i<kSpace_ptr.size(); i++) blas::zero(*kSpace_t[i]);
-
-      // Compute the axpy
-      blas::axpy(ritz_mat_keep[t], vecs_t, kSpace_t);
+      // Copy to data to 3D array, zero out workspace, make pointers
+      std::vector<ColorSpinorField *> vecs_t_ptr;
+      std::vector<ColorSpinorField *> kSpace_t_ptr;
+      for(int i=0; i<dim; i++) {
+	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i], *vecs_ptr[i]);
+	vecs_t_ptr.push_back(vecs_t[i]);
+      }
+      for(int i=0; i<keep; i++) {
+	blas::zero(*kSpace_t[i]);
+	kSpace_t_ptr.push_back(kSpace_t[i]);
+      }
+      
+      // Compute the axpy      
+      blas::axpy(ritz_mat_keep[t], vecs_t_ptr, kSpace_t_ptr);
       
       // Copy back to the 4D workspace array
-      for(unsigned int i=0; i<kSpace_ptr.size(); i++) blas3d::copy(t, blas3d::COPY_FROM_3D, *kSpace_t[i], *kSpace_ptr[i]);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       
       // Copy compressed Krylov
-      for (int i = 0; i < iter_keep_3D[t]; i++) {
-	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *kSpace[offset + i]);
-	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[1], *kSpace[num_locked_3D[t] + i]);
-	blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *kSpace[num_locked_3D[t] + i]);	    
-	blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[1], *kSpace[offset + i]);
+      for (int i = 0; i < keep; i++) {
+	blas3d::copy(t, blas3d::COPY_FROM_3D, *kSpace_t[i], *kSpace[num_locked_3D[t] + i]);
       }
 	
       // Update residual vector
-      blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *kSpace[n_kr]);	    
-      blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[1], *kSpace[num_locked_3D[t] + iter_keep_3D[t]]);
-      blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *kSpace[num_locked_3D[t] + iter_keep_3D[t]]);
-      blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[1], *kSpace[n_kr]);
-
-      // Delete 3D vectors
-      for(unsigned int i=0; i<vecs_ptr.size(); i++) delete vecs_t[i]; 
-      for(unsigned int i=0; i<kSpace_ptr.size(); i++) delete kSpace_t[i];
-      
+      blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *kSpace[n_kr]);
+      blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *kSpace[num_locked_3D[t] + keep]);
+            
       // Update sub arrow matrix
-      for (int i = 0; i < iter_keep_3D[t]; i++) beta_3D[t][i + num_locked_3D[t]] = beta_3D[t][n_kr - 1] * ritz_mat_3D[t][dim * (i + 1) - 1];
+      for (int i = 0; i < keep; i++) beta_3D[t][i + num_locked_3D[t]] = beta_3D[t][n_kr - 1] * ritz_mat_3D[t][dim * (i + 1) - 1];
       host_free(ritz_mat_keep[t]);
     }
+    
+    // Delete all 3D vectors
+    for(unsigned int i=0; i<vecs_t.size(); i++) delete vecs_t[i]; 
+    for(unsigned int i=0; i<kSpace_t.size(); i++) delete kSpace_t[i];
+    
     host_free(ritz_mat_keep);
   }
 
