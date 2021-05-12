@@ -1,6 +1,9 @@
 #include <color_spinor_field.h>
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>
+#include <target_device.h>
+#include <power_of_two_array.h>
+#include <blas_quda.h>
 
 namespace quda {
 
@@ -10,27 +13,24 @@ namespace quda {
     // up to a whole power of two.  So for example, 2x2x2x2 and
     // 3x3x3x1 aggregation would both use the same block size 32
 #ifndef QUDA_FAST_COMPILE_REDUCE
-    static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+    using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
-    static constexpr std::array<unsigned int, 1> block = {1024};
+    using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
 #endif
 
+    static constexpr array_type block = array_type();
     /**
        @brief Return the first power of two block that is larger than the required size
     */
     static unsigned int block_mapper(unsigned int raw_block)
     {
-      for (auto block_ : block) if (raw_block <= block_) return block_;
+      for (unsigned int b=0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
       errorQuda("Invalid raw block size %d\n", raw_block);
       return 0;
     }
   };
 
-#ifndef QUDA_FAST_COMPILE_REDUCE
-  constexpr std::array<unsigned int, 6> Aggregates::block;
-#else
-  constexpr std::array<unsigned int, 1> Aggregates::block;
-#endif
+  constexpr Aggregates::array_type  Aggregates::block;
 
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
   class RestrictLaunch : public TunableBlock2D {
@@ -46,7 +46,7 @@ namespace quda {
     bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
-
+    
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
@@ -64,12 +64,11 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      // TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
-
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
         Arg<QUDA_FLOAT2_FIELD_ORDER> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         arg.swizzle_factor = tp.aux.x;
+
         launch<Restrictor, Aggregates>(tp, stream, arg);
       } else {
         errorQuda("Unsupported field order %d", out.FieldOrder());
