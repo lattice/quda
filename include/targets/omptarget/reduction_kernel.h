@@ -78,8 +78,10 @@ namespace quda {
         auto idx = threadIdx.x + blockIdx.x * blockDim.x;
         auto j = threadIdx.y;
 
+        // if(blockIdx.x==0&&threadIdx.x==0) printf("team %d: thread %d: in value: %g\n", omp_get_team_num(), omp_get_thread_num(), *reinterpret_cast<double *>(&value));
         while (idx < dparg->threads.x) {
           value = t(value, idx, j);
+          // if(blockIdx.x==0&&threadIdx.x==0) printf("team %d: thread %d: idx %d: value: %g\n", omp_get_team_num(), omp_get_thread_num(), idx, *reinterpret_cast<double *>(&value));
           if (grid_stride) idx += blockDim.x * gridDim.x; else break;
         }
       }
@@ -93,7 +95,7 @@ namespace quda {
         bool isLastBlockDone;
         // if (threadIdx.x == 0 && threadIdx.y == 0)
         { // This is the main thread per team
-          if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
+          // if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
           dparg->partial[idx * gridDim.x + blockIdx.x] = value;
 
           // increment global block counter
@@ -122,7 +124,9 @@ namespace quda {
 
           // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
-          printf("lastBlock: team %d: idx: %d value: %g\n", omp_get_team_num(), idx, *reinterpret_cast<double *>(&sum));
+          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
+          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
+          // printf("\n");
           // write out the final reduced value
           // if (threadIdx.y * block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
@@ -210,6 +214,9 @@ namespace quda {
 
           // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
+          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
+          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
+          // printf("\n");
           // write out the final reduced value
           // if (threadIdx.y * block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
@@ -320,7 +327,7 @@ namespace quda {
         bool isLastBlockDone;
         // if (threadIdx.x == 0 && threadIdx.y == 0)
         { // This is the main thread per team
-          if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
+          // if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
           dparg->partial[idx * gridDim.x + blockIdx.x] = value;
 
           // increment global block counter
@@ -349,7 +356,9 @@ namespace quda {
 
           // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
-          printf("lastBlock: team %d: idx: %d value: %g\n", omp_get_team_num(), idx, *reinterpret_cast<double *>(&sum));
+          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
+          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
+          // printf("\n");
           // write out the final reduced value
           // if (threadIdx.y * block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
@@ -441,6 +450,9 @@ namespace quda {
 
           // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
+          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
+          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
+          // printf("\n");
           // write out the final reduced value
           // if (threadIdx.y * block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
