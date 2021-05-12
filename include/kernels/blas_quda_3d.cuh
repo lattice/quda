@@ -10,7 +10,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_> struct copy3dArg : public ReduceArg<double>
+  template <typename Float, int nColor_> struct copy3dArg : kernel_param<>
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
@@ -24,16 +24,13 @@ namespace quda {
     F y;
     F x;
     const int slice;
-    dim3 threads;     // number of active threads required      
     int_fastdiv X[4]; // grid dimensions
     
     copy3dArg(ColorSpinorField &y, ColorSpinorField &x, const int slice) :
-      ReduceArg<double>(y.X()[3]),
+      kernel_param(dim3(y.VolumeCB(), 2, 1)),
       y(y),
       x(x),
-      slice(slice),
-      // Launch xyz threads per t, t times.
-      threads(y.Volume()/y.X()[3], y.X()[3])      
+      slice(slice)
     {
       for(int i=0; i<4; i++) {
 	X[i] = y.X()[i];
@@ -41,70 +38,55 @@ namespace quda {
     }
     __device__ __host__ double init() const { return double(); }
   };
-  
-  template <typename Arg> struct copyTo3d : plus<double> {
-    using reduce_t = double;
-    using plus<reduce_t>::operator();
+
+  template <typename Arg> struct copyTo3d {
     const Arg &arg;
     constexpr copyTo3d(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    __device__ __host__ inline void operator()(int x_cb, int parity)
     {
       // Isolate the slice of the 4D array
-      if(t == arg.slice) {
+      int idx[4];
+      getCoords(idx, x_cb, arg.X, parity);
+      
+      if(idx[3] == arg.slice) {
 	using real = typename Arg::real;
 	using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
-
-	// Collect vector data
-	int parity = 0;
-	int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
-	int idx_cb = getParityCBFromFull(parity, arg.X, idx);	
-
+	
 	// Get 4D data
-	Vector y = arg.y(idx_cb, parity);
+	Vector y = arg.y(x_cb, parity);
+	// Get 3D location
+	int xyz = ((idx[2] * arg.X[1] + idx[1]) * arg.X[0] + idx[0]);
+
 	// Write to 3D
 	arg.x(xyz/2, xyz%2) = y;
-	if(xyz < 4) {
-	  //printf("writing to %d %d", xyz, t);
-	  //y.print();
-	}
       }
-      return plus::operator()(1.0, result);
     }
   };
 
-  template <typename Arg> struct copyFrom3d : plus<double> {
-    using reduce_t = double;
-    using plus<reduce_t>::operator();
+  template <typename Arg> struct copyFrom3d {
     const Arg &arg;
     constexpr copyFrom3d(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
-    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
+    __device__ __host__ inline void operator()(int x_cb, int parity)
     {
-      if(t == arg.slice) {
+      int idx[4] = { };
+      getCoords(idx, x_cb, arg.X, parity);
+      
+      if(idx[3] == arg.slice) {
 	using real = typename Arg::real;
 	using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
-	// Collect vector data
-	int parity = 0;
-	int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
-	int idx_cb = getParityCBFromFull(parity, arg.X, idx);	
-	
-	// Get 3D data
+	// Get 3D location
+	int xyz = ((idx[2] * arg.X[1] + idx[1]) * arg.X[0] + idx[0]);
 	Vector x = arg.x(xyz/2, xyz%2);
 	// Write to 4D
-	arg.y(idx_cb, parity) = x;
-	if(xyz < 4) {
-	  //printf("writing from %d %d", xyz, t);
-	  //x.print();
-	}	
+	arg.y(x_cb, parity) = x;
       }
-      return plus::operator()(1.0, result);
     }
   };
-
   
   template <typename Float, int nColor_> struct axpby3dArg : kernel_param<> 
   {

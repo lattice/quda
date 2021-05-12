@@ -10,17 +10,19 @@ namespace quda {
 
   namespace blas3d {
 
-    template <typename Float, int nColor> class copy3D : TunableMultiReduction<1>
+    template <typename Float, int nColor> class copy3D : TunableKernel2D
     {
     protected:
       ColorSpinorField &y;
       ColorSpinorField &x;
       const int t_slice;
       const copy3dType type;
+
+      unsigned int minThreads() const { return y.VolumeCB(); }
       
     public:
       copy3D(ColorSpinorField &y, ColorSpinorField &x, const int t_slice, const copy3dType type) :
-	TunableMultiReduction(y, y.X()[3]),
+	TunableKernel2D(y, y.SiteSubset()),
 	y(y),
 	x(x),
 	t_slice(t_slice),
@@ -32,17 +34,13 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	// Zero out the local results.
-	std::vector<double> res(y.X()[3]);
-	if(!activeTuning()) for(int i=0; i<y.X()[3]; i++) res[i] = 0.0;
-
-	copy3dArg<Float, nColor> arg(y, x, t_slice);
 	
+	copy3dArg<Float, nColor> arg(y, x, t_slice);	
 	switch(type) {
 	case COPY_TO_3D:
-	  launch<copyTo3d>(res, tp, stream, arg); break;
+	  launch<copyTo3d>(tp, stream, arg); break;
 	case COPY_FROM_3D:
-	  launch<copyFrom3d>(res, tp, stream, arg); break;
+	  launch<copyFrom3d>(tp, stream, arg); break;
 	default:
 	  errorQuda("Unknown 3D copy type");
 	}
@@ -50,8 +48,7 @@ namespace quda {
       
       long long flops() const
       {
-	// 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-	return 4 * 3 * 6ll * y.Volume();
+	return 0ll;
       }
       
       long long bytes() const
@@ -130,8 +127,8 @@ namespace quda {
     
       long long flops() const
       {
-	// 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-	return 4 * 3 * 6ll * x.Volume();
+	// 1 evec spin, 3 color, 3 complex, lattice volume
+	return 3 * 3ll * x.Volume();
       }
     
       long long bytes() const
@@ -206,8 +203,8 @@ namespace quda {
     
       long long flops() const
       {
-	// 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-	return 4 * 3 * 6ll * x.Volume();
+	// 1 evec spin, 3 color, 6 complex, lattice volume
+	return 3 * 6ll * x.Volume();
       }
     
       long long bytes() const
@@ -276,7 +273,6 @@ namespace quda {
 	// Copy results back to host array
 	if(!activeTuning()) {
 	  for(int i=0; i<x.X()[3]; i++) {
-	    //result[comm_coord(3) * x.X()[3] + i] = result_local[i];
 	    result[i] = result_local[i];
 	  }
 	}
@@ -284,7 +280,7 @@ namespace quda {
     
       long long flops() const
       {
-	return ((x.Nspin() * x.Nspin() * x.Ncolor() * 6ll) + (x.Nspin() * x.Nspin() * (x.Nspin() + x.Nspin()*x.Ncolor()))) * x.Volume();
+	return  x.Volume();
       }
       
       long long bytes() const

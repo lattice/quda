@@ -246,14 +246,12 @@ namespace quda
         printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
 
-	/*
         // Dump all Ritz values and residua if using Chebyshev
 	for (int t = 0; t < ortho_dim_size; t++) {
 	  for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
 	    printfQuda("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, alpha_3D[t][i], 0.0, residua_3D[t][i]);
 	  }
 	}
-	*/
       }
       
       // Compute eigenvalues
