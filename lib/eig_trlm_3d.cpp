@@ -74,6 +74,15 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
+    // Until we have support for reducing over spatial dims only
+    // so that the comm_allreduce data is not polluted with data
+    // from different timeslices, we must restrict the user to
+    // MPI splitting in T only
+    if(comm_dim(0) != 1 || comm_dim(1) != 1 || comm_dim(2) != 1) {
+      errorQuda("TRLM3D suppport MPI splitting in T dim only. Detected comm dim %d %d %d %d",
+		comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+    }
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -361,7 +370,10 @@ namespace quda
 
 	// r[t] = r[t] - beta[t]{j-1} * v[t]{j-1}
 	blas::axpy(beta_t.data(), vecs_t_ptr, r_t);
-	
+
+	// Save Lanczos step tuning
+	saveTuneCache();
+
 	// Copy residual back to 4D vector
 	blas3d::copy(t, blas3d::COPY_FROM_3D, *r_t[0], *r[0]);
       }
@@ -564,6 +576,9 @@ namespace quda
       
       // Compute the axpy      
       blas::axpy(ritz_mat_keep[t], vecs_t_ptr, kSpace_t_ptr);
+
+      // Save rotation tuning
+      saveTuneCache();      
       
       // Copy back to the 4D workspace array
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
