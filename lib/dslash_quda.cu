@@ -262,7 +262,7 @@ namespace quda {
     instantiate<GammaApply>(out, in, d, 0);
   }
 
-  // Applies out(x) = 1/2 * [(1 + gamma5) * in_right(x) + (1 - gamma5) * in_left(x)
+  // Applies out(x) = 1/2 * [(1 +/- gamma5) * in] + out
   void ApplyChiralProj(ColorSpinorField &out, const ColorSpinorField &in, const int proj)
   {
     checkPrecision(out, in);    // check all precisions match

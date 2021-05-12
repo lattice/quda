@@ -58,7 +58,6 @@ namespace quda {
     }
     __device__ __host__ spinor_matrix init() const { return spinor_matrix(); }
   };
-
   
   template <typename Arg> struct DegrandRossiContractFT : plus<spinor_matrix> {
     using reduce_t = spinor_matrix;

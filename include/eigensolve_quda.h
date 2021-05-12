@@ -578,6 +578,16 @@ namespace quda
     // Arrays for 3D residua
     std::vector<std::vector<double>> residua_3D;
 
+    // Array for convergence
+    std::vector<bool> converged_3D;
+    std::vector<bool> active_3D;
+    std::vector<int> iter_locked_3D;
+    std::vector<int> iter_keep_3D;
+    std::vector<int> iter_converged_3D;
+    std::vector<int> num_locked_3D;
+    std::vector<int> num_keep_3D;
+    std::vector<int> num_converged_3D;
+    
     // Tridiagonal/Arrow matrices, fixed size (for the 3D problem)
     double **alpha_3D;
     double **beta_3D;

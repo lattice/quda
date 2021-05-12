@@ -251,7 +251,7 @@ namespace quda
     // Resize Krylov Space
     for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(n_conv);
-    evals.resize(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D ? kSpace[0]->X()[3] * n_conv : n_conv);
+    evals.resize(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D ? comm_dim(3) * kSpace[0]->X()[3] * n_conv : n_conv);
     
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -534,7 +534,7 @@ namespace quda
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
-
+    
     // Alias the vectors we wish to keep
     vecs_ptr.reserve(block_i_rank);
     for (int i = i_range.first; i < i_range.second; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
@@ -542,9 +542,9 @@ namespace quda
     kSpace_ptr.reserve(block_j_rank);
     for (int j = j_range.first; j < j_range.second; j++) {
       int k = n_kr + 1 + j - j_range.first;
-      kSpace_ptr.push_back(kSpace[k]);
+      kSpace_ptr.push_back(kSpace[k]);      
     }
-
+    
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
@@ -1082,7 +1082,7 @@ namespace quda
         kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
-
+      
       // Alias the vectors we wish to keep.
       vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);

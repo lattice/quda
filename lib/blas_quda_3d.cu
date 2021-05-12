@@ -10,7 +10,7 @@ namespace quda {
 
   namespace blas3d {
 
-    template <typename Float, int nColor> class copy3D : TunableKernel2D
+    template <typename Float, int nColor> class copy3D : TunableMultiReduction<1>
     {
     protected:
       ColorSpinorField &y;
@@ -18,11 +18,9 @@ namespace quda {
       const int t_slice;
       const copy3dType type;
       
-      unsigned int minThreads() const { return x.VolumeCB(); }
-      
     public:
       copy3D(ColorSpinorField &y, ColorSpinorField &x, const int t_slice, const copy3dType type) :
-	TunableKernel2D(y, y.SiteSubset()),
+	TunableMultiReduction(y, y.X()[3]),
 	y(y),
 	x(x),
 	t_slice(t_slice),
@@ -34,11 +32,17 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	// Zero out the local results.
+	std::vector<double> res(y.X()[3]);
+	if(!activeTuning()) for(int i=0; i<y.X()[3]; i++) res[i] = 0.0;
+
+	copy3dArg<Float, nColor> arg(y, x, t_slice);
+	
 	switch(type) {
 	case COPY_TO_3D:
-	  launch<copyTo3d>(tp, stream, copy3dArg<Float, nColor>(y, x, t_slice)); break;
+	  launch<copyTo3d>(res, tp, stream, arg); break;
 	case COPY_FROM_3D:
-	  launch<copyFrom3d>(tp, stream, copy3dArg<Float, nColor>(y, x, t_slice)); break;
+	  launch<copyFrom3d>(res, tp, stream, arg); break;
 	default:
 	  errorQuda("Unknown 3D copy type");
 	}
@@ -47,7 +51,7 @@ namespace quda {
       long long flops() const
       {
 	// 4 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
-	return 4 * 3 * 6ll * x.Volume();
+	return 4 * 3 * 6ll * y.Volume();
       }
       
       long long bytes() const
@@ -55,6 +59,7 @@ namespace quda {
 	return x.Bytes() + y.Bytes();
       }
     };
+    
     
     //#ifdef GPU_BLAS_3D
     void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y)

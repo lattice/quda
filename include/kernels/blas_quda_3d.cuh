@@ -10,7 +10,7 @@
 
 namespace quda {
 
-  template <typename Float, int nColor_> struct copy3dArg : kernel_param<> 
+  template <typename Float, int nColor_> struct copy3dArg : public ReduceArg<double>
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
@@ -24,71 +24,84 @@ namespace quda {
     F y;
     F x;
     const int slice;
-    
+    dim3 threads;     // number of active threads required      
     int_fastdiv X[4]; // grid dimensions
     
     copy3dArg(ColorSpinorField &y, ColorSpinorField &x, const int slice) :
-      kernel_param(dim3(y.VolumeCB(), 2, 1)),
+      ReduceArg<double>(y.X()[3]),
       y(y),
       x(x),
-      slice(slice)
+      slice(slice),
+      // Launch xyz threads per t, t times.
+      threads(y.Volume()/y.X()[3], y.X()[3])      
     {
       for(int i=0; i<4; i++) {
 	X[i] = y.X()[i];
-      }      
+      }
     }
+    __device__ __host__ double init() const { return double(); }
   };
   
-  
-  template <typename Arg> struct copyTo3d {
+  template <typename Arg> struct copyTo3d : plus<double> {
+    using reduce_t = double;
+    using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr copyTo3d(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
     {
-      using real = typename Arg::real;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
-      
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-      int idx[4];
-      getCoords(idx, x_cb, X, parity);
-
       // Isolate the slice of the 4D array
-      if(idx[3] == arg.slice) {
+      if(t == arg.slice) {
+	using real = typename Arg::real;
+	using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+
+	// Collect vector data
+	int parity = 0;
+	int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
+	int idx_cb = getParityCBFromFull(parity, arg.X, idx);	
+
 	// Get 4D data
-	Vector data = arg.y(x_cb, parity);
+	Vector y = arg.y(idx_cb, parity);
 	// Write to 3D
-	int idx_3d = ((idx[2]) * X[1] + idx[1]) * X[0] + idx[0];
-	arg.x(idx_3d/2, idx_3d%2) = data;
+	arg.x(xyz/2, xyz%2) = y;
+	if(xyz < 4) {
+	  //printf("writing to %d %d", xyz, t);
+	  //y.print();
+	}
       }
+      return plus::operator()(1.0, result);
     }
   };
 
-  template <typename Arg> struct copyFrom3d {
+  template <typename Arg> struct copyFrom3d : plus<double> {
+    using reduce_t = double;
+    using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr copyFrom3d(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
-    __device__ __host__ inline void operator()(int x_cb, int parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
     {
-      using real = typename Arg::real;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+      if(t == arg.slice) {
+	using real = typename Arg::real;
+	using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-      int idx[4];
-      getCoords(idx, x_cb, X, parity);
-
-      // Isolate the slice of the 4D array
-      if(idx[3] == arg.slice) {
+	// Collect vector data
+	int parity = 0;
+	int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
+	int idx_cb = getParityCBFromFull(parity, arg.X, idx);	
+	
 	// Get 3D data
-	int idx_3d = ((idx[2]) * X[1] + idx[1]) * X[0] + idx[0];
-	Vector data = arg.x(idx_3d/2, idx_3d%2);
+	Vector x = arg.x(xyz/2, xyz%2);
 	// Write to 4D
-	arg.y(x_cb, parity) = data;
+	arg.y(idx_cb, parity) = x;
+	if(xyz < 4) {
+	  //printf("writing from %d %d", xyz, t);
+	  //x.print();
+	}	
       }
+      return plus::operator()(1.0, result);
     }
   };
 
@@ -197,10 +210,8 @@ namespace quda {
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
-      int X[4];
-      for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
       int idx[4];
-      getCoords(idx, x_cb, X, parity);
+      getCoords(idx, x_cb, arg.X, parity);
       
       Vector x = arg.x(x_cb, parity);
       Vector y = arg.y(x_cb, parity);
@@ -268,10 +279,9 @@ namespace quda {
      
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
-      real sum = 0.0;
       
       // Get the inner product
-      for (int s = 0; s < Arg::nSpin; s++) sum += innerProduct(x, y, s, s).real();
+      real sum = innerProduct(x, y).real();
       
       // Apply reduction to t bucket
       return plus::operator()(sum, result);
@@ -330,16 +340,13 @@ namespace quda {
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
       reduce_t sum = {0.0, 0.0};
-      complex<real> res;
       
       // Get the inner product
-      for (int s = 0; s < Arg::nSpin; s++) {
-	res = innerProduct(x, y, s, s);
-	sum.x += res.real();
-	sum.y += res.imag();
-      }
+      complex<real> res = innerProduct(x, y);
+      sum.x = res.real();
+      sum.y = res.imag();
       
-      // Apply reduction to dim bucket
+      // Apply reduction to temporal bucket
       return plus::operator()(sum, result);
     }
   };

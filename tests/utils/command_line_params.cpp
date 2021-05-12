@@ -1055,7 +1055,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
   
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gaueg field in the T dim prior to inversion (default false)");
+  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
   
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
@@ -1115,13 +1115,13 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
 
   opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
-                      "Set the number of source smearing steps (default 50)");
+                      "Set the number of source smearing steps (default 0)");
 
   opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
                       "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
-                      "Set the number of sink smearing steps (default 50)");
+                      "Set the number of sink smearing steps (default 0)");
   
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));

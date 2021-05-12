@@ -308,28 +308,6 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: Closed file for reading\n",__func__);
 }
 
-void read_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                           QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
-{
-  quda_this_node = QMP_get_node_number();
-
-  set_layout(X, subset);
-
-  /* Open the test file for reading */
-  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
-  if (infile == NULL) { errorQuda("Open file failed\n"); }
-
-  /* Read the spinor field record */
-  printfQuda("%s: reading %d vector fields\n", __func__, Nprop);
-  fflush(stdout);
-  int status = read_field(infile, 12 * 2 * nSpin * nColor, Nprop, V, precision, subset, parity, nSpin, nColor);
-  if (status) { errorQuda("read_spinor_fields failed %d\n", status); }
-
-  /* Close the file */
-  QIO_close_read(infile);
-  printfQuda("%s: Closed file for reading\n", __func__);
-}
-
 template <int len>
 int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
                 QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, const char *type)
@@ -344,8 +322,6 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
-  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n";
@@ -383,8 +359,6 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 128:
   case 256:
   case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
-  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12
   default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n\n";
@@ -533,30 +507,3 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   printfQuda("%s: Closed file for writing\n",__func__);
 }
 
-void write_propagator_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                            QudaParity parity, int nColor, int nSpin, int Nprop, int argc, char *argv[])
-{
-  quda_this_node = QMP_get_node_number();
-
-  set_layout(X, subset);
-
-  QudaPrecision file_prec = precision;
-
-  char type[128];
-  sprintf(type, "QUDA_%sNs%dNc%d_PropagatorField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", nSpin, nColor);
-
-  /* Open the test file for reading */
-  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
-  if (outfile == NULL) { errorQuda("Open file failed\n"); }
-
-  /* Write the propagator field record */
-  printfQuda("%s: writing %d propagator fields\n", __func__, Nprop);
-  fflush(stdout);
-  int status
-    = write_field(outfile, 12 * 2 * nSpin * nColor, Nprop, V, precision, precision, subset, parity, nSpin, nColor, type);
-  if (status) { errorQuda("write_propagator_fields failed %d\n", status); }
-
-  /* Close the file */
-  QIO_close_write(outfile);
-  printfQuda("%s: Closed file for writing\n", __func__);
-}
