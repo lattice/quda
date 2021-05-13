@@ -3,16 +3,8 @@
 #include <CL/sycl.hpp>
 #include <cstddef>
 
-//#define cudaMemcpyHostToHost qudaMemcpyHostToHost
-//#define cudaMemcpyHostToDevice qudaMemcpyHostToDevice
-//#define cudaMemcpyDeviceToHost qudaMemcpyDeviceToHost
-//#define cudaMemcpyDeviceToDevice qudaMemcpyDeviceToDevice
-//#define cudaMemcpyDefault qudaMemcpyDefault
-
 // warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
 
-//using qudaEvent_t = double;
-//using cudaEvent_t = qudaEvent_t;
 using cudaStream_t = int;
 
 //#include <error.h>
@@ -22,14 +14,14 @@ using cudaStream_t = int;
 
 #define __host__
 #define __device__
-#define __global__
+//#define __global__
 #define __forceinline__ __attribute__((always_inline)) inline
-#define __launch_bounds__(x)
+//#define __launch_bounds__(x)
 
 // FIXME
 //#define __constant__ static
 #define __shared__
-#define __shfl_down_sync(m, x, o) x
+//#define __shfl_down_sync(m, x, o) x
 
 inline std::string str(dim3 x)
 {
@@ -176,8 +168,8 @@ namespace quda
   }
 }
 
-#define qudaLaunchKernel(a,b,c,...) \
-  qudaLaunchKernel_(__FILE__,__LINE__,__func__,#a)
+//#define qudaLaunchKernel(a,b,c,...)			\
+//  qudaLaunchKernel_(__FILE__,__LINE__,__func__,#a)
 
 
 ///// MATH

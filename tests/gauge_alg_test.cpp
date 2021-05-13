@@ -148,7 +148,10 @@ protected:
       //Reunitarize gauge links...
       *num_failures_h = 0;
       unitarizeLinks(*U, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization");
+      if (*num_failures_h > 0) {
+	warningQuda("num_faulures_h: %d", *num_failures_h);
+	errorQuda("Error in the unitarization");
+      }
 
       plaquette(*U);
     }

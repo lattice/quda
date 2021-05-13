@@ -32,8 +32,8 @@ namespace quda {
   }
 
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE  
-   * @param a the angle 
+   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
    *
@@ -42,8 +42,8 @@ namespace quda {
   inline void sincos(const T a, T* s, T* c)
   {
     //*s = sycl::sincos(a, c);
-    *s = sin(a);
-    *c = cos(a);
+    *s = sycl::sin(a);
+    *c = sycl::cos(a);
   }
 
   /**
@@ -60,13 +60,13 @@ namespace quda {
   }
 
   /**
-     Generic wrapper for Trig functions -- used in gauge field order 
+     Generic wrapper for Trig functions -- used in gauge field order
   */
   template <bool isFixed, typename T>
   struct Trig {
-    static T Atan2( const T &a, const T &b) { return ::atan2(a,b); }
-    static T Sin( const T &a ) { return ::sin(a); }
-    static T Cos( const T &a ) { return ::cos(a); }
+    static T Atan2( const T &a, const T &b) { return sycl::atan2(a,b); }
+    static T Sin( const T &a ) { return sycl::sin(a); }
+    static T Cos( const T &a ) { return sycl::cos(a); }
     static void SinCos(const T &a, T *s, T *c) { quda::sincos(a, s, c); }
   };
 
@@ -75,13 +75,15 @@ namespace quda {
    */
   template <>
     struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b)/M_PI; }
+    __device__ __host__ static float Atan2( const float &a, const float &b) {
+      return sycl::atan2(a,b)/M_PI;
+    }
     __device__ __host__ static float Sin(const float &a)
     {
 #ifdef __CUDA_ARCH__
       return __sinf(a * static_cast<float>(M_PI));
 #else
-      return ::sinf(a * static_cast<float>(M_PI));
+      return sycl::sin(a * static_cast<float>(M_PI));
 #endif
     }
 
@@ -90,13 +92,15 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       return __cosf(a * static_cast<float>(M_PI));
 #else
-      return ::cosf(a * static_cast<float>(M_PI));
+      return sycl::cos(a * static_cast<float>(M_PI));
 #endif
     }
 
     static void SinCos(const float &a, float *s, float *c)
     {
-      *s = sycl::sincos(a * static_cast<float>(M_PI), c);
+      //*s = sycl::sincos(a * static_cast<float>(M_PI), c);
+      *s = sycl::sinpi(a);
+      *c = sycl::cospi(a);
     }
   };
 
@@ -117,7 +121,7 @@ namespace quda {
       return b & 1 ? sign * power : power;
     }
 #else
-    return std::pow(a, b);
+    return sycl::pow(a, b);
 #endif
   }
 

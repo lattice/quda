@@ -2,6 +2,7 @@
 #include <device.h>
 #include <tune_quda.h>
 #include <kernel_helper.h>
+#include <target_device.h>
 #include <utility>
 
 namespace quda {
@@ -112,38 +113,11 @@ namespace quda {
     return QUDA_SUCCESS;
   }
 
-#if 0
-  using Cacc = sycl::accessor<const char,1,sycl::access_mode::read,
-			      sycl::target::constant_buffer>;
-
-  template <typename T>
-  inline void checkSetConstPtr(T &x, int y) {
-    x.setConstPtr(0, (const char *)0);
-  }
-  template <typename T, typename U>
-  inline void checkSetConstPtr(T &x, U y) {
-    errorQuda("setConstPtr %s not available but const parameters were passed", typeid(x).name());
-  }
-
-  template <typename T>
-  inline void setptrs(T &x) {}
-
-  template <typename T>
-  inline void setptrs(T &x, Cacc acc) {
-    auto p = acc.get_pointer();
-    x.setConstPtr(0, p);
-  }
-#endif
-
   template <template <typename> class Functor, typename Arg, bool grid_stride>
-  void Kernel3D(Arg &arg, sycl::nd_item<3> &ndi)
+  void Kernel3D(const Arg &arg, sycl::nd_item<3> &ndi)
   {
-    //setptrs(arg, cnsts...);
     Functor<Arg> f(arg);
 
-    //auto i = threadIdx.x + blockIdx.x * blockDim.x;
-    //auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    //auto k = threadIdx.z + blockIdx.z * blockDim.z;
     auto j = ndi.get_global_id(1);
     if (j >= arg.threads.y) return;
     auto k = ndi.get_global_id(2);
@@ -157,8 +131,8 @@ namespace quda {
 
   template <template <typename> class Functor, typename Arg,
 	    bool grid_stride = false>
-  qudaError_t launchKernel3D(const TuneParam &tp, const qudaStream_t &stream,
-			     const Arg &arg)
+  std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
+  launchKernel3D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
       tp.grid.z*tp.block.z};
@@ -171,32 +145,48 @@ namespace quda {
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
     }
-#if 0
-    if(sizeof(arg)<=-3800) {   // FIXME
-      q.submit([&](sycl::handler& h) {
-	h.parallel_for<class Kernel3D>
-	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
-	     quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi);
-	   });
-      });
-    } else {
-#endif
-    {
-      //warningQuda("allocating kernel args");
-      auto p = device_malloc(sizeof(arg));
-      q.memcpy(p, &arg, sizeof(arg));
-      q.submit([&](sycl::handler& h) {
-	h.parallel_for<class Kernel3D>
-	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
-	     Arg *arg2 = static_cast<Arg *>(p);
-	     quda::Kernel3D<Functor, Arg, grid_stride>(*arg2, ndi);
-	   });
-      });
-      q.wait();
-      device_free(p);   //  FIXME: host task
+    q.submit([&](sycl::handler& h) {
+      h.parallel_for<class Kernel3D>
+	(ndRange,
+	 [=](sycl::nd_item<3> ndi) {
+	   quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi);
+	 });
+    });
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("  end launchKernel3D\n");
     }
+    return QUDA_SUCCESS;
+  }
+
+  template <template <typename> class Functor, typename Arg,
+	    bool grid_stride = false>
+  std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
+  launchKernel3D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+  {
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
+      tp.grid.z*tp.block.z};
+    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
+    sycl::nd_range<3> ndRange{globalSize, localSize};
+    auto q = device::get_target_stream(stream);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("launchKernel3D grid_stride: %s  sizeof(arg): %lu\n",
+		 grid_stride?"true":"false", sizeof(arg));
+      printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
+		 str(localSize).c_str(), str(arg.threads).c_str());
+    }
+    //warningQuda("allocating kernel args");
+    auto p = device_malloc(sizeof(arg));
+    q.memcpy(p, &arg, sizeof(arg));
+    q.submit([&](sycl::handler& h) {
+      h.parallel_for<class Kernel3D>
+	(ndRange,
+	 [=](sycl::nd_item<3> ndi) {
+	   Arg *arg2 = static_cast<Arg *>(p);
+	   quda::Kernel3D<Functor, Arg, grid_stride>(*arg2, ndi);
+	 });
+    });
+    q.wait();
+    device_free(p);   //  FIXME: host task
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("  end launchKernel3D\n");
     }

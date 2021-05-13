@@ -10,7 +10,6 @@
 #define QUDA_MAX_ARGUMENT_SIZE 2048
 #endif
 
-
 namespace quda {
 
   namespace target {
@@ -47,16 +46,15 @@ namespace quda {
 
 
     template <bool is_device> struct block_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
-#ifdef QUDA_CUDA_CC
-    template <> struct block_dim_impl<true> { __device__ dim3 operator()() { return dim3(blockDim.x, blockDim.y, blockDim.z); } };
-#endif
+    template <> struct block_dim_impl<true> { dim3 operator()() { return getBlockDim(); } };
 
     /**
        @brief Helper function that returns the thread block
        dimensions.  On CUDA this returns the intrinsic blockDim,
        whereas on the host this returns (1, 1, 1).
     */
-    __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+    //__device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
+    inline dim3 block_dim() { return getBlockDim(); }
 
 
     template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
@@ -69,7 +67,8 @@ namespace quda {
        thread block.  On CUDA this returns the intrinsic
        blockIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+    //__device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
+    inline dim3 block_idx() { return getBlockIdx(); }
 
 
     template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
@@ -82,7 +81,8 @@ namespace quda {
        thread block.  On CUDA this returns the intrinsic
        threadIdx, whereas on the host this just returns (0, 0, 0).
     */
-    __device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
+    //__device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
+    inline dim3 thread_idx() { return getThreadIdx(); }
 
   }
 
@@ -168,6 +168,17 @@ namespace quda {
     */
     constexpr int shared_memory_bank_width() { return 32; }
 
+    /**
+       @brief Helper function that returns true if we are to pass the
+       kernel parameter struct to the kernel as an explicit kernel
+       argument.  Otherwise the parameter struct is explicitly copied
+       to the device prior to kernel launch.
+    */
+    template <typename Arg> constexpr bool use_kernel_arg()
+    {
+      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+    }
+
   }
 
   /**
@@ -176,7 +187,7 @@ namespace quda {
   */
   template <typename T, int width> struct WarpReduce
   {
-    static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
+    //static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
     //using warp_reduce_t = cub::WarpReduce<T, width>;
 
     __device__ __host__ inline WarpReduce() {}
@@ -188,6 +199,7 @@ namespace quda {
         //typename warp_reduce_t::TempStorage dummy_storage;
         //warp_reduce_t warp_reduce(dummy_storage);
         //return warp_reduce.Sum(value);
+	//printf("ERROR: WarpReduce not implemented!\n");
 	return value;
       }
     };

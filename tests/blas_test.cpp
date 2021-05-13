@@ -229,7 +229,6 @@ void initFields(prec_pair_t prec_pair)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
 
-  fprintf(stderr,"creating CPU fields\n");
   vH = new cpuColorSpinorField(param);
   wH = new cpuColorSpinorField(param);
   xH = new cpuColorSpinorField(param);
@@ -264,8 +263,6 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec = prec_pair.first;
   QudaPrecision prec_other = prec_pair.second;
 
-  fprintf(stderr,"creating GPU fields\n");
-  fprintf(stderr,"param.mem_type: %i\n", param.mem_type);
   param.setPrecision(prec, prec, true);
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -273,14 +270,12 @@ void initFields(prec_pair_t prec_pair)
   yD = new cudaColorSpinorField(param);
   zD = new cudaColorSpinorField(param);
 
-  fprintf(stderr,"creating more GPU fields\n");
   param.setPrecision(prec_other, prec_other, true);
   voD = new cudaColorSpinorField(param);
   woD = new cudaColorSpinorField(param);
   xoD = new cudaColorSpinorField(param);
   yoD = new cudaColorSpinorField(param);
   zoD = new cudaColorSpinorField(param);
-  fprintf(stderr,"done creating GPU fields\n");
 
   // create composite fields
   param.is_composite = true;

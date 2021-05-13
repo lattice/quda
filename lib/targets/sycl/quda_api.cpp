@@ -2,21 +2,27 @@
 #include <tune_quda.h>
 #include <uint_to_char.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <device.h>
+
+// if this macro is defined then we use the driver API, else use the
+// runtime API.  Typically the driver API has 10-20% less overhead
+//#define USE_DRIVER_API
 
 // if this macro is defined then we profile the CUDA API calls
 //#define API_PROFILE
 
 #ifdef API_PROFILE
-#define PROFILE(f, idx)                                 \
-  apiTimer.TPSTART(idx);				\
-  f;                                                    \
+#define PROFILE(f, idx)                                                                                                \
+  apiTimer.TPSTART(idx);                                                                                               \
+  f;                                                                                                                   \
   apiTimer.TPSTOP(idx);
 #else
 #define PROFILE(f, idx) f;
 #endif
 
-namespace quda {
+namespace quda
+{
 
   static qudaError_t last_error = QUDA_SUCCESS;
   static std::string last_error_str("QUDA_SUCCESS");
@@ -31,14 +37,14 @@ namespace quda {
   std::string qudaGetLastErrorString()
   {
     auto rtn = last_error_str;
-    last_error_str = QUDA_SUCCESS;
+    last_error_str = "CUDA_SUCCESS";
     return rtn;
   }
 
   qudaError_t qudaLaunchKernel_(const char *file, const int line,
 				const char *func, const char *kern)
   {
-    warningQuda("qudaLaunchKernel_ %s %i %s %s\n", file, line, func, kern);
+    errorQuda("qudaLaunchKernel_ %s %i %s %s\n", file, line, func, kern);
     return QUDA_ERROR;
   }
 
@@ -53,6 +59,9 @@ namespace quda {
     const bool async;
     const char *name;
     const bool active_tuning;
+    const char *func;
+    const char *file;
+    const char *line;
 
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
@@ -60,7 +69,17 @@ namespace quda {
   public:
     inline QudaMem(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                    bool async, const char *func, const char *file, const char *line) :
-      dst(dst), src(src), count(count), value(0), copy(true), kind(kind), async(async), active_tuning(activeTuning())
+      dst(dst),
+      src(src),
+      count(count),
+      value(0),
+      copy(true),
+      kind(kind),
+      async(async),
+      active_tuning(activeTuning()),
+      func(func),
+      file(file),
+      line(line)
     {
       if (!async) {
         switch (kind) {
@@ -127,7 +146,9 @@ namespace quda {
           default: errorQuda("Unsupported qudaMemcpyTypeAsync %d", kind);
           }
 #endif
-          //PROFILE(qudaMemcpyAsync(dst, src, count, kind, device::get_quda_stream(stream)), type);
+          //cudaError_t error;
+          //PROFILE(cudaMemcpyAsync(dst, src, count, kind, device::get_cuda_stream(stream)), type);
+          //set_runtime_error(error, "cudaMemcpyAsync", func, file, line, active_tuning);
 	  auto q = device::get_target_stream(stream);
 	  q.memcpy(dst, src, count);
         } else {
@@ -177,8 +198,6 @@ namespace quda {
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-#if 0
-
     if (kind == qudaMemcpyDeviceToDevice) {
       QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
     } else {
@@ -200,27 +219,29 @@ namespace quda {
         errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
       }
 #else
-      PROFILE(qudaMemcpyAsync(dst, src, count, kind, device::get_quda_stream(stream)),
-              kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+      //PROFILE(cudaMemcpyAsync(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)),
+      //kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+      auto q = device::get_target_stream(stream);
+      q.memcpy(dst, src, count);
 #endif
     }
-#endif
   }
 
   void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
                            const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-#if 0
-    auto error = qudaMemcpyAsync(dst, src, count, qudaMemcpyDeviceToDevice, device::get_quda_stream(stream));
-    if (error != qudaSuccess)
-      errorQuda("qudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-#endif
+    //auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
+    //set_runtime_error(error, "cudaMemcpyAsync", func, file, line);
+    errorQuda("qudaMemcpyP2PAsync_ may not work\n");
+    auto q = device::get_target_stream(stream);
+    q.memcpy(dst, src, count);
   }
 
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      qudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
+    errorQuda("qudaMemcpy2D_ unimplemented\n");
 #if 0
     PROFILE(auto error = qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != qudaSuccess)
@@ -232,6 +253,7 @@ namespace quda {
                           qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
   {
+    errorQuda("qudaMemcpy2DAsync_ unimplemented\n");
 #if 0
     PROFILE(auto error = qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, device::get_quda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
     if (error != qudaSuccess)
@@ -242,6 +264,7 @@ namespace quda {
   void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                              const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
+    errorQuda("qudaMemcpy2DP2PAsync_ unimplemented\n");
 #if 0
     auto error = qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyDeviceToDevice, device::get_quda_stream(stream));
     if (error != qudaSuccess)
@@ -262,7 +285,7 @@ namespace quda {
                         const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem copy(ptr, value, count, stream, true, func, file, line);
+    QudaMem set(ptr, value, count, stream, true, func, file, line);
     qudaError_t error = qudaGetLastError();
     if (error != QUDA_SUCCESS) errorQuda("(QUDA) %s\n (%s:%s in %s())\n", qudaGetLastErrorString().c_str(), file, line, func);
   }
