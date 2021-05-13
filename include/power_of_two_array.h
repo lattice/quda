@@ -56,4 +56,30 @@ namespace quda {
           }
        }; // end struct
 
+#if 0
+       template<typename Tag, unsigned int Min, unsigned int Max> 
+       struct TaggedBlockMapper {
+         // List of block sizes we wish to instantiate.  The required block
+         // size is equal to number of fine points per aggregate, rounded
+         // up to a whole power of two.  So for example, 2x2x2x2 and
+         // 3x3x3x1 aggregation would both use the same block size 32
+#ifndef QUDA_FAST_COMPILE_REDUCE
+         using array_type = PowerOfTwoArray<Min, Max>;
+#else
+         using array_type = PowerOfTwoArray<Max, Max>;
+#endif
+
+         static constexpr array_type block=array_type(); 
+         /**
+          *  @brief Return the first power of two block that is larger than the required size
+          */
+         static unsigned int block_mapper(unsigned int raw_block)
+         {
+           for (unsigned int b=0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
+           errorQuda("Invalid raw block size %d\n", raw_block);
+           return 0;
+         }
+      };
+#endif
+      
 } // end namespace cuda 
