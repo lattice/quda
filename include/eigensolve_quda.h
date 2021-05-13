@@ -623,6 +623,13 @@ namespace quda
     void qrIteration(Complex **Q, Complex **R);
 
     /**
+       @brief Egensolve from an upper triangular matrix
+       @param[in] T The triangular matrix
+       @param[out] E The eigenvectors 
+    */
+    void eigensolveUpperT(Complex **T, Complex **E);
+    
+    /**
        @brief Reorder the Krylov space and eigenvalues
        @param[in] kSpace The Krylov space
        @param[in] evals the eigenvalues

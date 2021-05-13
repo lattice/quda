@@ -193,6 +193,9 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+# LLNL zfp
+option(QUDA_ZFP "enable ZFP" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
@@ -296,6 +299,7 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
+option(QUDA_DOWNLOAD_ZFP "Download zfp software as requested by QUDA_ZFP" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
@@ -904,6 +908,38 @@ if(QUDA_BACKWARDS)
   endif()
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
+
+# ZFP
+if(QUDA_ZFP)  
+  if(QUDA_DOWNLOAD_ZFP)
+    include(GNUInstallDirs)
+    ExternalProject_Add(
+      ZFP
+      GIT_REPOSITORY https://github.com/LLNL/zfp.git
+      GIT_TAG 0.5.5
+      GIT_SHALLOW YES
+      PREFIX zfp
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_GENERATOR "Unix Makefiles")
+    ExternalProject_Get_Property(ZFP INSTALL_DIR)
+    set(QUDA_ZFP_HOME ${INSTALL_DIR})
+    add_library(zfp STATIC IMPORTED)
+    add_dependencies(zfp ZFP)
+    set_target_properties(zfp PROPERTIES IMPORTED_LOCATION ${QUDA_ZFP_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
+  else(QUDA_DOWNLOAD_ZFP)
+    find_package(PkgConfig REQUIRED)
+
+    # We always need the serial library
+    pkg_check_modules(ZFP QUIET zfp)
+    if(NOT ZFP_FOUND OR QUDA_ZFP_HOME)
+      find_library(ZFP zfp PATH ${QUDA_ZFP_HOME})
+    else()
+      find_library(ZFP ${ZFP_LIBRARIES} PATH ${ZFP_LIBRARY_DIRS})
+    endif()
+    
+  endif(QUDA_DOWNLOAD_ZFP)
+endif(QUDA_ZFP)
+
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

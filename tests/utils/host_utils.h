@@ -93,11 +93,16 @@ void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType 
 void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
+void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision);
+
+template <typename Float> void constructFundamentalGaugeField(Float **res);
+template <typename Float> void expsuNTaylor(Float **res, int m);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param);
 template <typename Float>
 void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
 template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
+template <typename Float> void constructUnitaryGaugeField(Float **res);
 //------------------------------------------------------
 
 // Spinor utils

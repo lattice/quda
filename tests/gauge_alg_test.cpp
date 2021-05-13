@@ -32,7 +32,7 @@ class GaugeAlgTest : public ::testing::Test {
 protected:
   cudaGaugeField *U;
   double3 plaq;
-
+  
   void SetReunitarizationConsts(){
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;

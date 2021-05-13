@@ -42,6 +42,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+bool fund_gauge = false;
 double gaussian_sigma = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
@@ -257,6 +258,11 @@ int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
+double su3_qr_tol = 1e-6;
+int su3_qr_maxiter = 100;
+int su3_taylor_N = 25;
+int su3_comp_block_size = 4;
+double su3_comp_tol = 1e-6;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -659,12 +665,15 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
-    "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
-
+    "Generate a unit valued gauge field in the tests. (default false)");
+  quda_app->add_option(
+    "--fund-gauge", fund_gauge,
+    "Generate a fundamental valued gauge field in the tests. (default false)");
+  
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--verify", verify_results, "Verify the GPU results using CPU results (default true)");
-
+  
   // lattice dimensions
   auto dimopt = quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)")->check(CLI::Range(1, 512));
   auto sdimopt = quda_app
@@ -1079,6 +1088,16 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-qr-tol", su3_qr_tol, "Tolerance on the link QR solver (default 1e-6)");
+  
+  opgroup->add_option("--su3-qr-maxiter", su3_qr_maxiter, "Maximum iterations of the link QR solver (default 100)");
+
+  opgroup->add_option("--su3-taylor-N", su3_taylor_N, "The degree of the link Taylor expansion of exp(iH) (default 25)");
+
+  opgroup->add_option("--su3-comp-tol", su3_comp_tol, "The tolerance of the ZFP lossy link compression (default 1e-6)");
+  
+  opgroup->add_option("--su3-comp-block-size", su3_comp_block_size, "The block size of the ZFP lossy link compression (default 4)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

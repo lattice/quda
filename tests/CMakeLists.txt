@@ -12,14 +12,14 @@ add_subdirectory(utils)
 add_subdirectory(host_reference)
 
 if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
 
 if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -38,14 +38,14 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   endif()
 
   if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
-
+  
   if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
@@ -60,6 +60,11 @@ if(QUDA_ARPACK)
     list(APPEND TEST_LIBS ${PARPACK})
   endif()
 endif()
+
+if(QUDA_ZFP)
+  list(APPEND TEST_LIBS zfp)
+endif()
+
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
@@ -257,6 +262,13 @@ if(QUDA_FORCE_HISQ)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(QUDA_ZFP)
+  add_executable(link_compression_test link_compression_test.cpp)
+  target_link_libraries(link_compression_test ${TEST_LIBS})
+  quda_checkbuildtest(link_compression_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS link_compression_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_MPI OR QUDA_QMP)
