@@ -52,7 +52,7 @@ namespace quda {
 	X[i] = x.X()[i];
 	mom_mode[i] = mom_mode_in[i];
         source_position[i] = source_position_in[i];
-        offsets[i] = comm_coord(i) * x.X()[i];
+	offsets[i] = comm_coord(i) * x.X()[i]; 
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
@@ -170,35 +170,7 @@ namespace quda {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
-  
-  template <typename Arg> struct ColorContract {
-    const Arg &arg;
-    constexpr ColorContract(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity)
-    {
-      constexpr int nSpin = Arg::nSpin;
-      using real = typename Arg::real;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
-
-      Vector x = arg.x(x_cb, parity);
-      Vector y = arg.y(x_cb, parity);
-
-      Matrix<complex<real>, nSpin> A;
-#pragma unroll
-      for (int mu = 0; mu < nSpin; mu++) {
-#pragma unroll
-        for (int nu = 0; nu < nSpin; nu++) {
-          // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
-          // The Bra is conjugated
-          A(mu, nu) = innerProduct(x, y, mu, nu);
-        }
-      }
-      arg.s.save(A, x_cb, parity);
-    }
-  };  
-  
+    
   template <typename Arg> struct DegrandRossiContract {
     const Arg &arg;
     constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}

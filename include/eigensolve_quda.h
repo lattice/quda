@@ -681,7 +681,16 @@ namespace quda
       computeEvals3D(mat, evecs, evals, n_conv);
     }
     
-    
+    /**
+       @brief Load and check eigenpairs from file
+       @param[in] mat Matrix operator
+       @param[in] eig_vecs The eigenvectors to save
+       @param[in] file The filename to save
+    */
+    void loadFromFile3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
+
+    int getArrayMinMax3D(const std::vector<int> &array, const int limit, const bool min);
+      
   };
   
   /**

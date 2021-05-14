@@ -1559,7 +1559,7 @@ extern "C" {
                           const int *X);
   
   /**
-   * @brief Hacks for Callat
+   * @brief Hacks for Callat. Will document at PR time
    */
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
 		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
@@ -1574,6 +1574,12 @@ extern "C" {
 			int blockSizeMomProj,
 			const int X[4]);
   
+  void laphCurrentKernel(int n1, int n2, int nMom,
+			 double _Complex *host_quark, 
+			 double _Complex *host_quark_bar, 
+			 int *host_mom, 
+			 void *retArray,
+			 const int X[4]);
   
   void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
 					   void **host_evec, 

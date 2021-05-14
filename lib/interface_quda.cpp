@@ -264,6 +264,11 @@ TimeProfile &getProfileColorCross() { return profileColorCross; }
 static TimeProfile profileBLAS("blasQuda");
 TimeProfile &getProfileBLAS() { return profileBLAS; }
 
+//!< Profiler for current kernel
+static TimeProfile profileCurrentKernel("currentKernelQuda");
+TimeProfile &getProfileCurrentKernel() { return profileCurrentKernel; }
+
+
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
 
@@ -1592,6 +1597,7 @@ void endQuda(void)
     profileColorCross.Print();
     profileContractFT.Print();
     profileBLAS.Print();
+    profileCurrentKernel.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -2471,14 +2477,16 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
-  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
+  // Ensure device vectors are in UKQCD basis for Wilson type fermions
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   int n_evals = eig_param->n_conv;
   if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= X[3];
   std::vector<Complex> evals(n_evals, 0.0);
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
+  for (int i = 0; i < eig_param->n_conv; i++) {
+    kSpace.push_back(ColorSpinorField::Create(cudaParam));
+  }
   
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.

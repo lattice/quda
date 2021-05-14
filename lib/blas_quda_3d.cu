@@ -118,9 +118,7 @@ namespace quda {
 	
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	launch<axpby3d>(tp, stream, axpby3dArg<Float, nColor>((Float*)d_a, x, (Float*)d_b, y));
-	
-	qudaMemcpy(a, d_a, data_bytes, qudaMemcpyDeviceToHost);
-	qudaMemcpy(b, d_b, data_bytes, qudaMemcpyDeviceToHost);
+
 	pool_device_free(d_b);
 	pool_device_free(d_a);
       }
@@ -195,8 +193,6 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
 	
-	qudaMemcpy(a, d_a, data_bytes, qudaMemcpyDeviceToHost);
-	qudaMemcpy(b, d_b, data_bytes, qudaMemcpyDeviceToHost);
 	pool_device_free(d_b);
 	pool_device_free(d_a);
       }
@@ -272,12 +268,22 @@ namespace quda {
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
+	  std::vector<double> result_tmp(comm_dim(3) * x.X()[3], 0.0);
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i] = result_local[i];
+	    result_tmp[comm_coord(3) * x.X()[3] + i] = result_local[i];
+	  }
+	  
+	  // MPI all reduce the temp so that all the spatial data is summed
+	  // into the temporal buckets
+	  comm_allreduce_array((double *)result_tmp.data(), comm_dim(3) * x.X()[3]);
+	  
+	  // Copy back to MPI local arrat for t
+	  for(int i=0; i<x.X()[3]; i++) {
+	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
 	}
       }
-    
+      
       long long flops() const
       {
 	return  x.Volume();
@@ -354,9 +360,19 @@ namespace quda {
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
+	  std::vector<Complex> result_tmp(comm_dim(3) * x.X()[3], 0.0);
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i].real(result_local[2*i]);
-	    result[i].imag(result_local[2*i+1]);
+	    result_tmp[comm_coord(3) * x.X()[3] + i].real(result_local[2*i]);
+	    result_tmp[comm_coord(3) * x.X()[3] + i].imag(result_local[2*i+1]);
+	  }
+	  
+	  // MPI all reduce the temp so that all the spatial data is summed
+	  // into the temporal buckets
+	  comm_allreduce_array((double *)result_tmp.data(), 2 * comm_dim(3) * x.X()[3]);
+	  
+	  // Copy back to MPI local arrat for t
+	  for(int i=0; i<x.X()[3]; i++) {
+	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
 	}
       }

@@ -19,6 +19,7 @@ TimeProfile &getProfileAccumulateEvecs();
 TimeProfile &getProfileColorContract();
 TimeProfile &getProfileColorCross();
 TimeProfile &getProfileBLAS();
+TimeProfile &getProfileCurrentKernel();
 
 void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
 		     QudaInvertParam inv_param, unsigned int nEv, const int X[4])
@@ -781,4 +782,147 @@ void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int n
 void laphBaryonKernelComputeModeTripletEnd() {   
   if(mtb_loaded) pool_device_free(d_mtb);
   saveTuneCache();
+}
+
+void laphCurrentKernel(int n1, int n2, int n_mom,
+		       void **host_quark,
+		       void **host_quark_bar,
+		       int *host_mom,
+		       void *ret_arr,
+		       const int X[4]) {
+  
+  getProfileCurrentKernel().TPSTART(QUDA_PROFILE_TOTAL);
+  getProfileCurrentKernel().TPSTART(QUDA_PROFILE_INIT);
+  
+  // Check we are safe to cast into a Complex (= std::complex<double>)
+  if (sizeof(Complex) != sizeof(double _Complex)) {
+    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+  }
+  
+  QudaInvertParam inv_param = newQudaInvertParam();
+  
+  inv_param.dslash_type = QUDA_WILSON_DSLASH;
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;
+  
+  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.cuda_prec = QUDA_DOUBLE_PRECISION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  
+  // PADDING
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+  
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  // Some common variables
+  size_t n_color = 3;
+  size_t n_sites = X[0] * X[1] * X[2] * X[3];
+  QudaPrecision precision = QUDA_DOUBLE_PRECISION;
+  
+  // Create host pointers for the data device side objects.
+  //--------------------------------------------------------------------------------
+  // Parameter object describing quark
+  ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_quark_param.nSpin = 1;
+  
+  // QUDA style wrapper around the host quark
+  std::vector<ColorSpinorField*> quark;
+  cpu_quark_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  quark.reserve(n1);
+  for (int i=0; i<n1; i++) {
+    cpu_quark_param.v = host_quark[i];
+    quark.push_back(ColorSpinorField::Create(cpu_quark_param));
+  }
+
+  // Allocate device memory for quark. This is done to ensure a contiguous
+  // chunk of memory is used.
+  // vectors * colours * spatial sites * complex * precision
+  size_t data_quark_bytes = n1 * n_color * n_sites * 2 * precision;
+  void *d_quark = pool_device_malloc(data_quark_bytes);
+
+  // Create device vectors for quarks
+  ColorSpinorParam cuda_quark_param(cpu_quark_param);
+  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_quark_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  cuda_quark_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_quark;
+  for (int i=0; i<n1; i++) {
+    cuda_quark_param.v = (std::complex<double>*)d_quark + n_color*n_sites*i;
+    quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
+  }
+
+  // Repeat for quark_bar
+  ColorSpinorParam cpu_quark_bar_param(host_quark_bar, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_quark_bar_param.nSpin = 1;
+  
+  // QUDA style wrapper around the host quark_bar
+  std::vector<ColorSpinorField*> quark_bar;
+  cpu_quark_bar_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  quark_bar.reserve(n2);
+  for (int i=0; i<n2; i++) {
+    cpu_quark_bar_param.v = host_quark_bar[i];
+    quark_bar.push_back(ColorSpinorField::Create(cpu_quark_bar_param));
+  }
+
+  // Allocate device memory for quark_bar. This is done to ensure a contiguous
+  // chunk of memory is used.
+  // vectors * colours * spatial sites * complex * precision
+  size_t data_quark_bar_bytes = n2 * n_color * n_sites * 2 * precision;
+  void *d_quark_bar = pool_device_malloc(data_quark_bar_bytes);
+
+  // Create device vectors for quark_bar
+  ColorSpinorParam cuda_quark_bar_param(cpu_quark_bar_param);
+  cuda_quark_bar_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_quark_bar_param.create = QUDA_REFERENCE_FIELD_CREATE;
+  cuda_quark_bar_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  std::vector<ColorSpinorField *> quda_quark_bar;
+  for (int i=0; i<n2; i++) {
+    cuda_quark_bar_param.v = (std::complex<double>*)d_quark_bar + n_color*n_sites*i;
+    quda_quark_bar.push_back(ColorSpinorField::Create(cuda_quark_bar_param));
+  }
+
+  // Device array to hold the colour contraction
+  size_t data_cc_bytes = n_sites * precision;
+  void *d_cc = pool_device_malloc(data_cc_bytes);
+
+  std::vector<int> momenta(n_mom * 3, 0);
+  for(int i=0; i<3*n_mom; i++) momenta[i] = host_mom[i];
+  
+  getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_INIT);
+  //--------------------------------------------------------------------------------
+
+  // Copy host data to device
+  getProfileCurrentKernel().TPSTART(QUDA_PROFILE_H2D);
+  for (int i=0; i<n1; i++) *quda_quark[i] = *quark[i];
+  for (int i=0; i<n2; i++) *quda_quark_bar[i] = *quark_bar[i];
+  getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_H2D);
+
+  for (int dil1=0; dil1<n1; dil1++) {
+    for (int dil2=0; dil2<n2; dil2++) {
+
+      std::vector<Complex> mom_mode_data(n_mom * X[3], 0.0);
+      getProfileColorContract().TPSTART(QUDA_PROFILE_COMPUTE);
+      qudaMemset(d_cc, 0, data_cc_bytes);  
+      momentumProjectQuda(*quda_quark_bar[dil1], *quda_quark[dil2], d_cc,
+			  mom_mode_data, momenta, n_mom);
+      
+      memcpy((void*)&((Complex*)&ret_arr)[(dil1*n2 + dil2)*n_mom*X[3]], mom_mode_data.data(),
+	     sizeof(Complex) * n_mom*X[3]);
+      getProfileColorContract().TPSTOP(QUDA_PROFILE_COMPUTE);
+    }
+  }
+
+  // Clean up memory allocations
+  getProfileCurrentKernel().TPSTART(QUDA_PROFILE_FREE);
+  for (int i=0; i<n1; i++) delete quda_quark[i];
+  for (int i=0; i<n2; i++) delete quda_quark_bar[i];
+
+  pool_device_free(d_quark);
+  pool_device_free(d_quark_bar);
+  pool_device_free(d_cc);
+  
+  getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_FREE);
+  getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_TOTAL);
 }

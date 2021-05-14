@@ -7,6 +7,7 @@
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
+#include <vector_io.h>
 #include <qio_field.h>
 #include <color_spinor_field.h>
 #include <random_quda.h>
@@ -74,15 +75,6 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    // Until we have support for reducing over spatial dims only
-    // so that the comm_allreduce data is not polluted with data
-    // from different timeslices, we must restrict the user to
-    // MPI splitting in T only
-    if(comm_dim(0) != 1 || comm_dim(1) != 1 || comm_dim(2) != 1) {
-      errorQuda("TRLM3D suppport MPI splitting in T dim only. Detected comm dim %d %d %d %d",
-		comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
-    }
-    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
@@ -94,13 +86,18 @@ namespace quda
     // Override any user input for block size.
     block_size = 1;
 
+    // For the 3D solver, we must ensure the eval array is the correct size
+    evals.reserve(ortho_dim_size * comm_dim(3) * n_conv);
+    for(int i=0; i<ortho_dim_size * comm_dim(3) * n_conv; i++)
+      evals.push_back(0.0);
+    
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
-      loadFromFile(mat, kSpace, evals);
+      loadFromFile3D(mat, kSpace, evals);
       return;
     }
 
@@ -111,9 +108,6 @@ namespace quda
     // Increase the size of kSpace passed to the function, will be trimmed to
     // original size before exit.
     prepareKrylovSpace(kSpace, evals);
-    evals.reserve(ortho_dim_size * comm_dim(3) * n_conv);
-    for(int i=0; i<ortho_dim_size * comm_dim(3) * n_conv; i++)
-      evals.push_back(0.0);
     
     // Check for Chebyshev maximum estimation
     checkChebyOpMax3D(mat, kSpace);
@@ -134,16 +128,10 @@ namespace quda
     while (restart_iter < max_restarts && !converged) {
 
       // Get min step
-      int step_min = n_kr;
-      for(int t = 0; t < ortho_dim_size; t++)
-	if(num_keep_3D[t] < step_min) step_min = num_keep_3D[t];
-      
-      for (int step = step_min; step < n_kr; step++) {
-	lanczosStep3D(kSpace, step);
-	printfQuda("Step %d done\n", step);
-      }	
+      int step_min = getArrayMinMax3D(num_locked_3D, n_kr, true);
+      for (int step = step_min; step < n_kr; step++) lanczosStep3D(kSpace, step);
       iter += (n_kr - step_min);
-
+      
       // The eigenvalues are returned in the alpha array
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       eigensolveFromArrowMat3D();
@@ -194,23 +182,24 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz3D(kSpace);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      
+
+      int t_offset = ortho_dim_size * comm_coord(3);      
       for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
 	num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
 	num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
 	num_locked_3D[t] += iter_locked_3D[t];
 
-	if (getVerbosity() >= QUDA_VERBOSE) {
-	  printfQuda("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t, restart_iter + 1);
-	  printfQuda("iter Conv[%d] = %d\n", t, iter_converged_3D[t]);
-	  printfQuda("iter Keep[%d] = %d\n", t, iter_keep_3D[t]);
-	  printfQuda("iter Lock[%d] = %d\n", t, iter_locked_3D[t]);
-	  printfQuda("num_converged[%d] = %d\n", t, num_converged_3D[t]);
-	  printfQuda("num_keep[%d] = %d\n", t, num_keep_3D[t]);
-	  printfQuda("num_locked[%d] = %d\n", t, num_locked_3D[t]);
+	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+	  printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t_offset + t, restart_iter + 1);
+	  printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
+	  printf("iter Keep[%d] = %d\n", t_offset + t, iter_keep_3D[t]);
+	  printf("iter Lock[%d] = %d\n", t_offset + t, iter_locked_3D[t]);
+	  printf("num_converged[%d] = %d\n", t_offset + t, num_converged_3D[t]);
+	  printf("num_keep[%d] = %d\n", t_offset + t, num_keep_3D[t]);
+	  printf("num_locked[%d] = %d\n", t_offset + t, num_locked_3D[t]);
 	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	    for (int i = 0; i < n_kr; i++) {
-	      printfQuda("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t, i, alpha_3D[t][i], i, residua_3D[t][i]);
+	      printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, alpha_3D[t][i], i, residua_3D[t][i]);
 	    }
 	  }
 	}
@@ -676,18 +665,25 @@ namespace quda
     // Compute spectral radius estimate
     std::vector<double> inner_products(ortho_dim_size, 0.0);
     blas3d::reDotProduct(inner_products, *out_ptr, *in_ptr);
+    
     double result = 1.0;
-    std::vector<double> all_results(comm_dim(ortho_dim) * ortho_dim_size);
+    std::vector<double> all_results(comm_dim(ortho_dim) * ortho_dim_size, 0.0);
     for(int t=0; t<ortho_dim_size; t++) {
       all_results[comm_coord(ortho_dim) * ortho_dim_size + t] = inner_products[t];
-      if(inner_products[t] > result) result = inner_products[t];
     }
     
     comm_allreduce_array((double *)all_results.data(), comm_dim(ortho_dim) * ortho_dim_size);
     
+    int spatial_comm_vol = 1;
+    for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
     if (getVerbosity() >= QUDA_VERBOSE) {
+      
       for(int t=0; t<ortho_dim_size * comm_dim(ortho_dim); t++) {
+	// scale out the redundant summations
+	all_results[t] /= spatial_comm_vol;
+	
 	printfQuda("Chebyshev max at slice %d = %e\n", t, all_results[t]);
+	if(all_results[t] > result) result = all_results[t];
       }
     }
     
@@ -741,7 +737,7 @@ namespace quda
     }
 
     // If size = n_conv, this routine is called post sort
-    if (getVerbosity() >= QUDA_SUMMARIZE && size == n_conv) {
+    if (size == n_conv) {
       // We are computing T problems split across T nodes, so we must do an MPI gather
       // to display all the data to stdout.
       int t_size = ortho_dim_size * comm_dim(3);
@@ -755,12 +751,23 @@ namespace quda
       
       comm_allreduce_array((double *)&evals_t_all[0], 2 * t_size * size);
       comm_allreduce_array((double *)&resid_t_all[0], t_size * size);
+
+      int spatial_comm_vol = 1;
+      for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
       
       for(int t=0; t<t_size; t++)
 	for (int i = 0; i < size; i++) {
-	  printfQuda("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i,
-		     evals_t_all[t*size + i].real(), evals_t_all[t*size + i].imag(),
-		     resid_t_all[t*size + i]);
+	  
+	  // scale out the redundant summations
+	  evals_t_all[t*size + i] /= spatial_comm_vol;
+	  resid_t_all[t*size + i] /= spatial_comm_vol;
+	  
+	  if(getVerbosity() >= QUDA_SUMMARIZE) { 
+	    printfQuda("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i,
+		       evals_t_all[t*size + i].real(), evals_t_all[t*size + i].imag(),
+		       resid_t_all[t*size + i]);
+	  }
+	  
 	  // Transfer evals to eval array
 	  evals.resize(size * evecs[0]->X()[3]);
 	  evals[t*size + i] = evals_t_all[t*size + i];
@@ -771,5 +778,56 @@ namespace quda
     
     // Save Eval tuning
     saveTuneCache();
-  }  
+  }
+
+  void TRLM3D::loadFromFile3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
+			      std::vector<Complex> &evals)
+  {
+    // Set suggested parity of fields
+    const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
+    for (int i = 0; i < n_conv; i++) { kSpace[i]->setSuggestedParity(mat_parity); }
+
+    // Make an array of size n_conv
+    std::vector<ColorSpinorField *> vecs_ptr;
+    vecs_ptr.reserve(n_conv);
+    for (int i = 0; i < n_conv; i++) { vecs_ptr.push_back(kSpace[i]); }
+
+    {
+      // load the vectors
+      VectorIO io(eig_param->vec_infile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      io.load(vecs_ptr);
+    }
+
+    // Create the device side residual vector by cloning
+    // the kSpace passed to the function.
+    ColorSpinorParam csParam(*kSpace[0]);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    r.push_back(ColorSpinorField::Create(csParam));
+
+    // Error estimates (residua) given by ||A*vec - lambda*vec||
+    computeEvals3D(mat, kSpace, evals);
+    delete r[0];
+  }
+
+  int TRLM3D::getArrayMinMax3D(const std::vector<int> &array, const int limit, const bool min)
+  {
+    int ret_val = limit;
+    int spatial_comm_vol = 1;
+    int t_size = comm_dim(ortho_dim) * ortho_dim_size;
+    for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
+    
+    std::vector<double> all_array(t_size, 0);
+    for(int t=0; t<ortho_dim_size; t++) all_array[comm_coord(ortho_dim) * ortho_dim_size + t] = array[t];
+    
+    comm_allreduce_array((double *)all_array.data(), t_size);
+    
+    for(int t=0; t<t_size; t++) {
+      // scale out the redundant summations
+      all_array[t] /= spatial_comm_vol;
+      if(all_array[t] < ret_val &&  min) ret_val = all_array[t];
+      if(all_array[t] > ret_val && !min) ret_val = all_array[t];
+    }
+    return ret_val;
+  }
+  
 } // namespace quda
