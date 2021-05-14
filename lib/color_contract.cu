@@ -136,7 +136,6 @@ namespace quda {
     std::vector<int> &momenta;// host vector with momentum modes
     const int n_mom;
 
-    //instantiate<MomentumProject>(x, y, cc_array, mom_proj, momenta, (int)momenta.size()/3);
   public:
     MomentumProject(const ColorSpinorField &x, const ColorSpinorField &y,
 		    void *cc_array, std::vector<Complex> &mom_proj,
@@ -201,7 +200,6 @@ namespace quda {
     checkPrecision(x, y);
     
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x = %d y = %d", x.Ncolor(), y.Ncolor());
-    if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x = %d y = %d", x.Nspin(), y.Nspin());
     
     instantiate<ColorContract>(x, y, cc_array);
     instantiate<MomentumProject>(x, y, cc_array, mom_proj, momenta, n_mom);

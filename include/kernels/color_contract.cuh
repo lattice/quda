@@ -15,7 +15,7 @@ namespace quda
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 4;
+    static constexpr int nSpin = 1;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
