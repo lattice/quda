@@ -42,32 +42,37 @@ namespace quda {
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
+    /**
+       @param Helper function to check that the present launch parameters are valid
+    */
+    bool checkParam(const TuneParam &param) const
+    {
+      return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0) && // active threads must be a multiple of the warp
+              param.block.x % device::warp_size() == 0 &&                                     // block size must be a multiple of the warp
+              Nc % color_col_stride == 0 &&                                                   // number of colors must be divisible by the split
+              param.grid.x < device::max_grid_size(0));                                       // ensure the resulting grid size valid
+    }
+
     bool advanceColorStride(TuneParam &param) const
     {
-      if (2 * param.aux.x <= max_color_col_stride && Nc % (2 * param.aux.x) == 0 &&
-	  param.block.x % device::warp_size() == 0) {
-	// An x-dimension block size that is not a multiple of the
-	// warp size is incompatible with splitting the dot product
-	// across the warp so we must skip this
+      bool valid = false;
 
-	param.aux.x *= 2; // safe to advance
-	color_col_stride = param.aux.x;
-
-	// recompute grid size since minThreads() has now been updated
-	param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
-
-        if (param.grid.x < device::max_grid_size(0) && // check grid size is valid
-            (color_col_stride > 1 ? minThreads() % (unsigned)device::warp_size() == 0 : true)) // can only warp split if x threads are a multiple of the warp size
-          return true;
+      while (param.aux.x < max_color_col_stride) {
+        param.aux.x *= 2;
+        color_col_stride = param.aux.x;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+        valid = checkParam(param);
+        if (valid) break;
       }
 
-      // reset color column stride if too large or not divisible
-      param.aux.x = 1;
-      color_col_stride = param.aux.x;
+      if (!valid) {
+        // reset color column stride if too large or not divisible
+        param.aux.x = 1;
+        color_col_stride = param.aux.x;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+      }
 
-      // recompute grid size since minThreads() has now been updated
-      param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
-      return false;
+      return valid;
     }
 
     bool advanceDimThreads(TuneParam &param) const
@@ -171,6 +176,7 @@ namespace quda {
       color_col_stride = tp.aux.x;
       dim_threads = tp.aux.y;
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      if (!checkParam(tp)) errorQuda("Invalid launch param");
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
