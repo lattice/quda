@@ -100,15 +100,18 @@ namespace quda {
      Applies the coarse dslash on a given parity and checkerboard site index
      /out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
 
-     @param out The result - kappa * Dslash in
-     @param Y The coarse gauge field
-     @param kappa Kappa value
-     @param in The input field
-     @param parity The site parity
+     @param out The result vector
+     @param thread_dir Direction
      @param x_cb The checkerboarded site index
+     @param src_idx dummy for now
+     @param parity The site parity
+     @param s_row Which spin row are acting on
+     @param color_block Which color row are we acting on
+     @param color_off Which color column offset are we acting on
+     @param arg Arguments
    */
-  template <int Mc, int thread_dir, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
+  template <int Mc, int thread_dim, typename V, typename Arg>
+  __device__ __host__ inline void applyDslash(V &out, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
@@ -330,20 +333,13 @@ namespace quda {
       vector_type<complex <typename Arg::real>, Mc> out;
 
       if (Arg::dslash) {
-        if (dir == 0) {
-          if (dim == 0)      applyDslash<Mc, 0, 0>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 1) applyDslash<Mc, 0, 1>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 2) applyDslash<Mc, 0, 2>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 3) applyDslash<Mc, 0, 3>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-        } else {
-          if (dim == 0)      applyDslash<Mc, 1, 0>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 1) applyDslash<Mc, 1, 1>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 2) applyDslash<Mc, 1, 2>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-          else if (dim == 3) applyDslash<Mc, 1, 3>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-        }
-      }
+        if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 1) applyDslash<Mc, 1>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 2) applyDslash<Mc, 2>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 3) applyDslash<Mc, 3>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
 
-      target::dispatch<dim_collapse>(out, dir, dim, arg);
+        target::dispatch<dim_collapse>(out, dir, dim, arg);
+      }
 
       if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
 
