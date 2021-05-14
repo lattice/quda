@@ -251,7 +251,6 @@ const char *get_flavor_str(QudaTwistFlavorType type)
 
   switch (type) {
   case QUDA_TWIST_SINGLET: ret = "singlet"; break;
-  case QUDA_TWIST_DEG_DOUBLET: ret = "deg-doublet"; break;
   case QUDA_TWIST_NONDEG_DOUBLET: ret = "nondeg-doublet"; break;
   case QUDA_TWIST_NO: ret = "no"; break;
   default: ret = "unknown"; break;

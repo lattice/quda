@@ -305,7 +305,6 @@ namespace
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
-                                                                  {"deg-doublet", QUDA_TWIST_DEG_DOUBLET},
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
@@ -488,7 +487,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app
     ->add_option("--flavor", twist_flavor,
-                 "Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)")
+                 "Set the twisted mass flavor type (singlet (default), nondeg-doublet)")
     ->transform(CLI::QUDACheckedTransformer(twist_flavor_type_map));
   ;
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
