@@ -581,14 +581,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
         --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
-    add_test(NAME dslash_mobius_local-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
-                     --test MatPCDagMatPCLocal
-                     --matpc even-even
-                     --dim 2 4 6 8
-                     --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+    # This is fixed precision only and requires tensor cores so only enable 
+    # for Green Team targets
+    if( QUDA_TARGET_CUDA )
+	    add_test(NAME dslash_mobius_local-policy${pol2}
+		     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+			     --dslash-type mobius
+			     --test MatPCDagMatPCLocal
+			     --matpc even-even
+			     --dim 2 4 6 8
+			     --Lsdim 4
+			     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+    endif()
 
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
