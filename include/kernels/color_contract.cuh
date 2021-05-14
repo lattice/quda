@@ -13,13 +13,11 @@ namespace quda
   template <typename Float, int nColor_>
   struct MomentumProjectArg : public ReduceArg<double2>
   {
-    using real = typename mapper<Float>::type;
+    typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
-    static constexpr bool spin_project = true;
-    static constexpr bool spinor_direct_load = false; // false means texture load
+    typedef typename colorspinor_mapper<Float, nSpin, nColor>::type F;
 
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
     F meta;
     const complex<Float> *cc_array;
     
@@ -60,10 +58,7 @@ namespace quda
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
     {
-      constexpr int nSpin = Arg::nSpin;
-      constexpr int nColor = Arg::nColor;
       using real = typename Arg::real;
-      using Vector = ColorSpinor<real, nColor, nSpin>;
       
       reduce_t result_mom_mode = double2();
 
@@ -73,6 +68,7 @@ namespace quda
       if(x[3] != 0) printf("Womp, womp....\n");
            
       // Calculate the Fourier phase for this p mode at this x position
+      // exp( -i x \dot p)
       double x_dot_p = (((arg.offset[0] + x[0]) * arg.mom_mode[0])*1.0/arg.L[0] +
 			((arg.offset[1] + x[1]) * arg.mom_mode[1])*1.0/arg.L[1] +
 			((arg.offset[2] + x[2]) * arg.mom_mode[2])*1.0/arg.L[2]);
@@ -80,12 +76,17 @@ namespace quda
       double phase_real = 0.0;
       double phase_imag = 0.0;
       sincos(x_dot_p, &phase_imag, &phase_real);
-
+      // The exp( -i x \dot p) convention carries a -ve sign in the
+      // imaginary part of the phase
+      phase_imag *= -2.0*M_PI;
+      phase_real *=  2.0*M_PI;
+      
       // Get the 4D coordinates for the < q | q > data
       int parity = 0;
       int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
       int x_cb = getParityCBFromFull(parity, arg.X, idx);
       complex<real> cc = arg.cc_array[x_cb + parity*arg.threads.x];
+
       result_mom_mode.x = cc.real() * phase_real - cc.imag() * phase_imag;
       result_mom_mode.y = cc.real() * phase_imag + cc.imag() * phase_real;
       

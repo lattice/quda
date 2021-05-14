@@ -165,7 +165,7 @@ namespace quda {
 	  for(int i=0; i<2 * t_dim; i++) mom_proj_local[i] = 0.0;
 	}
 	const int mom[3] = {momenta[3*k + 0], momenta[3*k + 1], momenta[3*k + 2]};
-						     
+	
 	MomentumProjectArg<Float, nColor> arg(x, cc_array, mom);
 	launch<MomProj>(mom_proj_local, tp, stream, arg);
 	
