@@ -75,11 +75,7 @@ namespace quda
       
       double phase_real = 0.0;
       double phase_imag = 0.0;
-      sincos(x_dot_p, &phase_imag, &phase_real);
-      // The exp( -i x \dot p) convention carries a -ve sign in the
-      // imaginary part of the phase
-      phase_imag *= -2.0*M_PI;
-      phase_real *=  2.0*M_PI;
+      sincos(2.0*M_PI*x_dot_p, &phase_imag, &phase_real);
       
       // Get the 4D coordinates for the < q | q > data
       int parity = 0;
@@ -87,8 +83,10 @@ namespace quda
       int x_cb = getParityCBFromFull(parity, arg.X, idx);
       complex<real> cc = arg.cc_array[x_cb + parity*arg.threads.x];
 
-      result_mom_mode.x = cc.real() * phase_real - cc.imag() * phase_imag;
-      result_mom_mode.y = cc.real() * phase_imag + cc.imag() * phase_real;
+      // The exp( -i x \dot p) convention carries a -ve sign in the
+      // imaginary part of the phase
+      result_mom_mode.x =   cc.real() * phase_real + cc.imag() * phase_imag;
+      result_mom_mode.y = - cc.real() * phase_imag + cc.imag() * phase_real;
       
       return plus::operator()(result_mom_mode, result);
     }
