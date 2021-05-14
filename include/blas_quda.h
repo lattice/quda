@@ -131,6 +131,8 @@ namespace quda {
     */
     void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);
 
+    void axpy(const double *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y);
+
     /**
        @brief Compute the block "axpy_U" with over the set of
        ColorSpinorFields.  E.g., it computes
@@ -197,6 +199,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     void caxpy(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+    void caxpy(const Complex *a, std::vector<ColorSpinorField *> &&x, std::vector<ColorSpinorField *> &&y);
 
     /**
        @brief This is a wrapper for calling the block "caxpy" with a
@@ -366,8 +369,13 @@ namespace quda {
        @param y[in,out] vector of ColorSpinorFields
        @param z[in] input ColorSpinorField
     */
+   
+    void zero(std::vector<ColorSpinorField*> &a);
+   
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
 		   const double *b, ColorSpinorField &z, const double *c);
+    void axpyBzpcx(const double *a, std::vector<ColorSpinorField *> &&x, std::vector<ColorSpinorField *> &&y,
+                   const double *b, ColorSpinorField &z, const double *c);
 
     /**
        @brief Compute the vectorized "caxpyBxpz" over the set of
@@ -393,6 +401,7 @@ namespace quda {
     // multi-reduce kernels - defined in multi_reduce.cu
 
     void reDotProduct(double* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+    void reDotProduct(double *result, std::vector<ColorSpinorField *> &&a, std::vector<ColorSpinorField *> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b
@@ -402,6 +411,7 @@ namespace quda {
        @param b[in] set of input ColorSpinorFields
     */
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+    void cDotProduct(Complex *result, std::vector<ColorSpinorField *> &&a, std::vector<ColorSpinorField *> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector
@@ -414,6 +424,7 @@ namespace quda {
        @param b[in] set of input ColorSpinorFields
     */
     void hDotProduct(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+    void hDotProduct(Complex *result, std::vector<ColorSpinorField *> &&a, std::vector<ColorSpinorField *> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector
@@ -428,7 +439,7 @@ namespace quda {
        @param b[in] set of input ColorSpinorFields
     */
     void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
-
+    void hDotProduct_Anorm(Complex *result, std::vector<ColorSpinorField *> &&a, std::vector<ColorSpinorField *> &&b);
 
     /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b, and copies b into c
@@ -439,6 +450,8 @@ namespace quda {
        @param c[out] set of output ColorSpinorFields
     */
     void cDotProductCopy(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b, std::vector<ColorSpinorField*>& c);
+    void cDotProductCopy(Complex *result, std::vector<ColorSpinorField *> &&a, std::vector<ColorSpinorField *> &&b,
+                         std::vector<ColorSpinorField *> &&c);
 
   } // namespace blas
 

@@ -1027,6 +1027,8 @@ namespace quda {
   // as this should never be used to create field it is sufficient to be able to add pointers to the underlying vector
   using ColorSpinorFieldVector = std::vector<ColorSpinorField *>;
 
+  using ColorSpinorFieldVectorRef = std::vector<std::reference_wrapper<ColorSpinorField>>;
+
   // this is owning
   // would require some convenient way to get a non-owning version
   class ColorSpinorFieldVectorU : public std::vector<std::unique_ptr<ColorSpinorField>>
@@ -1039,6 +1041,19 @@ namespace quda {
       for (auto &x : *this) res.emplace_back(x.get());
       return res;
     }
+    ColorSpinorFieldVector Components() { return this->get(); }
+
+    ColorSpinorFieldVectorRef ref()
+    {
+      ColorSpinorFieldVectorRef res;
+      for (auto &x : *this) res.emplace_back(std::ref(*x));
+      return res;;
+    }
+
+    ColorSpinorField& Component(size_t i){
+      return *((*this)[i]);
+    }
+
     // call base class constructor
     ColorSpinorFieldVectorU() : std::vector<std::unique_ptr<ColorSpinorField>>() {};
 
