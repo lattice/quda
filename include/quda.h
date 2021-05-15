@@ -1575,8 +1575,8 @@ extern "C" {
 			const int X[4]);
   
   void laphCurrentKernel(int n1, int n2, int nMom,
-			 double _Complex *host_quark, 
-			 double _Complex *host_quark_bar, 
+			 void **host_quark, 
+			 void **host_quark_bar, 
 			 int *host_mom, 
 			 void *retArray,
 			 const int X[4]);

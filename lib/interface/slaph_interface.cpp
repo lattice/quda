@@ -904,15 +904,22 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
 
       std::vector<Complex> mom_mode_data(n_mom * X[3], 0.0);
       getProfileColorContract().TPSTART(QUDA_PROFILE_COMPUTE);
-      qudaMemset(d_cc, 0, data_cc_bytes);  
+      qudaMemset(d_cc, 0, data_cc_bytes);
+      
       momentumProjectQuda(*quda_quark_bar[dil1], *quda_quark[dil2], d_cc,
 			  mom_mode_data, momenta, n_mom);
       
-      memcpy((void*)&((Complex*)&ret_arr)[(dil1*n2 + dil2)*n_mom*X[3]], mom_mode_data.data(),
-	     sizeof(Complex) * n_mom*X[3]);
-      getProfileColorContract().TPSTOP(QUDA_PROFILE_COMPUTE);
+      size_t idx = 0;
+      for(int k=0; k<n_mom; k++) {
+	for(int t=0; t<X[3]; t++) {
+	  idx = ((X[3] * k + t) * n1 + dil1) * n2 + dil2;
+	  ((Complex*)&ret_arr)[idx] = mom_mode_data[t + k * X[3]];
+	}
+      }
+      
     }
   }
+    
 
   // Clean up memory allocations
   getProfileCurrentKernel().TPSTART(QUDA_PROFILE_FREE);
