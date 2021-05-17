@@ -53,7 +53,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -148,7 +153,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -236,7 +246,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -364,7 +379,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //initialize shared memory
     if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -447,7 +467,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
@@ -523,7 +548,12 @@ namespace quda {
 
     //Container for the four real parameters of SU(2) subgroup in shared memory
     SharedMemoryCache<Float> cache;
+#ifndef QUDA_BACKEND_OMPTARGET
     auto elems = cache.data();
+#else
+    Float elems[2048];
+    #pragma omp allocate(elems) allocator(omp_pteam_mem_alloc)
+#endif
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
