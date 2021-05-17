@@ -7,6 +7,66 @@
 //#include <kernels/contraction.cuh>
 
 namespace quda {
+
+  // DMH TODO: Conglomerate these into a single class with a QUDA
+  // param to denote either inner product or color contract.
+
+  // Inner Product
+  //----------------------------------------------------------------------------
+  template <typename Float, int nColor> class InnerProduct : TunableKernel2D
+  {
+  protected:
+    const ColorSpinorField &x;
+    const ColorSpinorField &y;
+    complex<Float> *result;
+
+    unsigned int minThreads() const { return x.VolumeCB(); }
+    
+  public:
+    InnerProduct(const ColorSpinorField &x, const ColorSpinorField &y, void *result) :
+      TunableKernel2D(x, 2),
+      x(x),
+      y(y),
+      result(static_cast<complex<Float>*>(result))
+    {
+      apply(device::get_default_stream());
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      ColorContractArg<Float, nColor> arg(x, y, result);
+      launch<InnerProd>(tp, stream, arg);
+    }
+    
+    long long flops() const
+    {
+      // 1 prop spins, 1 evec spin, 3 color, 6 complex, lattice volume
+      return 1 * 3 * 6ll * x.Volume();
+    }
+
+    long long bytes() const
+    {
+      return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(Complex);
+    }
+  };
+
+#ifdef GPU_CONTRACT
+  void innerProductQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
+  {
+    checkPrecision(x, y);
+    if (x.Nspin() != 1 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    
+    instantiate<InnerProduct>(x, y, result);
+  }
+#else
+  void innerProductQuda(const ColorSpinorField &, const ColorSpinorField &, void *)
+  {
+    errorQuda("Contraction code has not been built");
+  }
+#endif
+  //----------------------------------------------------------------------------
+
   
   // Color Contract
   //----------------------------------------------------------------------------
@@ -159,14 +219,14 @@ namespace quda {
       std::vector<double> mom_proj_local(2 * t_dim);
 
       for(int k=0; k<n_mom; k++) {
-	
+        //printfQuda("Computing mom_mode k=%d\n", k);	
 	// Zero out the local results.
 	if(!activeTuning()) {
 	  for(int i=0; i<2 * t_dim; i++) mom_proj_local[i] = 0.0;
 	}
 	const int mom[3] = {momenta[3*k + 0], momenta[3*k + 1], momenta[3*k + 2]};
 	
-	MomentumProjectArg<Float, nColor> arg(x, cc_array, mom);
+	MomentumProjectArg<Float, nColor, 1> arg(x, cc_array, mom);
 	launch<MomProj>(mom_proj_local, tp, stream, arg);
 	
 	// Copy results back to host array
@@ -177,8 +237,7 @@ namespace quda {
 	  }
 	}      
       }
-    }
-    
+    }    
     
     long long flops() const
     {
@@ -201,7 +260,7 @@ namespace quda {
     
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x = %d y = %d", x.Ncolor(), y.Ncolor());
     
-    instantiate<ColorContract>(x, y, cc_array);
+    instantiate<InnerProduct>(x, y, cc_array);
     instantiate<MomentumProject>(x, y, cc_array, mom_proj, momenta, n_mom);
   }
   //#else

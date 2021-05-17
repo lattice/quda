@@ -8,6 +8,8 @@ namespace quda {
   void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result);
   
   void colorContractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result);
+
+  void innerProductQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result);
   
   void momentumProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *cc_array,
 			   std::vector<Complex> &mom_proj, std::vector<int> &momenta, const int n_mom);

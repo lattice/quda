@@ -830,8 +830,8 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   // QUDA style wrapper around the host quark
   std::vector<ColorSpinorField*> quark;
   cpu_quark_param.create = QUDA_REFERENCE_FIELD_CREATE;
-  quark.reserve(n1);
-  for (int i=0; i<n1; i++) {
+  quark.reserve(n2);
+  for (int i=0; i<n2; i++) {
     cpu_quark_param.v = host_quark[i];
     quark.push_back(ColorSpinorField::Create(cpu_quark_param));
   }
@@ -839,7 +839,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   // Allocate device memory for quark. This is done to ensure a contiguous
   // chunk of memory is used.
   // vectors * colours * spatial sites * complex * precision
-  size_t data_quark_bytes = n1 * n_color * n_sites * 2 * precision;
+  size_t data_quark_bytes = n2 * n_color * n_sites * 2 * precision;
   void *d_quark = pool_device_malloc(data_quark_bytes);
 
   // Create device vectors for quarks
@@ -848,7 +848,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   cuda_quark_param.create = QUDA_REFERENCE_FIELD_CREATE;
   cuda_quark_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   std::vector<ColorSpinorField *> quda_quark;
-  for (int i=0; i<n1; i++) {
+  for (int i=0; i<n2; i++) {
     cuda_quark_param.v = (std::complex<double>*)d_quark + n_color*n_sites*i;
     quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
   }
@@ -860,8 +860,8 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   // QUDA style wrapper around the host quark_bar
   std::vector<ColorSpinorField*> quark_bar;
   cpu_quark_bar_param.create = QUDA_REFERENCE_FIELD_CREATE;
-  quark_bar.reserve(n2);
-  for (int i=0; i<n2; i++) {
+  quark_bar.reserve(n1);
+  for (int i=0; i<n1; i++) {
     cpu_quark_bar_param.v = host_quark_bar[i];
     quark_bar.push_back(ColorSpinorField::Create(cpu_quark_bar_param));
   }
@@ -869,7 +869,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   // Allocate device memory for quark_bar. This is done to ensure a contiguous
   // chunk of memory is used.
   // vectors * colours * spatial sites * complex * precision
-  size_t data_quark_bar_bytes = n2 * n_color * n_sites * 2 * precision;
+  size_t data_quark_bar_bytes = n1 * n_color * n_sites * 2 * precision;
   void *d_quark_bar = pool_device_malloc(data_quark_bar_bytes);
 
   // Create device vectors for quark_bar
@@ -878,7 +878,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   cuda_quark_bar_param.create = QUDA_REFERENCE_FIELD_CREATE;
   cuda_quark_bar_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   std::vector<ColorSpinorField *> quda_quark_bar;
-  for (int i=0; i<n2; i++) {
+  for (int i=0; i<n1; i++) {
     cuda_quark_bar_param.v = (std::complex<double>*)d_quark_bar + n_color*n_sites*i;
     quda_quark_bar.push_back(ColorSpinorField::Create(cuda_quark_bar_param));
   }
@@ -889,42 +889,50 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
 
   std::vector<int> momenta(n_mom * 3, 0);
   for(int i=0; i<3*n_mom; i++) momenta[i] = host_mom[i];
-  
+
   getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_INIT);
   //--------------------------------------------------------------------------------
 
+  std::vector<Complex> ret_arr_tmp(n_mom * X[3] * n1 * n2, 0.0);
+
   // Copy host data to device
   getProfileCurrentKernel().TPSTART(QUDA_PROFILE_H2D);
-  for (int i=0; i<n1; i++) *quda_quark[i] = *quark[i];
-  for (int i=0; i<n2; i++) *quda_quark_bar[i] = *quark_bar[i];
+  for (int i=0; i<n2; i++) *quda_quark[i] = *quark[i];
+  for (int i=0; i<n1; i++) *quda_quark_bar[i] = *quark_bar[i];
   getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_H2D);
 
   for (int dil1=0; dil1<n1; dil1++) {
     for (int dil2=0; dil2<n2; dil2++) {
 
       std::vector<Complex> mom_mode_data(n_mom * X[3], 0.0);
-      getProfileColorContract().TPSTART(QUDA_PROFILE_COMPUTE);
+      getProfileCurrentKernel().TPSTART(QUDA_PROFILE_COMPUTE);
       qudaMemset(d_cc, 0, data_cc_bytes);
-      
       momentumProjectQuda(*quda_quark_bar[dil1], *quda_quark[dil2], d_cc,
 			  mom_mode_data, momenta, n_mom);
-      
+      getProfileCurrentKernel().TPSTOP(QUDA_PROFILE_COMPUTE);
       size_t idx = 0;
       for(int k=0; k<n_mom; k++) {
 	for(int t=0; t<X[3]; t++) {
-	  idx = ((X[3] * k + t) * n1 + dil1) * n2 + dil2;
-	  ((Complex*)&ret_arr)[idx] = mom_mode_data[t + k * X[3]];
+          idx = dil2 + n2*dil1 + n2*n1*t + n2*n1*X[3]*k;
+	  ret_arr_tmp[idx] = mom_mode_data[t + k * X[3]];
 	}
-      }
-      
+      }      
     }
   }
-    
-
+  
+  memcpy(ret_arr, ret_arr_tmp.data(), sizeof(Complex) * n_mom * X[3] * n1 * n2);
+  
   // Clean up memory allocations
   getProfileCurrentKernel().TPSTART(QUDA_PROFILE_FREE);
-  for (int i=0; i<n1; i++) delete quda_quark[i];
-  for (int i=0; i<n2; i++) delete quda_quark_bar[i];
+  for (int i=0; i<n1; i++) {
+    delete quda_quark[i];
+    delete quark[i];
+  }
+
+  for (int i=0; i<n2; i++) {
+    delete quda_quark_bar[i];
+    delete quark_bar[i];
+  }
 
   pool_device_free(d_quark);
   pool_device_free(d_quark_bar);
