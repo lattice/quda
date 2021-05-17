@@ -137,6 +137,14 @@ namespace quda
     alloc[type].erase(ptr);
   }
 
+  namespace target {
+    static std::map<const void*,void*> omp_mapped_ptr;  // host -> device
+    bool is_device_ptr(void *p)
+    {
+      // DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, SHMEM
+      return alloc[DEVICE].count(p)>0 || alloc[DEVICE_PINNED].count(p)>0;
+    }
+  }
   /**
    * Under CUDA 4.0, cudaHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
@@ -322,7 +330,6 @@ namespace quda
     return ptr;
   }
 
-  static std::map<const void*,void*> omp_mapped_ptr;  // host -> device
   /**
    * Allocate page-locked ("pinned") host memory, and map it into the
    * GPU address space.  This function should only be called via the
@@ -347,16 +354,16 @@ namespace quda
     print_trace();
     if(0<omp_get_num_devices()){
       int d = omp_get_default_device();
-      void *dp = omp_target_alloc(a.base_size, d);  // FIXME keep it somewhere so we can free it
+      void *dp = omp_target_alloc(a.base_size, d);
       ompwip("require special memcpy",[=](){printfQuda("mapped_malloc_ device: %p\n",dp);});
       if(!dp)
         errorQuda("%s:%d %s() Failed to allocate device memory of size %zu for mapped malloc\n", file, line, func, size);
       if(omp_target_associate_ptr(ptr, dp, a.base_size, 0, d))
         errorQuda("%s:%d %s() Failed to assocaite device memory to host pointer\n", file, line, func);
-      omp_mapped_ptr[ptr] = dp;
+      target::omp_mapped_ptr[ptr] = dp;
     }else{
       warningQuda("%s:%d %s() mapped malloc without a device", file, line, func);
-      omp_mapped_ptr[ptr] = ptr;
+      target::omp_mapped_ptr[ptr] = ptr;
     }
 #endif
     track_malloc(MAPPED, a, ptr);
@@ -513,13 +520,13 @@ namespace quda
       track_free(HOST, ptr);
       free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
-      ompwip("free PINNED ptr unimplemented");
+      ompwip("free PINNED ptr");
 /*
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
+*/
       track_free(PINNED, ptr);
       free(ptr);
-*/
     } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
       ompwip("HOST_ALLOC alloc[MAPPED].count(ptr) untested code path"); print_trace();
@@ -530,7 +537,7 @@ namespace quda
 */
 #else
       ompwip("!HOST_ALLOC alloc[MAPPED].count(ptr)");
-      void *dp = omp_mapped_ptr[ptr];
+      void *dp = target::omp_mapped_ptr[ptr];
       if(dp!=ptr){
         omp_target_disassociate_ptr(ptr, omp_get_default_device());
         omp_target_free(dp, omp_get_default_device());
@@ -651,7 +658,7 @@ namespace quda
   {
     ompwip("get_mapped_device_pointer_");
     print_trace();
-    return omp_mapped_ptr[host];
+    return target::omp_mapped_ptr[host];
 /*
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);

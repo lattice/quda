@@ -73,6 +73,12 @@ printmem(void *d, std::size_t m, int host)
 }
 #endif
 
+namespace quda {
+  namespace target {
+    extern bool is_device_ptr(void *);
+  }
+}
+
 static inline void
 ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
 {
@@ -110,13 +116,35 @@ ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
     printmem(d,c,0);
     break;
   case cudaMemcpyDefault:
-    warningQuda("cudaMemcpyDefault calling host to device");
-    printmem(s,c,1);
     if(0<omp_get_num_devices()){
-      omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
-      printmem(d,c,0);
+      if(quda::target::is_device_ptr(d)){
+        if(quda::target::is_device_ptr(s)){
+          warningQuda("cudaMemcpyDefault calling device to device");
+          printmem(s,c,0);
+          omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_default_device());
+          printmem(d,c,0);
+        }else{
+          warningQuda("cudaMemcpyDefault calling host to device");
+          printmem(s,c,1);
+          omp_target_memcpy(d,s,c,0,0,omp_get_default_device(),omp_get_initial_device());
+          printmem(d,c,0);
+        }
+      }else{
+        if(quda::target::is_device_ptr(s)){
+          warningQuda("cudaMemcpyDefault calling device to host");
+          printmem(s,c,0);
+          omp_target_memcpy(d,s,c,0,0,omp_get_initial_device(),omp_get_default_device());
+          printmem(d,c,1);
+        }else{
+          warningQuda("cudaMemcpyDefault calling host to host");
+          printmem(s,c,1);
+          memcpy(d,s,c);
+          printmem(d,c,1);
+        }
+      }
     }else{
       warningQuda("cudaMemcpyDefault without a device, calling memcpy");
+      printmem(s,c,1);
       memcpy(d,s,c);
       printmem(d,c,1);
     }
