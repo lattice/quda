@@ -1121,8 +1121,8 @@ TEST_P(BlasTest, verify)
          (prec_pair.second == QUDA_SINGLE_PRECISION ? 1e-6 : (prec_pair.second == QUDA_HALF_PRECISION ? 1e-4 : 1e-2)));
   double tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
-  //EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
-  EXPECT_GE(tol, deviation) << "CPU and CUDA implementations do not agree";//GE fails on nan, unlike LE
+  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  EXPECT_EQ(false, std::isnan(deviation)) << "Nan has propagated into the result";
 }
 
 TEST_P(BlasTest, benchmark)
