@@ -52,7 +52,12 @@ namespace quda
       using Mat = HMatrix<real, N>;
       double trLogA = 0.0;
 
+#if 0
       for (int ch = 0; ch < 2; ch++) {
+#else
+      int ch=0;
+      while( ch < 2 ) { 
+#endif
         Mat A = arg.clover(x_cb, parity, ch);
         A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
 
@@ -70,7 +75,12 @@ namespace quda
 
         Mat Ainv = static_cast<real>(0.5) * cholesky.invert(); // return full inverse
         arg.inverse(x_cb, parity, ch) = Ainv;
+#if 0
       }
+#else 
+        ch++;
+      }
+#endif
 
       reduce_t result;
       parity ? result[1] = trLogA : result[0] = trLogA;
