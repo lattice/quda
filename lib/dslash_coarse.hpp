@@ -81,70 +81,66 @@ namespace quda
       }
     }
 
-    // FIXME: understand why this leads to slower perf and variable correctness
-    // int blockStep() const { return deviceProp.warpSize/4; }
-    // int blockMin() const { return deviceProp.warpSize/4; }
-
-    // Experimental autotuning of the color column stride
-    bool advanceAux(TuneParam &param) const
+    /**
+       @param Helper function to check that the present launch parameters are valid
+    */
+    bool checkParam(const TuneParam &param) const
     {
-      if (2 * param.aux.x <= max_color_col_stride && Nc % (2 * param.aux.x) == 0
-          && param.block.x % deviceProp.warpSize == 0) {
-        // An x-dimension block size that is not a multiple of the
-        // warp size is incompatible with splitting the dot product
-        // across the warp so we must skip this
+      constexpr int warp_size = 32;
+      return ((color_col_stride == 1 || minThreads() % warp_size == 0) && // active threads must be a multiple of the warp
+              param.block.x % warp_size == 0 &&                           // block size must be a multiple of the warp
+              Nc % color_col_stride == 0 &&                               // number of colors must be divisible by the split
+              param.grid.x < deviceProp.maxGridSize[0]);                  // ensure the resulting grid size valid
+    }
 
-        param.aux.x *= 2; // safe to advance
+    bool advanceColorStride(TuneParam &param) const
+    {
+      bool valid = false;
+
+      while (param.aux.x < max_color_col_stride) {
+        param.aux.x *= 2;
         color_col_stride = param.aux.x;
-
-        // recompute grid size since minThreads() has now been updated
-        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
-
-        // check this grid size is valid before returning
-        if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+        valid = checkParam(param);
+        if (valid) break;
       }
 
-      // reset color column stride if too large or not divisible
-      param.aux.x = 1;
-      color_col_stride = param.aux.x;
+      if (!valid) {
+        // reset color column stride if too large or not divisible
+        param.aux.x = 1;
+        color_col_stride = param.aux.x;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+      }
 
-      // recompute grid size since minThreads() has now been updated
-      param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
+      return valid;
+    }
 
+    bool advanceDimThreads(TuneParam &param) const
+    {
+      bool rtn;
       if (2 * param.aux.y <= nDim
           && param.block.x * param.block.y * dim_threads * 2 <= (unsigned int)deviceProp.maxThreadsPerBlock) {
         param.aux.y *= 2;
-        dim_threads = param.aux.y;
-
-        // need to reset z-block/grid size/shared_bytes since dim_threads has changed
-        param.block.z = dim_threads * 2;
-        param.grid.z = 2 * (Nc / Mc);
-
-        param.shared_bytes
-          = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z > sharedBytesPerBlock(param) ?
-          sharedBytesPerThread() * param.block.x * param.block.y * param.block.z :
-          sharedBytesPerBlock(param);
-
-        return true;
+        rtn = true;
       } else {
         param.aux.y = 1;
-        dim_threads = param.aux.y;
-
-        // need to reset z-block/grid size/shared_bytes since
-        // dim_threads has changed.  Strictly speaking this isn't needed
-        // since this is the outer dimension to tune, but would be
-        // needed if we added an aux.z tuning dimension
-        param.block.z = dim_threads * 2;
-        param.grid.z = 2 * (Nc / Mc);
-
-        param.shared_bytes
-          = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z > sharedBytesPerBlock(param) ?
-          sharedBytesPerThread() * param.block.x * param.block.y * param.block.z :
-          sharedBytesPerBlock(param);
-
-        return false;
+        rtn = false;
       }
+
+      dim_threads = param.aux.y;
+      // need to reset z-block/grid size/shared_bytes since dim_threads has changed
+      param.block.z = dim_threads * 2;
+      param.grid.z = 2 * (Nc / Mc);
+
+      param.shared_bytes
+        = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z > sharedBytesPerBlock(param) ?
+        sharedBytesPerThread() * param.block.x * param.block.y * param.block.z :
+        sharedBytesPerBlock(param);
+
+      return rtn;
     }
+
+    bool advanceAux(TuneParam &param) const { return advanceColorStride(param) || advanceDimThreads(param); }
 
     void initTuneParam(TuneParam &param) const
     {
@@ -243,6 +239,9 @@ namespace quda
       } else {
 
         const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        color_col_stride = tp.aux.x;
+        dim_threads = tp.aux.y;
+        if (!checkParam(tp)) errorQuda("Invalid launch param");
 
         if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
           errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
