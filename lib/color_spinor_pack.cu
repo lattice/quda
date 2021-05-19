@@ -67,7 +67,7 @@ namespace quda {
   public:
     PackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
               int nFace, int dagger, MemoryLocation *destination) :
-      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), 2 * a.SiteSubset()), // factor of 2 is dimension
+      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), 2 * a.SiteSubset()), // factor of 2 is direction
       ghost(ghost),
       a(a),
       parity(parity),
@@ -75,7 +75,7 @@ namespace quda {
       dagger(dagger)
     {
       // if doing block float then all spin-color components must be within the same block
-      if (block_float) TunableKernel2D_base<false>::resizeStep((a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)));
+      if (block_float) resizeStep((a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), step_z);
       switch (a.GhostPrecision()) {
       case QUDA_DOUBLE_PRECISION:  strcat(aux,",halo_prec=8"); break;
       case QUDA_SINGLE_PRECISION:  strcat(aux,",halo_prec=4"); break;
@@ -114,13 +114,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (a.Location() == QUDA_CPU_FIELD_LOCATION) {
-	if (a.Ndim() == 5) launch_host<GhostPacker>(tp, stream, Arg<5>(a, ghost, parity, nFace, dagger));
-        else               launch_host<GhostPacker>(tp, stream, Arg<4>(a, ghost, parity, nFace, dagger));
-      } else {
-        if (a.Ndim() == 5) launch_device<GhostPacker>(tp, stream, Arg<5>(a, ghost, parity, nFace, dagger));
-        else               launch_device<GhostPacker>(tp, stream, Arg<4>(a, ghost, parity, nFace, dagger));
-      }
+      if (a.Ndim() == 5) launch<GhostPacker, true>(tp, stream, Arg<5>(a, ghost, parity, nFace, dagger));
+      else               launch<GhostPacker, true>(tp, stream, Arg<4>(a, ghost, parity, nFace, dagger));
     }
 
     int blockStep() const { return block_float ? 2 : TunableKernel3D::blockStep(); }
