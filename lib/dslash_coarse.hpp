@@ -1,13 +1,10 @@
+
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <uint_to_char.h>
 #include <worker.h>
 #include <tunable_nd.h>
 #include <kernels/dslash_coarse.cuh>
-
-#ifndef QUDA_FAST_COMPILE_DSLASH
-#define QUDA_FAST_COMPILE_DSLASH
-#endif
 
 namespace quda {
 
@@ -43,40 +40,45 @@ namespace quda {
 
     unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc); }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
-    unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); } // 4-d volume since this x threads only
+    unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
-    // FIXME: understand why this leads to slower perf and variable correctness
-    //int blockStep() const { return device::warp_size()/4; }
-    //int blockMin() const { return device::warp_size()/4; }
-
-#ifndef QUDA_FAST_COMPILE_DSLASH
-    bool advanceAux(TuneParam &param) const
+    /**
+       @param Helper function to check that the present launch parameters are valid
+    */
+    bool checkParam(const TuneParam &param) const
     {
-      if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
-	  param.block.x % device::warp_size() == 0) {
-	// An x-dimension block size that is not a multiple of the
-	// warp size is incompatible with splitting the dot product
-	// across the warp so we must skip this
+      return ((color_col_stride == 1 || minThreads() % (unsigned)device::warp_size() == 0) && // active threads must be a multiple of the warp
+              param.block.x % device::warp_size() == 0 &&                                     // block size must be a multiple of the warp
+              Nc % color_col_stride == 0 &&                                                   // number of colors must be divisible by the split
+              param.grid.x < device::max_grid_size(0));                                       // ensure the resulting grid size valid
+    }
 
-	param.aux.x *= 2; // safe to advance
-	color_col_stride = param.aux.x;
+    bool advanceColorStride(TuneParam &param) const
+    {
+      bool valid = false;
 
-	// recompute grid size since minThreads() has now been updated
-	param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
-
-	// check this grid size is valid before returning
-	if (param.grid.x < device::max_grid_size(0)) return true;
+      while (param.aux.x < max_color_col_stride) {
+        param.aux.x *= 2;
+        color_col_stride = param.aux.x;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+        valid = checkParam(param);
+        if (valid) break;
       }
 
-      // reset color column stride if too large or not divisible
-      param.aux.x = 1;
-      color_col_stride = param.aux.x;
+      if (!valid) {
+        // reset color column stride if too large or not divisible
+        param.aux.x = 1;
+        color_col_stride = param.aux.x;
+        param.grid.x = (minThreads() + param.block.x - 1) / param.block.x; // grid size changed since minThreads has been updated
+      }
 
-      // recompute grid size since minThreads() has now been updated
-      param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
+      return valid;
+    }
 
+    bool advanceDimThreads(TuneParam &param) const
+    {
       bool rtn;
-      if (2*param.aux.y <= nDim &&  param.block.x*param.block.y*dim_threads*2 <= device::max_threads_per_block()) {
+      if (2 * param.aux.y <= nDim && param.block.x * param.block.y * dim_threads * 2 <= device::max_threads_per_block()) {
 	param.aux.y *= 2;
         rtn = true;
       } else {
@@ -92,6 +94,9 @@ namespace quda {
 
       return rtn;
     }
+
+#ifndef QUDA_FAST_COMPILE_DSLASH
+    bool advanceAux(TuneParam &param) const { return advanceColorStride(param) || advanceDimThreads(param); }
 #else
     bool advanceAux(TuneParam &) const { return false; }
 #endif
@@ -119,7 +124,7 @@ namespace quda {
       // ensure that the default x block size is divisible by the warpSize
       param.block.x = device::warp_size();
       param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
-      param.shared_bytes = std::max(sharedBytesPerThread()*param.block.x*param.block.y*param.block.z, sharedBytesPerBlock(param));
+      param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
   public:
@@ -127,7 +132,7 @@ namespace quda {
                  const GaugeField &Y, const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location)
       : TunableKernel3D(out, out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1), 2 * (Nc / Mc) * 2),
         out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
-        nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1)
+        nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1), color_col_stride(-1)
     {
       strcpy(aux, (std::string("policy_kernel,") + aux).c_str());
       strcat(aux, comm_dim_partitioned_string());
@@ -168,6 +173,10 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      color_col_stride = tp.aux.x;
+      dim_threads = tp.aux.y;
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      if (!checkParam(tp)) errorQuda("Invalid launch param");
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
@@ -557,7 +566,7 @@ namespace quda {
    {
     while ((unsigned)param.aux.x < policies.size()-1) {
       param.aux.x++;
-      if(policies[param.aux.x] != DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) return true;
+      if (policies[param.aux.x] != DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) return true;
     }
     param.aux.x = 0;
     return false;
