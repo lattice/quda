@@ -94,7 +94,6 @@ namespace quda
       for(int r=0; r<1; r++) {
         int offset_cc = r * arg.cc_stride;
         complex<real> cc = arg.cc_array[x_cb + parity*(arg.cc_stride/2) + offset_cc];
-        //if(idx_4d[0] == 0 && idx_4d[1] == 1 && idx_4d[2] == 2 && idx_4d[3] == 40) printf("In MJ: %d %d %d %d (%.16e,%.16e)\n", idx_4d[3], idx_4d[2], idx_4d[1], idx_4d[0], cc.real(), cc.imag());
         
         // The exp( -i x \dot p) convention carries a -ve sign in the
         // imaginary part of the phase
@@ -176,12 +175,14 @@ namespace quda
       Vector y = arg.y(x_cb, parity);
 
       // Collect index data
-      int idx[4] = { };
-      getCoords(idx, x_cb, arg.X, parity);
+      //int idx[4] = { };
+      //getCoords(idx, x_cb, arg.X, parity);
 
       // Compute the inner product over color
       res = innerProduct(x, y, 0, 0);
-      arg.s[x_cb + parity*arg.threads.x] = res;
+      // It is safe to use getIndexFull here as the array is not a QUDA array
+      arg.s[getIndexFull(x_cb, arg.X, parity)] = res;
+      //arg.s[x_cb + parity*arg.threads.x] = res;
     }
   };
 
