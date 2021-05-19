@@ -145,163 +145,164 @@ namespace quda {
     destroy();
   }
 
-  void cudaColorSpinorField::create(const QudaFieldCreate create) {
+  void cudaColorSpinorField::create(const QudaFieldCreate create)
+  {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) {
       errorQuda("Subset not implemented");
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      switch(mem_type) {
-      case QUDA_MEMORY_DEVICE:
-	v = pool_device_malloc(bytes);
-	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) norm = pool_device_malloc(norm_bytes);
-	break;
-      case QUDA_MEMORY_MAPPED:
-	v_h = mapped_malloc(bytes);
-        v = get_mapped_device_pointer(v_h);
+      switch (mem_type) {
+      case QUDA_MEMORY_DEVICE: {
+        v = pool_device_malloc(bytes);
+        auto deleter = [](char *ptr) { pool_device_free(ptr); };
+        _v = std::shared_ptr<char[]>(static_cast<char *>(v), deleter);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-	  norm_h = mapped_malloc(norm_bytes);
-          norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
+          norm = pool_device_malloc(norm_bytes);
+          _norm = std::shared_ptr<char[]>(static_cast<char *>(norm), deleter);
         }
-	break;
-      default:
-	errorQuda("Unsupported memory type %d", mem_type);
+      } break;
+      case QUDA_MEMORY_MAPPED: {
+        auto deleter = [](char *ptr) { host_free(ptr); };
+        v_h = mapped_malloc(bytes);
+        v = get_mapped_device_pointer(v_h);
+        _v = std::shared_ptr<char[]>(static_cast<char *>(v_h), deleter);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+          norm_h = mapped_malloc(norm_bytes);
+          norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
+          _norm = std::shared_ptr<char[]>(static_cast<char *>(norm), deleter);
+        }
+      } break;
+      default: errorQuda("Unsupported memory type %d", mem_type);
       }
       alloc = true;
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      if(composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
-	if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
-	  
+      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
+        if (composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+
         ColorSpinorParam param;
         param.siteSubset = QUDA_FULL_SITE_SUBSET;
         param.nDim = nDim;
-        memcpy(param.x, x, nDim*sizeof(int));
+        memcpy(param.x, x, nDim * sizeof(int));
         param.create = QUDA_REFERENCE_FIELD_CREATE;
         param.v = v;
         param.norm = norm;
-        param.is_composite   = false;
-        param.composite_dim  = 0;
+        param.is_composite = false;
+        param.composite_dim = 0;
         param.is_component = true;
-	param.mem_type = mem_type;
+        param.mem_type = mem_type;
 
         components.reserve(composite_descr.dim);
-        for(int cid = 0; cid < composite_descr.dim; cid++) {
-	  param.component_id = cid;
-	  components.push_back(new cudaColorSpinorField(*this, param));
+        for (int cid = 0; cid < composite_descr.dim; cid++) {
+          param.component_id = cid;
+          components.push_back(new cudaColorSpinorField(*this, param));
         }
       } else {
         // create the associated even and odd subsets
         ColorSpinorParam param;
         param.siteSubset = QUDA_PARITY_SITE_SUBSET;
         param.nDim = nDim;
-        memcpy(param.x, x, nDim*sizeof(int));
+        memcpy(param.x, x, nDim * sizeof(int));
         param.x[0] /= 2; // set single parity dimensions
         param.create = QUDA_REFERENCE_FIELD_CREATE;
         param.v = v;
         param.norm = norm;
-        param.is_composite  = false;
+        param.is_composite = false;
         param.composite_dim = 0;
-        param.is_component  = composite_descr.is_component;
-        param.component_id  = composite_descr.id;
-	param.mem_type = mem_type;
+        param.is_component = composite_descr.is_component;
+        param.component_id = composite_descr.id;
+        param.mem_type = mem_type;
 
-        even = new cudaColorSpinorField(*this, param);
-        odd = new cudaColorSpinorField(*this, param);
+        even = std::make_unique<cudaColorSpinorField>(*this, param);
+        odd = std::make_unique<cudaColorSpinorField>(*this, param);
 
         // need this hackery for the moment (need to locate the odd pointers half way into the full field)
         // check for special metadata wrapper (look at reference comments in
         // createTexObject() below)
+        // FIXME!!!!
         if (!((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
               || (precision == QUDA_HALF_PRECISION
                   && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()))) {
-          (dynamic_cast<cudaColorSpinorField *>(odd))->v = (void *)((char *)v + bytes / 2);
+          (dynamic_cast<cudaColorSpinorField *>(odd.get()))->v = (void *)((char *)v + bytes / 2);
           if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-            (dynamic_cast<cudaColorSpinorField *>(odd))->norm = (void *)((char *)norm + norm_bytes / 2);
+            (dynamic_cast<cudaColorSpinorField *>(odd.get()))->norm = (void *)((char *)norm + norm_bytes / 2);
         }
       }
-    } else { //siteSubset == QUDA_PARITY_SITE_SUBSET
+    } else { // siteSubset == QUDA_PARITY_SITE_SUBSET
 
       //! setup an object for selected eigenvector (the 1st one as a default):
-      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
-      {
-         if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
-         //if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the eigenvector set... Object size is : %u bytes\n", bytes);
-         // create the associated even and odd subsets
-         ColorSpinorParam param;
-         param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-         param.nDim = nDim;
-         memcpy(param.x, x, nDim*sizeof(int));
-         param.create = QUDA_REFERENCE_FIELD_CREATE;
-         param.v = v;
-         param.norm = norm;
-         param.is_composite   = false;
-         param.composite_dim  = 0;
-         param.is_component = true;
-	 param.mem_type = mem_type;
+      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
+        if (composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+        // if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the
+        // eigenvector set... Object size is : %u bytes\n", bytes);
+        // create the associated even and odd subsets
+        ColorSpinorParam param;
+        param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        param.nDim = nDim;
+        memcpy(param.x, x, nDim * sizeof(int));
+        param.create = QUDA_REFERENCE_FIELD_CREATE;
+        param.v = v;
+        param.norm = norm;
+        param.is_composite = false;
+        param.composite_dim = 0;
+        param.is_component = true;
+        param.mem_type = mem_type;
 
-         //reserve eigvector set
-         components.reserve(composite_descr.dim);
-         //setup volume, [real_]length and stride for a single eigenvector
-         for(int cid = 0; cid < composite_descr.dim; cid++)
-         {
-            param.component_id = cid;
-            components.push_back(new cudaColorSpinorField(*this, param));
-         }
+        // reserve eigvector set
+        components.reserve(composite_descr.dim);
+        // setup volume, [real_]length and stride for a single eigenvector
+        for (int cid = 0; cid < composite_descr.dim; cid++) {
+          param.component_id = cid;
+          components.push_back(new cudaColorSpinorField(*this, param));
+        }
       }
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      if ( !(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite) ) {
-	zeroPad();
-      } else { //temporary hack for the full spinor field sets, manual zeroPad for each component:
-	for(int cid = 0; cid < composite_descr.dim; cid++) {
-	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Even())).zeroPad();
-	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Odd())).zeroPad();
-	}
+      if (!(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite)) {
+        zeroPad();
+      } else { // temporary hack for the full spinor field sets, manual zeroPad for each component:
+        for (int cid = 0; cid < composite_descr.dim; cid++) {
+          (dynamic_cast<cudaColorSpinorField &>(components[cid]->Even())).zeroPad();
+          (dynamic_cast<cudaColorSpinorField &>(components[cid]->Odd())).zeroPad();
+        }
       }
     }
   }
 
   void cudaColorSpinorField::destroy()
   {
-    if (alloc) {
-      switch(mem_type) {
-      case QUDA_MEMORY_DEVICE:
-        pool_device_free(v);
-        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) pool_device_free(norm);
-        break;
-      case QUDA_MEMORY_MAPPED:
-        host_free(v_h);
-        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) host_free(norm_h);
-        break;
-      default:
-        errorQuda("Unsupported memory type %d", mem_type);
-      }
-    }
+    // if (alloc) {
+    //   switch (mem_type) {
+    //   case QUDA_MEMORY_DEVICE:
+    //     // pool_device_free(v);
+    //     if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) pool_device_free(norm);
+    //     break;
+    //   case QUDA_MEMORY_MAPPED:
+    //     host_free(v_h);
+    //     if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) host_free(norm_h);
+    //     break;
+    //   default: errorQuda("Unsupported memory type %d", mem_type);
+    //   }
+    // }
 
-
-    if (composite_descr.is_composite) 
-    {
-       CompositeColorSpinorField::iterator vec;
-       for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
-    } 
-
-    if ( siteSubset == QUDA_FULL_SITE_SUBSET && (!composite_descr.is_composite || composite_descr.is_component) ) {
-      delete even;
-      delete odd;
+    if (composite_descr.is_composite) {
+      CompositeColorSpinorField::iterator vec;
+      for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
     }
   }
 
-  void cudaColorSpinorField::backup() const {
+  void cudaColorSpinorField::backup() const
+  {
     if (backed_up) errorQuda("ColorSpinorField already backed up");
-    backup_h = new char[bytes];
-    qudaMemcpy(backup_h, v, bytes, qudaMemcpyDefault);
+    _backup_h = std::make_unique<char[]>(bytes);
+    qudaMemcpy(_backup_h.get(), v, bytes, qudaMemcpyDefault);
     if (norm_bytes) {
-      backup_norm_h = new char[norm_bytes];
-      qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDefault);
+      _backup_norm_h = std::make_unique<char[]>(norm_bytes);
+      qudaMemcpy(_backup_norm_h.get(), norm, norm_bytes, qudaMemcpyDefault);
     }
     backed_up = true;
   }
@@ -309,12 +310,10 @@ namespace quda {
   void cudaColorSpinorField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    qudaMemcpy(v, backup_h, bytes, qudaMemcpyDefault);
-    delete []backup_h;
-    if (norm_bytes) {
-      qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyDefault);
-      delete []backup_norm_h;
-    }
+    qudaMemcpy(v, _backup_h.get(), bytes, qudaMemcpyDefault);
+    if (norm_bytes) { qudaMemcpy(norm, _backup_norm_h.get(), norm_bytes, qudaMemcpyDefault); }
+    _backup_h.reset();
+    _backup_norm_h.reset();
     backed_up = false;
   }
 

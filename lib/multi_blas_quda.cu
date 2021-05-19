@@ -328,6 +328,11 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
+    void zero(std::vector<ColorSpinorField *> &x)
+    {
+      for(auto a: x ) blas::zero(*a);
+    }
+
     void caxpy(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
@@ -515,6 +520,14 @@ namespace quda {
       }
     }
 
+    void axpyBzpcx(const double *a_, std::vector<ColorSpinorField *> &&x_, std::vector<ColorSpinorField *> &&y_,
+                   const double *b_, ColorSpinorField &z_, const double *c_)
+    {
+      ColorSpinorFieldVector x = std::move(x_);
+      ColorSpinorFieldVector y = std::move(y_);
+      axpyBzpcx(a_, x, y, b_, z_, c_);
+    }
+
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
@@ -592,6 +605,46 @@ namespace quda {
 
     void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_L(a, x.Components(), y.Components()); }
 
+    void axpy(const double *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      axpy(a, xx, yy);
+    }
+
+    void axpy_U(const double *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      axpy_U(a, xx, yy);
+    }
+
+    void axpy_L(const double *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      axpy_L(a, xx, yy);
+    }
+
+    void caxpy(const Complex *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      caxpy(a, xx, yy);
+    }
+    void caxpy_U(const Complex *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      caxpy_U(a, xx, yy);
+    }
+
+    void caxpy_L(const Complex *a, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      caxpy_L(a, xx, yy);
+    }
   } // namespace blas
 
 } // namespace quda

@@ -218,8 +218,8 @@ namespace quda {
 
     template <template <typename ...> class ReducerDiagonal, template <typename ...> class ReducerOffDiagonal, typename T>
     void multiReduce(T result[], const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-                     CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-                     CompositeColorSpinorField &w, int i, int j)
+                     ColorSpinorFieldVector &x, ColorSpinorFieldVector &y, ColorSpinorFieldVector &z,
+                     ColorSpinorFieldVector &w, int i, int j)
     {
       if (i == j) { // we are on the diagonal so invoke the diagonal reducer
         using host_reduce_t = typename ReducerDiagonal<double, double>::reduce_t;
@@ -674,6 +674,13 @@ namespace quda {
       delete[] result_tmp;
     }
 
+    void reDotProduct(double *result, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      reDotProduct(result, xx, yy);
+    }
+
     void cDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
@@ -729,6 +736,13 @@ namespace quda {
           result[j*ylen+i] = result_tmp[i*xlen + j];
 
       delete[] result_tmp;
+    }
+
+    void cDotProduct(Complex *result, ColorSpinorFieldVector &&x, ColorSpinorFieldVector &&y)
+    {
+      ColorSpinorFieldVector xx = std::move(x);
+      ColorSpinorFieldVector yy = std::move(y);
+      cDotProduct(result, xx, yy);
     }
 
     void hDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
