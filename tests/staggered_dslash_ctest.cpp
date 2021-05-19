@@ -97,6 +97,7 @@ TEST_P(StaggeredDslashTest, verify)
   double deviation = 1.0;
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // check for skip_kernel
+  dslash_test_wrapper.staggeredDslashRef();
   if (dslash_test_wrapper.spinorRef != nullptr) {
     dslash_test_wrapper.run_test(2);
     deviation = dslash_test_wrapper.verify();

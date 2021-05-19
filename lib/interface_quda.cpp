@@ -6133,19 +6133,19 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
 
     copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
     double relax_boost = relax_boost0 + i*1.0/boost_iter;
-
+    
     gaugeFixingOVR(*gaugeFixed, 3, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
 		   stopWtheta);
     //gaugeFixingFFT(*gaugeFixed, 4, Nsteps, verbose_interval, relax_boost, 1, tolerance, stopWtheta);
     
     link_trace = getLinkTrace(*gaugeFixed);
-    //printfQuda("iter %d: link %.15e link_max %.15e boost = %f\n", i, link_trace[0], link_max, relax_boost);
+    printfQuda("iter %d: link %.15e link_max %.15e boost = %f\n", i, link_trace.x, link_max, relax_boost);
     
     // Use gaugeSmeared (FIXME...) to store the FMR gauge.
-    //if (link_trace[0] > link_max) {
-    //link_max = link_trace[0];
-    //copyExtendedGauge(*gaugeSmeared, *gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
-    //}
+    if (link_trace.x > link_max) {
+      link_max = link_trace.x;
+      copyExtendedGauge(*gaugeSmeared, *gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
+    }
     
     // Perform FC decomposition on the current candidate FMR gauge
     profileGaugeFundamental.TPSTART(QUDA_PROFILE_COMPUTE);

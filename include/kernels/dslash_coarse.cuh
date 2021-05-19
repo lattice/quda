@@ -236,7 +236,7 @@ namespace quda {
 
       // full split over dimension and direction
 #pragma unroll
-      for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward fathers (if any)
+      for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
 	// 4-way 1,2,3  (stride = 4)
 	// 2-way 1      (stride = 2)
         out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);

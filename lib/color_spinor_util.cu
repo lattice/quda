@@ -228,20 +228,20 @@ namespace quda {
 
 	for (int s=0; s<u.Nspin(); s++) {
 	  for (int c=0; c<u.Ncolor(); c++) {
-            complex<double> u_ = static_cast<complex<double>>(u(parity, x_cb, s, c));
+            complex<double> u_ = u(parity, x_cb, s, c);
             complex<double> v_ = v(parity, x_cb, s, c);
 
             double diff_real = fabs(u_.real() - v_.real());
             double diff_imag = fabs(u_.imag() - v_.imag());
 
             for (int f=0; f<fail_check; f++) {
-              if (diff_real > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
-              if (diff_imag > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
+              if (diff_real > pow(10.0,-(f+1)/(double)tol) || std::isnan(diff_real)) fail[f]++;
+              if (diff_imag > pow(10.0,-(f+1)/(double)tol) || std::isnan(diff_imag)) fail[f]++;
             }
 
             int j = (s * u.Ncolor() + c) * 2;
-            if (diff_real > 1e-3) iter[j+0]++;
-            if (diff_imag > 1e-3) iter[j+1]++;
+            if (diff_real > 1e-3 || std::isnan(diff_real)) iter[j+0]++;
+            if (diff_imag > 1e-3 || std::isnan(diff_imag)) iter[j+1]++;
 	  }
 	}
       }

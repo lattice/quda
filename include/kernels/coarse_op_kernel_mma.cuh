@@ -65,7 +65,7 @@ namespace quda
             Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
           }
 
-        } if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
+        } else if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
 
           int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
 
