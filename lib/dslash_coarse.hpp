@@ -90,7 +90,7 @@ namespace quda
       return ((color_col_stride == 1 || minThreads() % warp_size == 0) && // active threads must be a multiple of the warp
               param.block.x % warp_size == 0 &&                           // block size must be a multiple of the warp
               Nc % color_col_stride == 0 &&                               // number of colors must be divisible by the split
-              param.grid.x < deviceProp.maxGridSize[0]);                  // ensure the resulting grid size valid
+              param.grid.x < (unsigned)deviceProp.maxGridSize[0]);                  // ensure the resulting grid size valid
     }
 
     bool advanceColorStride(TuneParam &param) const
