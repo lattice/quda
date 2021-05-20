@@ -139,7 +139,6 @@ protected:
 
     // Reunitarization setup
     SetReunitarizationConsts();
-    plaquette(*U);
 
     for (int step=1; step<=nsteps; ++step) {
       printfQuda("Step %d\n",step);
@@ -149,9 +148,8 @@ protected:
       *num_failures_h = 0;
       unitarizeLinks(*U, num_failures_d);
       if (*num_failures_h > 0) errorQuda("Error in the unitarization");
-
-      plaquette(*U);
     }
+
     a1.stop();
 
     printfQuda("Time Monte -> %.6f s\n", a1.last());
