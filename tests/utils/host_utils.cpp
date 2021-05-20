@@ -284,6 +284,11 @@ void initComms(int, char **, int *const commDims)
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
 
   initCommsGridQuda(4, commDims, func, NULL);
+
+  for (int d = 0; d < 4; d++) {
+    if (dim_partitioned[d]) { commDimPartitionedSet(d); }
+  }
+
   initRand();
 
   printfQuda("Rank order is %s major (%s running fastest)\n", rank_order == 0 ? "column" : "row",

@@ -63,9 +63,6 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  for (int d = 0; d < 4; d++) {
-    if (dim_partitioned[d]) { commDimPartitionedSet(d); }
-  }
   updateR();
 
   initQuda(device_ordinal);
