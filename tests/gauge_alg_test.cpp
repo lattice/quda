@@ -99,10 +99,9 @@ protected:
     gParam.reconstruct = param.reconstruct;
     gParam.setPrecision(gParam.Precision(), true);
 
-#ifdef MULTI_GPU
     int y[4];
     int R[4] = {0,0,0,0};
-    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
+    for(int dir=0; dir<4; ++dir) if (comm_dim_partitioned(dir)) R[dir] = 2;
     for(int dir=0; dir<4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
     int pad = 0;
     GaugeFieldParam gParamEx(y, prec, link_recon,
@@ -114,9 +113,7 @@ protected:
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     U = new cudaGaugeField(gParamEx);
-#else
-    U = new cudaGaugeField(gParam);
-#endif
+
     // CURAND random generator initialization
     randstates = new RNG(*U, 1234);
 
