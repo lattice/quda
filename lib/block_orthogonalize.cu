@@ -72,6 +72,7 @@ namespace quda {
         strcat(aux, geo_str);
         if (d < V.Ndim() - 1) strcat(aux, "x");
       }
+      if (geoBlockSize == 1) errorQuda("Invalid MG aggregate size %d", geoBlockSize);
 
       strcat(aux, ",n_block_ortho=");
       char n_ortho_str[2];
