@@ -13,7 +13,11 @@ namespace quda
   /** Whether to use a shared memory scratch pad to store the input
      field acrosss the Ls dimension to minimize global memory
      reads. */
+#ifdef QUDA_BACKEND_OMPTARGET
+  constexpr bool shared() { return false; }
+#else
   constexpr bool shared() { return true; }
+#endif
 
   /** Whether to use variable or fixed coefficient algorithm.  Must be
       true if using ZMOBIUS */
