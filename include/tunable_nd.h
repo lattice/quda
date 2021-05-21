@@ -24,7 +24,6 @@ namespace quda {
     std::enable_if_t<device::use_kernel_arg<Arg>(), void>
       launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg, false>(kernel.name, tp, stream, arg);
 #else
@@ -55,7 +54,6 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
-      ompwip();
       constexpr bool grid_stride = false;
       const_cast<TunableKernel*>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }
@@ -78,14 +76,12 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip("OFFLOADING...");
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel1D), tp, stream, arg);
     }
 
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
     {
-      ompwip();
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
         f(i);
@@ -106,7 +102,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
       std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {
@@ -185,7 +180,6 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip("OFFLOADING...");
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel2D), tp, stream, arg);
     }
@@ -193,7 +187,6 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
     {
-      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       Functor<Arg> f(const_cast<Arg &>(arg));
       for (int i = 0; i < (int)arg.threads.x; i++) {
@@ -206,7 +199,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {
@@ -217,7 +209,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
     std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (TunableKernel1D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {
@@ -349,7 +340,6 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip("OFFLOADING...");
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Kernel3D), tp, stream, arg);
@@ -358,7 +348,6 @@ namespace quda {
     template <template <typename> class Functor, typename Arg>
     void launch_host(const TuneParam &, const qudaStream_t &, const Arg &arg)
     {
-      ompwip();
       const_cast<Arg &>(arg).threads.y = vector_length_y;
       const_cast<Arg &>(arg).threads.z = vector_length_z;
       Functor<Arg> f(const_cast<Arg &>(arg));
@@ -374,7 +363,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
   std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {
@@ -385,7 +373,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
   std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (TunableKernel2D_base<grid_stride>::location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {

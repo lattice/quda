@@ -85,7 +85,6 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      ompwip("Reduction2D on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg);
 #else
@@ -130,7 +129,6 @@ namespace quda {
 
       // copy element by element to output vector
       for (int i = 0; i < output_size; i++) {
-        std::cerr << "launch_host: reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[" << i << "]: " << reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i] << std::endl;
         reinterpret_cast<typename scalar<T>::type*>(result.data())[i] =
           reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
       }
@@ -306,7 +304,6 @@ namespace quda {
     template <template <typename> class Transformer, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      ompwip("MultiReduction on device");
 #ifdef JITIFY
       arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg);
 #else
