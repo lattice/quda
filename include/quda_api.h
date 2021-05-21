@@ -58,16 +58,29 @@ static inline double3 make_double3(double x,double y,double z){return double3{x,
 struct double4 {double x,y,z,w;};
 static inline double4 make_double4(double x,double y,double z,double w){return double4{x,y,z,w};}
 
+template <typename... Fmt>
 static inline int
-ompwip_(const char * const file, const size_t line, const char * const func, const char * const msg, std::function<void(void)>f = [](){})
+ompwip_(const char * const file, const size_t line, const char * const func, std::function<void(void)>f, Fmt... fmt)
 {
-  if(0==omp_get_team_num()&&0==omp_get_thread_num()) std::cerr<<"OMP WIP:"<<msg<<": "<<file<<':'<<line<<' '<<func<<std::endl;
+  if(0==omp_get_team_num()&&0==omp_get_thread_num()){
+    printf("OMP WIP: ");
+    printf(fmt...);
+    printf(" %s:%ld %s\n", file, line, func);
+  }
   f();
   return 0;
 }
+template <typename... Fmt>
 static inline int
-ompwip_(const char * const file, const size_t line, const char * const func, std::function<void(void)>f = [](){})
-{return ompwip_(file,line,func,"",f);}
+ompwip_(const char * const file, const size_t line, const char * const func, const char * const msg, Fmt... fmt)
+{
+  return ompwip_(file,line,func,[](){},msg,fmt...);
+}
+static inline int
+ompwip_(const char * const file, const size_t line, const char * const func, std::function<void(void)>f=[](){})
+{
+  return ompwip_(file,line,func,f,"");
+}
 #define ompwip(...) ompwip_(__FILE__,__LINE__,__PRETTY_FUNCTION__,##__VA_ARGS__)
 
 using cudaStream_t = int;  // device.h:/cudaStream_t
