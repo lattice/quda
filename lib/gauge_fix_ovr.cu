@@ -108,6 +108,8 @@ namespace quda {
           this->threads *= u.X()[dir] - border * 2;
         }
         this->threads /= 2;
+
+        if (threads == 0) errorQuda("Local volume is too small");
       } else {
         this->threads = threads;
       }
@@ -147,7 +149,7 @@ namespace quda {
     {
       param.aux.x = 0;
       TunableKernel2D::resizeVector(param.aux.x < 3 ? 8 : 4);
-      TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);      
+      TunableKernel2D::resizeStep(param.aux.x < 3 ? 8 : 4);
       TunableKernel2D::initTuneParam(param);
     }
 

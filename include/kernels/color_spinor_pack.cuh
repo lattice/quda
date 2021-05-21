@@ -112,7 +112,7 @@ namespace quda {
       constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
       static_assert(Ms == Arg::nSpin, "on host spins per thread must match total spins");
-      static_assert(Mc == Arg::nColor,  "on host colors per thread must match total colors");
+      static_assert(Mc == Arg::nColor, "on host colors per thread must match total colors");
       return thread_max;
     }
   };
@@ -125,7 +125,7 @@ namespace quda {
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
-      SharedMemoryCache<real, color_spin_threads, 2, true> cache;
+      SharedMemoryCache<real, color_spin_threads, 4, true> cache; // 4 comes from direction and parity
       if (active) cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -152,14 +152,13 @@ namespace quda {
     real thread_max = 0.0;
 
     if (active) {
-      const auto &rhs = arg.field;
 #pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {
         int s = spin_block + spin_local;
 #pragma unroll
         for (int color_local=0; color_local<Mc; color_local++) {
           int c = color_block + color_local;
-          complex<real> z = rhs(spinor_parity, x_cb, s, c);
+          complex<real> z = arg.field(spinor_parity, x_cb, s, c);
           thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
           thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
         }
@@ -169,8 +168,8 @@ namespace quda {
     return target::dispatch<site_max>(thread_max, arg, active);
   }
 
-  template <int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(const Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  template <typename Arg>
+  __device__ __host__ inline void packGhost(const Arg &arg, int dir, int dim, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -181,7 +180,7 @@ namespace quda {
     else getCoords(x, x_cb, arg.X, parity);
 
     {
-      real max = 1.0;
+      real max = static_cast<real>(1.0);
       if (Arg::block_float) {
         bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
         max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block, active);
@@ -208,7 +207,7 @@ namespace quda {
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
             arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-                = arg.field(spinor_parity, x_cb, s, c);
+              = arg.field(spinor_parity, x_cb, s, c);
           }
 	}
       }
@@ -234,24 +233,8 @@ namespace quda {
       const int color_block = (spin_color_block % (Arg::nColor / Mc)) * Mc;
 
 #pragma unroll
-      for (int dim=0; dim<4; dim++) {
-        switch(dir) {
-        case 0: // backwards pack
-          switch (dim) {
-          case 0: packGhost<0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 1: packGhost<1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 2: packGhost<2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 3: packGhost<3,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          }
-          break;
-        case 1: // forwards pack
-          switch (dim) {
-          case 0: packGhost<0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 1: packGhost<1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 2: packGhost<2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 3: packGhost<3,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          }
-        }
+      for (int dim = 0; dim < 4; dim++) {
+        packGhost(arg, dir, dim, x_cb, parity, spinor_parity, spin_block, color_block);
       }
     }
   };

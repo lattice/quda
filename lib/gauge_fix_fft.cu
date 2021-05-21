@@ -388,15 +388,12 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-#if defined(GPU_GAUGE_ALG) 
+#if defined(GPU_GAUGE_ALG)
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
                       const int autotune, const double tolerance, const int stopWtheta)
   {
-#ifdef MULTI_GPU
-    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
-      errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
-#endif
-    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);    
+    if (comm_partitioned()) errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
+    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
   }
 #else
   void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const int, const double, const int)
