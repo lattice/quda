@@ -5,6 +5,14 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
+
+#if defined(_NVHPC_CUDA)
+#include <constant_kernel_arg.h>
+constexpr bool use_kernel_arg = false;
+#else
+constexpr bool use_kernel_arg = true;
+#endif
+
 #include <kernel.h>
 
 namespace quda
@@ -623,7 +631,7 @@ namespace quda
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
             template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
-  struct dslash_functor_arg : kernel_param<> {
+  struct dslash_functor_arg : kernel_param<use_kernel_arg> {
     using Arg = Arg_;
     using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;

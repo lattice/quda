@@ -354,7 +354,6 @@ namespace quda
         Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
-      qudaDeviceSynchronize(); // debug
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
@@ -367,20 +366,15 @@ namespace quda
 
       issueRecv(*in, dslash, false); // Prepost receives
 
-            qudaDeviceSynchronize(); // debug
       const int packIndex = device::get_default_stream_idx();
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Device | (Remote * dslashParam.remote_write)),
                 packIndex);
 
-      qudaDeviceSynchronize(); // debug
-
       issueGather(*in, dslash);
 
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
-
-      qudaDeviceSynchronize(); // debug
 
       DslashCommsPattern pattern(dslashParam.commDim);
       while (pattern.completeSum < pattern.commDimTotal) {
@@ -421,10 +415,8 @@ namespace quda
               if (!comm_peer2peer_enabled(
                       1 - dir, i)) { // if not peer-to-peer we post an event in the scatter stream and wait on that
                 // Record the end of the scattering
-            qudaDeviceSynchronize(); // debug
                 PROFILE(qudaEventRecord(scatterEnd[2 * i + dir], device::get_stream(2 * i + dir)), profile, QUDA_PROFILE_EVENT_RECORD);
                 // wait for scattering to finish and then launch dslash
-            qudaDeviceSynchronize(); // debug
                 PROFILE(qudaStreamWaitEvent(device::get_default_stream(), scatterEnd[2 * i + dir], 0), profile,
                     QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
@@ -434,7 +426,6 @@ namespace quda
             dslashParam.threads = dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
 
             // all faces use this stream
-            qudaDeviceSynchronize(); // debug
             PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
             pattern.dslashCompleted[2 * i] = 1;
@@ -445,7 +436,6 @@ namespace quda
       completeDslash(*in, dslashParam);
       in->bufferIndex = (1 - in->bufferIndex);
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
-            qudaDeviceSynchronize(); // debug
     }
   };
 

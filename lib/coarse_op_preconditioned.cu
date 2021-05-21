@@ -6,11 +6,17 @@
 #include <kernels/coarse_op_preconditioned.cuh>
 #include <coarse_op_preconditioned_mma_launch.h>
 
+#if __cplusplus >= 201703L
+#define IF_CONSTEXPR if constexpr
+#else
+#define IF_CONSTEXPR if
+#endif
+
 namespace quda
 {
 
-  template <QudaFieldLocation location, typename Float_, typename PreconditionedGauge,
-            typename Gauge, typename GaugeInv, int n, int M, int N, bool compute_max>
+  template <QudaFieldLocation location_template, typename Float_, typename PreconditionedGauge,
+            typename Gauge, typename GaugeInv, int n, int M, int N, bool compute_max, bool use_mma>
   class CalculateYhat : public TunableKernel3D {
     using Float = Float_;
     using Arg = CalculateYhatArg<Float, PreconditionedGauge, Gauge, GaugeInv, n, M, N, compute_max>;
@@ -18,7 +24,6 @@ namespace quda
     GaugeField &Yhat;
     const GaugeField &Y;
     const GaugeField &Xinv;
-    bool use_mma;
 
     long long flops() const { return Y.Volume() * 8 * n * n * (8 * n - 2); } // 8 from dir, 8 from complexity,
     long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + !Arg::compute_max * 8*arg.Yhat.Bytes()) * n; }
@@ -31,13 +36,12 @@ namespace quda
     unsigned int maxBlockSize(const TuneParam &) const { return 8u; }
 
   public:
-    CalculateYhat(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv, bool use_mma) :
+    CalculateYhat(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv) :
       TunableKernel3D(Y, 2 * arg.tile.M_tiles, 4 * arg.tile.N_tiles),
       arg(Yhat, Y, Xinv),
       Yhat(Yhat),
       Y(Y),
-      Xinv(Xinv),
-      use_mma(use_mma)
+      Xinv(Xinv)
     {
       arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
       if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -71,8 +75,12 @@ namespace quda
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
-      if (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
-      else launch<ComputeYhat, true>(tp, stream, arg);
+      IF_CONSTEXPR (location_template == QUDA_CUDA_FIELD_LOCATION) {
+        IF_CONSTEXPR (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
+        else launch_device<ComputeYhat>(tp, stream, arg);
+      } else {
+        launch_host<ComputeYhat>(tp, stream, arg);
+      }
 
       if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
@@ -196,11 +204,11 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true>
-            (*Yhat_aos, *Y_aos, *Xinv_aos, use_mma);
+          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
+            (*Yhat_aos, *Y_aos, *Xinv_aos);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false>
-          (*Yhat_aos, *Y_aos, *Xinv_aos, use_mma);
+        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false, true>
+          (*Yhat_aos, *Y_aos, *Xinv_aos);
 
         if (&Y != Y_aos) { delete Y_aos; }
 
@@ -219,11 +227,11 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true>
-            (Yhat, Y, Xinv, use_mma);
+          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
+            (Yhat, Y, Xinv);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false>
-          (Yhat, Y, Xinv, use_mma);
+        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false, false>
+          (Yhat, Y, Xinv);
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)

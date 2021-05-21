@@ -93,32 +93,77 @@ namespace quda
   namespace blas
   {
 
-    template <typename store_t, bool is_fixed> struct SpinorNorm {
+    template <typename store_t, int N, bool is_fixed> struct data_t {
+      store_t *spinor;
+      int stride;
+      unsigned int cb_offset;
+      data_t() :
+        spinor(nullptr),
+        stride(0),
+        cb_offset(0)
+      {}
+
+      data_t(const ColorSpinorField &x) :
+        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
+        stride(x.Stride()),
+        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
+      {}
+    };
+
+    template <typename store_t, int N> struct data_t<store_t, N, true> {
       using norm_t = float;
+      store_t *spinor;
       norm_t *norm;
+      int stride;
+      unsigned int cb_offset;
       unsigned int cb_norm_offset;
+      data_t() :
+        spinor(nullptr),
+        norm(nullptr),
+        stride(0),
+        cb_offset(0),
+        cb_norm_offset(0)
+      {}
 
-      SpinorNorm() : norm(nullptr), cb_norm_offset(0) {}
-
-      SpinorNorm(const ColorSpinorField &x) :
-        norm((norm_t *)x.Norm()),
+      data_t(const ColorSpinorField &x) :
+        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
+        norm(static_cast<norm_t *>(const_cast<ColorSpinorField &>(x).Norm())),
+        stride(x.Stride()),
+        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N)),
         cb_norm_offset(x.NormBytes() / (2 * sizeof(norm_t)))
+      {}
+    };
+
+    /**
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector of RegType elements that this Spinor represents
+    */
+    template <typename store_t, int N> struct Spinor {
+      using Vector = typename VectorType<store_t, N>::type;
+      using norm_t = float;
+      data_t<store_t, N, isFixed<store_t>::value> data;
+
+      Spinor() {}
+
+      Spinor(const ColorSpinorField &x) : data(x) {}
+
+      template <bool is_fixed>
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> load_norm(const int, const int = 0) const { return 1.0; }
+
+      template <bool is_fixed>
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> load_norm(const int i, const int parity = 0) const
       {
+        return data.norm[data.cb_norm_offset * parity + i];
       }
 
-      void set(const ColorSpinorField &x)
+      template <bool is_fixed, typename real, int n>
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &, int, int) const
       {
-        norm = (norm_t *)x.Norm();
-        cb_norm_offset = x.NormBytes() / (2 * sizeof(norm_t));
+        return 1.0;
       }
 
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const
-      {
-        return norm[cb_norm_offset * parity + i];
-      }
-
-      template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
+      template <bool is_fixed, typename real, int n>
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -127,66 +172,16 @@ namespace quda
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
-        norm[x + parity * cb_norm_offset] = scale;
+        data.norm[x + parity * data.cb_norm_offset] = scale;
 
         return fdividef(fixedMaxValue<store_t>::value, scale);
-      }
-
-      norm_t *Norm() { return norm; }
-    };
-
-    template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
-      using norm_t = float;
-      SpinorNorm() {}
-      SpinorNorm(const ColorSpinorField &) {}
-      void set(const ColorSpinorField &) {}
-      __device__ __host__ inline norm_t load_norm(const int, const int = 0) const { return 1.0; }
-      template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &, int, int) const
-      {
-        return 1.0;
-      }
-      void backup(char **, size_t) {}
-      void restore(char **, size_t) {}
-      norm_t *Norm() { return nullptr; }
-    };
-
-    /**
-       @param RegType Register type used in kernel
-       @param InterType Intermediate format - RegType precision with StoreType ordering
-       @param StoreType Type used to store field in memory
-       @param N Length of vector of RegType elements that this Spinor represents
-    */
-    template <typename store_t, int N> struct Spinor : SpinorNorm<store_t, isFixed<store_t>::value> {
-      using SN = SpinorNorm<store_t, isFixed<store_t>::value>;
-      using Vector = typename VectorType<store_t, N>::type;
-      store_t *spinor;
-      int stride;
-      unsigned int cb_offset;
-
-      Spinor() : SN(), spinor(nullptr), stride(0), cb_offset(0) {}
-
-      Spinor(const ColorSpinorField &x) :
-        SN(x),
-        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
-        stride(x.Stride()),
-        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
-      {
-      }
-
-      void set(const ColorSpinorField &x)
-      {
-        SN::set(x);
-        spinor = static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V());
-        stride = x.Stride();
-        cb_offset = x.Bytes() / (2 * sizeof(store_t) * N);
       }
 
       template <typename real, int n>
       __device__ __host__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        float nrm = isFixed<store_t>::value ? SN::load_norm(x, parity) : 0.0;
+        float nrm = load_norm<isFixed<store_t>::value>(x, parity);
 
         // if(x>=0 && x<=4) printf("Spinor::load x %d parity %d spinor %p spinor[0] %g\n", x, parity, spinor, spinor[0]);
         vector_type<real, len> v_;
@@ -195,7 +190,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(spinor, parity * cb_offset + x + stride * i);
+          Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
           // now copy into output and scale
 #pragma unroll
           for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
@@ -211,7 +206,7 @@ namespace quda
         vector_type<real, len> v_;
 
         if (isFixed<store_t>::value) {
-          real scale_inv = SN::template store_norm<real, n>(v, x, parity);
+          real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
 #pragma unroll
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();
@@ -233,7 +228,7 @@ namespace quda
 #pragma unroll
           for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(spinor, parity * cb_offset + x + stride * i, vecTmp);
+          vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
         }
       }
     };

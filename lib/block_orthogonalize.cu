@@ -92,6 +92,8 @@ namespace quda {
         strcat(aux, geo_str);
         if (d < V.Ndim() - 1) strcat(aux, "x");
       }
+
+      if (aggregate_size == 1) errorQuda("Invalid MG aggregate size %d", aggregate_size);
       nBlock = (V.Volume()/aggregate_size) * chiral_blocks;
 
       strcat(aux, ",n_block_ortho=");
