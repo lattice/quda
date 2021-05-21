@@ -39,7 +39,7 @@ namespace quda {
                  launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
                  omp_get_num_teams(), omp_get_num_threads());
         char buffer[sizeof(Arg)];
-        memcpy(buffer, dparg, sizeof(Arg));
+        memcpy(buffer, (void *)dparg, sizeof(Arg));
         Kernel1D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
       }
       omp_target_free(dparg, omp_get_default_device());
@@ -101,7 +101,7 @@ namespace quda {
                  launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
                  omp_get_num_teams(), omp_get_num_threads());
         char buffer[sizeof(Arg)];
-        memcpy(buffer, dparg, sizeof(Arg));
+        memcpy(buffer, (void *)dparg, sizeof(Arg));
         Kernel2D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
       }
       omp_target_free(dparg, omp_get_default_device());
@@ -165,7 +165,7 @@ namespace quda {
                  launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
                  omp_get_num_teams(), omp_get_num_threads());
         char buffer[sizeof(Arg)];
-        memcpy(buffer, dparg, sizeof(Arg));
+        memcpy(buffer, (void *)dparg, sizeof(Arg));
         Kernel3D_impl<Functor, Arg, grid_stride>(*(Arg *)buffer);
       }
       omp_target_free(dparg, omp_get_default_device());
