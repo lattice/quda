@@ -524,14 +524,14 @@ struct Communicator {
       }
 
       int device_count = quda::device::get_device_count();
-      if (device_count == 0) { errorQuda("No devices found"); }
+      if (device_count == 0) { warningQuda("No devices found"); }
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
           gpuid = gpuid % device_count;
           printf("MPS enabled, rank=%3d -> gpu=%d\n", comm_rank(), gpuid);
         } else {
-          errorQuda("Too few GPUs available on %s", comm_hostname());
+          warningQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
     }
