@@ -186,9 +186,6 @@ namespace quda
       omp_target_memcpy(result_h, result_d, n_element*sizeof(device_t), 0, 0, omp_get_initial_device(), omp_get_default_device());
 #endif
       for (int i = 0; i < n_element; i++) result[i] = reinterpret_cast<device_t *>(result_h)[i];
-#ifdef QUDA_BACKEND_OMPTARGET
-      for (int i = 0; i < n_element; i++) std::cerr << "complete: result[" << i << "] = " << result[i] << std::endl;
-#endif
     }
 #endif
   };
