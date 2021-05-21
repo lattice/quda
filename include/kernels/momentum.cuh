@@ -95,6 +95,17 @@ namespace quda {
 
     static constexpr bool do_sum = false;
 
+#ifdef QUDA_BACKEND_OMPTARGET
+    static reduce_t reduce_omp(const reduce_t &a, const reduce_t &b)
+    {
+      auto c = a;
+      if (b[0] > a[0]) c[0] = b[0];
+      if (b[1] > a[1]) c[1] = b[1];
+      return c;
+    }
+    static reduce_t init_omp() { return reduce_t(); }  // see UpdateMomArg::init().
+#endif
+
     /**
        @brief Functor for finding the maximum over a vec2 field.  Each
        lane is evaluated separately.
