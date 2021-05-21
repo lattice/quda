@@ -5848,7 +5848,15 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 			     result_global, cType,
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
-		
+	  /*/DEBUG
+	  printfQuda("contractFTQuda from contractSummedQuda result_global p= %d %d %d %d",mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],
+		     mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]);
+	  for(unsigned j=0; j<result_global.size(); ++j){
+	    if(j % 4 == 0 )printfQuda("\n%3d ",j);
+	    printfQuda(" %10.3e %10.3e",result_global[j].real(),result_global[j].imag());
+	  }
+	  printfQuda("\n");
+	  //DEBUG*/
 	  comm_allreduce_array((double *)&result_global[0], 2*max_contract_results * global_decay_dim_slices);
 
 	  for (size_t t = 0; t < global_decay_dim_slices; t++) {
@@ -5863,6 +5871,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
       }
     }
   }
+  /*/DEBUG
+  printfQuda("contractFTQuda result: n_mom %d global_decay_dim_slices %ld num_out_results %ld\n",n_mom,global_decay_dim_slices,num_out_results);
+  for(size_t j=0; j < n_mom * global_decay_dim_slices * num_out_results * 2; ++j) {
+    if(j % 8 == 0 )printfQuda("\n%3ld",j);
+    printfQuda(" %10.3e",((double*)*result)[j]);
+  }
+  printfQuda("\n");
+  //DEBUG*/
 
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
