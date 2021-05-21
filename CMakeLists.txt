@@ -85,6 +85,7 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
+
 if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA")
   set(QUDA_TARGET_CUDA ON)
   set(QUDA_TARGET_LIBRARY quda_cuda_target)
@@ -95,7 +96,40 @@ if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
   set(QUDA_TARGET_HIP ON)
   set(QUDA_TARGET_LIBRARY quda_hip_target)
   set(QUDA_TARGET_HIP ON)
+
+  # HIP Speific CMake
+  if (NOT DEFINED ROCM_PATH )
+    if (NOT DEFINED ENV{ROCM_PATH} )
+  	    set(ROCM_PATH "/opt/rocm" CACHE PATH "ROCm path")
+    else()
+  	    set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "ROCm path")
+    endif()
+  endif()
+  set(CMAKE_MODULE_PATH "${ROCM_PATH}/lib/cmake" ${CMAKE_MODULE_PATH})
 endif()
+
+# This is needed now GPU ARCH
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  if( QUDA_TARGET_CUDA) 
+    set(QUDA_DEFAULT_GPU_ARCH sm_70)
+  endif()
+
+  if( QUDA_TARGET_HIP )
+    set(QUDA_DEFAULT_GPU_ARCH gfx908)
+  endif()
+endif()
+
+if(NOT QUDA_GPU_ARCH)
+  message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
+endif()
+  
+set(QUDA_GPU_ARCH
+  ${QUDA_DEFAULT_GPU_ARCH}
+  CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80, gfx906, gfx908)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80 gfx906 gfx908)
+
 
 if(GIT_FOUND)
   execute_process(
@@ -139,13 +173,6 @@ message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 ####################################################################################
 # END 1. Basic setup for cmake
 ####################################################################################
-
-
-
-set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -484,21 +511,11 @@ set(CMAKE_CUDA_FLAGS_DEBUG
     "-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
   
-  # This is needed now GPU ARCH
-  if(DEFINED ENV{QUDA_GPU_ARCH})
-    set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
-  else()
-    set(QUDA_DEFAULT_GPU_ARCH sm_70)
+ 
+  if( QUDA_GPU_ARCH MATCHES "gfx" )
+    message(FATAL_ERROR "GFX arch values are inappropriate for QUDA builds")
   endif()
-  if(NOT QUDA_GPU_ARCH)
-    message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
-  endif()
-  
-  set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
-  set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
-  
+
   set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
   string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
   set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
@@ -527,7 +544,15 @@ set(CMAKE_CUDA_FLAGS_DEBUG
   # HIP TARGET
   #########################################
 elseif(QUDA_TARGET_HIP) 
+  set(GPU_TARGETS ${QUDA_GPU_ARCH} CACHE STRING "The GPU_TARGET" )
   find_package(HIP)
+  find_package(hipfft REQUIRED)
+  find_package(hiprand REQUIRED)
+  find_package(rocrand REQUIRED)
+  find_package(hipblas REQUIRED)
+  find_package(rocblas REQUIRED)
+  find_package(hipcub REQUIRED)
+  find_package(rocprim REQUIRED)
 else()
   message(ERROR "Unknown QUDA_TARGET")
 endif()

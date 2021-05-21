@@ -458,7 +458,7 @@ endif()
 
 if(QUDA_QIO)
 	target_compile_definitions(quda PUBLIC HAVE_QIO)
-	target_link_libraries(quda PUBLIC QIO::qio)
+	arget_link_libraries(quda PUBLIC QIO::qio)
 endif()
 
 if(QUDA_QDPJIT)
@@ -580,6 +580,12 @@ endif(QUDA_NUMA_NVML)
 
 if(QUDA_NVML)
   target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
+endif()
+
+if(QUDA_TARGET_HIP)
+	target_include_directories(quda PUBLIC ${ROCM_PATH}/hipfft/include)
+	target_link_libraries(quda PUBLIC hip::hiprand roc::rocrand hip::hipfft 
+			      roc::hipblas roc::rocblas hip::hipcub roc::rocprim_hip )
 endif()
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
