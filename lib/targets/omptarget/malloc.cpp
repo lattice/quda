@@ -139,11 +139,6 @@ namespace quda
 
   namespace target {
     static std::map<const void*,void*> omp_mapped_ptr;  // host -> device
-    bool is_device_ptr(void *p)
-    {
-      // DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, SHMEM
-      return alloc[DEVICE].count(p)>0 || alloc[DEVICE_PINNED].count(p)>0;
-    }
   }
   /**
    * Under CUDA 4.0, cudaHostRegister seems to require that both the
@@ -292,7 +287,7 @@ namespace quda
     a.size = a.base_size = size;
 
     void *ptr = malloc(size);
-    ompwip([=](){printfQuda("malloc: %p\n",ptr);});
+    ompwip("malloc: %p\n",ptr);
     if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
@@ -350,12 +345,12 @@ namespace quda
     }
 #else
     void *ptr = aligned_malloc(a, size);
-    ompwip([=](){printfQuda("mapped_malloc_ host: %p\n",ptr);});
+    ompwip("mapped_malloc_ host: %p\n",ptr);
     print_trace();
     if(0<omp_get_num_devices()){
       int d = omp_get_default_device();
       void *dp = omp_target_alloc(a.base_size, d);
-      ompwip("require special memcpy",[=](){printfQuda("mapped_malloc_ device: %p\n",dp);});
+      ompwip("require special memcpy, mapped_malloc_ device: %p\n",dp);
       if(!dp)
         errorQuda("%s:%d %s() Failed to allocate device memory of size %zu for mapped malloc\n", file, line, func, size);
       if(omp_target_associate_ptr(ptr, dp, a.base_size, 0, d))
@@ -415,7 +410,7 @@ namespace quda
    * defined in malloc_quda.h
    */
   void *managed_malloc_(const char *func, const char *file, int line, size_t size)
-  {ompwip("managed_malloc_ unimplemented return nullptr");return nullptr;/*
+  {ompwip("ERROR: managed_malloc_ unimplemented return nullptr");return nullptr;/*
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -439,13 +434,13 @@ namespace quda
    */
   void device_free_(const char *func, const char *file, int line, void *ptr)
   {
-    if (use_managed_memory()) {ompwip();
+    if (use_managed_memory()) {ompwip("unimplemented");
       managed_free_(func, file, line, ptr);
       return;
     }
 
 #ifndef QDP_USE_CUDA_MANAGED_MEMORY
-    ompwip();
+    ompwip("device free: %p\n",ptr);
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
@@ -471,7 +466,7 @@ namespace quda
    */
   void device_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
-    ompwip("device_pinned_free_ untested code path"); print_trace();
+    ompwip("device_pinned_free_ untested code path: %p",ptr); print_trace();
     if (!comm_peer2peer_present()) {
       device_free_(func, file, line, ptr);
       return;
@@ -498,7 +493,7 @@ namespace quda
    * malloc_quda.h
    */
   void managed_free_(const char *func, const char *file, int line, void *ptr)
-  {ompwip("managed_free_ unimplemented doing nothing");/*
+  {ompwip("managed_free_ unimplemented doing nothing: %p",ptr);/*
     if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[MANAGED].count(ptr)) {
       errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
@@ -520,7 +515,7 @@ namespace quda
       track_free(HOST, ptr);
       free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
-      ompwip("free PINNED ptr");
+      ompwip("free PINNED ptr: %p",ptr);
 /*
       cudaError_t err = cudaHostUnregister(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
@@ -529,17 +524,18 @@ namespace quda
       free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
-      ompwip("HOST_ALLOC alloc[MAPPED].count(ptr) untested code path"); print_trace();
+      ompwip("HOST_ALLOC alloc[MAPPED].count(ptr) untested code path: %p",ptr); print_trace();
       free(ptr);
 /*
       cudaError_t err = cudaFreeHost(ptr);
       if (err != cudaSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
 */
 #else
-      ompwip("!HOST_ALLOC alloc[MAPPED].count(ptr)");
+      ompwip("!HOST_ALLOC alloc[MAPPED].count(ptr) free: %p",ptr);
       void *dp = target::omp_mapped_ptr[ptr];
       if(dp!=ptr){
         omp_target_disassociate_ptr(ptr, omp_get_default_device());
+        ompwip("!HOST_ALLOC alloc[MAPPED].count(ptr) free mapped device: %p",dp);
         omp_target_free(dp, omp_get_default_device());
       }
       free(ptr);
@@ -620,17 +616,15 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-    ompwip("get_pointer_location");
-    QudaFieldLocation loc = QUDA_INVALID_FIELD_LOCATION;
     if(alloc[DEVICE].count(const_cast<void*>(ptr)) || alloc[DEVICE_PINNED].count(const_cast<void*>(ptr))){
-      ompwip("get_pointer_location returns QUDA_CUDA_FIELD_LOCATION");
+      ompwip("get_pointer_location %p returns QUDA_CUDA_FIELD_LOCATION",ptr);
       return QUDA_CUDA_FIELD_LOCATION;
     }else if(alloc[HOST].count(const_cast<void*>(ptr)) || alloc[PINNED].count(const_cast<void*>(ptr)) || alloc[MAPPED].count(const_cast<void*>(ptr))){
-      ompwip("get_pointer_location returns QUDA_CPU_FIELD_LOCATION");
+      ompwip("get_pointer_location %p returns QUDA_CPU_FIELD_LOCATION",ptr);
       return QUDA_CPU_FIELD_LOCATION;
     }
-    ompwip("WARNING: get_pointer_location returns QUDA_INVALID_FIELD_LOCATION");
-    return QUDA_INVALID_FIELD_LOCATION;
+    ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CPU_FIELD_LOCATION",ptr);
+    return QUDA_CPU_FIELD_LOCATION;
 /*
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
@@ -656,7 +650,7 @@ namespace quda
 
   void *get_mapped_device_pointer_(const char *func, const char *file, int line, const void *host)
   {
-    ompwip("get_mapped_device_pointer_");
+    ompwip("get_mapped_device_pointer_: %p",host);
     print_trace();
     return target::omp_mapped_ptr[host];
 /*
@@ -672,7 +666,7 @@ namespace quda
 
   void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
   {
-    ompwip("register_pinned_ unimplemented");
+    ompwip("register_pinned_ unimplemented: %p",ptr);
 /*
     auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
     if (error != cudaSuccess) {
@@ -684,7 +678,7 @@ namespace quda
 
   void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
   {
-    ompwip("unregister_pinned_ unimplemented");
+    ompwip("unregister_pinned_ unimplemented: %p",ptr);
 /*
     auto error = cudaHostUnregister(ptr);
     if (error != cudaSuccess) {
@@ -753,7 +747,6 @@ namespace quda
 
     void *pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
-      ompwip("pool::pinned_malloc_");
       void *ptr = nullptr;
       if (pinned_memory_pool) {
         if (pinnedCache.empty()) {
@@ -776,12 +769,13 @@ namespace quda
       } else {
         ptr = quda::pinned_malloc_(func, file, line, nbytes);
       }
+      ompwip("pool::pinned_malloc_: %p",ptr);
       return ptr;
     }
 
     void pinned_free_(const char *func, const char *file, int line, void *ptr)
     {
-      ompwip("pool::pinnd_free_");
+      ompwip("pool::pinnd_free_: %p",ptr);
       if (pinned_memory_pool) {
         if (!pinnedSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
         pinnedCache.insert(std::make_pair(pinnedSize[ptr], ptr));
@@ -793,7 +787,6 @@ namespace quda
 
     void *device_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
-      ompwip("pool::device_malloc_");
       void *ptr = nullptr;
       if (device_memory_pool) {
         if (deviceCache.empty()) {
@@ -816,13 +809,13 @@ namespace quda
       } else {
         ptr = quda::device_malloc_(func, file, line, nbytes);
       }
-      ompwip([=](){printfQuda("device malloc: %p\n",ptr);});
+      ompwip("pool::device_malloc_: %p",ptr);
       return ptr;
     }
 
     void device_free_(const char *func, const char *file, int line, void *ptr)
     {
-      ompwip("pool::device_free_");
+      ompwip("pool::device_free_: %p",ptr);
       if (device_memory_pool) {
         if (!deviceSize.count(ptr)) { errorQuda("Attempt to free invalid pointer"); }
         deviceCache.insert(std::make_pair(deviceSize[ptr], ptr));
