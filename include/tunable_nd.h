@@ -91,7 +91,6 @@ namespace quda {
     template <template <typename> class Functor, bool enable_host = false, typename Arg>
       std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      ompwip();
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Arg>(tp, stream, arg);
       } else {
