@@ -210,8 +210,8 @@ namespace quda {
     }
 
     virtual bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
       param.block.y = block_size_y;
+      bool rtn = Tunable::advanceBlockDim(param);
       return rtn;
     }
 
