@@ -6,7 +6,7 @@
 namespace quda {
 
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
@@ -21,7 +21,7 @@ namespace quda {
    * some math libraries provide a fast inverse sqrt() function.
    * this implementation trusts the compiler.
    */
-  template<typename T> inline __host__ __device__ T rsqrt(T a) { return 1.0/std::sqrt(a); }
+  template<typename T> inline __host__ __device__ T rsqrt(T a) { return static_cast<T>(1.0) / std::sqrt(a); }
 
     /**
      Generic wrapper for Trig functions -- used in gauge field order 
