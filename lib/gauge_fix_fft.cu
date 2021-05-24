@@ -190,15 +190,15 @@ namespace quda {
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    std::cout << "\tAlpha parameter of the Steepest Descent Method: " << alpha0 << std::endl;
-    if ( autotune ) std::cout << "\tAuto tune active: yes" << std::endl;
-    else std::cout << "\tAuto tune active: no" << std::endl;
-    std::cout << "\tStop criterium: " << tolerance << std::endl;
-    if ( stopWtheta ) std::cout << "\tStop criterium method: theta" << std::endl;
-    else std::cout << "\tStop criterium method: Delta" << std::endl;
-    std::cout << "\tMaximum number of iterations: " << Nsteps << std::endl;
-    std::cout << "\tPrint convergence results at every " << verbose_interval << " steps" << std::endl;
-
+    if (getVerbosity() > QUDA_SUMMARIZE) {
+      printfQuda("\tAuto tune active: %s\n", autotune ? "true" : "false");      
+      printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha0);
+      printfQuda("\tTolerance: %lf\n", tolerance);
+      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
+      printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+      printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+    }
+    
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4(data.X()[0], data.X()[1], data.X()[2], data.X()[3]);
     FFTPlanHandle plan_xy;
@@ -294,7 +294,7 @@ namespace quda {
         }
       }
       //------------------------------------------------------------------------
-      // Check gauge fix quality criterium
+      // Check gauge fix quality criterion
       //------------------------------------------------------------------------
       if ( stopWtheta ) {   if ( argQ.getTheta() < tolerance ) break; }
       else { if ( diff < tolerance ) break; }
@@ -319,7 +319,7 @@ namespace quda {
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
-    if (*num_failures_h > 0) errorQuda("Error in the unitarization");
+    if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
     // end reunitarize
 
     arg.free();
@@ -386,7 +386,7 @@ namespace quda {
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
 #if defined(GPU_GAUGE_ALG)
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,

@@ -100,14 +100,14 @@ protected:
     a1 = std::abs(a.y - b.y);
     a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-8;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance*1e2;
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
   bool CheckDeterminant(double2 detu)
   {
     double prec_val = 5e-8;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-8;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val =  gf_tolerance*1e2;
     return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
@@ -119,44 +119,43 @@ protected:
 
       // Setup gauge container.
       setWilsonGaugeParam(param);
-      
-      GaugeFieldParam gParam(0, param);
-      gParam.pad = 0;
-      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-      gParam.create = QUDA_NULL_FIELD_CREATE;
-      gParam.link_type = param.type;
-      gParam.reconstruct = param.reconstruct;
-      gParam.setPrecision(gParam.Precision(), true);
-
-      if(checkDimsPartitioned()) {
-	int y[4];
-	int R[4] = {0, 0, 0, 0};
-	for (int dir = 0; dir < 4; ++dir)
-	  if (comm_dim_partitioned(dir)) R[dir] = 2;
-	for (int dir = 0; dir < 4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
-	int pad = 0;
-	GaugeFieldParam gParamEx(y, prec, link_recon, pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
-	gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-	gParamEx.order = gParam.order;
-	gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-	gParamEx.t_boundary = gParam.t_boundary;
-	gParamEx.nFace = 1;
-	for (int dir = 0; dir < 4; ++dir) gParamEx.r[dir] = R[dir];
-	U = new cudaGaugeField(gParamEx);
-      } else {
-	U = new cudaGaugeField(gParam);
-      }
-
-      int *num_failures_h = (int *)mapped_malloc(sizeof(int));
-      int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
 
       // Reunitarization setup
+      int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+      int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
       SetReunitarizationConsts();	
 
       a0.start();
-            
-      // If no field is loaded, create a physical quenched field
+      
+      // If no field is loaded, create a physical quenched field on the device
       if (!strcmp(latfile, "")) {
+
+	GaugeFieldParam gParam(0, param);
+	gParam.pad = 0;
+	gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+	gParam.create      = QUDA_NULL_FIELD_CREATE;
+	gParam.link_type   = param.type;
+	gParam.reconstruct = param.reconstruct;
+	gParam.setPrecision(gParam.Precision(), true);
+
+	if(checkDimsPartitioned()) {
+	  int y[4];
+	  int R[4] = {0,0,0,0};
+	  for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
+	  for(int dir=0; dir<4; ++dir) y[dir] = param.X[dir] + 2 * R[dir];
+	  int pad = 0;
+	  GaugeFieldParam gParamEx(y, prec, link_recon,
+				   pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+	  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+	  gParamEx.order = gParam.order;
+	  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+	  gParamEx.t_boundary = gParam.t_boundary;
+	  gParamEx.nFace = 1;
+	  for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+	  U = new cudaGaugeField(gParamEx);
+	} else {
+	  U = new cudaGaugeField(gParam);
+	}
 	
 	// CURAND random generator initialization
 	randstates = new RNG(*U, 1234);
@@ -181,7 +180,7 @@ protected:
 	  *num_failures_h = 0;
 	  unitarizeLinks(*U, num_failures_d);
 	  qudaDeviceSynchronize();
-	  if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+	  if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
 	  plaq = plaquette(*U);
 	  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);	  
 	}
@@ -189,19 +188,43 @@ protected:
 	a1.stop();	
 	printfQuda("Time Monte -> %.6f s\n", a1.last());	
       } else {
+
+	// If a field is loaded, create a device feild and copy 
 	GaugeField *host = nullptr;
 	printfQuda("Copying gauge field from host\n");	  
 	param.location = QUDA_CPU_FIELD_LOCATION;
-	GaugeFieldParam gauge_field_param(host_gauge, param);
+	GaugeFieldParam gauge_field_param(host_gauge, param);	
+	if (gauge_field_param.order <= 4) gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;	
 	host = static_cast<GaugeField*>(new cpuGaugeField(gauge_field_param));
-	U->copy(*host);
+
+	// switch the parameters for creating the mirror precise cuda gauge field
+	gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
+	gauge_field_param.reconstruct = param.reconstruct;
+	gauge_field_param.setPrecision(param.cuda_prec, true);
+	gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+	gauge_field_param.pad = param.ga_pad;
+	
+	if(checkDimsPartitioned()) {	  
+	  int R[4] = {0, 0, 0, 0};
+	  for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
+	  static TimeProfile GaugeFix("GaugeFix");
+	  cudaGaugeField *tmp = new cudaGaugeField(gauge_field_param);
+	  tmp->copy(*host);	
+	  tmp->exchangeGhost();	  
+	  U = createExtendedGauge(*tmp, R, GaugeFix);
+	  delete tmp;
+	} else {
+	  U = new cudaGaugeField(gauge_field_param);
+	  U->copy(*host);
+	}
 	delete host;
+
 	
 	// Reunitarization
 	*num_failures_h = 0;
 	unitarizeLinks(*U, num_failures_d);
 	qudaDeviceSynchronize();
-	if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+	if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
 	
 	plaq = plaquette(*U);
 	printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);	
