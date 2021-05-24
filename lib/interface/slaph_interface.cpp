@@ -961,7 +961,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   }
   
   // Copy device data back to host
-  qudaMemcpy((void*)&ret_arr_tmp[0], d_tmp, data_tmp_bytes, qudaMemcpyHostToDevice);
+  qudaMemcpy((void*)&ret_arr_tmp[0], d_ret, data_ret_bytes, qudaMemcpyHostToDevice);
   // Copy into return array 
   memcpy(ret_arr, ret_arr_tmp.data(), sizeof(Complex) * n_mom * X[3] * n1 * n2);
   
