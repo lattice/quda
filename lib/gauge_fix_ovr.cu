@@ -231,7 +231,7 @@ namespace quda {
     double flop = 0;
     double byte = 0;
 
-    if (getVerbosity() > QUDA_SUMMARIZE) {
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
       printfQuda("\tTolerance: %le\n", tolerance);
       printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta"); 
@@ -311,7 +311,7 @@ namespace quda {
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
-    printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
@@ -410,7 +410,7 @@ namespace quda {
 
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1))
+      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
         printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
@@ -434,7 +434,7 @@ namespace quda {
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
@@ -459,7 +459,7 @@ namespace quda {
 
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-    if (getVerbosity() > QUDA_SUMMARIZE){
+    if (getVerbosity() >= QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (flop * 1e-9) / (secs);
       double gbytes = byte / (secs * 1e9);
@@ -472,10 +472,10 @@ namespace quda {
                  const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
-        printfQuda("Starting Landau gauge fixing...\n");
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
         gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
-        printfQuda("Starting Coulomb gauge fixing...\n");
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing...\n");
         gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
