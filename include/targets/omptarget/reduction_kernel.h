@@ -18,11 +18,11 @@ namespace quda {
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
     #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
     {
-      if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-        printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-               "omp reports: teams %d threads %d\n",
-               launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-               omp_get_num_teams(), omp_get_num_threads());
+      // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+      //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+      //          "omp reports: teams %d threads %d\n",
+      //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+      //          omp_get_num_teams(), omp_get_num_threads());
       dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
       Transformer<Arg> t(arg);
@@ -49,7 +49,7 @@ namespace quda {
     const int tx = arg.threads.x;
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
-    printf("Reduction2D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
+    // printf("Reduction2D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
@@ -66,11 +66,11 @@ namespace quda {
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
-        if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-          printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-                 "omp reports: teams %d threads %d\n",
-                 launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-                 omp_get_num_teams(), omp_get_num_threads());
+        // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+        //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+        //          "omp reports: teams %d threads %d\n",
+        //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+        //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
         Transformer<Arg> t(*dparg);
@@ -144,7 +144,7 @@ namespace quda {
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    printf("Reduction2D: launch parameter: gd %d ld %d\n", gd, ld);
+    // printf("Reduction2D: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
       // Reduction2D_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
@@ -159,11 +159,11 @@ namespace quda {
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
-        if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-          printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-                 "omp reports: teams %d threads %d\n",
-                 launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-                 omp_get_num_teams(), omp_get_num_threads());
+        // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+        //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+        //          "omp reports: teams %d threads %d\n",
+        //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+        //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
         Transformer<Arg> t(*dparg);
@@ -243,11 +243,11 @@ namespace quda {
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
     #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
     {
-      if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-        printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-               "omp reports: teams %d threads %d\n",
-               launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-               omp_get_num_teams(), omp_get_num_threads());
+      // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+      //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+      //          "omp reports: teams %d threads %d\n",
+      //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+      //          omp_get_num_teams(), omp_get_num_threads());
       dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
       Transformer<Arg> t(arg);
@@ -279,7 +279,7 @@ namespace quda {
     const int tx = arg.threads.x;
     const int ty = arg.threads.y;
     const int tz = arg.threads.z;
-    printf("MultiReduction: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
+    // printf("MultiReduction: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
@@ -296,11 +296,11 @@ namespace quda {
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
-        if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-          printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-                 "omp reports: teams %d threads %d\n",
-                 launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-                 omp_get_num_teams(), omp_get_num_threads());
+        // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+        //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+        //          "omp reports: teams %d threads %d\n",
+        //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+        //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
         Transformer<Arg> t(*dparg);
@@ -376,7 +376,7 @@ namespace quda {
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    printf("MultiReduction: launch parameter: gd %d ld %d\n", gd, ld);
+    // printf("MultiReduction: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
       // MultiReduction_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
@@ -391,11 +391,11 @@ namespace quda {
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
-        if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-          printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-                 "omp reports: teams %d threads %d\n",
-                 launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-                 omp_get_num_teams(), omp_get_num_threads());
+        // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
+        //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
+        //          "omp reports: teams %d threads %d\n",
+        //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
+        //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
         Transformer<Arg> t(*dparg);
