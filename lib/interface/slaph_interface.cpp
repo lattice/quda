@@ -888,7 +888,7 @@ void laphCurrentKernel(int n1, int n2, int n_mom,
   }
   
   // Device array to hold the entire return array
-  size_t data_ret_bytes = block_size_mom_proj * n_sites * 2 * precision;
+  size_t data_ret_bytes = n_mom * X[3] * n1 * n2 * 2 * precision;
   void *d_ret = pool_device_malloc(data_ret_bytes);
 
   // Device array to hold the inner production
