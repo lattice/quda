@@ -306,9 +306,6 @@ int main(int argc, char **argv)
 
   auto *rng = new quda::RNG(*check, 1234);
 
-  std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
-  std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
-
   for (int i = 0; i < Nsrc; i++) {
     // Populate the host spinor with random numbers.
     in[i] = quda::ColorSpinorField::Create(cs_param);
