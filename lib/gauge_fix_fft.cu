@@ -193,15 +193,15 @@ namespace quda {
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    std::cout << "\tAlpha parameter of the Steepest Descent Method: " << alpha0 << std::endl;
-    if ( autotune ) std::cout << "\tAuto tune active: yes" << std::endl;
-    else std::cout << "\tAuto tune active: no" << std::endl;
-    std::cout << "\tStop criterium: " << tolerance << std::endl;
-    if ( stopWtheta ) std::cout << "\tStop criterium method: theta" << std::endl;
-    else std::cout << "\tStop criterium method: Delta" << std::endl;
-    std::cout << "\tMaximum number of iterations: " << Nsteps << std::endl;
-    std::cout << "\tPrint convergence results at every " << verbose_interval << " steps" << std::endl;
-
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("\tAuto tune active: %s\n", autotune ? "true" : "false");      
+      printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha0);
+      printfQuda("\tTolerance: %lf\n", tolerance);
+      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
+      printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+      printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+    }
+    
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4(data.X()[0], data.X()[1], data.X()[2], data.X()[3]);
     FFTPlanHandle plan_xy;
@@ -221,7 +221,7 @@ namespace quda {
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
     gfixquality.apply(device::get_default_stream());
     double action0 = argQ.getAction();
-    printf("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if(getVerbosity() >= QUDA_SUMMARIZE) printf("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     double diff = 0.0;
     int iter = 0;
@@ -288,25 +288,25 @@ namespace quda {
       gfixquality.apply(device::get_default_stream());
       double action = argQ.getAction();
       diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1))
+      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
         printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if ( autotune && ((action - action0) < -1e-14) ) {
         if ( arg.alpha > 0.01 ) {
           arg.alpha = 0.95 * arg.alpha;
-          printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
+          if(getVerbosity() >= QUDA_SUMMARIZE) printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
         }
       }
       //------------------------------------------------------------------------
-      // Check gauge fix quality criterium
+      // Check gauge fix quality criterion
       //------------------------------------------------------------------------
       if ( stopWtheta ) {   if ( argQ.getTheta() < tolerance ) break; }
       else { if ( diff < tolerance ) break; }
 
       action0 = action;
     }
-    if ((iter % verbose_interval) != 0 )
+    if ((iter % verbose_interval) != 0 && getVerbosity() >= QUDA_SUMMARIZE)
       printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
-
+    
     // Reunitarize at end
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
@@ -322,7 +322,7 @@ namespace quda {
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
-    if (*num_failures_h > 0) errorQuda("Error in the unitarization");
+    if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
     // end reunitarize
 
     arg.free();
@@ -331,37 +331,36 @@ namespace quda {
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    if (getVerbosity() > QUDA_SUMMARIZE){
-      double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
-      double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));
-      fftflop *= (double)data.Volume();
-      gfix.set_type(KERNEL_SET_INVPSQ);
-      double gflops = gfix.flops() + gfixquality.flops();
-      double gbytes = gfix.bytes() + gfixquality.bytes();
-      gfix.set_type(KERNEL_NORMALIZE);
-      double flop = gfix.flops() * recon / 2;
-      double byte = gfix.bytes() * recon / 2;
-      flop += (GFRotate.flops() + fftflop) * (recon / 2) * 2;
-      byte += GFRotate.bytes() * (recon / 2) * 4;     //includes FFT reads, assuming 1 read and 1 write per site
-#ifndef GAUGEFIXING_DONT_USE_GX
-      gfix.set_type(KERNEL_GX);
-      flop += gfix.flops();
-      byte += gfix.bytes();
-#endif
-      gfix.set_type(KERNEL_UEO);
-      flop += gfix.flops();
-      byte += gfix.bytes();
-      flop += gfixquality.flops();
-      byte += gfixquality.bytes();
-      gflops += flop * iter;
-      gbytes += byte * iter;
-      gflops += 4588.0 * data.Volume(); //Reunitarize at end
-      gbytes += 2 * data.Bytes(); //Reunitarize at end
 
-      gflops = (gflops * 1e-9) / (secs);
-      gbytes = gbytes / (secs * 1e9);
-      printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-    }
+    double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
+    double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));
+    fftflop *= (double)data.Volume();
+    gfix.set_type(KERNEL_SET_INVPSQ);
+    double gflops = gfix.flops() + gfixquality.flops();
+    double gbytes = gfix.bytes() + gfixquality.bytes();
+    gfix.set_type(KERNEL_NORMALIZE);
+    double flop = gfix.flops() * recon / 2;
+    double byte = gfix.bytes() * recon / 2;
+    flop += (GFRotate.flops() + fftflop) * (recon / 2) * 2;
+    byte += GFRotate.bytes() * (recon / 2) * 4;     //includes FFT reads, assuming 1 read and 1 write per site
+#ifndef GAUGEFIXING_DONT_USE_GX
+    gfix.set_type(KERNEL_GX);
+    flop += gfix.flops();
+    byte += gfix.bytes();
+#endif
+    gfix.set_type(KERNEL_UEO);
+    flop += gfix.flops();
+    byte += gfix.bytes();
+    flop += gfixquality.flops();
+    byte += gfixquality.bytes();
+    gflops += flop * iter;
+    gbytes += byte * iter;
+    gflops += 4588.0 * data.Volume(); //Reunitarize at end
+    gbytes += 2 * data.Bytes(); //Reunitarize at end
+    
+    gflops = (gflops * 1e-9) / (secs);
+    gbytes = gbytes / (secs * 1e9);
+    if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
 
     host_free(num_failures_h);
 #endif
@@ -372,10 +371,10 @@ namespace quda {
                    double alpha, int autotune, double tolerance, int stopWtheta)
     {
       if (gauge_dir != 3) {
-        printfQuda("Starting Landau gauge fixing with FFTs...\n");
+	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
-        printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
+	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
         gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
     }
@@ -390,7 +389,7 @@ namespace quda {
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
 #if defined(GPU_GAUGE_ALG)
   void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,

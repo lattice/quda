@@ -231,14 +231,15 @@ namespace quda {
     double flop = 0;
     double byte = 0;
 
-    printfQuda("\tOverrelaxation boost parameter: %lf\n", relax_boost);
-    printfQuda("\tStop criterium: %lf\n", tolerance);
-    if ( stopWtheta ) printfQuda("\tStop criterium method: theta\n");
-    else printfQuda("\tStop criterium method: Delta\n");
-    printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
-    printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
-    printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
-
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
+      printfQuda("\tTolerance: %le\n", tolerance);
+      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta"); 
+      printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+      printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
+      printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+    }
+    
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
@@ -310,11 +311,12 @@ namespace quda {
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
-    printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
-    if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+
+    if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
 
     GaugeFix<Float, recon, gauge_dir> gfixIntPoints(data, relax_boost, borderpoints, false, -1);
     GaugeFix<Float, recon, gauge_dir> gfixBorderPoints(data, relax_boost, borderpoints, true, threads);
@@ -398,7 +400,7 @@ namespace quda {
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         *num_failures_h = 0;
         unitarizeLinks(data, data, num_failures_d);
-        if (*num_failures_h > 0) errorQuda("Error in the unitarization");
+	if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
         flop += 4588.0 * data.Volume();
         byte += 2 * data.Bytes();
       }
@@ -408,7 +410,7 @@ namespace quda {
 
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if ((iter % verbose_interval) == (verbose_interval - 1))
+      if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
         printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
@@ -421,7 +423,7 @@ namespace quda {
     if ((iter % reunit_interval) != 0 )  {
       *num_failures_h = 0;
       unitarizeLinks(data, data, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization");
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)\n", *num_failures_h);
       flop += 4588.0 * data.Volume();
       byte += 2 * data.Bytes();
     }
@@ -432,7 +434,7 @@ namespace quda {
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
@@ -457,7 +459,7 @@ namespace quda {
 
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-    if (getVerbosity() > QUDA_SUMMARIZE){
+    if (getVerbosity() >= QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (flop * 1e-9) / (secs);
       double gbytes = byte / (secs * 1e9);
@@ -470,10 +472,10 @@ namespace quda {
                  const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
     {
       if (gauge_dir == 4) {
-        printfQuda("Starting Landau gauge fixing...\n");
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
         gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if (gauge_dir == 3) {
-        printfQuda("Starting Coulomb gauge fixing...\n");
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing...\n");
         gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Unexpected gauge_dir = %d", gauge_dir);
@@ -490,7 +492,7 @@ namespace quda {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
 #ifdef GPU_GAUGE_ALG
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
