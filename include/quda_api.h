@@ -304,8 +304,8 @@ namespace quda
   /**
      @brief Return elapsed time in seconds between two events
   */
-  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
-                              const char *func, const char *file, const char *line);
+  double qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+                               const char *func, const char *file, const char *line);
 
   /**
      @brief Destroy the event

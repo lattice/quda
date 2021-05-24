@@ -73,6 +73,20 @@ static int cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
   p->regsPerBlock = 32768;
   p->unifiedAddressing = 1;
   p->deviceOverlap = 0;
+
+  /* Now actually querying the device in some way. */
+  int m = 0;
+  #pragma omp target teams map(tofrom:m)
+  if(omp_get_team_num()==0)
+    m = omp_get_max_threads();
+  p->maxThreadsPerMultiProcessor = m;
+  p->maxThreadsPerBlock = m;
+  p->maxThreadsDim[0] = m;
+  p->maxThreadsDim[1] = m;
+  p->maxThreadsDim[2] = m;
+  #pragma omp target map(tofrom:m)
+  m = omp_get_num_procs();
+  p->multiProcessorCount = m/32;
   return 0;
 }
 

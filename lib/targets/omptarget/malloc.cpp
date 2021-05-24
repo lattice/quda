@@ -68,7 +68,7 @@ namespace quda
 
   long host_allocated_peak() { return max_total_bytes[HOST]; }
 
-  static void print_trace(void)
+  void print_trace(void)
   {
     void *array[10];
     size_t size;
@@ -287,7 +287,7 @@ namespace quda
     a.size = a.base_size = size;
 
     void *ptr = malloc(size);
-    ompwip("malloc: %p\n",ptr);
+    ompwip("malloc: %p",ptr);
     if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
@@ -345,12 +345,12 @@ namespace quda
     }
 #else
     void *ptr = aligned_malloc(a, size);
-    ompwip("mapped_malloc_ host: %p\n",ptr);
+    ompwip("mapped_malloc_ host: %p",ptr);
     print_trace();
     if(0<omp_get_num_devices()){
       int d = omp_get_default_device();
       void *dp = omp_target_alloc(a.base_size, d);
-      ompwip("require special memcpy, mapped_malloc_ device: %p\n",dp);
+      ompwip("require special memcpy, mapped_malloc_ device: %p",dp);
       if(!dp)
         errorQuda("%s:%d %s() Failed to allocate device memory of size %zu for mapped malloc\n", file, line, func, size);
       if(omp_target_associate_ptr(ptr, dp, a.base_size, 0, d))
@@ -440,7 +440,7 @@ namespace quda
     }
 
 #ifndef QDP_USE_CUDA_MANAGED_MEMORY
-    ompwip("device free: %p\n",ptr);
+    ompwip("device free: %p",ptr);
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
