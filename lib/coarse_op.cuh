@@ -235,7 +235,7 @@ namespace quda {
         if (from_coarse) errorQuda("compute_tmav should only be called from the fine grid");
 
 #if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
-        launch_host<compute_tmav>(arg);
+        launch_host<compute_tmav>(tp, stream, arg);
 #else
         errorQuda("Twisted mass dslash has not been built");
 #endif
