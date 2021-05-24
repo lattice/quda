@@ -589,10 +589,11 @@ if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
+if( QUDA_TARGET_CUDA )
 if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
   message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
 endif()
-
+endif()
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found

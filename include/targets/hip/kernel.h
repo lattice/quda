@@ -1,5 +1,6 @@
 #pragma once
 #include <hip/hip_runtime.h>
+#include <kernel_helper.h>
 
 namespace quda {
 

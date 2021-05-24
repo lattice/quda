@@ -55,6 +55,7 @@ namespace quda {
 	      errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
       }
       else hipGetLastError(); // Clear the error 
+
     }
 
     void set_driver_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,

@@ -265,24 +265,12 @@ namespace quda {
     }
   }
 
-<<<<<<< HEAD
-  //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template <int Mc, int dir, int dim, typename Arg>
-  __device__ __host__ inline void coarseDslash(const Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
-  {
-    constexpr int src_idx = 0;
-    using Float = typename Arg::real;
-    vector_type<complex <Float>, Mc> out;
-    if (Arg::dslash) applyDslash<Mc,dir,dim>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-    if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-=======
   template <bool is_device> struct dim_collapse {
     template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
     {
       out *= -arg.kappa;
     }
   };
->>>>>>> feature/generic_kernel
 
   template <> struct dim_collapse<true> {
     template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)

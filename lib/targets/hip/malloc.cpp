@@ -336,6 +336,19 @@ namespace quda
     return ptr;
   }
 
+
+  /**
+   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
+   * device_comms_pinned_malloc macro, defined in malloc_quda.h
+   */
+  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+//#ifdef NVSHMEM_COMMS
+//   return shmem_malloc_(func, file, line, size);
+//#else
+    return device_pinned_malloc_(func, file, line, size);
+//#endif
+  }
   /**
    * Free device memory allocated with device_malloc().  This function
    * should only be called via the device_free() macro, defined in
@@ -437,6 +450,19 @@ namespace quda
     }
   }
 
+  /**
+   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be
+   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
+   */
+  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+// #ifdef NVSHMEM_COMMS
+//    shmem_free_(func, file, line, ptr);
+// #else
+      device_pinned_free_(func, file, line, ptr);
+// #endif
+  }
+
   void printPeakMemUsage()
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
@@ -465,8 +491,10 @@ namespace quda
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
      hipPointerAttribute_t attr;
-     hipPointerGetAttributes(&attr, ptr);
-     //printf("memoryType of ptr: %d\n", attr.memoryType);
+     hipError_t error = hipPointerGetAttributes(&attr, ptr);
+     if( error != hipSuccess ) {
+       errorQuda("hipPointerGetAttributes returned error: %s\n", hipGetErrorString(error));
+     }
  
      switch (attr.memoryType) {
        case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION;

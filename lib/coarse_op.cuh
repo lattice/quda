@@ -1,8 +1,11 @@
 #pragma once
 
+
 #include <kernels/coarse_op_kernel.cuh>
 #include <uint_to_char.h>
+#ifdef QUDA_TARGET_CUDA
 #include <coarse_op_mma_launch.h>
+#endif
 #include <tunable_nd.h>
 
 #if __cplusplus >= 201703L
@@ -314,11 +317,16 @@ namespace quda {
     {
       if (type == COMPUTE_UV) {
 
+	// FIXME: Should I make stubs for the MMA Launches?
+#if QUDA_TARGET_CUDA
         IF_CONSTEXPR (use_mma) {
           mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
         } else {
           launch_device<compute_uv>(tp, stream, arg);
         }
+#else
+	launch_device<compute_uv>(tp,stream,arg);
+#endif
 
       } else if (type == COMPUTE_AV) {
 
@@ -369,12 +377,13 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
 
+#if QUDA_TARGET_CUDA
         IF_CONSTEXPR (use_mma) {
 
           mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
 
         } else {
-
+#endif
           // need to resize the grid since we don't tune over the entire coarseColor dimension
           // factor of two comes from parity onto different blocks (e.g. in the grid)
           tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
@@ -423,9 +432,9 @@ namespace quda {
             tp.block.x /= tp.aux.x;
             tp.grid.x *= tp.aux.x;
           }
-
+#if QUDA_TARGET_CUDA
         } // if use_mma
-
+#endif
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
 #if defined(WILSONCOARSE)
@@ -604,23 +613,18 @@ namespace quda {
 
     bool advanceTuneParam(TuneParam &param) const
     {
+#ifdef QUDA_TARGET_CUDA
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
         constexpr bool query_max = true;
-#endif
-#endif
         int max = 0;
         if (type == COMPUTE_UV) {
-#if defined(QUDA_TARGET_CUDA)
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
 #endif
-#endif
         } else if (type == COMPUTE_VUV) {
-#if defined(QUDA_TARGET_CUDA)
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
           max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
 #endif
-#endif	  
         }
 
         if (param.aux.x < max) {
@@ -630,7 +634,7 @@ namespace quda {
           return false;
         }
       }
-
+#endif 
       // only do autotuning if we have device fields
       if (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;

@@ -164,7 +164,7 @@ endif()
 
 if( QUDA_TARGET_HIP )
   set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES LANGUAGE CXX)
-  set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip -Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef") 
+  set_source_files_properties( ${QUDA_CU_OBJS} PROPERTIES COMPILE_FLAGS "-x hip -Wno-unused-function -Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-result") 
 endif()
 
 # make one library
@@ -179,9 +179,11 @@ else()
 endif()
 
 
-# malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
-# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+if(QUDA_TARGET_CUDA)
+  # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
+  # version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
+  target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+endif()
 
 # set up QUDA compile options
 target_compile_definitions(
@@ -228,30 +230,9 @@ if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
    AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
   target_compile_options(
-    quda
-    PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-    -ftz=true
-    -prec-div=false
-    -prec-sqrt=false>
-    $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
-    -fcuda-flush-denormals-to-zero
-    -fcuda-approx-transcendentals
-    -Xclang -fcuda-allow-variadic-functions>)
-  target_compile_options(
-    quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-    -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
-  
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
-    -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
-    --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
-  target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
-  
-  if(QUDA_VERBOSE_BUILD)
-    target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--ptxas-options=-v>)
-  endif(QUDA_VERBOSE_BUILD)
-
+    quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
+endif()
+endif()
 
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -350,7 +331,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function>)
+	target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>: -Wno-error=unused-function -Wno-unused-result>)
   
   # this is a hack to get colored diagnostics back when using Ninja and clang
   if(CMAKE_GENERATOR MATCHES "Ninja")
