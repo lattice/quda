@@ -280,11 +280,13 @@ struct StaggeredDslashTestWrapper {
     cpuFat = new cpuGaugeField(cpuFatParam);
     ghost_fatlink_cpu = cpuFat->Ghost();
 
-    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    GaugeFieldParam cpuLongParam(milc_longlink_cpu, gauge_param);
-    cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuLong = new cpuGaugeField(cpuLongParam);
-    ghost_longlink_cpu = cpuLong->Ghost();
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+      GaugeFieldParam cpuLongParam(milc_longlink_cpu, gauge_param);
+      cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      cpuLong = new cpuGaugeField(cpuLongParam);
+      ghost_longlink_cpu = cpuLong ? cpuLong->Ghost() : nullptr;
+    }
 #endif
 
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
