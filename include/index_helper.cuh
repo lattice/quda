@@ -876,6 +876,7 @@ namespace quda {
 #ifdef SWIZZLE
   template <typename T> __device__ inline int block_idx(const T &swizzle)
   {
+    QUDA_RT_CONSTS;
     // the portion of the grid that is exactly divisible by the number of SMs
     const int gridp = gridDim.x - gridDim.x % swizzle;
 
@@ -893,11 +894,8 @@ namespace quda {
 #else
   template <typename T> __device__ inline int block_idx(const T &)
   {
-#ifdef QUDA_BACKEND_OMPTARGET
-    return omp_get_thread_num();
-#else
+    QUDA_RT_CONSTS;
     return blockIdx.x;
-#endif
   }
 #endif
 
