@@ -66,7 +66,6 @@ void display_test_info()
   return;
 }
 
-
 int main(int argc, char **argv)
 {
 
@@ -85,10 +84,8 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
-    link_recon_sloppy = link_recon;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
   setDims(gauge_param.X);
