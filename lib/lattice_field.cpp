@@ -191,6 +191,17 @@ namespace quda {
 
     for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
       for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+
+        for (int b = 0; b < 2; b++) {
+          my_face_dim_dir_d[b][dim][dir] = nullptr;
+          my_face_dim_dir_hd[b][dim][dir] = nullptr;
+          my_face_dim_dir_h[b][dim][dir] = nullptr;
+
+          from_face_dim_dir_d[b][dim][dir] = nullptr;
+          from_face_dim_dir_hd[b][dim][dir] = nullptr;
+          from_face_dim_dir_h[b][dim][dir] = nullptr;
+        }
+
         mh_recv_fwd[dir][dim] = nullptr;
         mh_recv_back[dir][dim] = nullptr;
         mh_send_fwd[dir][dim] = nullptr;
@@ -231,33 +242,37 @@ namespace quda {
           qudaDeviceSynchronize();
           comm_barrier();
           for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_send_buffer_h[b]);
-	    host_free(ghost_pinned_recv_buffer_h[b]);
-	  }
+            device_comms_pinned_free(ghost_recv_buffer_d[b]);
+            device_comms_pinned_free(ghost_send_buffer_d[b]);
+            host_free(ghost_pinned_send_buffer_h[b]);
+            host_free(ghost_pinned_recv_buffer_h[b]);
+          }
         }
       }
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
-	  // pinned buffer used for sending
-	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for sending
+          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
+          // set the matching device-mapped pointer
+          ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
-	  // pinned buffer used for receiving
-	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for receiving
+          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
+          // set the matching device-mapped pointer
+          ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
         }
 
         initGhostFaceBuffer = true;
@@ -276,11 +291,11 @@ namespace quda {
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned send memory buffer
@@ -321,28 +336,18 @@ namespace quda {
     for (int i=0; i<nDimComms; i++) {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
-      for (int b=0; b<2; ++b) {
-        my_face_dim_dir_h[b][i][0] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][0];
-        from_face_dim_dir_h[b][i][0] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][0];
+      for (int dir = 0; dir < 2; dir++) {
+        for (int b=0; b<2; ++b) {
+          my_face_dim_dir_h[b][i][dir] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_h[b][i][dir] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][dir];
 
-        my_face_dim_dir_hd[b][i][0] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][0];
-        from_face_dim_dir_hd[b][i][0] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][0];
+          my_face_dim_dir_hd[b][i][dir] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_hd[b][i][dir] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][dir];
 
-        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
-        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
-      } // loop over b
-
-      for (int b=0; b<2; ++b) {
-        my_face_dim_dir_h[b][i][1] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][1];
-        from_face_dim_dir_h[b][i][1] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][1];
-
-        my_face_dim_dir_hd[b][i][1] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][1];
-        from_face_dim_dir_hd[b][i][1] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][1];
-
-        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
-        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];
-      } // loop over b
-
+          my_face_dim_dir_d[b][i][dir] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][dir];
+          from_face_dim_dir_d[b][i][dir] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][dir];
+        } // loop over b
+      } // loop over direction
     } // loop over dimension
 
     bool gdr = comm_gdr_enabled(); // only allocate rdma buffers if GDR enabled

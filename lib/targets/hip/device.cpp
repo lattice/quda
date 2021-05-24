@@ -141,11 +141,11 @@ namespace quda
       return max_shared_bytes-1;
     }
 #else
-    size_t max_default_shared_memory() { return 8192; }
+    size_t max_default_shared_memory() { return 32000; }
 
     size_t max_dynamic_shared_memory()
     {
-      return 16000;
+      return 32000;
     }
 #endif
 

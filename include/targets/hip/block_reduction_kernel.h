@@ -40,10 +40,9 @@ namespace quda {
      separately to the transform functor.  The x thread dimension is
      templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
-
   */
   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  __forceinline__ __device__ void BlockKernel2D_impl(Arg arg)
+  __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);

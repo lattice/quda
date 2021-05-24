@@ -58,7 +58,7 @@ namespace quda {
   }
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
-  struct PackGhostArg {
+  struct PackGhostArg : kernel_param<> {
     static constexpr bool block_float_requested = sizeof(store_t) == QUDA_SINGLE_PRECISION &&
       isFixed<ghost_store_t>::value;
 
@@ -82,17 +82,16 @@ namespace quda {
     const int dagger;
     const QudaPCType pc_type;
     int commDim[4]; // whether a given dimension is partitioned or not
-    dim3 threads;
 
     PackGhostArg(const ColorSpinorField &a, void **ghost, int parity, int nFace, int dagger) :
+      kernel_param(dim3(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())),
       field(a, nFace, 0, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),
       nParity(a.SiteSubset()),
       dagger(dagger),
-      pc_type(a.PCType()),
-      threads(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())
+      pc_type(a.PCType())
     {
       if (block_float_requested && nColor_ > max_block_float_nc)
         errorQuda("Block-float format not supported for Nc = %d", nColor_);
@@ -113,7 +112,7 @@ namespace quda {
       constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<is_device, Arg::nColor>();
       static_assert(Ms == Arg::nSpin, "on host spins per thread must match total spins");
-      static_assert(Mc == Arg::nColor,  "on host colors per thread must match total colors");
+      static_assert(Mc == Arg::nColor, "on host colors per thread must match total colors");
       return thread_max;
     }
   };
@@ -126,7 +125,7 @@ namespace quda {
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
       constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
-      SharedMemoryCache<real, color_spin_threads, 2, true> cache;
+      SharedMemoryCache<real, color_spin_threads, 4, true> cache; // 4 comes from direction and parity
       if (active) cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
@@ -145,7 +144,7 @@ namespace quda {
      Compute the max element over the spin-color components of a given site.
   */
   template <typename Arg>
-  __device__ __host__ inline auto compute_site_max(Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  __device__ __host__ inline auto compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -153,14 +152,13 @@ namespace quda {
     real thread_max = 0.0;
 
     if (active) {
-      const auto &rhs = arg.field;
 #pragma unroll
       for (int spin_local=0; spin_local<Ms; spin_local++) {
         int s = spin_block + spin_local;
 #pragma unroll
         for (int color_local=0; color_local<Mc; color_local++) {
           int c = color_block + color_local;
-          complex<real> z = rhs(spinor_parity, x_cb, s, c);
+          complex<real> z = arg.field(spinor_parity, x_cb, s, c);
           thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
           thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
         }
@@ -170,8 +168,8 @@ namespace quda {
     return target::dispatch<site_max>(thread_max, arg, active);
   }
 
-  template <int dim, int dir, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  template <typename Arg>
+  __device__ __host__ inline void packGhost(const Arg &arg, int dir, int dim, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
@@ -181,10 +179,8 @@ namespace quda {
     if (Arg::nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
     else getCoords(x, x_cb, arg.X, parity);
 
-    const auto &rhs = arg.field;
-
     {
-      real max = 1.0;
+      real max = static_cast<real>(1.0);
       if (Arg::block_float) {
         bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
         max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block, active);
@@ -198,7 +194,7 @@ namespace quda {
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
             arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-              = rhs(spinor_parity, x_cb, s, c);
+              = arg.field(spinor_parity, x_cb, s, c);
           }
 	}
       }
@@ -211,7 +207,7 @@ namespace quda {
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c = color_block + color_local;
             arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-                = rhs(spinor_parity, x_cb, s, c);
+              = arg.field(spinor_parity, x_cb, s, c);
           }
 	}
       }
@@ -219,8 +215,8 @@ namespace quda {
   }
 
   template <typename Arg> struct GhostPacker {
-    Arg &arg;
-    constexpr GhostPacker(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int spin_color_block, int parity_dir)
@@ -237,24 +233,8 @@ namespace quda {
       const int color_block = (spin_color_block % (Arg::nColor / Mc)) * Mc;
 
 #pragma unroll
-      for (int dim=0; dim<4; dim++) {
-        switch(dir) {
-        case 0: // backwards pack
-          switch (dim) {
-          case 0: packGhost<0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 1: packGhost<1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 2: packGhost<2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 3: packGhost<3,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          }
-          break;
-        case 1: // forwards pack
-          switch (dim) {
-          case 0: packGhost<0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 1: packGhost<1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 2: packGhost<2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          case 3: packGhost<3,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
-          }
-        }
+      for (int dim = 0; dim < 4; dim++) {
+        packGhost(arg, dir, dim, x_cb, parity, spinor_parity, spin_block, color_block);
       }
     }
   };

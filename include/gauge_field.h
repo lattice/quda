@@ -4,6 +4,8 @@
 #include <quda.h>
 #include <lattice_field.h>
 
+#include <comm_key.h>
+
 namespace quda {
 
   namespace gauge
@@ -293,6 +295,11 @@ namespace quda {
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = GaugeFieldParam;
+
+    /**
        Apply the staggered phase factors to the gauge field.
        @param[in] phase The phase we will apply to the field.  If this
        is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply
@@ -345,6 +352,8 @@ namespace quda {
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 
+    size_t TotalBytes() const { return bytes; }
+
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}
@@ -352,6 +361,8 @@ namespace quda {
     virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual int full_dim(int d) const { return x[d]; }
 
     const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
@@ -573,6 +584,18 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -664,6 +687,18 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -719,6 +754,16 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
+  /**
+    @brief This function is used for copying from a source gauge field to a destination gauge field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
+ */
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type);
 
   /**
      This function is used for copying the gauge field into an

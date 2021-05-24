@@ -188,6 +188,7 @@ double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be c
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
+bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
@@ -247,8 +248,19 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
+
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
 QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
 QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
@@ -665,10 +677,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       int p;
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
-        if (p & (1 << j)) {
-          commDimPartitionedSet(j);
-          dim_partitioned[j] = 1;
-        }
+        if (p & (1 << j)) { dim_partitioned[j] = 1; }
       }
       return retval;
     },
@@ -703,6 +712,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Use Eigen to eigensolve the upper Hessenberg in IRAM, else use QUDA's QR code. (default true)");
   opgroup->add_option("--eig-compute-svd", eig_compute_svd,
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
+
+  opgroup->add_option("--eig-compute-gamma5", eig_compute_gamma5,
+                      "Solve the gamma5 OP problem. Solve for OP then multiply by gamma_5 (default false)");
+
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option(
@@ -726,8 +739,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
 
-  opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
-                      "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
+  opgroup->add_option(
+    "--eig-io-parity-inflate", eig_io_parity_inflate,
+    "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
 
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,
@@ -868,7 +882,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
-  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,
+                      "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
@@ -1012,4 +1027,52 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
+void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for heatbath related options
+  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
+  opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
+  opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
+                      "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
+                      "Number of heatbath hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
+                      "Number of overrelaxation hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
+                      "Number of measurement steps in heatbath test (default 10)");
+  opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
+                      "Number of warmup steps in heatbath test (default 10)");
+}
+
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
+}
+
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup
+    = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
+  opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }

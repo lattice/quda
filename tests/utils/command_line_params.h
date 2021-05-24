@@ -90,8 +90,9 @@ public:
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool = false)
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -133,6 +134,9 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -308,6 +312,7 @@ extern double eig_amax;
 extern bool eig_use_normop;
 extern bool eig_use_dagger;
 extern bool eig_compute_svd;
+extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
@@ -368,8 +373,19 @@ extern int wflow_steps;
 extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
+extern int gf_gauge_dir;
+extern int gf_maxiter;
+extern int gf_verbosity_interval;
+extern double gf_ovr_relaxation_boost;
+extern double gf_fft_alpha;
+extern int gf_reunit_interval;
+extern double gf_tolerance;
+extern bool gf_theta_condition;
+extern bool gf_fft_autotune;
+
 extern QudaContractType contract_type;
 
+extern std::array<int, 4> grid_partition;
 extern QudaBLASOperation blas_trans_a;
 extern QudaBLASOperation blas_trans_b;
 extern QudaBLASDataType blas_data_type;

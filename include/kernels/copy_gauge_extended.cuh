@@ -12,7 +12,7 @@ namespace quda {
      Kernel argument struct
    */
   template <typename store_out_t, typename store_in_t, int length, typename OutOrder, typename InOrder, bool regularToextended_>
-  struct CopyGaugeExArg {
+  struct CopyGaugeExArg : kernel_param<> {
     using real_out_t = typename mapper<store_out_t>::type;
     using real_in_t = typename mapper<store_in_t>::type;
     static constexpr int nColor = gauge::Ncolor(length);
@@ -23,12 +23,11 @@ namespace quda {
     int_fastdiv Xout[QUDA_MAX_DIM];
     int border[QUDA_MAX_DIM];
     int geometry;
-    dim3 threads;
     CopyGaugeExArg(GaugeField &out, const GaugeField &in, store_out_t *Out, store_in_t *In) :
+      kernel_param(dim3(in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(), 2, 1)),
       out(out, Out),
       in(in, In),
-      geometry(in.Geometry()),
-      threads(in.VolumeCB() == out.VolumeCB() ? in.VolumeCB() : in.LocalVolumeCB(), 2, 1)
+      geometry(in.Geometry())
     {
       for (int d=0; d < in.Ndim(); d++) {
 	Xout[d] = out.X()[d];
@@ -46,8 +45,8 @@ namespace quda {
      Copy a regular/extended gauge field into an extended/regular gauge field
   */
   template <typename Arg> struct CopyGaugeEx_ {
-    Arg &arg;
-    constexpr CopyGaugeEx_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CopyGaugeEx_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

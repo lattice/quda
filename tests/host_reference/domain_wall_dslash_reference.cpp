@@ -327,9 +327,8 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
 #ifdef MULTI_GPU
 template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
-    sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
+                             sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  // int my_spinor_site_size = 24;
   for (int i = 0; i < V5h * spinor_site_size; i++) res[i] = 0.0;
 
   gFloat *gaugeEven[4], *gaugeOdd[4];
@@ -599,12 +598,11 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
   free(Ftr);
 }
 
-template <typename sComplex>
-sComplex cpow(const sComplex &x, int y)
+template <typename sComplex> sComplex cpow(const sComplex &x, int y)
 {
   static_assert(sizeof(sComplex) == sizeof(Complex), "C and C++ complex type sizes do not match");
   // note that C++ standard explicitly calls out that casting between C and C++ complex is legal
-  const Complex x_ = reinterpret_cast<const Complex&>(x);
+  const Complex x_ = reinterpret_cast<const Complex &>(x);
   Complex z_ = std::pow(x_, y);
   sComplex z = reinterpret_cast<sComplex &>(z_);
   return z;
@@ -1341,9 +1339,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 {
   int R[4];
 
-  for (int d = 0; d < 4; d++) {
-    R[d] = comm_dim_partitioned(d) ? 2 : 0;
-  }
+  for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
   cpuGaugeField *padded_gauge = createExtendedGauge(gauge, gauge_param, R);
 
