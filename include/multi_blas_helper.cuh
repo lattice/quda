@@ -167,6 +167,7 @@ namespace quda
 
       // compute the size remaining for the Y and W accessors
       constexpr auto arg_size = (max_arg_size<Functor>()
+                                 - sizeof(kernel_param<>)                                      // kernel_param parent
                                  - sizeof(int)                                                 // NYW parameter
                                  - sizeof(SpinorX[NXZ])                                        // SpinorX array
                                  - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
@@ -206,6 +207,7 @@ namespace quda
 
       // compute the size remaining for the Y and W accessors
       const auto arg_size = (max_arg_size<Functor>()
+                             - sizeof(kernel_param<>)                                      // kernel_param parent
                              - sizeof(int)                                                 // NYW parameter
                              - NXZ * spinor_x_size                                         // SpinorX array
                              - (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)

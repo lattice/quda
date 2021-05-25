@@ -25,7 +25,7 @@ endif()
 set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
-  coarse_op.cu coarsecoarse_op.cu
+  coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
@@ -35,6 +35,7 @@ set (QUDA_OBJS
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_fundamental.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
@@ -184,6 +185,10 @@ target_compile_options(
           -ftz=true
           -prec-div=false
           -prec-sqrt=false>
+          $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+          -Mflushz
+          -Mfpapprox=div
+          -Mfpapprox=sqrt>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
           -fcuda-flush-denormals-to-zero
           -fcuda-approx-transcendentals
@@ -300,6 +305,10 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
                             $<$<CONFIG:SANITIZE>:-lineinfo>
+                            >)
+
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+                            -gpu=lineinfo
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
@@ -526,6 +535,18 @@ if(QUDA_OPENBLAS)
     target_link_libraries(quda_cpp PUBLIC openblas)
   else()
     target_link_libraries(quda INTERFACE ${OPENBLAS})
+  endif()
+endif()
+
+
+if(QUDA_ZFP)
+  target_compile_definitions(quda PRIVATE ZFP_LIB)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_ZFP_HOME}/include>)
+  if(QUDA_DOWLOAD_ZFP)
+    target_link_libraries(quda PUBLIC zfp)
+    target_link_libraries(quda_cpp PUBLIC zfp)
+  else()
+    target_link_libraries(quda INTERFACE ${ZFP})
   endif()
 endif()
 

@@ -192,6 +192,9 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
 
+# LLNL zfp
+option(QUDA_ZFP "enable ZFP" OFF)
+
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
 option(QUDA_INTERFACE_MILC "build milc interface" ON)
@@ -273,7 +276,7 @@ option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20%
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    14
+    17
     CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
@@ -295,9 +298,10 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
+option(QUDA_DOWNLOAD_ZFP "Download zfp software as requested by QUDA_ZFP" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
-set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
+set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
 set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 
 
@@ -594,12 +598,19 @@ endif()
 
 if(QUDA_NVSHMEM)
   if(QUDA_DOWNLOAD_NVSHMEM)
+    get_filename_component(NVSHMEM_CUDA_HOME ${CUDAToolkit_INCLUDE_DIRS} DIRECTORY)
+    find_path(GDRCOPY_HOME NAME gdrapi.h PATHS "/usr/local/gdrcopy" ${QUDA_GDRCOPY_HOME} PATH_SUFFIXES "include")
+    mark_as_advanced(GDRCOPY_HOME)
+    if(NOT GDRCOPY_HOME)
+      message(SEND_ERROR "QUDA_DOWNLOAD_NVSHMEM requires gdrcopy to be installed. Please set QUDA_GDRCOPY_HOME to the location of your gdrcopy installation.")
+    endif()
+    get_filename_component(NVSHMEM_GDRCOPY_HOME ${GDRCOPY_HOME} DIRECTORY)
     ExternalProject_Add(NVSHMEM
                         URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
                         PREFIX nvshmem
                         CONFIGURE_COMMAND ""
                         BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${QUDA_GDRCOPY_HOME} install
+                        BUILD_COMMAND  make -j8 CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
                         INSTALL_COMMAND ""
                         LOG_INSTALL ON
                         LOG_BUILD ON
@@ -631,9 +642,9 @@ if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
                   OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
                   OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
@@ -903,6 +914,38 @@ if(QUDA_BACKWARDS)
   endif()
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
+
+# ZFP
+if(QUDA_ZFP)  
+  if(QUDA_DOWNLOAD_ZFP)
+    include(GNUInstallDirs)
+    ExternalProject_Add(
+      ZFP
+      GIT_REPOSITORY https://github.com/LLNL/zfp.git
+      GIT_TAG 0.5.5
+      GIT_SHALLOW YES
+      PREFIX zfp
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_GENERATOR "Unix Makefiles")
+    ExternalProject_Get_Property(ZFP INSTALL_DIR)
+    set(QUDA_ZFP_HOME ${INSTALL_DIR})
+    add_library(zfp STATIC IMPORTED)
+    add_dependencies(zfp ZFP)
+    set_target_properties(zfp PROPERTIES IMPORTED_LOCATION ${QUDA_ZFP_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
+  else(QUDA_DOWNLOAD_ZFP)
+    find_package(PkgConfig REQUIRED)
+
+    # We always need the serial library
+    pkg_check_modules(ZFP QUIET zfp)
+    if(NOT ZFP_FOUND OR QUDA_ZFP_HOME)
+      find_library(ZFP zfp PATH ${QUDA_ZFP_HOME})
+    else()
+      find_library(ZFP ${ZFP_LIBRARIES} PATH ${ZFP_LIBRARY_DIRS})
+    endif()
+    
+  endif(QUDA_DOWNLOAD_ZFP)
+endif(QUDA_ZFP)
+
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

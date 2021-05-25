@@ -1179,7 +1179,7 @@ namespace quda {
      exponentiation. The argument q must be anti hermitian.
      @param[in/out] q The matrix to be exponentiated
   */  
-  template <class T, int N> __device__ __host__ void expsuNTaylor12thAntiHerm(Matrix<T, N> &q)
+  template <class T, int N> __device__ __host__ void expsuNTaylor(Matrix<T, N> &q, int m)
   {
     // Port of the CHROMA implementation
     // In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/n!)*(q)^n up to n = 12
@@ -1197,8 +1197,8 @@ namespace quda {
     // The first two terms...
     q += Id;
     
-    // ...of a 12th order expansion
-    for(int i = 2; i <= 12; i++) {
+    // ...of an mth order expansion
+    for(int i = 2; i <= m; i++) {
       
       RealType coeff = 1.0/i;
       
@@ -1241,7 +1241,7 @@ namespace quda {
       temp1 = temp1 * Q;
       Tr_re = getTrace(temp1).x;
       c1 = 0.5*Tr_re;
-
+      
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
@@ -1347,7 +1347,7 @@ namespace quda {
     }
     else {
       exp_iQ = Q;
-      expsuNTaylor12thAntiHerm(exp_iQ);
+      expsuNTaylor(exp_iQ, 20);
     }     
     return exp_iQ;
   }
@@ -1433,7 +1433,7 @@ namespace quda {
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
     else {
-      expsuNTaylor12thAntiHerm(q);
+      expsuNTaylor(q, 20);
     }
   }
 } // end namespace quda

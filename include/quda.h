@@ -1418,6 +1418,25 @@ extern "C" {
   void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
+     @brief Perform an eigendecomposition on the links and then create 
+     an hermitian matrix from which the fundamental representation
+     can be read, assuming Gell-Mann matricies tau. The compute
+     is performed on gaugePrecise and teh result is stored in 
+     gaugeFundamental.
+
+     The Algorithm
+     U = exp(iH) where H = sum_{i=1..N^2-1} \alpha_i \tau_i  
+     UV = lambdaV = exp(i sigma)V,
+     HV = sigmaV,
+     hence H = V S V^{\dag} | S = diag(sigma_1, sigma_2, ... , sigma_N) 
+     
+     @param[in] qr_tol The tolerance on the QR solver
+     @param[in] qr_max_iter The maximum number of iterations in the QR
+     @param[in] taylor_N The number of terms in the Taylor expansion of exp(iH) 
+  */
+  void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const int taylor_N);
+  
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
@@ -1540,7 +1559,7 @@ extern "C" {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
@@ -1558,7 +1577,7 @@ extern "C" {
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
    * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */

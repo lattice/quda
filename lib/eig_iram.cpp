@@ -241,7 +241,7 @@ namespace quda
     for (int i = 0; i < n_kr - 1; i++) {
 
       // If the sub-diagonal element is numerically
-      // small enough, floor it to 0;
+      // small enough, floor it to 0
       if (abs(R[i + 1][i]) < tol) {
         R[i + 1][i] = 0.0;
         continue;
@@ -288,7 +288,7 @@ namespace quda
 #ifdef _OPENMP
 #pragma omp parallel
         {
-#pragma omp for schedule(static, 32) nowait
+#pragma omp for schedule(static, 32) 
 #endif
           for (int i = 0; i < j + 2; i++) {
             Complex temp = R[i][j];
@@ -296,7 +296,7 @@ namespace quda
             R[i][j + 1] -= (R21[j] * temp + R22[j] * R[i][j + 1]);
           }
 #ifdef _OPENMP
-#pragma omp for schedule(static, 32) nowait
+#pragma omp for schedule(static, 32) 
 #endif
           for (int i = 0; i < n_kr; i++) {
             Complex temp = Q[i][j];
@@ -355,12 +355,10 @@ namespace quda
         }
       }
 
-      // This is about as high as one cat get in double without causing
-      // the Arnoldi to compute more restarts.
       double tol = eig_param->qr_tol;
       int max_iter = 100000;
       int iter = 0;
-
+      
       Complex temp, discriminant, sol1, sol2, eval;
       for (int i = n_kr - 2; i >= 0; i--) {
         while (iter < max_iter) {
@@ -397,39 +395,92 @@ namespace quda
           iter++;
         }
       }
-      profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);
-
-      profile.TPSTART(QUDA_PROFILE_EIGENEV);
-      // Compute the eigevectors of the origial upper Hessenberg
-      // This is now very cheap because the input matrix to Eigen
-      // is upper triangular.
-      MatrixXcd Q = MatrixXcd::Zero(n_kr, n_kr);
-      MatrixXcd R = MatrixXcd::Zero(n_kr, n_kr);
+      
+      // Temp matrix storage
+      Complex **E = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
+      Complex **Qt = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
       for (int i = 0; i < n_kr; i++) {
-        for (int j = 0; j < n_kr; j++) {
-          Q(i, j) = Qmat[i][j];
-          R(i, j) = Rmat[i][j];
-        }
+	E[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
+	Qt[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
+	for (int j = 0; j < n_kr; j++) {
+	  E[i][j] = 0.0;
+	  Qt[i][j] = 0.0;
+	}
       }
 
-      MatrixXcd matUpper = MatrixXcd::Zero(n_kr, n_kr);
-      matUpper = R.triangularView<Eigen::Upper>();
-      matUpper.conservativeResize(n_kr, n_kr);
-      Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
-      Q *= eigenSolver.eigenvectors();
+      // eigenvectors returned in E
+      eigensolveUpperT(Rmat, E);
 
-      // Update eigenvalues, residuia, and the Q matrix
+      // rotate eigenvectors
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static, 32) 
+#endif
+      for (int i = 0; i < n_kr; i++) 
+	for (int j = 0; j < n_kr; j++) 
+	  for (int k = 0; k < n_kr; k++) Qt[i][j] += Qmat[i][k] * E[k][j];
+      
+      // update Qmat
+      for (int i = 0; i < n_kr; i++) 
+	for (int j = 0; j < n_kr; j++) Qmat[i][j] = Qt[i][j];
+      
+      // Update eigenvalues and residua
       for (int i = 0; i < n_kr; i++) {
-        evals[i] = eigenSolver.eigenvalues()[i];
-        residua[i] = abs(beta * Q.col(i)[n_kr - 1]);
-        for (int j = 0; j < n_kr; j++) Qmat[i][j] = Q(i, j);
+        evals[i] = Rmat[i][i];
+        residua[i] = abs(beta * Qmat[n_kr - 1][i]);
       }
-
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QR iterations = %d\n", iter);
-      profile.TPSTOP(QUDA_PROFILE_EIGENEV);
+      
+      for (int i = 0; i < n_kr; i++) {
+	host_free(E[i]);
+	host_free(Qt[i]);
+      }
+      host_free(E);
+      host_free(Qt);    
+      profile.TPSTOP(QUDA_PROFILE_HOST_COMPUTE);      
     }
   }
-
+  
+  void IRAM::eigensolveUpperT(Complex **T, Complex **E)
+  {
+    double tol = eig_param->qr_tol;
+    
+    // Temp matrix storage
+    Complex **TT = (Complex **)safe_malloc((n_kr) * sizeof(Complex *));
+    for (int i = 0; i < n_kr; i++) {
+      TT[i] = (Complex *)safe_malloc((n_kr) * sizeof(Complex));
+      for (int j = 0; j < n_kr; j++) {
+        TT[i][j] = T[i][j];;
+      }
+    }
+    
+    for (int i = n_kr - 1; i >= 0; i--) {
+      std::vector<Complex> V(n_kr, 0.0);
+      Complex lambda = T[i][i];
+      for (int j = 0; j < n_kr; j++ ) TT[j][j] = T[j][j] - lambda; 
+      
+      // free choice of this component
+      // back-substitute for other components
+      V[i] = 1.0;
+      
+      for (int j = i - 1; j >= 0; j--) {         
+	V[j] = 0.0;
+	for (int k = j + 1; k <= i; k++) V[j] -= TT[j][k] * V[k];
+	
+	// Exit if degenerate
+	if (abs(TT[j][j]) < tol) {
+	  errorQuda("Degeneracy detected in upper triangular eigensolve, likely due to the eig_qr_tol value being too high.");
+	} else V[j] = V[j] / TT[j][j];
+      }
+      // Normalise
+      double vnorm = 0.0;
+      for (int j=0; j<n_kr; j++) vnorm += norm(V[j]);
+      vnorm = sqrt(vnorm);
+      for (int j = 0; j <= i; j++ ) E[j][i] = V[j] / vnorm;
+    }
+    
+    for (int i = 0; i < n_kr; i++) host_free(TT[i]);
+    host_free(TT);
+  }
+  
   void IRAM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     // In case we are deflating an operator, save the tunechache from the inverter

@@ -17,6 +17,7 @@ namespace quda {
 		  const GaugeField &g, const CloverField &c, double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaFieldLocation location = Y.Location();
+    constexpr bool use_mma = false;
 
     bool need_bidirectional = false;
     if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_TRUE; }
@@ -52,7 +53,7 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
 	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, g, c,
          kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
@@ -88,7 +89,7 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
          avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, g, c,
          kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
@@ -176,17 +177,25 @@ namespace quda {
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
         calculateY<float,float>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
         calculateY<float,short>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }

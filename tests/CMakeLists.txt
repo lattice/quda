@@ -12,14 +12,14 @@ add_subdirectory(utils)
 add_subdirectory(host_reference)
 
 if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
 
 if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
+    AND QUDA_DOWNLOAD_USQCD
+    AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -38,14 +38,14 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   endif()
 
   if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
-
+  
   if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
+      AND QUDA_DOWNLOAD_USQCD
+      AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
@@ -60,6 +60,11 @@ if(QUDA_ARPACK)
     list(APPEND TEST_LIBS ${PARPACK})
   endif()
 endif()
+
+if(QUDA_ZFP)
+  list(APPEND TEST_LIBS zfp)
+endif()
+
 
 # define tests
 add_executable(c_interface_test c_interface_test.c)
@@ -96,12 +101,6 @@ if(QUDA_DIRAC_WILSON
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  if(QUDA_BLOCKSOLVER)
-    add_executable(invertmsrc_test invertmsrc_test.cpp)
-    target_link_libraries(invertmsrc_test ${TEST_LIBS})
-    quda_checkbuildtest(invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -135,13 +134,6 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-  if(QUDA_BLOCKSOLVER)
-    add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
-    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
-    quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
 
 endif()
 
@@ -257,6 +249,13 @@ if(QUDA_FORCE_HISQ)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
+if(QUDA_ZFP)
+  add_executable(link_compression_test link_compression_test.cpp)
+  target_link_libraries(link_compression_test ${TEST_LIBS})
+  quda_checkbuildtest(link_compression_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS link_compression_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_MPI OR QUDA_QMP)
@@ -495,10 +494,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+    set(DIRAC_NAME twisted-mass)
     # symmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
@@ -512,7 +512,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     # asymmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
