@@ -98,8 +98,6 @@ static int cudaDeviceGetStreamPriorityRange(int*lo,int*hi){ompwip();lo=0;hi=0;re
 static int cudaStreamCreateWithPriority(cudaStream_t*s,int lo,int hi){ompwip();*s=0;return 0;}
 static int cudaStreamDestroy(cudaStream_t s){ompwip();return 0;}
 static int cudaDeviceReset(){ompwip();return 0;}
-enum {cudaDevAttrMaxSharedMemoryPerBlockOptin};
-static int cudaDeviceGetAttribute(int*b,int o,int i){ompwip();*b=98304;return 0;}
 
 static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
@@ -342,27 +340,13 @@ namespace quda
       return Nstream - 1;
     }
 
-    bool managed_memory_supported()
-    {
-      // managed memory is supported on Pascal and up
-      return deviceProp.major >= 6;
-    }
+    bool managed_memory_supported() { return false; }
 
-    bool shared_memory_atomic_supported()
-    {
-      // shared memory atomics are supported on Maxwell and up
-      return deviceProp.major >= 5;
-    }
+    bool shared_memory_atomic_supported() { return false; }
 
     size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock; }
 
-    size_t max_dynamic_shared_memory()
-    {
-      static int max_shared_bytes = 0;
-      if (!max_shared_bytes)
-        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid()));
-      return max_shared_bytes;
-    }
+    size_t max_dynamic_shared_memory() { return 98304; }
 
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
 
@@ -374,45 +358,7 @@ namespace quda
 
     unsigned int processor_count() { return deviceProp.multiProcessorCount; }
 
-    unsigned int max_blocks_per_processor()
-    {
-#if CUDA_VERSION >= 11000
-      static int max_blocks_per_sm = 0;
-      if (!max_blocks_per_sm)
-        CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
-      return max_blocks_per_sm;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-	return 8;
-	break;
-      case 3:
-	return 16;
-	break;
-      case 5:
-	 return 32;
-	 break;
-      case 6: 
-	 return 32;
-	 break;
-      case 7:
-	{
-          switch (deviceProp.minor) {
-            case 0: return 32; break;
-            case 2: return 32; break;
-            case 5: return 16; break;
-	    default: return 32; break;
-	  };
-        }
-	break;
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 32;
-      }
-#endif
-    }
+    unsigned int max_blocks_per_processor() { return 32; }
 
     namespace profile
     {
