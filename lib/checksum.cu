@@ -35,23 +35,47 @@ namespace quda {
   {
     uint64_t checksum = 0;
     if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+#ifdef BUILD_QDP_INTERFACE
       ChecksumArg<T,QUDA_QDP_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("QDP interface has not been built");
+#endif
     } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+#ifdef BUILD_QDPJIT_INTERFACE
       ChecksumArg<T,QUDA_QDPJIT_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("QDPJIT interface has not been built");
+#endif
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+#ifdef BUILD_MILC_INTERFACE
       ChecksumArg<T,QUDA_MILC_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("MILC interface has not been built");
+#endif
     } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
+#ifdef BUILD_BQCD_INTERFACE
       ChecksumArg<T,QUDA_BQCD_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("BQCD interface has not been built");
+#endif
     } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
       ChecksumArg<T,QUDA_TIFR_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("TIFR interface has not been built");
+#endif
     } else if (u.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
       ChecksumArg<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> arg(u,mini);
       checksum = ChecksumCPU(arg);
+#else
+      errorQuda("TIFR interface has not been built");
+#endif
     } else {
       errorQuda("Checksum not implemented");
     }    

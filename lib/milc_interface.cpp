@@ -803,14 +803,36 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   if (target_residual[0] == 0) errorQuda("qudaMultishiftInvert: zeroth target residual cannot be zero\n");
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+
+  static bool force_double_queried = false;
+  static bool do_not_force_double = false;
+  if (!force_double_queried) {
+    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
+      do_not_force_double = true;
+      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
+    }
+    force_double_queried = true;
+  }
+
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
-                                     ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
+  bool use_mixed_precision = (((quda_precision == 2) && inv_args.mixed_precision)
+                              || ((quda_precision == 1) && (inv_args.mixed_precision == 2))) ?
+    true :
+    false;
+
   QudaPrecision device_precision_sloppy;
   switch(inv_args.mixed_precision) {
   case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
   case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
   default: device_precision_sloppy = device_precision;
+  }
+
+  // override fine precision to double, switch to mixed as necessary
+  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+    // force outer double
+    device_precision = QUDA_DOUBLE_PRECISION;
+    if (device_precision_sloppy == QUDA_SINGLE_PRECISION) use_mixed_precision = true;
   }
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
@@ -838,7 +860,7 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
   setColorSpinorParams(localDim, host_precision, &csParam);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1) invalidateGaugeQuda();
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   // set the solver
   if (invalidate_quda_gauge || !create_quda_gauge) {
@@ -880,15 +902,32 @@ void qudaInvert(int external_precision, int quda_precision, double mass, QudaInv
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
-  // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy;
 
+  static bool force_double_queried = false;
+  static bool do_not_force_double = false;
+  if (!force_double_queried) {
+    char *donotusedouble_env = getenv("QUDA_MILC_OVERRIDE_DOUBLE_MULTISHIFT"); // disable forcing outer double precision
+    if (donotusedouble_env && (!(strcmp(donotusedouble_env, "0") == 0))) {
+      do_not_force_double = true;
+      printfQuda("Disabling always using double as fine precision for MILC multishift\n");
+    }
+    force_double_queried = true;
+  }
+
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+
+  QudaPrecision device_precision_sloppy;
   switch(inv_args.mixed_precision) {
   case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
   case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
   default: device_precision_sloppy = device_precision;
+  }
+
+  // override fine precision to double, switch to mixed as necessary
+  if (!do_not_force_double && device_precision == QUDA_SINGLE_PRECISION) {
+    // force outer double
+    device_precision = QUDA_DOUBLE_PRECISION;
   }
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
