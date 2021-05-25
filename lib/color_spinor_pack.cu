@@ -185,8 +185,8 @@ namespace quda {
 #ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 2*N_COLORS) {
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2*N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 3*2*N_COLORS) { // Needed for two level free field Wilson
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3*2*N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN4
@@ -199,10 +199,10 @@ namespace quda {
     } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
-    } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == N_COLORS*24) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS*24>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == N_COLORS*32) { // wilson 3 -> 32 nvec, or staggered Nc = 96
+      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS*32>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 120) { // wilson 5 -> 120 nvec, or staggered Nc = 120
       PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,120>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1

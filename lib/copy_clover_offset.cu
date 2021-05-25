@@ -10,7 +10,7 @@ namespace quda
   template <typename Float> struct CopyCloverOffset {
     CopyCloverOffset(CloverField &out, const CloverField &in, CommKey offset, bool inverse)
     {
-      constexpr int length = 72;
+      constexpr int length = 8*N_COLORS*N_COLORS;
       using Field = CloverField;
       using Element = typename mapper<Float>::type;
 
