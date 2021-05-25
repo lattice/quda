@@ -335,7 +335,7 @@ namespace quda
       Eigen::ComplexEigenSolver<MatrixXcd> eigenSolver(matUpper);
       Q = schurUH.matrixU() * eigenSolver.eigenvectors();
 
-      // Update eigenvalues, residuia, and the Q matrix
+      // Update eigenvalues, residua, and the Q matrix
       for (int i = 0; i < n_kr; i++) {
         evals[i] = eigenSolver.eigenvalues()[i];
         residua[i] = abs(beta * Q.col(i)[n_kr - 1]);

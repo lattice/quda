@@ -171,7 +171,7 @@ namespace quda {
   };
   
   /**
-     @brief Application of twist to a color spinor field 
+     @brief Application of twist to a color spinor field
   */
   template <typename Arg> struct TwistGamma {
     using fermion_t = ColorSpinor<typename Arg::real, Arg::nColor, 4>;
