@@ -2,12 +2,9 @@
 
 #include <tune_quda.h>
 
-#if defined(QUDA_TARGET_CUDA)
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
+#include <quda_arch.h>
+#ifdef QUDA_MMA_AVAILABLE
 #include <kernels/coarse_op_kernel_mma.cuh>
-
-#endif
 #endif
 
 /**
@@ -22,9 +19,7 @@ namespace quda
   namespace mma
   {
 
-#if defined(QUDA_TARGET_CUDA)    
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
+#if QUDA_MMA_AVAILABLE
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<!Arg::is_mma_compatible, void>::type
     launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
@@ -636,8 +631,8 @@ namespace quda
       return -1;
     }
 
-#endif // compute capability >= 700, CUDA >= 10.1
-#endif // QUDA_TARGET_CUDA
+#endif // MMA_AVAILABLE
+
   } // namespace mma
 
 } // namespace quda

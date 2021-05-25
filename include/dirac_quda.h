@@ -1,5 +1,5 @@
 #pragma once
-
+#include <quda_arch.h>
 #include <quda_internal.h>
 #include <timer.h>
 #include <color_spinor_field.h>
@@ -78,12 +78,8 @@ namespace quda {
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
-#if defined(QUDA_TARGET_CUDA)
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
       use_mma(true)
-#else
-      use_mma(false)
-#endif
 #else
       use_mma(false)
 #endif

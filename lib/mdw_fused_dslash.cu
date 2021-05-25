@@ -1,3 +1,4 @@
+#include <quda_arch.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 
@@ -13,9 +14,7 @@ namespace quda
 {
 
   namespace mobius_tensor_core {
-#if defined( QUDA_TARGET_CUDA )
-#if  (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
+#ifdef QUDA_MMA_AVAILABLE
     template <class store_t, int nColor, QudaReconstructType recon> class FusedDslash : public TunableGridStrideKernel2D
     {
       ColorSpinorField &out;
@@ -254,14 +253,6 @@ namespace quda
       instantiatePreconditioner<FusedDslash>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
     }
-#else
-    void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
-                            const ColorSpinorField &, double, double, const Complex *, const Complex *,
-                            bool, int, int [4], int [4], MdwfFusedDslashType)
-    {
-      errorQuda("Domain wall dslash with tensor cores has not been built");
-    }
-#endif
 #else
     void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
                             const ColorSpinorField &, double, double, const Complex *, const Complex *,

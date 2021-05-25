@@ -1,16 +1,10 @@
 #include <typeinfo>
-#include <quda_api.h>
 #include <gauge_field.h>
 #include <blas_lapack.h>
 #include <blas_quda.h>
 #include <tunable_nd.h>
 #include <kernels/coarse_op_preconditioned.cuh>
-
-#if defined (QUDA_TARGET_CUDA)
 #include <coarse_op_preconditioned_mma_launch.h>
-#else
-using CUresult = bool;
-#endif
 
 #if __cplusplus >= 201703L
 #define IF_CONSTEXPR if constexpr
@@ -81,15 +75,9 @@ namespace quda
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
-
       IF_CONSTEXPR (location_template == QUDA_CUDA_FIELD_LOCATION) {
-        // FIXME:  how to eliminate this #ifdef. Shall I implement a nop mma::launch_yhat_kernel() ?
-#ifdef QUDA_TARGET_CUDA
         IF_CONSTEXPR (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
         else launch_device<ComputeYhat>(tp, stream, arg);
-#else
-        launch_device<ComputeYhat>(tp, stream, arg);
-#endif
       } else {
         launch_host<ComputeYhat>(tp, stream, arg);
       }
@@ -105,7 +93,6 @@ namespace quda
     bool advanceTuneParam(TuneParam &param) const
     {
       if (use_mma) {
-#if defined(QUDA_TARGET_CUDA)
         constexpr bool query_max = true;
         int max = mma::launch_yhat_kernel<query_max>(param, device::get_default_stream(), arg, *this);
         if (param.aux.x < max) {
@@ -113,10 +100,6 @@ namespace quda
           return true;
         }
         return false;
-#else
-	errorQuda("MMA Kernels can only be used in CUDA Target");
-	return false;
-#endif
       } else {
         if (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
           return TunableKernel3D::advanceTuneParam(param);
