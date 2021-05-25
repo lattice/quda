@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <quda_define.h>
 #include <quda.h>
 #include <quda_internal.h>
 #include <gauge_field.h>
@@ -22,7 +21,7 @@
 #include <qio_field.h>
 
 #include <gtest/gtest.h>
-#include <complex_quda.h>
+
 using namespace quda;
 
 //***********************************************************//
@@ -408,6 +407,8 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
 
 int main(int argc, char **argv)
 {
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
   // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);
@@ -450,8 +451,6 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device_ordinal);
     
-  // initalize google test, includes command line options
-  ::testing::InitGoogleTest(&argc, argv);
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
