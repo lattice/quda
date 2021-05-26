@@ -134,7 +134,8 @@ namespace quda {
           errorQuda("Unsupported field order %d\n", V.FieldOrder());
         }
       } else {
-        if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
+	//if ((V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER || V.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
+	if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {	  
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,DISABLE_GHOST> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,DISABLE_GHOST,isFixed<bFloat>::value> Vector;
           GPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
@@ -228,10 +229,9 @@ namespace quda {
   {
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == N_COLORS) {
-      constexpr int nColor = N_COLORS;
 #ifdef NSPIN4
       if (V.Nspin() == 4) {
-        constexpr int nColor = 3;
+        constexpr int nColor = N_COLORS;
         constexpr int nSpin = 4;
         if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 2;
@@ -252,7 +252,7 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (V.Nspin() == 1) {
-        constexpr int nColor = 3;
+        constexpr int nColor = N_COLORS;
         constexpr int nSpin = 1;
         if (spin_bs != 0) errorQuda("Unexpected spin block size = %d", spin_bs);
         constexpr int spinBlockSize = 0;

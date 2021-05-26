@@ -211,7 +211,10 @@ namespace quda {
       array(array),
       parity(parity),
       dim(dim)
-    { apply(stream); }
+    {
+      strcat(aux, dim == 0 ? ",d=0" : dim == 1 ? ",d=1" : dim == 2 ? ",d=2" : ",d=3");
+      apply(stream);
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -234,7 +237,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
       printfQuda("\tTolerance: %le\n", tolerance);
-      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta"); 
+      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
       printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
       printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
       printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);

@@ -104,7 +104,7 @@ void packTest()
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
 
-    GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
+    GaugeFieldParam cpsParam(param, cpsCpuGauge_p);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
     cpsParam.reconstruct = param.reconstruct;
@@ -128,7 +128,7 @@ void packTest()
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
-    GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
+    GaugeFieldParam qdpParam(param, qdpCpuGauge_p);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
     qdpParam.reconstruct = param.reconstruct;

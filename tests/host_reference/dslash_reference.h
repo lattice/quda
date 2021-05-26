@@ -143,7 +143,7 @@ static inline Float *gaugeLink(int i, int dir, int oddBit, Float **gaugeEven, Fl
 
 template <typename Float>
 static inline Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorField, int neighbor_distance,
-                                    int site_size = 24)
+                                    int site_size = 2*4*N_COLORS)
 {
   int j;
   int nb = neighbor_distance;
@@ -308,7 +308,7 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 
 template <typename Float>
 static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-                                           Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+                                           Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 2*4*N_COLORS)
 {
   int j;
   int nb = neighbor_distance;

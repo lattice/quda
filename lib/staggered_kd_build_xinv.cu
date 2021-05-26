@@ -183,7 +183,7 @@ namespace quda {
   }
 
   //Does the heavy lifting of building X
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
     // FIXME remove when done
@@ -218,7 +218,7 @@ namespace quda {
 #else
   void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
   {
-    errorQuda("Staggered fermion support has not been built");
+    errorQuda("Staggered fermion multigrid support has not been built");
   }
 #endif
 
