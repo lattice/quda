@@ -39,6 +39,9 @@ Communicator::~Communicator() { comm_finalize(); }
 
 void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
+  for (int d = 0; d < ndim; d++) {
+    if (dims[d] > 1) errorQuda("Grid dimension grid[%d] = %d greater than 1", d, dims[d]);
+  }
   comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
 

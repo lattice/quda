@@ -98,7 +98,7 @@ void init(int argc, char **argv)
   constructHostGaugeField(links, gauge_param, argc, argv);
 
   // cpuLink is only used for ghost allocation
-  GaugeFieldParam cpuParam(links, gauge_param);
+  GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLink   = new cpuGaugeField(cpuParam);
   ghostLink = cpuLink->Ghost();

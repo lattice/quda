@@ -49,7 +49,6 @@ namespace quda
 
     int_fastdiv blocks_per_dir;
     int dim_map[4];
-    int active_dims;
 
     int_fastdiv swizzle;
     int sites_per_block;
@@ -91,6 +90,8 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
+      threadDimMapLower{ },
+      threadDimMapUpper{ },
       swizzle(swizzle),
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
@@ -114,8 +115,6 @@ namespace quda
       int d = 0;
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
-        threadDimMapLower[i] = 0;
-        threadDimMapUpper[i] = 0;
         if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
@@ -123,8 +122,7 @@ namespace quda
 
         dim_map[d++] = i;
       }
-      active_dims = d;
-      blocks_per_dir = grid / (2 * active_dims);
+      blocks_per_dir = grid / (2 * d);
     }
   };
 
@@ -153,10 +151,6 @@ namespace quda
     const int face_num = (ghost_idx >= face_size) ? 1 : 0;
     ghost_idx -= face_num * face_size;
 
-    // remove const to ensure we have non-const Ghost member
-    typedef typename std::remove_const<decltype(arg.in_pack)>::type T;
-    T &in = const_cast<T &>(arg.in_pack);
-
     if (face_num == 0) { // backwards
 
       int idx = indexFromFaceIndex<nDim, pc, dim, nFace, 0>(ghost_idx, parity, arg);
@@ -172,9 +166,9 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     } else { // forwards
 
@@ -191,9 +185,9 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     }
   }
@@ -214,18 +208,14 @@ namespace quda
     const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;
     ghost_idx -= face_num * nFace * arg.dc.ghostFaceCB[dim];
 
-    // remove const to ensure we have non-const Ghost member
-    typedef typename std::remove_const<decltype(arg.in_pack)>::type T;
-    T &in = const_cast<T &>(arg.in_pack);
-
     if (face_num == 0) { // backwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 0>(ghost_idx, parity, arg);
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     } else { // forwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 1>(ghost_idx, parity, arg);
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     }
   }
 

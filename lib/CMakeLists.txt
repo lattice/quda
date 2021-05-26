@@ -184,6 +184,10 @@ target_compile_options(
           -ftz=true
           -prec-div=false
           -prec-sqrt=false>
+          $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+          -Mflushz
+          -Mfpapprox=div
+          -Mfpapprox=sqrt>
           $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
           -fcuda-flush-denormals-to-zero
           -fcuda-approx-transcendentals
@@ -300,6 +304,10 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
                             $<$<CONFIG:HOSTDEBUG>:-lineinfo>
                             $<$<CONFIG:SANITIZE>:-lineinfo>
+                            >)
+
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVHPC>:
+                            -gpu=lineinfo
                             >)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:

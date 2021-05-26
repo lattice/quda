@@ -275,16 +275,18 @@ struct StaggeredDslashTestWrapper {
 #ifdef MULTI_GPU
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-    GaugeFieldParam cpuFatParam(milc_fatlink_cpu, gauge_param);
+    GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink_cpu);
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cpuFat = new cpuGaugeField(cpuFatParam);
     ghost_fatlink_cpu = cpuFat->Ghost();
 
-    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    GaugeFieldParam cpuLongParam(milc_longlink_cpu, gauge_param);
-    cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cpuLong = new cpuGaugeField(cpuLongParam);
-    ghost_longlink_cpu = cpuLong->Ghost();
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+      GaugeFieldParam cpuLongParam(gauge_param, milc_longlink_cpu);
+      cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      cpuLong = new cpuGaugeField(cpuLongParam);
+      ghost_longlink_cpu = cpuLong ? cpuLong->Ghost() : nullptr;
+    }
 #endif
 
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
@@ -523,8 +525,6 @@ struct StaggeredDslashTestWrapper {
 
     DslashTime dslash_time = dslashCUDA(niter);
     *spinorOut = *cudaSpinorOut;
-
-    staggeredDslashRef();
 
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
