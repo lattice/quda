@@ -929,7 +929,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.coeff = inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff;
   // We must also adjust inv_param->clover_coeff here for forward compatibility. If a user has set kappa
   // and Csw, we must populate inv_param->clover_coeff for them as the computeClover routines uses that value
-  inv_param->clover_coeff = 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff;
+  inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff;
   clover_param.twisted = twisted;
   clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
