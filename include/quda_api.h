@@ -30,9 +30,6 @@ namespace quda
     void *event;
   };
 
-  qudaError_t qudaLaunchKernel_(const char *file, const int line,
-				const char *func, const char *kern);
-
   /**
      @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol
@@ -40,7 +37,7 @@ namespace quda
      @param[in] args Arguments
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel_(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
 
   /**
      @brief Templated wrapper around qudaLaunchKernel which can accept
@@ -54,7 +51,7 @@ namespace quda
   qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
   {
     const void *args[] = {&arg...};
-    return qudaLaunchKernel_(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
+    return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
   }
 
   /**
