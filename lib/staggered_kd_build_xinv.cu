@@ -76,8 +76,8 @@ namespace quda {
   void calculateStaggeredKDBlock(xGauge &X, fineGauge &G, GaugeField &X_, const GaugeField &G_, double mass)
   {
     // sanity checks
-    if (fineColor != 3)
-      errorQuda("Input gauge field should have nColor=3, not nColor=%d\n", fineColor);
+    if (fineColor != N_COLORS)
+      errorQuda("Input gauge field should have nColor=%d, not nColor=%d\n", N_COLORS, fineColor);
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
@@ -164,8 +164,8 @@ namespace quda {
     constexpr int coarseSpin = 2;
     const int coarseColor = X.Ncolor() / coarseSpin;
 
-    if (coarseColor == 24) { // half the dof w/in a KD-block
-      calculateStaggeredKDBlock<Float,vFloat,fineColor,24,coarseSpin>(X, g, mass);
+    if (coarseColor == 8 * N_COLORS) { // half the dof w/in a KD-block
+      calculateStaggeredKDBlock<Float,vFloat,fineColor,8*N_COLORS,coarseSpin>(X, g, mass);
     } else {
       errorQuda("Unsupported number of Kahler-Dirac dof %d\n", X.Ncolor());
     }
@@ -175,8 +175,8 @@ namespace quda {
   template <typename Float, typename vFloat>
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-    if (g.Ncolor() == 3) {
-      calculateStaggeredKDBlock<Float,vFloat,3>(X, g, mass);
+    if (g.Ncolor() == N_COLORS) {
+      calculateStaggeredKDBlock<Float,vFloat,N_COLORS>(X, g, mass);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

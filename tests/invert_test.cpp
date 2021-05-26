@@ -216,7 +216,7 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-
+  
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];
@@ -268,9 +268,9 @@ int main(int argc, char **argv)
   std::vector<quda::ColorSpinorField *> out(Nsrc);
   std::vector<quda::ColorSpinorField *> out_multishift(multishift * Nsrc);
   quda::ColorSpinorParam cs_param;
-  quda::ColorSpinorField *check = quda::ColorSpinorField::Create(cs_param);
-  
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+  auto check = quda::ColorSpinorField::Create(cs_param);
+  
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
 
   // QUDA host array for internal checks and malloc

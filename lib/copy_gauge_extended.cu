@@ -194,7 +194,7 @@ namespace quda {
   void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		   FloatOut *Out, FloatIn *In) {
 
-    if (in.Ncolor() != 3 && out.Ncolor() != 3) {
+    if (in.Ncolor() != N_COLORS && out.Ncolor() != N_COLORS) {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
 
@@ -204,15 +204,15 @@ namespace quda {
 
     if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
       // we are doing gauge field packing
-      copyGaugeEx<FloatOut,FloatIn,18>(out, in, location, Out, In);
+      copyGaugeEx<FloatOut,FloatIn,2*N_COLORS*N_COLORS>(out, in, location, Out, In);
     } else {
       errorQuda("Not supported");
     }
   }
-
+  
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out, void *In) {
-
+    
     for (int d=0; d<in.Ndim(); d++) {
       if ( (out.X()[d] - in.X()[d]) % 2 != 0)
 	errorQuda("Cannot copy into an asymmetrically extended gauge field");

@@ -254,7 +254,7 @@ int main(int argc, char **argv)
 
   // Create ghost gauge fields in case of multi GPU builds.
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
+    QUDA_SUN_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;

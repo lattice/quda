@@ -11,6 +11,7 @@ namespace quda {
   struct CloverTraceArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
+    static constexpr int length = (4*4*nColor_*nColor_)/2;
     using C = typename clover_mapper<Float>::type;
     using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
     G output;
@@ -29,8 +30,10 @@ namespace quda {
   template <typename Arg>
   __device__ __host__ void cloverSigmaTraceCompute(const Arg &arg, const int x, int parity)
   {
-    using real = typename Arg::real;
-    real A[72];
+    using real = typename Arg::real;    
+    static constexpr int len = Arg::length;
+    static constexpr int Nc = Arg::nColor;
+    real A[len];
     if (parity==0) arg.clover1.load(A,x,parity);
     else arg.clover2.load(A,x,parity);
 
@@ -38,25 +41,25 @@ namespace quda {
     for (int mu=0; mu<4; mu++) {
       for (int nu=0; nu<mu; nu++) {
 
-        Matrix<complex<real>, Arg::nColor> mat;
+        Matrix<complex<real>, Nc> mat;
         setZero(&mat);
 
-        real diag[2][6];
+        real diag[2][2*Nc];
         complex<real> tri[2][15];
-        const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
+        const int idtab[15] = {0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
         complex<real> ctmp;
 
         for (int ch=0; ch<2; ++ch) {
           // factor of two is inherent to QUDA clover storage
-          for (int i=0; i<6; i++) diag[ch][i] = 2.0*A[ch*36+i];
-          for (int i=0; i<15; i++) tri[ch][idtab[i]] = complex<real>(2.0*A[ch*36+6+2*i], 2.0*A[ch*36+6+2*i+1]);
+          for (int i=0; i<2*Nc; i++) diag[ch][i] = 2.0*A[ch*len/2+i];
+          for (int i=0; i<15; i++) tri[ch][idtab[i]] = complex<real>(2.0*A[ch*len/2 + 2*Nc + 2*i], 2.0*A[ch*len/2 + 2*Nc + 2*i+1]);
         }
 
         // X, Y
         if (nu == 0) {
           if (mu == 1) {
-            for (int j=0; j<3; ++j) {
-              mat(j,j).y = diag[0][j+3] + diag[1][j+3] - diag[0][j] - diag[1][j];
+            for (int j=0; j<Nc; ++j) {
+              mat(j,j).y = diag[0][j+Nc] + diag[1][j+Nc] - diag[0][j] - diag[1][j];
             }
 
             // triangular part

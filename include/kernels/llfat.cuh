@@ -12,7 +12,7 @@ namespace quda {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Link;
-    typedef typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
+    typedef typename gauge_mapper<Float, recon, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_MILC>::type Gauge;
 
     Link link;
     Gauge u;
@@ -106,8 +106,8 @@ namespace quda {
   struct StapleArg : kernel_param<> {
     using Float = Float_;
     using Link = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
-    using Gauge = typename gauge_mapper<Float, recon, 18, QUDA_STAGGERED_PHASE_MILC>::type;
-    using MuLink = typename gauge_mapper<Float, recon_mu, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+    using Gauge = typename gauge_mapper<Float, recon, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_MILC>::type;
+    using MuLink = typename gauge_mapper<Float, recon_mu, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_MILC>::type;
     static constexpr int nColor = nColor_;
     static constexpr bool save_staple = save_staple_;
 

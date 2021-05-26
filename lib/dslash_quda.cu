@@ -257,7 +257,7 @@ namespace quda {
 
   //Apply the Gamma matrix to a colorspinor field
   //out(x) = gamma_d*in
-  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, int d)
+  void ApplyGamma(ColorSpinorField &out, const ColorSpinorField &in, const int d)
   {
     instantiate<GammaApply>(out, in, d, 0);
   }

@@ -72,7 +72,9 @@ const char *get_recon_str(QudaReconstructType recon)
   switch (recon) {
   case QUDA_RECONSTRUCT_13: ret = "13"; break;
   case QUDA_RECONSTRUCT_12: ret = "12"; break;
+#if (N_COLORS > 2)
   case QUDA_RECONSTRUCT_9: ret = "9"; break;
+#endif
   case QUDA_RECONSTRUCT_8: ret = "8"; break;
   case QUDA_RECONSTRUCT_NO: ret = "18"; break;
   default: ret = "unknown"; break;

@@ -59,7 +59,7 @@ namespace quda {
     long long bytes() const {
       uint64_t sites = 0;
       for (int d=0; d<nDim; d++) sites += 2 * u.SurfaceCB(d) * u.Nface();
-      return sites * 2 * (u.Ncolor() == 3 ? u.Reconstruct() : 2 * u.Ncolor() * u.Ncolor()) * u.Precision();
+      return sites * 2 * (u.Ncolor() == N_COLORS ? u.Reconstruct() : 2 * u.Ncolor() * u.Ncolor()) * u.Precision();
     }
   };
 

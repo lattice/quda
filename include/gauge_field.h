@@ -84,7 +84,7 @@ namespace quda {
     GaugeFieldParam(void *const h_gauge = NULL) :
       LatticeFieldParam(),
       location(QUDA_INVALID_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
       order(QUDA_INVALID_GAUGE_ORDER),
@@ -111,7 +111,7 @@ namespace quda {
                     const QudaFieldGeometry geometry, const QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
       LatticeFieldParam(4, x, pad, precision, ghostExchange),
       location(QUDA_INVALID_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER),
@@ -135,7 +135,7 @@ namespace quda {
     GaugeFieldParam(const QudaGaugeParam &param, void *h_gauge = nullptr, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
       location(QUDA_CPU_FIELD_LOCATION),
-      nColor(3),
+      nColor(N_COLORS),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
       order(param.gauge_order),
@@ -155,7 +155,7 @@ namespace quda {
       site_size(param.site_size)
     {
       switch (link_type) {
-      case QUDA_SU3_LINKS:
+      case QUDA_SUN_LINKS:
       case QUDA_GENERAL_LINKS:
       case QUDA_SMEARED_LINKS:
       case QUDA_MOMENTUM_LINKS: nFace = 1; break;

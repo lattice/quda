@@ -16,8 +16,8 @@ namespace quda {
     static constexpr int dim = dim_;
     static constexpr int spin_project = true;
     using F = typename colorspinor_mapper<Float, nSpin, nColor, spin_project>::type;
-    using Gauge = typename gauge_mapper<Float, recon, 18>::type;
-    using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
+    using Gauge = typename gauge_mapper<Float, recon, 2*N_COLORS*N_COLORS>::type;
+    using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2*N_COLORS*N_COLORS>::type;
 
     Force force;
     const F inA;

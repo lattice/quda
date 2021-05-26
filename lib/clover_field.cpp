@@ -36,16 +36,16 @@ namespace quda {
   }
 
   CloverField::CloverField(const CloverFieldParam &param) :
-    LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff),
-    rho(param.rho), order(param.order), create(param.create), trlog{0, 0}
+    LatticeField(param), bytes(0), norm_bytes(0), nColor(N_COLORS), nSpin(4), 
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
+    order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
 
-    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (72 reals)
+    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (Nc=2->32 reals : Nc=3->72 reals : Nc=4->128 reals)
     length = 2 * ((size_t)stride) * nColor * nColor * nSpin * nSpin / 2;
 
     bytes = length * precision;
@@ -54,7 +54,7 @@ namespace quda {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
       if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
-//for twisted mass only:
+    //for twisted mass only:
     twisted = false;//param.twisted;
     mu2 = 0.0; //param.mu2;
 
@@ -521,8 +521,12 @@ namespace quda {
       errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
 
     ColorSpinorParam spinor_param;
-    // 72 = 9 * 4 * 2
-    spinor_param.nColor = 9;
+    // length = N_COLORS*N_COLORS * 4 * 2
+    // SU(2) : 32
+    // SU(3) : 72
+    // SU(4) : 128
+    // SU(5) : 200   
+    spinor_param.nColor = N_COLORS*N_COLORS;
     spinor_param.nSpin = 4;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];

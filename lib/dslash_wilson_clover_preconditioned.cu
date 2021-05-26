@@ -76,7 +76,7 @@ namespace quda
 
     long long bytes() const
     {
-      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
+      int clover_bytes = N_COLORS * N_COLORS * 4 * 2 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
 
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {

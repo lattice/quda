@@ -11,9 +11,9 @@ namespace quda {
   struct CloverArg : kernel_param<> {
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
-    static constexpr int nColor = 3;
+    static constexpr int nColor = N_COLORS;
     static constexpr int nSpin = 4;
-
+    
     using Clover = typename clover_mapper<store_t>::type;
     using Fmunu = typename gauge_mapper<store_t, QUDA_RECONSTRUCT_NO>::type;
 
@@ -78,10 +78,13 @@ namespace quda {
       Complex I(0.0,1.0);
       Complex coeff(0.0, arg.coeff);
       Link block1[2], block2[2];
-      block1[0] = coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops
-      block1[1] = coeff*(F[0]+F[5]); // 72 floating-point ops
-      block2[0] = arg.coeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
-      block2[1] = arg.coeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
+      // diagonal blocks
+      block1[0] = coeff*(F[0] - F[5]); // (2*Nc*Nc+6*Nc*Nc=) 72 Nc=3 floating-point ops
+      block1[1] = coeff*(F[0] + F[5]); // 72 floating-point ops
+
+      // off-diagonal blocks
+      block2[0] = arg.coeff*(F[1] + F[4] - I*(F[2] - F[3])); // 126 floating-point ops
+      block2[1] = arg.coeff*(F[1] - F[4] - I*(F[2] + F[3])); // 126 floating-point ops
 
       // This uses lots of unnecessary memory
 #pragma unroll
@@ -91,36 +94,37 @@ namespace quda {
         // Compute real diagonal elements
 #pragma unroll
         for (int i=0; i<N/2; ++i) {
-          A(i+0,i+0) = 1.0 - block1[ch](i,i).real();
-          A(i+3,i+3) = 1.0 + block1[ch](i,i).real();
+          A(i,i)                    = 1.0 - block1[ch](i,i).real();
+          A(i+N_COLORS, i+N_COLORS) = 1.0 + block1[ch](i,i).real();
         }
+	
+        // Compute off diagonal components, populating the A matrix
+	// row by row
 
-        // Compute off diagonal components
-        // First row
-        A(1,0) = -block1[ch](1,0);
-        // Second row
-        A(2,0) = -block1[ch](2,0);
-        A(2,1) = -block1[ch](2,1);
-        // Third row
-        A(3,0) =  block2[ch](0,0);
-        A(3,1) =  block2[ch](0,1);
-        A(3,2) =  block2[ch](0,2);
-        // Fourth row
-        A(4,0) =  block2[ch](1,0);
-        A(4,1) =  block2[ch](1,1);
-        A(4,2) =  block2[ch](1,2);
-        A(4,3) =  block1[ch](1,0);
-        // Fifth row
-        A(5,0) =  block2[ch](2,0);
-        A(5,1) =  block2[ch](2,1);
-        A(5,2) =  block2[ch](2,2);
-        A(5,3) =  block1[ch](2,0);
-        A(5,4) =  block1[ch](2,1);
+	// First nColor rows
+#pragma unroll
+	for(int c=1; c<Arg::nColor; c++) {
+	  for(int d=0; d<c; d++) {
+	    A(c,d) = - block1[ch](c,d);
+	  }
+	}
+	
+	// Second nColor rows
+#pragma unroll
+	for(int c=Arg::nColor; c<2*Arg::nColor; c++) {
+	  for(int d=0; d<Arg::nColor; d++) {
+	    A(c,d) = block2[ch](c - Arg::nColor,d);	      
+	  }
+	  for(int d=Arg::nColor; d<c; d++) {
+	    A(c,d) = block1[ch](c - Arg::nColor,d - Arg::nColor);
+	  }
+	}
+	
         A *= static_cast<real>(0.5);
-
+	
         arg.clover(x_cb, parity, ch) = A;
       } // ch
-      // 84 floating-point ops
+      // DMH FIXME 84 floating-point ops
     }
   };
 

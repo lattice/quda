@@ -115,9 +115,9 @@ namespace quda {
 
 #ifdef NSPIN4
     const int coarseSpin = 2;
-    const int coarseColor = Y.Ncolor() / coarseSpin;
-    if (coarseColor == 6) { // free field Wilson
-      calculateY<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    const int coarseColor = Y.Ncolor() / coarseSpin;    
+    if (coarseColor == 2*N_COLORS) { // free field Wilson
+      calculateY<Float,vFloat,fineColor,fineSpin,2*N_COLORS,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 24) {
       calculateY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
@@ -148,8 +148,8 @@ namespace quda {
                   ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c,
                   double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (g.Ncolor() == 3) {
-      calculateY<Float,vFloat,3>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
+    if (g.Ncolor() == N_COLORS) {
+      calculateY<Float,vFloat,N_COLORS>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mass, mu, mu_factor, dirac, matpc);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

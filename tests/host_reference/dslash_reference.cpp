@@ -264,7 +264,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
         if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
           ax(0.5 / inv_param.kappa, spinorCheck, 2 * V * spinor_site_size, inv_param.cpu_prec);
-          // CAREFULL
+          // CAREFUL
         } else {
           ax(0.5 / inv_param.kappa, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
         }

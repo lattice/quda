@@ -10,7 +10,8 @@ namespace quda {
   struct GaugePhaseArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    // DMH TESTME
+    //static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr QudaStaggeredPhase phase = phase_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;

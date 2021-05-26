@@ -11,7 +11,8 @@ namespace quda {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr int N = N_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    // DMH TESTME
+    static_assert(nColor == N_COLORS, "UpdateGaugeArg instantiated incorrectly");
     static constexpr bool conj_mom = conj_mom_;
     static constexpr bool exact = exact_;
     typedef typename gauge_mapper<Float,recon_u>::type Gauge;
@@ -58,7 +59,7 @@ namespace quda {
         }
       } else {
         mom = arg.dt * mom;
-        expsu3<real>(mom);
+        expsuN<real>(mom);
 
         if (!arg.conj_mom) {
           link = mom * link;
