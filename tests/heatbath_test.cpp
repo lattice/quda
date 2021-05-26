@@ -100,8 +100,7 @@ int main(int argc, char **argv)
 
   {
     using namespace quda;
-    GaugeFieldParam gParam(0, gauge_param);
-    gParam.pad = 0;
+    GaugeFieldParam gParam(gauge_param);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;

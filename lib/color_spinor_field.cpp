@@ -45,7 +45,7 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
-    if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
+    if (ghost_precision_allocated == ghost_precision) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;

@@ -70,7 +70,7 @@ static void hisq_force_init()
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  GaugeFieldParam gParam(0, gaugeParam);
+  GaugeFieldParam gParam(gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
