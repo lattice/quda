@@ -760,24 +760,6 @@ namespace quda {
 	  diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];	  
 	}
 	
-	// Compute the off diagonal positions of the clover matric
-	constexpr int* idtab_array() const {
-	  int idtab[2*N_COLORS*N_COLORS-N_COLORS];
-	  int idx = 0;
-	  const int L = 2*Nc-1;
-	  for(int col = 0; col<L; col++) {
-	    int id = col*(col+3)/2;
-	    idtab[idx] = id;
-	    idx++;
-	    for(int i=col+1; i<L; i++) {
-	      id += i;
-	      idtab[idx] = id;
-	      idx++;
-	    }
-	  }
-	  return idtab;
-	}
-	
 	bool  Twisted()	const	{return twisted;}
 	Float Mu2()	const	{return mu2;}
 	
@@ -788,12 +770,25 @@ namespace quda {
 	    for (int i=0; i<2*Nc; i++) {
 	      v[chirality*(length/2) + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
+
+	    int idtab[2*N_COLORS*N_COLORS-N_COLORS];
+	    int idx = 0;
+	    const int L = 2*Nc-1;
+	    for(int col = 0; col<L; col++) {
+	      int id = col*(col+3)/2;
+	      idtab[idx] = id;
+	      idx++;
+	      for(int i=col+1; i<L; i++) {
+		id += i;
+		idtab[idx] = id;
+		idx++;
+	      }
+	    }
 	    
 	    // the off diagonal elements
 	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      int *idtab = idtab_array();
 	      v[chirality*(length/2) + 2*Nc + i] = 0.5*offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
 	    }	    
 	  }
@@ -805,12 +800,25 @@ namespace quda {
 	    for (int i=0; i<2*Nc; i++) {
 	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + i];
 	    }
+
+	    int idtab[2*N_COLORS*N_COLORS-N_COLORS];
+	    int idx = 0;
+	    const int L = 2*Nc-1;
+	    for(int col = 0; col<L; col++) {
+	      int id = col*(col+3)/2;
+	      idtab[idx] = id;
+	      idx++;
+	      for(int i=col+1; i<L; i++) {
+		id += i;
+		idtab[idx] = id;
+		idx++;
+	      }
+	    }
 	    
 	    // the off diagonal elements
 	    for (int i=0; i<(length/2) - 2*Nc; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      int *idtab = idtab_array();
 	      offdiag[(((z*(2*Nc*Nc-Nc) + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*(length/2) + 2*Nc + i];
 	    }
 	  }
@@ -818,7 +826,7 @@ namespace quda {
 	
 	size_t Bytes() const { return length*sizeof(Float); }
       };
-      
+    
 
     /**
        BQCD ordering for clover fields
