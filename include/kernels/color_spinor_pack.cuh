@@ -169,8 +169,8 @@ namespace quda {
       for (int color_local=0; color_local<Mc; color_local++) {
         int c = color_block + color_local;
         complex<real> z = arg.field(spinor_parity, x_cb, s, c);
-        thread_max_r = std::max(thread_max_r, fabs(z.real()));
-        thread_max_i = std::max(thread_max_i, fabs(z.imag()));
+        thread_max_r = std::max(thread_max_r, std::abs(z.real()));
+        thread_max_i = std::max(thread_max_i, std::abs(z.imag()));
       }
     }
 
