@@ -353,7 +353,8 @@ int main(int argc, char **argv)
   //! Gauge parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
-
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  
   //! Set lattice dimensions
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
