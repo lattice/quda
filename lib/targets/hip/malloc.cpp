@@ -492,7 +492,12 @@ namespace quda
   {
      hipPointerAttribute_t attr;
      hipError_t error = hipPointerGetAttributes(&attr, ptr);
-     if( error != hipSuccess ) {
+
+     // hipReturnInvalidValue is not an error here it means that 
+     // hipPointerGetAttrributes was passed a pointer not knwon to hip
+     // This is therefore assumed to be a host pointer, and attr is
+     // appropriately filled out
+     if( error != hipSuccess && error != hipErrorInvalidValue ) {
        errorQuda("hipPointerGetAttributes returned error: %s\n", hipGetErrorString(error));
      }
  
