@@ -355,6 +355,14 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
+  }
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -392,13 +400,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.dslash_type = dslash_type;
 
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
-  }
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -717,6 +718,14 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+
 }
 
 // Parameters defining the eigensolver
