@@ -29,6 +29,7 @@ int main(int argc, char **argv)
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
   initQuda(device_ordinal);

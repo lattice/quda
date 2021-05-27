@@ -106,6 +106,7 @@ int main(int argc, char **argv)
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);

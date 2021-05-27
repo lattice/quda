@@ -689,7 +689,7 @@ namespace quda {
        correct point for each direction/dimension.
        @return Pointer to remote memory buffer
      */
-    void *remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
+    void *remoteFace_r() const;
 
     virtual void gather(int, int, int, const qudaStream_t &) { errorQuda("Not implemented"); }
 

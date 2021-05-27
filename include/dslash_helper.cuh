@@ -5,6 +5,8 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
+#include <fast_intdiv.h>
+#include <dslash_quda.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
