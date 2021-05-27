@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <quda_api.h>
 #include <quda_cuda_api.h>
+#include <target_device.h>
 
 #ifdef HOST_DEBUG
 
@@ -73,9 +74,11 @@ namespace quda {
   qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
                             const std::vector<std::string> &template_args,
                             const TuneParam &tp, const qudaStream_t &stream,
-                            const std::vector<constant_param_t> &param,
-                            std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types)
+                            std::vector<void*> &arg_ptrs, jitify::detail::vector<std::string> &arg_types,
+                            std::vector<size_t> &arg_sizes)
   {
+    if (arg_ptrs.size() > 1) errorQuda("Unsupported number of kernel arguments = %lu", arg_ptrs.size());
+
     std::string kernel_file(std::string("kernels/") + file);
     create_jitify_program_v2(kernel_file);
 
@@ -89,9 +92,11 @@ namespace quda {
                                   device::max_dynamic_shared_memory() - shared_size);
     }
 
-    for (unsigned int i=0; i < param.size(); i++) {
-      auto device_ptr = instance.get_constant_ptr(param[i].device_name);
-      qudaMemcpyAsync((void*)device_ptr, param[i].host, param[i].bytes, qudaMemcpyHostToDevice, stream);
+    for (size_t i = 0; i < arg_ptrs.size(); i++) {
+      if (arg_ptrs.size() > device::max_constant_size()) {
+        auto device_ptr = instance.get_constant_ptr("quda::device::buffer");
+        qudaMemcpyAsync((void*)device_ptr, arg_ptrs[i], arg_sizes[i], qudaMemcpyHostToDevice, stream);
+      }
     }
 
     auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream));

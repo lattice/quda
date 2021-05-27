@@ -257,6 +257,8 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
+    createGhostZone(nFace, false);
+
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 

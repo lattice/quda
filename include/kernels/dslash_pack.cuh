@@ -49,7 +49,6 @@ namespace quda
 
     int_fastdiv blocks_per_dir;
     int dim_map[4];
-    int active_dims;
 
     int_fastdiv swizzle;
     int sites_per_block;
@@ -91,6 +90,8 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
+      threadDimMapLower{ },
+      threadDimMapUpper{ },
       swizzle(swizzle),
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
@@ -114,8 +115,6 @@ namespace quda
       int d = 0;
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
-        threadDimMapLower[i] = 0;
-        threadDimMapUpper[i] = 0;
         if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
@@ -123,8 +122,7 @@ namespace quda
 
         dim_map[d++] = i;
       }
-      active_dims = d;
-      blocks_per_dir = grid / (2 * active_dims);
+      blocks_per_dir = grid / (2 * d);
     }
   };
 

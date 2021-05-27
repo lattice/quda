@@ -525,6 +525,11 @@ namespace quda {
     return ghost_remote_send_buffer_d[bufferIndex][dim][dir];
   }
 
+  void* LatticeField::remoteFace_r() const
+  {
+    return ghost_recv_buffer_d[bufferIndex];
+  }
+
   void LatticeField::setTuningString() {
     char vol_tmp[TuneKey::volume_n];
     int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);

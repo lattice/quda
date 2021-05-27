@@ -89,8 +89,7 @@ static int unitarize_link_test(int &test_rc)
 
   qudaGaugeParam.llfat_ga_pad = qudaGaugeParam.site_ga_pad = qudaGaugeParam.ga_pad = qudaGaugeParam.staple_pad = 0;
 
-  GaugeFieldParam gParam(0, qudaGaugeParam);
-  gParam.pad = 0;
+  GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = gauge_order;

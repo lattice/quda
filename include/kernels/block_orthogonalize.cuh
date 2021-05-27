@@ -1,5 +1,4 @@
 #include <multigrid_helper.cuh>
-#include <fast_intdiv.h>
 
 // this removes ghost accessor reducing the parameter space needed
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
@@ -7,6 +6,7 @@
 #include <color_spinor_field_order.h>
 #include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduction_kernel.h>
+#include <fast_intdiv.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE
