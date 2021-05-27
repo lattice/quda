@@ -8,9 +8,6 @@
 
 namespace quda {
 
-  // this is the maximum number of colors for which we support block-float format
-  constexpr int max_block_float_nc = 96;
-
   // these helper functions return the thread coarseness, with both
   // constexpr variants (to be called from parallel regions) and
   // run-time variants (to be called from host serial code)
