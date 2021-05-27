@@ -56,7 +56,8 @@ namespace quda {
   qudaError_t launch_jitify(const std::string &file, const std::string &kernel,
                             const std::vector<std::string> &template_args,
                             const TuneParam &tp, const qudaStream_t &stream,
-                            std::vector<void*> arg_ptrs, jitify::detail::vector<std::string> arg_types);
+                            std::vector<void*> &arg_ptrs, jitify::detail::vector<std::string> &arg_types,
+                            std::vector<size_t> &arg_sizes);
 
   template <template <typename> class Functor, bool grid_stride, typename Arg, bool template_block_size = false>
   qudaError_t launch_jitify(const std::string &kernel, const TuneParam &tp, const qudaStream_t &stream,
@@ -73,10 +74,10 @@ namespace quda {
 
     std::vector<void*> arg_ptrs{(void*)&arg};
     jitify::detail::vector<std::string> arg_types{Arg_reflect};
+    std::vector<size_t> arg_sizes{sizeof(arg)};
 
     return launch_jitify(Functor<Arg>::filename(), kernel, template_args,
-                         //{reflect((int)tp.block.x), reflect((int)tp.block.y), Functor_naked, Arg_reflect, reflect(grid_stride)},
-                         tp, stream, arg_ptrs, arg_types);
+                         tp, stream, arg_ptrs, arg_types, arg_sizes);
   }
 
   // FIXME merge the functionality of these launchers
@@ -92,10 +93,11 @@ namespace quda {
 
     std::vector<void*> arg_ptrs{(void*)&arg};
     jitify::detail::vector<std::string> arg_types{Arg_reflect};
+    std::vector<size_t> arg_sizes{sizeof(arg)};
 
     return launch_jitify(Functor<1, Arg>::filename(), kernel,
                          {reflect((int)tp.block.x), Functor_naked, Arg_reflect},
-                         tp, stream, arg_ptrs, arg_types);
+                         tp, stream, arg_ptrs, arg_types, arg_sizes);
   }
 
 #endif
