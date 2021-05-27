@@ -51,17 +51,25 @@ namespace quda {
     
     if (program_map.find(file) == program_map.end()) {
 
-      std::vector<std::string> options = {"-ftz=true", "-prec-div=false", "-prec-sqrt=false", "-remove-unused-globals"};
-
-#ifdef DEVICE_DEBUG
-      options.push_back(std::string("-G"));
-#endif
+      std::vector<std::string> options = {
+        "-ftz=true", "-prec-div=false", "-prec-sqrt=false", // match offline optimization options
+        "-remove-unused-globals",                           // remove unused globals to monimize module size
+        "-err-no",                                          // display error/warning numbers
 
 #if __cplusplus >= 201703L
-      options.push_back(std::string("-std=c++17"));
+        "-std=c++17",                                       // use C++17 dialect
 #else
-      options.push_back(std::string("-std=c++14"));
+        "-std=c++14",                                       // use C++14 dialect
 #endif
+
+#ifdef DEVICE_DEBUG
+        "-G",
+#endif
+
+        // disable warnings that are unavoidable
+        "-diag-suppress=64",                                 // declaration does not declare anything (anonymous structs in CUB)
+        "-diag-suppress=161"                                 // unknown pragmas, e.g., OpenMP
+      };
 
       // add an extra compilation options specific to this instance
       for (auto option : extra_options) options.push_back(option);
