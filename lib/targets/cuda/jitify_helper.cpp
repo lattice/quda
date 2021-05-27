@@ -75,7 +75,7 @@ namespace quda {
                             const std::vector<std::string> &template_args,
                             const TuneParam &tp, const qudaStream_t &stream,
                             std::vector<void*> &arg_ptrs, jitify::detail::vector<std::string> &arg_types,
-                            std::vector<size_t> &arg_sizes)
+                            std::vector<size_t> &arg_sizes, bool use_kernel_arg)
   {
     if (arg_ptrs.size() > 1) errorQuda("Unsupported number of kernel arguments = %lu", arg_ptrs.size());
 
@@ -93,7 +93,7 @@ namespace quda {
     }
 
     for (size_t i = 0; i < arg_ptrs.size(); i++) {
-      if (arg_ptrs.size() > device::max_constant_size()) {
+      if (!use_kernel_arg) {
         auto device_ptr = instance.get_constant_ptr("quda::device::buffer");
         qudaMemcpyAsync((void*)device_ptr, arg_ptrs[i], arg_sizes[i], qudaMemcpyHostToDevice, stream);
       }
