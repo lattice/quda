@@ -460,7 +460,7 @@ message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 
 # CUDA Wrapper for finding libs etc
-  find_package(CUDAToolkit)
+find_package(CUDAToolkit REQUIRED)
 
 
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
@@ -482,7 +482,7 @@ if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
 endif()
 
 if(QUDA_OPENMP)
-  find_package(OpenMP)
+  find_package(OpenMP REQUIRED)
 endif()
 
 #####################################################################
@@ -550,7 +550,7 @@ if(QUDA_MPI OR QUDA_QMP)
       "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
     )
   endif()
-  find_package(MPI)
+  find_package(MPI REQUIRED)
 endif()
 
 ####################################
@@ -623,7 +623,10 @@ if(QUDA_QMP)
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
       GIT_TAG fa386db
-      OPTIONS "QMP_MPI ON" 
+      OPTIONS
+      "QMP_MPI ON"
+      "QMP_TESTING" "OFF"
+      "QMP_BUILD_DOCS" "OFF"
     )
   endif()
 endif()

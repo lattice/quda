@@ -18,7 +18,7 @@ if( QUDA_QMP )
 endif()
 
 if( QUDA_MPI )
-  find_dependency(MPI)
+  find_dependency(MPI REQUIRED)
 endif()
 
 if( QUDA_QIO )
@@ -30,7 +30,7 @@ if( QUDA_OPENMP )
 endif()
 
 if( QUDA_MAGMA )
-  find_dependency(MAGMA)
+  find_dependency(MAGMA REQUIRED)
 endif()
 
 enable_language(CUDA)

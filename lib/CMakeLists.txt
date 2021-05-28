@@ -619,6 +619,8 @@ add_custom_command(
 
 set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
 
+add_library( QUDA::quda ALIAS quda )
+
 install(
   TARGETS quda
   EXPORT QUDATargets
