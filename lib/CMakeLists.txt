@@ -168,6 +168,11 @@ else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
 endif()
 
+include(CheckLinkerFlag)
+check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
+target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+
+add_library(QUDA::quda ALIAS quda)
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 # version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
@@ -591,12 +596,6 @@ if(QUDA_NVML)
   target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
 endif()
 
-# # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
-# if(QUDA_DOWNLOAD_EIGEN)
-#   add_dependencies(quda_cpp Eigen)
-#   add_dependencies(quda Eigen)
-# endif()
-
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
@@ -618,8 +617,6 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
 set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
-
-add_library( QUDA::quda ALIAS quda )
 
 install(
   TARGETS quda
@@ -649,8 +646,6 @@ write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
-
-
 
 add_custom_target(
   mpi_nvtx
