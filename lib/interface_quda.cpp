@@ -2181,9 +2181,11 @@ void checkClover(QudaInvertParam *param) {
 
   if ( (!cloverSloppy || param->cuda_prec_sloppy != cloverSloppy->Precision()) ||
        (!cloverPrecondition || param->cuda_prec_precondition != cloverPrecondition->Precision()) ||
-       (!cloverRefinement || param->cuda_prec_refinement_sloppy != cloverRefinement->Precision()) ) {
+       (!cloverRefinement || param->cuda_prec_refinement_sloppy != cloverRefinement->Precision()) ||
+       (!cloverEigensolver || param->cuda_prec_eigensolver != cloverEigensolver->Precision()) ) {
     freeSloppyCloverQuda();
-    QudaPrecision prec[] = {param->cuda_prec_sloppy, param->cuda_prec_precondition, param->cuda_prec_refinement_sloppy};
+    QudaPrecision prec[4] = {param->cuda_prec_sloppy, param->cuda_prec_precondition, 
+      param->cuda_prec_refinement_sloppy, param->cuda_prec_eigensolver};
     loadSloppyCloverQuda(prec);
   }
 
@@ -2191,6 +2193,7 @@ void checkClover(QudaInvertParam *param) {
   if (cloverSloppy == nullptr) errorQuda("Sloppy clover field doesn't exist");
   if (cloverPrecondition == nullptr) errorQuda("Precondition clover field doesn't exist");
   if (cloverRefinement == nullptr) errorQuda("Refinement clover field doesn't exist");
+  if (cloverEigensolver == nullptr) errorQuda("Eigensolver clover field doesn't exist");
 }
 
 quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
