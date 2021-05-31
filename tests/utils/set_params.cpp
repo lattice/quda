@@ -39,7 +39,7 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = fermion_t_boundary;
-
+  
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
   gauge_param.cuda_prec_eigensolver = cuda_prec_eigensolver;

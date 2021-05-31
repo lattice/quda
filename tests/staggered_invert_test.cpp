@@ -259,12 +259,12 @@ int main(int argc, char **argv)
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
-  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
+  GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
+  GaugeFieldParam cpuLongParam(gauge_param, milc_longlink);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
 

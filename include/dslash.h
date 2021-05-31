@@ -355,8 +355,10 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+#ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
       strcat(aux_barrier, ",shmem");
+#endif
     }
 
 #ifdef NVSHMEM_COMMS

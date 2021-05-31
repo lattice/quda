@@ -254,7 +254,7 @@ option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20%
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    14
+    17
     CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 

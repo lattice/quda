@@ -769,7 +769,13 @@ namespace quda
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
-    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
+    double tol;
+    switch (prec) {
+    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+    case QUDA_HALF_PRECISION:    tol = 1e-2; break;
+    case QUDA_SINGLE_PRECISION:  tol = 1e-3; break;
+    default: tol = 1e-8;
+    }
 
     // No need to check (projector) v_k for staggered case
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {

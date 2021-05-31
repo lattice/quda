@@ -619,8 +619,8 @@ namespace quda {
     qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
   }
 
-  void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
-
+  void cudaColorSpinorField::createComms(int nFace, bool spin_project)
+  {
     allocateGhostBuffer(nFace,spin_project); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs its comms buffers to be updated
