@@ -53,23 +53,29 @@ namespace quda {
   }
 
   template <int block_size, template <int, typename> class Transformer, typename Arg>
-  qudaError_t launchBlockKernel2D(const TuneParam &tp, const qudaStream_t &stream, Arg arg)
+  qudaError_t launchBlockKernel2D(const TuneParam &tp, const qudaStream_t &stream,
+				  const Arg &arg)
   {
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
+      tp.grid.z*tp.block.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
-    warningQuda("launchBlockKernel2D");
-    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
-    warningQuda("%s", str(arg.threads).c_str());
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      warningQuda("launchBlockKernel2D");
+      warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
+      warningQuda("%s", str(arg.threads).c_str());
+    }
     q.submit([&](sycl::handler& h) {
-	       h.parallel_for<class BlockKernel2D>
-		 (ndRange,
-		  [=](sycl::nd_item<3> ndi) {
-		    quda::BlockKernel2D<block_size, Transformer, Arg>(arg, ndi);
-		  });
-	     });
-    warningQuda("end launchBlockKernel2D");
+      h.parallel_for<class BlockKernel2D>
+	(ndRange,
+	 [=](sycl::nd_item<3> ndi) {
+	   quda::BlockKernel2D<block_size, Transformer, Arg>(arg, ndi);
+	 });
+    });
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      warningQuda("end launchBlockKernel2D");
+    }
     return QUDA_SUCCESS;
   }
 

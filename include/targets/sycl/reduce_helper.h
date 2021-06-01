@@ -193,7 +193,7 @@ namespace quda
 
   };
 
-#if 0 ///// TEST
+#if 1 ///// TEST
 
 #ifdef HETEROGENEOUS_ATOMIC
     /**

@@ -109,10 +109,9 @@ namespace quda {
   }
 
 
-#if 0
   template <int block_size_x, int block_size_y, template <typename> class Transformer,
 	    typename Arg, bool grid_stride = true>
-  void MultiReduction(const Arg &arg, sycl::nd_item<3> ndi)
+  void MultiReduction(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(const_cast<Arg&>(arg));
@@ -137,7 +136,6 @@ namespace quda {
     // perform final inter-block reduction and write out result
     reduce<block_size_x, block_size_y>(arg, t, value, j);
   }
-#endif
   template <int block_size_x, int block_size_y,
 	    template <typename> class Transformer,
 	    typename Arg, typename S, bool grid_stride = true>
@@ -162,7 +160,8 @@ namespace quda {
   qudaError_t launchMultiReduction(const TuneParam &tp,
 				   const qudaStream_t &stream, const Arg &arg)
   {
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
+    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y,
+      tp.grid.z*tp.block.z};
     sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
@@ -172,14 +171,14 @@ namespace quda {
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
     }
-#if 0
+#if 1
     q.submit([&](sycl::handler& h) {
-	       h.parallel_for<class MultiReduction>
-		 (ndRange,
-		  [=](sycl::nd_item<3> ndi) {
-		    MultiReduction<block_size_x, block_size_y, Transformer, Arg, grid_stride>(arg, ndi);
-		  });
-	     });
+      h.parallel_for<class MultiReductionx>
+	(ndRange,
+	 [=](sycl::nd_item<3> ndi) {
+	   MultiReduction<block_size_x,block_size_y,Transformer,Arg,grid_stride>(arg,ndi);
+	 });
+    });
 #else
     if(arg.threads.y==1) {
       using reduce_t = typename Transformer<Arg>::reduce_t;

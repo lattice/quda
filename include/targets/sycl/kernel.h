@@ -48,8 +48,11 @@ namespace quda {
       h.parallel_for<class Kernel1D>
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
+#ifdef QUDA_THREADS_BLOCKED
+	   quda::Kernel1Db<Functor, Arg, grid_stride>(arg, ndi);
+#else
 	   quda::Kernel1D<Functor, Arg, grid_stride>(arg, ndi);
-	   //quda::Kernel1Db<Functor, Arg, grid_stride>(arg, ndi);
+#endif
 	 });
     });
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -103,8 +106,11 @@ namespace quda {
       h.parallel_for<class Kernel2D>
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
+#ifdef QUDA_THREADS_BLOCKED
+	   quda::Kernel2Db<Functor, Arg, grid_stride>(arg, ndi);
+#else
 	   quda::Kernel2D<Functor, Arg, grid_stride>(arg, ndi);
-	   //quda::Kernel2Db<Functor, Arg, grid_stride>(arg, ndi);
+#endif
 	 });
     });
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -128,6 +134,24 @@ namespace quda {
       if (grid_stride) i += ndi.get_global_range(0); else break;
     }
   }
+  template <template <typename> class Functor, typename Arg, bool grid_stride>
+  void Kernel3Db(const Arg &arg, sycl::nd_item<3> &ndi)
+  {
+    Functor<Arg> f(arg);
+
+    auto j = ndi.get_global_id(1);
+    if (j >= arg.threads.y) return;
+    auto k = ndi.get_global_id(2);
+    if (k >= arg.threads.z) return;
+    auto tid = ndi.get_global_id(0);
+    auto nid = ndi.get_global_range(0);
+    auto n = arg.threads.x;
+    auto i0 = (tid*n)/nid;
+    auto i1 = ((tid+1)*n)/nid;
+    for(auto i=i0; i<i1; i++) {
+      f(i, j, k);
+    }
+  }
 
   template <template <typename> class Functor, typename Arg,
 	    bool grid_stride = false>
@@ -149,7 +173,11 @@ namespace quda {
       h.parallel_for<class Kernel3D>
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
+#ifdef QUDA_THREADS_BLOCKED
+	   quda::Kernel3Db<Functor, Arg, grid_stride>(arg, ndi);
+#else
 	   quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi);
+#endif
 	 });
     });
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -175,61 +203,36 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
     }
     //warningQuda("allocating kernel args");
-    auto p = device_malloc(sizeof(arg));
-    q.memcpy(p, &arg, sizeof(arg));
+    //auto p = device_malloc(sizeof(arg));
+    //q.memcpy(p, &arg, sizeof(arg));
+    //sycl::buffer<const Arg,1> buf{&arg, sycl::range(sizeof(arg))};
+    sycl::buffer<const char,1>
+      buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     q.submit([&](sycl::handler& h) {
+      //auto a = buf.get_access(h);
+      //auto a = buf.get_access<sycl::access_mode::read>(h);
+      auto a = buf.get_access<sycl::access::mode::read,
+			      sycl::access::target::constant_buffer>(h);
       h.parallel_for<class Kernel3D>
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
-	   Arg *arg2 = static_cast<Arg *>(p);
+	   //Arg *arg2 = static_cast<Arg *>(p);
+	   //const Arg *arg2 = a.get_pointer();
+	   const char *p = a.get_pointer();
+	   const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+#ifdef QUDA_THREADS_BLOCKED
+	   quda::Kernel3Db<Functor, Arg, grid_stride>(*arg2, ndi);
+#else
 	   quda::Kernel3D<Functor, Arg, grid_stride>(*arg2, ndi);
+#endif
 	 });
     });
-    q.wait();
-    device_free(p);   //  FIXME: host task
+    //q.wait();
+    //device_free(p);   //  FIXME: host task
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("  end launchKernel3D\n");
     }
     return QUDA_SUCCESS;
   }
-
-#if 0
-  template <template <typename> class Functor, bool grid_stride, typename Arg>
-  qudaError_t
-  launchKernel3D1(const TuneParam &tp, const qudaStream_t &stream, Arg arg,...)
-  {
-    errorQuda("setConstPtr %s not available but const parameters were passed", typeid(arg).name());
-    return QUDA_ERROR;
-  }
-
-  template <template <typename> class Functor, bool grid_stride, typename Arg,
-	    typename=decltype(std::declval<Arg>().setConstPtr(0,nullptr))>
-  qudaError_t
-  launchKernel3D1(const TuneParam &tp, const qudaStream_t &stream, Arg arg,
-		  constant_param_t param)
-  {
-    sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, tp.grid.z*tp.block.z};
-    sycl::range<3> localSize{tp.block.x, tp.block.y, tp.block.z};
-    sycl::nd_range<3> ndRange{globalSize, localSize};
-    auto q = device::get_target_stream(stream);
-    warningQuda("launchKernel3D %s", grid_stride?"true":"false");
-    warningQuda("%s  %s", str(globalSize).c_str(), str(localSize).c_str());
-    warningQuda("%s", str(arg.threads).c_str());
-    sycl::buffer<const char,1> buf{param.host, sycl::range(param.bytes)};
-    q.submit([&](sycl::handler& h) {
-	       auto acc = buf.get_access<sycl::access_mode::read,sycl::target::constant_buffer>(h);
-	       //auto p = acc0.get_pointer();
-	       //auto p = (const char *)device_malloc(100);
-	       //arg.setConstPtr(0, p);
-	       h.parallel_for<class Kernel3D>
-		 (ndRange,
-		  [=](sycl::nd_item<3> ndi) {
-		    quda::Kernel3D<Functor, Arg, grid_stride>(arg, ndi, acc);
-		  });
-	     });
-    warningQuda("end launchKernel3D");
-    return QUDA_SUCCESS;
-  }
-#endif
 
 }
