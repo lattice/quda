@@ -5842,21 +5842,26 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 	for (size_t c1 = 0; c1 < src_nColor; c1++) {
 	  profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 	  
+	  /*DEBUG-JNS*/
+	  printfQuda("contractFTQuda calling contractSummedQuda src_color=%ld p= %d %d %d %d\n",c1,
+		     mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]); fflush(stdout);
+	  /*DEBUG-JNS*/
 	  std::fill(result_global.begin(), result_global.end(), 0.0);
 	  contractSummedQuda(*d_prop1[s1 * src_nColor + c1],
 			     *d_prop2[b1 * src_nColor + c1],
 			     result_global, cType,
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
-	  /*/DEBUG
-	  printfQuda("contractFTQuda from contractSummedQuda result_global p= %d %d %d %d",mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],
-		     mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]);
+	  cudaDeviceSynchronize(); // DEBUG-JNS flush device print buffer
+	  /*DEBUG-JNS*
+	  printfQuda("contractFTQuda result_global src_color=%ld p= %d %d %d %d",c1,
+		     mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]);
 	  for(unsigned j=0; j<result_global.size(); ++j){
 	    if(j % 4 == 0 )printfQuda("\n%3d ",j);
 	    printfQuda(" %10.3e %10.3e",result_global[j].real(),result_global[j].imag());
 	  }
-	  printfQuda("\n");
-	  //DEBUG*/
+	  printfQuda("\n"); fflush(stdout);
+	  *DEBUG-JNS*/
 	  comm_allreduce_array((double *)&result_global[0], 2*max_contract_results * global_decay_dim_slices);
 
 	  for (size_t t = 0; t < global_decay_dim_slices; t++) {
@@ -5871,14 +5876,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
       }
     }
   }
-  /*/DEBUG
+  /*DEBUG-JNS*/
   printfQuda("contractFTQuda result: n_mom %d global_decay_dim_slices %ld num_out_results %ld\n",n_mom,global_decay_dim_slices,num_out_results);
   for(size_t j=0; j < n_mom * global_decay_dim_slices * num_out_results * 2; ++j) {
     if(j % 8 == 0 )printfQuda("\n%3ld",j);
     printfQuda(" %10.3e",((double*)*result)[j]);
   }
-  printfQuda("\n");
-  //DEBUG*/
+  printfQuda("\n"); fflush(stdout);
+  /*DEBUG-JNS*/
 
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory

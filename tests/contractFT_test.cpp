@@ -73,8 +73,9 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device_ordinal);
-  int X[4] = {xdim, ydim, zdim, tdim};
+  int X[4] = {xdim, ydim, zdim, tdim}; // local dims
   setDims(X);
+  cudaDeviceSetLimit(cudaLimitPrintfFifoSize,64*1024*1024); // DEBUG-JNS
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -177,6 +178,7 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   const int source_position[4]{0,0,0,0};
+  /*
   const int n_mom = 5;
   const int mom[n_mom*4]{0,0,0,0, 1,0,0,0, 0,1,0,0, 0,0,1,0, 2,0,0,0 };
   const QudaFFTSymmType fft_type[n_mom*4]{
@@ -184,6 +186,12 @@ int test(int contractionType, QudaPrecision test_prec)
     QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
     QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
     QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
+    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
+      };
+  */
+  const int n_mom = 1;
+  const int mom[n_mom*4]{0,0,0,0};
+  const QudaFFTSymmType fft_type[n_mom*4]{
     QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
       };
 
@@ -269,7 +277,7 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
 }
 
 // Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(2, NcontractType)), getContractName);
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 3), Range(2, NcontractType)), getContractName);
 
 
 

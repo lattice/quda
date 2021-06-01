@@ -429,6 +429,17 @@ namespace quda
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
 
+      /* DEBUG-JNS */
+      //printf("%2d %4d ^ %2d %2d %2d %2d\n", t,xyz,sink[3],sink[2],sink[1],sink[0]);
+      if(t <= 8) {
+	printf("%2d %2d %2d %2d: %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e = %10.3e %10.3e\n",
+	       sink[3],sink[2],sink[1],sink[0],
+	       x.data[0].real(),x.data[0].imag(),x.data[1].real(),x.data[1].imag(),x.data[2].real(),x.data[2].imag(),
+	       y.data[0].real(),y.data[0].imag(),y.data[1].real(),y.data[1].imag(),y.data[2].real(),y.data[2].imag(),
+	       prop_prod.real(),prop_prod.imag());
+      }
+      /* DEBUG-JNS */
+
       // Fourier phase
       double phase_real = 1.0;
       double phase_imag = 0.0;
