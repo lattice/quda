@@ -143,6 +143,9 @@ int main(int argc, char **argv)
     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
 
+  // release memory
+  host_free(qDensity);
+
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
 
@@ -206,9 +209,6 @@ int main(int argc, char **argv)
 #endif
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
-
-  // release memory
-  host_free(qDensity);
 
   for (int dir = 0; dir < 4; dir++) {
     host_free(gauge[dir]);
