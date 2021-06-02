@@ -885,7 +885,7 @@ template <typename Float> static int compareFloats(Float *a, Float *b, int len, 
 {
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon) {
+    if (diff > epsilon || std::isnan(diff)) {
       printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
       return 0;
     }
@@ -1240,8 +1240,8 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
           double diff = fabs(newG[d][ga_idx * 18 + j] - oldG[d][ga_idx * 18 + j]); /// fabs(oldG[d][ga_idx*18+j]);
 
           for (int f = 0; f < fail_check; f++)
-            if (diff > pow(10.0, -(f + 1))) fail[d][f]++;
-          if (diff > epsilon) iter[d][j]++;
+            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[d][f]++;
+          if (diff > epsilon || std::isnan(diff)) iter[d][j]++;
         }
       }
     }
@@ -1386,9 +1386,9 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
         int is = i * 18 + j;
         double diff = fabs(linkA[dir][is] - linkB[dir][is]);
         for (int f = 0; f < fail_check; f++)
-          if (diff > pow(10.0, -(f + 1))) fail[f]++;
+          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
         // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-        if (diff > 1e-3) iter[j]++;
+        if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
       }
     }
   }
@@ -1516,9 +1516,9 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
       int is = i * mom_site_size + j;
       double diff = fabs(momA[is] - momB[is]);
       for (int f = 0; f < fail_check; f++)
-        if (diff > pow(10.0, -(f + 1))) fail[f]++;
+        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
       // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3) iter[j]++;
+      if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
     }
   }
 
