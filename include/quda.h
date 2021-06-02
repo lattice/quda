@@ -494,6 +494,29 @@ extern "C" {
 
     //-------------------------------------------------
 
+    // COMPRESSION PARAMS
+    //-------------------------------------------------
+    /** Employ compression in the eigensolver **/
+    QudaBoolean compress;
+    /** Size of the eigenvector search space **/
+    int comp_n_ev;
+    /** Total size of Krylov space **/
+    int comp_n_kr;
+    /** Number of requested converged eigenvectors **/
+    int comp_n_conv;
+    /** For IRLM/IRAM, quit after n restarts of the fine eigensolver **/
+    int comp_max_restarts;
+
+    /** Geometric block size to use */
+    int geo_block_size[QUDA_MAX_DIM];
+
+    /** Spin block size to use */
+    int spin_block_size;
+
+    /** Number of times to repeat Gram-Schmidt in orthogonalization */
+    int n_block_ortho;    
+    //-------------------------------------------------
+    
     // EIG-CG PARAMS
     //-------------------------------------------------
     int nk;
