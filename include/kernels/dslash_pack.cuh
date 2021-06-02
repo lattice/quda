@@ -10,8 +10,6 @@ namespace quda
 {
   int *getPackComms();
 
-  static int commDim[QUDA_MAX_DIM];
-
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true,
             bool dagger_ = false, int twist_ = 0, QudaPCType pc_type_ = QUDA_4D_PC>
   struct PackArg : kernel_param<> {

@@ -35,6 +35,9 @@
 
 namespace quda {
 
+  // this is the maximum number of colors for which we support block-float format
+  constexpr int max_block_float_nc = 96;
+
   template <typename store_t, typename ghost_store_t, QudaFieldOrder order, int nSpin, int nColor>
   class PackGhost_ : public TunableKernel3D {
     void **ghost;

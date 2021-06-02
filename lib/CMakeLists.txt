@@ -238,8 +238,7 @@ target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
-
-target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
+target_link_libraries(quda PRIVATE Eigen)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
 
@@ -247,7 +246,7 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-target_include_directories(quda_cpp SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
+target_link_libraries(quda_cpp PRIVATE Eigen)
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
@@ -267,13 +266,13 @@ if(QUDA_NVSHMEM)
   set_property(TARGET quda PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif()
 
-# add target specific files		
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
-  add_subdirectory(targets/cuda)		
+# add target specific files
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_subdirectory(targets/cuda)
   target_include_directories(quda PRIVATE ../include/targets/cuda)
   target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
-endif()		
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_subdirectory(targets/hip)
   target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
@@ -315,7 +314,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
-                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
                             $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
@@ -327,7 +326,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
                             -Wall -Wextra -Wno-unknown-pragmas
                             $<$<CONFIG:STRICT>:-Werror -Wno-error=pass-failed>
                             $<$<CONFIG:SANITIZE>:-fsanitize=address -fsanitize=undefined>
-                            >)
+          >)
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -464,8 +463,8 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-	target_compile_definitions(quda PUBLIC QMP_COMMS)
-	target_link_libraries(quda PUBLIC QMP::qmp)
+  target_compile_definitions(quda PUBLIC QMP_COMMS)
+  target_link_libraries(quda PUBLIC QMP::qmp)
 endif()
 
 if(QUDA_NVSHMEM)
@@ -482,8 +481,8 @@ if(QUDA_NVSHMEM)
 endif()
 
 if(QUDA_QIO)
-	target_compile_definitions(quda PUBLIC HAVE_QIO)
-	arget_link_libraries(quda PUBLIC QIO::qio)
+  target_compile_definitions(quda PUBLIC HAVE_QIO)
+  target_link_libraries(quda PUBLIC QIO::qio)
 endif()
 
 if(QUDA_QDPJIT)
@@ -612,16 +611,19 @@ if(QUDA_NVML)
 endif()
 
 if(QUDA_TARGET_HIP)
-	target_include_directories(quda PUBLIC ${ROCM_PATH}/hipfft/include)
-	target_link_libraries(quda PUBLIC hip::hiprand roc::rocrand hip::hipfft 
-			      roc::hipblas roc::rocblas hip::hipcub roc::rocprim_hip )
+  target_include_directories(quda PUBLIC ${ROCM_PATH}/hipfft/include)
+  target_link_libraries(quda PUBLIC 
+    hip::hiprand roc::rocrand 
+    hip::hipfft 
+    roc::hipblas roc::rocblas 
+    hip::hipcub roc::rocprim_hip )
 endif()
 
-# if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
-if(QUDA_DOWNLOAD_EIGEN)
-  add_dependencies(quda_cpp Eigen)
-  add_dependencies(quda Eigen)
-endif()
+# # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
+# if(QUDA_DOWNLOAD_EIGEN)
+#   add_dependencies(quda_cpp Eigen)
+#   add_dependencies(quda Eigen)
+# endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
@@ -643,13 +645,22 @@ add_custom_command(
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
+set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
+
+add_library( QUDA::quda ALIAS quda )
+
 install(
   TARGETS quda
-  EXPORT qudaTargets
+  EXPORT QUDATargets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
-  INCLUDES
-  DESTINATION include)
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include)
+
+install(EXPORT QUDATargets
+	FILE QUDATargets.cmake
+	NAMESPACE QUDA::
+	DESTINATION lib/cmake/QUDA)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
@@ -667,17 +678,7 @@ write_basic_package_version_file(
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
 
-export(
-  EXPORT qudaTargets
-  FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake"
-  NAMESPACE quda::)
 
-set(ConfigPackageLocation lib/cmake/quda/)
-
-install(
-  EXPORT qudaTargets
-  NAMESPACE quda::
-  DESTINATION ${ConfigPackageLocation})
 
 add_custom_target(
   mpi_nvtx
