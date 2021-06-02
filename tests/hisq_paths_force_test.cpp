@@ -238,11 +238,7 @@ static void hisq_force_init()
 
   //createMomCPU(cpuMom->Gauge_p(), mom_prec);
 
-  hw = malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
-  if (hw == NULL){
-    fprintf(stderr, "ERROR: malloc failed for hw\n");
-    exit(1);
-  }
+  hw = safe_malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
 
   createHwCPU(hw, hw_prec);
 
@@ -292,7 +288,7 @@ static void hisq_force_end()
   delete cpuOprod_ex;  
   delete cpuLongLinkOprod_ex;
 
-  free(hw);
+  host_free(hw);
 
   endQuda();
 }

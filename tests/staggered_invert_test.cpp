@@ -224,12 +224,12 @@ int main(int argc, char **argv)
   GaugeField *cpuLong = nullptr;
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-  milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   // For load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -310,7 +310,7 @@ int main(int argc, char **argv)
   // Quark masses
   std::vector<double> masses(multishift);
   // Host array for solutions
-  void **outArray = (void **)malloc(multishift * sizeof(void *));
+  void **outArray = (void **)safe_malloc(multishift * sizeof(void *));
   // QUDA host array for internal checks and malloc
   std::vector<ColorSpinorField *> qudaOutArray(multishift);
 
@@ -428,21 +428,12 @@ int main(int argc, char **argv)
 
   // Clean up gauge fields
   for (int dir = 0; dir < 4; dir++) {
-    if (qdp_inlink[dir] != nullptr) {
-      free(qdp_inlink[dir]);
-      qdp_inlink[dir] = nullptr;
-    }
-    if (qdp_fatlink[dir] != nullptr) {
-      free(qdp_fatlink[dir]);
-      qdp_fatlink[dir] = nullptr;
-    }
-    if (qdp_longlink[dir] != nullptr) {
-      free(qdp_longlink[dir]);
-      qdp_longlink[dir] = nullptr;
-    }
+    host_free(qdp_inlink[dir]);
+    host_free(qdp_fatlink[dir]);
+    host_free(qdp_longlink[dir]);
   }
-  if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
-  if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
+  host_free(milc_fatlink);
+  host_free(milc_longlink);
 
   if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
   if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
@@ -451,7 +442,7 @@ int main(int argc, char **argv)
   for (auto out_vec : out) { delete out_vec; }
   delete ref;
   delete tmp;
-  free(outArray);
+  host_free(outArray);
 
   if (use_split_grid) {
     for (auto p : _h_b) { delete p; }

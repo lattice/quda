@@ -51,8 +51,8 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = malloc(V * gauge_site_size * param.cpu_prec); }
-  cpsCpuGauge_p = malloc(4 * V * gauge_site_size * param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = safe_malloc(V * gauge_site_size * param.cpu_prec); }
+  cpsCpuGauge_p = safe_malloc(4 * V * gauge_site_size * param.cpu_prec);
 
   csParam.nColor = 3;
   csParam.nSpin = 4;
@@ -75,8 +75,7 @@ void init() {
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
-  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+  csParam.setPrecision(prec, prec, true);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
 
@@ -89,8 +88,8 @@ void end() {
   delete spinor2;
   delete spinor;
 
-  for (int dir = 0; dir < 4; dir++) free(qdpCpuGauge_p[dir]);
-  free(cpsCpuGauge_p);
+  for (int dir = 0; dir < 4; dir++) host_free(qdpCpuGauge_p[dir]);
+  host_free(cpsCpuGauge_p);
   endQuda();
 }
 

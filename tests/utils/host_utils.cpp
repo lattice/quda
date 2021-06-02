@@ -1456,14 +1456,8 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
 
 void createMomCPU(void *mom, QudaPrecision precision)
 {
-  void *temp;
-
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4 * V * gauge_site_size * gSize);
-  if (temp == NULL) {
-    fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
 
   for (int i = 0; i < V; i++) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1485,7 +1479,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
     }
   }
 
-  free(temp);
+  host_free(temp);
   return;
 }
 
