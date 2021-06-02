@@ -1,11 +1,6 @@
 #pragma once
 #include <quda_define.h>
 
-// Make sure this is not defined
-#ifdef QUDA_MMA_AVAILABLE
-#undef QUDA_MMA_AVAILABLE
-#endif
-
 #if defined(QUDA_TARGET_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
