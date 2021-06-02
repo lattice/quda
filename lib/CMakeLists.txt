@@ -178,6 +178,11 @@ else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
 endif()
 
+include(CheckLinkerFlag)
+check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
+target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
+
+add_library(QUDA::quda ALIAS quda)
 
 if(QUDA_TARGET_CUDA)
   # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
@@ -647,8 +652,6 @@ add_custom_command(
 
 set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
 
-add_library( QUDA::quda ALIAS quda )
-
 install(
   TARGETS quda
   EXPORT QUDATargets
@@ -677,8 +680,6 @@ write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
-
-
 
 add_custom_target(
   mpi_nvtx
