@@ -622,7 +622,7 @@ if(QUDA_QMP)
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG fa386db
+      GIT_TAG 9b0f958
       OPTIONS
       "QMP_MPI ON"
       "QMP_TESTING" "OFF"
@@ -650,7 +650,7 @@ if(QUDA_QIO)
     CPMAddPackage(
       NAME QIO
       GITHUB_REPOSITORY usqcd-software/qio
-      GIT_TAG 3c99383
+      GIT_TAG 0627f013
       OPTIONS 
         "QIO_ENABLE_PARALLEL_BUILD ON"
         "QIO_ENABLE_QMP_ROUTE OFF" 
