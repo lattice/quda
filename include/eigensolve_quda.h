@@ -6,6 +6,9 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
+// For the compression
+#include <transfer.h>
+
 namespace quda
 {
 
@@ -58,6 +61,27 @@ namespace quda
 
     QudaPrecision save_prec;
 
+    // Compression variables
+    //----------------------
+    bool compress; /** indicates that we wish to perform a fine, then compressed solve */
+    std::vector<ColorSpinorField *> fine_vector; /** Current decompressed vector(s) */
+    std::vector<ColorSpinorField *> compressed_space; /** Compressed vector(s) */
+    std::vector<ColorSpinorField *> fine_space; /** fine vector(s) */
+    
+    /** This is the transfer operator that defines the prolongation and restriction 
+	operators */
+    Transfer *transfer;
+    
+    /** We define here the parameters needed to create a Transfer operator */
+    int geo_block_size[4];
+    int spin_block_size;
+    int n_block_ortho;
+
+    int fine_n_ev;         /** Size of initial factorisation */
+    int fine_n_kr;         /** Size of Krylov space after extension */
+    int fine_n_conv;       /** Number of converged eigenvalues requested */
+    int fine_max_restarts; /** Maximum number of restarts to perform */
+    
   public:
     /**
        @brief Constructor for base Eigensolver class
@@ -111,6 +135,14 @@ namespace quda
        @param[in] evals The eigenvalue array
     */
     void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Extend the compressed Krylov space. The compressed space in internal 
+       to the eigensolver and IO routines only
+       @param[in] kSpace The fine Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Set the epsilon parameter
@@ -376,6 +408,13 @@ namespace quda
     void loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
 
     /**
+       @brief Save eigenvectors
+       @param[in] mat Matrix operator
+       @param[in] eig_vecs The eigenvectors to save
+    */
+    void saveToFile(const std::vector<ColorSpinorField *> &eig_vecs, const QudaParity mat_parity);
+    
+    /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
        @param[in] spec_type The spectrum type (Largest/Smallest)(Modulus/Imaginary/Real)
        @param[in] n The number of elements to sort
@@ -414,6 +453,47 @@ namespace quda
        @param[in] y An array whose elements will be permuted in tandem with x
     */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
+
+    /**
+       @brief Construct a transfer operator, restrict, then prolong the eigenvectors,
+       and then check for fidelity with the originals.
+       @param[in] kSpace The basis to transfer
+    */    
+    void verifyCompression(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Construct a transfer operator from the supplied vector space.
+       @param[in] kSpace The basis to transfer
+    */        
+    void createTransferBasis(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Compress vectors from the fine space to the coarse space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to compress
+    */        
+    void compressVectors(const std::vector<ColorSpinorField *> &fine,
+			 std::vector<ColorSpinorField *> &coarse,
+			 const unsigned int fine_vec_position,			 
+			 const unsigned int coarse_vec_position,
+			 const unsigned int num);
+
+    /**
+       @brief Promote vectors from the coarse space to the fine space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to promote
+    */        
+    void promoteVectors(const std::vector<ColorSpinorField *> &fine,
+			std::vector<ColorSpinorField *> &coarse,
+			const unsigned int fine_vec_position,
+			const unsigned int coarse_vec_position,
+			const unsigned int num);    
   };
 
   /**
@@ -455,6 +535,12 @@ namespace quda
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
+    /**
+       @brief Perform the TRLM solve
+       @param[in] kSpace Krylov vector space
+    */
+    bool trlmSolve(std::vector<ColorSpinorField *> &kSpace);
+    
     /**
        @brief Lanczos step: extends the Krylov space.
        @param[in] v Vector space

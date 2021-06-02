@@ -263,6 +263,24 @@ void setEigParam(QudaEigParam &eig_param)
   } else {
     eig_param.n_conv = eig_n_conv;
   }
+  // Compressed eigensolver parameters
+  if(eig_comp) {
+    if (eig_comp_n_conv < 0) {
+      eig_param.comp_n_conv = eig_comp_n_ev;
+      eig_comp_n_conv = eig_comp_n_ev;
+    } else {
+      eig_param.comp_n_conv = eig_comp_n_conv;
+    }
+    eig_param.comp_n_ev = eig_comp_n_ev;
+    eig_param.comp_n_kr = eig_comp_n_kr;
+    eig_param.comp_max_restarts = eig_comp_max_restarts;
+    for (int j = 0; j < 4; j++) {
+      // if not defined use 4
+      eig_param.geo_block_size[j] = eig_comp_geo_block_size[0][j] ? eig_comp_geo_block_size[0][j] : 4;
+    }    
+    eig_param.compress = QUDA_BOOLEAN_TRUE;
+    eig_param.n_block_ortho = eig_comp_n_block_ortho;
+  }
 
   // Inverters will deflate only this number of vectors.
   if (eig_n_ev_deflate < 0) {
@@ -304,6 +322,8 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  strcpy(eig_param.coarse_vec_infile, eig_coarse_vec_infile);
+  strcpy(eig_param.coarse_vec_outfile, eig_coarse_vec_outfile);
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }

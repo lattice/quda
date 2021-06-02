@@ -191,6 +191,8 @@ bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_vec_infile[256] = "";
 char eig_vec_outfile[256] = "";
+char eig_coarse_vec_infile[256] = "";
+char eig_coarse_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 
@@ -738,6 +740,11 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-save-vec", eig_vec_outfile, "Save eigenvectors to <file> (requires QIO)");
   opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
     ->check(CLI::ExistingFile);
+
+  opgroup->add_option("--eig-save-coarse-vec", eig_coarse_vec_outfile, "Save coarse eigenvectors to <file> (requires QIO)");
+  opgroup->add_option("--eig-load-coarse-vec", eig_coarse_vec_infile, "Load coarse eigenvectors to <file> (requires QIO)")
+    ->check(CLI::ExistingFile);
+
   opgroup
     ->add_option("--eig-save-prec", eig_save_prec,
                  "If saving eigenvectors, use this precision to save. No-op if eig-save-prec is greater than or equal "

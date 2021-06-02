@@ -24,9 +24,10 @@ namespace quda
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
-    alpha = (double *)safe_malloc(n_kr * sizeof(double));
-    beta = (double *)safe_malloc(n_kr * sizeof(double));
-    for (int i = 0; i < n_kr; i++) {
+    int max_n_kr = std::max(fine_n_kr, n_kr);
+    alpha = (double *)safe_malloc(max_n_kr * sizeof(double));
+    beta = (double *)safe_malloc(max_n_kr * sizeof(double));
+    for (int i = 0; i < max_n_kr; i++) {
       alpha[i] = 0.0;
       beta[i] = 0.0;
     }
@@ -34,6 +35,8 @@ namespace quda
     // Thick restart specific checks
     if (n_kr < n_ev + 6) errorQuda("n_kr=%d must be greater than n_ev+6=%d\n", n_kr, n_ev + 6);
 
+    if (compress && (fine_n_kr < fine_n_ev + 6)) errorQuda("fine_n_kr=%d must be greater than fine_n_ev+6=%d\n", fine_n_kr, fine_n_ev + 6);
+    
     if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
@@ -52,6 +55,7 @@ namespace quda
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
+    
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -59,33 +63,95 @@ namespace quda
       return;
     }
 
-    // Check for an initial guess. If none present, populate with rands, then
-    // orthonormalise
-    prepareInitialGuess(kSpace);
-
-    // Increase the size of kSpace passed to the function, will be trimmed to
-    // original size before exit.
-    prepareKrylovSpace(kSpace, evals);
+    // If no eigenspace was loaded, we must construct it
+    if(!converged) {
+      
+      // If using the compression, we first perform the fine computation. Set the
+      // eig_param values to the fine problem values, then switch to the
+      // full problem when the fine problem is complete.
+      if(compress) {
+	n_ev = fine_n_ev;
+	n_kr = fine_n_kr;
+	n_conv = fine_n_conv;
+	max_restarts = fine_max_restarts;
+	printfQuda("n_ev %d, n_kr %d, n_conv %d, mr %d\n", n_ev, n_kr, n_conv, max_restarts); 
+      }
+      
+      // Check for an initial guess. If none present, populate with rands, then
+      // orthonormalise.
+      prepareInitialGuess(kSpace);
+      
+      // Increase the size of kSpace passed to the function, will be trimmed to
+      // original size before exit.
+      prepareKrylovSpace(kSpace, evals);
+    }
 
     // Check for Chebyshev maximum estimation
     checkChebyOpMax(mat, kSpace);
 
+    // Begin TRLM Eigensolver computation
+    //---------------------------------------------------------------------------
+    // If no fine eigenspace was loaded, we must construct it
+    if(!converged) {
+      // Print Eigensolver params
+      printEigensolverSetup();
+      converged = trlmSolve(kSpace);
+    }
+    
+    // Post computation report
+    //---------------------------------------------------------------------------
+    if (!converged) {
+      if (eig_param->require_convergence) {
+        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                  "restart steps. Exiting.",
+                  n_conv, n_ev, n_kr, max_restarts);
+      } else {
+        warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                    "restart steps. Continuing with current lanczos factorisation.",
+                    n_conv, n_ev, n_kr, max_restarts);
+      }
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
+                   restart_iter, iter);
+
+        // Dump all Ritz values and residua if using Chebyshev
+        for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
+          printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+        }
+      }
+
+      // Compute eigenvalues
+      computeEvals(mat, kSpace, evals);
+    }
+
+    // Local clean-up
+    cleanUpEigensolver(kSpace, evals);
+  }
+  
+  // Destructor
+  TRLM::~TRLM()
+  {
+    ritz_mat.clear();
+    ritz_mat.shrink_to_fit();
+    host_free(alpha);
+    host_free(beta);
+  }
+
+  // Thick Restart Member functions
+  //---------------------------------------------------------------------------
+  bool TRLM::trlmSolve(std::vector<ColorSpinorField *> &kSpace)
+  {
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     // Convergence and locking criteria
     double mat_norm = 0.0;
     double epsilon = setEpsilon(kSpace[0]->Precision());
-
-    // Print Eigensolver params
-    printEigensolverSetup();
-    //---------------------------------------------------------------------------
-
-    // Begin TRLM Eigensolver computation
-    //---------------------------------------------------------------------------
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
+    converged = false;
+    
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
-
-      for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);
+      
+      for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);      
       iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
@@ -138,18 +204,20 @@ namespace quda
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
 
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
-        printfQuda("iter Lock = %d\n", iter_locked);
+	printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("num_converged = %d\n", num_converged);
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
-        for (int i = 0; i < n_kr; i++) {
-          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
-        }
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	  for (int i = 0; i < n_kr; i++) {
+	    printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+	  }
+	}
       }
-
+      
       // Check for convergence
       if (num_converged >= n_conv) {
         reorder(kSpace);
@@ -158,51 +226,10 @@ namespace quda
 
       restart_iter++;
     }
-
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    // Post computation report
-    //---------------------------------------------------------------------------
-    if (!converged) {
-      if (eig_param->require_convergence) {
-        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-                  "restart steps. Exiting.",
-                  n_conv, n_ev, n_kr, max_restarts);
-      } else {
-        warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-                    "restart steps. Continuing with current lanczos factorisation.",
-                    n_conv, n_ev, n_kr, max_restarts);
-      }
-    } else {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
-                   restart_iter, iter);
-
-        // Dump all Ritz values and residua if using Chebyshev
-        for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
-          printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
-        }
-      }
-
-      // Compute eigenvalues
-      computeEvals(mat, kSpace, evals);
-    }
-
-    // Local clean-up
-    cleanUpEigensolver(kSpace, evals);
+    return converged;
   }
-
-  // Destructor
-  TRLM::~TRLM()
-  {
-    ritz_mat.clear();
-    ritz_mat.shrink_to_fit();
-    host_free(alpha);
-    host_free(beta);
-  }
-
-  // Thick Restart Member functions
-  //---------------------------------------------------------------------------
+  
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}

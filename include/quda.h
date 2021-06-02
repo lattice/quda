@@ -514,7 +514,13 @@ extern "C" {
     int spin_block_size;
 
     /** Number of times to repeat Gram-Schmidt in orthogonalization */
-    int n_block_ortho;    
+    int n_block_ortho;
+
+    /** Filename prefix of the coarse eigenvectors to load */
+    char coarse_vec_infile[256];
+    
+    /** Filename prefix of the coarse eigenvectors to save */
+    char coarse_vec_outfile[256];
     //-------------------------------------------------
     
     // EIG-CG PARAMS

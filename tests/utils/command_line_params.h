@@ -360,6 +360,8 @@ extern char eig_arpack_logfile[256];
 extern char eig_QUDA_logfile[256];
 extern char eig_vec_infile[256];
 extern char eig_vec_outfile[256];
+extern char eig_coarse_vec_infile[256];
+extern char eig_coarse_vec_outfile[256];
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 
