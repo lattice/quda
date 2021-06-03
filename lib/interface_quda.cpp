@@ -5852,7 +5852,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 			     result_global, cType,
 			     source_position, &mom_modes[4*mom_idx], &fft_type[4*mom_idx],
 			     s1, b1);
-	  cudaDeviceSynchronize(); // DEBUG-JNS flush device print buffer
+	  //cudaDeviceSynchronize(); // DEBUG-JNS flush device print buffer
 	  /*DEBUG-JNS*
 	  printfQuda("contractFTQuda result_global src_color=%ld p= %d %d %d %d",c1,
 		     mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]);
@@ -5876,14 +5876,14 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
       }
     }
   }
-  /*DEBUG-JNS*/
+  /*DEBUG-JNS*
   printfQuda("contractFTQuda result: n_mom %d global_decay_dim_slices %ld num_out_results %ld\n",n_mom,global_decay_dim_slices,num_out_results);
   for(size_t j=0; j < n_mom * global_decay_dim_slices * num_out_results * 2; ++j) {
     if(j % 8 == 0 )printfQuda("\n%3ld",j);
     printfQuda(" %10.3e",((double*)*result)[j]);
   }
   printfQuda("\n"); fflush(stdout);
-  /*DEBUG-JNS*/
+  *DEBUG-JNS*/
 
   profileContractFT.TPSTART(QUDA_PROFILE_FREE);
   // Free memory
