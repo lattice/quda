@@ -415,7 +415,7 @@ namespace quda
 	NxNyNzNt[i] = arg.NxNyNzNt[i];
       }
       
-      //The coordinate of the sink
+      //The local coordinate of the sink
       int *sink;
       sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
 
@@ -429,16 +429,16 @@ namespace quda
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
 
-      /* DEBUG-JNS */
-      //printf("%2d %4d ^ %2d %2d %2d %2d\n", t,xyz,sink[3],sink[2],sink[1],sink[0]);
-      if(t <= 8) {
+      /* DEBUG-JNS *
+      //printf("%2d %4d ^ %2d %2d %2d %2d\n", t,xyz,sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0]);
+      #if 1
 	printf("%2d %2d %2d %2d: %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e = %10.3e %10.3e\n",
-	       sink[3],sink[2],sink[1],sink[0],
+	       sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0],
 	       x.data[0].real(),x.data[0].imag(),x.data[1].real(),x.data[1].imag(),x.data[2].real(),x.data[2].imag(),
 	       y.data[0].real(),y.data[0].imag(),y.data[1].real(),y.data[1].imag(),y.data[2].real(),y.data[2].imag(),
 	       prop_prod.real(),prop_prod.imag());
-      }
-      /* DEBUG-JNS */
+      #endif
+      * DEBUG-JNS */
 
       // Fourier phase
       double phase_real = 1.0;

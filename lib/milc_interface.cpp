@@ -1684,22 +1684,37 @@ void qudaContractFT(int external_precision,
   qudamilc_called<true>(__func__, verbosity);
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   ColorSpinorParam csParam;
-  setColorSpinorParams(localDim, host_precision, &csParam);
+  setColorSpinorParams(localDim, host_precision, &csParam); // Incorrect config.
+  /* DEBUG-JNS */
+  csParam.nColor = 3;
+  csParam.nSpin = 1;
+  csParam.nDim = 4;
+  for(int i = 0; i < 4; i++)
+    csParam.x[i] = localDim[i];
+  csParam.x[4] = 1;
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  csParam.setPrecision(host_precision);
+  csParam.pad = 0;
+  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
+  /* DEBUG-JNS */
+  // Support only staggered color fields for now
+  csParam.nSpin = 1;
+  QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
 
   int const n_mom = cont_args->n_mom;
   int * const mom_modes = cont_args->mom_modes;
   const QudaFFTSymmType *const fft_type = cont_args->fft_type;
   int const *source_position = cont_args->source_position;
   
-  // Support only staggered color fields for now
-  csParam.nSpin = 1;
-  QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
   int const src_colors = 1;
   // Only one pair of color fields and one result, so only one element in the arrays
-  void *prop_array_flavor_1[1] = {quark1};
-  void *prop_array_flavor_2[1] = {quark2};
-  void *result[1] = {corr};
-
+  void *prop_array_flavor_1[src_colors] = {quark1};
+  void *prop_array_flavor_2[src_colors] = {quark2};
+  void *result[1] = {corr}; // NB: contractFTQuda always expects a single array, not a list of arrays
 
   contractFTQuda(prop_array_flavor_1, prop_array_flavor_2, result, cType, &csParam, 
 		 src_colors, localDim, source_position, n_mom, mom_modes, fft_type);
