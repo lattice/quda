@@ -107,9 +107,10 @@ namespace quda {
       strcat(aux, label);
 
       // compute number of number of work items we have to do
+      // unlike the dslash kernels, we include the fifth dimension here
       for (int i = 0; i < 4; i++) {
         if (!comm_dim_partitioned(i)) continue;
-        work_items += 2 * nFace * a.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
+        work_items += 2 * nFace * a.getDslashConstant().ghostFaceCB[i] * a.getDslashConstant().Ls; // 2 for forwards and backwards faces
       }
 
       apply(device::get_default_stream());

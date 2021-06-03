@@ -57,6 +57,7 @@ void init() {
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
+  csParam.pc_type = QUDA_4D_PC;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
   csParam.setPrecision(prec_cpu);
   csParam.pad = 0;
