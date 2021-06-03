@@ -1,7 +1,6 @@
 #pragma once
 
 #include <tune_quda.h>
-
 #include <quda_arch.h>
 #ifdef QUDA_MMA_AVAILABLE
 #include <kernels/coarse_op_kernel_mma.cuh>
@@ -19,10 +18,10 @@ namespace quda
   namespace mma
   {
 
-#if QUDA_MMA_AVAILABLE
-    template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    typename std::enable_if<!Arg::is_mma_compatible, void>::type
-    launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
+#ifdef QUDA_MMA_AVAILABLE
+    template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg, class Tunable>
+    std::enable_if_t<!Arg::is_mma_compatible, void>
+      launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &, Tunable &)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
@@ -614,7 +613,7 @@ namespace quda
       return -1;
     }
 
-#endif // MMA_AVAILABLE
+#endif // compute capability >= 700, CUDA >= 10.1
 
   } // namespace mma
 
