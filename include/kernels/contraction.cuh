@@ -446,29 +446,31 @@ namespace quda
       // Phase factor for each direction is either the cos, sin, or exp Fourier phase
       for(int dir=0; dir<4; ++dir)
 	{
-	  if(mom_mode[dir] == 0) continue; // phase is one
-	  double dXi_dot_Pi = 1./NxNyNzNt[dir];
-	  dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[dir];
-	  double ph_real;
-	  double ph_imag;
-	  if(fft_type[dir] == QUDA_FFT_SYMM_EO) {
-	    // exp(+i k.x) case
-	    ph_real = cos(dXi_dot_Pi*2.*M_PI);
-	    ph_imag = sin(dXi_dot_Pi*2.*M_PI);
-	  } else if(fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
-	    // cos(k.x) case
-	    ph_real = cos(dXi_dot_Pi*2.*M_PI);
-	    ph_imag = 0.0;
-	  } else if(fft_type[dir] == QUDA_FFT_SYMM_ODD) {
-	    // sin(k.x) case
-	    ph_real = 0.0;
-	    ph_imag = sin(dXi_dot_Pi*2.*M_PI);
+	  if(mom_mode[dir] != 0) {
+	    // phase is not one
+	    double dXi_dot_Pi = 2.*M_PI / NxNyNzNt[dir];
+	    dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[dir];
+	    double ph_real;
+	    double ph_imag;
+	    if(fft_type[dir] == QUDA_FFT_SYMM_EO) {
+	      // exp(+i k.x) case
+	      ph_real = cos(dXi_dot_Pi);
+	      ph_imag = sin(dXi_dot_Pi);
+	    } else if(fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
+	      // cos(k.x) case
+	      ph_real = cos(dXi_dot_Pi);
+	      ph_imag = 0.0;
+	    } else if(fft_type[dir] == QUDA_FFT_SYMM_ODD) {
+	      // sin(k.x) case
+	      ph_real = 0.0;
+	      ph_imag = sin(dXi_dot_Pi);
+	    }
+	    // phase *= ph
+	    double tmp_real = phase_real;
+	    double tmp_imag = phase_imag;
+	    phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
+	    phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
 	  }
-	  // phase *= ph
-	  double tmp_real = phase_real;
-	  double tmp_imag = phase_imag;
-	  phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
-	  phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
 	}
       
       // Staggered uses only the first element of result_all_channels
