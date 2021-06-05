@@ -950,7 +950,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
   // FIXME do we need to make this more robust to changing other meta data (compare cloverPrecise against clover_param)
-  // IF either of the clover params have changed, trigger a recompute
+  // If either of the clover params have changed, trigger a recompute
   bool clover_update = false;
   double csw_old = cloverPrecise ? cloverPrecise->Csw() : 0.0;
   double coeff_old = cloverPrecise ? cloverPrecise->Coeff() : 0.0;
