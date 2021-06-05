@@ -180,14 +180,14 @@ static void hisq_force_init()
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
-  gParam = GaugeFieldParam(0, qudaGaugeParam);
+  gParam = GaugeFieldParam(qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
 
   gParam.order = gauge_order;
   cpuGauge = new cpuGaugeField(gParam);
 
-  gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
+  gParam_ex = GaugeFieldParam(qudaGaugeParam_ex);
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;

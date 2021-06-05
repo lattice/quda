@@ -530,6 +530,7 @@ extern double gf_tolerance;
 extern bool gf_theta_condition;
 extern bool gf_fft_autotune;
 
+// contract options
 extern QudaContractType contract_type;
 extern char correlator_save_dir[256];
 extern char correlator_file_affix[256];
@@ -549,4 +550,3 @@ extern std::array<int, 3> blas_strides;
 extern std::array<double, 2> blas_alpha_re_im;
 extern std::array<double, 2> blas_beta_re_im;
 extern int blas_batch;
-

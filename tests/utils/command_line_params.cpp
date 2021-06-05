@@ -266,7 +266,6 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
-
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // contract options
@@ -276,6 +275,7 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
+// GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;
@@ -1053,7 +1053,6 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
                        "Number of measurement steps in heatbath before checkpointing (default 5)");
-
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
