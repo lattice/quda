@@ -40,13 +40,13 @@ namespace quda {
     seed(seedin)
   {
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateXORWOW\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Using randStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Using randStateMRG32k3a\n");
 #endif
-
+    
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                  size * sizeof(RNGState) / (float)(1048576));

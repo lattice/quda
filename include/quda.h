@@ -1650,12 +1650,13 @@ extern "C" {
   /**
    * Performs one leapfrog HMC step on gaugePrecise, copies the updated gauge 
    * into gauge evolved.
-   * @param h_x Solution spinor field
-   * @param h_b Source spinor field
-   * @param hmc_param Parameter structure containing HMC parameters
-   * @param step The step label in the Markov chain.
+   * @param[in] h_x Solution spinor field
+   * @param[in] h_b Source spinor field
+   * @param[in] hmc_param Parameter structure containing HMC parameters
+   * @param[in] step The step label in the Markov chain.
+   * @return int Accept/Reject
    */
-  void performLeapfrogStep(void *h_x, void *h_b, QudaHMCParam *hmc_param, int step);
+  int performLeapfrogStep(void *h_x, void *h_b, QudaHMCParam *hmc_param, int step);
 
   /**
    * Convert a 4D point source to a 5D one

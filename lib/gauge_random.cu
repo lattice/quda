@@ -24,7 +24,7 @@ namespace quda {
       sigma(static_cast<Float>(sigma)),
       group(U.LinkType() == QUDA_SU3_LINKS)
     {
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
         else printfQuda("Creating Gaussian distrbuted Lie algebra field\n");
       }

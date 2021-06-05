@@ -117,12 +117,25 @@ int main(int argc, char **argv)
   // RNG for populating the host spinor with random numbers.
   auto *rng = new quda::RNG(*check, 1234);
   
+  double acceptance = 0.0;
+  
   // Run the QUDA computation. The the metropolis step is performed in the function.
-  for(int i=0; i<hmc_param.updates; i++) {
-    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);      
-    performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
+  for(int i=0; i<hmc_param.therm_updates + hmc_param.therm_updates; i++) {
+    // Momentum refresh
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
+    // HMC step
+    int accept = performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
+    // Checkpoint
+    if((i+1)%hmc_checkpoint == 0) {
+      
+    }
+    
+    if(i > hmc_param.therm_updates) {
+      acceptance += accept;
+      printfQuda("Trajectory %d: Acceptance rate %.6e\n", i, acceptance/(i-hmc_param.therm_updates));
+    }	
   }
-
+  
   // Stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;

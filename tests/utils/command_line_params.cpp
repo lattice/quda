@@ -238,10 +238,10 @@ bool heatbath_coldstart = false;
 
 // HMC params
 int hmc_start = 0;
-int hmc_updates = 100;
+int hmc_updates = 200;
 int hmc_therm_updates = 100;
 int hmc_checkpoint = 5;
-int hmc_traj_steps = 25;
+int hmc_traj_steps = 100;
 double hmc_traj_length = 1.0;
 bool hmc_coldstart = false;
 QudaGaugeActionType hmc_gauge_action = QUDA_GAUGE_ACTION_TYPE_WILSON;

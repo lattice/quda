@@ -6245,7 +6245,7 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCParam *hmc_param, int step)
+int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCParam *hmc_param, int step)
 {
   profileInit.TPSTART(QUDA_PROFILE_TOTAL);
   // Transfer the inv_param and gauge_param structures contained in hmc_param
@@ -6272,7 +6272,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
   // Define gauge coefficients
-  QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
+  QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_SYMANZIK;
   double path_coeff[3] = {1.0, 1.0, 1.0};
   double epsilon = (hmc_param->traj_length/(1.0*hmc_param->traj_steps));
   //---------------------------------------------------------------------
@@ -6367,6 +6367,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
     
     // We just evolved the gauge field, so we must recompute the fermion fields
     // and invert to calculate the impulse on the fermion.
+    
     profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
     gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_param->beta*epsilon/3.0, path_coeff);
@@ -6428,7 +6429,7 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
 	       step, accept ? "accepted" : "rejected", dH, expdH, prob);	  
   }
   
-  if(getVerbosity() >= QUDA_SUMMARIZE) {
+  if(getVerbosity() == QUDA_SUMMARIZE) {
     printfQuda("Trajectory %d: acceptance %d dH %+.16e expdH %.16e plaq %.16e Q %+.16e\n", step, (int)accept, dH, expdH, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge);
   }
 
@@ -6436,4 +6437,5 @@ void performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMC
   delete force;
   delete device_mom;
   popVerbosity();
+  return accept ? 1 : 0;
 }
