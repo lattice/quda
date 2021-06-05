@@ -504,7 +504,8 @@ namespace quda {
         __device__ __host__ inline operator complex<Float>() const
         {
           if (!fixed) {
-            return complex<Float>(v[idx]);
+            complex<storeFloat> tmp = v[idx];
+            return complex<Float>(tmp.real(), tmp.imag());
           } else {
             complex<storeFloat> tmp = v[idx];
             Float norm_ = block_float ? norm[norm_idx] : scale_inv;
@@ -750,8 +751,8 @@ namespace quda {
       {
         return fieldorder_wrapper<Float, ghostFloat, block_float_ghost, norm_t>(ghost[2*dim+dir],
                                                                                 ghostAccessor.index(dim,parity,x_cb,s,c,n),
-                                                                                block_float_ghost ? fdividef(1.f, max) : ghost_scale,
-                                                                                block_float_ghost ? max : ghost_scale_inv,
+                                                                                block_float_ghost ? fdividef(fixedMaxValue<ghostFloat>::value, max) : ghost_scale,
+                                                                                block_float_ghost ? fixedInvMaxValue<ghostFloat>::value * max : ghost_scale_inv,
                                                                                 ghost_norm[2 * dim + dir],
                                                                                 parity*ghostAccessor.faceVolumeCB[dim] + x_cb,
                                                                                 s == 0 && c == 0 && n == 0);

@@ -228,6 +228,7 @@ void initFields(prec_pair_t prec_pair)
   param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.pc_type = QUDA_4D_PC;
 
   vH = new cpuColorSpinorField(param);
   wH = new cpuColorSpinorField(param);
@@ -1110,6 +1111,7 @@ TEST_P(BlasTest, verify)
   double tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  EXPECT_EQ(false, std::isnan(deviation)) << "Nan has propagated into the result";
 }
 
 TEST_P(BlasTest, benchmark)

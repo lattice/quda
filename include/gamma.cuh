@@ -219,7 +219,6 @@ namespace quda {
 
     // Multiplies a given row of the gamma matrix to a complex number
     __device__ __host__ inline complex<ValueType> apply(int row, const complex<ValueType> &a) const {
-      complex<ValueType> I(0,1);
       if (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
 	switch(dir) {
 	case 0:

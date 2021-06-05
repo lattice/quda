@@ -97,6 +97,7 @@ TEST_P(StaggeredDslashTest, verify)
   double deviation = 1.0;
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // check for skip_kernel
+  dslash_test_wrapper.staggeredDslashRef();
   if (dslash_test_wrapper.spinorRef != nullptr) {
     dslash_test_wrapper.run_test(2);
     deviation = dslash_test_wrapper.verify();
@@ -170,14 +171,6 @@ int main(int argc, char **argv)
 
   // return result of RUN_ALL_TESTS
   int test_rc = RUN_ALL_TESTS();
-
-  // Clean up loaded gauge field
-  for (int dir = 0; dir < 4; dir++) {
-    if (dslash_test_wrapper.qdp_inlink[dir] != nullptr) {
-      free(dslash_test_wrapper.qdp_inlink[dir]);
-      dslash_test_wrapper.qdp_inlink[dir] = nullptr;
-    }
-  }
 
   dslash_test_wrapper.end_ctest_once();
 

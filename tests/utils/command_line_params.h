@@ -257,6 +257,7 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_hmc_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
@@ -532,6 +533,17 @@ extern int wflow_steps;
 extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
+// GF options
+extern int gf_gauge_dir;
+extern int gf_maxiter;
+extern int gf_verbosity_interval;
+extern double gf_ovr_relaxation_boost;
+extern double gf_fft_alpha;
+extern int gf_reunit_interval;
+extern double gf_tolerance;
+extern bool gf_theta_condition;
+extern bool gf_fft_autotune;
+
 // contract options
 extern QudaContractType contract_type;
 extern char correlator_save_dir[256];
@@ -552,4 +564,3 @@ extern std::array<int, 3> blas_strides;
 extern std::array<double, 2> blas_alpha_re_im;
 extern std::array<double, 2> blas_beta_re_im;
 extern int blas_batch;
-

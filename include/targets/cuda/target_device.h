@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <algorithm>
 #ifdef _NVHPC_CUDA
 #include <nv/target>
