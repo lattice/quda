@@ -67,7 +67,6 @@ namespace quda
 
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, Omega, OmegaDiff, Q;
-      Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
@@ -89,7 +88,7 @@ namespace quda
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 
       // Debug tools
-#if 0
+#if 1
       //Test for Traceless:
       double error = getTrace(Q).real();
       printf("Trace test %d %d %.15e\n", x_cb, dir, error);
@@ -139,7 +138,6 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;
       Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
@@ -163,7 +161,7 @@ namespace quda
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 
       // Debug tools
-#if 0
+#if 1
       //Test for Traceless:
       double error = getTrace(Q).real();
       printf("Trace test %d %d %.15e\n", x_cb, dir, error);

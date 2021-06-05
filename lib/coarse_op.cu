@@ -89,7 +89,7 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
          avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, g, c,
          kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,

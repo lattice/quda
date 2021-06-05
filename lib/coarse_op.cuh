@@ -314,7 +314,7 @@ namespace quda {
       if (type == COMPUTE_UV) {
 
         IF_CONSTEXPR (use_mma) {
-          mma::launch_compute_uv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
+          mma::launch_compute_uv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);
         } else {
           launch_device<compute_uv>(tp, stream, arg);
         }
@@ -370,7 +370,7 @@ namespace quda {
 
         IF_CONSTEXPR (use_mma) {
 
-          mma::launch_compute_vuv_kernel<from_coarse>(tp, arg, arg.fineVolumeCB, stream);
+          mma::launch_compute_vuv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);
 
         } else {
 
@@ -606,9 +606,9 @@ namespace quda {
         constexpr bool query_max = true;
         int max = 0;
         if (type == COMPUTE_UV) {
-          max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
+          max = mma::launch_compute_uv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
         } else if (type == COMPUTE_VUV) {
-          max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
+          max = mma::launch_compute_vuv_kernel<query_max>(param, arg, 1, device::get_default_stream(), *this);
         }
 
         if (param.aux.x < max) {
@@ -661,7 +661,7 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
-        if (use_mma) strcat(Aux, ",MMA");
+        if (use_mma) strcat(Aux, ",mma");
       } else if (type == COMPUTE_AV)
         strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");

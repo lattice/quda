@@ -145,7 +145,6 @@ namespace quda {
       dc.dims[3][2]=X[2];
     }
     ghost_precision_allocated = ghost_precision;
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
@@ -167,6 +166,7 @@ namespace quda {
     nVec = Nvec;
     twistFlavor = Twistflavor;
 
+    if (pc_type != QUDA_5D_PC && pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", pc_type);
     this->pc_type = pc_type;
     this->suggested_parity = suggested_parity;
 
