@@ -45,16 +45,16 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
       }
       mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param,
               inv_param.mass, inv_param.b_5, inv_param.c_5);
-      free(kappa_b);
-      free(kappa_c);
+      host_free(kappa_b);
+      host_free(kappa_c);
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_mat(spinorCheck, gauge, spinorOut, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass,
                    inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
@@ -77,16 +77,16 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
       dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
                 gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      free(kappa_b);
-      free(kappa_c);
+      host_free(kappa_b);
+      host_free(kappa_c);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorCheck, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
@@ -102,7 +102,7 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
 
   } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
-    void *spinorTmp = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    void *spinorTmp = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
     ax(0, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
 
     // DOMAIN_WALL START
@@ -117,8 +117,8 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
       dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
@@ -127,8 +127,8 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
                 inv_param.mass, inv_param.b_5, inv_param.c_5);
       mdw_matpc(spinorCheck, gauge, spinorTmp, kappa_b, kappa_c, inv_param.matpc_type, 1, inv_param.cpu_prec,
                 gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      free(kappa_b);
-      free(kappa_c);
+      host_free(kappa_b);
+      host_free(kappa_c);
       // DOMAIN_WALL END
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       mdw_eofa_matpc(spinorTmp, gauge, spinorOut, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
@@ -146,7 +146,7 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, voi
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
     }
 
-    free(spinorTmp);
+    host_free(spinorTmp);
   } else {
     errorQuda("Solution type %s not implemented", get_solution_str(inv_param.solution_type));
   }
@@ -171,7 +171,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
     }
 
-    void *spinorTmp = malloc(Vh * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    void *spinorTmp = safe_malloc(Vh * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
     printfQuda("Host residuum checks: \n");
     for (int i = 0; i < inv_param.num_offset; i++) {
       ax(0, spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
@@ -231,7 +231,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
                  i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
                  inv_param.true_res_hq_offset[i]);
     }
-    free(spinorTmp);
+    host_free(spinorTmp);
 
   } else {
     // Non-multishift workflow
@@ -308,7 +308,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
-      void *spinorTmp = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+      void *spinorTmp = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
       ax(0, spinorCheck, V * spinor_site_size, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -357,7 +357,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
       }
 
-      free(spinorTmp);
+      host_free(spinorTmp);
     } else {
       errorQuda("Solution type %s not implemented", get_solution_str(inv_param.solution_type));
     }
