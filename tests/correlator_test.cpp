@@ -353,7 +353,8 @@ int main(int argc, char **argv)
   //! Gauge parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
-
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  
   //! Set lattice dimensions
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
@@ -431,7 +432,12 @@ int main(int argc, char **argv)
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
   //! calculate correlators
-  construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
+  // Now that the clover field is set, we may assign a
+  // new MG preconditioner
+  if(inv_multigrid) {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
   invert_and_contract(prop_array_ptr, prop_array_ptr, correlation_function_sum, corr_param, cs_param,
                       gauge_param, inv_param, inv_param4D);
 
