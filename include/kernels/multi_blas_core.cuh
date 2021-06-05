@@ -48,12 +48,12 @@ namespace quda
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i].set(*x[i]);
-          if (Functor::use_z) this->Z[i].set(*z[i]);
+          this->X[i] = *x[i];
+          if (Functor::use_z) this->Z[i] = *z[i];
         }
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i].set(*y[i]);
-          if (Functor::use_w) this->W[i].set(*w[i]);
+          this->Y[i] = *y[i];
+          if (Functor::use_w) this->W[i] = *w[i];
         }
       }
     };
