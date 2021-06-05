@@ -114,6 +114,7 @@ protected:
 
       // Setup gauge container.
       setWilsonGaugeParam(param);
+      param.t_boundary = QUDA_PERIODIC_T;
 
       // Reunitarization setup
       int *num_failures_h = (int *)mapped_malloc(sizeof(int));

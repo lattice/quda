@@ -1389,7 +1389,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     double n = blas::norm2(p.Component(i));
     blas::ax(1/sqrt(n),p.Component(i));
     for(int j=i+1; j < param.num_src; j++) {
-      std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+      auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
       blas::caxpy(-ri,p.Component(i),p.Component(j));
     }
   }
@@ -1540,7 +1540,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           double n = blas::norm2(p.Component(i));
           blas::ax(1/sqrt(n),p.Component(i));
           for(int j=i+1; j < param.num_src; j++) {
-            std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+            auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
             blas::caxpy(-ri,p.Component(i),p.Component(j));
 
           }
