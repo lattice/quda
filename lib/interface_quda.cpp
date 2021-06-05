@@ -2564,7 +2564,31 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   blas_lapack::set_native(param->native_blas_lapack);
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);
-
+  cudaGaugeField *gaugeTemp = nullptr;
+  
+  // Smear the gauge field
+  if (mg_param.invert_param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    if(!inv_gauge_smeared) {
+      switch(mg_param.invert_param->gauge_smear_type) {
+      case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(mg_param.invert_param->gauge_smear_steps, mg_param.invert_param->gauge_smear_coeff, 1); break;
+      case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(mg_param.invert_param->gauge_smear_steps, mg_param.invert_param->gauge_smear_coeff, 1); break;
+      default: errorQuda("Unsupported smear type %d", mg_param.invert_param->gauge_smear_type);
+      }
+      inv_gauge_smeared = true;
+    }
+  
+    // Copy the gauge field, restore after the MG construction
+    GaugeFieldParam gParam(*gaugeSmeared);
+    gaugeTemp = new cudaGaugeField(gParam);
+    gaugeTemp->copy(*gaugePrecise);
+    
+    gaugeSloppy->copy(*gaugeSmeared);
+    gaugePrecondition->copy(*gaugeSmeared);
+    gaugeRefinement->copy(*gaugeSmeared);
+    gaugeEigensolver->copy(*gaugeSmeared);
+    gaugePrecise->copy(*gaugeSmeared);
+  }
+  
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
     errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
@@ -2637,6 +2661,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
 
+  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    gaugePrecise->copy(*gaugeTemp);
+    delete gaugeTemp;
+  }
+  
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -2910,6 +2939,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     gaugeTemp = new cudaGaugeField(gParam);
     gaugeTemp->copy(*gaugePrecise);
     gaugePrecise->copy(*gaugeSmeared);
+    gaugeSloppy->copy(*gaugeSmeared);
+    gaugePrecondition->copy(*gaugeSmeared);
+    gaugeRefinement->copy(*gaugeSmeared);
+    gaugeEigensolver->copy(*gaugeSmeared);
+    gaugePrecise->copy(*gaugeSmeared);
+
     profileInvert.TPSTART(QUDA_PROFILE_TOTAL);    
   }
   

@@ -274,8 +274,6 @@ int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
-QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
-
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
 std::array<int,4> momentum = {0, 0, 0, 0};
