@@ -88,7 +88,7 @@ namespace quda
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 
       // Debug tools
-#if 1
+#if 0
       //Test for Traceless:
       double error = getTrace(Q).real();
       printf("Trace test %d %d %.15e\n", x_cb, dir, error);
@@ -161,7 +161,7 @@ namespace quda
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 
       // Debug tools
-#if 1
+#if 0
       //Test for Traceless:
       double error = getTrace(Q).real();
       printf("Trace test %d %d %.15e\n", x_cb, dir, error);
