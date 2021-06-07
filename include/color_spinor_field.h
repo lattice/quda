@@ -800,30 +800,24 @@ namespace quda {
 
     /**
        @brief Initiate halo communication sending
-       @param[in] nFace Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream_idx The stream in which to do the copy.  If
        -1 is passed then the copy will be issied to the d^th stream
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr = false,
-                   bool remote_write = false);
+    void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false);
 
     /**
        @brief Initiate halo communication
-       @param[in] Depth of face exchange
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (presently unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsStart(int nFace, int d, int dagger, const qudaStream_t &stream, bool gdr_send = false,
-                    bool gdr_recv = false);
+    void commsStart(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
 
     /**
        @brief Non-blocking query if the halo communication has completed

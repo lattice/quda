@@ -148,7 +148,6 @@ protected:
       strcat(aux, comm_dim_topology_string());
       if (in.PCType() == QUDA_5D_PC) { strcat(aux, ",5D_pc"); }
       if (dagger && in.Nspin() == 4) { strcat(aux, ",dagger"); }
-      if (getKernelPackT()) { strcat(aux, ",kernelPackT"); }
       switch (nFace) {
       case 1: strcat(aux, ",nFace=1"); break;
       case 3: strcat(aux, ",nFace=3"); break;
@@ -201,7 +200,6 @@ public:
     // compute number of number of work items we have to do
     for (int i = 0; i < 4; i++) {
       if (!commDim[i]) continue;
-      if (i == 3 && !getKernelPackT()) continue;
       work_items += 2 * nFace * in.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
     }
   }
@@ -402,7 +400,7 @@ public:
     int nDimPack = 0;
     for (int d = 0; d < 4; d++) {
       if (!commDim[d]) continue;
-      if (d != 3 || getKernelPackT()) nDimPack++;
+      nDimPack++;
     }
     if (!nDimPack) return; // if zero then we have nothing to pack
 

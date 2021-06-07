@@ -96,9 +96,6 @@ namespace quda {
                                 commDimPartitioned(2), commDimPartitioned(3) };
     setPackComms(comms);
 
-    // need to enable packing in temporal direction to get spin-projector correct
-    pushKernelPackT(true);
-
     // first transfer src1
     qudaDeviceSynchronize();
 
@@ -118,7 +115,7 @@ namespace quda {
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsStart(1, 2*i, dag, device::get_stream(2 * i));
+	a.commsStart(2*i, device::get_stream(2 * i));
       }
     }
 
@@ -130,7 +127,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    popKernelPackT(); // restore packing state
 
     a.bufferIndex = (1 - a.bufferIndex);
     comm_barrier();
