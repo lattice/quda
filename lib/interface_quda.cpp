@@ -2408,11 +2408,12 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   std::vector<Complex> evals;
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->block_size; i++) {
+  int n_vecs = eig_param->compress ? eig_param->comp_n_conv : eig_param->n_conv;
+  for (int i = 0; i < n_vecs; i++) {
     kSpace.push_back(ColorSpinorField::Create(cudaParam));
     // Copy data from the host array into the the kSpace. QUDA interprets this as a
     // user supplied initial guess. The Eigensolver will resize the arrays.
-    *kSpace[i] = *host_evecs_[i];
+    if(i<eig_param->block_size) *kSpace[i] = *host_evecs_[i];
   }
   
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
@@ -2491,7 +2492,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // host side gamma basis.
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < n_vecs; i++) {
+      *host_evecs_[i] = *kSpace[i];
+    }
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 

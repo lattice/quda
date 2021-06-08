@@ -59,22 +59,45 @@ namespace quda
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      if(compress) {
+	n_ev = fine_n_ev;
+	n_kr = fine_n_kr;
+	n_conv = fine_n_conv;
+	max_restarts = fine_max_restarts;
+      }
+      
+      prepareKrylovSpace(kSpace, evals);
       loadFromFile(mat, kSpace, evals);
-      return;
+      // Set converged to true as the fine problem is solved.
+      converged = true;
+      
+      if (compress) {	
+	// Load the coarse space from file
+	if (strcmp(eig_param->coarse_vec_infile, "") != 0) {
+	  prepareCompressedKrylovSpace(kSpace, evals);
+	  compressed_mode = true;	  
+	  loadFromFile(mat, compressed_space, evals);
+	  // We are done
+	  return;
+	}
+      } else {	
+	// If not performing a compressed solve, and we loaded a fine space
+	// we are done.	
+	return;      
+      }
     }
 
     // If no eigenspace was loaded, we must construct it
     if(!converged) {
       
-      // If using the compression, we first perform the fine computation. Set the
-      // eig_param values to the fine problem values, then switch to the
+      // If using the compressed solver, we first perform the fine computation.
+      // Set the eig_param values to the fine problem values, then switch to the
       // full problem when the fine problem is complete.
       if(compress) {
 	n_ev = fine_n_ev;
 	n_kr = fine_n_kr;
 	n_conv = fine_n_conv;
 	max_restarts = fine_max_restarts;
-	printfQuda("n_ev %d, n_kr %d, n_conv %d, mr %d\n", n_ev, n_kr, n_conv, max_restarts); 
       }
       
       // Check for an initial guess. If none present, populate with rands, then
@@ -84,19 +107,45 @@ namespace quda
       // Increase the size of kSpace passed to the function, will be trimmed to
       // original size before exit.
       prepareKrylovSpace(kSpace, evals);
-    }
 
-    // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
-
-    // Begin TRLM Eigensolver computation
-    //---------------------------------------------------------------------------
-    // If no fine eigenspace was loaded, we must construct it
-    if(!converged) {
-      // Print Eigensolver params
+      // Check for Chebyshev maximum estimation
+      checkChebyOpMax(mat, kSpace);
+      
+      // Begin fine TRLM Eigensolver computation
+      //---------------------------------------------------------------------------
       printEigensolverSetup();
       converged = trlmSolve(kSpace);
     }
+
+    // If in compressed mode, switch to the full problem parameters
+    if(compress && converged) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+	printfQuda("FINE PROBLEM: TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv, restart_iter, iter);
+      }
+      
+      // If we loaded a fine space to create a transfer basis, we start the
+      // computation from scratch 
+      if (strcmp(eig_param->vec_infile, "") != 0) {            
+	num_converged = 0;
+	num_keep = 0;
+	num_locked = 0;
+	for (int i = 0; i < n_kr; i++) {
+	  alpha[i] = 0.0;
+	  beta[i] = 0.0;
+	  residua[i] = 0.0;
+	}
+      }
+      
+      // Algorithm parameters (n_ev, n_kr, etc) are updated in this function
+      prepareCompressedKrylovSpace(kSpace, evals);
+      compressed_mode = true;
+      
+      // Print Eigensolver params
+      printEigensolverSetup();
+      converged = trlmSolve(compressed_space);    
+    }
+    //---------------------------------------------------------------------------
+    
     
     // Post computation report
     //---------------------------------------------------------------------------
@@ -120,13 +169,15 @@ namespace quda
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
-
-      // Compute eigenvalues
-      computeEvals(mat, kSpace, evals);
     }
-
+    
+    // Compute eigenvalues
+    if(compressed_mode) computeEvals(mat, compressed_space, evals);
+    else computeEvals(mat, kSpace, evals);
+    
     // Local clean-up
-    cleanUpEigensolver(kSpace, evals);
+    if(compressed_mode) cleanUpEigensolver(compressed_space, evals);
+    else cleanUpEigensolver(kSpace, evals);    
   }
   
   // Destructor
@@ -150,8 +201,34 @@ namespace quda
     
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
+
+      // If true, promote the entire krylov space to the
+      // fine representation and extend the space, then compress
+      // back to coarse.
+      bool fine_lanczos = false;
+      if(fine_lanczos) {
+	int k_size = kSpace.size();
+	int f_size = fine_vector.size();
+	// Create fine vectors for test workspace
+	ColorSpinorParam cs_param_fine(*fine_vector[0]);
+	cs_param_fine.create = QUDA_ZERO_FIELD_CREATE;
+	
+	for (int i = f_size; i < k_size; i++) fine_vector.push_back(ColorSpinorField::Create(cs_param_fine));
+	promoteVectors(fine_vector, kSpace, 0, 0, k_size);
+	compressed_mode = false;
+	for (int step = num_keep; step < n_kr; step++) lanczosStep(fine_vector, step);
+	
+	int f_size_new = fine_vector.size();
+	ColorSpinorParam cs_param_coarse(*kSpace[0]);
+	for (int i = k_size; i < f_size_new; i++) kSpace.push_back(ColorSpinorField::Create(cs_param_coarse));
+	compressVectors(fine_vector, kSpace, 0, 0, f_size_new);
       
-      for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);      
+	for (int i = f_size; i < f_size_new; i++) delete fine_vector[i];
+	fine_vector.resize(f_size);      
+	compressed_mode = true;
+      } else {
+	for (int step = num_keep; step < n_kr; step++) lanczosStep(kSpace, step);
+      }
       iter += (n_kr - num_keep);
 
       // The eigenvalues are returned in the alpha array
@@ -233,30 +310,84 @@ namespace quda
   void TRLM::lanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
-    // r = A * v_j
 
-    chebyOp(mat, *r[0], *v[j]);
+    // If in compressed mode, we promote the current Lanczos vector
+    // else just point to the current vector
+    std::vector<ColorSpinorField *> v_j;
+    if(compressed_mode) {
+      promoteVectors(fine_vector, v, 0, j, 1);
+      v_j.push_back(fine_vector[0]);
+    } else {
+      v_j.push_back(v[j]);
+    }
+
+    // r = A * v_j
+    chebyOp(mat, *r[0], *v_j[0]);
 
     // a_j = v_j^dag * r
-    alpha[j] = blas::reDotProduct(*v[j], *r[0]);
+    alpha[j] = blas::reDotProduct(*v_j[0], *r[0]);
 
     // r = r - a_j * v_j
-    blas::axpy(-alpha[j], *v[j], *r[0]);
+    blas::axpy(-alpha[j], *v_j[0], *r[0]);
 
     int start = (j > num_keep) ? j - 1 : 0;
-
+    
     if (j - start > 0) {
       std::vector<ColorSpinorField *> r_ {r[0]};
       std::vector<double> beta_;
-      beta_.reserve(j - start);
       std::vector<ColorSpinorField *> v_;
-      v_.reserve(j - start);
-      for (int i = start; i < j; i++) {
-        beta_.push_back(-beta[i]);
-        v_.push_back(v[i]);
+      
+      if(compressed_mode) {	
+	int batch_size = std::min((int)fine_vector.size(), j - start);
+	int full_batches = (j - start)/batch_size;
+	int remainder = (j - start)%batch_size;
+	bool do_remainder = (j - start)%batch_size == 0 ? false : true;
+	
+	// We promote the v_idx + vectors.
+	// No need to compress after as we read only.
+	for (int b = 0; b < full_batches; b++) {
+
+	  beta_.reserve(batch_size);
+	  v_.reserve(batch_size);
+
+	  int idx = start + b * batch_size;
+	  promoteVectors(fine_vector, v, 0, idx, batch_size);
+	  
+	  for(int i = 0; i < batch_size; i++) {
+	    beta_.push_back(-beta[idx + i]);
+	    v_.push_back(fine_vector[i]);
+	  }
+	  // r = r - b_{j-1} * v_{j-1}
+	  blas::axpy(beta_.data(), v_, r_);
+	  
+	  beta_.resize(0);
+	  v_.resize(0);
+	}
+	if(do_remainder) {
+	  beta_.reserve(remainder);
+	  v_.reserve(remainder);
+	  
+	  int idx = start + full_batches * batch_size;
+	  promoteVectors(fine_vector, v, 0, idx, remainder);
+	  for(int i = 0; i < remainder; i++) {
+	    beta_.push_back(-beta[idx + i]);
+	    v_.push_back(fine_vector[i]);
+	  }
+	  // r = r - b_{j-1} * v_{j-1}
+	  blas::axpy(beta_.data(), v_, r_);
+	  beta_.resize(0);
+	  v_.resize(0);
+	}	
+      } else {
+	beta_.reserve(j - start);
+	v_.reserve(j - start);	
+	for (int i = start; i < j; i++) {
+	  beta_.push_back(-beta[i]);
+	  v_.push_back(v[i]);
+	}
+	// r = r - b_{j-1} * v_{j-1}
+	blas::axpy(beta_.data(), v_, r_);
       }
-      // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(beta_.data(), v_, r_);
     }
 
     // Orthogonalise r against the Krylov space
@@ -267,8 +398,15 @@ namespace quda
 
     // Prepare next step.
     // v_{j+1} = r / b_j
-    blas::zero(*v[j + 1]);
-    blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
+    if(compressed_mode) {
+      promoteVectors(fine_vector, v, 0, j+1, 1);
+      blas::zero(*fine_vector[0]);
+      blas::axpy(1.0 / beta[j], *r[0], *fine_vector[0]);
+      compressVectors(fine_vector, v, 0, j+1, 1);      
+    } else {
+      blas::zero(*v[j + 1]);
+      blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
+    }
 
     // Save Lanczos step tuning
     saveTuneCache();
@@ -375,14 +513,41 @@ namespace quda
       for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
     }
 
-    rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    // If true, promote the entire krylov space to the
+    // fine representation and rotate the space, then compress
+    // back to coarse.
+    bool fine_rotate = true;
+    if(fine_rotate) {
+      int k_size = kSpace.size();
+      int f_size = fine_vector.size();
 
+      // Create fine vectors for test workspace
+      ColorSpinorParam cs_param_fine(*fine_vector[0]);
+      cs_param_fine.create = QUDA_ZERO_FIELD_CREATE;
+
+      for (int i = f_size; i < k_size; i++) fine_vector.push_back(ColorSpinorField::Create(cs_param_fine));
+      promoteVectors(fine_vector, kSpace, 0, 0, k_size);
+      compressed_mode = false;
+      rotateVecs(fine_vector, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+
+      int f_size_new = fine_vector.size();
+      ColorSpinorParam cs_param_coarse(*kSpace[0]);
+      for (int i = k_size; i < f_size_new; i++) kSpace.push_back(ColorSpinorField::Create(cs_param_coarse));
+      compressVectors(fine_vector, kSpace, 0, 0, f_size_new);
+      
+      for (int i = f_size; i < f_size_new; i++) delete fine_vector[i];
+      fine_vector.resize(f_size);      
+      compressed_mode = true;
+    } else {
+      rotateVecs(kSpace, ritz_mat_keep, offset, dim, iter_keep, num_locked, profile);
+    }
+    
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[n_kr]);
 
     // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[n_kr - 1] * ritz_mat[dim * (i + 1) - 1];
-
+    
     host_free(ritz_mat_keep);
   }
 } // namespace quda

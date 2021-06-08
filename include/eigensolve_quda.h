@@ -63,15 +63,22 @@ namespace quda
 
     // Compression variables
     //----------------------
-    bool compress; /** indicates that we wish to perform a fine, then compressed solve */
-    std::vector<ColorSpinorField *> fine_vector; /** Current decompressed vector(s) */
-    std::vector<ColorSpinorField *> compressed_space; /** Compressed vector(s) */
-    std::vector<ColorSpinorField *> fine_space; /** fine vector(s) */
+    bool compress; /** indicates that we wish to perform a fine, then compressed 
+		       solve */
+    bool compressed_mode; /** indicates that the solver is running in compressed 
+			      mode */
+    std::vector<ColorSpinorField *> fine_vector; /** Decompressed vector(s) use as 
+						     workspace */
+    std::vector<ColorSpinorField *> compressed_space; /** Compressed vector space */
+    std::vector<ColorSpinorField *> fine_space; /** fine vector space */
     
     /** This is the transfer operator that defines the prolongation and restriction 
 	operators */
     Transfer *transfer;
-    
+    std::vector<ColorSpinorField*> B; /** Used to create the transfer operator */
+    ColorSpinorField *tmp_comp1;
+    ColorSpinorField *tmp_comp2;
+
     /** We define here the parameters needed to create a Transfer operator */
     int geo_block_size[4];
     int spin_block_size;
