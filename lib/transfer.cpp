@@ -1,4 +1,3 @@
-
 #include <transfer.h>
 
 #include <blas_quda.h>
@@ -177,14 +176,12 @@ namespace quda {
         && location != QUDA_CPU_FIELD_LOCATION) {
       return;
     }
-
     postTrace();
     ColorSpinorParam param(*B[0]);
     param.create = QUDA_NULL_FIELD_CREATE;
     param.location = location;
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     if (param.Precision() < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION);
-
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       if (fine_tmp_d && coarse_tmp_d) return;
       fine_tmp_d = ColorSpinorField::Create(param);
@@ -199,10 +196,8 @@ namespace quda {
   void Transfer::initializeLazy(QudaFieldLocation location) const
   {
     if (!enable_cpu && !enable_gpu) errorQuda("Neither CPU or GPU coarse fields initialized");
-
     // delayed allocating this temporary until we need it
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) createTmp(QUDA_CUDA_FIELD_LOCATION);
-
     switch (location) {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
@@ -413,20 +408,17 @@ namespace quda {
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
-
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
     } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
 
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
-
       if (output->VolumeCB() != input->VolumeCB()) errorQuda("Optimized KD transfer is only between equal volumes");
 
       // the optimized KD op acts on fine spinors
@@ -438,9 +430,7 @@ namespace quda {
       }
       flops_ += 0;
     } else if (transfer_type == QUDA_TRANSFER_AGGREGATE) {
-
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
-
       if (use_gpu) {
         if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
         if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())

@@ -93,13 +93,20 @@ namespace quda {
 #ifdef NSPIN4
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN4
-#ifdef NSPIN1
+	// MG Lanczos additions
       } else if (nVec == 64) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 96) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-#endif // NSPIN1
+      } else if (nVec == 128) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,128>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 256) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,256>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 384) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,384>(out, in, v, fine_to_coarse, parity);
+      } else if (nVec == 512) {
+        Prolongate<Float,fineSpin,fineColor,coarseSpin,512>(out, in, v, fine_to_coarse, parity);
+#endif // NSPIN4
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
