@@ -58,7 +58,7 @@ namespace quda {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
         return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
       } else {
-        errorQuda("Unexpected block size %d\n", tp.block.x);
+        errorQuda("Unexpected block size %d", tp.block.x);
         return QUDA_ERROR;
       }
     }
@@ -229,7 +229,7 @@ namespace quda {
        parity is local to the thread block in the y dimension, half
        the max threads in the x dimension.
      */
-    unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size(); }
+    unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size<block_size_y>(); }
 
     template <int block_size_x, template <typename> class Functor, typename FunctorArg>
     std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
@@ -239,7 +239,7 @@ namespace quda {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
         return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
       } else {
-        return launch<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
+        return launch<block_size_x / 2, Functor>(arg, tp, stream);
       }
     }
 
@@ -251,7 +251,7 @@ namespace quda {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
         return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
       } else {
-        errorQuda("Unexpected block size %d\n", tp.block.x);
+        errorQuda("Unexpected block size %d", tp.block.x);
         return QUDA_ERROR;
       }
     }
@@ -259,7 +259,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      arg.launch_error = launch<device::max_multi_reduce_block_size(), Functor>(arg, tp, stream);
+      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -333,7 +333,20 @@ namespace quda {
       n_batch(n_batch)
     { }
 
-    bool advanceBlockDim(TuneParam &param) const { return Tunable::advanceBlockDim(param); }
+    template <typename T> bool is_power2(T x) const { return (x != 0) && ((x & (x - 1)) == 0); }
+
+    /**
+       @brief Custom variant that only selects power of two block
+       sizes.  We restrict in this way to limit instantiations.
+     */
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      bool rtn;
+      do {
+        rtn = Tunable::advanceBlockDim(param);
+      } while (rtn && !is_power2(param.block.x));
+      return rtn;
+    }
 
     void initTuneParam(TuneParam &param) const
     {
