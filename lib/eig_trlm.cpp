@@ -205,8 +205,8 @@ namespace quda
       // If true, promote the entire krylov space to the
       // fine representation and extend the space, then compress
       // back to coarse.
-      bool fine_lanczos = false;
-      if(fine_lanczos) {
+      bool fine_lanczos = true;
+      if(fine_lanczos && compressed_mode) {
 	int k_size = kSpace.size();
 	int f_size = fine_vector.size();
 	// Create fine vectors for test workspace
@@ -517,7 +517,7 @@ namespace quda
     // fine representation and rotate the space, then compress
     // back to coarse.
     bool fine_rotate = true;
-    if(fine_rotate) {
+    if(fine_rotate && compressed_mode) {
       int k_size = kSpace.size();
       int f_size = fine_vector.size();
 
