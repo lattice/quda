@@ -336,6 +336,22 @@ namespace quda
     return ptr;
   }
 
+  /** 
+   * Round to the nearest 2MiB
+   *
+   */
+  size_t align2MiB(const size_t size) noexcept
+  {
+     constexpr size_t TwoMiB=(1<<21);
+     constexpr size_t LowBits = TwoMiB-1;
+     constexpr size_t HighBits = ~LowBits;
+
+     // If there are low bits, round to nearest 2MiB
+     size_t align_remainder = (size & LowBits ) ? TwoMiB : 0;
+
+     // Add high bits
+     return  (size & HighBits) + align_remainder;
+  }
 
   /**
    * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
@@ -343,10 +359,11 @@ namespace quda
    */
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
+
 //#ifdef NVSHMEM_COMMS
 //   return shmem_malloc_(func, file, line, size);
 //#else
-    return device_pinned_malloc_(func, file, line, size);
+    return device_pinned_malloc_(func, file, line, align2MiB(size));
 //#endif
   }
   /**

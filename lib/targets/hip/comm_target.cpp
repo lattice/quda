@@ -70,7 +70,8 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
     const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
     for (int dir=0; dir<num_dir; ++dir) {
       remote[dim][dir] = nullptr;
-      if (comm_peer2peer_enabled(dir,dim)) CHECK_HIP_ERROR(hipIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], hipIpcMemLazyEnablePeerAccess));
+      if (!comm_peer2peer_enabled(dir,dim)) continue;
+      CHECK_HIP_ERROR(hipIpcOpenMemHandle(&remote[dim][dir], remote_handle[dir][dim], hipIpcMemLazyEnablePeerAccess));
     }
     if (num_dir == 1) remote[dim][1] = remote[dim][0];
   }
