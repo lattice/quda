@@ -27,7 +27,7 @@ find_package(PythonInterp)
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
-  set(DEFBUILD "DEVEL")
+  set(DEFBUILD "RELEASE")
 endif()
 
 set(VALID_BUILD_TYPES
@@ -345,7 +345,7 @@ endif()
 
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if(${CPU_ARCH} STREQUAL "x86_64")
-  set(CXX_OPT "-march=native")
+  set(CXX_OPT "-mtune=native")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
