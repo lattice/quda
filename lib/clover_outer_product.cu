@@ -107,7 +107,7 @@ namespace quda {
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
 	// Initialize the host transfer from the source spinor
-	a.gather(1, dag, 2*i, device::get_stream(2*i));
+	a.gather(2*i, device::get_stream(2*i));
       } // commDim(i)
     } // i=3,..,0
 

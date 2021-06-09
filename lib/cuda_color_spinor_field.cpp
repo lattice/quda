@@ -545,8 +545,7 @@ namespace quda {
   }
  
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-                                       const int dagger, qudaStream_t stream)
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream)
   {
     void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
     qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
@@ -606,7 +605,7 @@ namespace quda {
     packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
   }
 
-  void cudaColorSpinorField::gather(int nFace, int dagger, int dir, const qudaStream_t &stream)
+  void cudaColorSpinorField::gather(int dir, const qudaStream_t &stream)
   {
     int dim = dir/2;
 
@@ -614,12 +613,12 @@ namespace quda {
       // backwards copy to host
       if (comm_peer2peer_enabled(0,dim)) return;
 
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][0], nFace, dim, QUDA_BACKWARDS, dagger, stream);
+      sendGhost(my_face_dim_dir_h[bufferIndex][dim][0], dim, QUDA_BACKWARDS, stream);
     } else {
       // forwards copy to host
       if (comm_peer2peer_enabled(1,dim)) return;
 
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][1], nFace, dim, QUDA_FORWARDS, dagger, stream);
+      sendGhost(my_face_dim_dir_h[bufferIndex][dim][1], dim, QUDA_FORWARDS, stream);
     }
   }
 
@@ -663,10 +662,6 @@ namespace quda {
     int dir = d%2;
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-
-    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
-    int Npad = Nint/Nvec;
 
     if (!comm_peer2peer_enabled(dir,dim)) {
       if (dir == 0)

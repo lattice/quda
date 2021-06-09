@@ -741,14 +741,11 @@ namespace quda {
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
       @param ghost_spinor Where to send the ghost zone
-      @param nFace Number of face to send
       @param dim The lattice dimension we are sending
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
-      @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir, const int dagger,
-                   qudaStream_t stream);
+    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -781,13 +778,11 @@ namespace quda {
     /**
        @brief Copies the ghost to the host from the device, prior to
        communication.
-       @param[in] nFace Depth of face exchange
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] stream The stream in which to do the copy
      */
-    void gather(int nFace, int dagger, int dir, const qudaStream_t &stream);
+    void gather(int dir, const qudaStream_t &stream);
 
     /**
        @brief Initiate halo communication receive

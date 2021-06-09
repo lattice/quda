@@ -190,7 +190,7 @@ namespace quda
         PROFILE(qudaStreamWaitEvent(device::get_stream(2*i+dir), event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
-        PROFILE(if (dslash_copy) in.gather(dslash.Nface()/2, dslash.Dagger(), 2*i+dir, device::get_stream(2*i+dir)), profile, QUDA_PROFILE_GATHER);
+        PROFILE(if (dslash_copy) in.gather(2*i+dir, device::get_stream(2*i+dir)), profile, QUDA_PROFILE_GATHER);
 
         // Record the end of the gathering if not peer-to-peer
 	if (!comm_peer2peer_enabled(dir,i)) {
@@ -341,6 +341,7 @@ namespace quda
         Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
         = 0;
 
+    virtual ~DslashPolicyImp() { }
   };
 
   /**
