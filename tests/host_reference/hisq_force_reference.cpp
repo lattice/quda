@@ -1257,11 +1257,7 @@ void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, 
 #endif
   // allocate memory for temporary fields
   void *tempmat[6];
-  if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
-    for (int i = 0; i < 6; ++i) tempmat[i] = malloc(len * 18 * sizeof(double));
-  } else {
-    for (int i = 0; i < 6; ++i) tempmat[i] = malloc(len * 18 * sizeof(float));
-  }
+  for (int i = 0; i < 6; i++) { tempmat[i] = safe_malloc(len * 18 * param.cpu_prec); }
 
   PathCoefficients<double> act_path_coeff;
   act_path_coeff.one = path_coeff[0];
@@ -1282,7 +1278,7 @@ void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, 
     errorQuda("Unsupported precision");
   }
 
-  for (int i = 0; i < 6; ++i) { free(tempmat[i]); }
+  for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
 }
 
 template <class Real, int oddBit>

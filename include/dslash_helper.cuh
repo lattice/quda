@@ -5,6 +5,8 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
+#include <fast_intdiv.h>
+#include <dslash_quda.h>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
@@ -254,8 +256,6 @@ namespace quda
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
 
-    real t_proj_scale; // factor to correct for T-dimensional spin projection
-
     DslashConstant dc;      // pre-computed dslash constants for optimized indexing
     KernelType kernel_type; // interior, exterior_t, etc.
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
@@ -373,7 +373,6 @@ namespace quda
         pack_threads = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          if (i == 3 && !getKernelPackT()) continue;
           pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
           dim_map[d++] = i;
         }
@@ -385,7 +384,6 @@ namespace quda
         int d = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          if (i == 3 && !getKernelPackT()) continue;
           dim_map[d++] = i;
         }
         pack_threads = 0;
