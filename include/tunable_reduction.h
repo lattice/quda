@@ -1,17 +1,9 @@
 #pragma once
 
-#include <tune_quda.h>
+#include <tunable_kernel.h>
 #include <lattice_field.h>
-#include <device.h>
-#include <kernel_helper.h>
-#include <target_device.h>
-#include <reduce_helper.h>
 #include <reduction_kernel.h>
-#include <register_traits.h>
-
-#ifdef JITIFY
-#include <jitify_helper2.cuh>
-#endif
+#include <reduction_kernel_host.h>
 
 namespace quda {
 
@@ -23,20 +15,17 @@ namespace quda {
      two and is the parity dimension.
    */
   template <int block_size_y = 2>
-  class TunableReduction2D : public Tunable
+  class TunableReduction2D : public TunableKernel
   {
   protected:
-    QudaFieldLocation location;
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    static constexpr bool grid_stride = true;
 
     /**
        Reduction kernels require grid-size tuning, so enable this, and
        we mark as final to prevent a derived class from accidentally
        switching it off.
     */
-    bool tuneGridDim() const final { return true; }
+    bool tuneGridDim() const final { return grid_stride; }
 
     virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
     virtual int gridStep() const { return minGridSize(); }
@@ -49,47 +38,35 @@ namespace quda {
      */
     virtual unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size<block_size_y>(); }
 
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
-    std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
-    std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      return qudaLaunchKernel(Reduction2D<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
+    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
     std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
-      launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+      launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == block_size_x) return launch_device<block_size_x, Transformer, Arg>(arg, tp, stream);
-      else return launch<block_size_x - device::warp_size(), Transformer>(arg, tp, stream);
+      if (tp.block.x == block_size_x) {
+        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
+        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
+      } else {
+        return launch<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
+      }
     }
 
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
+    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
     std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
-      launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+      launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == block_size_x) return launch_device<block_size_x, Transformer, Arg>(arg, tp, stream);
-      else errorQuda("Unexpected block size %d\n", tp.block.x);
-      return QUDA_ERROR;
+      if (tp.block.x == block_size_x) {
+        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
+        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(Reduction2D), tp, stream, Arg(arg));
+      } else {
+        errorQuda("Unexpected block size %d\n", tp.block.x);
+        return QUDA_ERROR;
+      }
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-#ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("Reduction2D", tp, stream, arg);
-#else
-      arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Transformer>(arg, tp, stream);
-#endif
+      arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -101,27 +78,19 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch_device<Transformer>(result_, tp, stream, arg);
+      launch_device<Functor>(result_, tp, stream, arg);
       result = result_[0];
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
      void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-      Transformer<Arg> t(arg);
-
-      reduce_t value = arg.init();
-
-      for (int j = 0; j < (int)arg.threads.y; j++) {
-        for (int i = 0; i < (int)arg.threads.x; i++) {
-          value = t(value, i, j);
-        }
-      }
+      using reduce_t = typename Functor<Arg>::reduce_t;
+      reduce_t value = Reduction2D_host<Functor, Arg>(arg);
 
       int input_size = vec_length<reduce_t>::value;
       int output_size = result.size() * vec_length<T>::value;
@@ -139,33 +108,33 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
     void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch_host<Transformer>(result_, tp, stream, arg);
+      launch_host<Functor>(result_, tp, stream, arg);
       result = result_[0];
     }
 
-    template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<!enable_host, void>
       launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
     }
 
-    template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<enable_host, void>
       launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else {
-        launch_host<Transformer>(result, tp, stream, arg);
+        launch_host<Functor>(result, tp, stream, arg);
       }
     }
 
@@ -177,17 +146,17 @@ namespace quda {
        @param[in] arg Kernel argument struct
        @param[in] param Constant kernel meta data
      */
-    template <template <typename> class Transformer, typename T, typename Arg>
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
-      launch<Transformer>(result_, tp, stream, arg);
+      launch<Functor>(result_, tp, stream, arg);
       result = result_[0];
     }
 
   public:
     TunableReduction2D(const LatticeField &field, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
+      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location())
     {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
@@ -198,15 +167,10 @@ namespace quda {
     }
 
     TunableReduction2D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      location(location)
+      TunableKernel(location)
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
-    }
-
-    virtual bool advanceTuneParam(TuneParam &param) const
-    {
-      return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
     }
 
     virtual bool advanceBlockDim(TuneParam &param) const {
@@ -224,8 +188,6 @@ namespace quda {
       Tunable::defaultTuneParam(param);
       param.block.y = block_size_y;
     }
-
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
   /**
@@ -242,6 +204,7 @@ namespace quda {
     static_assert(block_size_y == 1, "only block_size_y = 1 supported");
     using Tunable::apply;
     using TunableReduction2D<block_size_y>::location;
+    using TunableReduction2D<block_size_y>::grid_stride;
 
   protected:
     const int n_batch;
@@ -268,47 +231,35 @@ namespace quda {
      */
     unsigned int maxBlockSize(const TuneParam &) const { return device::max_multi_reduce_block_size(); }
 
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
-    std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      return qudaLaunchKernel(MultiReduction<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
-    std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      return qudaLaunchKernel(MultiReduction<block_size_x, block_size_y, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
+    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
     std::enable_if_t<block_size_x != device::warp_size(), qudaError_t>
-      launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+      launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == block_size_x) return launch_device<block_size_x, Transformer, Arg>(arg, tp, stream);
-      else return launch<block_size_x - device::warp_size(), Transformer>(arg, tp, stream);
+      if (tp.block.x == block_size_x) {
+        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
+        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
+      } else {
+        return launch<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
+      }
     }
 
-    template <int block_size_x, template <typename> class Transformer, typename Arg>
+    template <int block_size_x, template <typename> class Functor, typename FunctorArg>
     std::enable_if_t<block_size_x == device::warp_size(), qudaError_t>
-      launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+      launch(FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == block_size_x) return launch_device<block_size_x, Transformer, Arg>(arg, tp, stream);
-      else errorQuda("Unexpected block size %d\n", tp.block.x);
-      return QUDA_ERROR;
+      if (tp.block.x == block_size_x) {
+        using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
+        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
+      } else {
+        errorQuda("Unexpected block size %d\n", tp.block.x);
+        return QUDA_ERROR;
+      }
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-#ifdef JITIFY
-      arg.launch_error = launch_jitify<Transformer, true, Arg, true>("MultiReduction", tp, stream, arg);
-#else
-      arg.launch_error = launch<device::max_multi_reduce_block_size(), Transformer>(arg, tp, stream);
-#endif
+      arg.launch_error = launch<device::max_multi_reduce_block_size(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -323,32 +274,23 @@ namespace quda {
       }
     }
 
-    template <template <typename> class Transformer, typename Arg, typename T>
+    template <template <typename> class Functor, typename Arg, typename T>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-      Transformer<Arg> t(arg);
+      using reduce_t = typename Functor<Arg>::reduce_t;
 
       int input_size = vec_length<reduce_t>::value;
       int output_size = vec_length<T>::value;
       if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
 
+      auto value = MultiReduction_host<Functor, Arg>(arg);
       for (int j = 0; j < (int)arg.threads.y; j++) {
-        reduce_t value = arg.init();
-
-        for (int k = 0; k < (int)arg.threads.z; k++) {
-          for (int i = 0; i < (int)arg.threads.x; i++) {
-            value = t(value, i, j, k);
-          }
-        }
-
         // copy element by element to output vector
         for (int i = 0; i < output_size; i++) {
           reinterpret_cast<typename scalar<T>::type*>(&result[j])[i] =
-            reinterpret_cast<typename scalar<reduce_t>::type*>(&value)[i];
+            reinterpret_cast<typename scalar<reduce_t>::type*>(&value[j])[i];
         }
       }
-
 
 #if 0 // WAR for now to avoid double and/or wrong reduction type
       if (!activeTuning() && commGlobalReduction()) {
@@ -358,25 +300,25 @@ namespace quda {
 #endif
     }
 
-    template <template <typename> class Transformer, bool enable_host = false, typename T, typename Arg>
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
     std::enable_if_t<!enable_host, void>
     launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
     }
 
-    template <template <typename> class Transformer, bool enable_host, typename T, typename Arg>
+    template <template <typename> class Functor, bool enable_host, typename T, typename Arg>
     std::enable_if_t<enable_host, void>
     launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else {
-	launch_host<Transformer>(result, tp, stream, arg);
+	launch_host<Functor>(result, tp, stream, arg);
       }
     }
 

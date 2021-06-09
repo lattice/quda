@@ -427,7 +427,11 @@ struct Communicator {
              comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
 
+#ifdef MULTI_GPU
   int comm_dim_partitioned(int dim) { return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1)); }
+#else
+  int comm_dim_partitioned(int) { return 0; }
+#endif
 
   int comm_partitioned()
   {

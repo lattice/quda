@@ -109,8 +109,6 @@ namespace quda
 
     inline void setParam(TuneParam &tp)
     {
-      arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
-
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
       // Also, the accessor constructor calls Ghost(), which uses
@@ -355,8 +353,10 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+#ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
       strcat(aux_barrier, ",shmem");
+#endif
     }
 
 #ifdef NVSHMEM_COMMS

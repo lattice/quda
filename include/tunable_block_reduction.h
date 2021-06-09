@@ -1,15 +1,9 @@
 #pragma once
 
-#include <tune_quda.h>
-#include <device.h>
-#include <kernel_helper.h>
-#include <reduce_helper.h>
-#include <target_device.h>
+#include <tunable_kernel.h>
+#include <lattice_field.h>
 #include <block_reduction_kernel.h>
-
-#ifdef JITIFY
-#include <jitify_helper2.cuh>
-#endif
+#include <block_reduction_kernel_host.h>
 
 namespace quda {
 
@@ -23,105 +17,79 @@ namespace quda {
      the thread blocks, no block-size tuning is performed in the x
      dimension.
    */
-  class TunableBlock2D : public Tunable
+  class TunableBlock2D : public TunableKernel
   {
   protected:
     const LatticeField &field;
-    QudaFieldLocation location;
     mutable unsigned int vector_length_y;
     mutable unsigned int step_y;
     const unsigned int max_block_y;
     bool tune_block_x;
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    static constexpr bool grid_stride = false;
 
     /**
        Block reduction kernels do not use grid-size tuning, so disable this, and
        we mark as final to prevent a derived class from accidentally
        switching it on.
     */
-    bool tuneGridDim() const final { return false; }
+    bool tuneGridDim() const final { return grid_stride; }
 
-    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<device::use_kernel_arg<Arg>(), void>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
+    template <int idx, typename Block, template <typename> class Functor, typename FunctorArg>
+    std::enable_if_t<idx != 0, void> launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
-      launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
-      qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      qudaLaunchKernel(BlockKernel2D<block_size, Transformer, Arg>, tp, stream, arg);
-    }
-
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<idx != 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
-      else launch_device<idx - 1, Block, Transformer>(arg, tp, stream);
-    }
-
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<idx == 0, void> launch_device(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == Block::block[idx]) launch_device<Block::block[idx], Transformer, Arg>(arg, tp, stream);
-      else errorQuda("Unexpected block size %d\n", tp.block.x);
-    }
-
-    template <template <int, typename> class Transformer, typename Block, typename Arg>
-    void launch_device(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
-    {
-      arg.grid_dim = tp.grid;
-      arg.block_dim = tp.block;
-#ifdef JITIFY
-      launch_error = launch_jitify_block<Transformer>("BlockKernel2D", tp, stream, arg);
-#else
-      launch_device<Block::block.size() - 1, Block, Transformer>(arg, tp, stream);
-#endif
-    }
-
-    template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    void kernel(Arg &arg)
-    {
-      Transformer<block_size, Arg> t(arg);
-      dim3 block(0, 0, 0);
-      for (block.y = 0; block.y < arg.grid_dim.y; block.y++) {
-        for (block.x = 0; block.x < arg.grid_dim.x; block.x++) {
-          t(block, dim3(0, 0, 0));
-        }
+      if (tp.block.x == Block::block[idx]) {
+        using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
+        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
+      } else {
+        launch_device<idx - 1, Block, Functor>(arg, tp, stream);
       }
     }
 
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<idx != 0, void> launch_host(const TuneParam &tp, Arg &arg)
+    template <int idx, typename Block, template <typename> class Functor, typename FunctorArg>
+    std::enable_if_t<idx == 0, void> launch_device(const FunctorArg &arg, const TuneParam &tp, const qudaStream_t &stream)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
-      else launch_host<idx - 1, Block, Transformer>(tp, arg);
+      if (tp.block.x == Block::block[idx]) {
+        using Arg = BlockKernelArg<Block::block[idx], FunctorArg>;
+        TunableKernel::launch_device<Functor, grid_stride>(KERNEL(BlockKernel2D), tp, stream, Arg(arg));
+      } else {
+        errorQuda("Unexpected block size %d", tp.block.x);
+      }
     }
 
-    template <int idx, typename Block, template <int, typename> class Transformer, typename Arg>
-    std::enable_if_t<idx == 0, void> launch_host(const TuneParam &tp, Arg &arg)
+    template <template <typename> class Functor, typename Block, typename Arg>
+    void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) kernel<Block::block[idx], Transformer, Arg>(arg);
-      else errorQuda("Unexpected block size %d\n", tp.block.x);
+      const_cast<Arg&>(arg).grid_dim = tp.grid;
+      const_cast<Arg&>(arg).block_dim = tp.block;
+      launch_device<Block::block.size() - 1, Block, Functor>(arg, tp, stream);
     }
 
-    template <template <int, typename> class Transformer, typename Block, typename Arg>
-    void launch_host(const TuneParam &tp, const qudaStream_t &, Arg &arg)
+    template <int idx, typename Block, template <typename> class Functor, typename Arg>
+    std::enable_if_t<idx != 0, void> launch_host(const TuneParam &tp, const Arg &arg)
     {
-      arg.grid_dim = tp.grid;
-      arg.block_dim = tp.block;
-      launch_host<Block::block.size() - 1, Block, Transformer>(tp, arg);
+      if (tp.block.x == Block::block[idx]) BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
+      else launch_host<idx - 1, Block, Functor>(tp, arg);
+    }
+
+    template <int idx, typename Block, template <typename> class Functor, typename Arg>
+    std::enable_if_t<idx == 0, void> launch_host(const TuneParam &tp, const Arg &arg)
+    {
+      if (tp.block.x == Block::block[idx]) BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
+      else errorQuda("Unexpected block size %d", tp.block.x);
+    }
+
+    template <template <typename> class Functor, typename Block, typename Arg>
+    void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
+    {
+      const_cast<Arg&>(arg).grid_dim = tp.grid;
+      const_cast<Arg&>(arg).block_dim = tp.block;
+      launch_host<Block::block.size() - 1, Block, Functor>(tp, arg);
     }
 
     /**
        @brief Launch function for BlockReductionKernel2D.
-       @tparam Transformer Class which performs any pre-reduction
+       @tparam Functor Class which performs any pre-reduction
        transformation (defined as ternary operator) as well as a store
        method for writing out the result.
        @tparam Block Class that must contain a static std::array of
@@ -130,31 +98,31 @@ namespace quda {
        @param[in] stream Stream in which to execute
        @param[in,out] arg Algorithm meta data
      */
-    template <template <int, typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
-    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    template <template <typename> class Functor, typename Block, bool enable_host = false, typename Arg>
+    std::enable_if_t<!enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer, Block>(tp, stream, arg);
+        launch_device<Functor, Block>(tp, stream, arg);
       } else {
 	errorQuda("CPU not supported yet");
       }
     }
 
-    template <template <int, typename> class Transformer, typename Block, bool enable_host = false, typename Arg>
-    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    template <template <typename> class Functor, typename Block, bool enable_host = false, typename Arg>
+    std::enable_if_t<enable_host, void> launch(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Transformer, Block>(tp, stream ,arg);
+        launch_device<Functor, Block>(tp, stream, arg);
       } else {
-        launch_host<Transformer, Block>(tp, stream, arg);
+        launch_host<Functor, Block>(tp, stream, arg);
       }
     }
 
   public:
     TunableBlock2D(const LatticeField &field, unsigned int vector_length_y,
                    unsigned int max_block_y = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       field(field),
-      location(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       vector_length_y(vector_length_y),
       step_y(1),
       max_block_y(max_block_y == 0 ? vector_length_y : max_block_y),
@@ -213,8 +181,6 @@ namespace quda {
 
     void resizeVector(int y) const { vector_length_y = y; }
     void resizeStep(int y) const { step_y = y; }
-
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
 }
