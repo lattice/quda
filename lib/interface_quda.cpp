@@ -2358,10 +2358,6 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer the inv param structure contained in eig_param
   QudaInvertParam *inv_param = eig_param->invert_param;
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
-    setKernelPackT(true);
-
   if (!initialized) errorQuda("QUDA not initialized");
 
   pushVerbosity(inv_param->verbosity);
@@ -2830,10 +2826,6 @@ void destroyDeflationQuda(void *df) {
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
-
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
-    setKernelPackT(true);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <target_device.h>
 #include <reduce_helper.h>
 
 namespace quda {
@@ -35,13 +36,25 @@ namespace quda {
   }
 
   /**
+     @brief This class is derived from the arg class that the functor
+     creates and curries in the block size.  This allows the block
+     size to be set statically at launch time in the actual argument
+     class that is passed to the kernel.
+   */
+  template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
+    using Arg = Arg_;
+    static constexpr unsigned int block_size = block_size_;
+    BlockKernelArg(const Arg &arg) : Arg(arg) { }
+  };
+
+  /**
      @brief Generic block kernel.  Here, we split the block and thread
      indices in the x and y dimension and pass these indices
      separately to the transform functor.  The x thread dimension is
      templated, e.g., for efficient reductions, and typically the y
      thread dimension is a trivial vectorizable dimension.
   */
-  template <int block_size, template <int, typename> class Transformer, typename Arg>
+  template <template <typename> class Transformer, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
@@ -49,43 +62,24 @@ namespace quda {
     auto j = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
-    Transformer<block_size, Arg> t(arg);
+    Transformer<Arg> t(arg);
     t(block_idx, thread_idx);
   }
-  
-  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    __launch_bounds__(block_size)
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>()
-    							  && (Arg::launch_bounds || block_size > 512)	
-    							, void> BlockKernel2D(Arg arg)
+
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
+    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
-    BlockKernel2D_impl<block_size, Transformer, Arg>(arg);
+    static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
+    BlockKernel2D_impl<Transformer, Arg>(arg);
   }
 
-  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>()
-    							  && !(Arg::launch_bounds || block_size > 512)	
-    							, void> BlockKernel2D(Arg arg)
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
-    BlockKernel2D_impl<block_size, Transformer, Arg>(arg);
-  }
-
-
-  template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-    __launch_bounds__(block_size)
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>()
-                                  && (Arg::launch_bounds || block_size > 512)	
-                                , void> BlockKernel2D()
-  {
-    BlockKernel2D_impl<block_size, Transformer, Arg>(device::get_arg<Arg>());
-  }
-  
-   template <unsigned int block_size, template <int, typename> class Transformer, typename Arg>
-   __global__ std::enable_if_t<!device::use_kernel_arg<Arg>()
-                                  && !(Arg::launch_bounds || block_size > 512)	
-                                , void> BlockKernel2D()
-  {
-    BlockKernel2D_impl<block_size, Transformer, Arg>(device::get_arg<Arg>());
+    static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
+    BlockKernel2D_impl<Transformer, Arg>(device::get_arg<Arg>());
   }
 
 }

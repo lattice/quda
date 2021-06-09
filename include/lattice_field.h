@@ -697,9 +697,9 @@ namespace quda {
      */
     void *remoteFace_r() const;
 
-    virtual void gather(int, int, int, const qudaStream_t &) { errorQuda("Not implemented"); }
+    virtual void gather(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int, int, int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
+    virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
     virtual int commsQuery(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); return 0; }
 
