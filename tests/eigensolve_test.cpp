@@ -140,7 +140,7 @@ int main(int argc, char **argv)
   // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
-  int n_vecs = eig_param->eig_compress ? eig_param->comp_n_conv : eig_param->n_conv;
+  int n_vecs = eig_param->compress ? eig_param->comp_n_conv : eig_param->n_conv;
   void **host_evecs = (void **)malloc(n_vecs * sizeof(void *));
   for (int i = 0; i < n_vecs; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
