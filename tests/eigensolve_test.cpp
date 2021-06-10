@@ -140,11 +140,12 @@ int main(int argc, char **argv)
   // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
-  for (int i = 0; i < eig_n_conv; i++) {
+  int n_vecs = eig_param->eig_compress ? eig_param->comp_n_conv : eig_param->n_conv;
+  void **host_evecs = (void **)malloc(n_vecs * sizeof(void *));
+  for (int i = 0; i < n_vecs; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(n_vecs * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
@@ -163,10 +164,10 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
 
   // Clean up memory allocations
-  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
+  for (int i = 0; i < n_vecs; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
-
+  
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 

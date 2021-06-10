@@ -2393,8 +2393,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   // create wrappers around application vector set
+  int n_vecs = eig_param->compress ? eig_param->comp_n_conv : eig_param->n_conv;
   std::vector<ColorSpinorField *> host_evecs_;
-  for (int i = 0; i < eig_param->n_conv; i++) {
+  for (int i = 0; i < n_vecs; i++) {
     cpuParam.v = host_evecs[i];
     host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
   }
@@ -2408,7 +2409,6 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   std::vector<Complex> evals;
   std::vector<ColorSpinorField *> kSpace;
-  int n_vecs = eig_param->compress ? eig_param->comp_n_conv : eig_param->n_conv;
   for (int i = 0; i < n_vecs; i++) {
     kSpace.push_back(ColorSpinorField::Create(cudaParam));
     // Copy data from the host array into the the kSpace. QUDA interprets this as a
@@ -2485,7 +2485,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->n_conv; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
+  for (int i = 0; i < n_vecs; i++) { memcpy(host_evals + i, &evals[i], sizeof(Complex)); }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
@@ -2499,11 +2499,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < eig_param->n_conv; i++) delete host_evecs_[i];
+  for (int i = 0; i < n_vecs; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
+  for (int i = 0; i < n_vecs; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
