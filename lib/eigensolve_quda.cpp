@@ -157,7 +157,7 @@ namespace quda
       orthonormalizeMGS(kSpace, block_size);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (block_size > 1)
-          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
+          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d of 5\n", (k + 1));
         else
           printfQuda("Orthonormalising initial guess\n");
       }
@@ -767,8 +767,9 @@ namespace quda
 
     int n_defl = n_ev_deflate;
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
-
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("Deflating %d vectors with %d eigenvectors\n", (int)src.size(), n_defl);      
+    }
     // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
 
@@ -784,8 +785,10 @@ namespace quda
     blas::cDotProduct(s.data(), eig_vecs, src_);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
+    for (int j = 0; j < (int)src.size(); j++)
+      for (int i = 0; i < n_defl; i++) 
+	s[i*(int)src.size() + j] /= evals[i].real();
+    
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate)
       for (auto &x : sol) blas::zero(*x);

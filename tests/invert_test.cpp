@@ -188,10 +188,32 @@ int main(int argc, char **argv)
   if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
-  } else {
-    inv_param.eig_param = nullptr;
-  }
+  } else inv_param.eig_param = nullptr;
 
+  if (inv_split_grid_deflate) {
+    // Though no inversions are performed, the inv_param
+    // structure contains all the information we need to
+    // construct the dirac operator. We encapsualte the
+    // inv_param structure inside the eig_param structure
+    // to avoid any confusion
+    QudaInvertParam eig_inv_param = inv_param;    
+    // Specific changes to the invert param for the eigensolver
+    // QUDA's device routines require UKQCD gamma basis. QUDA will
+    // automatically rotate from this basis on the host, to UKQCD
+    // on the device, and back to this basis upon completion.
+    eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    
+    eig_inv_param.solve_type
+      = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+    // Place a copy of the modified Invert param inside Eig param
+    eig_param.invert_param = &eig_inv_param;
+    setEigParam(eig_param);
+    
+    inv_param.split_grid_eig_param = &eig_param;
+  } else inv_param.split_grid_eig_param = nullptr;
+
+  if (inv_split_grid_deflate && inv_deflate) errorQuda("inv_split_grid_deflate and inv_deflate are mutually exclusive choices");
+  
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
@@ -344,13 +366,25 @@ int main(int argc, char **argv)
       _hp_x[i] = out[i]->V();
       _hp_b[i] = in[i]->V();
     }
+    
     // Run split grid
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
       invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
     } else {
-      invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
+      if (inv_split_grid_deflate) {
+	for (int i = 0; i < 3; i++) {
+	  for (int s = 0; s < Nsrc && i == 0; s++) *out[s] = *in[s];
+	  
+	  inv_param.tol = 1e-3 / pow(10, 3*i);
+	  eig_param.preserve_deflation = i < 2 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;	
+	  invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
+	}
+      } else {
+	invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);	
+      } 
     }
+    
     comm_allreduce_int(&inv_param.iter);
     inv_param.iter /= comm_size() / num_sub_partition;
     comm_allreduce(&inv_param.gflops);

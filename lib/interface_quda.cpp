@@ -131,6 +131,20 @@ cudaCloverField *cloverEigensolver = nullptr;
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
+quda::deflation_space *defl_space = nullptr;
+
+void delete_deflation_space() {
+
+  printfQuda("Deleting deflation space\n");
+  for (auto &vec : defl_space->evecs)
+    if (vec) delete vec;
+  defl_space->evecs.resize(0);
+  defl_space->evals.resize(0);
+  delete defl_space;
+}
+
+quda::EigenSolver *defl_eig_solve = nullptr;
+
 std::vector<cudaColorSpinorField*> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
@@ -2501,6 +2515,226 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void deflateQuda(void **host_source, void **host_defl_guess, QudaEigParam *eig_param, QudaInvertParam *invert_param)
+{
+  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+  profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
+
+  // Transfer the inv param structure contained in eig_param
+  QudaInvertParam *inv_param = invert_param;
+  
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+    setKernelPackT(true);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printQudaInvertParam(inv_param);
+    printQudaEigParam(eig_param);
+  }
+
+  checkInvertParam(inv_param);
+  checkEigParam(eig_param);
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  inv_param->secs = 0;
+  inv_param->gflops = 0;
+  inv_param->iter = 0;
+
+  // Define problem matrix
+  //------------------------------------------------------
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+
+  // Create the dirac operator with a sloppy and a precon.
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+  Dirac &dirac = *d;
+
+  const int *X = cudaGauge->X();
+  ColorSpinorParam cpuParam(host_source[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
+  
+  // create wrappers around application guess vector set
+  std::vector<ColorSpinorField *> host_defl_guess_;
+  host_defl_guess_.reserve(inv_param->num_src);
+  for (int i = 0; i < inv_param->num_src; i++) {
+    cpuParam.v = host_defl_guess[i];
+    host_defl_guess_.push_back(ColorSpinorField::Create(cpuParam));
+  }
+
+  // create wrappers around application source vector set
+  std::vector<ColorSpinorField *> host_source_;
+  host_source_.reserve(inv_param->num_src);
+  for (int i = 0; i < inv_param->num_src; i++) {
+    cpuParam.v = host_source[i];
+    host_source_.push_back(ColorSpinorField::Create(cpuParam));
+  }
+  
+  // Create device side ColorSpinorField Krylov space 
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
+  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
+  if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+  if(!defl_space) {
+    defl_space = new quda::deflation_space;
+    defl_space->evecs.reserve(eig_param->n_conv);
+    defl_space->evals.resize(eig_param->n_conv);
+    defl_space->constructed = false;
+    for (int i = 0; i < eig_param->n_conv; i++) defl_space->evecs.push_back(ColorSpinorField::Create(cudaParam));
+  }  
+  
+  // Create device side ColorSpinorField guess vectors
+  std::vector<ColorSpinorField *> guess;
+  guess.reserve(inv_param->num_src);  
+  for (int i = 0; i < inv_param->num_src; i++) {
+    guess.push_back(ColorSpinorField::Create(cudaParam));
+    *guess[i] = *host_defl_guess_[i];
+  }
+
+  // Create device side ColorSpinorField source vectors
+  std::vector<ColorSpinorField *> source;
+  source.reserve(inv_param->num_src);  
+  for (int i = 0; i < inv_param->num_src; i++) {
+    source.push_back(ColorSpinorField::Create(cudaParam));
+    *source[i] = *host_source_[i];
+  }
+  
+  // Create device side ColorSpinorField deflated guess vectors
+  std::vector<ColorSpinorField *> defl_guess;
+  defl_guess.reserve(inv_param->num_src);
+  for (int i = 0; i < inv_param->num_src; i++) {
+    defl_guess.push_back(ColorSpinorField::Create(cudaParam));
+    *defl_guess[i] = *host_defl_guess_[i];
+  }
+
+  // Create device side ColorSpinorField temp vectors
+  std::vector<ColorSpinorField *> temp_vec;
+  temp_vec.reserve(inv_param->num_src);
+  for (int i = 0; i < inv_param->num_src; i++) {
+    temp_vec.push_back(ColorSpinorField::Create(cudaParam));
+  }
+  
+  // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
+  // the solver will fail.
+  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
+      && ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
+          || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
+              && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
+    errorQuda("Cannot compute imaginary spectra with a hermitian operator");
+  }
+
+  // Gamma5 pre-multiplication is only supported for the M type operator
+  if (eig_param->compute_gamma5) {
+    if (eig_param->use_norm_op || eig_param->use_dagger) {
+      errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s",
+                eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
+    }
+  }
+
+  profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
+  
+  if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
+    DiracG5M m(dirac);
+    defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
+    defl_eig_solve->deflate(defl_guess, guess, defl_space->evecs, defl_space->evals, false);
+    // Copy deflated vectors back to the host
+    for (int i = 0; i < inv_param->num_src; i++) {
+      *host_defl_guess_[i] = *defl_guess[i];
+      printfQuda("source norm post defl= %e\n", blas::norm2(*defl_guess[i]));
+    }
+    delete defl_eig_solve;
+    
+  } else if (!eig_param->use_norm_op && !eig_param->use_dagger && !eig_param->compute_gamma5) {
+    DiracM m(dirac);
+    defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
+    defl_eig_solve->deflate(defl_guess, guess, defl_space->evecs, defl_space->evals, false);
+    // Copy deflated vectors back to the host
+    for (int i = 0; i < inv_param->num_src; i++) {
+      *host_defl_guess_[i] = *defl_guess[i];
+      printfQuda("source norm post defl= %e\n", blas::norm2(*defl_guess[i]));
+    }
+    delete defl_eig_solve;
+
+  } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMdag m(dirac);
+    defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
+    defl_eig_solve->deflate(defl_guess, guess, defl_space->evecs, defl_space->evals, false);
+    // Copy deflated vectors back to the host
+    for (int i = 0; i < inv_param->num_src; i++) {
+      *host_defl_guess_[i] = *defl_guess[i];
+      printfQuda("source norm post defl= %e\n", blas::norm2(*defl_guess[i]));
+    }
+    delete defl_eig_solve;
+
+    // USE THIS CODE PATH ONLY FOR TESTING
+  } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
+    DiracMdagM m(dirac);
+    defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    if(!defl_space->constructed) {
+      (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
+      defl_space->constructed = true;
+    }
+    defl_eig_solve->deflate(defl_guess, guess, defl_space->evecs, defl_space->evals, false);
+    
+    // Copy deflated vectors back to the host
+    for (int i = 0; i < inv_param->num_src; i++) {
+      
+      m(*temp_vec[0], *defl_guess[i]);
+      blas::xmyNorm(*guess[i], *temp_vec[0]);      
+      //*host_defl_guess_[i] = *temp_vec[0];
+      //*host_defl_guess_[i] = *defl_guess[0];
+      *host_source_[i] = *temp_vec[0];
+      //printfQuda("MdagM source norm post defl = %e\n", blas::norm2(*host_defl_guess_[i]));
+    }
+    delete defl_eig_solve;
+
+  } else if (eig_param->use_norm_op && eig_param->use_dagger) {
+    DiracMMdag m(dirac);
+    defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+    (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
+    defl_eig_solve->deflate(defl_guess, guess, defl_space->evecs, defl_space->evals, true);
+    // Copy deflated vectors back to the host
+    for (int i = 0; i < inv_param->num_src; i++) {
+      *host_defl_guess_[i] = *defl_guess[i];
+      printfQuda("source norm post defl= %e\n", blas::norm2(*defl_guess[i]));
+    }
+    delete defl_eig_solve;
+  } else {
+    errorQuda("Invalid use_norm_op and dagger combination");
+  }
+  
+  profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
+  for (int i = 0; i < inv_param->num_src; i++) {
+    delete guess[i];
+    delete defl_guess[i];
+    delete host_defl_guess_[i];
+    delete temp_vec[i];
+  }
+  
+  delete d;
+  delete dSloppy;
+  delete dPre;
+  profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
+
+  popVerbosity();
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
+
+  profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
@@ -2888,6 +3122,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cpuParam.location = param->output_location;
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
 
+  printfQuda("h_x = %e\n", blas::norm2(*h_x));
+  
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
@@ -2920,8 +3156,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
-
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using initial guess %e %e\n", blas::norm2(*x), blas::norm2(*h_x));
     *x = *h_x; // solution
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using initial guess %e %e\n", blas::norm2(*x), blas::norm2(*h_x));
   } else { // zero initial guess
     blas::zero(*x);
   }
@@ -3479,6 +3716,15 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     comm_barrier();
 
+    // We perform deflation here before splitting the fermion fields.
+    if(param->split_grid_eig_param) {
+      deflateQuda(_hp_b, _hp_x, (QudaEigParam*)param->split_grid_eig_param, param);
+      //param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      if (param->eig_param) {
+	errorQuda("Deflation within the solver is not supported with splitgrid. To use deflation with splitgrid populate the split_grid_eig_param element of the QudaInvertParam");
+      }
+    }
+
     // Split input fermion field
     quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
     for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
@@ -3487,10 +3733,17 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
       _collect_b[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
       _collect_x[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
-      auto first = _h_b.begin() + n * num_sub_partition;
-      auto last = _h_b.begin() + (n + 1) * num_sub_partition;
-      std::vector<ColorSpinorField *> _v_b(first, last);
+      auto b_first = _h_b.begin() + n * num_sub_partition;
+      auto b_last = _h_b.begin() + (n + 1) * num_sub_partition;
+      std::vector<ColorSpinorField *> _v_b(b_first, b_last);
       split_field(*_collect_b[n], _v_b, split_key, pc_type);
+
+      if(param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+	auto x_first = _h_x.begin() + n * num_sub_partition;
+	auto x_last = _h_x.begin() + (n + 1) * num_sub_partition;
+	std::vector<ColorSpinorField *> _v_x(x_first, x_last);
+	split_field(*_collect_x[n], _v_x, split_key, pc_type);
+      }
     }
     comm_barrier();
 
@@ -3565,9 +3818,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     if (input_clover) { delete input_clover; }
     if (collected_clover) { delete collected_clover; }
 
+    
+    if(static_cast<QudaEigParam*>(param->split_grid_eig_param)){
+      if(static_cast<QudaEigParam*>(param->split_grid_eig_param)->preserve_deflation == QUDA_BOOLEAN_FALSE) delete_deflation_space();
+    }
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profileInvertMultiSrc.TPSTOP(QUDA_PROFILE_TOTAL);
-
+    
     // Restore the gauge field
     if (!is_staggered) {
       loadGaugeQuda(h_gauge, gauge_param);

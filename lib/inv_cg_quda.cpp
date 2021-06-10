@@ -362,12 +362,21 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      printfQuda("SOLVER IG norm pre %e\n", blas::norm2(x));
       // Compute r = b - A * x
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
+      printfQuda("SOLVER IG norm post %e\n", blas::norm2(r));
       if (b2 == 0) b2 = r2;
       // y contains the original guess.
       blas::copy(y, x);
+      //if (param.split_grid_deflate) {
+      // If we perfrom a split grid deflation, we passed a deflated initial
+      // guess, so we need to add the original guess to y too. This vector
+      // is stored in p_init.
+      //blas::xpy(p_init, y);
+      //}
+      printfQuda("CG init guess applied\n");
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
@@ -376,9 +385,11 @@ namespace quda {
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
-      eig_solve->deflate(y, r, evecs, evals, true);
+      printfQuda("SOLVER DEFL norm pre %.16e\n", blas::norm2(r));
+      eig_solve->deflate(y, r, evecs, evals, true);      
       mat(r, y, x, tmp3);
       r2 = blas::xmyNorm(b, r);
+      printfQuda("SOLVER DEFL norm post %.16e\n", blas::norm2(r));
     }
 
     blas::zero(x);
@@ -606,8 +617,8 @@ namespace quda {
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
           blas::axpy(alpha, p_, x_);
-        }
-
+	}
+	
         blas::copy(x, xSloppy); // nop when these pointers alias
 
         blas::xpy(x, y); // swap these around?
@@ -625,6 +636,11 @@ namespace quda {
           maxr_deflate = sqrt(r2);
         }
 
+	if(sqrt(r2) < maxr_deflate * param.tol_restart) {
+	  printfQuda("Exit to deflate here\n");
+	  //break;
+	}
+	
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
 

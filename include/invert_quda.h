@@ -1448,6 +1448,7 @@ public:
   */
   struct deflation_space : public Object {
     bool svd;                              /** Whether this space is for an SVD deflaton */
+    bool constructed;                      /** Whether this space is populated */
     std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
     std::vector<Complex> evals;            /** The eigenvalues */
   };

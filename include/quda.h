@@ -299,11 +299,14 @@ extern "C" {
     /** Deflation instance */
     void *deflation_op;
 
-    /** defines deflation */
+    /** defines deflation within the solver */
     void *eig_param;
 
-    /** If true, deflate the initial guess */
+    /** If true, deflate the initial guess within the solver */
     QudaBoolean deflate;
+
+    /** defines deflation outside the split grid solver */
+    void *split_grid_eig_param;
 
     /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
