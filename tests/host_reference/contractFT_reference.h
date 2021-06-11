@@ -5,8 +5,8 @@
 #include "color_spinor_field.h"
 
 extern int Z[4];
-extern int Vh;
-extern int V;
+extern int V;  // local 4-volume in sites
+extern int Vh; // local half volume
 
 using namespace quda;
 template <typename T> using complex = std::complex<T>;
@@ -37,7 +37,6 @@ template <typename Float>
 template <typename Float>
 inline void FourierPhase(complex<Float>* z, const Float theta, const QudaFFTSymmType fft_type)
 {
-  if(theta == 0.) return;
   complex<Float> w{z};
   if(fft_type == QUDA_FFT_SYMM_EVEN){
     Float costh = cos(theta);
@@ -52,8 +51,8 @@ inline void FourierPhase(complex<Float>* z, const Float theta, const QudaFFTSymm
   else if(fft_type == QUDA_FFT_SYMM_EO){
     Float costh = cos(theta);
     Float sinth = sin(theta);
-    *z.real() = w.real()*costh-w.imag()*sinth;
-    *z.imag() = w.imag()*costh+w.real()*sinth;
+    *z.real() = w.real()*costh - w.imag()*sinth;
+    *z.imag() = w.imag()*costh + w.real()*sinth;
   }
 };
 
@@ -66,13 +65,13 @@ void contractFTHost(Float *h_prop_array_flavor_1, Float *h_prop_array_flavor_2,
 		    double *h_result
 		    )
 {
-  const int pX[4]{}; // TODO this grid partition offset
   const int X[4]{xdim, ydim, zdim, tdim}; // local grid dims
+  const int N[4]{X[0]*comm_dim(0),X[1]*comm_dim(1),X[2]*comm_dim(2),X[3]*comm_dim(3)}; // global grid dims
 
   // The number of contraction results expected in the output
-  size_t num_out_results = n_spin * n_spin;
+  size_t num_out_results = n_mom * n_spin * n_spin;
 
-  size_t corr_dim = 3;
+  size_t corr_dim = 3; // t-dir
   if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) corr_dim = 2;
 
   // The number of slices in the decay dimension on this MPI rank.
@@ -87,14 +86,17 @@ void contractFTHost(Float *h_prop_array_flavor_1, Float *h_prop_array_flavor_2,
 
   complex<Float> M[n_spin*n_spin];
   size_t spinor_sz = n_spin * 3 * 2; // in Floats
-  int lx, ly, lz, lt; // local coords
+  int xl,yl,zl,tl; // local coords
   for(tl=0; tl<X[3]; ++tl)
     for(zl=0; zl<X[2]; ++zl)
       for(yl=0; yl<X[1]; ++yl)
 	for(xl=0; xl<X[0]; ++xl) {
-	  int sink[4]{xl+pX[0],yl+pX[1],zl+pX[2],tl+pX[3]}; // sink global coordinates
-	  size_t sindx = 0; //TODO
-	  size_t soff = sindx * spinor_sz;
+	  // sink global coordinates
+	  int sink[4]{xl+comm_coord(0)*X[0],yl+comm_coord(1)*X[1],zl+comm_coord(2)*X[2],tl+comm_coord(3)*X[3]};
+	  size_t sindx = X[0] * ( X[1] * ( X[2] * tl + zl ) + yl ) + zl; //local index
+	  size_t sindx_cb = sindx / 2;
+	  int parity = sindx % 2;
+	  size_t soff = (parity * Vh + sindx_cb) * spinor_sz; // in Floats
 
 	  for (size_t s1 = 0; s1 < n_spin; ++s1) {
 	    for (size_t s2 = 0; s2 < n_spin; ++s2) {
@@ -111,12 +113,13 @@ void contractFTHost(Float *h_prop_array_flavor_1, Float *h_prop_array_flavor_2,
 		for (int mom_idx=0; mom_idx<n_mom; ++mom_idx) {
 		  complex<Float> fphase{1.,0.};
 		  for(int dir=0; dir<4; ++dir) {
-		    Float theta = mom_modes[4*mom_indx+dir]*(source_position[dir]-sink[dir]-offsets[dir])/N[dir];
+		    Float theta = 2.0*M_PI/N[dir] * mom_modes[4*mom_indx+dir] * (source_position[dir] - sink[dir]);
 		    FourierPhase<Float>(&fphase,theta,fft_type[4*mom_indx+dir]);
 		  }
 
 		  // mutiply by phase and accumulate reduction
-
+		  int t = tl + comm_coord(3)*X[3]; //global
+		  result_global[] += fphase * M[n_spin*s1 + s2];
 		} // momenta
 	      } // src color
 	    } // src spin
