@@ -1,8 +1,6 @@
 #pragma once
 
 #include <iostream>
-#include <memory>
-
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
@@ -395,7 +393,7 @@ namespace quda {
 
     mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
-    mutable std::unique_ptr<DslashConstant> dslash_constant; // constants used by dslash and packing kernels
+    mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
@@ -556,7 +554,7 @@ namespace quda {
     /**
        @brief Get the dslash_constant structure from this field
     */
-    const DslashConstant& getDslashConstant() const { return *(dslash_constant.get()); }
+    const DslashConstant& getDslashConstant() const { return *dslash_constant; }
 
     const ColorSpinorField& Even() const;
     const ColorSpinorField& Odd() const;
