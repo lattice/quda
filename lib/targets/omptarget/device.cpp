@@ -358,7 +358,7 @@ namespace quda
 
     unsigned int processor_count() { return deviceProp.multiProcessorCount; }
 
-    unsigned int max_blocks_per_processor() { return 32; }
+    unsigned int max_blocks_per_processor() { return 1; }
 
     namespace profile
     {

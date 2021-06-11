@@ -1,10 +1,24 @@
 #pragma once
 
+#include <target_device.h>
 #include <reduce_helper.h>
 
 namespace quda {
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  /**
+     @brief This class is derived from the arg class that the functor
+     creates and curries in the block size.  This allows the block
+     size to be set statically at launch time in the actual argument
+     class that is passed to the kernel.
+  */
+  template <int block_size_x_, int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
+    using Arg = Arg_;
+    static constexpr int block_size_x = block_size_x_;
+    static constexpr int block_size_y = block_size_y_;
+    ReduceKernelArg(const Arg &arg) : Arg(arg) { }
+  };
+
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
     const dim3
@@ -38,24 +52,24 @@ namespace quda {
 
     // perform final inter-block reduction and write out result
     Transformer<Arg> t(arg);
-    reduce<block_size_x, block_size_y>(arg, t, value);
+    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
   }
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    const int tx = arg.threads.x;
-    const int ty = arg.threads.y;
-    const int tz = arg.threads.z;
+    // const int tx = arg.threads.x;
+    // const int ty = arg.threads.y;
+    // const int tz = arg.threads.z;
     // printf("Reduction2D: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      // Reduction2D_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(*dparg);
+      // Reduction2D_impl<Transformer, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
@@ -87,7 +101,7 @@ namespace quda {
       }
       // perform final inter-block reduction and write out result
       Transformer<Arg> t(*dparg);
-      // reduce<block_size_x, block_size_y>(*dparg, t, value);
+      // reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
       // ../../reduce_helper.h:/reduce
       {
         const auto idx = 0;
@@ -115,10 +129,10 @@ namespace quda {
           #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
           {
             dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * block_size_x + threadIdx.x;
+            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
             while (i < gridDim.x) {
               sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += block_size_x * block_size_y;
+              i += Arg::block_size_x * Arg::block_size_y;
             }
           }
 
@@ -128,7 +142,7 @@ namespace quda {
           // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
           // printf("\n");
           // write out the final reduced value
-          // if (threadIdx.y * block_size_x + threadIdx.x == 0)
+          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
             dparg->result_d[idx] = sum;
             dparg->count[idx] = 0; // set to zero for next time
@@ -139,7 +153,7 @@ namespace quda {
     omp_target_free(dparg, omp_get_default_device());
   }
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
     __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -147,7 +161,7 @@ namespace quda {
     // printf("Reduction2D: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
-      // Reduction2D_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
+      // Reduction2D_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
       Arg *dparg = &device::get_arg<Arg>();
       const dim3
         blockDim=launch_param.block,
@@ -178,7 +192,7 @@ namespace quda {
       }
       // perform final inter-block reduction and write out result
       Transformer<Arg> t(*dparg);
-      // reduce<block_size_x, block_size_y>(*dparg, t, value);
+      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value);
       // ../../reduce_helper.h:/reduce
       {
         const auto idx = 0;
@@ -205,10 +219,10 @@ namespace quda {
           #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
           {
             dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * block_size_x + threadIdx.x;
+            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
             while (i < gridDim.x) {
               sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += block_size_x * block_size_y;
+              i += Arg::block_size_x * Arg::block_size_y;
             }
           }
 
@@ -218,7 +232,7 @@ namespace quda {
           // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
           // printf("\n");
           // write out the final reduced value
-          // if (threadIdx.y * block_size_x + threadIdx.x == 0)
+          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
             dparg->result_d[idx] = sum;
             dparg->count[idx] = 0; // set to zero for next time
@@ -229,7 +243,7 @@ namespace quda {
   }
 
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
     const dim3
@@ -266,26 +280,26 @@ namespace quda {
     // perform final inter-block reduction and write out result
     Transformer<Arg> t(arg);
     auto j = blockIdx.y * blockDim.y;
-    reduce<block_size_x, block_size_y>(arg, t, value, j);
+    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
   }
 
   /** Workaround compiler limitations.  We have to inline parallel regions with target teams. **/
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    const int tx = arg.threads.x;
-    const int ty = arg.threads.y;
-    const int tz = arg.threads.z;
+    // const int tx = arg.threads.x;
+    // const int ty = arg.threads.y;
+    // const int tz = arg.threads.z;
     // printf("MultiReduction: launch parameter: gd %d ld %d tx %d ty %d tz %d\n", gd, ld, tx, ty, tz);
     Arg *dparg = (Arg*)omp_target_alloc(sizeof(Arg), omp_get_default_device());
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
-      // MultiReduction_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(*dparg);
+      // MultiReduction_impl<Transformer, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
@@ -319,7 +333,7 @@ namespace quda {
       // perform final inter-block reduction and write out result
       Transformer<Arg> t(*dparg);
       auto j = blockIdx.y * blockDim.y;
-      // reduce<block_size_x, block_size_y>(*dparg, t, value, j);
+      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value, j);
       // ../../reduce_helper.h:/reduce
       {
         const auto idx = j;
@@ -347,10 +361,10 @@ namespace quda {
           #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
           {
             dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * block_size_x + threadIdx.x;
+            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
             while (i < gridDim.x) {
               sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += block_size_x * block_size_y;
+              i += Arg::block_size_x * Arg::block_size_y;
             }
           }
 
@@ -360,7 +374,7 @@ namespace quda {
           // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
           // printf("\n");
           // write out the final reduced value
-          // if (threadIdx.y * block_size_x + threadIdx.x == 0)
+          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
             dparg->result_d[idx] = sum;
             dparg->count[idx] = 0; // set to zero for next time
@@ -371,7 +385,7 @@ namespace quda {
     omp_target_free(dparg, omp_get_default_device());
   }
 
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
     __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -379,7 +393,7 @@ namespace quda {
     // printf("MultiReduction: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
-      // MultiReduction_impl<block_size_x, block_size_y, Transformer, Arg, grid_stride>(device::get_arg<Arg>());
+      // MultiReduction_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
       Arg *dparg = &device::get_arg<Arg>();
       const dim3
         blockDim=launch_param.block,
@@ -414,7 +428,7 @@ namespace quda {
       // perform final inter-block reduction and write out result
       Transformer<Arg> t(*dparg);
       auto j = blockIdx.y * blockDim.y;
-      // reduce<block_size_x, block_size_y>(*dparg, t, value, j);
+      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value, j);
       // ../../reduce_helper.h:/reduce
       {
         const auto idx = j;
@@ -441,10 +455,10 @@ namespace quda {
           #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
           {
             dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * block_size_x + threadIdx.x;
+            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
             while (i < gridDim.x) {
               sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += block_size_x * block_size_y;
+              i += Arg::block_size_x * Arg::block_size_y;
             }
           }
 
@@ -454,7 +468,7 @@ namespace quda {
           // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
           // printf("\n");
           // write out the final reduced value
-          // if (threadIdx.y * block_size_x + threadIdx.x == 0)
+          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
           { // This is the main thread per team
             dparg->result_d[idx] = sum;
             dparg->count[idx] = 0; // set to zero for next time

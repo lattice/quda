@@ -803,8 +803,8 @@ namespace quda
           }
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
             if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
-              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
-                         tunable.perfString(elapsed_time).c_str());
+              printfQuda("    %s gives %s (time %.3f ms)\n", tunable.paramString(param).c_str(),
+                         tunable.perfString(elapsed_time).c_str(), elapsed_time);
             } else {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
