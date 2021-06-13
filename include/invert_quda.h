@@ -51,6 +51,9 @@ namespace quda {
     /**< Whether deflate the initial guess */
     bool deflate;
 
+    /**< Whether the initial guess was from split grid deflation*/
+    bool split_grid_deflate;
+    
     /**< Used to define deflation */
     QudaEigParam eig_param;
 
@@ -272,6 +275,7 @@ namespace quda {
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.eig_param != 0),
+      split_grid_deflate(param.split_grid_eig_param != 0),
       use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       delta(param.reliable_delta),
@@ -349,6 +353,7 @@ namespace quda {
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.deflate),
+      split_grid_deflate(param.split_grid_deflate),
       eig_param(param.eig_param),
       use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector),
@@ -1447,10 +1452,11 @@ public:
      deflated solver.
   */
   struct deflation_space : public Object {
-    bool svd;                              /** Whether this space is for an SVD deflaton */
-    bool constructed;                      /** Whether this space is populated */
-    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
-    std::vector<Complex> evals;            /** The eigenvalues */
+    bool svd;                                  /** Whether this space is for an SVD deflaton */
+    bool constructed;                          /** Whether this space is populated */
+    std::vector<ColorSpinorField *> evecs;     /** Container for the eigenvectors */
+    std::vector<ColorSpinorField *> aux_vecs;  /** Container for auxiliary vectors */
+    std::vector<Complex> evals;                /** The eigenvalues */
   };
 
 } // namespace quda

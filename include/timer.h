@@ -116,6 +116,7 @@ namespace quda {
     QUDA_PROFILE_EIGENEV,      /**< time spent on host-side Eigen EV */
     QUDA_PROFILE_EIGENQR,      /**< time spent on host-side Eigen QR */
     QUDA_PROFILE_ARPACK,       /**< time spent on host-side ARPACK */
+    QUDA_PROFILE_DEFLATE,      /**< time spent on deflating vectors */
     QUDA_PROFILE_HOST_COMPUTE, /**< time spent on miscellaneous host-side computation */
 
     // lower level counters used in the dslash and api profiling

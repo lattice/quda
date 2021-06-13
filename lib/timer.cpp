@@ -48,6 +48,7 @@ namespace quda {
                                       "eigenEV",
                                       "eigenQR",
                                       "arpack",
+				      "deflate",
                                       "host compute",
                                       "dummy",
                                       "pack kernel",

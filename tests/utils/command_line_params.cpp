@@ -62,6 +62,7 @@ QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_split_grid_deflate = false;
 bool inv_multigrid = false;
+bool inv_test_init_guess = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 int precon_schwarz_cycle = 1;
@@ -513,6 +514,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--inv-split-grid-deflate", inv_split_grid_deflate, "Deflate the inverter using the eigensolver at the start of the split grid solve");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
+  quda_app->add_option("--inv-test-init-guess", inv_test_init_guess, "Test the initual guess routines with random noise");
+    
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option("--laplace3D", laplace3D,
 		       "Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)");

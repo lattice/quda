@@ -223,7 +223,7 @@ namespace quda {
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
     if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
-
+    
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -291,7 +291,7 @@ namespace quda {
     }
 
     if (param.deflate) {
-      // Construct the eigensolver and deflation space if requested.
+       // Construct the eigensolver and deflation space if requested.
       constructDeflationSpace(b, matEig);
       if (deflate_compute) {
         // compute the deflation space.
@@ -363,35 +363,40 @@ namespace quda {
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       printfQuda("SOLVER IG norm pre %e\n", blas::norm2(x));
-      // Compute r = b - A * x
+      // Compute r = b - Ax0
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
-      printfQuda("SOLVER IG norm post %e\n", blas::norm2(r));
+      printfQuda("SOLVER IG norm post %.16e\n", blas::norm2(r));
       if (b2 == 0) b2 = r2;
-      // y contains the original guess.
+      // y = x0 
       blas::copy(y, x);
-      //if (param.split_grid_deflate) {
-      // If we perfrom a split grid deflation, we passed a deflated initial
-      // guess, so we need to add the original guess to y too. This vector
-      // is stored in p_init.
-      //blas::xpy(p_init, y);
-      //}
-      printfQuda("CG init guess applied\n");
     } else {
+      // r = b 
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
+      // y = 0
       blas::zero(y);
     }
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
-      printfQuda("SOLVER DEFL norm pre %.16e\n", blas::norm2(r));
-      eig_solve->deflate(y, r, evecs, evals, true);      
+      printfQuda("SOLVER DEFL norm r pre %.16e\n", blas::norm2(r));
+      printfQuda("SOLVER DEFL norm b pre %.16e\n", blas::norm2(b));
+      eig_solve->deflate(y, r, evecs, evals, true);
+      // if using an initial guess
+      // y = V(L^1)Vdag (b - Ax0) 
+      // else
+      // y = V(L^1)Vdag b
       mat(r, y, x, tmp3);
+      // If an initial guess was supplied,
+      // r = b - AV(L^1)Vdag (b - Ax0)
+      // r = b - AV(L^1)Vdag b + AV(L^1)Vdag Ax0
+      // else
+      // r = b - AV(L^1)Vdag b
       r2 = blas::xmyNorm(b, r);
       printfQuda("SOLVER DEFL norm post %.16e\n", blas::norm2(r));
     }
-
+    
     blas::zero(x);
     if (&x != &xSloppy) blas::zero(xSloppy);
     blas::copy(rSloppy,r);
@@ -625,20 +630,20 @@ namespace quda {
         mat(r, y, x, tmp3); //  here we can use x as tmp
         r2 = blas::xmyNorm(b, r);
 
-        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {	  
           // Deflate and accumulate to solution vector
           eig_solve->deflate(y, r, evecs, evals, true);
-
-          // Compute r_defl = RHS - A * LHS
-          mat(r, y, x, tmp3);
+	  mat(r, y, x, tmp3);
           r2 = blas::xmyNorm(b, r);
 
           maxr_deflate = sqrt(r2);
         }
 
-	if(sqrt(r2) < maxr_deflate * param.tol_restart) {
-	  printfQuda("Exit to deflate here\n");
-	  //break;
+	// If performing split grid deflation, we trigger the convergence
+	// procedure so that we may exit to perfrom deflation.
+	if(sqrt(r2) < maxr_deflate * param.tol_restart && param.split_grid_deflate) {
+	  printfQuda("Exit to deflate\n");
+	  converged = true;
 	}
 	
         blas::copy(rSloppy, r); //nop when these pointers alias
@@ -739,8 +744,9 @@ namespace quda {
 
       PrintStats("CG", k, r2, b2, heavy_quark_res);
       // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
-
+      bool true_converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+      if(true_converged) converged = true;
+      
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
         // L2 is converged or precision maxed out for L2

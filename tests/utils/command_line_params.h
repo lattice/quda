@@ -196,6 +196,7 @@ extern QudaInverterType inv_type;
 extern bool inv_deflate;
 extern bool inv_split_grid_deflate;
 extern bool inv_multigrid;
+extern bool inv_test_init_guess;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
 extern int precon_schwarz_cycle;

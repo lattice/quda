@@ -39,6 +39,7 @@ namespace quda {
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z);
 
     inline void xpy(ColorSpinorField &x, ColorSpinorField &y) { axpbyz(1.0, x, 1.0, y, y); }
+    inline void xmy(ColorSpinorField &x, ColorSpinorField &y) { axpbyz(1.0, x,-1.0, y, y); }
     inline void mxpy(ColorSpinorField &x, ColorSpinorField &y) { axpbyz(-1.0, x, 1.0, y, y); }
     inline void axpy(double a, ColorSpinorField &x, ColorSpinorField &y) { axpbyz(a, x, 1.0, y, y); }
     inline void axpby(double a, ColorSpinorField &x, double b, ColorSpinorField &y) { axpbyz(a, x, b, y, y); }
@@ -77,7 +78,8 @@ namespace quda {
     double axpbyzNorm(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z);
     inline double axpyNorm(double a, ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(a, x, 1.0, y, y); }
     inline double xmyNorm(ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x, -1.0, y, y); }
-
+    inline double xpyNorm(ColorSpinorField &x, ColorSpinorField &y) { return axpbyzNorm(1.0, x,  1.0, y, y); }
+    
     Complex cDotProduct(ColorSpinorField &, ColorSpinorField &);
     double3 cDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
 

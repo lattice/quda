@@ -765,6 +765,21 @@ namespace quda
       return;
     }
 
+    checkPrecision(*sol[0], *src[0]);
+    checkOrder(*sol[0], *src[0]);
+    
+    if (src[0]->GammaBasis() != sol[0]->GammaBasis()) 
+      errorQuda("Unexpected gamma basis x=%d y=%d", src[0]->GammaBasis(), sol[0]->GammaBasis());
+    if (src[0]->Ncolor() != sol[0]->Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", src[0]->Ncolor(), sol[0]->Ncolor());
+    if (src[0]->Nspin() != sol[0]->Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", src[0]->Nspin(), sol[0]->Nspin());
+    
+    if (src[0]->GammaBasis() != evecs[0]->GammaBasis()) 
+      errorQuda("Unexpected gamma basis x=%d y=%d", src[0]->GammaBasis(), evecs[0]->GammaBasis());
+    if (src[0]->Ncolor() != evecs[0]->Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", src[0]->Ncolor(), evecs[0]->Ncolor());
+    if (src[0]->Nspin() != evecs[0]->Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", src[0]->Nspin(), evecs[0]->Nspin());
+
+    for(int i=0; i<(int)src.size(); i++) printfQuda("Pre deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+    
     int n_defl = n_ev_deflate;
 
     if (getVerbosity() >= QUDA_VERBOSE) {
@@ -789,11 +804,14 @@ namespace quda
       for (int i = 0; i < n_defl; i++) 
 	s[i*(int)src.size() + j] /= evals[i].real();
     
+    
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate)
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
 
+    for(int i=0; i<(int)src.size(); i++) printfQuda("post deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+	      
     // Save Deflation tuning
     saveTuneCache();
   }

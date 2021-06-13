@@ -201,7 +201,7 @@ int main(int argc, char **argv)
     // QUDA's device routines require UKQCD gamma basis. QUDA will
     // automatically rotate from this basis on the host, to UKQCD
     // on the device, and back to this basis upon completion.
-    eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+    //eig_inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
     
     eig_inv_param.solve_type
       = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
@@ -336,8 +336,13 @@ int main(int argc, char **argv)
     in[i] = quda::ColorSpinorField::Create(cs_param);
     in[i]->Source(QUDA_RANDOM_SOURCE);
     out[i] = quda::ColorSpinorField::Create(cs_param);
+    if(inv_test_init_guess) {
+      out[i]->Source(QUDA_CONSTANT_SOURCE, 1.0);
+      inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      if(inv_split_grid_deflate) errorQuda("initial guess with split grid deflation not supported");
+    }
   }
-
+  
   if (!use_split_grid) {
 
     for (int i = 0; i < Nsrc; i++) {
@@ -359,7 +364,7 @@ int main(int argc, char **argv)
   } else {
     inv_param.num_src = Nsrc;
     inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-    // Host arrays for solutions, sources, and check
+    // Raw pointers to solutions and sources
     std::vector<void *> _hp_x(Nsrc);
     std::vector<void *> _hp_b(Nsrc);
     for (int i = 0; i < Nsrc; i++) {
@@ -373,18 +378,25 @@ int main(int argc, char **argv)
       invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
     } else {
       if (inv_split_grid_deflate) {
-	for (int i = 0; i < 3; i++) {
-	  for (int s = 0; s < Nsrc && i == 0; s++) *out[s] = *in[s];
-	  
-	  inv_param.tol = 1e-3 / pow(10, 3*i);
-	  eig_param.preserve_deflation = i < 2 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;	
+	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+	inv_param.true_res = 1e10;
+	double gflops = 0.0;
+	double secs = 0.0;
+	int iter = 0;
+	while (inv_param.true_res > inv_param.tol) {
 	  invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
+	  gflops += inv_param.gflops;
+	  secs += inv_param.secs;
+	  iter += inv_param.iter;
 	}
+	inv_param.gflops = gflops;
+	inv_param.secs = secs;
+	inv_param.iter = iter;	
       } else {
 	invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);	
       } 
     }
-    
+   
     comm_allreduce_int(&inv_param.iter);
     inv_param.iter /= comm_size() / num_sub_partition;
     comm_allreduce(&inv_param.gflops);
