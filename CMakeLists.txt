@@ -234,19 +234,6 @@ option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various inter
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
 
-# Locations for QIO / QMP
-set(QUDA_QIOHOME
-  ""
-  CACHE PATH "path to QIO")
-set(QUDA_QMPHOME
-  ""
-  CACHE PATH "path to QMP")
-set(QUDA_LIMEHOME
-  ""
-  CACHE PATH "path to LIME")
-set(QUDA_QDPJITHOME
-  ""
-  CACHE PATH "path to QDPJIT installation")
 set(QUDA_ARPACK_HOME
   ""
   CACHE PATH "path to arpack / parpack")
@@ -770,6 +757,7 @@ if(QUDA_QDPJIT)
   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
     message(FATAL_ERROR "Found QDPXX but it is not QDP-JIT. Please specify with QDPXX_DIR pointing to the right path or add to the CMAKE_PREFIX_PATH")
   endif()
+  set(QUDA_INTERFACE_QDPJIT ON)
 endif()
 
 ####################################
@@ -964,10 +952,10 @@ configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake
 	INSTALL_DESTINATION lib/cmake/QUDA)
 
 write_basic_package_version_file(
-	QUDAVersion.cmake
+	QUDAConfigVersion.cmake
 	VERSION ${PACKAGE_VERSION}
 	COMPATIBILITY AnyNewerVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake
 	${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
 	DESTINATION lib/cmake/QUDA)

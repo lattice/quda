@@ -282,6 +282,8 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
 
+if( QUDA_QDPJIT )
+
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
@@ -492,17 +494,7 @@ endif()
 
 if(QUDA_QDPJIT)
   target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QDPJITHOME}/include>)
-  target_link_libraries(
-    quda
-    INTERFACE ${QDP_LDFLAGS}
-              ${QDP_LIB}
-              ${QDP_LIBS}
-              ${QIO_LIB}
-              ${LIME_LIB}
-              ${QUDA_QMP_LDFLAGS}
-              ${QMP_LIB}
-              MPI::MPI_CXX)
+  target_link_libraries(quda PUBLIC QDPXX::qdp) 
 endif()
 
 if(QUDA_ARPACK)

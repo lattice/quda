@@ -9,8 +9,7 @@
 
 #include <hip/hip_runtime.h>
 #ifdef USE_QDPJIT
-#include "qdp_quda.h"
-#include "qdp_config.h"
+#include "qdp_gpu.h"
 #endif
 
 namespace quda
@@ -166,13 +165,8 @@ namespace quda
         char *enable_managed_prefetch = getenv("QUDA_ENABLE_MANAGED_PREFETCH");
         if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
 	  // BJoo: Managed Memory Prefetch is not supported currently under HIP
-#ifdef __HIP_PLATFORM_NVCC__
-          warningQuda("Enabling prefetch support for managed memory");
-          prefetch = true;
-#else
 	  warningQuda("HIP Does not currently allow prefetch support for managed memory. Setting prefetch to false");
 	  prefetch = false;
-#endif
         }
       }
 
@@ -197,14 +191,25 @@ namespace quda
 
     a.size = a.base_size = size;
 
+#ifndef USE_QDPJIT
+    // Regular version
     hipError_t err = hipMalloc(&ptr, size);
     if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
+#else 
+    // QDPJIT version
+    bool err = gpu_malloc(&ptr,size);
+    if (!err ) {
+      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
     track_malloc(DEVICE, a, ptr);
+#endif
+
 #ifdef HOST_DEBUG
     hipMemset(ptr, 0xff, size);
 #endif
+
     return ptr;
 #else
     // when QDP uses managed memory we can bypass the QDP memory manager
@@ -228,12 +233,6 @@ namespace quda
     void *ptr;
 
     a.size = a.base_size = size;
-
-
-    // FIXME: QDP-JIT may have hijacked this function. 
-#ifdef USE_QDPJIT
-    warningQuda("calling hipMalloc() while using QDP-JIT. QDP-JIT may have hijacked this.  (%s:%d in %s())\n", file, line, func);
-#endif
     hipError_t err = hipMalloc(&ptr, size);
 
 
@@ -383,8 +382,16 @@ namespace quda
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
+ 
+#ifndef USE_QDPJIT
+    // Regular 
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+#else
+    // QDPJIT version
+    gpu_free(ptr);
+#endif
+
     track_free(DEVICE, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);
@@ -408,9 +415,6 @@ namespace quda
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
 
-#ifdef USE_QDPJIT
-    warningQuda("device_pinned_free_ while using QDP-JIT calls hipFree()\n");
-#endif
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
