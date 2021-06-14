@@ -131,6 +131,12 @@ if(BUILD_FORTRAN_INTERFACE)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
+
+if(QUDA_TARGET_HIP) 
+  # Workaround for exorbitant build times
+  set_source_files_properties(block_orthogonalize.cu PROPERTIES COMPILE_OPTIONS "-mllvm;-unroll-count=1")
+endif()
+
 # QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
