@@ -31,30 +31,6 @@ namespace quda
   };
 
   /**
-     @brief Wrapper around cudaLaunchKernel
-     @param[in] func Device function symbol
-     @param[in] tp TuneParam containing the launch parameters
-     @param[in] args Arguments
-     @param[in] stream Stream identifier
-  */
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
-
-  /**
-     @brief Templated wrapper around qudaLaunchKernel which can accept
-     a templated kernel, and expects a kernel with a single Arg argument
-     @param[in] func Device function symbol
-     @param[in] tp TuneParam containing the launch parameters
-     @param[in] args Arguments
-     @param[in] stream Stream identifier
-  */
-  template <typename T, typename... Arg>
-  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
-  {
-    const void *args[] = {&arg...};
-    return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
-  }
-
-  /**
      @brief Wrapper around cudaMemcpy or driver API equivalent
      @param[out] dst Destination pointer
      @param[in] src Source pointer

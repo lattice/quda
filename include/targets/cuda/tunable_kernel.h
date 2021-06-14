@@ -4,6 +4,7 @@
 #include <target_device.h>
 #include <kernel_helper.h>
 #include <kernel.h>
+#include <quda_cuda_api.h>
 
 #ifdef JITIFY
 #include <jitify_helper2.cuh>
@@ -27,7 +28,7 @@ namespace quda {
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, arg);
+      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
     }
@@ -41,7 +42,7 @@ namespace quda {
 #else
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
       qudaMemcpyAsync(device::get_constant_buffer<Arg>(), &arg, sizeof(Arg), qudaMemcpyHostToDevice, stream);
-      launch_error = qudaLaunchKernel(kernel.func, tp, stream, arg);
+      launch_error = qudaLaunchKernel(kernel.func, tp, stream, static_cast<const void *>(&arg));
 #endif
       return launch_error;
     }
