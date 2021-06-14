@@ -2551,7 +2551,7 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 
   // Create the dirac operator with a sloppy and a precon.  
   createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
-  Dirac &dirac = *d;
+  Dirac &dirac = *dEig;
 
   const int *X = cudaGauge->X();
   QudaPrecision prec_orig =   inv_param->cuda_prec;
