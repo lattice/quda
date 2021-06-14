@@ -288,8 +288,6 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   target_include_directories(quda PRIVATE ../include/targets/hip)
 endif()
 
-if( QUDA_QDPJIT )
-
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 add_subdirectory(interface)
