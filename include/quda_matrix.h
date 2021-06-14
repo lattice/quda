@@ -352,16 +352,16 @@ namespace quda {
 	for (int i=0; i<N; i++) {
 #pragma unroll
 	  for (int k=0; k<N; k++) if (i<=k) { // else compiler can't handle triangular unroll
-	    tmp.x  = (*this)(i,0).real() * (*this)(0,k).real();
-	    tmp.x -= (*this)(i,0).imag() * (*this)(0,k).imag();
-	    tmp.y  = (*this)(i,0).real() * (*this)(0,k).imag();
-	    tmp.y += (*this)(i,0).imag() * (*this)(0,k).real();
+            tmp.real(             (*this)(i,0).real() * (*this)(0,k).real());
+	    tmp.real(tmp.real() - (*this)(i,0).imag() * (*this)(0,k).imag());
+            tmp.imag(             (*this)(i,0).real() * (*this)(0,k).imag());
+	    tmp.imag(tmp.imag() + (*this)(i,0).imag() * (*this)(0,k).real());
 #pragma unroll
 	    for (int j=1; j<N; j++) {
-	      tmp.x += (*this)(i,j).real() * (*this)(j,k).real();
-	      tmp.x -= (*this)(i,j).imag() * (*this)(j,k).imag();
-	      tmp.y += (*this)(i,j).real() * (*this)(j,k).imag();
-	      tmp.y += (*this)(i,j).imag() * (*this)(j,k).real();
+              tmp.real(tmp.real() + (*this)(i,j).real() * (*this)(j,k).real());
+              tmp.real(tmp.real() - (*this)(i,j).imag() * (*this)(j,k).imag());
+              tmp.imag(tmp.imag() + (*this)(i,j).real() * (*this)(j,k).imag());
+              tmp.imag(tmp.imag() + (*this)(i,j).imag() * (*this)(j,k).real());
 	    }
 	    result(i,k) = tmp;
 	  }
@@ -527,16 +527,16 @@ namespace quda {
       for (int i=0; i<N; i++) {
 #pragma unroll
 	for (int k=0; k<N; k++) {
-	  result(i,k).x  = a(i,0).real() * b(0,k).real();
-	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
-	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
-	  result(i,k).y += a(i,0).imag() * b(0,k).real();
+          result(i,k).real(                     a(i,0).real() * b(0,k).real());
+          result(i,k).real(result(i,k).real() - a(i,0).imag() * b(0,k).imag());
+          result(i,k).imag(                     a(i,0).real() * b(0,k).imag());
+          result(i,k).imag(result(i,k).imag() + a(i,0).imag() * b(0,k).real());
 #pragma unroll
 	  for (int j=1; j<N; j++) {
-	    result(i,k).x += a(i,j).real() * b(j,k).real();
-	    result(i,k).x -= a(i,j).imag() * b(j,k).imag();
-	    result(i,k).y += a(i,j).real() * b(j,k).imag();
-	    result(i,k).y += a(i,j).imag() * b(j,k).real();
+	    result(i,k).real(result(i,k).real() + a(i,j).real() * b(j,k).real());
+	    result(i,k).real(result(i,k).real() - a(i,j).imag() * b(j,k).imag());
+	    result(i,k).imag(result(i,k).imag() + a(i,j).real() * b(j,k).imag());
+	    result(i,k).imag(result(i,k).imag() + a(i,j).imag() * b(j,k).real());
 	  }
 	}
       }
@@ -860,55 +860,6 @@ namespace quda {
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
       (*uinv)(2,2) = (temp*det_inv);
-    }
-  // template this!
-  inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
-#pragma unroll
-    for (int i=0; i<3; ++i){
-#pragma unroll
-      for (int j=0; j<3; ++j){
-        (*link)(i,j).x = array[(i*3+j)*2];
-        (*link)(i,j).y = array[(i*3+j)*2 + 1];
-      }
-    }
-  }
-
-  template<class Cmplx, class Real>
-    inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-#pragma unroll
-      for (int i=0; i<3; ++i){
-#pragma unroll
-        for (int j=0; j<3; ++j){
-          (*link)(i,j).x = array[(i*3+j)*2];
-          (*link)(i,j).y = array[(i*3+j)*2 + 1];
-        }
-      }
-    }
-
-
-  // and this!
-  inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-#pragma unroll
-    for (int i=0; i<3; ++i){
-#pragma unroll
-      for (int j=0; j<3; ++j){
-        array[(i*3+j)*2] = link(i,j).x;
-        array[(i*3+j)*2 + 1] = link(i,j).y;
-      }
-    }
-  }
-
-  // and this!
-  template<class Cmplx, class Real>
-    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-#pragma unroll
-      for (int i=0; i<3; ++i){
-#pragma unroll
-        for (int j=0; j<3; ++j){
-          array[(i*3+j)*2] = link(i,j).x;
-          array[(i*3+j)*2 + 1] = link(i,j).y;
-        }
-      }
     }
 
   template<class T>
