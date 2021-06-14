@@ -84,14 +84,13 @@ namespace quda
 
       // In the following `x_cb` are all passed as `x_cb = 0`, since it will not be used if `shared = true`, and `shared = true`
 
-      if (active) {
-
+      {
         /******
          *  Apply M5pre
          */
         if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           constexpr bool sync = false;
-          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
+          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s, active);
         }
 
         /******
@@ -101,9 +100,8 @@ namespace quda
           // Apply the m5inv.
           constexpr bool sync = false;
           out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out,
-              my_spinor_parity, 0, s);
+              my_spinor_parity, 0, s, active);
         }
-
       }
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
@@ -114,10 +112,10 @@ namespace quda
          *    this is actually   y = 1 * x - kappa_b^2 * m5inv * D4 * in
          *                     out = m5inv-dagger * y
          */
-        if (active) {
+        {
           constexpr bool sync = false;
           out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
-              0, s);
+              0, s, active);
         }
 
         Vector aggregate_external;
@@ -156,11 +154,12 @@ namespace quda
         if (active) {
           if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS) { out = stencil_out; }
 
-          if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
-            constexpr bool sync = false;
-            out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
-                arg, stencil_out, my_spinor_parity, 0, s);
-          }
+        }
+
+        if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
+          constexpr bool sync = false;
+          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
+              arg, stencil_out, my_spinor_parity, 0, s, active);
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
