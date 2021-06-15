@@ -60,6 +60,31 @@ namespace quda
     }
   };
 
+  template <KernelType kernel_type>
+  struct ActiveSyncUnit {
+
+    SharedMemoryCache<int> _cache;
+
+    __host__ __device__ ActiveSyncUnit (ArriveWaitBarrier awb): _cache(target::block_dim()) {
+    }
+
+    void __host__ __device__ sync() {
+      _cache.sync();
+    }
+  };
+
+  template <>
+  struct ActiveSyncUnit<EXTERIOR_KERNEL_ALL> {
+    ArriveWaitBarrier _awb;
+
+    __host__ __device__ ActiveSyncUnit (ArriveWaitBarrier awb): _awb(awb) {
+    }
+
+    void __host__ __device__ sync() {
+      _awb.sync();
+    }
+  };
+
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct domainWall4DFusedM5 : dslash_default {
 
@@ -75,14 +100,28 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
+      // `active` can only be false for EXTERIOR_KERNEL_ALL kernels
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+
       int thread_dim; // which dimension is thread working on (fused kernel only)
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector stencil_out;
       applyWilson<nParity, dagger, mykernel_type>(stencil_out, arg, coord, parity, idx, thread_dim, active);
+
+      // `complete` is always true for EXTERIOR_KERNEL_ALL
+      bool complete = isComplete<mykernel_type>(arg, coord);
+
+#ifdef __CUDA_ARCH__
+      __shared__ ArriveWaitBarrier::barrier bar;
+#else
+      ArriveWaitBarrier::barrier bar;
+#endif
+      ArriveWaitBarrier awb(bar, active && complete);
+
+      ActiveSyncUnit<mykernel_type> active_sync_unit(awb);
 
       Vector out;
 
@@ -97,7 +136,7 @@ namespace quda
          */
         if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE) {
           constexpr bool sync = false;
-          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s);
+          out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity, 0, s, active_sync_unit);
         }
       }
 
@@ -112,7 +151,7 @@ namespace quda
         if (active) {
           constexpr bool sync = false;
           out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
-                                                                                    0, s);
+                                                                                    0, s, active_sync_unit);
         }
 
         Vector aggregate_external;
@@ -132,14 +171,12 @@ namespace quda
           out = x + aggregate_external;
         }
 
-        bool complete = isComplete<mykernel_type>(arg, coord);
-
         if (complete && active) {
           constexpr bool sync = true;
           constexpr bool this_dagger = true;
           // Then we apply the second m5inv-dag
           out
-            = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+            = variableInv<sync, this_dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, awb);
         }
 #else
         /******
@@ -197,16 +234,16 @@ namespace quda
 
           if (Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB) {
             constexpr bool sync = false;
-            out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS_PRE>(
-              arg, stencil_out, my_spinor_parity, 0, s);
+            out = d5<sync, dagger, shared, Vector, typename Arg::Dslash5Arg, ActiveSyncUnit<mykernel_type>, Dslash5Type::DSLASH5_MOBIUS_PRE>(
+              arg, stencil_out, my_spinor_parity, 0, s, active_sync_unit);
           }
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
           Vector x = arg.x(xs, my_spinor_parity);
           constexpr bool sync_m5mob = Arg::dslash5_type == Dslash5Type::DSLASH5_MOBIUS ? false : true;
-          x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg, Dslash5Type::DSLASH5_MOBIUS>(
-            arg, x, my_spinor_parity, 0, s);
+          x = d5<sync_m5mob, dagger, shared, Vector, typename Arg::Dslash5Arg, SharedMemoryCache<Vector>, Dslash5Type::DSLASH5_MOBIUS>(
+            arg, x, my_spinor_parity, 0, s, SharedMemoryCache<Vector>(target::block_dim()));
           out = x + arg.a_5[s] * out;
         } else if (mykernel_type != INTERIOR_KERNEL && active) {
           Vector x = arg.out(xs, my_spinor_parity);
@@ -232,14 +269,13 @@ namespace quda
         /******
          *  Apply M5inv
          */
-        bool complete = isComplete<mykernel_type>(arg, coord);
         if (complete && active) {
 
           if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
             // Apply the m5inv.
             constexpr bool sync = false;
             out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out,
-                                                                                      my_spinor_parity, 0, s);
+                                                                                      my_spinor_parity, 0, s, awb);
           }
 
           /******
@@ -249,7 +285,7 @@ namespace quda
             // Apply the m5inv.
             constexpr bool sync_m5inv = false;
             out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s);
+                                                                                            0, s, awb);
             // Apply the m5pre.
 #if 0
             // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
@@ -257,7 +293,7 @@ namespace quda
             out = arg.alpha * out + arg.beta * stencil_out;
 #else
             constexpr bool sync_m5pre = true;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, awb);
 #endif
           }
 
@@ -267,11 +303,11 @@ namespace quda
           if (Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
             // Apply the m5pre.
             constexpr bool sync_m5pre = false;
-            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
+            out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s, awb);
             // Apply the m5inv.
             constexpr bool sync_m5inv = true;
             out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
-                                                                                            0, s);
+                                                                                            0, s, awb);
           }
         }
       }

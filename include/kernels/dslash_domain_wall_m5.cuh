@@ -7,6 +7,8 @@
 #include <kernel.h>
 #include <domain_wall_helper.h>
 
+#include <cooperative_groups.h>
+
 namespace quda
 {
 
@@ -211,8 +213,8 @@ namespace quda
     }
   };
 
-  template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
-    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s) {
+  template <bool sync, bool dagger, bool shared, class Vector, class Arg, class SyncUnit, Dslash5Type type = Arg::type>
+    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s, SyncUnit sync_unit) {
 
       using real = typename Arg::real;
       constexpr bool is_variable = true;
@@ -228,9 +230,9 @@ namespace quda
       { // forwards direction
         constexpr int proj_dir = dagger ? +1 : -1;
         if (shared) {
-          if (sync) { cache.sync(); }
+          if (sync) { sync_unit.sync(); }
           cache.save(in.project(4, proj_dir));
-          cache.sync();
+          sync_unit.sync();
         }
         const int fwd_s = (s + 1) % arg.Ls;
         const int fwd_idx = fwd_s * arg.volume_4d_cb + x_cb;
@@ -251,9 +253,9 @@ namespace quda
       { // backwards direction
         constexpr int proj_dir = dagger ? -1 : +1;
         if (shared) {
-          cache.sync();
+          sync_unit.sync();
           cache.save(in.project(4, proj_dir));
-          cache.sync();
+          sync_unit.sync();
         }
         const int back_s = (s + arg.Ls - 1) % arg.Ls;
         const int back_idx = back_s * arg.volume_4d_cb + x_cb;
@@ -276,9 +278,9 @@ namespace quda
       // if using shared-memory caching then load spinor field for my site into cache
       SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
-        if (sync) { cache.sync(); }
+        if (sync) { sync_unit.sync(); }
         cache.save(in);
-        cache.sync();
+        sync_unit.sync();
       }
 
       { // forwards direction
@@ -337,7 +339,7 @@ namespace quda
       constexpr bool sync = false;
       constexpr bool shared = false;
 
-      Vector out = d5<sync, Arg::dagger, shared, Vector, Arg>(arg, Vector(), parity, x_cb, s);
+      Vector out = d5<sync, Arg::dagger, shared, Vector, Arg>(arg, Vector(), parity, x_cb, s, SharedMemoryCache<Vector>(target::block_dim()));
 
       if (Arg::xpay) {
         if (Arg::type == Dslash5Type::DSLASH5_DWF) {
@@ -371,8 +373,8 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg, typename SyncUnit>
+  __device__ __host__ inline Vector constantInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, SyncUnit sync_unit)
   {
     using real = typename Arg::real;
     const auto k = arg.kappa;
@@ -382,9 +384,9 @@ namespace quda
     SharedMemoryCache<Vector> cache(target::block_dim());
     if (shared) {
       // cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
-      if (sync) { cache.sync(); }
+      if (sync) { sync_unit.sync(); }
       cache.save(in);
-      cache.sync();
+      sync_unit.sync();
     }
 
     Vector out;
@@ -428,8 +430,8 @@ namespace quda
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_)
+  template <bool sync, bool dagger, bool shared, typename Vector, typename Arg, typename SyncUnit>
+  __device__ __host__ inline Vector variableInv(const Arg &arg, const Vector &in, int parity, int x_cb, int s_, SyncUnit sync_unit)
   {
     constexpr int nSpin = 4;
     using real = typename Arg::real;
@@ -444,9 +446,9 @@ namespace quda
       constexpr int proj_dir = dagger ? -1 : +1;
 
       if (shared) {
-        if (sync) { cache.sync(); }
+        if (sync) { sync_unit.sync(); }
         cache.save(in.project(4, proj_dir));
-        cache.sync();
+        sync_unit.sync();
       }
 
       int s = s_;
@@ -472,9 +474,9 @@ namespace quda
     { // second do L
       constexpr int proj_dir = dagger ? +1 : -1;
       if (shared) {
-        cache.sync(); // ensure we finish R before overwriting cache
+        sync_unit.sync(); // ensure we finish R before overwriting cache
         cache.save(in.project(4, proj_dir));
-        cache.sync();
+        sync_unit.sync();
       }
 
       int s = s_;
@@ -499,9 +501,9 @@ namespace quda
     } else { // use_half_vector
     SharedMemoryCache<Vector> cache(target::block_dim());
     if (shared) {
-      if (sync) { cache.sync(); }
+      if (sync) { sync_unit.sync(); }
       cache.save(in);
-      cache.sync();
+      sync_unit.sync();
     }
 
     { // first do R
@@ -573,9 +575,9 @@ namespace quda
       Vector out;
       constexpr bool sync = false;
       if (mobius_m5::var_inverse()) { // zMobius, must call variableInv
-        out = variableInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s);
+        out = variableInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s, SharedMemoryCache<Vector>(target::block_dim()));
       } else {
-        out = constantInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s);
+        out = constantInv<sync, Arg::dagger, mobius_m5::shared()>(arg, in, parity, x_cb, s, SharedMemoryCache<Vector>(target::block_dim()));
       }
 
       if (Arg::xpay) {

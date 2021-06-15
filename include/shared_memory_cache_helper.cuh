@@ -2,6 +2,8 @@
 
 #include <target_device.h>
 
+#include <cuda/barrier>
+
 /**
    @file shared_memory_cache_helper.cuh
 
@@ -232,6 +234,57 @@ namespace quda
 
     __device__ __host__ T& operator[](int i) { return array[i]; }
     __device__ __host__ const T& operator[](int i) const { return array[i]; }
+  };
+
+  template <class T>
+    __device__ T reduce_warp(T val) {
+#pragma unroll
+      for (int offset = 16; offset > 0; offset /= 2) {
+        val += __shfl_down_sync(0xffffffff, val, offset);
+      }
+      return val;
+    }
+
+  template<class T>
+    __device__ T reduce_block(T val) {
+      int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+      int warp_id = thread_id / 32;
+      int lane_id = thread_id % 32;
+      int n_lanes = (blockDim.x * blockDim.y * blockDim.z) / 32;
+      __shared__ T temp[32];
+      val = reduce_warp(val);
+      if (lane_id == 0) {
+        temp[warp_id] = val;
+      }
+      __syncthreads();
+      if (warp_id == 0) {
+        val = reduce_warp(lane_id < n_lanes ? temp[lane_id] : 0);
+      }
+      return val;
+    }
+
+  struct ArriveWaitBarrier {
+
+    using barrier = cuda::barrier<cuda::thread_scope_block>;
+
+    barrier &_bar;
+
+    __host__ __device__ ArriveWaitBarrier(barrier &bar, bool active): _bar(bar) {
+#ifdef __CUDA_ARCH__
+      int _active_threads = reduce_block(static_cast<int>(active));
+      if ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x == 0) {
+        init(&_bar, _active_threads);
+      }
+      __syncthreads();
+#endif
+    }
+
+    void __host__ __device__ sync() {
+#ifdef __CUDA_ARCH__
+      _bar.arrive_and_wait(); /* wait for all threads participating in the barrier to complete bar.arrive()*/
+#endif
+    }
+
   };
 
 } // namespace quda
