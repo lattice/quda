@@ -778,7 +778,7 @@ namespace quda
     if (src[0]->Nspin() != evecs[0]->Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", src[0]->Nspin(), evecs[0]->Nspin());
     */
     
-    for(int i=0; i<(int)src.size(); i++) printfQuda("Pre deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+    //for(int i=0; i<(int)src.size(); i++) printfQuda("Pre deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
     
     int n_defl = n_ev_deflate;
 
@@ -810,7 +810,7 @@ namespace quda
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
 
-    for(int i=0; i<(int)src.size(); i++) printfQuda("post deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+    //for(int i=0; i<(int)src.size(); i++) printfQuda("post deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
 	      
     // Save Deflation tuning
     saveTuneCache();

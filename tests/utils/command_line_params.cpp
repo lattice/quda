@@ -61,6 +61,7 @@ quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_split_grid_deflate = false;
+int inv_split_grid_deflate_maxiter = 10;
 bool inv_multigrid = false;
 bool inv_test_init_guess = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
@@ -511,8 +512,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
-  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
-  quda_app->add_option("--inv-split-grid-deflate", inv_split_grid_deflate, "Deflate the inverter using the eigensolver at the start of the split grid solve");
+  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver (default false)");
+  quda_app->add_option("--inv-split-grid-deflate", inv_split_grid_deflate, "Deflate the inverter using the eigensolver and split grid (default false) ");
+  quda_app->add_option("--inv-split-grid-deflate-maxiter", inv_split_grid_deflate_maxiter, "The number of allowed deflation applications in the splitgrid deflated solve (default 10)");
   quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--inv-test-init-guess", inv_test_init_guess, "Test the initual guess routines with random noise");
     

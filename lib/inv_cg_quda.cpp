@@ -362,11 +362,11 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("SOLVER IG norm pre %e\n", blas::norm2(x));
+      //printfQuda("SOLVER IG norm pre %e\n", blas::norm2(x));
       // Compute r = b - Ax0
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
-      printfQuda("SOLVER IG norm post %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER IG norm post %.16e\n", blas::norm2(r));
       if (b2 == 0) b2 = r2;
       // y = x0 
       blas::copy(y, x);
@@ -380,8 +380,8 @@ namespace quda {
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
-      printfQuda("SOLVER DEFL norm r pre %.16e\n", blas::norm2(r));
-      printfQuda("SOLVER DEFL norm b pre %.16e\n", blas::norm2(b));
+      //printfQuda("SOLVER DEFL norm r pre %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER DEFL norm b pre %.16e\n", blas::norm2(b));
       eig_solve->deflate(y, r, evecs, evals, true);
       // if using an initial guess
       // y = V(L^1)Vdag (b - Ax0) 
@@ -394,7 +394,7 @@ namespace quda {
       // else
       // r = b - AV(L^1)Vdag b
       r2 = blas::xmyNorm(b, r);
-      printfQuda("SOLVER DEFL norm post %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER DEFL norm post %.16e\n", blas::norm2(r));
     }
     
     blas::zero(x);
@@ -642,7 +642,7 @@ namespace quda {
 	// If performing split grid deflation, we trigger the convergence
 	// procedure so that we may exit to perfrom deflation.
 	if(sqrt(r2) < maxr_deflate * param.tol_restart && param.split_grid_deflate) {
-	  printfQuda("Exit to deflate\n");
+	  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Exit split grid to deflate on the global grid\n");
 	  converged = true;
 	}
 	

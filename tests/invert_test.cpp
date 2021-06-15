@@ -383,7 +383,7 @@ int main(int argc, char **argv)
 	double gflops = 0.0;
 	double secs = 0.0;
 	int iter = 0;
-	while (inv_param.true_res > inv_param.tol) {
+	for(int defl_restart = 0; inv_param.true_res > inv_param.tol && defl_restart < inv_split_grid_deflate_maxiter; defl_restart++) {
 	  invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);
 	  gflops += inv_param.gflops;
 	  secs += inv_param.secs;
