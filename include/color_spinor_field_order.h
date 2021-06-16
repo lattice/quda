@@ -504,7 +504,8 @@ namespace quda {
         __device__ __host__ inline operator complex<Float>() const
         {
           if (!fixed) {
-            return complex<Float>(v[idx]);
+            complex<storeFloat> tmp = v[idx];
+            return complex<Float>(tmp.real(), tmp.imag());
           } else {
             complex<storeFloat> tmp = v[idx];
             Float norm_ = block_float ? norm[norm_idx] : scale_inv;

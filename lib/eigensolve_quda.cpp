@@ -213,8 +213,8 @@ namespace quda
     // Increase space 
     int max_size = (strcmp(eig_param->vec_infile, "") != 0 ? n_conv : n_kr + 1 + block_size);
     kSpace.reserve(max_size);
-    for (int i = k_size; i < max_size; i++) kSpace.push_back(ColorSpinorField::Create(cs_param));
-    cs_param.create = QUDA_ZERO_FIELD_CREATE;
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    for (int i = k_size; i < max_size; i++) kSpace.push_back(ColorSpinorField::Create(cs_param)); // FIXME - why do we need this to be zero initialized?
     for (int b = r_size; b < block_size; b++) { r.push_back(ColorSpinorField::Create(cs_param)); }
     
     // Increase evals
