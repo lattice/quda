@@ -66,7 +66,7 @@ static int cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
     p->maxGridSize[2] = 65536;
     p->multiProcessorCount = 16;
   }
-  p->warpSize = 32;
+  p->warpSize = 8;
   p->totalGlobalMem = 1u<34;
   p->totalConstMem = 65536;
   p->memPitch = 1u<31;
@@ -86,7 +86,7 @@ static int cudaGetDeviceProperties(cudaDeviceProp*p,int dev)
   p->maxThreadsDim[2] = m;
   #pragma omp target map(tofrom:m)
   m = omp_get_num_procs();
-  p->multiProcessorCount = m/32;
+  p->multiProcessorCount = m/8;
   return 0;
 }
 
@@ -346,7 +346,7 @@ namespace quda
 
     size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock; }
 
-    size_t max_dynamic_shared_memory() { return 98304; }
+    size_t max_dynamic_shared_memory() { return 65536; }
 
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
 

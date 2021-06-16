@@ -88,7 +88,7 @@ namespace quda {
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return 32; }
+    constexpr int warp_size() { return 8; }
 
     /**
        @brief Return the thread mask for a converged warp.
