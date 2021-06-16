@@ -97,7 +97,10 @@ namespace quda {
       } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
+        ompwip("unsupported for now");
+/*
         ExtractGhostEx<QDPOrder<Float,length>>(u, dim, R, ghost, extract);
+*/
 #else
         errorQuda("QDP interface has not been built\n");
 #endif
@@ -121,7 +124,10 @@ namespace quda {
       } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
+        ompwip("unsupported for now");
+/*
         ExtractGhostEx<MILCOrder<Float,length>>(u, dim, R, ghost, extract);
+*/
 #else
         errorQuda("MILC interface has not been built\n");
 #endif

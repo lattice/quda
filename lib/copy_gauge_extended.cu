@@ -86,8 +86,11 @@ namespace quda {
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
+      ompwip("unsupported for now");
+/*
       using G = QDPOrder<FloatOut,length>;
       CopyGaugeEx<FloatOut,FloatIn,length, G, InOrder>(out, in, location, Out, In);
+*/
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -95,8 +98,11 @@ namespace quda {
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
+      ompwip("unsupported for now");
+/*
       using G = MILCOrder<FloatOut, length>;
       CopyGaugeEx<FloatOut,FloatIn,length, G, InOrder>(out, in, location, Out, In);
+*/
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -160,8 +166,11 @@ namespace quda {
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
+      ompwip("unsupported for now");
+/*
       using G = QDPOrder<FloatIn, length>;
       copyGaugeEx<FloatOut,FloatIn,length, G>(out, in, location, Out, In);
+*/
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -169,8 +178,11 @@ namespace quda {
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
+      ompwip("unsupported for now");
+/*
       using G = MILCOrder<FloatIn, length>;
       copyGaugeEx<FloatOut,FloatIn,length, G>(out, in, location, Out, In);
+*/
 #else
       errorQuda("MILC interface has not been built\n");
 #endif

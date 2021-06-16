@@ -60,8 +60,11 @@ namespace quda
         }
       } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 #ifdef BUILD_QDP_INTERFACE
+        ompwip("unsupported for now");
+/*
         using G = typename gauge_order_mapper<Float, QUDA_QDP_GAUGE_ORDER, nColor>::type;
         copy_gauge_offset<Field, Element, G>(out, in, offset);
+*/
 #else
         errorQuda("QDP interface has not been built\n");
 #endif
@@ -75,8 +78,11 @@ namespace quda
 
       } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
+        ompwip("unsupported for now");
+/*
         using G = typename gauge_order_mapper<Float, QUDA_MILC_GAUGE_ORDER, nColor>::type;
         copy_gauge_offset<Field, Element, G>(out, in, offset);
+*/
 #else
         errorQuda("MILC interface has not been built\n");
 #endif
