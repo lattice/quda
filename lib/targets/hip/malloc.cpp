@@ -205,9 +205,8 @@ namespace quda
     if (!err ) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
-    track_malloc(DEVICE, a, ptr);
 #endif
-
+    track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
     hipMemset(ptr, 0xff, size);
 #endif
