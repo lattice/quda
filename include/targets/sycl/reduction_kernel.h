@@ -100,6 +100,9 @@ namespace quda {
 	 });
     });
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      if (commAsyncReduction()) {
+	q.memcpy(result_h, result_d, sizeof(reduce_t));
+      }
       q.wait();
       printfQuda("  end launchReduction2D result_h: %g\n", *(double *)result_h);
     }

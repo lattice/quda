@@ -172,9 +172,11 @@ namespace quda
     {
       if (launch_error == QUDA_ERROR) return; // kernel launch failed so return
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
-      auto event = reducer::get_event();
-      qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
+      //auto event = reducer::get_event();
+      //qudaEventRecord(event, stream);
+      //while (!qudaEventQuery(event)) {}
+      auto q = device::get_target_stream(stream);
+      q.wait();
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
