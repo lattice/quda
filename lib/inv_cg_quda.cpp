@@ -362,19 +362,19 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("SOLVER IG norm r pre %.16e\n", blas::norm2(r));
-      printfQuda("SOLVER IG norm x pre %.16e\n", blas::norm2(x));
-      printfQuda("SOLVER IG norm b pre %.16ee\n", blas::norm2(b));
+      //printfQuda("SOLVER IG norm r pre %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER IG norm x pre %.16e\n", blas::norm2(x));
+      //printfQuda("SOLVER IG norm b pre %.16ee\n", blas::norm2(b));
       // Compute r = b - Ax0
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
-      printfQuda("SOLVER IG norm r post %.16e\n", blas::norm2(r));
-      printfQuda("SOLVER IG norm x post %.16e\n", blas::norm2(x));
-      printfQuda("SOLVER IG norm b post %.16e\n", blas::norm2(b));
+      //printfQuda("SOLVER IG norm r post %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER IG norm x post %.16e\n", blas::norm2(x));
+      //printfQuda("SOLVER IG norm b post %.16e\n", blas::norm2(b));
       if (b2 == 0) b2 = r2;
       // y = x0 
       blas::copy(y, x);
-      printfQuda("SOLVER IG norm y post %.16e\n", blas::norm2(y));   
+      //printfQuda("SOLVER IG norm y post %.16e\n", blas::norm2(y));   
     } else {
       // r = b 
       if (&r != &b) blas::copy(r, b);
@@ -385,10 +385,10 @@ namespace quda {
 
     if (param.deflate && param.maxiter > 1) {
       // Deflate and accumulate to solution vector
-      printfQuda("SOLVER DEFL INIT norm r pre %.16e\n", blas::norm2(r));
-      printfQuda("SOLVER DEFL INIT norm b pre %.16e\n", blas::norm2(b));
-      printfQuda("SOLVER DEFL INIT norm x (not used) pre %.16e\n", blas::norm2(x));
-      printfQuda("SOLVER DEFL INIT norm y pre %.16e\n", blas::norm2(y));
+      //printfQuda("SOLVER DEFL INIT norm r pre %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER DEFL INIT norm b pre %.16e\n", blas::norm2(b));
+      //printfQuda("SOLVER DEFL INIT norm x (not used) pre %.16e\n", blas::norm2(x));
+      //printfQuda("SOLVER DEFL INIT norm y pre %.16e\n", blas::norm2(y));
       eig_solve->deflate(y, r, evecs, evals, true);
       // if using an initial guess
       // y = V(L^1)Vdag (b - Ax0) 
@@ -401,9 +401,9 @@ namespace quda {
       // else
       // r = b - AV(L^1)Vdag b
       r2 = blas::xmyNorm(b, r);
-      printfQuda("SOLVER DEFL INIT norm r post %.16e\n", blas::norm2(r));
-      printfQuda("SOLVER DEFL INIT norm b post %.16e\n", blas::norm2(b));
-      printfQuda("SOLVER DEFL INIT norm y post %.16e\n", blas::norm2(y));
+      //printfQuda("SOLVER DEFL INIT norm r post %.16e\n", blas::norm2(r));
+      //printfQuda("SOLVER DEFL INIT norm b post %.16e\n", blas::norm2(b));
+      //printfQuda("SOLVER DEFL INIT norm y post %.16e\n", blas::norm2(y));
     }
     
     blas::zero(x);
@@ -641,16 +641,16 @@ namespace quda {
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {	  
           // Deflate and accumulate to solution vector
-	  printfQuda("SOLVER DEFL MID norm r pre %.16e\n", blas::norm2(r));
-	  printfQuda("SOLVER DEFL MID norm b pre %.16e\n", blas::norm2(b));
-	  printfQuda("SOLVER DEFL MID norm (not used) x pre %.16e\n", blas::norm2(x));
-	  printfQuda("SOLVER DEFL MID norm y pre %.16e\n", blas::norm2(y));
+	  //printfQuda("SOLVER DEFL MID norm r pre %.16e\n", blas::norm2(r));
+	  //printfQuda("SOLVER DEFL MID norm b pre %.16e\n", blas::norm2(b));
+	  //printfQuda("SOLVER DEFL MID norm (not used) x pre %.16e\n", blas::norm2(x));
+	  //printfQuda("SOLVER DEFL MID norm y pre %.16e\n", blas::norm2(y));
           eig_solve->deflate(y, r, evecs, evals, true);
 	  mat(r, y, x, tmp3);
           r2 = blas::xmyNorm(b, r);
-	  printfQuda("SOLVER DEFL MID norm r post %.16e\n", blas::norm2(r));
-	  printfQuda("SOLVER DEFL MID norm b post %.16e\n", blas::norm2(b));
-	  printfQuda("SOLVER DEFL MID norm y post %.16e\n", blas::norm2(y));	  
+	  //printfQuda("SOLVER DEFL MID norm r post %.16e\n", blas::norm2(r));
+	  //printfQuda("SOLVER DEFL MID norm b post %.16e\n", blas::norm2(b));
+	  //printfQuda("SOLVER DEFL MID norm y post %.16e\n", blas::norm2(y));	  
           maxr_deflate = sqrt(r2);
         }
 

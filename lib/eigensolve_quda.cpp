@@ -283,8 +283,10 @@ namespace quda
         }
       }
       // save the vectors
+      profile.TPSTART(QUDA_PROFILE_D2H);
       VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
+      profile.TPSTOP(QUDA_PROFILE_D2H);
       for (unsigned int i = 0; i < kSpace.size() && save_prec < prec; i++) delete vecs_ptr[i];
     }
 
@@ -778,7 +780,7 @@ namespace quda
     if (src[0]->Nspin() != evecs[0]->Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", src[0]->Nspin(), evecs[0]->Nspin());
     */
     
-    for(int i=0; i<(int)src.size(); i++) printfQuda("Pre deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+    //for(int i=0; i<(int)src.size(); i++) printfQuda("Pre deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
     
     int n_defl = n_ev_deflate;
 
@@ -810,7 +812,7 @@ namespace quda
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
 
-    for(int i=0; i<(int)src.size(); i++) printfQuda("post deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
+    //for(int i=0; i<(int)src.size(); i++) printfQuda("post deflation norms %d: src %.16e sol %.16e\n", i, blas::norm2(*src[i]), blas::norm2(*sol[i]));
 	      
     // Save Deflation tuning
     saveTuneCache();
@@ -830,8 +832,10 @@ namespace quda
 
     {
       // load the vectors
+      profile.TPSTART(QUDA_PROFILE_H2D);
       VectorIO io(eig_param->vec_infile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.load(vecs_ptr);
+      profile.TPSTOP(QUDA_PROFILE_H2D);
     }
 
     // Create the device side residual vector by cloning
@@ -841,7 +845,9 @@ namespace quda
     r.push_back(ColorSpinorField::Create(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     computeEvals(mat, kSpace, evals);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     delete r[0];
   }
 

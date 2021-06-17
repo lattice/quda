@@ -2768,9 +2768,6 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
   } 
   
   if(!sol_state) {    
-    //QudaPrecision prec_orig = inv_param->cuda_prec;
-    //inv_param->cuda_prec = inv_param->cuda_prec_eigensolver;  
-    // Use the invert_param solution type for wrapping host vector data
     ColorSpinorParam cpuParam(nullptr, *inv_param, X, inv_param->solution_type, inv_param->input_location);    
     create_solver_state(host_source, host_guess, inv_param, &cpuParam);    
   } else {
@@ -2808,7 +2805,13 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
     ColorSpinorField *in = nullptr;
     ColorSpinorField *out = nullptr;
 
+    profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
+    profileEigensolve.TPSTART(QUDA_PROFILE_H2D);
+    
     copy_solver_state_to_device();
+    
+    profileEigensolve.TPSTOP(QUDA_PROFILE_H2D);
+    profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
     
     bool accumulate = false;
     for (int i = 0; i < inv_param->num_src; i++) {
@@ -2818,16 +2821,17 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 
       // rescale the source and solution vectors to help prevent the onset of underflow
       if (inv_param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-	//blas::ax(1.0/sqrt(nb), *sol_state->source[i]);
-	//blas::ax(1.0/sqrt(nb), *sol_state->guess[i]);
+	blas::ax(1.0/sqrt(nb), *sol_state->source[i]);
+	blas::ax(1.0/sqrt(nb), *sol_state->guess[i]);
       }
 
-      printfQuda("Pre rescale\n");
+      //printfQuda("Pre rescale\n");
       massRescale(*static_cast<cudaColorSpinorField *>(sol_state->source[i]), *inv_param, false);
-      printfQuda("Post rescale\n");
+      //printfQuda("Post rescale\n");
       dirac_solver.prepare(in, out, *sol_state->guess[i], *sol_state->source[i], QUDA_MAT_SOLUTION);
-      printfQuda("Pre prepare\n");
-      
+      //printfQuda("Pre prepare\n");
+
+      /*
       if (getVerbosity() >= QUDA_VERBOSE) {
 	double nin = blas::norm2(*in);
 	double nout = blas::norm2(*out);
@@ -2839,9 +2843,10 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 	double nin = blas::norm2(*in);
 	printfQuda("Prepared source post mass rescale = %.16e\n", nin);
       }
+      */
       
       if (inv_param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-	printfQuda("Deflating guess\n");	
+	//printfQuda("Deflating guess\n");	
 	// This is a subsequent solve. We deflate the initial guess
 	// Compute residual
 
@@ -2852,21 +2857,18 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 	// Accumulate the previous guesses
 	accumulate = true;
 	*sol_state->defl_guess[i] = *out;
-	//printfQuda("DEFL residual norm = %.16e\n", blas::norm2(*sol_state->defl_guess[i]));
       } else {
 	// This is the initial solve, we deflate the source, prepare, and apply
 	// the mat vec
-	//printfQuda("Pre copy\n");	
 	blas::copy(*sol_state->temp_vec[i], *in);	
 	// prepare source: b' = A^dag b
 	cudaColorSpinorField tmp(*sol_state->temp_vec[i]);
-	//printfQuda("Post copy\n");
 	dirac_solver.Mdag(*sol_state->temp_vec[i], tmp);
-	//printfQuda("post Mdag\n");
-	//printfQuda("DEFL residual norm = %.16e\n", blas::norm2(*sol_state->temp_vec[i]));
       }
     }
 
+    // Construct the deflation space if required
+    //-----------------------------------------------------------------------------------
     DiracMdagM m(dirac);
     EigenSolver *defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
     if(!defl_space->constructed) {
@@ -2892,11 +2894,11 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
       profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
       (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
       defl_space->constructed = true;
-      profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
-      
+      profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);      
     }
 
-    
+    // Deflate
+    //-----------------------------------------------------------------------------------
     defl_eig_solve->deflate(sol_state->defl_guess, sol_state->temp_vec,
 			    defl_space->evecs, defl_space->evals, accumulate);
     
@@ -2911,21 +2913,22 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
     if (!accumulate) {
       update_solver_state_vecs(sol_state->guess, sol_state->defl_guess, true, true);
       update_solver_state_vecs(sol_state->guess, sol_state->temp_vec, true, false);
+      // We must keep a copy of the original, prepped source, else apply
+      // a matvec with each new restart.
       update_solver_state_vecs(sol_state->temp_vec2, sol_state->temp_vec);
     } else {
       update_solver_state_vecs(sol_state->guess, sol_state->defl_guess, true, true);
       update_solver_state_vecs(sol_state->guess, sol_state->temp_vec2, true, false);
     }
+    
+    profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
+    profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
+
     copy_solver_guess_to_host();
-    
-    //printfQuda("DEFL GUESS norm = %.16e\n", blas::norm2(*sol_state->defl_guess[0]));
-    //printfQuda("GUESS norm = %.16e\n", blas::norm2(*sol_state->guess[0]));
-    //printfQuda("SOURCE norm = %.16e\n", blas::norm2(*sol_state->source[0]));
-    //printfQuda("TMP norm = %.16e\n", blas::norm2(*sol_state->temp_vec[0]));
-    
-    //printfQuda("HOST GUESS norm = %.16e\n", blas::norm2(*sol_state->host_guess[0]));
-    //printfQuda("HOST SOURCE norm = %.16e\n", blas::norm2(*sol_state->host_source[0]));
-    
+
+    profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
+    profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
+
     delete defl_eig_solve;
     
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
@@ -2936,7 +2939,6 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
     errorQuda("Invalid use_norm_op and dagger combination");
   }
      
-  //inv_param->cuda_prec = prec_orig;
   profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
   
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);

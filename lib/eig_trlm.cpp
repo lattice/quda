@@ -53,11 +53,12 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) queryPrec(kSpace[0]->Precision());
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);      
       loadFromFile(mat, kSpace, evals);
       return;
     }
 
+    profile.TPSTART(QUDA_PROFILE_INIT);
     // Check for an initial guess. If none present, populate with rands, then
     // orthonormalise
     prepareInitialGuess(kSpace);
@@ -75,6 +76,7 @@ namespace quda
 
     // Print Eigensolver params
     printEigensolverSetup();
+    profile.TPSTOP(QUDA_PROFILE_INIT);
     //---------------------------------------------------------------------------
 
     // Begin TRLM Eigensolver computation
@@ -158,8 +160,6 @@ namespace quda
       restart_iter++;
     }
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
@@ -186,7 +186,9 @@ namespace quda
       // Compute eigenvalues
       computeEvals(mat, kSpace, evals);
     }
-
+    
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    
     // Local clean-up
     cleanUpEigensolver(kSpace, evals);
   }
