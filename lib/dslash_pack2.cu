@@ -204,12 +204,6 @@ public:
     }
   }
 
-  template <typename T, typename Arg>
-  inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
-  {
-    qudaLaunchKernel(f, tp, stream, arg);
-  }
-
   template <int nSpin, bool dagger = false, int twist = 0, QudaPCType pc_type = QUDA_4D_PC> using Arg =
     PackArg<Float, nColor, nSpin, spin_project, dagger, twist, pc_type>;
 

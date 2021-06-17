@@ -168,7 +168,7 @@ namespace quda {
               for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], chirality);
             } else {
 #pragma unroll
-              for (int m = 0; m < mVec; m++) load(v[tx][m], parity[tx], x_cb[tx], chirality, j + m);
+              for (int m = 0; m < mVec; m++) load(v[m][tx], parity[tx], x_cb[tx], chirality, j + m);
             }
           }
 

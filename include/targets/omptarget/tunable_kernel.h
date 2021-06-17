@@ -11,6 +11,14 @@
 
 namespace quda {
 
+  template <typename... Arg>
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
+  {
+    qudaSetupLaunchParameter(tp);
+    reinterpret_cast<void(*)(Arg...)>(const_cast<void*>(func))(arg...);
+    return QUDA_SUCCESS;
+  }
+
   class TunableKernel : public Tunable
   {
 
