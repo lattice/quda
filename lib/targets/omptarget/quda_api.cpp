@@ -353,16 +353,6 @@ namespace quda
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
-  {
-    ompwip([&](){std::cerr<<"ERROR: unimplemented launch "<<func<<' '<<tp<<' '<<*args<<' '<<device::get_cuda_stream(stream)<<std::endl;});
-    // if launch requests the maximum shared memory and the device supports it then opt in
-    if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
-      ompwip("Unimplemented for maximum shared memory");
-    }
-    return QUDA_SUCCESS;
-  }
-
   class QudaMem : public Tunable
   {
     void *dst;
