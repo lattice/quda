@@ -9,9 +9,7 @@
 
 #include <hip/hip_runtime.h>
 #ifdef USE_QDPJIT
-#include "qdp_forward.h"
 #include "qdp_cache.h"
-#include "qdp_gpu.h"
 #endif
 
 namespace quda
@@ -201,10 +199,7 @@ namespace quda
     }
 #else 
     // QDPJIT version
-    bool err = QDP::gpu_malloc(&ptr,size);
-    if (!err ) {
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
+     QDP::QDP_get_global_cache().addDeviceStatic( &ptr , size , true );    
 #endif
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
@@ -390,7 +385,8 @@ namespace quda
     if (err != hipSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
 #else
     // QDPJIT version
-    QDP::gpu_free(ptr);
+    // It will barf if it goes wrong
+    QDP::QDP_get_global_cache().signoffViaPtr( ptr );
 #endif
 
     track_free(DEVICE, ptr);

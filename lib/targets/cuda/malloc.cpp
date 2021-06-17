@@ -11,9 +11,7 @@
 #include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
-#include "qdp_forward.h"
 #include "qdp_cache.h"
-#include "qdp_gpu.h"
 #endif
 
 #ifdef QUDA_BACKWARDSCPP
@@ -222,10 +220,8 @@ namespace quda
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #else
-    bool err = QDP::gpu_malloc(&ptr,size);
-    if (!err) {
-      errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
+    // QDPJIT version -- barfs internally if it fails
+     QDP::QDP_get_global_cache().addDeviceStatic( &ptr , size , true );
 #endif
 
     track_malloc(DEVICE, a, ptr);
@@ -423,7 +419,8 @@ namespace quda
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
 #else
-    QDP::gpu_free(ptr);
+    // QDPJIT: Barfs if it fails internally
+    QDP::QDP_get_global_cache().signoffViaPtr( ptr ); 
 #endif
 
     track_free(DEVICE, ptr);
