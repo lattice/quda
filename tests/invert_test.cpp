@@ -378,6 +378,15 @@ int main(int argc, char **argv)
       invertMultiSrcCloverQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param, clover, clover_inv);
     } else {
       if (inv_split_grid_deflate) {
+
+	// Make host side copies of the source (temp WAR)
+	std::vector<quda::ColorSpinorField *> in_orig(Nsrc);
+	for (int i = 0; i < Nsrc; i++) {
+	  in_orig[i] = quda::ColorSpinorField::Create(cs_param);
+	  *in_orig[i] = *in[i];
+	}
+	
+	
 	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
 	inv_param.true_res = 1e10;
 	double gflops = 0.0;
@@ -391,7 +400,15 @@ int main(int argc, char **argv)
 	}
 	inv_param.gflops = gflops;
 	inv_param.secs = secs;
-	inv_param.iter = iter;	
+	inv_param.iter = iter;
+
+	// Copy back original sources
+	for (int i = 0; i < Nsrc; i++) {
+	  *in[i] = *in_orig[i];
+	  delete in_orig[i];
+	}
+	in_orig.resize(0);
+	
       } else {
 	invertMultiSrcQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)gauge, &gauge_param);	
       } 
@@ -432,7 +449,7 @@ int main(int argc, char **argv)
     for (auto p : out_multishift) { delete p; }
   }
 
-  for (auto p : in) { delete p; }
+  for (auto p : in) { delete p; }  
   for (auto p : out) { delete p; }
 
   freeGaugeQuda();

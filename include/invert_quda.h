@@ -1455,7 +1455,6 @@ public:
     bool svd;                                  /** Whether this space is for an SVD deflaton */
     bool constructed;                          /** Whether this space is populated */
     std::vector<ColorSpinorField *> evecs;     /** Container for the eigenvectors */
-    std::vector<ColorSpinorField *> aux_vecs;  /** Container for auxiliary vectors */
     std::vector<Complex> evals;                /** The eigenvalues */
   };
 

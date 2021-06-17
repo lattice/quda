@@ -174,7 +174,7 @@ namespace quda
           max_threads_per_dir = std::max(max_threads_per_dir, (arg.threadDimMapUpper[i] - arg.threadDimMapLower[i]) / 2);
         }
         int nDimComms = 0;
-        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        for (int d = 0; d < 4; d++) nDimComms += arg.commDim[d];
 
         /* if doing the fused packing + interior kernel we tune how many blocks to use for communication */
         // use up to a quarter of the GPU for packing (but at least up to 4 blocks per dir)
