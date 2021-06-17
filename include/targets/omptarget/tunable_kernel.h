@@ -9,10 +9,10 @@
 #include <jitify_helper2.cuh>
 #endif
 
-// defined in ../../../lib/targets/omptarget/quda_api.cpp:/qudaSetupLaunchParameter
-void qudaSetupLaunchParameter(const TuneParam &);
-
 namespace quda {
+
+  // defined in ../../../lib/targets/omptarget/quda_api.cpp:/qudaSetupLaunchParameter
+  void qudaSetupLaunchParameter(const TuneParam &);
 
   template <typename... Arg>
   qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, qudaStream_t stream, const Arg &... arg)
