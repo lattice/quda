@@ -378,6 +378,13 @@ namespace quda
     }
 
     /**
+       @brief Smooth the eigenvector with CG
+       @param[in] mat Matrix operator
+       @param[in] v Eigenvector we wish to smooth
+     */
+    void smoothEvec(const DiracMatrix &mat, ColorSpinorField &v);
+
+    /**
        @brief Computes Left/Right SVD from pre computed Right/Left
        @param[in] mat Matrix operator
        @param[in] evecs Computed eigenvectors of NormOp
@@ -486,7 +493,7 @@ namespace quda
 			 std::vector<ColorSpinorField *> &coarse,
 			 const unsigned int fine_vec_position,			 
 			 const unsigned int coarse_vec_position,
-			 const unsigned int num);
+			 const unsigned int num) const;
 
     /**
        @brief Promote vectors from the coarse space to the fine space
@@ -496,11 +503,11 @@ namespace quda
        @param[in] coarse_vec_position The starting place in the coarse vectors
        @param[in] num The number of vectors to promote
     */        
-    void promoteVectors(const std::vector<ColorSpinorField *> &fine,
-			std::vector<ColorSpinorField *> &coarse,
+    void promoteVectors(std::vector<ColorSpinorField *> &fine,
+			const std::vector<ColorSpinorField *> &coarse,
 			const unsigned int fine_vec_position,
 			const unsigned int coarse_vec_position,
-			const unsigned int num);    
+			const unsigned int num) const;
   };
 
   /**

@@ -16,6 +16,7 @@
 #include <tune_quda.h>
 #include <vector_io.h>
 #include <eigen_helper.h>
+#include <invert_quda.h>
 
 namespace quda
 {
@@ -28,6 +29,7 @@ namespace quda
     profile(profile),
     tmp1(nullptr),
     tmp2(nullptr),
+    transfer(nullptr),
     tmp_comp1(nullptr),
     tmp_comp2(nullptr)
   {
@@ -213,7 +215,7 @@ namespace quda
     // Increase space 
     int max_size = (strcmp(eig_param->vec_infile, "") != 0 ? n_conv : n_kr + 1 + block_size);
     kSpace.reserve(max_size);
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    cs_param.create = QUDA_ZERO_FIELD_CREATE;
     for (int i = k_size; i < max_size; i++) kSpace.push_back(ColorSpinorField::Create(cs_param)); // FIXME - why do we need this to be zero initialized?
     for (int b = r_size; b < block_size; b++) { r.push_back(ColorSpinorField::Create(cs_param)); }
     
@@ -1026,6 +1028,31 @@ namespace quda
     saveTuneCache();
   }
 
+  void EigenSolver::smoothEvec(const DiracMatrix &mat, ColorSpinorField &v)
+  {
+    pushVerbosity(QUDA_SILENT);
+    ColorSpinorParam csParam(v);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    auto source = ColorSpinorField::Create(csParam);
+
+    SolverParam param;
+    param.precision = csParam.Precision();
+    param.precision_sloppy = param.precision;
+    param.solution_accumulator_pipeline = 1;
+    param.maxiter = 10;
+    param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+    param.deflate = false;
+    param.is_preconditioner = false;
+    param.global_reduction = true;
+    param.use_alternative_reliable = true;
+
+    CG cg(mat, mat, mat, mat, param, profile);
+    cg.operator()(v, *source);
+    delete source;
+    popVerbosity();
+  }
+
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
@@ -1046,6 +1073,10 @@ namespace quda
 	profile.TPSTART(QUDA_PROFILE_COMPUTE);
 	promoteVectors(fine_vector, evecs, 0, i, 1);
 	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+#if 0
+        if (i >= fine_space.size()) smoothEvec(mat, *fine_vector[0]);
+#endif
 	evecs_ptr.push_back(fine_vector[0]);
       } else {
 	evecs_ptr.push_back(evecs[i]);
@@ -1085,27 +1116,58 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
 
-    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
-    // for all i computed eigenvectors and values.
+    if (compressed_mode) {
+      int n_batch = 1;
+      std::vector<ColorSpinorField*> decompressed(n_batch);
+      ColorSpinorParam cs_param(*fine_vector[0]);
+      for (auto &v : decompressed) v = ColorSpinorField::Create(cs_param);
 
-    // Pointers to the required Krylov space vectors,
-    // no extra memory is allocated.
-    std::vector<ColorSpinorField *> eig_vecs;
-    eig_vecs.reserve(n_defl);
-    for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
+      for (int i = 0; i < n_defl; i += n_batch) {
+        promoteVectors(decompressed, compressed_space, 0, i, n_batch);
 
-    // 1. Take block inner product: (V_i)^dag * vec = A_i
-    std::vector<Complex> s(n_defl * src.size());
-    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
-    blas::cDotProduct(s.data(), eig_vecs, src_);
+        // 1. Take block inner product: (V_i)^dag * vec = A_i
+        std::vector<Complex> s(n_batch * src.size());
+        std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+        blas::cDotProduct(s.data(), const_cast<std::vector<ColorSpinorField*> &>(decompressed), src_);
 
-    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+        // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
+        for (int j = 0; j < n_batch; j++) {
+          for (int k = 0; k < src.size(); k++) {
+            s[j * src.size() + k] /= evals[i + j].real(); // FIXME need to check if (j,j) are in correct order when src.size > 1
+          }
+        }
 
-    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    if (!accumulate)
-      for (auto &x : sol) blas::zero(*x);
-    blas::caxpy(s.data(), eig_vecs, sol);
+        // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+        if (!accumulate && i == 0)
+          for (auto &x : sol) blas::zero(*x);
+        blas::caxpy(s.data(), decompressed, sol);
+      }
+
+      for (auto &v : decompressed) delete v;
+    } else {
+
+      // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
+      // for all i computed eigenvectors and values.
+
+      // Pointers to the required Krylov space vectors,
+      // no extra memory is allocated.
+      std::vector<ColorSpinorField *> eig_vecs;
+      eig_vecs.reserve(n_defl);
+      for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
+
+      // 1. Take block inner product: (V_i)^dag * vec = A_i
+      std::vector<Complex> s(n_defl * src.size());
+      std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+      blas::cDotProduct(s.data(), eig_vecs, src_);
+
+      // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
+      for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+
+      // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+      if (!accumulate)
+        for (auto &x : sol) blas::zero(*x);
+      blas::caxpy(s.data(), eig_vecs, sol);
+    }
 
     // Save Deflation tuning
     saveTuneCache();
@@ -1131,15 +1193,23 @@ namespace quda
     
     // Create the device side residual vector by cloning
     // the kSpace passed to the function.
-    if(!r[0]) {
+
+    bool deallocate = false;
+    if (!r.size()) r.resize(1);
+    if (!r[0]) {
       ColorSpinorParam csParam(*kSpace[0]);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      r.push_back(ColorSpinorField::Create(csParam));
+      r[0] = ColorSpinorField::Create(csParam);
+      deallocate = true;
     }
     
     // Error estimates (residua) given by ||A*vec - lambda*vec||
     computeEvals(mat, kSpace, evals);
-    if(r[0]) delete r[0];
+
+    if (deallocate) {
+      delete r[0];
+      r[0] = nullptr;
+    }
   }
 
   void EigenSolver::saveToFile(const std::vector<ColorSpinorField *> &kSpace, const QudaParity mat_parity)
@@ -1566,6 +1636,8 @@ namespace quda
 
   EigenSolver::~EigenSolver()
   {
+    if (transfer) delete transfer;
+
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
     if (tmp_comp1) delete tmp_comp1;
@@ -1595,29 +1667,20 @@ namespace quda
     if(transfer) delete transfer;    
     // Create the transfer operator
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Transfer basis of size fine_n_conv = %d\n", fine_n_conv);
-    QudaPrecision prec = vec_space[0]->Precision();
     
     // Point to the converged fine vectors
     fine_space.reserve(fine_n_conv);
     for(int i=0; i<fine_n_conv; i++) fine_space.push_back(vec_space[i]);
 
-    // Create a new vector space with native ordering for the transfer basis
-    QudaInvertParam *inv_param = eig_param->invert_param;
-    bool pc_solution = ((inv_param->solution_type == QUDA_MATPC_SOLUTION) ||
-			(inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION));
-    
-    printfQuda("pc_solution = %s\n", pc_solution ? "true" : "false");
-    int X[4] = {vec_space[0]->X()[0], vec_space[0]->X()[1],
-		vec_space[0]->X()[2], vec_space[0]->X()[3]};
+#if 0
+    bool pc_solution = false;
+    if (pc_solution) X[0] *= 1;
+#endif
 
-    for(int i=0; i<4; i++) printfQuda("vol[%d] = %d\n", i, vec_space[0]->X()[i]);
-    if(pc_solution) X[0] *= 1;
-    
-    ColorSpinorParam csParam(nullptr, *inv_param, X, pc_solution, QUDA_CUDA_FIELD_LOCATION);
+    // Create a new vector space with native ordering for the transfer basis
+    ColorSpinorParam csParam(*vec_space[0]);
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    csParam.setPrecision(prec, prec, true);
     csParam.mem_type = QUDA_MEMORY_MAPPED;
-    csParam.gammaBasis = vec_space[0]->GammaBasis();
     B.reserve(fine_n_conv);
     for (int i = 0; i < fine_n_conv; i++) {
       B.push_back(ColorSpinorField::Create(csParam));
@@ -1625,7 +1688,7 @@ namespace quda
     }
     
     transfer = new Transfer(B, fine_n_conv, n_block_ortho,
-			    geo_block_size, spin_block_size, prec,
+			    geo_block_size, spin_block_size, vec_space[0]->Precision(),
 			    QUDA_TRANSFER_AGGREGATE, profile);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer basis created successfully\n");
     verifyCompression(B);
@@ -1672,7 +1735,7 @@ namespace quda
 				    std::vector<ColorSpinorField *> &coarse,
 				    const unsigned int fine_vec_position,
 				    const unsigned int coarse_vec_position,
-				    const unsigned int num)
+				    const unsigned int num) const
   {
     if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");
     unsigned int f_size = fine.size();
@@ -1693,11 +1756,11 @@ namespace quda
     }
   }
 
-  void EigenSolver::promoteVectors(const std::vector<ColorSpinorField *> &fine,
-				   std::vector<ColorSpinorField *> &coarse,
+  void EigenSolver::promoteVectors(std::vector<ColorSpinorField *> &fine,
+				   const std::vector<ColorSpinorField *> &coarse,
 				   const unsigned int fine_vec_position,
 				   const unsigned int coarse_vec_position,
-				   const unsigned int num)
+				   const unsigned int num) const
   {
     if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");    
     unsigned int f_size = fine.size();
