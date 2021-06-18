@@ -5842,10 +5842,10 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 	for (size_t c1 = 0; c1 < src_nColor; c1++) {
 	  profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
 	  
-	  /*DEBUG-JNS*/
+	  /*DEBUG-JNS*
 	  printfQuda("contractFTQuda calling contractSummedQuda src_color=%ld p= %d %d %d %d\n",c1,
 		     mom_modes[4*mom_idx+0],mom_modes[4*mom_idx+1],mom_modes[4*mom_idx+2],mom_modes[4*mom_idx+3]); fflush(stdout);
-	  /*DEBUG-JNS*/
+	  *DEBUG-JNS*/
 	  std::fill(result_global.begin(), result_global.end(), 0.0);
 	  contractSummedQuda(*d_prop1[s1 * src_nColor + c1],
 			     *d_prop2[b1 * src_nColor + c1],

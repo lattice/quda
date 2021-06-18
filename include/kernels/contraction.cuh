@@ -244,7 +244,23 @@ namespace quda
     x[reduction_dim] = t;    
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
-   
+
+  template <class T>
+  __device__ __host__ inline void FFTphase(T* ph_real, T* ph_imag, T theta, QudaFFTSymmType fft_type) {
+    //complex<T> z{0.,0.};
+    T z_real, z_imag;
+    T sin_th, cos_th;
+    quda::sincos(theta, &sin_th, &cos_th);
+    // Select either the cos, sin, or exp Fourier phase
+    if(fft_type == QUDA_FFT_SYMM_EVEN) sin_th = 0.0;
+    if(fft_type == QUDA_FFT_SYMM_ODD)  cos_th = 0.0;
+    z_real = *ph_real * cos_th - *ph_imag * sin_th;
+    z_imag = *ph_imag * cos_th + *ph_real * sin_th;
+    //return z;
+    *ph_real = z_real;
+    *ph_imag = z_imag;
+  };
+
   template <typename Float, int nSpin_, int nColor_, bool spin_project_, int reduction_dim_ = 3>
   struct ContractionSummedArg :  public ReduceArg<contract_array>
   {
@@ -258,6 +274,7 @@ namespace quda
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+
     F x;
     F y;
     int s1, b1;
@@ -268,7 +285,6 @@ namespace quda
     DRGammaMatrix<real> Gamma;
     int t_offset;
     int offsets[4];
-    
     dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
@@ -430,6 +446,12 @@ namespace quda
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
 
       /* DEBUG-JNS *
+      printf("%2d %3d = %2d %2d %2d %2d : %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
+	     t, xyz,
+	     sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0],
+	     x.data[0].real(),x.data[0].imag(),x.data[1].real(),x.data[1].imag(),x.data[2].real(),x.data[2].imag(),
+	     y.data[0].real(),y.data[0].imag(),y.data[1].real(),y.data[1].imag(),y.data[2].real(),y.data[2].imag()
+	     );
       //printf("%2d %4d ^ %2d %2d %2d %2d\n", t,xyz,sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0]);
       #if 1
 	printf("%2d %2d %2d %2d: %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e = %10.3e %10.3e\n",
@@ -440,39 +462,60 @@ namespace quda
       #endif
       * DEBUG-JNS */
 
+      // enable one and only one of the following #if blocks
+#if 1
+      // this code is working checks with milc when requesting QUDA_FFT_SYMM_EO
+      double phase_real;
+      double phase_imag;
+      double Sum_dXi_dot_Pi;
+      
+      // Calculate exp(i * [x dot p])
+      Sum_dXi_dot_Pi = (double)((sink[0]+offsets[0]-source_position[0])*mom_mode[0]*1./NxNyNzNt[0]+
+				(sink[1]+offsets[1]-source_position[1])*mom_mode[1]*1./NxNyNzNt[1]+
+				(sink[2]+offsets[2]-source_position[2])*mom_mode[2]*1./NxNyNzNt[2]+
+				(sink[3]+offsets[3]-source_position[3])*mom_mode[3]*1./NxNyNzNt[3]);
+      
+      phase_real = cospi(Sum_dXi_dot_Pi*2.); // implicit M_PI
+      phase_imag = sinpi(Sum_dXi_dot_Pi*2.); // implicit M_PI
+#endif
+#if 0
+      // this code checks for QUDA_FFT_SYMM_EO mom p000 and pk00 but otherwise is NOT working
+      // unrolling the loop either explicitly or via the pragma leads to different incorrect results.
       // Fourier phase
       double phase_real = 1.0;
       double phase_imag = 0.0;
-      // Phase factor for each direction is either the cos, sin, or exp Fourier phase
-      for(int dir=0; dir<4; ++dir)
-	{
-	  if(mom_mode[dir] != 0) {
-	    // phase is not one
-	    double dXi_dot_Pi = 2.*M_PI / NxNyNzNt[dir];
-	    dXi_dot_Pi *= (source_position[dir]-sink[dir]-offsets[dir])*mom_mode[dir];
-	    double ph_real;
-	    double ph_imag;
-	    if(fft_type[dir] == QUDA_FFT_SYMM_EO) {
-	      // exp(+i k.x) case
-	      ph_real = cos(dXi_dot_Pi);
-	      ph_imag = sin(dXi_dot_Pi);
-	    } else if(fft_type[dir] == QUDA_FFT_SYMM_EVEN) {
-	      // cos(k.x) case
-	      ph_real = cos(dXi_dot_Pi);
-	      ph_imag = 0.0;
-	    } else if(fft_type[dir] == QUDA_FFT_SYMM_ODD) {
-	      // sin(k.x) case
-	      ph_real = 0.0;
-	      ph_imag = sin(dXi_dot_Pi);
-	    }
-	    // phase *= ph
-	    double tmp_real = phase_real;
-	    double tmp_imag = phase_imag;
-	    phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
-	    phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
-	  }
-	}
-      
+      double tmp_real, tmp_imag;
+      double dXi_dot_Pi, ph_real, ph_imag;
+      #pragma unroll
+      for(int d=0; d<4; ++d) {
+	dXi_dot_Pi = M_PI * ((double)( (sink[d]+offsets[d] - source_position[d]) * mom_mode[d] )) * 2./NxNyNzNt[d];
+	// exp(i k.x) case
+	ph_real =  cos(dXi_dot_Pi);
+	ph_imag =  sin(dXi_dot_Pi);
+	if( fft_type[d] == QUDA_FFT_SYMM_EVEN ) ph_imag = 0.0;  // cos(k.x) case
+	if( fft_type[d] == QUDA_FFT_SYMM_ODD )  ph_real = 0.0;  // sin(k.x) case
+	// phase *= ph
+	tmp_real = phase_real;
+	tmp_imag = phase_imag;
+	phase_real = ph_real*tmp_real - ph_imag*tmp_imag;
+	phase_imag = ph_imag*tmp_real + ph_real*tmp_imag;
+      }
+#endif
+#if 0
+      // this code works for p000 and pk00 but otherwise is NOT working; incorrect results are yet again different
+      // Fourier phase
+      double phase_real = 1.0;
+      double phase_imag = 0.0;
+      double dXi_dot_Pi;
+      dXi_dot_Pi = M_PI * ((double)( (sink[0]+offsets[0] - source_position[0]) * mom_mode[0] )) * 2./NxNyNzNt[0];
+      FFTphase<double>(&phase_real,&phase_imag,dXi_dot_Pi,fft_type[0]);
+      dXi_dot_Pi = M_PI * ((double)( (sink[1]+offsets[1] - source_position[1]) * mom_mode[1] )) * 2./NxNyNzNt[1];
+      FFTphase<double>(&phase_real,&phase_imag,dXi_dot_Pi,fft_type[1]);
+      dXi_dot_Pi = M_PI * ((double)( (sink[2]+offsets[2] - source_position[2]) * mom_mode[2] )) * 2./NxNyNzNt[2];
+      FFTphase<double>(&phase_real,&phase_imag,dXi_dot_Pi,fft_type[2]);
+      dXi_dot_Pi = M_PI * ((double)( (sink[3]+offsets[3] - source_position[3]) * mom_mode[3] )) * 2./NxNyNzNt[3];
+      FFTphase<double>(&phase_real,&phase_imag,dXi_dot_Pi,fft_type[3]);
+#endif
       // Staggered uses only the first element of result_all_channels
       result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
       result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;

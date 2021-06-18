@@ -178,21 +178,25 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   const int source_position[4]{0,0,0,0};
-  /*
-  const int n_mom = 5;
-  const int mom[n_mom*4]{0,0,0,0, 1,0,0,0, 0,1,0,0, 0,0,1,0, 2,0,0,0 };
-  const QudaFFTSymmType fft_type[n_mom*4]{
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
+  const int n_mom = 9;
+  const int mom[n_mom*4]{
+      0, 0, 0, 0,
+      1, 0, 0, 0,    -1, 0, 0, 0,
+      0, 1, 0, 0,     0,-1, 0, 0,
+      0, 0, 1, 0,     0, 0,-1, 0,
+      1, 1, 1, 0,    -1,-1,-1, 0
       };
-  */
-  const int n_mom = 1;
-  const int mom[n_mom*4]{0,0,0,0};
+  const QudaFFTSymmType ftype = QUDA_FFT_SYMM_EO;
   const QudaFFTSymmType fft_type[n_mom*4]{
-    QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO
       };
 
   int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
@@ -209,7 +213,7 @@ int test(int contractionType, QudaPrecision test_prec)
 
   printfQuda("contractions:");
   for(int k=0; k<n_mom; ++k) {
-    printfQuda("\np = %d %d %d %d",mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3]);
+    printfQuda("\np = %2d %2d %2d %2d",mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3]);
     for(int c=0; c<red_size*nSpin*nSpin*2; c+= 2) {
       int indx = k*red_size*nSpin*nSpin*2 + c;
       if( c % 8 == 0 ) printfQuda("\n%3d",indx);
@@ -277,7 +281,7 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
 }
 
 // Instantiate all test cases: prec 3==double, 2==float; contractType 2==staggered_FT
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(2, NcontractType)), getContractName);
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 3), Range(2, NcontractType)), getContractName);
 
 
 
