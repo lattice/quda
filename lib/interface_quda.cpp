@@ -223,7 +223,6 @@ void create_solver_state(void **host_source_, void**host_guess_, QudaInvertParam
   
   ColorSpinorParam cuda_pc_param(nullptr, *inv_param, sol_state->host_source[0]->X(), sol_type, QUDA_CUDA_FIELD_LOCATION);
   cuda_pc_param.create = QUDA_ZERO_FIELD_CREATE;
-  //cuda_pc_param.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   cuda_pc_param.setPrecision(inv_param->cuda_prec, inv_param->cuda_prec, true);
   if (cuda_pc_param.nSpin != 1) cuda_pc_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   
@@ -240,11 +239,13 @@ void create_solver_state(void **host_source_, void**host_guess_, QudaInvertParam
   }
 
   // Create device side ColorSpinorField temp vectors
-  sol_state->temp_vec2.reserve(inv_param->num_src);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    sol_state->temp_vec2.push_back(ColorSpinorField::Create(cuda_pc_param));
+  if(pc_solve) {
+    sol_state->temp_vec2.reserve(inv_param->num_src);
+    for (int i = 0; i < inv_param->num_src; i++) {
+      sol_state->temp_vec2.push_back(ColorSpinorField::Create(cuda_pc_param));
+    }
   }
-
+  
   sol_state->constructed = true;
 }
 
@@ -259,13 +260,9 @@ void update_solver_state_vecs(std::vector<ColorSpinorField*> &vec_out,
       *vec_out[i] = *vec_in[i];
     } else {
       if(parity_even) {
-	//printfQuda("PRE EVEN UPDATE COPY: %e %e\n", blas::norm2(*vec_out[i]), blas::norm2(*vec_in[i]));
 	vec_out[i]->Even() = *vec_in[i];
-	//printfQuda("POST EVEN UPDATE COPY: %e %e\n", blas::norm2(*vec_out[i]), blas::norm2(*vec_in[i]));
       } else {
-	//printfQuda("PRE ODD UPDATE COPY: %e %e\n", blas::norm2(*vec_out[i]), blas::norm2(*vec_in[i]));
 	vec_out[i]->Odd() = *vec_in[i];
-	//printfQuda("POST ODD UPDATE COPY: %e %e\n", blas::norm2(*vec_out[i]), blas::norm2(*vec_in[i]));
       }
     }
   }
@@ -1308,8 +1305,7 @@ void freeSloppyGaugeQuda()
   if (gaugeRefinement != gaugeSloppy && gaugeRefinement) delete gaugeRefinement;
 
   // Delete gaugePrecondition if it does not alias gaugePrecise, gaugeSloppy, or gaugeEigensolver.
-  if (gaugePrecondition != gaugeSloppy && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeEigensolver
-      && gaugePrecondition)
+  if (gaugePrecondition != gaugeSloppy && gaugePrecondition != gaugePrecise && gaugePrecondition != gaugeEigensolver && gaugePrecondition)
     delete gaugePrecondition;
 
   // Delete gaugeEigensolver if it does not alias gaugePrecise or gaugeSloppy.
@@ -2695,7 +2691,6 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-#if 1
 void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param, QudaInvertParam *invert_param)
 {
   profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
@@ -2723,6 +2718,17 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
     || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
+  QudaSolutionType sol_type;
+  if(pc_solve) {
+    if(inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
+       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE ||
+       inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) sol_type = QUDA_MATPC_SOLUTION;
+  } else { 
+    if(inv_param->solve_type == QUDA_NORMOP_SOLVE ||
+       inv_param->solve_type == QUDA_NORMERR_SOLVE ||
+       inv_param->solve_type == QUDA_DIRECT_SOLVE) sol_type = QUDA_MAT_SOLUTION;
+  }  
+  
   // Define the problem matrix and create a deflation space
   //-------------------------------------------------------
   Dirac *d = nullptr;
@@ -2736,28 +2742,15 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
   Dirac &dirac_solver = *d;
   
   const int *X = cudaGauge->X();
-  
-  QudaSolutionType sol_type;
-  if(pc_solve) {
-    if(inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
-       inv_param->solve_type == QUDA_NORMERR_PC_SOLVE ||
-       inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) sol_type = QUDA_MATPC_SOLUTION;
-    printfQuda("You hit PC solve\n");
-  } else { 
-    if(inv_param->solve_type == QUDA_NORMOP_SOLVE ||
-       inv_param->solve_type == QUDA_NORMERR_SOLVE ||
-       inv_param->solve_type == QUDA_DIRECT_SOLVE) sol_type = QUDA_MAT_SOLUTION;
-    printfQuda("You hit non PC solve\n");
-  }  
-  
+    
   if(!defl_space) {
     defl_space = new quda::deflation_space;
     defl_space->evecs.reserve(eig_param->n_conv);
     defl_space->evals.resize(eig_param->n_conv);
     defl_space->constructed = false;
 
-    // Deflation space vectors may be single parity. We create single parity vectors to save
-    // on storage.
+    // Deflation space vectors may be single parity. We create single parity vectors
+    // to save on storage.
     ColorSpinorParam deflParam(nullptr, *inv_param, X, sol_type, QUDA_CUDA_FIELD_LOCATION);
     deflParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
     deflParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -2824,51 +2817,33 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 	blas::ax(1.0/sqrt(nb), *sol_state->source[i]);
 	blas::ax(1.0/sqrt(nb), *sol_state->guess[i]);
       }
-
-      //printfQuda("Pre rescale\n");
       massRescale(*static_cast<cudaColorSpinorField *>(sol_state->source[i]), *inv_param, false);
-      //printfQuda("Post rescale\n");
       dirac_solver.prepare(in, out, *sol_state->guess[i], *sol_state->source[i], QUDA_MAT_SOLUTION);
-      //printfQuda("Pre prepare\n");
-
-      /*
-      if (getVerbosity() >= QUDA_VERBOSE) {
-	double nin = blas::norm2(*in);
-	double nout = blas::norm2(*out);
-	printfQuda("Prepared source = %.16e\n", nin);
-	printfQuda("Prepared solution = %.16e\n", nout);
-      }
-      
-      if (getVerbosity() >= QUDA_VERBOSE) {
-	double nin = blas::norm2(*in);
-	printfQuda("Prepared source post mass rescale = %.16e\n", nin);
-      }
-      */
       
       if (inv_param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-	//printfQuda("Deflating guess\n");	
 	// This is a subsequent solve. We deflate the initial guess
-	// Compute residual
-
-	//printfQuda("TMP norm = %.16e\n", blas::norm2(*sol_state->temp_vec[i]));
-	m_solver(*sol_state->temp_vec[i], *out);
-	blas::xmy(*sol_state->temp_vec2[i], *sol_state->temp_vec[i]);
 	
-	// Accumulate the previous guesses
+	// Compute residual r = b - Ax0 
+	m_solver(*sol_state->temp_vec[i], *out);
+	if(pc_solve) blas::xmy(*sol_state->temp_vec2[i], *sol_state->temp_vec[i]);
+	else blas::xmy(*in, *sol_state->temp_vec[i]);
+	
+	// Accumulate the into previous guess
 	accumulate = true;
 	*sol_state->defl_guess[i] = *out;
       } else {
 	// This is the initial solve, we deflate the source, prepare, and apply
-	// the mat vec
+	// the mat vec. We save the source in temp_vec2 to save on a matvec.
 	blas::copy(*sol_state->temp_vec[i], *in);	
 	// prepare source: b' = A^dag b
 	cudaColorSpinorField tmp(*sol_state->temp_vec[i]);
 	dirac_solver.Mdag(*sol_state->temp_vec[i], tmp);
+	if(pc_solve) *sol_state->temp_vec2[i] = *sol_state->temp_vec[i];
       }
     }
 
     // Construct the deflation space if required
-    //-----------------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
     DiracMdagM m(dirac);
     EigenSolver *defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
     if(!defl_space->constructed) {
@@ -2898,34 +2873,32 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
     }
 
     // Deflate
-    //-----------------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
     defl_eig_solve->deflate(sol_state->defl_guess, sol_state->temp_vec,
 			    defl_space->evecs, defl_space->evals, accumulate);
     
     // Copy guess back to the host
     printfQuda("Vectors deflated\n");
+
     
-    // If this is the first solve, we must write over the source
+    if(pc_solve) {
+      update_solver_state_vecs(sol_state->guess, sol_state->defl_guess, true, true);
+      update_solver_state_vecs(sol_state->guess, sol_state->temp_vec2, true, false);
+    } else {
+      update_solver_state_vecs(sol_state->guess, sol_state->defl_guess);
+      if(!accumulate) update_solver_state_vecs(sol_state->source, sol_state->temp_vec);
+    }
+    
     // DMH: I can copy parity components from single parity device to full parity device,
     // then full parity device to full parity host, but not the shortcut single parity device to
     // full parity host. File a bug report.
-    
-    if (!accumulate) {
-      update_solver_state_vecs(sol_state->guess, sol_state->defl_guess, true, true);
-      update_solver_state_vecs(sol_state->guess, sol_state->temp_vec, true, false);
-      // We must keep a copy of the original, prepped source, else apply
-      // a matvec with each new restart.
-      update_solver_state_vecs(sol_state->temp_vec2, sol_state->temp_vec);
-    } else {
-      update_solver_state_vecs(sol_state->guess, sol_state->defl_guess, true, true);
-      update_solver_state_vecs(sol_state->guess, sol_state->temp_vec2, true, false);
-    }
     
     profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
 
     copy_solver_guess_to_host();
-
+    if(!accumulate && !pc_solve) copy_solver_source_to_host();
+    
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
     profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
 
@@ -2955,239 +2928,6 @@ void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param,
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-#endif
-
-#if 0
-void deflateQuda(void **host_source, void **host_guess, QudaEigParam *eig_param, QudaInvertParam *invert_param)
-{
-  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
-  profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
-
-  // Transfer the inv param structure contained in eig_param
-  QudaInvertParam *inv_param = invert_param;
-  
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
-    setKernelPackT(true);
-
-  if (!initialized) errorQuda("QUDA not initialized");
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printQudaInvertParam(inv_param);
-    printQudaEigParam(eig_param);
-  }
-
-  checkInvertParam(inv_param);
-  checkEigParam(eig_param);
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE)
-    || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-
-  // Define problem matrix
-  //------------------------------------------------------
-  Dirac *d = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
-  Dirac *dEig = nullptr;
-
-  // Create the dirac operator with a sloppy and a precon.  
-  createDiracWithEig(d, dSloppy, dPre, dEig, *inv_param, pc_solve);
-  Dirac &dirac = *dEig;
-
-  const int *X = cudaGauge->X();
-  QudaPrecision prec_orig =   inv_param->cuda_prec;
-  inv_param->cuda_prec = inv_param->cuda_prec_eigensolver;
-  ColorSpinorParam cpuParam(host_source[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
-  
-  // create wrappers around application guess vector set
-  std::vector<ColorSpinorField *> host_guess_;
-  host_guess_.reserve(inv_param->num_src);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    cpuParam.v = host_guess[i];
-    host_guess_.push_back(ColorSpinorField::Create(cpuParam));
-  }
-
-  // create wrappers around application source vector set
-  std::vector<ColorSpinorField *> host_source_;
-  host_source_.reserve(inv_param->num_src);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    cpuParam.v = host_source[i];
-    host_source_.push_back(ColorSpinorField::Create(cpuParam));
-  }
-  
-  // Create device side ColorSpinorField Krylov space 
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
-  // Ensure device vectors qre in UKQCD basis for Wilson type fermions
-  if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
-  if(!defl_space) {
-    defl_space = new quda::deflation_space;
-    defl_space->evecs.reserve(eig_param->n_conv);
-    defl_space->evals.resize(eig_param->n_conv);
-    defl_space->constructed = false;
-    for (int i = 0; i < eig_param->n_conv; i++) defl_space->evecs.push_back(ColorSpinorField::Create(cudaParam));
-  }  
-  
-  // Create device side ColorSpinorField guess vectors
-  std::vector<ColorSpinorField *> guess;
-  guess.reserve(inv_param->num_src);  
-  for (int i = 0; i < inv_param->num_src; i++) {
-    guess.push_back(ColorSpinorField::Create(cudaParam));
-    *guess[i] = *host_guess_[i];
-  }
-
-  // Create device side ColorSpinorField source vectors
-  std::vector<ColorSpinorField *> source;
-  source.reserve(inv_param->num_src);  
-  for (int i = 0; i < inv_param->num_src; i++) {
-    source.push_back(ColorSpinorField::Create(cudaParam));
-    *source[i] = *host_source_[i];
-  }
-  
-  // Create device side ColorSpinorField deflated guess vectors
-  std::vector<ColorSpinorField *> defl_guess;
-  defl_guess.reserve(inv_param->num_src);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    defl_guess.push_back(ColorSpinorField::Create(cudaParam));
-  }
-
-  // Create device side ColorSpinorField temp vectors
-  std::vector<ColorSpinorField *> temp_vec;
-  temp_vec.reserve(inv_param->num_src);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    temp_vec.push_back(ColorSpinorField::Create(cudaParam));
-  }
-
-  // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
-  // the solver will fail.
-  if ((eig_param->spectrum == QUDA_SPECTRUM_LI_EIG || eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-      && ((eig_param->use_norm_op || (inv_param->dslash_type == QUDA_LAPLACE_DSLASH))
-          || ((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH)
-              && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE))) {
-    errorQuda("Cannot compute imaginary spectra with a hermitian operator");
-  }
-
-  // Gamma5 pre-multiplication is only supported for the M type operator
-  if (eig_param->compute_gamma5) {
-    if (eig_param->use_norm_op || eig_param->use_dagger) {
-      errorQuda("gamma5 premultiplication is only supported for M type operators: dag = %s, normop = %s",
-                eig_param->use_dagger ? "true" : "false", eig_param->use_norm_op ? "true" : "false");
-    }
-  }
-  profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
-  
-  profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
-  
-  // USE THIS CODE PATH ONLY FOR TESTING
-  if (eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracMdagM m(dirac);
-
-    profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
-    EigenSolver *defl_eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
-    if(!defl_space->constructed) {
-      (*defl_eig_solve)(defl_space->evecs, defl_space->evals);
-      defl_space->constructed = true;
-    }
-    profileEigensolve.TPSTART(QUDA_PROFILE_DEFLATE);
-    ColorSpinorField *in = nullptr;
-    ColorSpinorField *out = nullptr;
-
-    bool accumulate = false;
-    for (int i = 0; i < inv_param->num_src; i++) {
-
-      double nb = blas::norm2(*source[i]);
-      if (nb==0.0) errorQuda("Source has zero norm");
-
-      // rescale the source and solution vectors to help prevent the onset of underflow    
-      if (inv_param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-	blas::ax(1.0/sqrt(nb), *source[i]);
-	blas::ax(1.0/sqrt(nb), *guess[i]);
-      }
-      
-      massRescale(*static_cast<cudaColorSpinorField *>(source[i]), *inv_param, false);
-      dirac.prepare(in, out, *guess[i], *source[i], inv_param->solution_type);
-      
-      if (getVerbosity() >= QUDA_VERBOSE) {
-	double nin = blas::norm2(*in);
-	double nout = blas::norm2(*out);
-	printfQuda("Prepared source = %g\n", nin);
-	printfQuda("Prepared solution = %g\n", nout);
-      }
-      
-      if (getVerbosity() >= QUDA_VERBOSE) {
-	double nin = blas::norm2(*in);
-	printfQuda("Prepared source post mass rescale = %g\n", nin);
-      }
-
-      if (inv_param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-	printfQuda("Deflating guess\n");	
-	// This is a subsequent solve. We deflate the initial guess
-	// Compute residual
-	m(*temp_vec[i], *out);
-	blas::xmy(*in, *temp_vec[i]);
-
-	// Accumulate the previous guesses
-	accumulate = true;
-	*defl_guess[i] = *out;
-	//printfQuda("DEFL residual norm = %e\n", blas::norm2(*temp_vec[i]));
-      } else {
-	// This is the initial solve we deflate the source and prepare
-	// with a mat vec
-	blas::copy(*temp_vec[i], *in);	
-	// prepare source: b' = A^dag b
-	cudaColorSpinorField tmp(*temp_vec[i]);
-	dirac.Mdag(*temp_vec[i], tmp);	
-      }
-    }
-    
-    defl_eig_solve->deflate(defl_guess, temp_vec, defl_space->evecs, defl_space->evals, accumulate);
-    
-    // Copy guess back to the host
-    for (int i = 0; i < inv_param->num_src; i++) {
-      *host_guess_[i] = *defl_guess[i];
-      // If this is the first solve, we must write over the source
-      if (!accumulate) *host_source_[i] = *temp_vec[i];
-    }
-    delete defl_eig_solve;
-    
-  } else {
-    errorQuda("Invalid use_norm_op and dagger combination");
-  }
-
-  inv_param->cuda_prec = prec_orig;
-  profileEigensolve.TPSTOP(QUDA_PROFILE_DEFLATE);
-  
-  profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < inv_param->num_src; i++) {
-    delete guess[i];
-    delete defl_guess[i];
-    delete host_guess_[i];
-    delete source[i];
-    delete host_source_[i];
-    delete temp_vec[i];
-  }
-  
-  delete d;
-  delete dSloppy;
-  delete dPre;
-  delete dEig;
-  profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
-
-  popVerbosity();
-
-  // cache is written out even if a long benchmarking job gets interrupted
-  saveTuneCache();
-
-  profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
-}
-
-
-#endif
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
   : profile(profile) {
@@ -3662,10 +3402,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
   } else {
-    // Source prepped in deflateQuda
-    in = &(x->Odd());
-    out = &(x->Even());
-
+    if(pc_solve) {
+      // Source prepped in deflateQuda
+      in = &(x->Odd());
+      out = &(x->Even());
+    } else {
+      in = b;
+      out = x;
+    }
+	
     if (getVerbosity() >= QUDA_VERBOSE) {
       double nin = blas::norm2(*in);
       double nout = blas::norm2(*out);
@@ -4026,7 +3771,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     if (gauge_param == nullptr) { errorQuda("gauge_param == nullptr.\n"); }
 
-    // Doing the sub-partition arithmatics
+    // Doing the sub-partition arithmetic
     if (param->num_src_per_sub_partition * num_sub_partition != param->num_src) {
       errorQuda("We need to have split_grid[0](=%d) * split_grid[1](=%d) * split_grid[2](=%d) * split_grid[3](=%d) * "
                 "num_src_per_sub_partition(=%d) == num_src(=%d).",
