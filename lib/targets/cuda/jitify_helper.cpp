@@ -54,7 +54,6 @@ namespace quda {
       std::vector<std::string> options = {
         "-ftz=true", "-prec-div=false", "-prec-sqrt=false", // match offline optimization options
         "-remove-unused-globals",                           // remove unused globals to monimize module size
-        "-err-no",                                          // display error/warning numbers
 
 #if __cplusplus >= 201703L
         "-std=c++17",                                       // use C++17 dialect
@@ -66,9 +65,12 @@ namespace quda {
         "-G",
 #endif
 
+#if CUDA_VERSION >= 11200
+        "-err-no",                                          // display error/warning numbers
         // disable warnings that are unavoidable
-        "-diag-suppress=64",                                 // declaration does not declare anything (anonymous structs in CUB)
-        "-diag-suppress=161"                                 // unknown pragmas, e.g., OpenMP
+        "-diag-suppress=64",                                // declaration does not declare anything (anonymous structs in CUB)
+        "-diag-suppress=161"                                // unknown pragmas, e.g., OpenMP
+#endif
       };
 
       // add an extra compilation options specific to this instance

@@ -125,13 +125,8 @@ namespace quda
       double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
-    // with symmetric dagger operator we must use kernel packing
-    if (dagger && !asymmetric) pushKernelPackT(true);
-
     instantiate<NdegTwistedMassPreconditionedApply>(
         out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-
-    if (dagger && !asymmetric) popKernelPackT();
   }
 #else
   void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,

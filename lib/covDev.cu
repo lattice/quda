@@ -157,9 +157,7 @@ namespace quda
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    pushKernelPackT(true); // non-spin projection requires kernel packing
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-    popKernelPackT();
   }
 #else
   void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,
