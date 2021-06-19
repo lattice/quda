@@ -82,8 +82,9 @@ namespace quda {
     }
   };
 
-  template <int block_size, typename Arg> struct BlockOrtho_ {
+  template <typename Arg> struct BlockOrtho_ {
     const Arg &arg;
+    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;
@@ -164,7 +165,7 @@ namespace quda {
               for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], chirality);
             } else {
 #pragma unroll
-              for (int m = 0; m < mVec; m++) load(v[tx][m], parity[tx], x_cb[tx], chirality, j + m);
+              for (int m = 0; m < mVec; m++) load(v[m][tx], parity[tx], x_cb[tx], chirality, j + m);
             }
           }
 

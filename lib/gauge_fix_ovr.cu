@@ -109,7 +109,7 @@ namespace quda {
         }
         this->threads /= 2;
 
-        if (threads == 0) errorQuda("Local volume is too small");
+        if (this->threads == 0) errorQuda("Local volume is too small");
       } else {
         this->threads = threads;
       }

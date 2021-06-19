@@ -80,6 +80,9 @@ namespace quda {
       total_block_size *= geo_bs[d];
     }
 
+    if (Nvec > total_block_size * spin_bs * B[0]->Ncolor())
+      errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, total_block_size * spin_bs * B[0]->Ncolor());
+
     // Various consistency checks for optimized KD "transfers"
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
 
