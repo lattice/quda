@@ -5291,7 +5291,8 @@ void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
   fflush(stdout);
 }
 
-void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
+void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param)
+{
   // ensure that fifth dimension is set to 1
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
 
@@ -5302,7 +5303,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 
   // compute offset assuming TIFR padded ordering (FIXME)
   if (param->dirac_order != QUDA_TIFR_PADDED_DIRAC_ORDER)
-    errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER");
+    errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER and not %d", param->dirac_order);
 
   const int *X = gaugePrecise->X();
   size_t cb_offset = (X[0]/2) * X[1] * (X[2] + 4) * X[3] * gaugePrecise->Ncolor() * nSpin * 2 * param->cpu_prec;
