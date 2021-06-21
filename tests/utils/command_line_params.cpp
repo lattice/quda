@@ -282,6 +282,7 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
+// GF options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;
@@ -292,7 +293,6 @@ double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
@@ -1186,23 +1186,6 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
     
-}
-
-void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  // Option group for heatbath related options
-  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
-  opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
-  opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
-                      "Whether to use a cold or hot start in heatbath test (default false)");
-  opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
-                      "Number of heatbath hits per heatbath step (default 5)");
-  opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
-                      "Number of overrelaxation hits per heatbath step (default 5)");
-  opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
-                      "Number of measurement steps in heatbath test (default 10)");
-  opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
-                      "Number of warmup steps in heatbath test (default 10)");
 }
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)

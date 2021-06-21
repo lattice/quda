@@ -38,8 +38,8 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-
   auto app = make_app();
+  add_su3_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

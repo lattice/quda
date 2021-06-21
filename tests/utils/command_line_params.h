@@ -141,7 +141,7 @@ class QUDAApp : public CLI::App
   template <typename T>
   CLI::Option *add_psoption(CLI::Option_group *group, std::string option_name,
                             std::array<std::array<T, 4>, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                            std::string option_description = "", bool defaulted = false)
+                            std::string option_description = "")
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -179,7 +179,7 @@ class QUDAApp : public CLI::App
   template <typename T>
   CLI::Option *add_fileoption(CLI::Option_group *group, std::string option_name,
                               std::array<T, QUDA_MAX_SOURCES> &variable, CLI::Validator trans,
-                              std::string option_description = "", bool defaulted = false)
+                              std::string option_description = "")
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {

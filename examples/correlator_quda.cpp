@@ -237,7 +237,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
       time0 /= CLOCKS_PER_SEC;
 
       // Collect data on the element by element differences. Replace 
-      // prop_array_ptr_2[prop] with teh zfp version for further testing
+      // prop_array_ptr_2[prop] with the zfp version for further testing
       double L2norm = 0.0;
       double diff = 0.0;
       for(int i=0; i<n_elems; i++) {
