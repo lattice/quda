@@ -10,11 +10,15 @@
 
 namespace quda
 {  
-  template <typename Float, int nColor_>
-  struct MomentumProjectArg : public ReduceArg<double2>
+  
+  using test_array = vector_type<double2, 1>;  
+
+  template <typename Float, int nColor_, int reduction_width_>
+  struct MomentumProjectArg : public ReduceArg<test_array>
   {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
+    static constexpr int reduction_width = reduction_width_;
     static constexpr int nSpin = 1;
     typedef typename colorspinor_mapper<Float, nSpin, nColor>::type F;
 
@@ -25,15 +29,17 @@ namespace quda
     int_fastdiv X[4]; // grid dimensions
     int L[3];
     int offset[3];
-    int mom_mode[3];
-    
+    int mom_mode[3];    
+    int cc_stride;
+
     MomentumProjectArg(const ColorSpinorField &meta, const complex<Float> *cc_array_in,
 		       const int mom_mode_in[3]) :
-      ReduceArg<double2>(meta.X()[3]),
+      ReduceArg<test_array>(meta.X()[3]),
       meta(meta),
-      cc_array(cc_array_in),      
+      cc_array(cc_array_in),
       // Launch xyz threads per t, t times.
-      threads(meta.Volume()/meta.X()[3], meta.X()[3])
+      threads(meta.Volume()/meta.X()[3], meta.X()[3]),
+      cc_stride(meta.Volume())
     {
       for(int i=0; i<4; i++) {
 	X[i] = meta.X()[i];
@@ -42,14 +48,15 @@ namespace quda
 	  offset[i] = comm_coord(i) * meta.X()[i];
 	  mom_mode[i] = mom_mode_in[i];
 	}
-      }
+      }      
     }
-    
-    __device__ __host__ double2 init() const { return double2(); }
+      
+    __device__ __host__ test_array init() const { 
+      return test_array(); }
   };
   
-  template <typename Arg> struct MomProj : plus<double2> {
-    using reduce_t = double2;
+  template <typename Arg> struct MomProj : plus<test_array> {
+    using reduce_t = test_array;
     using plus<reduce_t>::operator();    
     const Arg &arg;
     constexpr MomProj(const Arg &arg) : arg(arg) {}
@@ -60,13 +67,13 @@ namespace quda
     {
       using real = typename Arg::real;
       
-      reduce_t result_mom_mode = double2();
-
+      reduce_t result_mom_mode = test_array();
+      
       // Collect index data
       int x[4] = { };
       getCoords(x, xyz/2, arg.X, xyz%2);
       if(x[3] != 0) printf("Womp, womp....\n");
-           
+      
       // Calculate the Fourier phase for this p mode at this x position
       // exp( -i x \dot p)
       double x_dot_p = (((arg.offset[0] + x[0]) * arg.mom_mode[0])*1.0/arg.L[0] +
@@ -81,12 +88,18 @@ namespace quda
       int parity = 0;
       int idx = idx_from_t_xyz<3>(t, xyz, arg.X);
       int x_cb = getParityCBFromFull(parity, arg.X, idx);
-      complex<real> cc = arg.cc_array[x_cb + parity*arg.threads.x];
-
-      // The exp( -i x \dot p) convention carries a -ve sign in the
-      // imaginary part of the phase
-      result_mom_mode.x =   cc.real() * phase_real + cc.imag() * phase_imag;
-      result_mom_mode.y = - cc.real() * phase_imag + cc.imag() * phase_real;
+      int idx_4d[4] = { };
+      getCoords(idx_4d, x_cb, arg.X, parity);
+      
+      for(int r=0; r<1; r++) {
+        int offset_cc = r * arg.cc_stride;
+        complex<real> cc = arg.cc_array[x_cb + parity*(arg.cc_stride/2) + offset_cc];
+        
+        // The exp( -i x \dot p) convention carries a -ve sign in the
+        // imaginary part of the phase
+        result_mom_mode[r].x +=   cc.real() * phase_real + cc.imag() * phase_imag;
+        result_mom_mode[r].y += - cc.real() * phase_imag + cc.imag() * phase_real;
+      }
       
       return plus::operator()(result_mom_mode, result);
     }
@@ -97,12 +110,12 @@ namespace quda
   {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;    
-    static constexpr int nSpin = 4;
+    static constexpr int nSpin = 1;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     // Create a typename F for the ColorSpinorFields
-    typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
+    typedef typename colorspinor_mapper<Float, nSpin, nColor>::type F;
 
     F x;
     F y;
@@ -137,17 +150,46 @@ namespace quda
       Vector x = arg.x(x_cb, parity);
       Vector y = arg.y(x_cb, parity);
 
+      // Collect index data
+      int idx[4] = { };
+      getCoords(idx, x_cb, arg.X, parity);
+
       // Compute the inner product over color
       res = colorContract(x, y, 0, 0);
-      //printf("parity = %d, idx_cb = %d\n", parity, idx_cb);
       arg.s[x_cb + parity*arg.threads.x] = res;
-      //arg.s.save(A, x_cb, parity);
     }
   };
 
+  template <typename Arg> struct InnerProd {
+    const Arg &arg;
+    constexpr InnerProd(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x_cb, int parity)
+    {
+      using real = typename Arg::real;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+
+      complex<real> res;
+      Vector x = arg.x(x_cb, parity);
+      Vector y = arg.y(x_cb, parity);
+
+      // Collect index data
+      //int idx[4] = { };
+      //getCoords(idx, x_cb, arg.X, parity);
+
+      // Compute the inner product over color
+      res = innerProduct(x, y, 0, 0);
+      // It is safe to use getIndexFull here as the array is not a QUDA array
+      arg.s[getIndexFull(x_cb, arg.X, parity)] = res;
+      //arg.s[x_cb + parity*arg.threads.x] = res;
+    }
+  };
+
+
   template <typename Float, int nColor_> struct ColorCrossArg : kernel_param<>
   {
-    using real = typename mapper<Float>::type;
+    typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;

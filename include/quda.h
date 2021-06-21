@@ -1562,32 +1562,33 @@ extern "C" {
    * @brief Hacks for Callat. Will document at PR time
    */
   void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
-		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
+		       QudaInvertParam inv_param, unsigned int n_ev, const int X[4]);
 
-  void laphBaryonKernel(int n1, int n2, int n3, int nMom,
+  void laphBaryonKernel(int n1, int n2, int n3, int n_mom,
 			double _Complex *host_coeffs1, 
 			double _Complex *host_coeffs2, 
 			double _Complex *host_coeffs3,
-			double _Complex *momP, 
-			int nEv, void **evPtr, 
-			void *retArray,
-			int blockSizeMomProj,
+			double _Complex *mom_ptr, 
+			int n_ev, void **ev_ptr, 
+			void *ret_array,
+			int block_size_mom_proj,
 			const int X[4]);
   
-  void laphCurrentKernel(int n1, int n2, int nMom,
+  void laphCurrentKernel(int n1, int n2, int n_mom,
+                         int block_size_mom_proj,
 			 void **host_quark, 
 			 void **host_quark_bar, 
 			 int *host_mom, 
-			 void *retArray,
+			 void *ret_array,
 			 const int X[4]);
   
-  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int blockSizeMomProj,
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int block_size_mom_proj,
 					   void **host_evec, 
 					   double _Complex *host_mom,
 					   double _Complex *return_array,
 					   const int X[4]);  
   
-  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int nMom, int nEv, 
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int n_mom, int n_ev, 
 					   double _Complex *host_coeffs1, 
 					   double _Complex *host_coeffs2, 
 					   double _Complex *host_coeffs3,
