@@ -4393,7 +4393,7 @@ void destroyGaugeFieldQuda(void* gauge){
 }
 
 
-void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **x,
+void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *, void **x,
 			       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4405,11 +4405,6 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   gParam.reconstruct = gauge_param->reconstruct;
   gParam.t_boundary = QUDA_PERIODIC_T;
   cpuGaugeField cpuMom(gParam);
-
-  // create the host momentum field
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.gauge = h_force;
-  cpuGaugeField cpuForce(gParam);
 
   // create the device momentum field
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
