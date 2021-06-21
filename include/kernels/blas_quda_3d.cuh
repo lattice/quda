@@ -263,7 +263,7 @@ namespace quda {
       Vector y = arg.y(idx_cb, parity);
       
       // Get the inner product
-      real sum = innerProduct(x, y).real();
+      reduce_t sum = innerProduct(x, y).real();
       
       // Apply reduction to t bucket
       return plus::operator()(sum, result);
