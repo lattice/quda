@@ -85,7 +85,11 @@ namespace quda {
 #else
       use_mma(false),
 #endif
+#ifdef NVSHMEM_COMMS
+      use_mobius_fused_kernel(false)
+#else
       use_mobius_fused_kernel(true)
+#endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
