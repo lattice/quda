@@ -31,6 +31,28 @@ namespace quda {
   }
 
 #ifdef GPU_UNITARIZE
+  template <typename T, int n, class Real>
+  void copyArrayToLink(Matrix<T,n> &link, Real* array)
+  {
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        link(i, j).real(array[(i * n + j) * 2 + 0]);
+        link(i, j).imag(array[(i * n + j) * 2 + 1]);
+      }
+    }
+  }
+
+  template <typename T, int n, class Real>
+  void copyLinkToArray(Real* array, const Matrix<T, n> &link)
+  {
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        array[(i * n + j) * 2 + 0] = link(i, j).real();
+        array[(i * n + j) * 2 + 1] = link(i, j).imag();
+      }
+    }
+  }
+
   void unitarizeLinksCPU(GaugeField &outfield, const GaugeField& infield)
   {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
@@ -42,11 +64,11 @@ namespace quda {
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
 	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
 	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
 	} // precision?
@@ -70,9 +92,9 @@ namespace quda {
     for (unsigned int i = 0; i < field.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir) {
 	if (field.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
 	} else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
 	} else {
 	  errorQuda("Unsupported precision\n");
 	}

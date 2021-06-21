@@ -20,11 +20,6 @@ namespace quda
 
     bool tuneSharedBytes() const { return false; }
 
-    bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
-    {
-      return location == QUDA_CUDA_FIELD_LOCATION ? Tunable::advanceTuneParam(param) : false;
-    }
-
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
