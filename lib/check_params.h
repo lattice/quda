@@ -282,7 +282,7 @@ void printQudaCloverParam(QudaInvertParam *param)
 #endif
 
 #ifdef INIT_PARAM
-    P(compute_clover_trlog, 0);
+    P(compute_clover_trlog, 1);
     P(compute_clover, 0);
     P(compute_clover_inverse, 0);
     P(return_clover, 0);
@@ -641,6 +641,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
 #else
   P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+#ifdef NVSHMEM_COMMS
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
+#endif
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

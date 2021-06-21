@@ -24,7 +24,6 @@
 
 namespace quda
 {
-  constexpr int warp_size = 32;
 
   template <class T> struct TensorCoreSharedMemory {
     __device__ inline operator T *()
@@ -48,7 +47,6 @@ namespace quda
   template <int block_dim_x, int Ls, int M_sm, class compute_type>
   __device__ inline void construct_matrix_a_generic(half *sm_a, compute_type *generic)
   {
-
     int offset_k = threadIdx.y * 4;
     int x = threadIdx.x;
 
@@ -90,10 +88,11 @@ namespace quda
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
   // one(spin).
   // x by y
-  template <int block_dim_x, int Ls, int M_sm, bool dagger, class Arg>
+  template <int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_m5inv(Arg &arg, half *sm_a, const float *mp = nullptr,
                                                   const float *mm = nullptr)
   {
+    constexpr int Ls = Arg::Ls;
     const float k = arg.kappa;
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
@@ -101,8 +100,8 @@ namespace quda
 
     const float inv = arg.alpha * arg.fac_inv;
 
-    int offset_k = threadIdx.y * 4;
-    int x = threadIdx.x;
+    auto offset_k = threadIdx.y * 4;
+    auto x = threadIdx.x;
 
     while (x < Ls) {
       int offset_m = x * 2;
@@ -152,7 +151,7 @@ namespace quda
       A[(offset_k + 3) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RmL);
       A[(offset_k + 3) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RpL);
 
-      x += block_dim_x;
+      x += Arg::block_dim_x;
     }
   }
 
@@ -160,15 +159,16 @@ namespace quda
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
   // one(spin).
   // x by y
-  template <int block_dim_x, int Ls, int M_sm, bool dagger, class Arg>
+  template <int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_d5(Arg &arg, half *sm_a)
   {
+    constexpr int Ls = Arg::Ls;
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
     // Otherwise a = 1., b = 0.;
     const float b = arg.beta;
 
-    int offset_k = threadIdx.y * 4;
-    int x = threadIdx.x;
+    auto offset_k = threadIdx.y * 4;
+    auto x = threadIdx.x;
 
     while (x < Ls) {
       int offset_m = x * 2;
@@ -205,7 +205,7 @@ namespace quda
       A[(offset_k + 3) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RmL);
       A[(offset_k + 3) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RpL);
 
-      x += block_dim_x;
+      x += Arg::block_dim_x;
     }
   }
 
@@ -252,8 +252,7 @@ namespace quda
   {
 #pragma unroll
     for (int offset = 16; offset > 0; offset /= 2) {
-      // TODO: Only works for CUDA 9.2 or later
-      float other_f = __shfl_down_sync(0xffffffffu, f, offset);
+      float other_f = __shfl_down_sync(device::warp_converged_mask(), f, offset);
       if (other_f > f) { f = other_f; }
     }
   }
@@ -263,7 +262,6 @@ namespace quda
   template <int block_x, int block_y, class Vector>
   __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
   {
-
     __syncthreads();
 
     int lane_id = ((threadIdx.y * blockDim.x + threadIdx.x) & 31);

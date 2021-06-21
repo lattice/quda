@@ -103,15 +103,8 @@ int main(int argc, char **argv)
 //-----------------------------------------------------------------------------
 
 // Performs the CPU GPU comparison with the given parameters
-int test(int contractionType, int Prec)
+int test(int contractionType, QudaPrecision test_prec)
 {
-  QudaPrecision test_prec = QUDA_INVALID_PRECISION;
-  switch (Prec) {
-  case 0: test_prec = QUDA_SINGLE_PRECISION; break;
-  case 1: test_prec = QUDA_DOUBLE_PRECISION; break;
-  default: errorQuda("Undefined QUDA precision type %d\n", Prec);
-  }
-
   int X[4] = {xdim, ydim, zdim, tdim};
 
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -158,9 +151,9 @@ int test(int contractionType, int Prec)
   // It returns the number of faults it detects.
   int faults = 0;
   if (test_prec == QUDA_DOUBLE_PRECISION) {
-    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType, X);
+    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType);
   } else {
-    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
+    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType);
   }
 
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
@@ -193,8 +186,9 @@ class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, in
 // Sets up the Google test
 TEST_P(ContractionTest, verify)
 {
-  int prec = ::testing::get<0>(GetParam());
+  QudaPrecision prec = getPrecision(::testing::get<0>(GetParam()));
   int contractionType = ::testing::get<1>(GetParam());
+  if ((QUDA_PRECISION & prec) == 0) GTEST_SKIP();
   auto faults = test(contractionType, prec);
   EXPECT_EQ(faults, 0) << "CPU and GPU implementations do not agree";
 }
@@ -211,4 +205,4 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
 }
 
 // Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(0, 2), Range(0, NcontractType)), getContractName);
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(0, NcontractType)), getContractName);

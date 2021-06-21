@@ -19,12 +19,13 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
+             "Ls_dimension   dslash_type  normalization\n");
+  printfQuda(
+    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
+    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
   if (inv_multigrid) {
     printfQuda("MG parameters\n");
@@ -161,7 +162,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   QudaEigParam eig_param = newQudaEigParam();
 
   if (inv_multigrid) {
@@ -303,8 +304,7 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
+  auto *rng = new quda::RNG(*check, 1234);
 
   std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
   std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
@@ -363,7 +363,6 @@ int main(int argc, char **argv)
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
-  rng->Release();
   delete rng;
 
   // free the multigrid solver

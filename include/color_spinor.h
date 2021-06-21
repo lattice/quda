@@ -189,7 +189,7 @@ namespace quda {
           a(2, i) = -i_(t(1, i));
           a(3, i) = -i_(t(0, i));
         }
-	break;
+        break;
       case 1: // y dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -198,7 +198,7 @@ namespace quda {
           a(2, i) = -t(1, i);
           a(3, i) = t(0, i);
         }
-	break;
+        break;
       case 2: // z dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -207,7 +207,7 @@ namespace quda {
           a(2, i) = -i_(t(0, i));
           a(3, i) = i_(t(1, i));
         }
-	break;
+        break;
       case 3: // t dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -216,7 +216,7 @@ namespace quda {
           a(2, i) = -t(2, i);
           a(3, i) = -t(3, i);
         }
-	break;
+        break;
       case 4: // gamma_5
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -225,7 +225,7 @@ namespace quda {
           a(2, i) = t(0, i);
           a(3, i) = t(1, i);
         }
-	break;
+        break;
       }
 
       return a;
@@ -249,7 +249,7 @@ namespace quda {
           a(2, i) = t(1, i);
           a(3, i) = t(0, i);
         }
-	break;
+        break;
       case 1: // y dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -258,7 +258,7 @@ namespace quda {
           a(2, i) = -i_(t(1, i));
           a(3, i) = i_(t(0, i));
         }
-	break;
+        break;
       case 2: // z dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -267,7 +267,7 @@ namespace quda {
           a(2, i) = t(0, i);
           a(3, i) = -t(1, i);
         }
-	break;
+        break;
       case 3: // t dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -276,7 +276,7 @@ namespace quda {
           a(2, i) = -i_(t(2, i));
           a(3, i) = -i_(t(3, i));
         }
-	break;
+        break;
       case 4: // gamma_5
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
@@ -285,7 +285,7 @@ namespace quda {
           a(2, i) = i_(t(0, i));
           a(3, i) = i_(t(1, i));
         }
-	break;
+        break;
       }
 
       return a;
@@ -326,14 +326,14 @@ namespace quda {
             proj(0, i) = t(0, i) + i_(t(3, i));
             proj(1, i) = t(1, i) + i_(t(2, i));
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(3, i));
             proj(1, i) = t(1, i) - i_(t(2, i));
           }
-	  break;
+          break;
 	}
 	break;
       case 1: // y dimension
@@ -344,14 +344,14 @@ namespace quda {
             proj(0, i) = t(0, i) + t(3, i);
             proj(1, i) = t(1, i) - t(2, i);
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - t(3, i);
             proj(1, i) = t(1, i) + t(2, i);
           }
-	  break;
+          break;
 	}
       	break;
       case 2: // z dimension
@@ -363,13 +363,13 @@ namespace quda {
             proj(1, i) = t(1, i) - i_(t(3, i));
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(2, i));
             proj(1, i) = t(1, i) + i_(t(3, i));
           }
-	  break;
+          break;
 	}
 	break;
       case 3: // t dimension
@@ -377,17 +377,17 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = 2 * t(0, i);
-            proj(1, i) = 2 * t(1, i);
+            proj(0, i) = static_cast<Float>(2.0) * t(0, i);
+            proj(1, i) = static_cast<Float>(2.0) * t(1, i);
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0, i) = 2 * t(2, i);
-            proj(1, i) = 2 * t(3, i);
+            proj(0, i) = static_cast<Float>(2.0) * t(2, i);
+            proj(1, i) = static_cast<Float>(2.0) * t(3, i);
           }
-	  break;
+          break;
 	}
 	break;
       case 4:
@@ -448,9 +448,9 @@ namespace quda {
 		    -i  0  0  0
 		     0  i  0  0
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) {
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) const {
       ColorSpinor<Float,Nc,4> a;
-      ColorSpinor<Float,Nc,4> &b = *this;
+      const ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
 
       switch(mu) {
@@ -746,7 +746,7 @@ namespace quda {
             recon(2, i) = -i_(t(1, i));
             recon(3, i) = -i_(t(0, i));
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
@@ -755,7 +755,7 @@ namespace quda {
             recon(2, i) = i_(t(1, i));
             recon(3, i) = i_(t(0, i));
           }
-	  break;
+          break;
 	}
 	break;
       case 1: // y dimension
@@ -768,7 +768,7 @@ namespace quda {
             recon(2, i) = -t(1, i);
             recon(3, i) = t(0, i);
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
@@ -790,7 +790,7 @@ namespace quda {
             recon(2, i) = -i_(t(0, i));
             recon(3, i) = i_(t(1, i));
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
@@ -799,7 +799,7 @@ namespace quda {
             recon(2, i) = i_(t(0, i));
             recon(3, i) = -i_(t(1, i));
           }
-	  break;
+          break;
 	}
 	break;
       case 3: // t dimension
@@ -809,8 +809,8 @@ namespace quda {
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
-            recon(2,i) = 0;
-	    recon(3,i) = 0;
+            recon(2, i) = 0;
+            recon(3,i) = 0;
 	  }
 	  break;
 	case -1: // negative projector
@@ -821,7 +821,7 @@ namespace quda {
             recon(2, i) = t(0, i);
             recon(3, i) = t(1, i);
           }
-	  break;
+          break;
 	}
 	break;
       case 4:
@@ -910,6 +910,44 @@ namespace quda {
      @return The inner product
   */
   template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
+                                        ColorSpinor<Float, Nc, Ns> &y)
+  {
+#pragma unroll
+    for (int i = 0; i < Nc * Ns; i++) {
+      y(i).real( a.real() * x(i).real() + y(i).real());
+      y(i).real(-a.imag() * x(i).imag() + y(i).real());
+      y(i).imag( a.imag() * x(i).real() + y(i).imag());
+      y(i).imag( a.real() * x(i).imag() + y(i).imag());
+    }
+  }
+
+  /**
+     @brief Compute the L2 norm squared over color and spin
+     nrm = \sum_s,c conj(a(s,c)) * a(s,c)
+     @param a ColorSpinor we taking the norm
+     @return The L2 norm squared
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline Float norm2(const ColorSpinor<Float, Nc, Ns> &a)
+  {
+    Float nrm = 0.0;
+#pragma unroll
+    for (int i = 0; i < Nc * Ns; i++) {
+      nrm += a(i).real() * a(i).real();
+      nrm += a(i).imag() * a(i).imag();
+    }
+    return nrm;
+  }
+
+  /**
+     @brief Compute the inner product over color and spin
+     dot = \sum_s,c conj(a(s,c)) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @return The inner product
+  */
+  template <typename Float, int Nc, int Ns>
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
                                                          const ColorSpinor<Float, Nc, Ns> &b)
   {
@@ -928,7 +966,7 @@ namespace quda {
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline complex<Float> colorContract(const ColorSpinor<Float, Nc, Ns> &a,
-							  const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
+                                                          const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
   {
     complex<Float> dot = 0;
     for (int c = 0; c < Nc; c++) {
@@ -1022,9 +1060,8 @@ namespace quda {
     res(0, 1) = a(sa, 2) * b(sb, 0) - a(sa, 0) * b(sb, 2);
     res(0, 2) = a(sa, 0) * b(sb, 1) - a(sa, 1) * b(sb, 0);
     return res;
-    }
-  
-  
+  }
+
   /**
      Compute the outer product over color and take the spin trace
      out(j,i) = \sum_s a(s,j) * conj (b(s,i))

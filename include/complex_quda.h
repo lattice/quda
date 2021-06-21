@@ -20,12 +20,10 @@
 
 #pragma once
 
-//#include <math.h>
-
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <cuComplex.h>
+#include <cstdint>
 
 namespace quda {
   namespace gauge {
@@ -33,7 +31,7 @@ namespace quda {
   }
 
   namespace colorspinor {
-    template<typename Float, typename storeFloat> struct fieldorder_wrapper;
+    template<typename Float, typename storeFloat, bool block_float, typename norm_t> struct fieldorder_wrapper;
   }
 }
 
@@ -109,11 +107,7 @@ namespace quda
   template <typename ValueType, typename ExponentType>
     __host__ __device__
     inline ValueType pow(ValueType x, ExponentType e){
-#if (CUDA_VERSION < 7050)
     return std::pow(x,static_cast<ValueType>(e));
-#else
-    return std::pow(x,e);
-#endif
   }
   template <typename ValueType>
     __host__ __device__
@@ -125,11 +119,9 @@ namespace quda
     inline ValueType abs(ValueType x){
     return std::abs(x);
   }
-  template <typename ValueType>
-    __host__ __device__
-    inline ValueType conj(ValueType x){
-    return x;
-  }
+
+  __host__ __device__ inline float conj(float x) { return x; }
+  __host__ __device__ inline double conj(double x) { return x; }
 
   template <typename ValueType> struct complex;
   //template <> struct complex<float>;
@@ -311,7 +303,7 @@ namespace quda
     {
       os << '(' << z.real() << ',' << z.imag() << ')';
       return os;
-    };
+    }
 
   template<typename ValueType, typename charT, class traits>
     std::basic_istream<charT, traits>&
@@ -468,23 +460,21 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    complex<float>(const complex<float> & z)
-    : float2(z){}
+  __host__ __device__ complex<float>(const complex<float> & z) : float2(z) {}
+  __host__ __device__ complex<float>& operator=(const complex<float> &z)
+    {
+      real(z.real());
+      imag(z.imag());
+      return *this;
+    }
 
   __host__ __device__
     complex<float>(float2 z)
     : float2(z){}
-  
-  template <class X>
-    inline complex<float>(const std::complex<X> & z)
-    {
-      real(z.real());
-      imag(z.imag());
-    }  
 
+  template <typename X>
+    inline complex<float>(const std::complex<X> & z) : float2{ static_cast<float>(z.real()), static_cast<float>(z.imag()) } {}
+  
   // Member operators
   template <typename T>
     __host__ __device__
@@ -563,17 +553,6 @@ public:
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<float>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<float>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template<>
@@ -590,11 +569,13 @@ public:
       imag(im);
     }
 
-  // For some reason having the following constructor
-  // explicitly makes things faster with at least g++
-  __host__ __device__
-    inline complex<double>(const complex<double> & z)
-    : double2(z) {}
+  __host__ __device__ complex<double>(const complex<double> & z) : double2(z) {}
+  __host__ __device__ complex<double>& operator=(const complex<double> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__
     inline complex<double>(double2 z)
@@ -693,17 +674,6 @@ public:
   template <typename T>
   inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
 
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<double>(const gauge::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline void operator=(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
-
-  template<typename otherFloat, typename storeFloat>
-    __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
 template <> struct complex<int8_t> : public char2 {
@@ -718,7 +688,13 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) { }
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> & z) : char2(z) {}
+  __host__ __device__ inline complex<int8_t>& operator=(const complex<int8_t> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
@@ -765,7 +741,13 @@ public:
       imag(im);
     }
 
-  __host__ __device__ inline complex<short>(const complex<short> & z) : short2(z){}
+  __host__ __device__ complex<short>(const complex<short> & z) : short2(z) {}
+  __host__ __device__ complex<short>& operator=(const complex<short> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
   __host__ __device__ inline complex<short>& operator+=(const complex<short> z)
     {
@@ -812,7 +794,16 @@ public:
     }
 
   __host__ __device__ inline complex<int>(const complex<int> & z) : int2(z){}
+  __host__ __device__ complex<int>& operator=(const complex<int> &z)
+    {
+      x = z.x;
+      y = z.y;
+      return *this;
+    }
 
+  template <typename X>
+  inline complex<int>(const std::complex<X> & z) : int2{static_cast<int>(z.x), static_cast<int>(z.y)} {}
+  
   __host__ __device__ inline complex<int>& operator+=(const complex<int> z)
     {
       real(real()+z.real());
@@ -1375,6 +1366,24 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     w.y += x.imag() * y.real();
     w.y += x.real() * y.imag();
     return w;
+  }
+
+  template <typename T1, typename T2, typename T3>
+  __host__ __device__ inline auto cmac(const T1 &x, const T2 &y, const T3 &z)
+  {
+    static_assert(std::is_same<typename T1::value_type, typename T2::value_type>::value &&
+                  std::is_same<typename T1::value_type, typename T3::value_type>::value,
+                  "precisions do not match");
+
+    using real = typename T1::value_type;
+    complex<real> X = x;
+    complex<real> Y = y;
+    complex<real> Z = z;
+    Z.real(Z.real() + X.real() * Y.real());
+    Z.real(Z.real() - X.imag() * Y.imag());
+    Z.imag(Z.imag() + X.imag() * Y.real());
+    Z.imag(Z.imag() + X.real() * Y.imag());
+    return Z;
   }
 
   template <typename real> __host__ __device__ inline complex<real> i_(const complex<real> &a)

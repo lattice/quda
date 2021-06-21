@@ -21,6 +21,7 @@ namespace quda {
     tmp2(param.tmp2),
     type(param.type),
     halo_precision(param.halo_precision),
+    use_mobius_fused_kernel(param.use_mobius_fused_kernel),
     profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];

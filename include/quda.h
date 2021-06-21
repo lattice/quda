@@ -398,6 +398,9 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Whether to use fused kernels for mobius */
+    QudaBoolean use_mobius_fused_kernel;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
@@ -1197,8 +1200,7 @@ extern "C" {
    * @param parity The source and destination parity of the field
    * @param inverse Whether to apply the inverse of the clover term
    */
-  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-                  QudaParity parity, int inverse);
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -1368,8 +1370,8 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x,
-				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+                                 QudaInvertParam *invert_param);
 
   /**
    * Compute the fermion force for the HISQ quark action and integrate the momentum.
@@ -1420,10 +1422,9 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externalGaugeResident cudaGaugeField
-   * @param Location of gauge field
+   * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field

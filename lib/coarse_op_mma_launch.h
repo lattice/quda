@@ -24,14 +24,14 @@ namespace quda
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<!Arg::is_mma_compatible, void>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<Arg::is_mma_compatible, void>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       tp.block.x = 1;
       tp.block.y = block_y;
@@ -51,7 +51,7 @@ namespace quda
     }
 
     template <bool from_coarse, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (arg.dir == QUDA_BACKWARDS) {
         switch (arg.dim) {
@@ -98,7 +98,7 @@ namespace quda
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<!from_coarse, int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
       return -1;
@@ -112,7 +112,7 @@ namespace quda
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 1;
       switch (tp.aux.x) {
@@ -130,7 +130,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
 #if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 5;
@@ -168,7 +168,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 3;
       switch (tp.aux.x) {
@@ -188,7 +188,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 5;
       switch (tp.aux.x) {
@@ -211,7 +211,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       switch (tp.aux.x) {
@@ -234,7 +234,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 2;
       switch (tp.aux.x) {
@@ -253,7 +253,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       switch (tp.aux.x) {
@@ -276,7 +276,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       switch (tp.aux.x) {
@@ -300,7 +300,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 5;
       switch (tp.aux.x) {
@@ -321,14 +321,14 @@ namespace quda
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<!Arg::is_mma_compatible, void>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
 
     template <bool from_coarse, int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z, class Arg>
     typename std::enable_if<Arg::is_mma_compatible, void>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       tp.block.x = 1;
       tp.block.y = block_y;
@@ -348,7 +348,7 @@ namespace quda
     }
 
     template <bool from_coarse, int bM, int bN, int bK, int block_y, int block_z, class Arg>
-    void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    void launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (arg.dir == QUDA_BACKWARDS) {
         switch (arg.dim) {
@@ -395,7 +395,7 @@ namespace quda
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<!from_coarse, int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
       return -1;
@@ -403,7 +403,7 @@ namespace quda
 
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 2;
       switch (tp.aux.x) {
@@ -421,7 +421,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
 #if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 1;
@@ -455,7 +455,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 4;
       switch (tp.aux.x) {
@@ -476,7 +476,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 7;
       switch (tp.aux.x) {
@@ -501,7 +501,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 24 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       // clang-format off
@@ -522,7 +522,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 32 && Arg::coarseColor == 32 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 3;
       // clang-format off
@@ -540,7 +540,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 7;
       // clang-format off
@@ -562,7 +562,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 64 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       switch (tp.aux.x) {
@@ -586,7 +586,7 @@ namespace quda
     template <bool from_coarse, bool query_max = false, class Arg>
     typename std::enable_if<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2,
                             int>::type
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream)
     {
       if (query_max) return 6;
       switch (tp.aux.x) {
@@ -609,14 +609,14 @@ namespace quda
 #else
 
     template <bool from_coarse, bool query_max = false, class Arg>
-    int launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    int launch_compute_uv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA multigrid is not available for this setup.");
       return -1;
     }
 
     template <bool from_coarse, bool query_max = false, class Arg>
-    int launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+    int launch_compute_vuv_kernel(TuneParam &, const Arg &, int, const qudaStream_t &)
     {
       errorQuda("MMA multigrid is not available for this setup.");
       return -1;

@@ -18,7 +18,7 @@ namespace quda
   // => Total number of floating point ops per function call
   // dims * (2*18 + 4*198) = dims*828
   template <typename Arg, typename Link, typename Int>
-  __host__ __device__ inline void computeStaple(Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
+  __host__ __device__ inline void computeStaple(const Arg &arg, const int *x, const Int *X, const int parity, const int nu, Link &staple, const int dir_ignore)
   {
     setZero(&staple);
     int dx[4] = { };
@@ -91,7 +91,7 @@ namespace quda
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
   template <typename Arg, typename Link, typename Int>
-  __host__ __device__ inline void computeStapleRectangle(Arg &arg, const int *x, const Int *X, const int parity, const int nu,
+  __host__ __device__ inline void computeStapleRectangle(const Arg &arg, const int *x, const Int *X, const int parity, const int nu,
                                                          Link &staple, Link &rectangle, const int dir_ignore)
   {
     setZero(&staple);

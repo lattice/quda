@@ -4,6 +4,7 @@
 #include <sys/time.h>
 
 #include "quda.h"
+#include "timer.h"
 #include "gauge_field.h"
 #include "host_utils.h"
 #include <command_line_params.h>
@@ -11,7 +12,6 @@
 #include "util_quda.h"
 #include "llfat_quda.h"
 #include <unitarization_links.h>
-#include "dslash_quda.h"
 #include "ks_improved_force.h"
 
 #ifdef MULTI_GPU

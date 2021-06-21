@@ -13,8 +13,6 @@
 #include <util_quda.h>
 #include <blas_quda.h>
 
-extern void *memset(void *s, int c, size_t n);
-
 // covdevReference()
 //
 // if oddBit is zero: calculate even parity spinor elements (using odd parity spinor) 

@@ -36,9 +36,8 @@ void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, voi
   }
 }
 
-void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck,
-                                   QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover,
-                                   void *clover_inv)
+void verifyDomainWallTypeInversion(void *spinorOut, void **, void *spinorIn, void *spinorCheck,
+                                   QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *, void *)
 {
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
     if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {

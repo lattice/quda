@@ -36,12 +36,9 @@ namespace quda {
      @brief Launcher for CPU instantiations of coarse-link construction
    */
   template <QudaFieldLocation location, typename Arg> struct Launch {
-
     static constexpr bool from_coarse = Arg::from_coarse;
-
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, qudaError_t &, TuneParam &, ComputeType type, bool use_mma, const qudaStream_t &)
     {
-
       if (use_mma) { errorQuda("MMA intructions are not supported on the host."); }
 
       if (type == COMPUTE_UV) {
@@ -163,11 +160,12 @@ namespace quda {
     using Float = typename Arg::Float;
     static constexpr bool from_coarse = Arg::from_coarse;
 
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
+    Launch(Arg &arg, qudaError_t &qerror, TuneParam &tp, ComputeType type, bool use_mma, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
 #endif
+      CUresult error = CUDA_SUCCESS;
       if (type == COMPUTE_UV) {
         if (use_mma && arg.dir != QUDA_IN_PLACE) {
 
@@ -179,7 +177,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeUVGPU")
           .instantiate(arg.dim,arg.dir,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
           if      (arg.dim==0) qudaLaunchKernel(ComputeUVGPU<0,QUDA_BACKWARDS,Arg>, tp, stream, arg);
@@ -202,7 +200,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeAVGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeAVGPU<Arg>, tp, stream, arg);
@@ -217,7 +215,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeTMAVGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(GPU_TWISTED_MASS_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMAVGPU<Arg>, tp, stream, arg);
@@ -232,7 +230,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeTMCAVGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(GPU_TWISTED_CLOVER_DIRAC) && defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeTMCAVGPU<Arg>, tp, stream, arg);
@@ -249,7 +247,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeCloverInvMaxGPU")
           .instantiate(false, Type<Arg>())
-          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+          .configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream))
           .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
@@ -275,7 +273,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeCloverInvMaxGPU")
           .instantiate(true, Type<Arg>())
-          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+          .configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream))
           .launch(arg);
 #else
 #if defined(DYNAMIC_CLOVER) && defined(WILSONCOARSE)
@@ -335,7 +333,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeVUVGPU")
           .instantiate(arg.shared_atomic,arg.parity_flip,arg.dim,arg.dir,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         if (arg.shared_atomic) {
           if (arg.parity_flip != true) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
@@ -397,7 +395,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeCoarseCloverGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(WILSONCOARSE)
         qudaLaunchKernel(ComputeCoarseCloverGPU<Arg>, tp, stream, arg);
@@ -411,7 +409,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ComputeYReverseGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         qudaLaunchKernel(ComputeYReverseGPU<Arg>, tp, stream, arg);
 #endif
@@ -420,7 +418,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseDiagonalGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         qudaLaunchKernel(AddCoarseDiagonalGPU<Arg>, tp, stream, arg);
 #endif
@@ -429,7 +427,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseStaggeredMassGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
 #if defined(STAGGEREDCOARSE)
         qudaLaunchKernel(AddCoarseStaggeredMassGPU<Arg>, tp, stream, arg);
@@ -443,7 +441,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::AddCoarseTmDiagonalGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         qudaLaunchKernel(AddCoarseTmDiagonalGPU<Arg>, tp, stream, arg);
 #endif
@@ -452,7 +450,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::ConvertGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         qudaLaunchKernel(ConvertGPU<Arg>, tp, stream, arg);
 #endif
@@ -461,7 +459,7 @@ namespace quda {
 #ifdef JITIFY
         error = program->kernel("quda::RescaleYGPU")
           .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+          .configure(tp.grid,tp.block,tp.shared_bytes,device::get_cuda_stream(stream)).launch(arg);
 #else
         qudaLaunchKernel(RescaleYGPU<Arg>, tp, stream, arg);
 #endif
@@ -469,6 +467,9 @@ namespace quda {
       } else {
         errorQuda("Undefined compute type %d", type);
       }
+
+      // convert Jitify return error into QUDA error
+      qerror = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
     }
   };
 
@@ -583,6 +584,8 @@ namespace quda {
 	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
@@ -645,7 +648,6 @@ namespace quda {
                GaugeField &X_atomic, bool use_mma) :
       TunableVectorYZ(2, 1),
       arg(arg),
-      type(COMPUTE_INVALID),
       meta(meta),
       Y(Y),
       X(X),
@@ -653,6 +655,7 @@ namespace quda {
       X_atomic(X_atomic),
       dim(0),
       dir(QUDA_BACKWARDS),
+      type(COMPUTE_INVALID),
       use_mma(use_mma)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -674,8 +677,7 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, Arg>(arg, jitify_error, tp,
-                                                                                              type, use_mma, stream);
+      Launch<location, Arg>(arg, launch_error, tp, type, use_mma, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
@@ -734,7 +736,7 @@ namespace quda {
       if (param.aux.y == 0) {
 
         // pre-Maxwell does not support shared-memory atomics natively so no point in trying
-        if (deviceProp.major < 5) return false;
+        if (!device::shared_memory_atomic_supported()) return false;
 
         // before advancing, check we can use shared-memory atomics
         int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
@@ -781,11 +783,11 @@ namespace quda {
 
       if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV) && dir != QUDA_IN_PLACE) {
         constexpr bool query_max = true;
-        int max;
+        int max = 0;
         if (type == COMPUTE_UV) {
-          max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, 0);
+          max = mma::launch_compute_uv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
         } else if (type == COMPUTE_VUV) {
-          max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, 0);
+          max = mma::launch_compute_vuv_kernel<from_coarse, query_max>(param, arg, 1, device::get_default_stream());
         }
 
         if (param.aux.x < max) {
@@ -910,6 +912,8 @@ namespace quda {
       switch (type) {
       case COMPUTE_VUV:
         Y_atomic.backup();
+	X_atomic.backup();
+        break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
@@ -922,6 +926,7 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.backup();
+        break;
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -939,6 +944,8 @@ namespace quda {
       switch (type) {
       case COMPUTE_VUV:
 	Y_atomic.restore();
+	X_atomic.restore();
+        break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
@@ -951,6 +958,7 @@ namespace quda {
         break;
       case COMPUTE_RESCALE:
         Y.restore();
+        break;
       case COMPUTE_UV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -1056,8 +1064,8 @@ namespace quda {
     // do exchange of null-space vectors
     const int nFace = 1;
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-    arg.V.resetGhost(v, v.Ghost());  // point the accessor to the correct ghost buffer
-    if (&v == &av) arg.AV.resetGhost(av, av.Ghost());
+    arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
+    if (&v == &av) arg.AV.resetGhost(av.Ghost());
     LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("V2 = %e\n", arg.V.norm2());
@@ -1071,7 +1079,7 @@ namespace quda {
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
         y.setComputeType(COMPUTE_CLOVER_INV_MAX);
-        y.apply(0);
+        y.apply(device::get_default_stream());
         double max = 6 * arg.max_h;
 #else
         double max = 6*C_.abs_max(true);
@@ -1082,7 +1090,7 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_AV);
-      y.apply(0);
+      y.apply(device::get_default_stream());
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
@@ -1104,7 +1112,7 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_TMAV);
-      y.apply(0);
+      y.apply(device::get_default_stream());
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
@@ -1119,7 +1127,7 @@ namespace quda {
       if (av.Precision() == QUDA_HALF_PRECISION) {
 #ifdef DYNAMIC_CLOVER
         y.setComputeType(COMPUTE_TWISTED_CLOVER_INV_MAX);
-        y.apply(0);
+        y.apply(device::get_default_stream());
 	double max = 6*sqrt(arg.max_h);
 #else
 	double max = 6*sqrt(C_.abs_max(true));
@@ -1130,7 +1138,7 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_TMCAV);
-      y.apply(0);
+      y.apply(device::get_default_stream());
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
@@ -1166,16 +1174,15 @@ namespace quda {
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%d U_max = %e v_max = %e uv_max = %e\n", from_coarse ? d+4 : d, U_max, v.Scale(), uv_max);
         }
 
-        y.setComputeType(COMPUTE_UV);  // compute U*V product
-        y.apply(0);
-
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+	y.setComputeType(COMPUTE_UV);  // compute U*V product
+	y.apply(device::get_default_stream());
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
-        y.apply(0);
+        y.apply(device::get_default_stream());
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda("Y2[%d] (atomic) = %e\n", 4+d, Y_atomic_.norm2((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
@@ -1197,7 +1204,7 @@ namespace quda {
 
               for (int d_=0; d_<d; d_++) {
                 y.setDimension(d_);
-                y.apply(0);
+                y.apply(device::get_default_stream());
               }
 
               y.setDimension(d);
@@ -1207,7 +1214,7 @@ namespace quda {
           }
 
           y.setComputeType(COMPUTE_CONVERT);
-          y.apply(0);
+          y.apply(device::get_default_stream());
 
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
         }
@@ -1218,7 +1225,7 @@ namespace quda {
     if ( ((dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD)) || (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
-      arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
+      arg.AV.resetGhost(av.Ghost());  // make sure we point to the correct pointer in the accessor
       LatticeField::bufferIndex = (1 - LatticeField::bufferIndex); // update ghost bufferIndex for next exchange
     }
 
@@ -1238,14 +1245,14 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_UV);  // compute U*A*V product
-      y.apply(0);
+      y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
       // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
-      y.apply(0);
+      y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("Y2[%d] (atomic) = %e\n", d, Y_atomic_.norm2(d%arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
@@ -1270,14 +1277,14 @@ namespace quda {
               y.setDirection(QUDA_FORWARDS);
               for (int d_=0; d_<4; d_++) {
                 y.setDimension(d_);
-                y.apply(0);
+                y.apply(device::get_default_stream());
               }
             }
 
             y.setDirection(QUDA_BACKWARDS);
             for (int d_=0; d_<d; d_++) {
               y.setDimension(d_);
-              y.apply(0);
+              y.apply(device::get_default_stream());
             }
 
             y.setDimension(d);
@@ -1287,7 +1294,7 @@ namespace quda {
         }
 
         y.setComputeType(COMPUTE_CONVERT);
-        y.apply(0);
+        y.apply(device::get_default_stream());
 
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, Y_.norm2( d ));
       }
@@ -1301,14 +1308,14 @@ namespace quda {
     if ( !bidirectional_links ) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Reversing links\n");
       y.setComputeType(COMPUTE_REVERSE_Y);  // reverse the links for the forwards direction
-      y.apply(0);
+      y.apply(device::get_default_stream());
     }
 
     // Check if we have a fine or coarse clover term that needs to be coarsened
     if (dirac == QUDA_CLOVER_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing fine->coarse clover term\n");
       y.setComputeType(COMPUTE_COARSE_CLOVER);
-      y.apply(0);
+      y.apply(device::get_default_stream());
     } else if (dirac == QUDA_COARSE_DIRAC) {
 
       // We can write coarsening the coarse clover as a UV, VUV sequence where `U` is replaced with `C`
@@ -1328,23 +1335,23 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_UV);  // compute C*V product
-      y.apply(0);
+      y.apply(device::get_default_stream());
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CV2 = %e\n", arg.UV.norm2());
 
       y.setComputeType(COMPUTE_VUV); // compute X += VCV
-      y.apply(0);
+      y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("X2 (atomic) = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
     } else if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) { 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
       y.setComputeType(COMPUTE_STAGGEREDMASS);
-      y.apply(0);
+      y.apply(device::get_default_stream());
     } else {  //Otherwise, we just have to add the identity matrix
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
-      y.apply(0);
+      y.apply(device::get_default_stream());
     }
 
     if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
@@ -1352,7 +1359,7 @@ namespace quda {
 	arg.mu_factor += 1.;
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
       y.setComputeType(COMPUTE_TMDIAGONAL);
-      y.apply(0);
+      y.apply(device::get_default_stream());
     }
 
     // now convert from atomic to application computation format if necessary for X field
@@ -1368,7 +1375,7 @@ namespace quda {
       }
 
       y.setComputeType(COMPUTE_CONVERT);
-      y.apply(0);
+      y.apply(device::get_default_stream());
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));

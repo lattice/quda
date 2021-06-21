@@ -39,7 +39,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
 };
 
 struct StaggeredDslashTestWrapper {
@@ -176,7 +176,7 @@ struct StaggeredDslashTestWrapper {
     has_been_called = true;
   }
 
-  void init_ctest(int precision, QudaReconstructType link_recon_, int partition)
+  void init_ctest(int precision, QudaReconstructType link_recon_)
   {
     gauge_param = newQudaGaugeParam();
     inv_param = newQudaInvertParam();
@@ -290,9 +290,8 @@ struct StaggeredDslashTestWrapper {
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-                                             QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 :
-                                             link_recon;
+        QUDA_RECONSTRUCT_13 :
+        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
     } else {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     }
@@ -312,9 +311,8 @@ struct StaggeredDslashTestWrapper {
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-                                             QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 :
-                                             link_recon;
+        QUDA_RECONSTRUCT_13 :
+        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
       printfQuda("Sending long links to GPU\n");
       loadGaugeQuda(milc_longlink_gpu, &gauge_param);
     }
@@ -466,17 +464,13 @@ struct StaggeredDslashTestWrapper {
 
   DslashTime dslashCUDA(int niter)
   {
-
     DslashTime dslash_time;
-    timeval tstart, tstop;
 
-    cudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventRecord(start, 0);
-    cudaEventSynchronize(start);
+    host_timer_t host_timer;
+    device_timer_t device_timer;
 
     comm_barrier();
-    cudaEventRecord(start, 0);
+    device_timer.start();
 
     if (test_split_grid) {
 
@@ -493,7 +487,7 @@ struct StaggeredDslashTestWrapper {
 
       for (int i = 0; i < niter; i++) {
 
-        gettimeofday(&tstart, NULL);
+        host_timer.start();
 
         switch (dtest_type) {
         case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
@@ -502,29 +496,19 @@ struct StaggeredDslashTestWrapper {
         default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
         }
 
-        gettimeofday(&tstop, NULL);
-        long ds = tstop.tv_sec - tstart.tv_sec;
-        long dus = tstop.tv_usec - tstart.tv_usec;
-        double elapsed = ds + 0.000001 * dus;
+        host_timer.stop();
 
-        dslash_time.cpu_time += elapsed;
+        dslash_time.cpu_time += host_timer.last();
         // skip first and last iterations since they may skew these metrics if comms are not synchronous
-        if (i > 0 && i < niter) {
-          if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-          if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+        if (i>0 && i<niter) {
+          dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+          dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
         }
       }
     }
 
-    cudaEventCreate(&end);
-    cudaEventRecord(end, 0);
-    cudaEventSynchronize(end);
-    float runTime;
-    cudaEventElapsedTime(&runTime, start, end);
-    cudaEventDestroy(start);
-    cudaEventDestroy(end);
-
-    dslash_time.event_time = runTime / 1000;
+    device_timer.stop();
+    dslash_time.event_time = device_timer.last();
 
     return dslash_time;
   }

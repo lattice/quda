@@ -56,9 +56,9 @@ namespace quda
       out(out),
       in(in, improved_ ? 3 : 1),
       in_pack(in, improved_ ? 3 : 1),
+      x(x),
       U(U),
       L(L),
-      x(x),
       a(a),
       tboundary(U.TBoundary()),
       is_first_time_slice(comm_coord(3) == 0 ? true : false),
@@ -85,8 +85,8 @@ namespace quda
      @param[in] x_cb The checkerboarded site index
   */
   template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord & coord, int parity,
-                                                 int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyStaggered(Vector &out, const Arg &arg, Coord & coord, int parity,
+                                                 int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -134,7 +134,6 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
@@ -173,8 +172,8 @@ namespace quda
   template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
-    Arg &arg;
-    constexpr staggered(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr staggered(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

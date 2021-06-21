@@ -6,8 +6,8 @@
 
 namespace quda {
 
-  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_>
-  struct CalculateYhatArg {
+  template <typename Float_, typename PreconditionedGauge, typename Gauge, typename GaugeInv, int n_, int M_, int N_, bool compute_max_>
+  struct CalculateYhatArg : kernel_param<> {
     using Float = Float_;
     using yhatTileType = TileSize<n_, n_, n_, M_, N_, 1>;
     yhatTileType tile;
@@ -17,6 +17,7 @@ namespace quda {
     static constexpr int K = n_;
 
     static constexpr bool is_mma_compatible = PreconditionedGauge::is_mma_compatible;
+    static constexpr bool compute_max = compute_max_;
 
     PreconditionedGauge Yhat;
     const Gauge Y;
@@ -25,22 +26,23 @@ namespace quda {
     int comm_dim[QUDA_MAX_DIM];
     int nFace;
 
-    Float *max_h;  // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
+    Float *max_h; // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
     Float *max_d; // device scalar that stores the maximum element of Yhat
+    Float *max;
 
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const GaugeInv Xinv, const int *dim,
-                     const int *comm_dim, int nFace) :
-      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), max_h(nullptr), max_d(nullptr)
+    CalculateYhatArg(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv) :
+      kernel_param(dim3(Y.VolumeCB(), 2 * yhatTileType::M_tiles, 4 * yhatTileType::N_tiles)),
+      Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(1), max_h(nullptr), max_d(nullptr)
     {
       for (int i=0; i<4; i++) {
-        this->comm_dim[i] = comm_dim[i];
-        this->dim[i] = dim[i];
+        this->comm_dim[i] = comm_dim_partitioned(i);
+        this->dim[i] = Xinv.X()[i];
       }
     }
   };
 
-  template <bool compute_max_only, typename Arg>
-  inline __device__ __host__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, int i0, int j0)
+  template <typename Arg>
+  inline __device__ __host__ auto computeYhat(const Arg &arg, int d, int x_cb, int parity, int i0, int j0)
   {
     using real = typename Arg::Float;
     using complex = complex<real>;
@@ -68,7 +70,7 @@ namespace quda {
         yHat.mma_nt(Y, X);
       }
 
-      if (compute_max_only) {
+      if (Arg::compute_max) {
         yHatMax = yHat.abs_max();
       } else {
         yHat.save(arg.Yhat, d, 1 - parity, ghost_idx, i0, j0);
@@ -89,7 +91,7 @@ namespace quda {
 
         yHat.mma_nt(Y, X);
       }
-      if (compute_max_only) {
+      if (Arg::compute_max) {
         yHatMax = yHat.abs_max();
       } else {
         yHat.save(arg.Yhat, d, 1 - parity, back_idx, i0, j0);
@@ -109,7 +111,7 @@ namespace quda {
 
         yHat.mma_nn(X, Y);
       }
-      if (compute_max_only) {
+      if (Arg::compute_max) {
         yHatMax = fmax(yHatMax, yHat.abs_max());
       } else {
         yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
@@ -119,41 +121,21 @@ namespace quda {
     return yHatMax;
   }
 
-  template <bool compute_max_only, typename Arg> void CalculateYhatCPU(Arg &arg)
-  {
-    typename Arg::Float max = 0.0;
-    for (int d=0; d<4; d++) {
-      for (int parity=0; parity<2; parity++) {
-#pragma omp parallel for
-        for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
-          for (int i = 0; i < Arg::yhatTileType::m; i += Arg::yhatTileType::M)
-            for (int j = 0; j < Arg::yhatTileType::n; j += Arg::yhatTileType::N) {
-              typename Arg::Float max_x = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
-              if (compute_max_only) max = max > max_x ? max : max_x;
-            }
-        }
-      } //parity
-    } // dimension
-    if (compute_max_only) *arg.max_h = max;
-  }
+  template <typename Arg> struct ComputeYhat {
+    const Arg &arg;
+    constexpr ComputeYhat(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-  template <bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
-  {
-    int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.Y.VolumeCB()) return;
-    int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2 * Arg::yhatTileType::M_tiles) return;
-    int j_d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (j_d >= 4 * Arg::yhatTileType::N_tiles) return;
+    __device__ __host__ void operator()(int x_cb, int i_parity, int j_d)
+    {
+      int i = i_parity % Arg::yhatTileType::M_tiles;
+      int parity = i_parity / Arg::yhatTileType::M_tiles;
+      int j = j_d % Arg::yhatTileType::N_tiles;
+      int d = j_d / Arg::yhatTileType::N_tiles;
 
-    int i = i_parity % Arg::yhatTileType::M_tiles;
-    int parity = i_parity / Arg::yhatTileType::M_tiles;
-    int j = j_d % Arg::yhatTileType::N_tiles;
-    int d = j_d / Arg::yhatTileType::N_tiles;
-
-    typename Arg::Float max
-      = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
-    if (compute_max_only) atomicAbsMax(arg.max_d, max);
-  }
+      auto max = computeYhat(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
+      if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
+    }
+  };
 
 } // namespace quda

@@ -115,7 +115,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
       sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
-      
+
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
@@ -124,7 +124,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
-      
+
       sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
   }
@@ -133,8 +133,8 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 #else
 
 template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFloat *spinorField, 
-		     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
+void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField, sFloat **fwdSpinor,
+                     sFloat **backSpinor, int oddBit, int daggerBit)
 {
   for (int i = 0; i < Vh * spinor_site_size; i++) res[i] = 0.0;
 
@@ -162,7 +162,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
 	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
       }
-      
+
       sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
 
@@ -171,11 +171,16 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
 
 #endif
 
+#ifndef MULTI_GPU
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
 void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision, QudaGaugeParam &gauge_param) {
-  
-#ifndef MULTI_GPU  
+		QudaPrecision precision, QudaGaugeParam &)
+#else
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
+		QudaPrecision precision, QudaGaugeParam &gauge_param)
+#endif
+{
+#ifndef MULTI_GPU
   if (precision == QUDA_DOUBLE_PRECISION)
     dslashReference((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
   else

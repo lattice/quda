@@ -14,7 +14,7 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {

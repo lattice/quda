@@ -11,10 +11,9 @@
 #include <command_line_params.h>
 #include "misc.h"
 
-using namespace std;
+#include <eigen_helper.h>
 
-#include <Eigen/Dense>
-using namespace Eigen;
+template <typename T> using complex = std::complex<T>;
 
 void fillEigenArray(MatrixXcd &EigenArr, complex<double> *arr, int rows, int cols, int ld, int offset)
 {

@@ -6,7 +6,6 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
@@ -159,24 +158,13 @@ void end(void)
 
 double dslashCUDA(int niter, int mu)
 {
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  device_timer_t timer;
+  timer.start();
 
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
-
-  double secs = runTime / 1000; //stopwatchReadSeconds();
-
-  return secs;
+  timer.stop();
+  return timer.last();
 }
 
 void covdevRef(int mu)
