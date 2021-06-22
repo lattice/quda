@@ -111,17 +111,6 @@ project(
   VERSION 1.1.0
   LANGUAGES)
 
-message(STATUS "")
-message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
-message(STATUS "cmake version: ${CMAKE_VERSION}")
-message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
-message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
-
-# ######################################################################################################################
-# QUDA OPTIONS likely to be changed by users
-# ######################################################################################################################
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -132,9 +121,36 @@ if(NOT QUDA_GPU_ARCH)
 endif()
 
 set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+  ${QUDA_DEFAULT_GPU_ARCH}
+  CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+
+set(QUDA_N_COLORS
+  "3"
+  CACHE STRING "Set the SU(N) (1 - 8)")
+if(QUDA_N_COLORS GREATER 8)
+  message(SEND_ERROR "Maximum QUDA_N_COLORS is 8.")
+endif()
+
+if(QUDA_N_COLORS LESS 1)
+  message(SEND_ERROR "Minimum QUDA_N_COLORS is 1.")
+endif()
+
+
+message(STATUS "")
+message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
+message(STATUS "cmake version: ${CMAKE_VERSION}")
+message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
+message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
+message(STATUS "QUDA arch: ${QUDA_GPU_ARCH}")
+message(STATUS "SU(N): ${QUDA_N_COLORS}")
+
+# ######################################################################################################################
+# QUDA OPTIONS likely to be changed by users
+# ######################################################################################################################
+  
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -176,6 +192,9 @@ option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 
 # OpenBLAS
 option(QUDA_OPENBLAS "enable OpenBLAS" OFF)
+
+# LLNL zfp
+option(QUDA_ZFP "enable ZFP" OFF)
 
 # Interface options
 option(QUDA_INTERFACE_QDP "build qdp interface" ON)
@@ -239,8 +258,12 @@ set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, quarter)")
 set(QUDA_RECONSTRUCT
-    "7"
-    CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+     "7"
+   CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+ 
+if(NOT QUDA_RECONSTRUCT STREQUAL 4 AND NOT QUDA_N_COLORS STREQUAL 3)
+  message(SEND_ERROR "Gauge reconstruction not enabled for Nc != 3. Please reconfigure with QUDA_RECONSTRUCT 4")
+endif()
 
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
 set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
@@ -254,7 +277,7 @@ option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20%
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    14
+    17
     CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
@@ -276,6 +299,7 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
+option(QUDA_DOWNLOAD_ZFP "Download zfp software as requested by QUDA_ZFP" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
@@ -891,6 +915,38 @@ if(QUDA_BACKWARDS)
   endif()
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
+
+# ZFP
+if(QUDA_ZFP)  
+  if(QUDA_DOWNLOAD_ZFP)
+    include(GNUInstallDirs)
+    ExternalProject_Add(
+      ZFP
+      GIT_REPOSITORY https://github.com/LLNL/zfp.git
+      GIT_TAG 0.5.5
+      GIT_SHALLOW YES
+      PREFIX zfp
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DZFP_WITH_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_GENERATOR "Unix Makefiles")
+    ExternalProject_Get_Property(ZFP INSTALL_DIR)
+    set(QUDA_ZFP_HOME ${INSTALL_DIR})
+    add_library(zfp STATIC IMPORTED)
+    add_dependencies(zfp ZFP)
+    set_target_properties(zfp PROPERTIES IMPORTED_LOCATION ${QUDA_ZFP_HOME}/${CMAKE_INSTALL_LIBDIR}/libzfp.a)
+  else(QUDA_DOWNLOAD_ZFP)
+    find_package(PkgConfig REQUIRED)
+
+    # We always need the serial library
+    pkg_check_modules(ZFP QUIET zfp)
+    if(NOT ZFP_FOUND OR QUDA_ZFP_HOME)
+      find_library(ZFP zfp PATH ${QUDA_ZFP_HOME})
+    else()
+      find_library(ZFP ${ZFP_LIBRARIES} PATH ${ZFP_LIBRARY_DIRS})
+    endif()
+    
+  endif(QUDA_DOWNLOAD_ZFP)
+endif(QUDA_ZFP)
+
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

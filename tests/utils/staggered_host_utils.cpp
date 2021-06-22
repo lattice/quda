@@ -217,7 +217,7 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
   int link_pad = 3 * pad_size;
 
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
+    QUDA_SUN_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
 
   gauge_param.ga_pad = fat_pad;
@@ -333,8 +333,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
   // Needed for unitarization, following "unitarize_link_test.cpp"
-  quda::GaugeFieldParam gParam(0, qudaGaugeParam);
-  gParam.pad = 0;
+  quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER; // must be true!
@@ -674,6 +673,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
+  cs_param->pc_type = QUDA_4D_PC;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
   // Lattice vector data properties
@@ -792,7 +792,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
       }
 
-      for (int j = 0; j < 18; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
+      for (int j = 0; j < gauge_site_size; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
     }
     // odd
     for (int i = 0; i < Vh; i++) {
@@ -814,7 +814,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if ((i4 + i1 + i2) % 2 == 1) { sign = -1; }
       }
 
-      for (int j = 0; j < 18; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
+      for (int j = 0; j < gauge_site_size; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
     }
   }
 
@@ -828,7 +828,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
         if (j >= (X4 - 1) * X1h * X2 * X3) { sign = -1; }
       }
 
-      for (int i = 0; i < 18; i++) {
+      for (int i = 0; i < gauge_site_size; i++) {
         gauge[3][j * gauge_site_size + i] *= sign;
         gauge[3][(Vh + j) * gauge_site_size + i] *= sign;
       }

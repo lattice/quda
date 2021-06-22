@@ -26,30 +26,36 @@ void display_test_info()
   switch (test_type) {
   case 0:
     printfQuda("\nAPE smearing\n");
-    printfQuda(" - rho %f\n", ape_smear_rho);
+    printfQuda(" - rho %e\n", ape_smear_rho);
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 1:
     printfQuda("\nStout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - rho %e\n", stout_smear_rho);
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 2:
     printfQuda("\nOver-Improved Stout smearing\n");
-    printfQuda(" - rho %f\n", stout_smear_rho);
-    printfQuda(" - epsilon %f\n", stout_smear_epsilon);
+    printfQuda(" - rho %e\n", stout_smear_rho);
+    printfQuda(" - epsilon %e\n", stout_smear_epsilon);
     printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 3:
     printfQuda("\nWilson Flow\n");
-    printfQuda(" - epsilon %f\n", wflow_epsilon);
+    printfQuda(" - epsilon %e\n", wflow_epsilon);
     printfQuda(" - Wilson flow steps %d\n", wflow_steps);
     printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
+  case 4:
+    printfQuda("\nFundamental Rep\n");
+    printfQuda(" - QR tolerance %e\n", wflow_epsilon);
+    printfQuda(" - QR max iterations %d\n", wflow_steps);
+    break;
+    
   default: errorQuda("Undefined test type %d given", test_type);
   }
 
@@ -59,15 +65,14 @@ void display_test_info()
   return;
 }
 
-
 int main(int argc, char **argv)
 {
 
   auto app = make_app();
   add_su3_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
+  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}, {"Fundamental Rep", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-
+  
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -78,19 +83,18 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
-    link_recon_sloppy = link_recon;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device_ordinal);
@@ -120,7 +124,7 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
-  void *qDensity = malloc(array_size);
+  void *qDensity = safe_malloc(array_size);
   // start the timer
   double time0 = -((double)clock());
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -143,7 +147,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
 
-  free(qDensity);
+  // release memory
+  host_free(qDensity);
 
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
@@ -200,23 +205,33 @@ int main(int argc, char **argv)
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Wilson Flow = %g secs\n", time0);
     break;
+  case 4:
+    // Compute the fundamental representation
+    // Start the timer
+    time0 = -((double)clock());
+    computeGaugeFundamental(su3_qr_tol, su3_qr_maxiter, su3_taylor_N);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Fundamental Rep = %g secs\n", time0);
+    break;
+    
   default: errorQuda("Undefined test type %d given", test_type);
   }
-
+  
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
+  for (int dir = 0; dir < 4; dir++) {
+    host_free(gauge[dir]);
+    host_free(new_gauge[dir]);
+  }
+
   freeGaugeQuda();
   endQuda();
-
-  // release memory
-  for (int dir = 0; dir < 4; dir++) {
-    free(gauge[dir]);
-    free(new_gauge[dir]);
-  }
 
   finalizeComms();
   return 0;

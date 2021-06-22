@@ -189,6 +189,7 @@ namespace quda {
       using Arg = Arg_;
       Arg arg;
       FatLinkParam(Arg &arg) :
+        kernel_param<>(arg.threads),
         arg(arg) {}
     };
 
@@ -627,7 +628,7 @@ namespace quda {
     template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
     struct LongLinkArg : public BaseForceArg<real, nColor, reconstruct> {
 
-      typedef typename gauge::FloatNOrder<real,18,2,11> M;
+      typedef typename gauge::FloatNOrder<real,2*N_COLORS*N_COLORS,2,11> M;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       F outA;
       const F oProd;

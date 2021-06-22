@@ -79,8 +79,8 @@ namespace quda {
                              ColorSpinorField &out_, const ColorSpinorField &, const GaugeField &Xinv_)
   {
     // sanity checks
-    if (fineColor != 3)
-      errorQuda("Input gauge field should have nColor=3, not nColor=%d\n", fineColor);
+    if (fineColor != N_COLORS)
+      errorQuda("Input gauge field should have nColor=%d, not nColor=%d\n", N_COLORS, fineColor);
 
     if (Xinv.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
@@ -155,8 +155,8 @@ namespace quda {
     if (out.Nspin() != in.Nspin())
       errorQuda("Nspin %d and %d do not match", out.Nspin(), in.Nspin());
 
-    if (out.Ncolor() == 3 && out.Nspin() == 1) {
-      applyStaggeredKDBlock<vFloatSpinor, vFloatGauge, 3, 1>(out, in, Xinv, dagger);
+    if (out.Ncolor() == N_COLORS && out.Nspin() == 1) {
+      applyStaggeredKDBlock<vFloatSpinor, vFloatGauge, N_COLORS, 1>(out, in, Xinv, dagger);
     } else {
       errorQuda("Unsupported (color, spin) = (%d, %d)", out.Ncolor(), out.Nspin());
     }
@@ -182,7 +182,7 @@ namespace quda {
     }
   };
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
   {
@@ -206,7 +206,7 @@ namespace quda {
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, bool)
   {
-    errorQuda("Staggered fermion support has not been built");
+    errorQuda("Staggered fermion multigrid support has not been built");
   }
 #endif
 

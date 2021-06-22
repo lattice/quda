@@ -25,7 +25,7 @@ namespace quda {
       GaugePlaqArg<Float, nColor, recon> arg(u);
       launch<Plaquette>(plq, tp, stream, arg);
       if (!activeTuning()) {
-        for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads.x*comm_size();
+        for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= (nColor*3.0*2.0*arg.threads.x*comm_size());
       }
     }
 

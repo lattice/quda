@@ -55,8 +55,9 @@ namespace quda {
     if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
-    if (link_type != QUDA_COARSE_LINKS && nColor != 3)
-      errorQuda("nColor must be 3, not %d for this link type", nColor);
+    // DMH: deleting the error below
+    if (link_type != QUDA_COARSE_LINKS && nColor != N_COLORS)
+      errorQuda("nColor must be N_COLORS=%d, not %d for this link type", N_COLORS, nColor);
     if (nDim != 4)
       errorQuda("Number of dimensions must be 4 not %d", nDim);
     if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0)
@@ -77,9 +78,8 @@ namespace quda {
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
 
-    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) &&
-	(link_type != QUDA_SU3_LINKS && link_type != QUDA_SMEARED_LINKS && link_type != QUDA_WILSON_LINKS)) {
-      errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
+    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SUN_LINKS) {
+      errorQuda("Cannot request a 12/8 reconstruct type without SU(N) link type");
     }
     
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
@@ -111,8 +111,11 @@ namespace quda {
   void GaugeField::setTuningString() {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
-    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride,
-                         precision, geometry, nColor);
+    int check = (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) ?
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d",
+               volume, stride, precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d",
+               volume, stride, precision, geometry, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
@@ -297,7 +300,7 @@ namespace quda {
      errorQuda("Not implemented for this order %d", a.FieldOrder());
 
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
-    if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
+    if (a.Ncolor() != N_COLORS) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
 
     if (a.Precision() == QUDA_HALF_PRECISION || a.Precision() == QUDA_QUARTER_PRECISION)
       errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
@@ -392,7 +395,7 @@ namespace quda {
   // helper for creating extended (cpu) gauge fields
   cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
   {
-    GaugeFieldParam gauge_field_param(gauge, gauge_param);
+    GaugeFieldParam gauge_field_param(gauge_param, gauge);
     cpuGaugeField cpu(gauge_field_param);
 
     gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;

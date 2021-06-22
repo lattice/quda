@@ -117,7 +117,6 @@ namespace quda
   void VectorIO::load(std::vector<ColorSpinorField *> &) { errorQuda("\nQIO library was not built.\n"); }
 #endif
 
-
 #ifdef HAVE_QIO
   void VectorIO::save(const std::vector<ColorSpinorField *> &vecs)
   {

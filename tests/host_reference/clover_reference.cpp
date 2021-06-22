@@ -17,7 +17,7 @@
 template <typename sFloat, typename cFloat>
 void cloverReference(sFloat *out, cFloat *clover, sFloat *in, int parity) {
   int nSpin = 4;
-  int nColor = 3;
+  int nColor = N_COLORS;
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2*(N-1)*N/2;
 
@@ -78,12 +78,12 @@ void apply_clover(void *out, void *clover, void *in, int parity, QudaPrecision p
 
 void clover_dslash(void *out, void **gauge, void *clover, void *in, int parity,
 		   int dagger, QudaPrecision precision, QudaGaugeParam &param) {
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   wil_dslash(tmp, gauge, in, parity, dagger, precision, param);
   apply_clover(out, clover, tmp, parity, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Wilson-clover operator
@@ -91,7 +91,7 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
 		  QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
   double kappa2 = -kappa*kappa;
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   switch(matpc_type) {
   case QUDA_MATPC_EVEN_EVEN:
@@ -137,17 +137,17 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
     xpay(tmp, kappa2, out, Vh * spinor_site_size, precision);
     break;
   default:
-    errorQuda("Unsupoorted matpc=%d", matpc_type);
+    errorQuda("Unsupported matpc=%d", matpc_type);
   }
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the full Wilson-clover operator
 void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa, 
 		int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(V * spinor_site_size * precision);
+  void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   void *inEven = in;
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
@@ -167,7 +167,7 @@ void clover_mat(void *out, void **gauge, void *clover, void *in, double kappa,
   // lastly apply the kappa term
   xpay(tmp, -kappa, out, V * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precision) {
@@ -176,9 +176,9 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
     for(int i = 0; i < Vh; i++)
       for(int s = 0; s < 4; s++) {
         double a5 = ((s / 2) ? -1.0 : +1.0) * a;
-        for(int c = 0; c < 3; c++) {
-          ((double *) out)[i * 24 + s * 6 + c * 2 + 0] = ((double *) tmpH)[i * 24 + s * 6 + c * 2 + 0] - a5*((double *) in)[i * 24 + s * 6 + c * 2 + 1];
-          ((double *) out)[i * 24 + s * 6 + c * 2 + 1] = ((double *) tmpH)[i * 24 + s * 6 + c * 2 + 1] + a5*((double *) in)[i * 24 + s * 6 + c * 2 + 0];
+        for(int c = 0; c < N_COLORS; c++) {
+          ((double *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] = ((double *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5*((double *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1];
+          ((double *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] = ((double *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5*((double *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0];
         }
       }
     break;
@@ -186,9 +186,9 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
     for(int i = 0; i < Vh; i++)
       for(int s = 0; s < 4; s++) {
         float a5 = ((s / 2) ? -1.0 : +1.0) * a;
-        for(int c = 0; c < 3; c++) {
-          ((float *) out)[i * 24 + s * 6 + c * 2 + 0] = ((float *) tmpH)[i * 24 + s * 6 + c * 2 + 0] - a5*((float *) in)[i * 24 + s * 6 + c * 2 + 1];
-          ((float *) out)[i * 24 + s * 6 + c * 2 + 1] = ((float *) tmpH)[i * 24 + s * 6 + c * 2 + 1] + a5*((float *) in)[i * 24 + s * 6 + c * 2 + 0];
+        for(int c = 0; c < N_COLORS; c++) {
+          ((float *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] = ((float *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5*((float *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1];
+          ((float *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] = ((float *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5*((float *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0];
         }
       }
     break;
@@ -201,19 +201,20 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
 void twistClover(void *out, void *in, void *x, void *clover, const double a, int dagger, int parity,
                  QudaPrecision precision)
 {
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   // tmp1 = Clov in
   apply_clover(tmp, clover, in, parity, precision);
   applyTwist(out, tmp, x, (dagger ? -a : a), precision);
-  free(tmp);
+
+  host_free(tmp);
 }
 
 // Apply (C + i*a*gamma_5)/(C^2 + a^2)
 void twistCloverGamma5(void *out, void *in, void *clover, void *cInv, const int dagger, const double kappa, const double mu,
 		       const QudaTwistFlavorType flavor, const int parity, QudaTwistGamma5Type twist, QudaPrecision precision) {
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   double a = 0.0;
 
@@ -237,14 +238,14 @@ void twistCloverGamma5(void *out, void *in, void *clover, void *cInv, const int 
     exit(0);
   }
 
-  free(tmp2);
-  free(tmp1);
+  host_free(tmp2);
+  host_free(tmp1);
 }
 
 void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, QudaTwistFlavorType flavor,
 		int parity, QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &param) {
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   if (dagger) {
     twistCloverGamma5(tmp1, in, clover, cInv, dagger, kappa, mu, flavor, 1-parity, QUDA_TWIST_GAMMA5_INVERSE, precision);
@@ -259,15 +260,15 @@ void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, dou
     twistCloverGamma5(out, tmp1, clover, cInv, dagger, kappa, mu, flavor, parity, QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
 
-  free(tmp2);
-  free(tmp1);
+  host_free(tmp2);
+  host_free(tmp1);
 }
 
 // Apply the full twisted-clover operator
 void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu,
 	     QudaTwistFlavorType flavor, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(V * spinor_site_size * precision);
+  void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   void *inEven = in;
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
@@ -287,7 +288,7 @@ void tmc_mat(void *out, void **gauge, void *clover, void *in, double kappa, doub
   // lastly apply the kappa term
   xpay(tmp, -kappa, out, V * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
@@ -296,8 +297,8 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
 
   double kappa2 = -kappa*kappa;
 
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   switch(matpc_type) {
   case QUDA_MATPC_EVEN_EVEN:
@@ -346,8 +347,8 @@ void tmc_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, doub
     errorQuda("Unsupported matpc=%d", matpc_type);
   }
 
-  free(tmp2);
-  free(tmp1);
+  host_free(tmp2);
+  host_free(tmp1);
 }
 
 // Apply the full twisted-clover operator
@@ -384,7 +385,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
   } else {
 
     // Symmetric case:  - i mu gamma_5 A^2 psi_in
-    void *tmp = malloc(Vh * spinor_site_size * precision);
+    void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
 
@@ -402,7 +403,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
       // out_e = out_e -/+ i gamma_5 mu A (A_ee)
       twistClover(outOdd, tmp, outOdd, clover, 0.25 * mu, dagger, 1, precision);
     }
-    free(tmp);
+    host_free(tmp);
   }
 }
 

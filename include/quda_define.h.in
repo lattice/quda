@@ -18,6 +18,12 @@
  */
 #define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
 
+/**
+ * @def   N_COLORS
+ * @brief This macro sets the number of colors in the gauge theory
+ */
+#define N_COLORS @QUDA_N_COLORS@
+
 #cmakedefine QUDA_HETEROGENEOUS_ATOMIC
 #ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**

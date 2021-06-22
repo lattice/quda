@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <su3_project.cuh>
+//#include <su3_project.cuh>
 #include <kernels/gauge_utils.cuh>
 #include <kernel.h>
 
@@ -14,7 +14,7 @@ namespace quda
   struct STOUTArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static_assert(nColor == N_COLORS, "STOUTArg instantiated incorrectly");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int stoutDim = stoutDim_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
@@ -67,7 +67,6 @@ namespace quda
 
       int dx[4] = {0, 0, 0, 0};
       Link U, Stap, Omega, OmegaDiff, Q;
-      Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
@@ -99,10 +98,10 @@ namespace quda
       error = getTrace(Q_diff).real();
       printf("Herm test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
+      error = ErrorSUN(exp_iQ);
       printf("expiQ test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
+      error = ErrorSUN(U);
       printf("expiQ*u test %d %d %.15e\n", x_cb, dir, error);
 #endif
     }
@@ -139,7 +138,6 @@ namespace quda
       int dx[4] = {0, 0, 0, 0};
       Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;
       Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
@@ -173,10 +171,10 @@ namespace quda
       error = getTrace(Q_diff).real();
       printf("Herm test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
+      error = ErrorSUN(exp_iQ);
       printf("expiQ test %d %d %.15e\n", x_cb, dir, error);
       //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
+      error = ErrorSUN(U);
       printf("expiQ*u test %d %d %.15e\n", x_cb, dir, error);
 #endif
     }

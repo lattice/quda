@@ -42,6 +42,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+bool fund_gauge = false;
 double gaussian_sigma = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
@@ -257,6 +258,11 @@ int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
+double su3_qr_tol = 1e-6;
+int su3_qr_maxiter = 100;
+int su3_taylor_N = 25;
+int su3_comp_block_size = 4;
+double su3_comp_tol = 1e-6;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -275,6 +281,16 @@ std::array<int,4> momentum = {0, 0, 0, 0};
 char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
+
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
@@ -660,12 +676,15 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
-    "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
-
+    "Generate a unit valued gauge field in the tests. (default false)");
+  quda_app->add_option(
+    "--fund-gauge", fund_gauge,
+    "Generate a fundamental valued gauge field in the tests. (default false)");
+  
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--verify", verify_results, "Verify the GPU results using CPU results (default true)");
-
+  
   // lattice dimensions
   auto dimopt = quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)")->check(CLI::Range(1, 512));
   auto sdimopt = quda_app
@@ -1080,6 +1099,16 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-qr-tol", su3_qr_tol, "Tolerance on the link QR solver (default 1e-6)");
+  
+  opgroup->add_option("--su3-qr-maxiter", su3_qr_maxiter, "Maximum iterations of the link QR solver (default 100)");
+
+  opgroup->add_option("--su3-taylor-N", su3_taylor_N, "The degree of the link Taylor expansion of exp(iH) (default 25)");
+
+  opgroup->add_option("--su3-comp-tol", su3_comp_tol, "The tolerance of the ZFP lossy link compression (default 1e-6)");
+  
+  opgroup->add_option("--su3-comp-block-size", su3_comp_block_size, "The block size of the ZFP lossy link compression (default 4)");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1155,6 +1184,30 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
+}
+
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -184,12 +184,12 @@ struct DslashTestWrapper {
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
 
     // construct input fields
-    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
+    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
         || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-      hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
     }
 
     ColorSpinorParam csParam;
@@ -369,11 +369,11 @@ struct DslashTestWrapper {
     vp_spinorOut.clear();
     vp_spinorRef.clear();
 
-    for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
+    for (int dir = 0; dir < 4; dir++) host_free(hostGauge[dir]);
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      free(hostClover);
-      free(hostCloverInv);
+      host_free(hostClover);
+      host_free(hostCloverInv);
     }
   }
 
@@ -646,7 +646,7 @@ struct DslashTestWrapper {
       default: printf("Test type not supported for domain wall\n"); exit(-1);
       }
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-      double *kappa_5 = (double *)malloc(Ls * sizeof(double));
+      double *kappa_5 = (double *)safe_malloc(Ls * sizeof(double));
       for (int xs = 0; xs < Ls; xs++) kappa_5[xs] = kappa5;
       switch (dtest_type) {
       case dslash_test_type::Dslash:
@@ -683,12 +683,12 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for domain wall\n"); exit(-1);
       }
-      free(kappa_5);
+      host_free(kappa_5);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
@@ -739,15 +739,15 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for Mobius domain wall\n"); exit(-1);
       }
-      free(kappa_b);
-      free(kappa_c);
-      free(kappa_5);
-      free(kappa_mdwf);
+      host_free(kappa_b);
+      host_free(kappa_c);
+      host_free(kappa_5);
+      host_free(kappa_mdwf);
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
@@ -804,10 +804,10 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
       }
-      free(kappa_b);
-      free(kappa_c);
-      free(kappa_5);
-      free(kappa_mdwf);
+      host_free(kappa_b);
+      host_free(kappa_c);
+      host_free(kappa_5);
+      host_free(kappa_mdwf);
     } else {
       printfQuda("Unsupported dslash_type\n");
       exit(-1);

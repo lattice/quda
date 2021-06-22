@@ -39,6 +39,7 @@ namespace quda {
     }
   };
 
+  // DMH: FIXME SUN
   template <typename real, typename Link> __device__ __host__ Link gauss_su3(RNGState &localState)
   {
     Link ret;
@@ -96,11 +97,11 @@ namespace quda {
         for (int mu = 0; mu < 4; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
-          // generate Gaussian distributed su(n) fiueld
+          // generate Gaussian distributed su(n) field
           Link u = gauss_su3<real, Link>(localState);
           if (arg.group) {
             u = arg.sigma * u;
-            expsu3<real>(u);
+            expsuN<real>(u);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
 

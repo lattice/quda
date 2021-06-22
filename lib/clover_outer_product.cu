@@ -77,6 +77,7 @@ namespace quda {
     void postTune() { force.restore(); }
 
     // spin trace + multiply-add (ignore spin-project)
+    // DMH FIXME
     long long flops() const { return minThreads() * (144 + 234) * (kernel == INTERIOR ? 4 : 1); }
 
     long long bytes() const
@@ -96,9 +97,6 @@ namespace quda {
                                 commDimPartitioned(2), commDimPartitioned(3) };
     setPackComms(comms);
 
-    // need to enable packing in temporal direction to get spin-projector correct
-    pushKernelPackT(true);
-
     // first transfer src1
     qudaDeviceSynchronize();
 
@@ -110,7 +108,7 @@ namespace quda {
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
 	// Initialize the host transfer from the source spinor
-	a.gather(1, dag, 2*i, device::get_stream(2*i));
+	a.gather(2*i, device::get_stream(2*i));
       } // commDim(i)
     } // i=3,..,0
 
@@ -118,7 +116,7 @@ namespace quda {
 
     for (int i=3; i>=0; i--) {
       if (commDimPartitioned(i)) {
-	a.commsStart(1, 2*i, dag, device::get_stream(2 * i));
+	a.commsStart(2*i, device::get_stream(2 * i));
       }
     }
 
@@ -130,7 +128,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    popKernelPackT(); // restore packing state
 
     a.bufferIndex = (1 - a.bufferIndex);
     comm_barrier();

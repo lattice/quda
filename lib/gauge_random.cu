@@ -22,7 +22,7 @@ namespace quda {
       U(U),
       rng(rng),
       sigma(static_cast<Float>(sigma)),
-      group(U.LinkType() == QUDA_SU3_LINKS)
+      group(U.LinkType() == QUDA_SUN_LINKS)
     {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
@@ -52,7 +52,7 @@ namespace quda {
   void gaugeGauss(GaugeField &U, RNG &rng, double sigma)
   {
     if (!U.isNative()) errorQuda("Order %d with %d reconstruct not supported", U.Order(), U.Reconstruct());
-    if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
+    if (U.LinkType() != QUDA_SUN_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
       errorQuda("Unexpected link type %d", U.LinkType());
 
     instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);

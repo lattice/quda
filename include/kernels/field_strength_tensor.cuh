@@ -11,7 +11,7 @@ namespace quda
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static_assert(nColor == N_COLORS, "FmunuArg instantiated incorrectly");
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type G;
     typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
@@ -37,7 +37,7 @@ namespace quda
   template <int mu, int nu, typename Arg>
   __device__ __host__ __forceinline__ void computeFmunuCore(const Arg &arg, int idx, int parity)
   {
-    using Link = Matrix<complex<typename Arg::Float>, 3>;
+    using Link = Matrix<complex<typename Arg::Float>, N_COLORS>;
 
     int x[4];
     int X[4];
@@ -158,8 +158,8 @@ namespace quda
     }
     // 3 matrix additions, 12 matrix-matrix multiplications, 8 matrix conjugations
     // Each matrix conjugation involves 9 unary minus operations but these ar not included in the operation count
-    // Each matrix addition involves 18 real additions
-    // Each matrix-matrix multiplication involves 9*3 complex multiplications and 9*2 complex additions
+    // Each matrix addition involves 2*N_COLORS*N_COLORS real additions
+    // Each matrix-matrix multiplication involves N_COLORS**3 complex multiplications and 2*N_COLORS*N_COLORS complex additions
     // = 9*3*6 + 9*2*2 = 198 floating-point ops
     // => Total number of floating point ops per site above is
     // 3*18 + 12*198 =  54 + 2376 = 2430

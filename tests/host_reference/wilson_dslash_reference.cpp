@@ -70,18 +70,18 @@ static const double projector[8][4][4][2] = {
 // todo pass projector
 template <typename Float>
 void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
-  for (int i=0; i<4*3*2; i++) res[i] = 0.0;
-
+  for (int i=0; i<spinor_site_size; i++) res[i] = 0.0;
+  
   for (int s = 0; s < 4; s++) {
     for (int t = 0; t < 4; t++) {
       Float projRe = projector[projIdx][s][t][0];
       Float projIm = projector[projIdx][s][t][1];
       
-      for (int m = 0; m < 3; m++) {
-	Float spinorRe = spinorIn[t*(3*2) + m*(2) + 0];
-	Float spinorIm = spinorIn[t*(3*2) + m*(2) + 1];
-	res[s*(3*2) + m*(2) + 0] += projRe*spinorRe - projIm*spinorIm;
-	res[s*(3*2) + m*(2) + 1] += projRe*spinorIm + projIm*spinorRe;
+      for (int m = 0; m < N_COLORS; m++) {
+	Float spinorRe = spinorIn[t*(N_COLORS*2) + m*(2) + 0];
+	Float spinorIm = spinorIn[t*(N_COLORS*2) + m*(2) + 1];
+	res[s*(N_COLORS*2) + m*(2) + 0] += projRe*spinorRe - projIm*spinorIm;
+	res[s*(N_COLORS*2) + m*(2) + 1] += projRe*spinorIm + projIm*spinorRe;
       }
     }
   }
@@ -115,16 +115,14 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
       sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
-
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
       for (int s = 0; s < 4; s++) {
-	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
+	else su3Tmul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
       }
-
       sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
   }
@@ -159,10 +157,9 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       
       for (int s = 0; s < 4; s++) {
-	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+	if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
+	else su3Tmul(&gaugedSpinor[s*(N_COLORS*2)], gauge, &projectedSpinor[s*(N_COLORS*2)]);
       }
-
       sum(&res[i * spinor_site_size], &res[i * spinor_site_size], gaugedSpinor, spinor_site_size);
     }
 
@@ -187,7 +184,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
     dslashReference((float*)out, (float**)gauge, (float*)in, oddBit, daggerBit);
 #else
 
-  GaugeFieldParam gauge_field_param(gauge, gauge_param);
+  GaugeFieldParam gauge_field_param(gauge_param, gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
   void **ghostGauge = (void**)cpu.Ghost();
@@ -196,7 +193,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
   csParam.v = in;
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = Z[d];
@@ -208,6 +205,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  csParam.pc_type = QUDA_4D_PC;
   
   cpuColorSpinorField inField(csParam);
 
@@ -255,15 +253,15 @@ void twistGamma5(sFloat *out, sFloat *in, const int dagger, const sFloat kappa, 
   if (dagger) a *= -1.0;
 
   for(int i = 0; i < V; i++) {
-    sFloat tmp[24];
+    sFloat tmp[spinor_site_size];
     for(int s = 0; s < 4; s++)
-      for(int c = 0; c < 3; c++) {
+      for(int c = 0; c < N_COLORS; c++) {
 	sFloat a5 = ((s / 2) ? -1.0 : +1.0) * a;	  
-	tmp[s * 6 + c * 2 + 0] = b* (in[i * 24 + s * 6 + c * 2 + 0] - a5*in[i * 24 + s * 6 + c * 2 + 1]);
-	tmp[s * 6 + c * 2 + 1] = b* (in[i * 24 + s * 6 + c * 2 + 1] + a5*in[i * 24 + s * 6 + c * 2 + 0]);
+	tmp[s * 2*N_COLORS + c * 2 + 0] = b* (in[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5*in[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1]);
+	tmp[s * 2*N_COLORS + c * 2 + 1] = b* (in[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5*in[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0]);
       }
 
-    for (int j=0; j<24; j++) out[i*24+j] = tmp[j];
+    for (int j=0; j<spinor_site_size; j++) out[i*spinor_site_size+j] = tmp[j];
   }
   
 }
@@ -319,7 +317,7 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu,
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + Vh * spinor_site_size * precision;
-  void *tmp = malloc(V * spinor_site_size * precision);
+  void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   wil_dslash(outOdd, gauge, inEven, 1, dagger_bit, precision, gauge_param);
   wil_dslash(outEven, gauge, inOdd, 0, dagger_bit, precision, gauge_param);
@@ -330,7 +328,7 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu,
   // combine
   xpay(tmp, -kappa, (double *)out, V * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
@@ -338,7 +336,7 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa,
 	       QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision,
 	       QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   // FIXME: remove once reference clover is finished
   // full dslash operator
@@ -354,14 +352,14 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa,
   double kappa2 = -kappa*kappa;
   xpay(inEven, kappa2, outEven, Vh * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
 void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
 	      QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     wil_dslash(tmp, gauge, inEven, 1, daggerBit, precision, gauge_param);
@@ -408,7 +406,7 @@ void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu
     xpay(tmp, kappa2, outEven, Vh * spinor_site_size, precision);
   }
 
-  free(tmp);
+  host_free(tmp);
 }
 
 
@@ -434,25 +432,25 @@ void ndegTwistGamma5(sFloat *out1, sFloat *out2, sFloat *in1, sFloat *in2, const
   if (dagger) a *= -1.0;
   
   for(int i = 0; i < V; i++) {
-    sFloat tmp1[24];
-    sFloat tmp2[24];    
+    sFloat tmp1[spinor_site_size];
+    sFloat tmp2[spinor_site_size];    
     for(int s = 0; s < 4; s++)
-      for(int c = 0; c < 3; c++) {
+      for(int c = 0; c < N_COLORS; c++) {
 	sFloat a5 = ((s / 2) ? -1.0 : +1.0) * a;
-        tmp1[s * 6 + c * 2 + 0] = d
-            * (in1[i * 24 + s * 6 + c * 2 + 0] - a5 * in1[i * 24 + s * 6 + c * 2 + 1]
-                + b * in2[i * 24 + s * 6 + c * 2 + 0]);
-        tmp1[s * 6 + c * 2 + 1] = d
-            * (in1[i * 24 + s * 6 + c * 2 + 1] + a5 * in1[i * 24 + s * 6 + c * 2 + 0]
-                + b * in2[i * 24 + s * 6 + c * 2 + 1]);
-        tmp2[s * 6 + c * 2 + 0] = d
-            * (in2[i * 24 + s * 6 + c * 2 + 0] + a5 * in2[i * 24 + s * 6 + c * 2 + 1]
-                + b * in1[i * 24 + s * 6 + c * 2 + 0]);
-        tmp2[s * 6 + c * 2 + 1] = d
-            * (in2[i * 24 + s * 6 + c * 2 + 1] - a5 * in2[i * 24 + s * 6 + c * 2 + 0]
-                + b * in1[i * 24 + s * 6 + c * 2 + 1]);
+        tmp1[s * 2*N_COLORS + c * 2 + 0] = d
+            * (in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5 * in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1]
+                + b * in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0]);
+        tmp1[s * 2*N_COLORS + c * 2 + 1] = d
+            * (in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5 * in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0]
+                + b * in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1]);
+        tmp2[s * 2*N_COLORS + c * 2 + 0] = d
+            * (in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] + a5 * in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1]
+                + b * in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0]);
+        tmp2[s * 2*N_COLORS + c * 2 + 1] = d
+            * (in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] - a5 * in2[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0]
+                + b * in1[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1]);
       }
-    for (int j=0; j<24; j++) out1[i*24+j] = tmp1[j], out2[i*24+j] = tmp2[j];
+    for (int j=0; j<spinor_site_size; j++) out1[i*spinor_site_size+j] = tmp1[j], out2[i*spinor_site_size+j] = tmp2[j];
   }
   
 }
@@ -489,8 +487,8 @@ void tm_ndeg_dslash(void *res1, void *res2, void **gauge, void *spinorField1, vo
 void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, void *inEven2, double kappa, double mu, double epsilon,
 	   QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   if (!daggerBit) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -551,8 +549,8 @@ void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, 
   xpay(inEven1, kappa2, outEven1, Vh * spinor_site_size, precision);
   xpay(inEven2, kappa2, outEven2, Vh * spinor_site_size, precision);
 
-  free(tmp1);
-  free(tmp2);
+  host_free(tmp1);
+  host_free(tmp2);
 }
 
 
@@ -571,11 +569,11 @@ void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *
   void *outOdd1   = oddOut;
   void *outOdd2 = (char *)oddOut + precision * Vh * spinor_site_size;
 
-  void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpEven2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpEven1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpEven2 = safe_malloc(Vh * spinor_site_size * precision);
 
-  void *tmpOdd1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpOdd2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd2 = safe_malloc(Vh * spinor_site_size * precision);
 
   // full dslash operator:
   wil_dslash(outOdd1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
@@ -594,11 +592,11 @@ void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *
   xpay(tmpEven1, -kappa, outEven1, Vh * spinor_site_size, precision);
   xpay(tmpEven2, -kappa, outEven2, Vh * spinor_site_size, precision);
 
-  free(tmpOdd1);
-  free(tmpOdd2);
+  host_free(tmpOdd1);
+  host_free(tmpOdd2);
   //
-  free(tmpEven1);
-  free(tmpEven2);
+  host_free(tmpEven1);
+  host_free(tmpEven2);
 }
 
 //End of nondeg TM

@@ -2,7 +2,7 @@
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <kernels/gauge_utils.cuh>
-#include <su3_project.cuh>
+//#include <su3_project.cuh>
 #include <kernel.h>
 
 namespace quda
@@ -19,7 +19,8 @@ namespace quda
   struct GaugeWFlowArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    // DMH TESTME
+    //static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
     static constexpr QudaWFlowType wflow_type = wflow_type_;

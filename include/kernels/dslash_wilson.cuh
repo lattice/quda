@@ -25,7 +25,7 @@ namespace quda
     static constexpr QudaReconstructType reconstruct = reconstruct_;
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-    typedef typename gauge_mapper<Float, reconstruct, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
+    typedef typename gauge_mapper<Float, reconstruct, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type G;
 
     typedef typename mapper<Float>::type real;
 
@@ -52,24 +52,7 @@ namespace quda
       checkLocation(out, in, x, U);  // check all locations match
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
-
-      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel if ghost vector length is different than bulk
     }
-
-    // defined the copy constructor to ensure we don't have an excess pop if the arg is copied
-    WilsonArg(const WilsonArg &arg) :
-      DslashArg<Float, nDim>(arg),
-      out(arg.out),
-      in(arg.in),
-      in_pack(arg.in_pack),
-      x(arg.x),
-      U(arg.U),
-      a(arg.a)
-    {
-      if (F::N != F::N_ghost) pushKernelPackT(true);
-    }
-
-    virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
   };
 
   /**
@@ -111,7 +94,6 @@ namespace quda
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
@@ -138,7 +120,6 @@ namespace quda
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale;
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {

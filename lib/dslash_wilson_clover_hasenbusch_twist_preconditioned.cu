@@ -79,8 +79,8 @@ namespace quda
 
     long long bytes() const
     {
-      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
-
+      int clover_bytes = 8*N_COLORS*N_COLORS * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
+      
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
@@ -233,8 +233,8 @@ namespace quda
 
     long long bytes() const
     {
-      int clover_bytes = 72 * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
-
+      int clover_bytes = 8*N_COLORS*N_COLORS * in.Precision() + (isFixed<typename Arg::Float>::value ? 2 * sizeof(float) : 0);
+      
       // if we use dynamic clover we read only A (even for A^{-1}
       // otherwise we read both A and A^{-1}
       int dyn_factor = arg.dynamic_clover ? 1 : 2;

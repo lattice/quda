@@ -85,7 +85,7 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Arg::fineSpin; s++) {
 
-	constexpr int color_unroll = Arg::fineColor == 3 ? 3 : 2;
+	constexpr int color_unroll = Arg::fineColor == N_COLORS ? N_COLORS : 2;
 
 	complex<typename Arg::real> partial[color_unroll];
 #pragma unroll
@@ -104,7 +104,8 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename Arg> struct Restrictor {
+  template <typename Arg> struct Restrictor {
+    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;
