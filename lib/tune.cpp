@@ -672,7 +672,7 @@ namespace quda
   TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
     if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("tuneLaunch\n");
+      printfQuda("begin tuneLaunch\n");
     }
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -726,6 +726,9 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("used tune cache\nend tuneLaunch\n");
+      }
       return param_tuned;
     }
 
@@ -745,6 +748,9 @@ namespace quda
                    tunable.paramString(param_default).c_str());
       }
 
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("used default\nend tuneLaunch\n");
+      }
       return param_default;
     } else if (!tuning) {
 
