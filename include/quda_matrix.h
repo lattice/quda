@@ -1079,28 +1079,29 @@ namespace quda {
       }
       return os;
     }
-  
-  template<class Cmplx, class Real, int Nc>
-    inline void copyArrayToLink(Matrix<Cmplx,Nc>* link, Real* array)
+
+  template <typename T, int Nc, class Real>
+  void copyArrayToLink(Matrix<T,Nc> &link, Real* array)
   {
 #pragma unroll
-    for (int i=0; i<Nc; ++i){
+    for (int i = 0; i < Nc; ++i) {
 #pragma unroll
-      for (int j=0; j<Nc; ++j){
-	(*link)(i,j).x = array[(i*Nc+j)*2];
-	(*link)(i,j).y = array[(i*Nc+j)*2 + 1];
+      for (int j = 0; j < Nc; ++j) {
+        link(i, j).real(array[(i * Nc + j) * 2 + 0]);
+        link(i, j).imag(array[(i * Nc + j) * 2 + 1]);
       }
     }
-  }  
+  }
 
-  template<class Cmplx, class Real, int Nc>
-    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,Nc>& link){
+  template <typename T, int Nc, class Real>
+  void copyLinkToArray(Real* array, const Matrix<T, Nc> &link)
+  {
 #pragma unroll
-    for (int i=0; i<Nc; ++i){
+    for (int i = 0; i < Nc; ++i) {
 #pragma unroll
-      for (int j=0; j<Nc; ++j){
-	array[(i*Nc+j)*2] = link(i,j).x;
-	array[(i*Nc+j)*2 + 1] = link(i,j).y;
+      for (int j = 0; j < Nc; ++j) {
+        array[(i * Nc + j) * 2 + 0] = link(i, j).real();
+        array[(i * Nc + j) * 2 + 1] = link(i, j).imag();
       }
     }
   }

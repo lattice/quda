@@ -30,6 +30,7 @@ namespace quda {
   }
 
 #ifdef GPU_UNITARIZE
+  /*
   template <typename T, int n, class Real>
   void copyArrayToLink(Matrix<T,n> &link, Real* array)
   {
@@ -51,7 +52,8 @@ namespace quda {
       }
     }
   }
-
+  */
+  
   void unitarizeLinksCPU(GaugeField &outfield, const GaugeField& infield)
   {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");

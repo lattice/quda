@@ -164,7 +164,7 @@ namespace quda {
     }
   };
 
-#ifdef GPU_CONTRACT  
+#if defined(GPU_CONTRACT) && (N_COLORS == 3)  
   void colorCrossQuda(const ColorSpinorField &x, const ColorSpinorField &y, ColorSpinorField &result)
   {
     checkPrecision(x, y);

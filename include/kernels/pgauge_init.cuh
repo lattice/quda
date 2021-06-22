@@ -110,7 +110,6 @@ namespace quda {
 #else
     // Apply general strategy
     complex<Float> t2((Float)0.0, (Float)0.0);
-    complex<Float> t4((Float)0.0, (Float)0.0);
     Float t1 = 0.0, t3 = 0.0;
     int Nc = nColors;
     
@@ -147,7 +146,8 @@ namespace quda {
     //Reconstruct last row
     int sign = 1;
     for (int c = 0; c < Nc; c++) {
-      U(Nc-1,c) = sign * conj(getDeterminant(getSubMat(U, Nc, c)));
+      U(Nc-1,c) = conj(getDeterminant(getSubMat(U, Nc, c)));
+      U(Nc-1,c) *= sign;
       sign *= -1;
     }
 #endif
