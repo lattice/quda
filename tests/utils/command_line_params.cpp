@@ -282,6 +282,7 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
+// GF options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;

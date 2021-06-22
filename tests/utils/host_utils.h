@@ -94,6 +94,7 @@ void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision);
+void fundamentalHostGaugeField(void **gauge, QudaPrecision precision);
 
 template <typename Float> void constructFundamentalGaugeField(Float **res);
 template <typename Float> void expsuNTaylor(Float **res, int m);
@@ -286,3 +287,9 @@ void setFermionSmearParam(QudaInvertParam &inv_param, double omega, int steps);
 void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
+
+// ZFP
+double process3D(double* buffer, uint blocks, double tolerance, uint block_size);
+double process4D(double* buffer, uint blocks, double tolerance, uint block_size);
+double zfp_compress_decompress_link(void **array_in, void **array_out);
+double zfp_compress_decompress_prop(void *prop_in, void *prop_out, bool zfp_4D);

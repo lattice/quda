@@ -3036,7 +3036,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
         (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
-
+    
     *x = *h_x; // solution
   } else { // zero initial guess
     blas::zero(*x);
@@ -3321,7 +3321,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);
     double nh_x = blas::norm2(*h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+    printfQuda("Reconstructed: CUDA solution = %.16e, CPU copy = %.16e\n", nx, nh_x);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -5375,7 +5375,7 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   GaugeFieldParam param(*data);
   param.reconstruct = QUDA_RECONSTRUCT_12;
   param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField u(param);
+  //cudaGaugeField u(param);
 
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
   quda::gaugeGauss(*data, seed, sigma);
@@ -5389,6 +5389,9 @@ void gaussGaugeQuda(unsigned long long seed, double sigma)
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+/*
+ * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+ */
 void plaqQuda(double plaq[3])
 {
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
@@ -6255,7 +6258,7 @@ void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_para
   profileMake4DProp.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const int taylor_N)
+ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const int taylor_N)
 {
   profileGaugeFundamental.TPSTART(QUDA_PROFILE_TOTAL);
   if (!gaugePrecise) errorQuda("Cannot generate fundamental GaugeField as there is no resident gauge field");
@@ -6271,34 +6274,42 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
   
   int Nsteps = 100000;
   int verbose_interval = 50;
-  double relax_boost0 = 1.1;
-  double tolerance = 1e-11;
-  int reunit_interval = 10;
+  double relax_boost = 1.5;
+  double tolerance = 1e-15;
+  int reunit_interval = 1;
   double stopWtheta = 0;
-  int boost_iter = 100;
+
+  int iter = 200;
+  unsigned long long seed = 1234;
+  double sigma = 1.5;
   
   double2 link_trace;
-  double link_max = 0.0;
+  double action;
+  double action_max = 0.0;
     
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  
-  for(int i=0; i<boost_iter+1; i++) {
 
-    copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    double relax_boost = relax_boost0 + i*1.0/boost_iter;
-    
-    gaugeFixingOVR(*gaugeFixed, 3, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
+  // Perform FC decomposition on the gauge
+  profileGaugeFundamental.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeFundamentalRep(*gaugeFundamental, *gaugePrecise, qr_tol, qr_max_iter, taylor_N);
+  profileGaugeFundamental.TPSTOP(QUDA_PROFILE_COMPUTE);
+  
+  for(int i=0; i<iter; i++) {
+
+    gaugeFixingOVR(*gaugeFixed, 4, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
 		   stopWtheta);
+    
     //gaugeFixingFFT(*gaugeFixed, 4, Nsteps, verbose_interval, relax_boost, 1, tolerance, stopWtheta);
     
     link_trace = getLinkTrace(*gaugeFixed);
-    printfQuda("iter %d: link %.15e link_max %.15e boost = %f\n", i, link_trace.x, link_max, relax_boost);
+    action = reinterpret_cast<double *>(&link_trace)[0]/3.0;
+    printfQuda("iter %d: action %.15e action_max %.15e boost = %f\n", i, action, action_max, relax_boost);
     
     // Use gaugeSmeared (FIXME...) to store the FMR gauge.
-    if (link_trace.x > link_max) {
-      link_max = link_trace.x;
+    if (action > action_max) {
+      action_max = action;
       copyExtendedGauge(*gaugeSmeared, *gaugeFixed, QUDA_CUDA_FIELD_LOCATION);
     }
     
@@ -6313,16 +6324,34 @@ void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const i
       printfQuda("%.16e %+.16e %+.16e %+.16e %+.16e\n", param.plaquette[0], param.energy[0], param.energy[1],
 		 param.energy[2], param.qcharge);
     }
+    
+    profileGaugeFundamental.TPSTOP(QUDA_PROFILE_TOTAL);
+    // Perform a gauge transformation
+    profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+    GaugeFieldParam param(*gaugePrecise);
+    param.reconstruct = QUDA_RECONSTRUCT_NO;
+    param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    param.geometry = QUDA_SCALAR_GEOMETRY;
+    cudaGaugeField transform(param);    
+    profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+    quda::gaugeGauss(transform, clock() + i, sigma);    
+    copyExtendedGauge(*gaugeFixed, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    quda::gaugeTransform(*gaugeFixed, transform);
+    profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
+    profileGaugeFundamental.TPSTART(QUDA_PROFILE_TOTAL);
   }
+  
+  // Copy the FMR gauge to gauge precise
+  copyExtendedGauge(*gaugePrecise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
   
   // Perform FC decomposition on the the candidate FMR gauge
   profileGaugeFundamental.TPSTART(QUDA_PROFILE_COMPUTE);
-  quda::gaugeFundamentalRep(*gaugeFundamental, *gaugeFixed, qr_tol, qr_max_iter, taylor_N);
+  quda::gaugeFundamentalRep(*gaugeFundamental, *gaugePrecise, qr_tol, qr_max_iter, taylor_N);
   profileGaugeFundamental.TPSTOP(QUDA_PROFILE_COMPUTE);
-
   
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    gaugeObservables(*gaugeFundamental, param, profileGaugeFundamental);
+    gaugeObservables(*gaugePrecise, param, profileGaugeFundamental);
     printfQuda("plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
     printfQuda("%.16e %+.16e %+.16e %+.16e %+.16e\n", param.plaquette[0], param.energy[0], param.energy[1],
 	       param.energy[2], param.qcharge);

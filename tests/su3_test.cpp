@@ -14,6 +14,7 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
+#include <qio_field.h>
 
 void display_test_info()
 {
@@ -217,6 +218,25 @@ int main(int argc, char **argv)
     break;
     
   default: errorQuda("Undefined test type %d given", test_type);
+  }
+
+  // Save if output string is specified
+  if (strcmp(gauge_outfile,"")) {
+    
+    printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+    
+    void *cpu_gauge[4];
+    for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+    
+    // Copy device field to CPU field
+    saveGaugeQuda(cpu_gauge, &gauge_param);    
+    
+    // Write to disk
+    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+    
+    for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+  } else {
+    printfQuda("No output file specified.\n");
   }
   
 #else
