@@ -964,14 +964,14 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
 
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
 
-  void** sln_pointer = (void**)malloc(num_offsets*sizeof(void*));
+  void** sln_pointer = (void**)safe_malloc(num_offsets*sizeof(void*));
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
   void* src_pointer = static_cast<char*>(source) + quark_offset;
 
   for (int i = 0; i < num_offsets; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
 
   invertMultiShiftQuda(sln_pointer, src_pointer, &invertParam);
-  free(sln_pointer);
+  host_free(sln_pointer);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1167,16 +1167,16 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
 
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
-  void** sln_pointer = (void**)malloc(num_src*sizeof(void*));
-  void** src_pointer = (void**)malloc(num_src*sizeof(void*));
+  void** sln_pointer = (void**)safe_malloc(num_src*sizeof(void*));
+  void** src_pointer = (void**)safe_malloc(num_src*sizeof(void*));
 
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
   invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam, nullptr, nullptr);
 
-  free(sln_pointer);
-  free(src_pointer);
+  host_free(sln_pointer);
+  host_free(src_pointer);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
