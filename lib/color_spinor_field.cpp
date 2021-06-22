@@ -17,7 +17,8 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
@@ -30,7 +31,8 @@ namespace quda {
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ), dslash_constant(std::make_unique<DslashConstant>()),
+      ghost( ), ghostNorm( ), ghostFace( ),
+      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
@@ -40,12 +42,13 @@ namespace quda {
   }
 
   ColorSpinorField::~ColorSpinorField() {
+    if (dslash_constant) host_free(dslash_constant);
     destroy();
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
-    if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
+    if (ghost_precision_allocated == ghost_precision) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
@@ -142,7 +145,6 @@ namespace quda {
       dc.dims[3][2]=X[2];
     }
     ghost_precision_allocated = ghost_precision;
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
@@ -164,6 +166,7 @@ namespace quda {
     nVec = Nvec;
     twistFlavor = Twistflavor;
 
+    if (pc_type != QUDA_5D_PC && pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", pc_type);
     this->pc_type = pc_type;
     this->suggested_parity = suggested_parity;
 

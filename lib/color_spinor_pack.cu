@@ -31,23 +31,22 @@
    ensure that we can always fit within a single thread block.  It is
    this constraint that gives rise for the need to cap the limit for
    block-float support, e.g., max_block_float_nc.
-
-   At present we launch a volume of threads (actually multiples
-   thereof for direction / dimension) and thus we have coalesced reads
-   but not coalesced writes.  A more optimal implementation will
-   launch a surface of threads for each halo giving coalesced writes.
  */
 
 namespace quda {
 
+  // this is the maximum number of colors for which we support block-float format
+  constexpr int max_block_float_nc = 96;
+
   template <typename store_t, typename ghost_store_t, QudaFieldOrder order, int nSpin, int nColor>
-  class PackGhost : public TunableKernel3D {
+  class PackGhost_ : public TunableKernel3D {
     void **ghost;
     const ColorSpinorField &a;
     const QudaParity parity;
     const int nFace;
     const int dagger;
     static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
+    size_t work_items;
 
     unsigned int sharedBytesPerBlock(const TuneParam &) const
     {
@@ -62,17 +61,18 @@ namespace quda {
     }
 
     bool tuneSharedBytes() const { return false; }
-    unsigned int minThreads() const { return a.VolumeCB(); }
+    unsigned int minThreads() const { return work_items; }
 
   public:
-    PackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
+    PackGhost_(void **ghost, const ColorSpinorField &a, QudaParity parity,
               int nFace, int dagger, MemoryLocation *destination) :
-      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), 2 * a.SiteSubset()), // factor of 2 is direction
+      TunableKernel3D(a, (a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), a.SiteSubset()),
       ghost(ghost),
       a(a),
       parity(parity),
       nFace(nFace),
-      dagger(dagger)
+      dagger(dagger),
+      work_items(0)
     {
       // if doing block float then all spin-color components must be within the same block
       if (block_float) resizeStep((a.Nspin()/spins_per_thread(a))*(a.Ncolor()/colors_per_thread(a)), step_z);
@@ -106,30 +106,41 @@ namespace quda {
       u32toa(label, colors_per_thread(a));
       strcat(aux, label);
 
+      // compute number of number of work items we have to do
+      // unlike the dslash kernels, we include the fifth dimension here
+      for (int i = 0; i < 4; i++) {
+        if (!comm_dim_partitioned(i)) continue;
+        work_items += 2 * nFace * a.getDslashConstant().ghostFaceCB[i] * a.getDslashConstant().Ls; // 2 for forwards and backwards faces
+      }
+
       apply(device::get_default_stream());
     }
 
     template <int nDim> using Arg = PackGhostArg<store_t, ghost_store_t, nSpin, nColor, nDim, order>;
 
+    template <bool enable>
+    std::enable_if_t<enable, void> launch_(const TuneParam &tp, const qudaStream_t &stream)
+    {
+      if (a.Ndim() == 5) launch<GhostPacker, true>(tp, stream, Arg<5>(a, work_items, ghost, parity, nFace, dagger));
+      else               launch<GhostPacker, true>(tp, stream, Arg<4>(a, work_items, ghost, parity, nFace, dagger));
+    }
+
+    template <bool enable>
+    std::enable_if_t<!enable, void> launch_(TuneParam &, const qudaStream_t &)
+    {
+      errorQuda("block-float halo format not supported for nColor = %d", nColor);
+    }
+
     void apply(const qudaStream_t &stream)
     {
       auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (a.Ndim() == 5) launch<GhostPacker, true>(tp, stream, Arg<5>(a, ghost, parity, nFace, dagger));
-      else               launch<GhostPacker, true>(tp, stream, Arg<4>(a, ghost, parity, nFace, dagger));
+      launch_<(!block_float || nColor <= max_block_float_nc)>(tp, stream);
     }
 
     int blockStep() const { return block_float ? 2 : TunableKernel3D::blockStep(); }
     int blockMin() const { return block_float ? 2 : TunableKernel3D::blockMin(); }
 
-    long long flops() const { return 0; }
-    long long bytes() const {
-      size_t totalBytes = 0;
-      for (int d=0; d<4; d++) {
-	if (!comm_dim_partitioned(d)) continue;
-	totalBytes += nFace*2*a.Nspin()*a.Ncolor()*a.SurfaceCB(d)*(a.Precision() + a.GhostPrecision());
-      }
-      return totalBytes;
-    }
+    long long bytes() const { return work_items * 2 * a.Nspin() * a.Ncolor() * (a.Precision() + a.GhostPrecision()); }
   };
 
   // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise
@@ -180,53 +191,53 @@ namespace quda {
 #endif
 
     if (a.Ncolor() == 3) {
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 6) {
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN4
     } else if (a.Ncolor() == 32) { // Needed for Wilson
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
     } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1
     } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 288) { // staggered 3 -> 96 Nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,288>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,288>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
     } else if (a.Ncolor() == 576) { // staggered KD free-field or wilson 24 -> 24 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,576>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,576>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN4
     } else if (a.Ncolor() == 768) { // wilson 24 -> 32 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,768>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,768>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 1024) { // wilson 32 -> 32 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 1536) { // staggered KD 24 -> 64 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2304>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2304>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 4096) { // staggered 64 -> 64
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4096>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4096>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 6144) { // staggered 64 -> 96 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6144>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6144>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 9216) { // staggered 96 -> 96 nvec
-      PackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,9216>::nColor>(ghost, a, parity, nFace, dagger, destination);
+      PackGhost_<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,9216>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
 #endif // GPU_MULTIGRID
     } else {

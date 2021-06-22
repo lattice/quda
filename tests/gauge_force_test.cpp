@@ -280,7 +280,7 @@ void gauge_force_test(void)
     }
   }
 
-  quda::GaugeFieldParam param(0, gauge_param);
+  quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   auto U_qdp = new quda::cpuGaugeField(param);

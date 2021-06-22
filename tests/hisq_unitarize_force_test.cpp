@@ -10,6 +10,7 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include <sys/time.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -57,8 +58,6 @@ void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device_ordinal);
-
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
   gaugeParam.X[2] = zdim;
@@ -70,7 +69,7 @@ static void hisq_force_init()
   gaugeParam.cuda_prec = link_prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  GaugeFieldParam gParam(0, gaugeParam);
+  GaugeFieldParam gParam(gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -113,11 +112,9 @@ static void hisq_force_end()
   delete cudaResult;
 
   delete cpuReference;
-
-  endQuda();
 }
 
-static void hisq_force_test()
+TEST(hisq_force_unitarize, verify)
 {
   hisq_force_init();
 
@@ -147,17 +144,21 @@ static void hisq_force_test()
   cudaResult->saveCPUField(*cpuReference);
   
   printfQuda("Comparing CPU and GPU results\n");
-  for(int dir=0; dir<4; ++dir){
-    int res = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
-                             cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
-#ifdef MULTI_GPU
-    comm_allreduce_int(&res);
-    res /= comm_size();
-#endif
-    printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
+  int res[4];
+
+  for (int dir=0; dir<4; ++dir) {
+    res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+                              cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
+
+    comm_allreduce_int(&res[dir]);
+    res[dir] /= comm_size();
   }
 
   hisq_force_end();
+
+  for (int dir=0; dir<4; ++dir) {
+    ASSERT_EQ(res[dir], 1) << "Dir:" << dir;
+  }
 }
 
 static void display_test_info()
@@ -173,11 +174,10 @@ static void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
+
   auto app = make_app();
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -185,15 +185,17 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device_ordinal);
 
   setPrecision(prec);
 
   display_test_info();
-    
-  hisq_force_test();
 
+  int test_rc = RUN_ALL_TESTS();
+
+  endQuda();
   finalizeComms();
 
-  return EXIT_SUCCESS;
+  return test_rc;
 }
 

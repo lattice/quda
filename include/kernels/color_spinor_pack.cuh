@@ -4,11 +4,9 @@
 #include <fast_intdiv.h>
 #include <kernel.h>
 #include <shared_memory_cache_helper.cuh>
+#include <dslash_quda.h>
 
 namespace quda {
-
-  // this is the maximum number of colors for which we support block-float format
-  constexpr int max_block_float_nc = 96;
 
   // these helper functions return the thread coarseness, with both
   // constexpr variants (to be called from parallel regions) and
@@ -59,14 +57,10 @@ namespace quda {
 
   template <typename store_t, typename ghost_store_t, int nSpin_, int nColor_, int nDim_, QudaFieldOrder order>
   struct PackGhostArg : kernel_param<> {
-    static constexpr bool block_float_requested = sizeof(store_t) == QUDA_SINGLE_PRECISION &&
-      isFixed<ghost_store_t>::value;
-
-    // if we only have short precision for the ghost then this means we have block-float
-    static constexpr bool block_float = block_float_requested && nColor_ <= max_block_float_nc;
+    static constexpr bool block_float = sizeof(store_t) == QUDA_SINGLE_PRECISION && isFixed<ghost_store_t>::value;
 
     // ensure we only compile supported block-float kernels
-    static constexpr int nColor = (block_float_requested && nColor_ > max_block_float_nc) ? max_block_float_nc : nColor_;
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nDim = nDim_;
 
@@ -74,39 +68,44 @@ namespace quda {
     using Field = typename colorspinor::FieldOrderCB<real,nSpin,nColor,1,order,store_t,ghost_store_t>;
 
     Field field;
-    int_fastdiv X[QUDA_MAX_DIM];
     const int_fastdiv volumeCB;
     const int nFace;
     const int parity;
     const int_fastdiv nParity;
     const int dagger;
     const QudaPCType pc_type;
-    int commDim[4]; // whether a given dimension is partitioned or not
+    DslashConstant dc; // pre-computed dslash constants for optimized indexing
+    int_fastdiv work_items;
+    int threadDimMapLower[4];
+    int threadDimMapUpper[4];
 
-    PackGhostArg(const ColorSpinorField &a, void **ghost, int parity, int nFace, int dagger) :
-      kernel_param(dim3(a.VolumeCB(), (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), 2 * a.SiteSubset())),
+    PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger) :
+      kernel_param(dim3(work_items, (a.Nspin() / spins_per_thread(a)) * (a.Ncolor() / colors_per_thread(a)), a.SiteSubset())),
       field(a, nFace, 0, ghost),
       volumeCB(a.VolumeCB()),
       nFace(nFace),
       parity(parity),
       nParity(a.SiteSubset()),
       dagger(dagger),
-      pc_type(a.PCType())
+      pc_type(a.PCType()),
+      dc(a.getDslashConstant()),
+      threadDimMapLower{ },
+      threadDimMapUpper{ }
     {
-      if (block_float_requested && nColor_ > max_block_float_nc)
-        errorQuda("Block-float format not supported for Nc = %d", nColor_);
-
-      X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
-      for (int d=1; d<nDim; d++) X[d] = a.X(d);
-      X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
-      for (int i=0; i<4; i++) {
-	commDim[i] = comm_dim_partitioned(i);
+      int prev = -1; // previous dimension that was partitioned
+      for (int i = 0; i < 4; i++) {
+        if (!comm_dim_partitioned(i)) continue;
+        // unlike the dslash kernels, we include the fifth dimension here
+        dc.ghostFaceCB[i] *= nFace * (nDim == 5 ? dc.Ls : 1);
+        threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
+        prev = i;
       }
     }
   };
 
   template <bool is_device> struct site_max {
-    template <typename Arg> inline auto operator()(typename Arg::real thread_max, Arg &, bool)
+    template <typename Arg> inline auto operator()(typename Arg::real thread_max, Arg &)
     {
       // on the host we require that both spin and color are fully thread local
       constexpr int Ms = spins_per_thread<is_device, Arg::nSpin>();
@@ -118,99 +117,89 @@ namespace quda {
   };
 
   template <> struct site_max<true> {
-    template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &, bool active)
+    template <typename Arg> __device__ inline auto operator()(typename Arg::real thread_max, Arg &)
     {
-      // on the host we require that both spin and color are fully thread local
       using real = typename Arg::real;
       constexpr int Ms = spins_per_thread<true, Arg::nSpin>();
       constexpr int Mc = colors_per_thread<true, Arg::nColor>();
-      constexpr int color_spin_threads = Arg::nColor <= max_block_float_nc ? (Arg::nSpin/Ms) * (Arg::nColor/Mc) : 1;
-      SharedMemoryCache<real, color_spin_threads, 4, true> cache; // 4 comes from direction and parity
-      if (active) cache.save(thread_max);
+      constexpr int color_spin_threads = (Arg::nSpin/Ms) * (Arg::nColor/Mc);
+      SharedMemoryCache<real, color_spin_threads, 2, true> cache; // 2 comes from parity
+      cache.save(thread_max);
       cache.sync();
       real this_site_max = static_cast<real>(0);
-      if (active) {
 #pragma unroll
-        for (int sc = 0; sc < color_spin_threads; sc++) {
-          auto sc_max = cache.load_y(sc);
-          this_site_max = this_site_max > sc_max ? this_site_max : sc_max;
-        }
+      for (int sc = 0; sc < color_spin_threads; sc++) {
+        auto sc_max = cache.load_y(sc);
+        this_site_max = this_site_max > sc_max ? this_site_max : sc_max;
       }
       return this_site_max;
     }
   };
 
+  template <typename Arg> __device__ __host__ inline std::enable_if_t<!Arg::block_float, typename Arg::real>
+  compute_site_max(const Arg &, int, int, int, int)
+  {
+    return static_cast<typename Arg::real>(1.0); // dummy return for non-block float
+  }
+
   /**
      Compute the max element over the spin-color components of a given site.
   */
-  template <typename Arg>
-  __device__ __host__ inline auto compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block, bool active)
+  template <typename Arg> __device__ __host__ inline std::enable_if_t<Arg::block_float, typename Arg::real>
+  compute_site_max(const Arg &arg, int x_cb, int spinor_parity, int spin_block, int color_block)
   {
     using real = typename Arg::real;
     const int Ms = spins_per_thread<Arg::nSpin>();
     const int Mc = colors_per_thread<Arg::nColor>();
-    real thread_max = 0.0;
+    real thread_max_r = 0.0;
+    real thread_max_i = 0.0;
 
-    if (active) {
 #pragma unroll
-      for (int spin_local=0; spin_local<Ms; spin_local++) {
-        int s = spin_block + spin_local;
+    for (int spin_local=0; spin_local<Ms; spin_local++) {
+      int s = spin_block + spin_local;
 #pragma unroll
-        for (int color_local=0; color_local<Mc; color_local++) {
-          int c = color_block + color_local;
-          complex<real> z = arg.field(spinor_parity, x_cb, s, c);
-          thread_max = thread_max > fabs(z.real()) ? thread_max : fabs(z.real());
-          thread_max = thread_max > fabs(z.imag()) ? thread_max : fabs(z.imag());
-        }
+      for (int color_local=0; color_local<Mc; color_local++) {
+        int c = color_block + color_local;
+        complex<real> z = arg.field(spinor_parity, x_cb, s, c);
+        thread_max_r = std::max(thread_max_r, std::abs(z.real()));
+        thread_max_i = std::max(thread_max_i, std::abs(z.imag()));
       }
     }
 
-    return target::dispatch<site_max>(thread_max, arg, active);
+    return target::dispatch<site_max>(std::max(thread_max_r, thread_max_i), arg);
+  }
+
+  /**
+     This is distinct from the variant in index_helper.cuh in that the
+     fifth dimension is included in the thread map array.  At some
+     point we should replace that one with this one, which has less
+     division for the 5-d operators.
+  */
+  template <typename Arg>
+  __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
+  {
+    face_idx = tid;
+    if (face_idx < arg.threadDimMapUpper[0]) {
+      return 0;
+    } else if (face_idx < arg.threadDimMapUpper[1]) {
+      face_idx -= arg.threadDimMapLower[1];
+      return 1;
+    } else if (face_idx < arg.threadDimMapUpper[2]) {
+      face_idx -= arg.threadDimMapLower[2];
+      return 2;
+    } else {
+      face_idx -= arg.threadDimMapLower[3];
+      return 3;
+    }
   }
 
   template <typename Arg>
-  __device__ __host__ inline void packGhost(const Arg &arg, int dir, int dim, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  __device__ __host__ inline auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
   {
-    using real = typename Arg::real;
-    const int Ms = spins_per_thread<Arg::nSpin>();
-    const int Mc = colors_per_thread<Arg::nColor>();
-
-    int x[5] = { };
-    if (Arg::nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
-    else getCoords(x, x_cb, arg.X, parity);
-
-    {
-      real max = static_cast<real>(1.0);
-      if (Arg::block_float) {
-        bool active = ( arg.commDim[dim] && ( (dir == 0 && x[dim] < arg.nFace) || (dir == 1 && x[dim] >= arg.X[dim] - arg.nFace) ) );
-        max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block, active);
-      }
-
-      if (dir == 0 && arg.commDim[dim] && x[dim] < arg.nFace) {
-#pragma unroll
-	for (int spin_local=0; spin_local<Ms; spin_local++) {
-	  int s = spin_block + spin_local;
-#pragma unroll
-	  for (int color_local=0; color_local<Mc; color_local++) {
-	    int c = color_block + color_local;
-            arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-              = arg.field(spinor_parity, x_cb, s, c);
-          }
-	}
-      }
-
-      if (dir == 1 && arg.commDim[dim] && x[dim] >= arg.X[dim] - arg.nFace) {
-#pragma unroll
-	for (int spin_local=0; spin_local<Ms; spin_local++) {
-	  int s = spin_block + spin_local;
-#pragma unroll
-	  for (int color_local=0; color_local<Mc; color_local++) {
-	    int c = color_block + color_local;
-            arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1, Arg::nDim>(x, arg.X, dim, arg.nFace), s, c, 0, max)
-              = arg.field(spinor_parity, x_cb, s, c);
-          }
-	}
-      }
+    if (arg.nFace == 1) {
+      return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);
+    } else {
+      return indexFromFaceIndexStaggered<Arg::nDim>(dim, dir, ghost_idx, parity, 3, arg.pc_type, arg);
     }
   }
 
@@ -219,22 +208,34 @@ namespace quda {
     constexpr GhostPacker(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
-    __device__ __host__ void operator()(int x_cb, int spin_color_block, int parity_dir)
+    __device__ __host__ void operator()(int tid, int spin_color_block, int parity)
     {
       const int Ms = spins_per_thread<Arg::nSpin>();
       const int Mc = colors_per_thread<Arg::nColor>();
 
-      spin_color_block %= (Arg::nSpin/Ms)*(Arg::nColor/Mc);
-
-      const int dir = parity_dir / arg.nParity;
-      const int parity = (arg.nParity == 2) ? (parity_dir % arg.nParity) : arg.parity;
+      if (arg.nParity == 1) parity = arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;
       const int spin_block = (spin_color_block / (Arg::nColor / Mc)) * Ms;
       const int color_block = (spin_color_block % (Arg::nColor / Mc)) * Mc;
 
+      int ghost_idx;
+      const int dim = dimFromFaceIndex<Arg>(ghost_idx, tid, arg);
+
+      // determine which end of the lattice we are packing: 0 = start, 1 = end
+      const int dir = (ghost_idx >= arg.dc.ghostFaceCB[dim]) ? 1 : 0;
+      ghost_idx -= dir * arg.dc.ghostFaceCB[dim];
+
+      int x_cb = indexFromFaceIndex(dim, dir, ghost_idx, parity, arg);
+      auto max = compute_site_max<Arg>(arg, x_cb, spinor_parity, spin_block, color_block);
+
 #pragma unroll
-      for (int dim = 0; dim < 4; dim++) {
-        packGhost(arg, dir, dim, x_cb, parity, spinor_parity, spin_block, color_block);
+      for (int spin_local=0; spin_local<Ms; spin_local++) {
+        int s = spin_block + spin_local;
+#pragma unroll
+        for (int color_local=0; color_local<Mc; color_local++) {
+          int c = color_block + color_local;
+          arg.field.Ghost(dim, dir, spinor_parity, ghost_idx, s, c, 0, max) = arg.field(spinor_parity, x_cb, s, c);
+        }
       }
     }
   };

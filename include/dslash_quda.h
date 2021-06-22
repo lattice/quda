@@ -51,19 +51,6 @@ namespace quda {
   };
 
   /**
-    @param pack Sets whether to use a kernel to pack the T dimension
-    */
-  void setKernelPackT(bool pack);
-
-  /**
-    @return Whether the T dimension is kernel packed or not
-    */
-  bool getKernelPackT();
-
-  void pushKernelPackT(bool pack);
-  void popKernelPackT();
-
-  /**
      @brief Helper function that sets which dimensions the packing
      kernel should be packing for.
      @param[in] dim_pack Array that specifies which dimenstions need

@@ -333,8 +333,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
   // Needed for unitarization, following "unitarize_link_test.cpp"
-  quda::GaugeFieldParam gParam(0, qudaGaugeParam);
-  gParam.pad = 0;
+  quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER; // must be true!
@@ -674,6 +673,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
+  cs_param->pc_type = QUDA_4D_PC;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
   // Lattice vector data properties
