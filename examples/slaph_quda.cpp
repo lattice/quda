@@ -16,40 +16,6 @@
 #include <random_quda.h>
 #include <unitarization_links.h>
 
-// Local helper functions
-//------------------------------------------------------------------------------------
-void setReunitarizationConsts()
-{
-  using namespace quda;
-  const double unitarize_eps = 1e-14;
-  const double max_error = 1e-10;
-  const int reunit_allow_svd = 1;
-  const int reunit_svd_only = 0;
-  const double svd_rel_error = 1e-6;
-  const double svd_abs_error = 1e-6;
-  setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
-}
-
-void saveGaugeField(int step, cudaGaugeField *gaugeEx, cudaGaugeField *gauge)
-{
-  // Construct a filename
-  char param_str[256];
-  char this_file_name[256];
-  char base_file_name[256];
-  strcpy(base_file_name, gauge_outfile);
-  strcpy(this_file_name, gauge_outfile);
-  sprintf(param_str, "_heatbath_Lx%dLy%dLz%dLt%d_beta%f_step%d.lime", xdim, ydim, zdim, tdim, heatbath_beta_value, step);
-  strcat(this_file_name, param_str);
-  printfQuda("Saving the gauge field to file %s\n", this_file_name);
-  strcpy(gauge_outfile, this_file_name);
-
-  // Save the device gauge field
-  saveDeviceGaugeField(gaugeEx, gauge);
-
-  // Restore outfile base
-  strcpy(gauge_outfile, base_file_name);
-}
-
 void constructGaugeField(QudaGaugeParam &gauge_param, cudaGaugeField *gaugeEx,
 			 cudaGaugeField *gauge, RNG *randstates) {
   
@@ -79,14 +45,6 @@ void display_info()
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
              tdim, Lsdim);
-
-  printfQuda("Heatbath with %d overrelaxation and %d heatbath hits per step\n", heatbath_num_overrelax_per_step, heatbath_num_heatbath_per_step);
-  printfQuda(" - Start type %s\n", strcmp(latfile,"") ? "loaded" : (heatbath_coldstart ? "cold" : "hot"));
-  printfQuda(" - Warm up steps %d\n", heatbath_warmup_steps);
-  printfQuda(" - Measurement Steps %d\n", heatbath_num_steps);
-  printfQuda(" - Step start %d\n", heatbath_step_start);
-  printfQuda(" - Checkpoint Steps %d\n", heatbath_checkpoint);
-  printfQuda(" - Beta %f\n", heatbath_beta_value);
   
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -97,7 +55,7 @@ int main(int argc, char **argv)
 {
   // command line options
   auto app = make_app();
-  add_heatbath_option_group(app);
+  add_eigen_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -135,15 +93,6 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
   
-  int nsteps = heatbath_num_steps;
-  int nwarm = heatbath_warmup_steps;
-  int checkpoint = heatbath_checkpoint;
-  int nhbsteps = heatbath_num_heatbath_per_step;
-  int nstart = heatbath_step_start;
-  int novrsteps = heatbath_num_overrelax_per_step;
-  bool coldstart = heatbath_coldstart;
-  double beta_value = heatbath_beta_value;
-  
   // All user inputs now defined
   display_info();
   //----------------------------------------------------------------------------
@@ -151,7 +100,7 @@ int main(int argc, char **argv)
 
   // Construct an extended device gauge field
   //--------------------------------------------------------------------------
-  using namespace quda;
+  //using namespace quda;
   GaugeFieldParam gParam(gauge_param);
   gParam.pad = 0;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -203,48 +152,64 @@ int main(int argc, char **argv)
   //--------------------------------------------------------------------------
   
   
-  // Begin Heatbath simulation
+  // Begin 
   //--------------------------------------------------------------------------
-  // Reunitarisation failure checking
-  int *num_failures_h = (int *)mapped_malloc(sizeof(int));
-  int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
-  *num_failures_h = 0;
-  
-  // Reunitarization setup
-  setReunitarizationConsts();
-  
   // Start the timer
   time0 = -((double)clock());
-  
-  for (int step = nstart; step < nstart + nwarm + nsteps; ++step) {
-    Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
-    
-    quda::unitarizeLinks(*gaugeEx, num_failures_d);
-    if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
-    
-    if(step >= nwarm) {
-      // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      // load the gauge field from gauge
-      gauge_param.gauge_order = gauge->Order();
-      gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-      
-      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      gaugeObservablesQuda(&param);
-      printfQuda("step=%d plaquette = %.16e Q charge = %.16e\n", step, param.plaquette[0], param.qcharge);
-      
-      freeGaugeQuda();
-      if (strcmp(gauge_outfile, "") && step%checkpoint == 0) {
-	saveGaugeField(step, gaugeEx, gauge);
-      }
-    }
+  // Only the Laplace3D dslash type is applicable.
+  if (dslash_type != QUDA_LAPLACE_DSLASH || laplace3D != 3) {
+    printfQuda("dslash_type %s (ortho dim %d) not supported, defaulting to %s with orthodim 3\n", get_dslash_str(dslash_type), laplace3D, get_dslash_str(QUDA_LAPLACE_DSLASH));
+    dslash_type = QUDA_LAPLACE_DSLASH;
+    laplace3D = 3;
   }
+  
+  // Load/Create eigenvectors
+  setQudaStaggeredEigTestParams();
+  // Set QUDA internal parameters
+  // Though no inversions are performed, the inv_param
+  // structure contains all the information we need to
+  // construct the dirac operator. We encapsualte the
+  // inv_param structure inside the eig_param structure
+  // to avoid any confusion
+  QudaInvertParam eig_inv_param = newQudaInvertParam();
+  setStaggeredInvertParam(eig_inv_param);
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+  // We encapsulate the eigensolver parameters inside the invert parameter structure
+  eig_param.invert_param = &eig_inv_param;
+
+  if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
+    errorQuda("ARPACK check only available in double precision");
+  }
+
+    // Host side arrays to store the eigenpairs computed by QUDA
+  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
+  for (int i = 0; i < eig_n_conv; i++) {
+    host_evecs[i] = (void *)safe_malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
+  }
+  int n_evals = eig_param.n_conv;
+  if(eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= tdim;  
+  double _Complex *host_evals = (double _Complex *)safe_malloc(n_evals * sizeof(double _Complex));
+  double time = 0.0;
+
+  // QUDA Laplace 3D eigensolver 
+  //----------------------------------------------------------------------------  
+  time = -((double)clock());
+  eigensolveQuda(host_evecs, host_evals, &eig_param);
+  time += (double)clock();
+
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
+  
+  // Deallocate host memory
+  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
+  host_free(host_evecs);
+  host_free(host_evals);
   
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-  printfQuda("Heatbath complete, total time = %g secs for %d steps\n", time0, nsteps + nwarm);
+  printfQuda("sLapH complete, total time = %g secs\n", time0);
    
   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
   PGaugeExchangeFree();
@@ -252,7 +217,6 @@ int main(int argc, char **argv)
   delete gauge;
   delete gaugeEx;
   delete randstates;
-  host_free(num_failures_h);
   for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
   //--------------------------------------------------------------------------
   

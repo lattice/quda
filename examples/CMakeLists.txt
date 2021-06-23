@@ -129,3 +129,7 @@ target_include_directories(wilson_flow_quda PUBLIC ${EXAMPLES_INC})
 add_executable(heatbath_quda heatbath_quda.cpp)
 target_link_libraries(heatbath_quda ${EXAMPLES_LIBS})
 target_include_directories(heatbath_quda PUBLIC ${EXAMPLES_INC})
+
+add_executable(slaph_quda slaph_quda.cpp)
+target_link_libraries(slaph_quda ${EXAMPLES_LIBS})
+target_include_directories(slaph_quda PUBLIC ${EXAMPLES_INC})
