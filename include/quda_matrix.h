@@ -352,16 +352,16 @@ namespace quda {
 	for (int i=0; i<N; i++) {
 #pragma unroll
 	  for (int k=0; k<N; k++) if (i<=k) { // else compiler can't handle triangular unroll
-	    tmp.x  = (*this)(i,0).real() * (*this)(0,k).real();
-	    tmp.x -= (*this)(i,0).imag() * (*this)(0,k).imag();
-	    tmp.y  = (*this)(i,0).real() * (*this)(0,k).imag();
-	    tmp.y += (*this)(i,0).imag() * (*this)(0,k).real();
+            tmp.real(             (*this)(i,0).real() * (*this)(0,k).real());
+	    tmp.real(tmp.real() - (*this)(i,0).imag() * (*this)(0,k).imag());
+            tmp.imag(             (*this)(i,0).real() * (*this)(0,k).imag());
+	    tmp.imag(tmp.imag() + (*this)(i,0).imag() * (*this)(0,k).real());
 #pragma unroll
 	    for (int j=1; j<N; j++) {
-	      tmp.x += (*this)(i,j).real() * (*this)(j,k).real();
-	      tmp.x -= (*this)(i,j).imag() * (*this)(j,k).imag();
-	      tmp.y += (*this)(i,j).real() * (*this)(j,k).imag();
-	      tmp.y += (*this)(i,j).imag() * (*this)(j,k).real();
+              tmp.real(tmp.real() + (*this)(i,j).real() * (*this)(j,k).real());
+              tmp.real(tmp.real() - (*this)(i,j).imag() * (*this)(j,k).imag());
+              tmp.imag(tmp.imag() + (*this)(i,j).real() * (*this)(j,k).imag());
+              tmp.imag(tmp.imag() + (*this)(i,j).imag() * (*this)(j,k).real());
 	    }
 	    result(i,k) = tmp;
 	  }
@@ -527,16 +527,16 @@ namespace quda {
       for (int i=0; i<N; i++) {
 #pragma unroll
 	for (int k=0; k<N; k++) {
-	  result(i,k).x  = a(i,0).real() * b(0,k).real();
-	  result(i,k).x -= a(i,0).imag() * b(0,k).imag();
-	  result(i,k).y  = a(i,0).real() * b(0,k).imag();
-	  result(i,k).y += a(i,0).imag() * b(0,k).real();
+          result(i,k).real(                     a(i,0).real() * b(0,k).real());
+          result(i,k).real(result(i,k).real() - a(i,0).imag() * b(0,k).imag());
+          result(i,k).imag(                     a(i,0).real() * b(0,k).imag());
+          result(i,k).imag(result(i,k).imag() + a(i,0).imag() * b(0,k).real());
 #pragma unroll
 	  for (int j=1; j<N; j++) {
-	    result(i,k).x += a(i,j).real() * b(j,k).real();
-	    result(i,k).x -= a(i,j).imag() * b(j,k).imag();
-	    result(i,k).y += a(i,j).real() * b(j,k).imag();
-	    result(i,k).y += a(i,j).imag() * b(j,k).real();
+	    result(i,k).real(result(i,k).real() + a(i,j).real() * b(j,k).real());
+	    result(i,k).real(result(i,k).real() - a(i,j).imag() * b(j,k).imag());
+	    result(i,k).imag(result(i,k).imag() + a(i,j).real() * b(j,k).imag());
+	    result(i,k).imag(result(i,k).imag() + a(i,j).imag() * b(j,k).real());
 	  }
 	}
       }
@@ -861,55 +861,6 @@ namespace quda {
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
       (*uinv)(2,2) = (temp*det_inv);
     }
-  // template this!
-  inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
-#pragma unroll
-    for (int i=0; i<3; ++i){
-#pragma unroll
-      for (int j=0; j<3; ++j){
-        (*link)(i,j).x = array[(i*3+j)*2];
-        (*link)(i,j).y = array[(i*3+j)*2 + 1];
-      }
-    }
-  }
-
-  template<class Cmplx, class Real>
-    inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-#pragma unroll
-      for (int i=0; i<3; ++i){
-#pragma unroll
-        for (int j=0; j<3; ++j){
-          (*link)(i,j).x = array[(i*3+j)*2];
-          (*link)(i,j).y = array[(i*3+j)*2 + 1];
-        }
-      }
-    }
-
-
-  // and this!
-  inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-#pragma unroll
-    for (int i=0; i<3; ++i){
-#pragma unroll
-      for (int j=0; j<3; ++j){
-        array[(i*3+j)*2] = link(i,j).x;
-        array[(i*3+j)*2 + 1] = link(i,j).y;
-      }
-    }
-  }
-
-  // and this!
-  template<class Cmplx, class Real>
-    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-#pragma unroll
-      for (int i=0; i<3; ++i){
-#pragma unroll
-        for (int j=0; j<3; ++j){
-          array[(i*3+j)*2] = link(i,j).x;
-          array[(i*3+j)*2 + 1] = link(i,j).y;
-        }
-      }
-    }
 
   template<class T>
   __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
@@ -929,31 +880,30 @@ namespace quda {
 
   template<class T>
   __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
-    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
-    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
-    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
-    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
-    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
-    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
-    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
-    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
+    double sum = (double)(a(0,0).real() * b(0,0).real()  + a(0,0).imag() * b(0,0).imag());
+    sum += (double)(a(0,1).real() * b(0,1).real()  + a(0,1).imag() * b(0,1).imag());
+    sum += (double)(a(0,2).real() * b(0,2).real()  + a(0,2).imag() * b(0,2).imag());
+    sum += (double)(a(1,0).real() * b(1,0).real()  + a(1,0).imag() * b(1,0).imag());
+    sum += (double)(a(1,1).real() * b(1,1).real()  + a(1,1).imag() * b(1,1).imag());
+    sum += (double)(a(1,2).real() * b(1,2).real()  + a(1,2).imag() * b(1,2).imag());
+    sum += (double)(a(2,0).real() * b(2,0).real()  + a(2,0).imag() * b(2,0).imag());
+    sum += (double)(a(2,1).real() * b(2,1).real()  + a(2,1).imag() * b(2,1).imag());
+    sum += (double)(a(2,2).real() * b(2,2).real()  + a(2,2).imag() * b(2,2).imag());
     return sum;
   }
 
-  // and this!
   template<class Cmplx>
     __host__ __device__ inline
     void printLink(const Matrix<Cmplx,3>& link){
-      printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-      printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-      printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-      printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-      printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-      printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-      printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-      printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-      printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
+      printf("(%lf, %lf)\t", link(0,0).real(), link(0,0).imag());
+      printf("(%lf, %lf)\t", link(0,1).real(), link(0,1).imag());
+      printf("(%lf, %lf)\n", link(0,2).real(), link(0,2).imag());
+      printf("(%lf, %lf)\t", link(1,0).real(), link(1,0).imag());
+      printf("(%lf, %lf)\t", link(1,1).real(), link(1,1).imag());
+      printf("(%lf, %lf)\n", link(1,2).real(), link(1,2).imag());
+      printf("(%lf, %lf)\t", link(2,0).real(), link(2,0).imag());
+      printf("(%lf, %lf)\t", link(2,1).real(), link(2,1).imag());
+      printf("(%lf, %lf)\n", link(2,2).real(), link(2,2).imag());
       printf("\n");
     }
 
@@ -992,36 +942,32 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      typedef decltype(Q(0, 0).x) matType;
+      using real = typename T::value_type;
 
-      matType inv3 = 1.0 / 3.0;
-      matType c0, c1, c0_max, Tr_re;
-      matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-      matType theta;
-      matType u_p, w_p; // u, w parameters.
+      real inv3 = 1.0 / 3.0;
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
-      const T & det_Q = getDeterminant(Q);
-      c0 = det_Q.x;
+      real c0 = getDeterminant(Q).real();
       //[15] c1 = 1/2Tr(Q^2)
       // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
       temp1 = Q;
       temp1 = temp1 * Q;
-      Tr_re = getTrace(temp1).x;
-      c1 = 0.5*Tr_re;
+      real Tr_re = getTrace(temp1).real();
+      real c1 = static_cast<real>(0.5) * Tr_re;
 
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
 
       //[17]
-      auto sqrt_c1_inv3 = sqrt(c1 * inv3);
-      c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
+      real sqrt_c1_inv3 = sqrt(c1 * inv3);
+      real c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
       //[25]
-      theta  = acos(c0/c0_max);
+      real theta = acos(c0 / c0_max);
 
+      real u_p, w_p; // u, w parameters.
       quda::sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
@@ -1030,17 +976,15 @@ namespace quda {
       w_p *= sqrt(c1);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      matType u_sq = u_p * u_p;
-      matType w_sq = w_p * w_p;
-      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
-      matType exp_iu_re, exp_iu_im;
+      real u_sq = u_p * u_p;
+      real w_sq = w_p * w_p;
+      real denom_inv = static_cast<real>(1.0) / (9 * u_sq - w_sq);
+      real exp_iu_re, exp_iu_im;
       quda::sincos(u_p, &exp_iu_im, &exp_iu_re);
-      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
-      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
-      matType cos_w = cos(w_p);
-      matType sinc_w;
-      matType hj_re = 0.0;
-      matType hj_im = 0.0;
+      real exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      real exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      real cos_w = cos(w_p);
+      real sinc_w;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
@@ -1059,42 +1003,26 @@ namespace quda {
 
       //Get all the numerators for fj,
       //[30] f0
-      hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
-      hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
-      f0_re = hj_re*denom_inv;
-      f0_im = hj_im*denom_inv;
+      real hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
+      real hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
+      T f0{hj_re * denom_inv, hj_im * denom_inv};
 
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
-      f1_re = hj_re*denom_inv;
-      f1_im = hj_im*denom_inv;
+      T f1{hj_re * denom_inv, hj_im * denom_inv};
 
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
       hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
-      f2_re = hj_re*denom_inv;
-      f2_im = hj_im*denom_inv;
+      T f2{hj_re * denom_inv, hj_im * denom_inv};
 
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
-	f0_im *= -1.0;
-	f1_re *= -1.0;
-	f2_im *= -1.0;
+	f0.imag(-f0.imag());
+	f1.real(-f1.real());
+	f2.imag(-f2.imag());
       }
-
-      T f0_c;
-      T f1_c;
-      T f2_c;
-
-      f0_c.x = f0_re;
-      f0_c.y = f0_im;
-
-      f1_c.x = f1_re;
-      f1_c.y = f1_im;
-
-      f2_c.x = f2_re;
-      f2_c.y = f2_im;
 
       //[19] Construct exp{iQ}
       Matrix<T, 3> exp_iQ;
@@ -1102,16 +1030,16 @@ namespace quda {
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I
-      temp1 = f0_c * UnitM;
+      temp1 = f0 * UnitM;
       exp_iQ = temp1;
 
       // +f1*Q
-      temp1 = f1_c * Q;
+      temp1 = f1 * Q;
       exp_iQ += temp1;
 
       // +f2*Q^2
       temp1 = Q * Q;
-      temp2 = f2_c * temp1;
+      temp2 = f2 * temp1;
       exp_iQ += temp2;
 
       //exp(iQ) is now defined.

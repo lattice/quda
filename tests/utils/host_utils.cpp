@@ -219,6 +219,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   } else {
     cs_param->nDim = 4;
   }
+  cs_param->pc_type = inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
@@ -245,6 +246,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = 4;
+  param.pc_type = QUDA_4D_PC;
   param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
@@ -885,7 +887,7 @@ template <typename Float> static int compareFloats(Float *a, Float *b, int len, 
 {
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
-    if (diff > epsilon) {
+    if (diff > epsilon || std::isnan(diff)) {
       printfQuda("ERROR: i=%d, a[%d]=%f, b[%d]=%f\n", i, i, a[i], i, b[i]);
       return 0;
     }
@@ -1240,8 +1242,8 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
           double diff = fabs(newG[d][ga_idx * 18 + j] - oldG[d][ga_idx * 18 + j]); /// fabs(oldG[d][ga_idx*18+j]);
 
           for (int f = 0; f < fail_check; f++)
-            if (diff > pow(10.0, -(f + 1))) fail[d][f]++;
-          if (diff > epsilon) iter[d][j]++;
+            if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[d][f]++;
+          if (diff > epsilon || std::isnan(diff)) iter[d][j]++;
         }
       }
     }
@@ -1386,9 +1388,9 @@ template <typename Float> int compareLink(Float **linkA, Float **linkB, int len)
         int is = i * 18 + j;
         double diff = fabs(linkA[dir][is] - linkB[dir][is]);
         for (int f = 0; f < fail_check; f++)
-          if (diff > pow(10.0, -(f + 1))) fail[f]++;
+          if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
         // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-        if (diff > 1e-3) iter[j]++;
+        if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
       }
     }
   }
@@ -1456,14 +1458,8 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
 
 void createMomCPU(void *mom, QudaPrecision precision)
 {
-  void *temp;
-
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4 * V * gauge_site_size * gSize);
-  if (temp == NULL) {
-    fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
 
   for (int i = 0; i < V; i++) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1485,7 +1481,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
     }
   }
 
-  free(temp);
+  host_free(temp);
   return;
 }
 
@@ -1522,9 +1518,9 @@ template <typename Float> int compare_mom(Float *momA, Float *momB, int len)
       int is = i * mom_site_size + j;
       double diff = fabs(momA[is] - momB[is]);
       for (int f = 0; f < fail_check; f++)
-        if (diff > pow(10.0, -(f + 1))) fail[f]++;
+        if (diff > pow(10.0, -(f + 1)) || std::isnan(diff)) fail[f]++;
       // if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-      if (diff > 1e-3) iter[j]++;
+      if (diff > 1e-3 || std::isnan(diff)) iter[j]++;
     }
   }
 

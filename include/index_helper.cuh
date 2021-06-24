@@ -836,7 +836,6 @@ namespace quda {
   template <int nDim = 4, typename Arg>
   __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
   {
-
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
     const int s = (nDim == 5 ? tid / arg.work_items : 0);
 
@@ -858,11 +857,6 @@ namespace quda {
       face_idx += s * (arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]);
       return 3;
     }
-  }
-
-  template <int nDim = 4, typename Arg> __host__ __device__ inline int dimFromFaceIndex(int &face_idx, const Arg &arg)
-  {
-    return dimFromFaceIndex<nDim>(face_idx, face_idx, arg);
   }
 
   /**
