@@ -194,11 +194,10 @@ namespace quda {
 	__device__ __host__ inline uint64_t checksum() const {
           // ensure length is rounded up to 64-bit multiple
           constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
-          uint64_t base_[length] = { };
-          T *data_ = reinterpret_cast<T*>( static_cast<void*>(base_) );
-          for (int i=0; i<N*N; i++) data_[i] = data[i];
-          uint64_t checksum_ = base_[0];
-          for (int i=1; i<length; i++) checksum_ ^= base_[i];
+          uint64_t base[length] = { };
+          memcpy(base, data, N * N * sizeof(T));
+          uint64_t checksum_ = base[0];
+          for (int i=1; i<length; i++) checksum_ ^= base[i];
           return checksum_;
         }
 
