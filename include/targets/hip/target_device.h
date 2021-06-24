@@ -140,7 +140,7 @@ namespace quda {
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return max_block_size<block_size_y, block_size_z>()
+      return max_block_size<block_size_y, block_size_z>();
 #endif
     }
 
