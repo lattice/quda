@@ -120,25 +120,10 @@ namespace quda {
 
   static TimeProfile apiTimer("HIP API calls (runtime)");
 
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
   {
-#if 0
-	// if launch requests the maximum shared memory and the device supports it then opt in
-	if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
-	  static std::unordered_set<const void *> cache;
-	  auto search = cache.find(func);
-	  if (search == cache.end()) {
-	    cache.insert(func);
-	    cudaFuncSetAttribute(func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-	    cudaFuncAttributes attributes;
-	    cudaFuncGetAttributes(&attributes, func);
-	    cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize,
-	    		device::max_dynamic_shared_memory() - attributes.sharedSizeBytes);
-	  }
-	}
-#endif
-
     // no driver API variant here since we have C++ functions
+    void *args[] =  {const_cast<void *>(arg)};
     PROFILE(hipError_t error = hipLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, device::get_cuda_stream(stream)),
             QUDA_PROFILE_LAUNCH_KERNEL);
     set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
