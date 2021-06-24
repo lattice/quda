@@ -432,8 +432,7 @@ namespace quda
       }
       
       //The local coordinate of the sink
-      int *sink;
-      sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+      const int const* sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
 
       // Collect vector data
       int parity = 0;
