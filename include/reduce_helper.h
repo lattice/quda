@@ -243,6 +243,9 @@ namespace quda
           } else { // write to device memory
             arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
           }
+          // TODO in principle we could remove this final atomic store
+          // if we use a sense reversal barrier, avoiding the need to
+          // reset the count at the end
           arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
         }
       }
