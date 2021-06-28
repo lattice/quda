@@ -134,7 +134,7 @@ endif()
 
 if(QUDA_TARGET_HIP) 
   # Workaround for exorbitant build times
-  set_source_files_properties(block_orthogonalize.cu PROPERTIES COMPILE_OPTIONS "-mllvm;-unroll-count=1")
+  set_source_files_properties(block_orthogonalize.cu PROPERTIES COMPILE_OPTIONS "-mllvm;-pragma-unroll-threshold=4096")
 endif()
 
 # QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
