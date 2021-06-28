@@ -17,8 +17,7 @@ namespace quda
 
   class EigenSolver
   {
-    using range = std::pair<int, int>;
-
+    
   protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
@@ -88,8 +87,10 @@ namespace quda
     int fine_n_kr;         /** Size of Krylov space after extension */
     int fine_n_conv;       /** Number of converged eigenvalues requested */
     int fine_max_restarts; /** Maximum number of restarts to perform */
+
+    using range = std::pair<int, int>;
     
-  public:
+  public:    
     /**
        @brief Constructor for base Eigensolver class
        @param eig_param MGParam struct that defines all meta data
@@ -142,14 +143,6 @@ namespace quda
        @param[in] evals The eigenvalue array
     */
     void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
-
-    /**
-       @brief Extend the compressed Krylov space. The compressed space in internal 
-       to the eigensolver and IO routines only
-       @param[in] kSpace The fine Krylov space vectors
-       @param[in] evals The eigenvalue array
-    */
-    void prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
     /**
        @brief Set the epsilon parameter
@@ -468,46 +461,6 @@ namespace quda
     */
     void sortArrays(QudaEigSpectrumType spec_type, int n, std::vector<double> &x, std::vector<double> &y);
 
-    /**
-       @brief Construct a transfer operator, restrict, then prolong the eigenvectors,
-       and then check for fidelity with the originals.
-       @param[in] kSpace The basis to transfer
-    */    
-    void verifyCompression(std::vector<ColorSpinorField *> &kSpace);
-
-    /**
-       @brief Construct a transfer operator from the supplied vector space.
-       @param[in] kSpace The basis to transfer
-    */        
-    void createTransferBasis(std::vector<ColorSpinorField *> &kSpace);
-
-    /**
-       @brief Compress vectors from the fine space to the coarse space
-       @param[in] fine The fine space
-       @param[in] coarse The coarse space
-       @param[in] fine_vec_position The starting place in the fine vectors
-       @param[in] coarse_vec_position The starting place in the coarse vectors
-       @param[in] num The number of vectors to compress
-    */        
-    void compressVectors(const std::vector<ColorSpinorField *> &fine,
-			 std::vector<ColorSpinorField *> &coarse,
-			 const unsigned int fine_vec_position,			 
-			 const unsigned int coarse_vec_position,
-			 const unsigned int num) const;
-
-    /**
-       @brief Promote vectors from the coarse space to the fine space
-       @param[in] fine The fine space
-       @param[in] coarse The coarse space
-       @param[in] fine_vec_position The starting place in the fine vectors
-       @param[in] coarse_vec_position The starting place in the coarse vectors
-       @param[in] num The number of vectors to promote
-    */        
-    void promoteVectors(std::vector<ColorSpinorField *> &fine,
-			const std::vector<ColorSpinorField *> &coarse,
-			const unsigned int fine_vec_position,
-			const unsigned int coarse_vec_position,
-			const unsigned int num) const;
   };
 
   /**
@@ -649,6 +602,148 @@ namespace quda
     void computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace);
   };
 
+  /**
+     @brief Thick Restarted Lanczos Method.
+  */
+  class MGTRLM : public TRLM
+  {
+
+  public:
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    MGTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
+    virtual ~MGTRLM();
+
+    /**
+       @return Whether the solver is only for Hermitian systems
+    */
+    virtual bool hermitian() { return true; } /** MGTRLM is only for Hermitian systems */
+
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Perform the TRLM solve
+       @param[in] kSpace Krylov vector space
+    */
+    bool mgTRLMSolve(std::vector<ColorSpinorField *> &kSpace);
+    
+    /**
+       @brief Lanczos step: extends the Krylov space.
+       @param[in] v Vector space
+       @param[in] j Index of vector being computed
+    */
+    void mgLanczosStep(std::vector<ColorSpinorField *> v, int j);
+
+    /**
+       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+       @param[in] nKspace current Krylov space
+    */
+    void mgComputeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Orthogonalise input vectors r against
+       vector space v using block-BLAS
+       @param[in] v Vector space
+       @param[in] r Vectors to be orthogonalised
+       @param[in] j Use vectors v[0:j]
+       @param[in] s array of
+    */
+    void mgBlockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
+
+    /**
+       @brief Rotate part of kSpace
+       @param[in/out] kSpace The current Krylov space
+       @param[in] array The real rotation matrix
+       @param[in] rank row rank of array
+       @param[in] is Start of i index
+       @param[in] ie End of i index
+       @param[in] js Start of j index
+       @param[in] je End of j index
+       @param[in] blockType Type of caxpy(_U/L) to perform
+       @param[in] je End of j index
+       @param[in] offset Position of extra vectors in kSpace
+    */
+    void mgBlockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+		       blockType b_type);
+
+    /**
+       @brief Rotate the Krylov space
+       @param[in] kSpace the Krylov space
+       @param[in] rot_array The real rotation matrix
+       @param[in] offset The position of the start of unused vectors in kSpace
+       @param[in] dim The number of rows in the rotation array
+       @param[in] keep The number of columns in the rotation array
+       @param[in] profile Time profiler
+    */
+    void mgRotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim,
+		      const int keep, TimeProfile &profile);
+    
+    /**
+       @brief Extend the compressed Krylov space. The compressed space in internal 
+       to the eigensolver and IO routines only
+       @param[in] kSpace The fine Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    
+    /**
+       @brief Construct a transfer operator, restrict, then prolong the eigenvectors,
+       and then check for fidelity with the originals.
+       @param[in] kSpace The basis to transfer
+    */    
+    void verifyCompression(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Construct a transfer operator from the supplied vector space.
+       @param[in] kSpace The basis to transfer
+    */        
+    void createTransferBasis(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Compress vectors from the fine space to the coarse space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to compress
+    */        
+    void compressVectors(const std::vector<ColorSpinorField *> &fine,
+			 std::vector<ColorSpinorField *> &coarse,
+			 const unsigned int fine_vec_position,			 
+			 const unsigned int coarse_vec_position,
+			 const unsigned int num) const;
+
+    /**
+       @brief Promote vectors from the coarse space to the fine space
+       @param[in] fine The fine space
+       @param[in] coarse The coarse space
+       @param[in] fine_vec_position The starting place in the fine vectors
+       @param[in] coarse_vec_position The starting place in the coarse vectors
+       @param[in] num The number of vectors to promote
+    */        
+    void promoteVectors(std::vector<ColorSpinorField *> &fine,
+			const std::vector<ColorSpinorField *> &coarse,
+			const unsigned int fine_vec_position,
+			const unsigned int coarse_vec_position,
+			const unsigned int num) const;
+
+    
+  };
+
+  
   /**
      @brief Implicitly Restarted Arnoldi Method.
   */

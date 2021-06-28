@@ -2389,7 +2389,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   // create wrappers around application vector set
-  int n_vecs = eig_param->compress ? eig_param->comp_n_conv : eig_param->n_conv;
+  int n_vecs = eig_param->n_conv;
   std::vector<ColorSpinorField *> host_evecs_;
   for (int i = 0; i < n_vecs; i++) {
     cpuParam.v = host_evecs[i];
@@ -2463,8 +2463,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
+      printfQuda("one\n");
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      printfQuda("two\n");
       (*eig_solve)(kSpace, evals);
+      printfQuda("three\n");
       delete eig_solve;
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {

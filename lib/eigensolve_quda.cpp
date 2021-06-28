@@ -137,11 +137,17 @@ namespace quda
       break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
+      printf("boom 1\n");
       eig_solver = new TRLM(mat, eig_param, profile);
+      printf("boom 2\n");
       break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param, profile);
+      break;
+    case QUDA_EIG_MG_TR_LANCZOS:
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Multigrid TR Lanczos eigensolver\n");
+      eig_solver = new MGTRLM(mat, eig_param, profile);
       break;
     default: errorQuda("Invalid eig solver type");
     }
@@ -223,71 +229,6 @@ namespace quda
     int eval_size = (strcmp(eig_param->coarse_vec_infile, "") != 0 ? n_conv : n_kr);
     evals.reserve(eval_size);
     for (int i = e_size; i < eval_size; i++) evals.push_back(0.0);
-  }
-
-  void EigenSolver::prepareCompressedKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
-  {
-    int c_size = compressed_space.size();
-    if(c_size != 0) errorQuda("A compressed space already exists");
-    int f_size = fine_vector.size();
-    int e_size = evals.size();
-
-    if(!transfer) createTransferBasis(kSpace);
-    QudaPrecision prec = kSpace[0]->Precision();
-    QudaFieldLocation location = kSpace[0]->Location();
-    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
-							   spin_block_size,
-							   fine_n_conv, prec,
-							   location);
-    
-    // Clone the coarse paramters
-    ColorSpinorParam cs_param_coarse(*tmp_coarse);
-    delete tmp_coarse;
-
-    // Update algorithm parameters
-    n_ev = eig_param->n_ev;
-    n_kr = eig_param->n_kr;	  
-    n_conv = eig_param->n_conv;	  
-    max_restarts = eig_param->max_restarts;	  
-    
-    // Increase coarse space
-    int max_size = (strcmp(eig_param->coarse_vec_infile, "") != 0 ? n_conv : n_kr + 1 + batched_rotate);
-    compressed_space.reserve(max_size);
-    for (int i = c_size; i < max_size; i++) compressed_space.push_back(ColorSpinorField::Create(cs_param_coarse));
-    
-    // Create fine vectors for workspace
-    ColorSpinorParam cs_param_fine(*kSpace[0]);
-    cs_param_fine.create = QUDA_ZERO_FIELD_CREATE;
-    for (int b = f_size; b < batched_rotate; b++) { fine_vector.push_back(ColorSpinorField::Create(cs_param_fine)); }
-
-    // Increase evals
-    int eval_size = (strcmp(eig_param->coarse_vec_infile, "") != 0 ? n_conv : n_kr);
-    evals.reserve(eval_size);
-    for (int i = e_size; i < eval_size; i++) evals.push_back(0.0);
-    
-    // If we load the fine space we must restart the coarse solve from scratch.
-    if (strcmp(eig_param->vec_infile, "") != 0) {
-      // Restart the solver
-      blas::zero(*fine_vector[0]);
-      // Get some random noise
-      prepareInitialGuess(fine_vector);
-      // Compress the guess
-      compressVectors(fine_vector, compressed_space, 0, 0, block_size);
-    } else {
-      printfQuda("prepareCompressedKrylovSpace compress vectors start\n");
-      // We may simply compress the current factorisation and continue
-      compressVectors(kSpace, compressed_space, 0, 0, kSpace.size());
-      printfQuda("prepareCompressedKrylovSpace compress vectors end\n");
-    }
-    
-    // Only save if outfile is defined.    
-    if (strcmp(eig_param->vec_outfile, "") != 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving fine eigenvectors\n");
-      saveToFile(kSpace, impliedParityFromMatPC(mat.getMatPCType()));
-    }
-    
-    for(unsigned int i=block_size; i<kSpace.size(); i++) delete kSpace[i];
-    kSpace.resize(block_size);
   }
   
   void EigenSolver::printEigensolverSetup()
@@ -579,84 +520,22 @@ namespace quda
 
     std::vector<ColorSpinorField *> vecs_ptr;
 
-    if(!compressed_mode) {
-      std::vector<Complex> s(array_size);
-      
-      vecs_ptr.reserve(vecs_size);
-      for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
-
-      // Block dot products stored in s.
-      blas::cDotProduct(s.data(), vecs_ptr, rvecs);
-
-      // Block orthogonalise
-      for (int i = 0; i < array_size; i++) s[i] *= -1.0;
-      blas::caxpy(s.data(), vecs_ptr, rvecs);
-    } else {
-
-      int batch_size = std::min((int)fine_vector.size(), j);
-      int full_batches = j/batch_size;
-      int remainder = j%batch_size;
-      bool do_remainder = j%batch_size != 0 ? true : false;
-
-      for (int b = 0; b < full_batches; b++) {
-        int idx = b * batch_size;
-        promoteVectors(fine_vector, vecs, 0, idx, batch_size);
-
-        // Block dot products stored in s.
-        std::vector<Complex> s(batch_size * r_size);
-        blas::cDotProduct(s.data(), fine_vector, rvecs);
-	
-        // Block orthogonalise
-        for (int i = 0; i < batch_size * r_size; i++) s[i] *= -1.0;
-        blas::caxpy(s.data(), fine_vector, rvecs);
-      }
-      if(do_remainder) {
-	
-        int idx = full_batches * batch_size;
-	
-        promoteVectors(fine_vector, vecs, 0, idx, remainder);
-        vecs_ptr.reserve(remainder);
-        for (int i = 0; i < remainder; i++) { vecs_ptr.push_back(fine_vector[i]); }
-
-        // Block dot products stored in s
-        std::vector<Complex> s(remainder * r_size);
-        blas::cDotProduct(s.data(), vecs_ptr, rvecs);
-
-        // Block orthogonalise
-        for (int i = 0; i < remainder * r_size; i++) s[i] *= -1.0;
-        blas::caxpy(s.data(), vecs_ptr, rvecs);
-      }
-    }
-
-    // Save orthonormalisation tuning
-    saveTuneCache();
-  }
-
-#if 0
-  // Orthogonalise r[0:] against V_[0:j]
-  void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
-  {
-    int vecs_size = j;
-    int r_size = (int)rvecs.size();
-    int array_size = vecs_size * r_size;
     std::vector<Complex> s(array_size);
-
-    std::vector<ColorSpinorField *> vecs_ptr;
+    
     vecs_ptr.reserve(vecs_size);
     for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
-
+    
     // Block dot products stored in s.
     blas::cDotProduct(s.data(), vecs_ptr, rvecs);
-
+    
     // Block orthogonalise
     for (int i = 0; i < array_size; i++) s[i] *= -1.0;
     blas::caxpy(s.data(), vecs_ptr, rvecs);
-
+    
     // Save orthonormalisation tuning
     saveTuneCache();
   }
-#endif
-  
+    
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
   {
     std::vector<int> pivots(size);
@@ -693,149 +572,6 @@ namespace quda
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i_range,
-                                const range &j_range, blockType b_type)
-  {
-    int block_i_rank = i_range.second - i_range.first;
-    int block_j_rank = j_range.second - j_range.first;
-    
-    // Quick return if no op.
-    if (block_i_rank == 0 || block_j_rank == 0) return;
-    
-    // Pointers to the relevant vectors
-    std::vector<ColorSpinorField *> vecs_ptr;
-    std::vector<ColorSpinorField *> kSpace_ptr;
-
-    // Populate batch array (COLUMN major -> ROW major)
-    double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
-    for (int j = j_range.first; j < j_range.second; j++) {
-      for (int i = i_range.first; i < i_range.second; i++) {
-	int j_arr = j - j_range.first;
-	int i_arr = i - i_range.first;
-	batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
-      }
-    }
-    
-    if(!compressed_mode) {
-
-      // Alias the extra space vectors
-      kSpace_ptr.reserve(block_j_rank);
-      for (int j = j_range.first; j < j_range.second; j++) {
-	int k = n_kr + 1 + j - j_range.first;
-	kSpace_ptr.push_back(kSpace[k]);
-      }
-      
-      // Alias the vectors we wish to keep
-      vecs_ptr.reserve(block_i_rank);
-      for (int i = i_range.first; i < i_range.second; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }      
-      
-      switch (b_type) {
-      case PENCIL: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
-      case LOWER_TRI: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
-      case UPPER_TRI: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
-      default: errorQuda("Undefined MultiBLAS type in blockRotate");
-      }      
-      // Save Krylov block rotation tuning
-      saveTuneCache();
-      
-    } else {      
-      // If compressed vectors are passed, we create fine vectors
-      // and prolongate the batches into them.
-      
-      // Create fine vectors
-      int f_size = fine_vector.size();
-      if(2*block_j_rank > f_size) {
-	fine_vector.reserve(2*block_j_rank);      
-	ColorSpinorParam cs_param_fine(*fine_vector[0]);
-	cs_param_fine.create = QUDA_ZERO_FIELD_CREATE;
-	for (int i = f_size; i < 2*block_j_rank; i++) fine_vector.push_back(ColorSpinorField::Create(cs_param_fine));
-      }
-      
-      // Alias the extra space vectors
-      kSpace_ptr.reserve(block_j_rank);
-      promoteVectors(fine_vector, kSpace, 0, n_kr + 1, block_j_rank);
-      for (int j = 0; j < block_j_rank; j++) kSpace_ptr.push_back(fine_vector[j]);
-            
-      // The `batch array` now contains either a PENCIL or TRI of data.
-      // In compressed mode we must loop over SQUARES of the PENCIL,
-      // each of side length `block_j_rank`.
-      
-      int full_batches = block_i_rank / block_j_rank;
-      int batch_size = block_j_rank;
-      int batch_size_r = block_i_rank % batch_size;
-      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
-      int sq_size = batch_size * batch_size; // Elements in a square
-      double *square_batch_array = (double *)safe_malloc((sq_size) * sizeof(double));
-
-      for (int b = 0; b < full_batches; b++) {
-
-	// Populate square batch array
-	int i_offset = num_locked + i_range.first + b * batch_size;
-	for (int i = b * batch_size; i < (b+1)*batch_size; i++) {
-	  int i_sq = i - b * batch_size;	  
-	  for (int j = 0; j < batch_size; j++) {
-	    square_batch_array[i_sq * batch_size + j] = batch_array[i * batch_size + j];
-	  }
-	} 
-	
-	// Alias the vectors we wish to keep
-	vecs_ptr.reserve(batch_size);
-	promoteVectors(fine_vector, kSpace, batch_size, i_offset, batch_size);
-	for (int i = 0; i < batch_size; i++) vecs_ptr.push_back(fine_vector[batch_size + i]);
-	
-	switch (b_type) {
-	case PENCIL: blas::axpy(square_batch_array, vecs_ptr, kSpace_ptr); break;
-	case LOWER_TRI: blas::axpy_L(square_batch_array, vecs_ptr, kSpace_ptr); break;
-	case UPPER_TRI: blas::axpy_U(square_batch_array, vecs_ptr, kSpace_ptr); break;
-	default: errorQuda("Undefined MultiBLAS type in blockRotate");
-	}
-
-	compressVectors(fine_vector, kSpace, batch_size, i_offset, batch_size);
-	vecs_ptr.resize(0);
-      }
-      host_free(square_batch_array);
-      
-      if (do_batch_remainder) {
-	int r_size = batch_size * batch_size_r; // Elements in a remainder rectangle
-	double *r_batch_array = (double *)safe_malloc((r_size) * sizeof(double));
-	
-	// Populate remainder batch array
-	int b = full_batches;
-	int i_offset = num_locked + i_range.first + b * batch_size;
-	for (int i = b * batch_size; i < b * batch_size + batch_size_r; i++) {
-	  int i_r = i - b * batch_size;
-	  for (int j = 0; j < batch_size; j++) {
-	    r_batch_array[i_r * batch_size + j] = batch_array[i * batch_size + j];
-	  }
-	} 
-	
-	// Alias the vectors we wish to keep
-	vecs_ptr.reserve(batch_size_r);
-	promoteVectors(fine_vector, kSpace, batch_size, i_offset, batch_size_r);
-	for (int i = 0; i < batch_size_r; i++) vecs_ptr.push_back(fine_vector[batch_size + i]);
-	
-	// There will never be a TRI type in the remainder of a compressed rotation.
-	blas::axpy(r_batch_array, vecs_ptr, kSpace_ptr);
-	compressVectors(fine_vector, kSpace, batch_size, i_offset, batch_size_r);	
-	host_free(r_batch_array);
-	vecs_ptr.resize(0);
-      }
-      
-      // Compress the rotated fine vectors
-      compressVectors(kSpace_ptr, kSpace, 0, n_kr + 1, batch_size);
-      if(2*block_j_rank > f_size) {
-	for (int i = f_size; i < 2*block_j_rank; i++) delete fine_vector[i];
-	fine_vector.resize(f_size);
-      }
-    }
-    
-    host_free(batch_array);
-    // Save Krylov block rotation tuning
-    saveTuneCache();    
-  }
-
-#if 0  
   void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i_range,
                                 const range &j_range, blockType b_type)
   {
@@ -879,7 +615,6 @@ namespace quda
     // Save Krylov block rotation tuning
     saveTuneCache();
   }
-#endif
   
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end, int offset)
   {
@@ -1069,18 +804,18 @@ namespace quda
     
     for (int i = 0; i < size; i++) {      
       // r = A * v_i      
-      if(compressed_mode) {
-	profile.TPSTART(QUDA_PROFILE_COMPUTE);
-	promoteVectors(fine_vector, evecs, 0, i, 1);
-	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      //if(compressed_mode) {
+      //profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      //promoteVectors(fine_vector, evecs, 0, i, 1);
+      //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-#if 0
-        if (i >= fine_space.size()) smoothEvec(mat, *fine_vector[0]);
-#endif
-	evecs_ptr.push_back(fine_vector[0]);
-      } else {
-	evecs_ptr.push_back(evecs[i]);
-      }
+      //#if 0
+      //if (i >= fine_space.size()) smoothEvec(mat, *fine_vector[0]);
+      //#endif
+      //evecs_ptr.push_back(fine_vector[0]);
+      //} else {
+      evecs_ptr.push_back(evecs[i]);
+      //}
       
       matVec(mat, *temp[0], *evecs_ptr[i]);
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
@@ -1113,9 +848,10 @@ namespace quda
     }
 
     int n_defl = n_ev_deflate;
-
+    
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
 
+    /*
     if (compressed_mode) {
       int n_batch = 1;
       std::vector<ColorSpinorField*> decompressed(n_batch);
@@ -1145,7 +881,7 @@ namespace quda
 
       for (auto &v : decompressed) delete v;
     } else {
-
+    */
       // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
       // for all i computed eigenvectors and values.
 
@@ -1167,10 +903,10 @@ namespace quda
       if (!accumulate)
         for (auto &x : sol) blas::zero(*x);
       blas::caxpy(s.data(), eig_vecs, sol);
-    }
-
-    // Save Deflation tuning
-    saveTuneCache();
+      //}
+      
+      // Save Deflation tuning
+      saveTuneCache();
   }
 
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
@@ -1661,122 +1397,5 @@ namespace quda
     if (vec) delete vec;    
     B.resize(0);    
   }
-
-  void EigenSolver::createTransferBasis(std::vector<ColorSpinorField *> &vec_space)
-  {
-    if(transfer) delete transfer;    
-    // Create the transfer operator
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Transfer basis of size fine_n_conv = %d\n", fine_n_conv);
-    
-    // Point to the converged fine vectors
-    fine_space.reserve(fine_n_conv);
-    for(int i=0; i<fine_n_conv; i++) fine_space.push_back(vec_space[i]);
-
-#if 0
-    bool pc_solution = false;
-    if (pc_solution) X[0] *= 1;
-#endif
-
-    // Create a new vector space with native ordering for the transfer basis
-    ColorSpinorParam csParam(*vec_space[0]);
-    csParam.create = QUDA_NULL_FIELD_CREATE;
-    csParam.mem_type = QUDA_MEMORY_MAPPED;
-    B.reserve(fine_n_conv);
-    for (int i = 0; i < fine_n_conv; i++) {
-      B.push_back(ColorSpinorField::Create(csParam));
-      *B[i] = *vec_space[i];
-    }
-    
-    transfer = new Transfer(B, fine_n_conv, n_block_ortho,
-			    geo_block_size, spin_block_size, vec_space[0]->Precision(),
-			    QUDA_TRANSFER_AGGREGATE, profile);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer basis created successfully\n");
-    verifyCompression(B);
-  }
   
-  void EigenSolver::verifyCompression(std::vector<ColorSpinorField *> &kSpace)
-  {
-    if(!transfer) createTransferBasis(kSpace);
-    QudaPrecision prec = kSpace[0]->Precision();
-    QudaFieldLocation location = kSpace[0]->Location();
-    ColorSpinorField *tmp_coarse = kSpace[0]->CreateCoarse(geo_block_size,
-							   spin_block_size,
-							   fine_n_conv, prec,
-							   location);
-
-    // may want to revisit this---these were relaxed for cases where
-    // ghost_precision < precision these were set while hacking in tests of quarter
-    // precision ghosts
-    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
-    ColorSpinorParam param(*kSpace[0]);
-    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    if(!tmp_comp1) tmp_comp1 = ColorSpinorField::Create(param);
-    if(!tmp_comp2) tmp_comp2 = ColorSpinorField::Create(param);
-    bool error = false;
-    for (unsigned int i = 0; i < kSpace.size(); i++) {
-      *tmp_comp1 = *kSpace[i];
-      transfer->R(*tmp_coarse, *tmp_comp1);
-      transfer->P(*tmp_comp2, *tmp_coarse);
-      double deviation = sqrt(blas::xmyNorm(*tmp_comp1, *tmp_comp2) / blas::norm2(*tmp_comp1));
-      
-      if (getVerbosity() >= QUDA_VERBOSE)
-	printfQuda( "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
-		    i, blas::norm2(*tmp_comp1), blas::norm2(*tmp_coarse), blas::norm2(*tmp_comp2), deviation);
-      if (deviation > tol) {
-	printfQuda("L2 relative deviation for k=%d failed, %e > %e\n", i, deviation, tol);
-	if(!error) error = true;	
-      }      
-    }
-    if(error) errorQuda("verifyCompression failed");
-    delete tmp_coarse;
-  }
-
-  void EigenSolver::compressVectors(const std::vector<ColorSpinorField *> &fine,
-				    std::vector<ColorSpinorField *> &coarse,
-				    const unsigned int fine_vec_position,
-				    const unsigned int coarse_vec_position,
-				    const unsigned int num) const
-  {
-    if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");
-    unsigned int f_size = fine.size();
-    unsigned int c_size = coarse.size();
-    if(fine_vec_position >= f_size) errorQuda("fine_vec_position = %d is greater than or equal the fine space size = %d", fine_vec_position, f_size);
-    if(coarse_vec_position >= c_size) errorQuda("coarse_vec_position = %d is greater than or equal the coarse space size = %d", coarse_vec_position, c_size);
-    if(num > (f_size) - fine_vec_position) errorQuda("Attempting to compress %u vectors at position %u with a fine vector space of size %u", num, fine_vec_position, f_size);
-    if(num > (c_size) - coarse_vec_position) errorQuda("Attempting to compress %u vectors to position %u with a coarse vector space of size %u", num, coarse_vec_position, c_size);
-
-    printfQuda("f_size = %d, c_size = %d\n", f_size, c_size);
-    
-    for (unsigned int i = 0; i < num; i++) {
-      bool compute_profile = profile.isRunning(QUDA_PROFILE_COMPUTE);
-      if (compute_profile) profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      *tmp_comp1 = *fine[fine_vec_position + i];
-      transfer->R(*coarse[coarse_vec_position+i], *tmp_comp1);
-      if (compute_profile) profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
-  }
-
-  void EigenSolver::promoteVectors(std::vector<ColorSpinorField *> &fine,
-				   const std::vector<ColorSpinorField *> &coarse,
-				   const unsigned int fine_vec_position,
-				   const unsigned int coarse_vec_position,
-				   const unsigned int num) const
-  {
-    if(!transfer) errorQuda("Eigensolver transfer operator not yet constructed");    
-    unsigned int f_size = fine.size();
-    unsigned int c_size = coarse.size();
-    if(fine_vec_position >= f_size) errorQuda("fine_vec_position = %d is greater than or equal the fine space size = %d", fine_vec_position, f_size);
-    if(coarse_vec_position >= c_size) errorQuda("coarse_vec_position = %d is greater than or equal the coarse space size = %d", coarse_vec_position, c_size);
-    if(num > (f_size) - fine_vec_position) errorQuda("Attempting to promote %u vectors to position %u with a fine vector space of size %u", num, fine_vec_position, f_size);
-    if(num > (c_size) - coarse_vec_position) errorQuda("Attempting to promote %u vectors at position %u with a coarse vector space of size %u", num, coarse_vec_position, c_size);
-    
-    for (unsigned int i = 0; i < num; i++) {
-      bool compute_profile = profile.isRunning(QUDA_PROFILE_COMPUTE);
-      if (compute_profile) profile.TPSTOP(QUDA_PROFILE_COMPUTE);      
-      transfer->P(*tmp_comp1, *coarse[coarse_vec_position + i]);
-      *fine[fine_vec_position + i] = *tmp_comp1;
-      if (compute_profile) profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    }
-  }
-
 } // namespace quda

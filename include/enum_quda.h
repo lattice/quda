@@ -135,6 +135,7 @@ typedef enum QudaInverterType_s {
 typedef enum QudaEigType_s {
   QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
   QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
+  QUDA_EIG_MG_TR_LANCZOS,  // Multigrid Thick restarted lanczos solver
   QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver
   QUDA_EIG_BLK_IR_ARNOLDI, // Block Implicitly Restarted Arnoldi solver
   QUDA_EIG_INVALID = QUDA_INVALID_ENUM
