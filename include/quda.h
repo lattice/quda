@@ -491,22 +491,21 @@ extern "C" {
 
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
-
     //-------------------------------------------------
 
-    // COMPRESSION PARAMS
+    // MG Lanczos PARAMS
     //-------------------------------------------------
-    /** Employ compression in the eigensolver **/
-    QudaBoolean compress;
-    /** Size of the eigenvector search space **/
-    int comp_n_ev;
-    /** Total size of Krylov space **/
-    int comp_n_kr;
-    /** Number of requested converged eigenvectors **/
-    int comp_n_conv;
-    /** For IRLM/IRAM, quit after n restarts of the fine eigensolver **/
-    int comp_max_restarts;
-
+    /** Size of the coarse eigenvector search space **/
+    int coarse_n_ev;
+    /** Total size of coarse Krylov space **/
+    int coarse_n_kr;
+    /** Number of requested converged coarse eigenvectors **/
+    int coarse_n_conv;
+    /** Quit after n restarts of the coarse eigensolver **/
+    int coarse_max_restarts;
+    /** Number of requested converged coarse eigenvectors to use in deflation **/
+    int coarse_n_ev_deflate;
+    
     /** Geometric block size to use */
     int geo_block_size[QUDA_MAX_DIM];
 

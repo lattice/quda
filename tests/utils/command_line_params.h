@@ -130,8 +130,8 @@ class QUDAApp : public CLI::App
     }
 
   template <typename T>
-    CLI::Option *add_eigcompoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-				   CLI::Validator trans, std::string option_description = "", bool = false)
+    CLI::Option *add_mglanczos_option(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
+			       CLI::Validator trans, std::string option_description = "", bool = false)
     {
       
       CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -336,8 +336,8 @@ extern QudaMemoryType mem_type_ritz;
 extern int eig_block_size;
 extern int eig_n_ev;
 extern int eig_n_kr;
-extern int eig_n_conv;         // If unchanged, will be set to n_ev
-extern int eig_n_ev_deflate;   // If unchanged, will be set to n_conv
+extern int eig_n_conv;         // If unchanged, will be set to eig_n_ev
+extern int eig_n_ev_deflate;   // If unchanged, will be set to eig_n_conv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
@@ -365,16 +365,16 @@ extern char eig_coarse_vec_outfile[256];
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 
-// Parameters for eigensolver compression
-extern bool eig_comp;
-extern quda::mgarray<std::array<int, 4>> eig_comp_geo_block_size;
-extern int eig_comp_max_restarts;
-extern int eig_comp_n_block_ortho;
-extern int eig_comp_n_ev;
-extern int eig_comp_n_kr;
-extern int eig_comp_n_conv;         // If unchanged, will be set to eig_comp_n_ev
+// Parameters for MG Lanczos
+extern quda::mgarray<std::array<int, 4>> eig_coarse_geo_block_size;
+extern int eig_coarse_max_restarts;
+extern int eig_coarse_n_block_ortho;
+extern int eig_coarse_n_ev;
+extern int eig_coarse_n_kr;
+extern int eig_coarse_n_conv;       // If unchanged, will be set to eig_coarse_n_ev
+extern int eig_coarse_n_ev_deflate; // If unchanged, will be set to eig_coarse_n_conv
 
-// Parameters for the MG eigensolver.
+// Parameters for the MG coarse level eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;

@@ -33,6 +33,9 @@ namespace quda
     bool reverse;     /** True if using polynomial acceleration */
     char spectrum[3]; /** Part of the spectrum to be computed */
 
+    bool compressed_mode; /** indicates that the solver is running in compressed 
+			      mode */
+    
     // Algorithm variables
     //--------------------
     bool converged;
@@ -59,35 +62,7 @@ namespace quda
     ColorSpinorField *tmp2;
 
     QudaPrecision save_prec;
-
-    // Compression variables
-    //----------------------
-    bool compress; /** indicates that we wish to perform a fine, then compressed 
-		       solve */
-    bool compressed_mode; /** indicates that the solver is running in compressed 
-			      mode */
-    std::vector<ColorSpinorField *> fine_vector; /** Decompressed vector(s) use as 
-						     workspace */
-    std::vector<ColorSpinorField *> compressed_space; /** Compressed vector space */
-    std::vector<ColorSpinorField *> fine_space; /** fine vector space */
     
-    /** This is the transfer operator that defines the prolongation and restriction 
-	operators */
-    Transfer *transfer;
-    std::vector<ColorSpinorField*> B; /** Used to create the transfer operator */
-    ColorSpinorField *tmp_comp1;
-    ColorSpinorField *tmp_comp2;
-
-    /** We define here the parameters needed to create a Transfer operator */
-    int geo_block_size[4];
-    int spin_block_size;
-    int n_block_ortho;
-
-    int fine_n_ev;         /** Size of initial factorisation */
-    int fine_n_kr;         /** Size of Krylov space after extension */
-    int fine_n_conv;       /** Number of converged eigenvalues requested */
-    int fine_max_restarts; /** Maximum number of restarts to perform */
-
     using range = std::pair<int, int>;
     
   public:    
@@ -416,10 +391,11 @@ namespace quda
 
     /**
        @brief Save eigenvectors
-       @param[in] mat Matrix operator
        @param[in] eig_vecs The eigenvectors to save
+       @param[in] n_vecs The number of eigenvectors to save
+       @param[in] mat_parity The parity of the vectors
     */
-    void saveToFile(const std::vector<ColorSpinorField *> &eig_vecs, const QudaParity mat_parity);
+    void saveToFile(const std::vector<ColorSpinorField *> &eig_vecs, const int n_vecs, const QudaParity mat_parity);
     
     /**
        @brief Sort array the first n elements of x according to spec_type, y comes along for the ride
@@ -607,7 +583,32 @@ namespace quda
   */
   class MGTRLM : public TRLM
   {
+  protected:
+    // MG Lanczos variables
+    //----------------------
+    std::vector<ColorSpinorField *> fine_vector_workspace; /** Decompressed vector(s) use as 
+							       workspace */
+    std::vector<ColorSpinorField *> compressed_space;      /** Compressed vector space */
+    std::vector<ColorSpinorField *> fine_space;            /** fine vector space */
+    
+    /** This is the transfer operator that defines the prolongation and restriction 
+	operators */
+    Transfer *transfer;
+    std::vector<ColorSpinorField*> B; /** Used to create the transfer operator */
+    ColorSpinorField *tmp_comp1;
+    ColorSpinorField *tmp_comp2;
 
+    /** We define here the parameters needed to create a Transfer operator */
+    int geo_block_size[4];
+    int spin_block_size;
+    int n_block_ortho;
+
+    int coarse_n_ev;         /** Size of coarse factorisation */
+    int coarse_n_kr;         /** Size of coarse Krylov space after extension */
+    int coarse_n_conv;       /** Number of converged coarse eigenvalues requested */
+    int coarse_max_restarts; /** Maximum number of coarse restarts to perform */
+    int coarse_n_ev_deflate; /** Number of converged coarse eigenvalues to use in deflation */
+    
   public:
     /**
        @brief Constructor for Thick Restarted Eigensolver class
@@ -690,6 +691,62 @@ namespace quda
     */
     void mgRotateVecs(std::vector<ColorSpinorField *> &kSpace, const double *rot_array, const int offset, const int dim,
 		      const int keep, TimeProfile &profile);
+
+    /**
+       @brief Compute eigenvalues and their residiua
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+       @param[in] size The number of eigenvalues to compute
+    */
+    void mgComputeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+                      int size);
+    
+    /**
+       @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+    */
+    void mgComputeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+    {
+      mgComputeEvals(mat, evecs, evals, n_conv);
+    }
+
+    /**
+       @brief Deflate a set of source vectors with a given eigenspace
+       @param[in] sol The resulting deflated vector set
+       @param[in] src The source vector set we are deflating
+       @param[in] evecs The eigenvectors to use in deflation
+       @param[in] evals The eigenvalues to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+    */
+    void mgDeflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+		   const std::vector<Complex> &evals, bool accumulate = false) const;
+    
+    /**
+       @brief Deflate a given source vector with a given eigenspace.
+       This is a wrapper variant for a single source vector.
+       @param[in] sol The resulting deflated vector
+       @param[in] src The source vector we are deflating
+       @param[in] evecs The eigenvectors to use in deflation
+       @param[in] evals The eigenvalues to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+    */
+    void mgDeflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
+		   const std::vector<Complex> &evals, bool accumulate = false)
+    {
+      // FIXME add support for mixed-precison dot product to avoid this copy
+      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
+        ColorSpinorParam param(*evecs[0]);
+        tmp1 = ColorSpinorField::Create(param);
+      }
+      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
+      blas::copy(*src_tmp, src); // no-op if these alias
+      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> sol_ {&sol};
+      mgDeflate(sol_, src_, evals, accumulate);
+    }
     
     /**
        @brief Extend the compressed Krylov space. The compressed space in internal 

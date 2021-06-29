@@ -134,10 +134,15 @@ namespace quda {
           errorQuda("Unsupported field order %d\n", V.FieldOrder());
         }
       } else {
+	printfQuda("Flag 2\n");
         if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
+	  printfQuda("Flag 2.1\n");
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,DISABLE_GHOST> Rotator;
+	  printfQuda("Flag 2.2\n");
           typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,DISABLE_GHOST,isFixed<bFloat>::value> Vector;
+	  printfQuda("Flag 2.3\n");	  
           GPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+	  printfQuda("Flag 2.4\n");
         } else {
           errorQuda("Unsupported field order V=%d B=%d\n", V.FieldOrder(), B[0]->FieldOrder());
         }
@@ -220,6 +225,7 @@ namespace quda {
     BlockOrtho<vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
     ortho.apply(device::get_default_stream());
+    printfQuda("Flag 3\n");
   }
 
   template <typename vFloat, typename bFloat>
@@ -392,6 +398,7 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision combination V=%d B=%d\n", V.Precision(), B[0]->Precision());
     }
+    printfQuda("Flag 4\n");
   }
 #else
   void BlockOrthogonalize(ColorSpinorField &, const std::vector<ColorSpinorField *> &, const int *,

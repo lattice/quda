@@ -28,10 +28,7 @@ namespace quda
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
-    tmp2(nullptr),
-    transfer(nullptr),
-    tmp_comp1(nullptr),
-    tmp_comp2(nullptr)
+    tmp2(nullptr)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -70,7 +67,7 @@ namespace quda
     if (n_kr == 0) errorQuda("n_kr=0 passed to Eigensolver");
     if (n_conv == 0) errorQuda("n_conv=0 passed to Eigensolver");
     if (n_ev_deflate > n_conv) errorQuda("deflation vecs = %d is greater than n_conv = %d", n_ev_deflate, n_conv);
-
+    
     residua.reserve(n_kr);
     for (int i = 0; i < n_kr; i++) residua.push_back(0.0);
 
@@ -96,27 +93,7 @@ namespace quda
       spectrum[0] = 'S';
     }
 
-    // Parse compression parameters
     compressed_mode = false;
-    transfer = nullptr;
-    if(eig_param->compress == QUDA_BOOLEAN_TRUE) {
-      compress = true;
-      fine_n_ev = eig_param->comp_n_ev;
-      fine_n_kr = eig_param->comp_n_kr;
-      fine_n_conv = eig_param->comp_n_conv;
-      fine_max_restarts = eig_param->comp_max_restarts;
-
-      // Sanity checks
-      if (fine_n_kr <= fine_n_ev) errorQuda("fine_n_kr = %d is less than or equal to fine_n_ev = %d", fine_n_kr, fine_n_ev);
-      if (fine_n_ev < fine_n_conv) errorQuda("fine_n_conv=%d is greater than fine_n_ev=%d", fine_n_conv, fine_n_ev);
-      if (fine_n_ev == 0) errorQuda("fine_n_ev=0 passed to Eigensolver");
-      if (fine_n_kr == 0) errorQuda("fine_n_kr=0 passed to Eigensolver");
-      if (fine_n_conv == 0) errorQuda("fine_n_conv=0 passed to Eigensolver");      
-      
-      spin_block_size = 2;
-      n_block_ortho = eig_param->n_block_ortho;
-      for(int i=0; i<4; i++) geo_block_size[i] = eig_param->geo_block_size[i];
-    } else compress = false;
     
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -137,9 +114,7 @@ namespace quda
       break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
-      printf("boom 1\n");
       eig_solver = new TRLM(mat, eig_param, profile);
-      printf("boom 2\n");
       break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");
@@ -799,25 +774,14 @@ namespace quda
     std::vector<ColorSpinorField *> temp;
     std::vector<ColorSpinorField *> evecs_ptr;
     evecs_ptr.reserve(size);
-    ColorSpinorParam cs_param_fine(compressed_mode ? *fine_vector[0] : *r[0]);
-    temp.push_back(ColorSpinorField::Create(cs_param_fine));
+    ColorSpinorParam cs_param(*r[0]);
+    temp.push_back(ColorSpinorField::Create(cs_param));
     
     for (int i = 0; i < size; i++) {      
       // r = A * v_i      
-      //if(compressed_mode) {
-      //profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      //promoteVectors(fine_vector, evecs, 0, i, 1);
-      //profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-      //#if 0
-      //if (i >= fine_space.size()) smoothEvec(mat, *fine_vector[0]);
-      //#endif
-      //evecs_ptr.push_back(fine_vector[0]);
-      //} else {
       evecs_ptr.push_back(evecs[i]);
-      //}
-      
       matVec(mat, *temp[0], *evecs_ptr[i]);
+      
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs_ptr[i], *temp[0]) / sqrt(blas::norm2(*evecs_ptr[i]));
       // Measure || lambda_i * v_i - A * v_i ||
@@ -850,63 +814,31 @@ namespace quda
     int n_defl = n_ev_deflate;
     
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
-
-    /*
-    if (compressed_mode) {
-      int n_batch = 1;
-      std::vector<ColorSpinorField*> decompressed(n_batch);
-      ColorSpinorParam cs_param(*fine_vector[0]);
-      for (auto &v : decompressed) v = ColorSpinorField::Create(cs_param);
-
-      for (int i = 0; i < n_defl; i += n_batch) {
-        promoteVectors(decompressed, compressed_space, 0, i, n_batch);
-
-        // 1. Take block inner product: (V_i)^dag * vec = A_i
-        std::vector<Complex> s(n_batch * src.size());
-        std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
-        blas::cDotProduct(s.data(), const_cast<std::vector<ColorSpinorField*> &>(decompressed), src_);
-
-        // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-        for (int j = 0; j < n_batch; j++) {
-          for (int k = 0; k < src.size(); k++) {
-            s[j * src.size() + k] /= evals[i + j].real(); // FIXME need to check if (j,j) are in correct order when src.size > 1
-          }
-        }
-
-        // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-        if (!accumulate && i == 0)
-          for (auto &x : sol) blas::zero(*x);
-        blas::caxpy(s.data(), decompressed, sol);
-      }
-
-      for (auto &v : decompressed) delete v;
-    } else {
-    */
-      // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
-      // for all i computed eigenvectors and values.
-
-      // Pointers to the required Krylov space vectors,
-      // no extra memory is allocated.
-      std::vector<ColorSpinorField *> eig_vecs;
-      eig_vecs.reserve(n_defl);
-      for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
-
-      // 1. Take block inner product: (V_i)^dag * vec = A_i
-      std::vector<Complex> s(n_defl * src.size());
-      std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
-      blas::cDotProduct(s.data(), eig_vecs, src_);
-
-      // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-      for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
-      // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-      if (!accumulate)
-        for (auto &x : sol) blas::zero(*x);
-      blas::caxpy(s.data(), eig_vecs, sol);
-      //}
-      
-      // Save Deflation tuning
-      saveTuneCache();
+    
+    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
+    // for all i computed eigenvectors and values.
+    
+    // Pointers to the required Krylov space vectors,
+    // no extra memory is allocated.
+    std::vector<ColorSpinorField *> eig_vecs;
+    eig_vecs.reserve(n_defl);
+    for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
+    
+    // 1. Take block inner product: (V_i)^dag * vec = A_i
+    std::vector<Complex> s(n_defl * src.size());
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+    blas::cDotProduct(s.data(), eig_vecs, src_);
+    
+    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
+    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+    
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
+    blas::caxpy(s.data(), eig_vecs, sol);
+    
+    // Save Deflation tuning
+    saveTuneCache();
   }
 
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
@@ -948,11 +880,11 @@ namespace quda
     }
   }
 
-  void EigenSolver::saveToFile(const std::vector<ColorSpinorField *> &kSpace, const QudaParity mat_parity)
+  void EigenSolver::saveToFile(const std::vector<ColorSpinorField *> &kSpace, const int n_vecs, const QudaParity mat_parity)
   {
     // Make an array of size n_conv
     std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(n_conv);
+    vecs_ptr.reserve(n_vecs);
     
     // We may wish to compute vectors in high prec, but use in a lower
     // prec. This allows the user to down copy the data for later use.
@@ -962,7 +894,7 @@ namespace quda
       ColorSpinorParam cs_param(*kSpace[0]);
       cs_param.create = QUDA_REFERENCE_FIELD_CREATE;
       cs_param.setPrecision(save_prec);
-      for (unsigned int i = 0; i < kSpace.size(); i++) {
+      for (int i = 0; i < n_vecs; i++) {
 	kSpace[i]->setSuggestedParity(mat_parity);
 	vecs_ptr.push_back(kSpace[i]->CreateAlias(cs_param));
       }
@@ -971,7 +903,7 @@ namespace quda
 		   vecs_ptr[0]->Precision());
       }
     } else {
-      for (int i = 0; i < fine_n_conv; i++) {
+      for (int i = 0; i < n_vecs; i++) {
 	kSpace[i]->setSuggestedParity(mat_parity);
 	vecs_ptr.push_back(kSpace[i]);
       }
@@ -1372,30 +1304,12 @@ namespace quda
 
   EigenSolver::~EigenSolver()
   {
-    if (transfer) delete transfer;
-
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
-    if (tmp_comp1) delete tmp_comp1;
-    if (tmp_comp2) delete tmp_comp2;    
-
-    //if(transfer) delete transfer;
-    
-    for (auto &vec : compressed_space)
-    if (vec) delete vec;    
-    compressed_space.resize(0);
     
     for (auto &vec : r)
     if (vec) delete vec;    
     r.resize(0);    
-    
-    for (auto &vec : fine_vector)
-    if (vec) delete vec;    
-    fine_vector.resize(0);
-    
-    for (auto &vec : B)
-    if (vec) delete vec;    
-    B.resize(0);    
   }
   
 } // namespace quda

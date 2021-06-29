@@ -196,16 +196,16 @@ char eig_coarse_vec_outfile[256] = "";
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 
-// Parameters for eigensolver compression
-bool eig_comp = false;
-quda::mgarray<std::array<int, 4>> eig_comp_geo_block_size = {};
-int eig_comp_max_restarts;
-int eig_comp_n_block_ortho;
-int eig_comp_n_ev;
-int eig_comp_n_kr;
-int eig_comp_n_conv; // If unchanged, will be set to eig_comp_n_ev
+// Parameters for MG Lanczos eigensolver
+quda::mgarray<std::array<int, 4>> eig_coarse_geo_block_size = {};
+int eig_coarse_max_restarts = 100;
+int eig_coarse_n_block_ortho = 1;
+int eig_coarse_n_ev = 64;
+int eig_coarse_n_kr = 128;
+int eig_coarse_n_conv = 64; // If unchanged, will be set to eig_coarse_n_ev
+int eig_coarse_n_ev_deflate = -1;  // If unchanged, will be set to n_conv
 
-// Parameters for the MG eigensolver.
+// Parameters for the MG coarse grid eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
@@ -374,6 +374,7 @@ namespace
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
+						 {"mgtrlm", QUDA_EIG_MG_TR_LANCZOS},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
@@ -771,22 +772,22 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)");
   opgroup->add_option("--eig-use-poly-acc", eig_use_poly_acc, "Use Chebyshev polynomial acceleration in the eigensolver");
 
-  auto eigcompgroup = quda_app->add_option_group("EigCompress", "Options controlling eigensolver compression");
+  auto mglanczos_group = quda_app->add_option_group("MGLanczos", "Options controlling the MG Lanczos");
   
-  quda_app->add_eigcompoption(eigcompgroup, "--eig-compress-block-size", eig_comp_geo_block_size, CLI::Validator(),
-			      "Set the geometric block size for the transfer operator (default 4 4 4 4)");
+  quda_app->add_mglanczos_option(mglanczos_group, "--eig-coarse-block-size", eig_coarse_geo_block_size, CLI::Validator(),
+				 "Set the geometric block size for the transfer operator for the coarse eigensolver (default 4 4 4 4)");
   
-  opgroup->add_option("--eig-compress", eig_comp, "Whether to employ compression in the eigensolver default (false)");
-
-  opgroup->add_option("--eig-compress-max-restarts", eig_comp_max_restarts, "Perform n iterations of the restart in the eigensolver");
+  opgroup->add_option("--eig-coarse-max-restarts", eig_coarse_max_restarts, "Perform n iterations of the restart in the coarse eigensolver");
     
-  opgroup->add_option("--eig-compress-n-conv", eig_comp_n_conv, "The number of converged eigenvalues requested in the full eigensover (default eig_n_ev)");
+  opgroup->add_option("--eig-coarse-n-conv", eig_coarse_n_conv, "The number of converged eigenvalues requested in the coarse eigensover (default eig_n_ev)");
   
-  opgroup->add_option("--eig-compress-n-ev", eig_comp_n_ev, "The size of eigenvector search space in the full eigensolver");
+  opgroup->add_option("--eig-coarse-n-ev", eig_coarse_n_ev, "The size of eigenvector search space in the coarse eigensolver");
   
-  opgroup->add_option("--eig-compress-n-kr", eig_comp_n_kr, "The size of the Krylov subspace to use in the full eigensolver");
+  opgroup->add_option("--eig-coarse-n-kr", eig_coarse_n_kr, "The size of the Krylov subspace to use in the coarse eigensolver");
+
+  opgroup->add_option("--eig-coarse-n-ev-deflate", eig_coarse_n_ev_deflate, "The number of converged coarse eigenpairs that will be used in the deflation routines (default eig_coarse_n_conv)");
   
-  opgroup->add_option("--eig-compress-n-block-ortho", eig_comp_n_block_ortho, "The number of times to run Gram-Schmidt during block orthonormalization in the transfer operator (default 1)");
+  opgroup->add_option("--eig-coarse-n-block-ortho", eig_coarse_n_block_ortho, "The number of times to run Gram-Schmidt during block orthonormalization in the transfer operator (default 1)");
 
 }
 

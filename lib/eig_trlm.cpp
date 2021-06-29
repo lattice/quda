@@ -52,9 +52,7 @@ namespace quda
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("prec 1 %lu\n", kSpace.size());
       queryPrec(kSpace[0]->Precision());
-      printfQuda("prec 2\n");
     }
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -62,21 +60,17 @@ namespace quda
       loadFromFile(mat, kSpace, evals);
       return;
     }
-    printfQuda("here 1\n");
     
     // Check for an initial guess. If none present, populate with rands, then
     // orthonormalise
     prepareInitialGuess(kSpace);
-    printfQuda("here 2\n");
     
     // Increase the size of kSpace passed to the function, will be trimmed to
     // original size before exit.
     prepareKrylovSpace(kSpace, evals);
-    printfQuda("here 3\n");
     
     // Check for Chebyshev maximum estimation
     checkChebyOpMax(mat, kSpace);
-    printfQuda("here 4\n");
     
     // Convergence and locking criteria
     double mat_norm = 0.0;

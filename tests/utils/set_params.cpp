@@ -263,34 +263,51 @@ void setEigParam(QudaEigParam &eig_param)
   } else {
     eig_param.n_conv = eig_n_conv;
   }
-  // Compressed eigensolver parameters
-  if(eig_comp) {
-    if (eig_comp_n_conv < 0) {
-      eig_param.comp_n_conv = eig_comp_n_ev;
-      eig_comp_n_conv = eig_comp_n_ev;
+  
+  // MG Lanczos eigensolver parameters
+  if(eig_param.eig_type == QUDA_EIG_MG_TR_LANCZOS) {
+    if (eig_coarse_n_conv < 0) {
+      eig_param.coarse_n_conv = eig_coarse_n_ev;
+      eig_coarse_n_conv = eig_coarse_n_ev;
     } else {
-      eig_param.comp_n_conv = eig_comp_n_conv;
+      eig_param.coarse_n_conv = eig_coarse_n_conv;
     }
-    eig_param.comp_n_ev = eig_comp_n_ev;
-    eig_param.comp_n_kr = eig_comp_n_kr;
-    eig_param.comp_max_restarts = eig_comp_max_restarts;
+    eig_param.coarse_n_ev = eig_coarse_n_ev;
+    eig_param.coarse_n_kr = eig_coarse_n_kr;
+    eig_param.coarse_max_restarts = eig_coarse_max_restarts;
     for (int j = 0; j < 4; j++) {
       // if not defined use 4
-      eig_param.geo_block_size[j] = eig_comp_geo_block_size[0][j] ? eig_comp_geo_block_size[0][j] : 4;
+      eig_param.geo_block_size[j] = eig_coarse_geo_block_size[0][j] ? eig_coarse_geo_block_size[0][j] : 4;
     }    
-    eig_param.compress = QUDA_BOOLEAN_TRUE;
-    eig_param.n_block_ortho = eig_comp_n_block_ortho;
+    eig_param.n_block_ortho = eig_coarse_n_block_ortho;
   }
 
   // Inverters will deflate only this number of vectors.
   if (eig_n_ev_deflate < 0) {
-    eig_param.n_ev_deflate = eig_n_conv;
-    eig_n_ev_deflate = eig_n_conv;
+    // Use the default value
+    eig_param.n_ev_deflate = eig_param.n_conv;
+    eig_n_ev_deflate = eig_param.n_conv;
   } else {
-    if (eig_n_ev_deflate > eig_n_conv) errorQuda("Can not deflate more that eig_n_conv eigenvectors.");
+    // Use user defined value
+    if (eig_n_ev_deflate > eig_param.n_conv)
+      errorQuda("Can not deflate more than the requested number of converged eigenvectors %d.", eig_param.n_conv);
     eig_param.n_ev_deflate = eig_n_ev_deflate;
   }
 
+  // Inverters will deflate only this number of vectors.
+  if(eig_param.eig_type == QUDA_EIG_MG_TR_LANCZOS) {
+    if (eig_coarse_n_ev_deflate < 0) {
+      // Use the default value
+      eig_param.coarse_n_ev_deflate = eig_param.coarse_n_conv;
+      eig_coarse_n_ev_deflate = eig_param.coarse_n_conv;
+    } else {
+      // Use user defined value
+      if (eig_coarse_n_ev_deflate > eig_param.coarse_n_conv)
+	errorQuda("Can not deflate more than the requested number of converged coarse eigenvectors %d.", eig_param.coarse_n_conv);
+      eig_param.coarse_n_ev_deflate = eig_coarse_n_ev_deflate;
+    }
+  }
+  
   eig_param.block_size
     = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
