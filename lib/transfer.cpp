@@ -80,9 +80,6 @@ namespace quda {
       total_block_size *= geo_bs[d];
     }
 
-    if (Nvec > total_block_size * spin_bs * B[0]->Ncolor())
-      errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, total_block_size * spin_bs * B[0]->Ncolor());
-
     // Various consistency checks for optimized KD "transfers"
     if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
 
@@ -93,7 +90,17 @@ namespace quda {
       // The number of coarse dof is technically fineColor for optimized KD
       if (Nvec != B[0]->Ncolor())
         errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
+
+    } else {
+      int aggregate_size = total_block_size * B[0]->Ncolor();
+      if (spin_bs == 0)
+        aggregate_size /= 2; // effective spin_bs of 0.5 (fine spin / coarse spin)
+      else
+        aggregate_size *= spin_bs;
+      if (Nvec > aggregate_size)
+        errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
     }
+
 
     std::string block_str = std::to_string(geo_bs[0]);
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
