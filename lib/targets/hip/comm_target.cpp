@@ -46,12 +46,14 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
         receiveHandle = comm_declare_receive_relative(&remote_handle[1-dir][dim],
                                                       dim, -disp, sizeof(remote_handle));
       }
+
       // now send
-      hipIpcMemHandle_t local_handle;
-      CHECK_HIP_ERROR(hipIpcGetMemHandle(&local_handle, local));
       if (comm_peer2peer_enabled(dir,dim)) {
+        hipIpcMemHandle_t local_handle;
+        CHECK_HIP_ERROR(hipIpcGetMemHandle(&local_handle, local));
         sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
       }
+
       if (receiveHandle) comm_start(receiveHandle);
       if (sendHandle) comm_start(sendHandle);
 
