@@ -11,7 +11,9 @@ Version 1.1.0 - July 2021
   for more details.
 
 - Addition of the Exact One Flavor Algorithm (EOFA) for Möbius
-  fermions.
+  fermions.  See
+  https://github.com/lattice/quda/wiki/The-Exact-One-Flavor-Algorithm-(EOFA)
+  for more details.
 
 - Addition of a fully GPU native Implicitly Restarted Arnoldi
   eigensolver (as opposed to partially relying on ARPACK).  See
@@ -22,7 +24,7 @@ Version 1.1.0 - July 2021
   of heterogeneous atomics.  Requires CUDA 11.0+.
 
 - Addition of support for a split-grid multi-RHS solver.  See
-  https://github.com/lattice/quda/wiki/Split-Gridfor more details.
+  https://github.com/lattice/quda/wiki/Split-Grid for more details.
 
 - Continued work on enhancing and refining the staggered multigrid
   algorithm.  The MILC interface can now drive the staggered multigrid
@@ -38,9 +40,10 @@ Version 1.1.0 - July 2021
 
 - Improved the performance of using MILC RHMC with QUDA
 
-- Add support for a new internal data order FLOAT8.  This can be
-  enabled for applicable half precision field types (instead of
-  FLOAT4) when enabled with the cmake option QUDA_FLOAT8.
+- Add support for a new internal data order FLOAT8.  This is the
+  default data order for nSpin=4 half and quarter precision fields,
+  though the prior FLOAT4 order can be enabled with the cmake option
+  QUDA_FLOAT8=OFF.
 
 - Remove of the singularity from the reconstruct-8 and reconstruct-9
   compressed gauge field ordering.  This enables support for free
