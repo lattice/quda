@@ -49,6 +49,12 @@ Version 1.1.0 - July 2021
   compressed gauge field ordering.  This enables support for free
   fields with these orderings.
 
+- The clover parameter convention has been codified: one can either
+  1.) pass in QudaInvertParam::kappa and QudaInvertParam::csw
+  separately, and QUDA will infer the necessary clover coefficient, or
+  2.) pass an explicit value of QudaInvertParam::clover_coeff
+  (e.g. CHROMA's use case) and that will override the above inference.
+
 - QUDA now includes fast-compilation options (QUDA_FAST_COMPILE_DSLASH
   and QUDA_FAST_COMPILE_REUDCE) which enable much faster build times
   for development at the expense of reduced performance.
