@@ -27,7 +27,7 @@ namespace quda {
   /**
      @return host memory allocated
    */
-  size_t host_allocatedk();
+  size_t host_allocated();
 
   /**
      @return peak device memory allocated
