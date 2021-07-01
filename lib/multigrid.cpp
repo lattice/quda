@@ -769,10 +769,11 @@ namespace quda
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
+    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
     double tol;
     switch (prec) {
     case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
-    case QUDA_HALF_PRECISION:    tol = 1e-2; break;
+    case QUDA_HALF_PRECISION:    tol = 2e-2; break;
     case QUDA_SINGLE_PRECISION:  tol = 1e-3; break;
     default: tol = 1e-8;
     }
