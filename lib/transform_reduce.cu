@@ -173,6 +173,8 @@ namespace quda
     QudaFieldLocation, complex<float> const *, int, square_<double, float>, double, plus<double>);
   template double transform_reduce<double, complex<short>, int, square_<double, short>, plus<double>>(
     QudaFieldLocation, complex<short> const *, int, square_<double, short>, double, plus<double>);
+  template double transform_reduce<double, complex<short>, int, abs_<double, short>, maximum<double>>(
+    QudaFieldLocation, complex<short> const*, int, abs_<double, short>, double, maximum<double>);
 
   template float reduce<float, float, int, maximum<float>>(QudaFieldLocation, float const *, int, float, maximum<float>);
 
