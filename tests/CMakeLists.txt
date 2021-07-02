@@ -5,23 +5,11 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
-target_link_libraries(quda_test PUBLIC quda)
-target_compile_options(quda_test PUBLIC -fPIC)
+target_link_libraries(quda_test PUBLIC Eigen)
+target_link_libraries(quda_test PUBLIC QUDA::quda)
+set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
-
-if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
-  add_dependencies(quda_test QIO)
-endif()
-
-if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
-  add_dependencies(quda_test QMP)
-endif()
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
@@ -35,18 +23,6 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
-  endif()
-
-  if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
-    add_dependencies(${mytarget} QIO)
-  endif()
-
-  if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
-    add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
 
