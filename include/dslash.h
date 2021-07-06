@@ -404,8 +404,10 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+#ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
       strcat(aux_barrier, ",shmem");
+#endif
 
       // extract the filename from the template template class (do
       // this regardless of jitify to ensure a build error if filename

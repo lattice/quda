@@ -457,6 +457,7 @@ public:
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
 #endif
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
+      if (this->threads == 0) errorQuda("Local volume is too small");
     }
   };
 

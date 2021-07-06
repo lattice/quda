@@ -58,8 +58,6 @@ static int unitarize_link_test(int &test_rc)
 {
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(device_ordinal);
-
   qudaGaugeParam.anisotropy = 1.0;
 
   qudaGaugeParam.X[0] = xdim;
@@ -196,7 +194,6 @@ static int unitarize_link_test(int &test_rc)
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif
-  endQuda();
 
   printfQuda("Unitarization time: %g ms\n", TDIFF(t0,t1)*1000); 
   return num_failures;
@@ -240,6 +237,7 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device_ordinal);
 
   // Ensure gtest prints only from rank 0
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
@@ -260,6 +258,8 @@ int main(int argc, char **argv)
   }else{
     printfQuda("Unitarization successfull!\n");
   }
+
+  endQuda();
   finalizeComms();
 
   return test_rc;
