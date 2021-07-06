@@ -109,8 +109,11 @@ namespace quda {
   void GaugeField::setTuningString() {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
-    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride,
-                         precision, geometry, nColor);
+    int check = (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) ?
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d",
+               volume, stride, precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d",
+               volume, stride, precision, geometry, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 

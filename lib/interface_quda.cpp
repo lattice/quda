@@ -4044,24 +4044,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profilerStop(__func__);
 }
 
-void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param) {
-
+void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param)
+{
 #ifdef GPU_FATLINK
   profileFatLink.TPSTART(QUDA_PROFILE_TOTAL);
   profileFatLink.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(param);
-
-  if (ulink) {
-    const double unitarize_eps = 1e-14;
-    const double max_error = 1e-10;
-    const int reunit_allow_svd = 1;
-    const int reunit_svd_only  = 0;
-    const double svd_rel_error = 1e-6;
-    const double svd_abs_error = 1e-6;
-    quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only,
-				     svd_rel_error, svd_abs_error);
-  }
 
   GaugeFieldParam gParam(fatlink, *param, QUDA_GENERAL_LINKS);
   cpuGaugeField cpuFatLink(gParam);   // create the host fatlink
@@ -4070,21 +4059,17 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.gauge = ulink;
   cpuGaugeField cpuUnitarizedLink(gParam);
   gParam.link_type = param->type;
-  gParam.gauge     = inlink;
+  gParam.gauge = inlink;
   cpuGaugeField cpuInLink(gParam);    // create the host sitelink
 
   // create the device fields
   gParam.reconstruct = param->reconstruct;
   gParam.setPrecision(param->cuda_prec, true);
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
   cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
-
   profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileFatLink.TPSTART(QUDA_PROFILE_H2D);
-  cudaInLink->loadCPUField(cpuInLink);
-  profileFatLink.TPSTOP(QUDA_PROFILE_H2D);
-
+  cudaInLink->loadCPUField(cpuInLink, profileFatLink);
   cudaGaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileFatLink);
 
   profileFatLink.TPSTART(QUDA_PROFILE_FREE);
@@ -4096,33 +4081,64 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(param->cuda_prec, true);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  if (longlink) {
+    profileFatLink.TPSTART(QUDA_PROFILE_INIT);
+    cudaGaugeField *cudaLongLink = new cudaGaugeField(gParam);
+    profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
+    longKSLink(cudaLongLink, *cudaInLinkEx, path_coeff);
+    profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    cudaLongLink->saveCPUField(cpuLongLink, profileFatLink);
+
+    profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+    delete cudaLongLink;
+    profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  profileFatLink.TPSTART(QUDA_PROFILE_INIT);
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
-  cudaGaugeField *cudaUnitarizedLink = ulink ? new cudaGaugeField(gParam) : nullptr;
-  cudaGaugeField *cudaLongLink = longlink ? new cudaGaugeField(gParam) : nullptr;
+  profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
   profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-  fatLongKSLink(cudaFatLink, cudaLongLink, *cudaInLinkEx, path_coeff);
+  fatKSLink(cudaFatLink, *cudaInLinkEx, path_coeff);
   profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
+  if (fatlink) cudaFatLink->saveCPUField(cpuFatLink, profileFatLink);
+
+  profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+  delete cudaInLinkEx;
+  profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+
   if (ulink) {
+    const double unitarize_eps = 1e-14;
+    const double max_error = 1e-10;
+    const int reunit_allow_svd = 1;
+    const int reunit_svd_only  = 0;
+    const double svd_rel_error = 1e-6;
+    const double svd_abs_error = 1e-6;
+    quda::setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only,
+				     svd_rel_error, svd_abs_error);
+
+    cudaGaugeField *cudaUnitarizedLink = new cudaGaugeField(gParam);
+
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
     *num_failures_h = 0;
     quda::unitarizeLinks(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
-    if (*num_failures_h>0) errorQuda("Error in unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
+    if (*num_failures_h > 0) errorQuda("Error in unitarization component of the hisq fattening: %d failures", *num_failures_h);
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
-  }
 
-  profileFatLink.TPSTART(QUDA_PROFILE_D2H);
-  if (ulink) cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink);
-  if (fatlink) cudaFatLink->saveCPUField(cpuFatLink);
-  if (longlink) cudaLongLink->saveCPUField(cpuLongLink);
-  profileFatLink.TPSTOP(QUDA_PROFILE_D2H);
+    cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink, profileFatLink);
+
+    profileFatLink.TPSTART(QUDA_PROFILE_FREE);
+    delete cudaUnitarizedLink;
+    profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
+  }
 
   profileFatLink.TPSTART(QUDA_PROFILE_FREE);
   delete cudaFatLink;
-  if (longlink) delete cudaLongLink;
-  if (ulink) delete cudaUnitarizedLink;
-  delete cudaInLinkEx;
   profileFatLink.TPSTOP(QUDA_PROFILE_FREE);
 
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -4393,7 +4409,7 @@ void destroyGaugeFieldQuda(void* gauge){
 }
 
 
-void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_force, void **x,
+void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *, void **x,
 			       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
@@ -4405,11 +4421,6 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   gParam.reconstruct = gauge_param->reconstruct;
   gParam.t_boundary = QUDA_PERIODIC_T;
   cpuGaugeField cpuMom(gParam);
-
-  // create the host momentum field
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.gauge = h_force;
-  cpuGaugeField cpuForce(gParam);
 
   // create the device momentum field
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -5291,7 +5302,8 @@ void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
   fflush(stdout);
 }
 
-void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
+void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param)
+{
   // ensure that fifth dimension is set to 1
   if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
 
@@ -5302,7 +5314,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 
   // compute offset assuming TIFR padded ordering (FIXME)
   if (param->dirac_order != QUDA_TIFR_PADDED_DIRAC_ORDER)
-    errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER");
+    errorQuda("Fortran multi-shift solver presently only supports QUDA_TIFR_PADDED_DIRAC_ORDER and not %d", param->dirac_order);
 
   const int *X = gaugePrecise->X();
   size_t cb_offset = (X[0]/2) * X[1] * (X[2] + 4) * X[3] * gaugePrecise->Ncolor() * nSpin * 2 * param->cpu_prec;
