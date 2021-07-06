@@ -5,6 +5,7 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
+#include <dslash_quda.h>
 
 namespace quda
 {
