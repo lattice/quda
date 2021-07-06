@@ -179,7 +179,7 @@ namespace quda {
         using value_type = Float;
         using store_type = storeFloat;
         complex<storeFloat> *v;
-        const int idx;
+        const unsigned int idx;
         const Float scale;
         const Float scale_inv;
         static constexpr bool fixed = fixed_point<Float, storeFloat>();
@@ -188,7 +188,7 @@ namespace quda {
            @brief fieldorder_wrapper constructor
            @param idx Field index
         */
-        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, unsigned int idx, Float scale, Float scale_inv) :
           v(v),
           idx(idx),
           scale(scale),
@@ -350,9 +350,9 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       static constexpr bool is_mma_compatible = false;
       complex <storeFloat> *u[QUDA_MAX_GEOMETRY];
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int geometry;
-      const int cb_offset;
+      const unsigned int cb_offset;
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
@@ -413,7 +413,7 @@ namespace quda {
     struct GhostAccessor<Float, nColor, QUDA_QDP_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       complex<storeFloat> *ghost[8];
-      int ghostOffset[8];
+      unsigned int ghostOffset[8];
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
@@ -452,7 +452,7 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       static constexpr bool is_mma_compatible = true;
       complex<storeFloat> *u;
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int geometry;
       Float scale;
       Float scale_inv;
@@ -499,8 +499,8 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int start = dim == -1 ? 0 : dim;
-        int count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
+        auto start = dim == -1 ? 0 : dim;
+        auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
         std::vector<double> result = {init, init};
         std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
                                       u + (1 * geometry + start) * volumeCB * nColor * nColor};
@@ -513,7 +513,7 @@ namespace quda {
     struct GhostAccessor<Float, nColor, QUDA_MILC_GAUGE_ORDER, native_ghost, storeFloat> {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       complex<storeFloat> *ghost[8];
-      int ghostOffset[8];
+      unsigned int ghostOffset[8];
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();
@@ -566,9 +566,9 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       static constexpr bool is_mma_compatible = false;
       complex<storeFloat> *u;
-      const int offset_cb;
-      const int volumeCB;
-      const int stride;
+      const unsigned int offset_cb;
+      const unsigned int volumeCB;
+      const unsigned int stride;
       const int geometry;
       Float max;
       Float scale;
@@ -595,7 +595,7 @@ namespace quda {
 
       __device__ __host__ inline wrapper operator()(int dim, int parity, int x_cb, int row, int col) const
       {
-	int index = parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb;
+	auto index = parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb;
 	return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
       }
 
@@ -616,8 +616,8 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int start = (dim == -1) ? 0 : dim;
-        int count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
+        auto start = (dim == -1) ? 0 : dim;
+        auto count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
         std::vector<double> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
         ::quda::transform_reduce(location, result, v, count, h, init, r);
@@ -630,7 +630,7 @@ namespace quda {
       using wrapper = fieldorder_wrapper<Float, storeFloat>;
       complex<storeFloat> *ghost[8];
       const int volumeCB;
-      int ghostVolumeCB[8];
+      unsigned int ghostVolumeCB[8];
       Float scale;
       Float scale_inv;
       static constexpr bool fixed = fixed_point<Float,storeFloat>();

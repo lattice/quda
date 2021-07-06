@@ -1,5 +1,7 @@
 #pragma once
 
+#include "complex_quda.h"
+
 namespace quda {
 
   template <typename T> struct plus {

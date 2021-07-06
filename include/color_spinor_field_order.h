@@ -608,13 +608,13 @@ namespace quda {
       mutable complex<ghostFloat> *ghost[8];
       mutable norm_t *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
-    const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
+      const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
       Float ghost_scale;
       Float ghost_scale_inv;
 #endif
