@@ -564,6 +564,9 @@ extern "C" {
     /** Number of times to repeat Gram-Schmidt in block orthogonalization */
     int n_block_ortho[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to do passes at block orthogonalize in fixed point for improved accuracy */
+    QudaBoolean block_ortho_two_pass[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 

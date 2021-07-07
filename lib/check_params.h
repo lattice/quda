@@ -738,8 +738,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 #ifdef INIT_PARAM
     P(n_block_ortho[i], 1);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_TRUE);
 #else
     P(n_block_ortho[i], INVALID_INT);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_INVALID);
 #endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
