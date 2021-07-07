@@ -179,6 +179,10 @@ static int *num_failures_d = nullptr;
 
 static bool initialized = false;
 
+// HMC acceptance_rate
+static int accepted = 0;
+static int trajectories = 0;
+
 //!< Profiler for initQuda
 static TimeProfile profileInit("initQuda");
 
@@ -214,6 +218,9 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
+
+//!<Profiler for updateMomentumFieldQuda
+static TimeProfile profileMomentumUpdate("updateMomentumFieldQuda");
 
 //!<Profiler for createExtendedGaugeField
 static TimeProfile profileExtendedGauge("createExtendedGaugeField");
@@ -1591,6 +1598,7 @@ void endQuda(void)
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
+    profileMomentumUpdate.Print();
     profileExtendedGauge.Print();
     profileWilsonForce.Print();
     profileCloverForce.Print();
@@ -6261,10 +6269,10 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   checkGaugeParam(gauge_param);
   
   // check the gauge fields have been created
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
+  //cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
   // Define gauge coefficients
-  QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_SYMANZIK;
+  QudaGaugeActionType gauge_action_type = QUDA_GAUGE_ACTION_TYPE_WILSON;
   double path_coeff[3] = {1.0, 1.0, 1.0};
   double epsilon = (hmc_param->traj_length/(1.0*hmc_param->traj_steps));
   //---------------------------------------------------------------------
@@ -6280,7 +6288,6 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   // An auxilliary field
   GaugeFieldParam aux_param(*gaugeEvolved);
   GaugeField *gaugeTemp = GaugeField::Create(aux_param);
-  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
   
   // Create device momentum field
   //---------------------------------------------------------------------
@@ -6293,24 +6300,26 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   mom_param.pad = 0;
   mom_param.setPrecision(inv_param->cuda_prec, true);
   
-  // If the resident momentum field exists, reuse.
-  GaugeField *device_mom = GaugeField::Create(mom_param);
-
-  // Populate the momentum field with rands, make anti hermitian
-  // DMH FIXME: add a global seed to QUDA. 
-  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-  quda::gaugeGauss(*device_mom, 17*step + 137, 1.0);
-  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
-  
-
   // Create a field for the force
   GaugeFieldParam force_param(*gaugeEvolved);
   force_param.link_type = QUDA_GENERAL_LINKS;
   force_param.create = QUDA_ZERO_FIELD_CREATE;
   force_param.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeField *force = GaugeField::Create(force_param);
+
+  // DMH TODO: If the resident momentum field exists, reuse.
+  GaugeField *device_mom = GaugeField::Create(mom_param);
+  GaugeField *device_mom_copy = GaugeField::Create(mom_param);
+  profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  // Populate the momentum field with rands, make anti hermitian
+  // DMH FIXME: add a global seed to QUDA. 
+  profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
+  quda::gaugeGauss(*device_mom, 17*step + 137, 1.0);
+  device_mom_copy->copy(*device_mom);  
+  profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);  
   //---------------------------------------------------------------------
       
   // Start HMC 
@@ -6347,33 +6356,26 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
 
   // Begin HMC with initial half step.
   //----------------------------------
-  profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
-  updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);
-  copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
-  gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
-  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
+  double hmc_coeff = hmc_param->beta*epsilon/3.0;
+
+  // Initial half step
+  //P_{1/2} = P_0 - dtau/2 * (fU - fD) 
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  // Inside the gauge force calculation is a momentum update too.
+  gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff/2.0, path_coeff);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
   
   for(int k=1; k<hmc_param->traj_steps; k++) {
-    
-    // We just evolved the gauge field, so we must recompute the fermion fields
-    // and invert to calculate the impulse on the fermion.
-    
-    profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
-    profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_param->beta*epsilon/3.0, path_coeff);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-    
+
     // Now we have the gauge field force accumulated in the momentum
     // field, we apply the impulse to the gauge field, reunitarize,
-    // and start the next leapfrog step in the integration
-    
+    // and start the next leapfrog step in the integration.
+    //U_{k} = exp(i dtau P_{k-1/2}) * U_{k-1}
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
-    if(k == hmc_param->traj_steps-1) updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);
-    else updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
+    updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
     copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
     gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
     profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -6382,8 +6384,39 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     *num_failures_h = 0;
     quda::unitarizeLinks(*gaugeEvolved, num_failures_d); // unitarize on the gpu
     if (*num_failures_h>0) errorQuda("Error in reunitarization: %d failures\n", *num_failures_h);
+    
+    // We just evolved the gauge field, so we must recompute the fermion fields
+    // and invert to calculate the impulse from the fermion field.
+    //P_{k+1/2} = P_{k-1/2} - dtau * (fU - fD)
+    profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+    profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
+    gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff, path_coeff);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+    
   }
 
+  // Final half step
+  //U_{n} = exp(i dtau P_{n-1/2}) * U_{n-1}
+  profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
+  updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
+  copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
+  gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
+  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
+  
+  *num_failures_h = 0;
+  quda::unitarizeLinks(*gaugeEvolved, num_failures_d); // unitarize on the gpu
+  if (*num_failures_h>0) errorQuda("Error in reunitarization: %d failures\n", *num_failures_h);
+  
+  //P_{n} = P_{n-1/2} - dtau/2 * (fU - fD) 
+  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
+  gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff/2.0, path_coeff);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  
   // Measure gauge and Q charge
   gaugeObservablesQuda(&gauge_obs_param);
   
@@ -6415,19 +6448,24 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   }
   
   bool accept = (dH < 0 || step < hmc_param->therm_updates || prob < expdH);    
-  
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Trajectory %d: %s delta H %+.8e expdH %.8e prob %.8e\n",
-	       step, accept ? "accepted" : "rejected", dH, expdH, prob);	  
+  if(step >= hmc_param->therm_updates) {
+    trajectories++;
+    accepted += (int)accept;
   }
   
   if(getVerbosity() == QUDA_SUMMARIZE) {
-    printfQuda("Trajectory %d: acceptance %d dH %+.16e expdH %.16e plaq %.16e Q %+.16e\n", step, (int)accept, dH, expdH, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge);
+    printfQuda("Trajectory %d: acceptance %d dH %+.16e expdH %.16e plaq %.16e Q %+.16e", step, (int)accept, dH, expdH, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge);
+    if(step >= hmc_param->therm_updates) {
+      printfQuda(" rate %f\n", (1.0*accepted)/trajectories);
+    } else {
+      printfQuda("\n");
+    }
   }
 
   delete gaugeTemp;
   delete force;
   delete device_mom;
+  delete device_mom_copy;
   popVerbosity();
   return accept ? 1 : 0;
 }

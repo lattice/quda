@@ -11,6 +11,7 @@
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
+#include <blas_quda.h>
 
 void display_info()
 {
@@ -73,7 +74,7 @@ int main(int argc, char **argv)
   // Allocate space on the host for a gauge field, fill with a random gauge, a unit gauge
   // or a user supplied gauge.
   void *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);  
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -117,23 +118,54 @@ int main(int argc, char **argv)
   // RNG for populating the host spinor with random numbers.
   auto *rng = new quda::RNG(*check, 1234);
   
-  double acceptance = 0.0;
-  
   // Run the QUDA computation. The the metropolis step is performed in the function.
   for(int i=0; i<hmc_param.therm_updates + hmc_param.therm_updates; i++) {
+
     // Momentum refresh
     constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, inv_param.solution_type, gauge_param.X, *rng);
+
+    // Reversibility check
+    //if((i+1)%hmc_reversibility_check == 0) {
+    if((i+1)%10 == 0 && 0) {
+
+      // Save current momentum
+      check = in;
+      
+      // Save current gauge 
+      saveGaugeQuda((void *)gauge, &gauge_param);
+    }
+
+    
     // HMC step
     int accept = performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
+
     // Checkpoint
     if((i+1)%hmc_checkpoint == 0) {
       
     }
     
-    if(i > hmc_param.therm_updates) {
-      acceptance += accept;
-      printfQuda("Trajectory %d: Acceptance rate %.6e\n", i, acceptance/(i-hmc_param.therm_updates));
-    }	
+    // Reversibility check
+    //if((i+1)%hmc_reversibility_check == 0) {
+    if((i+1)%10 == 0 && 0) {
+
+      // Apply HMC from current config and check against old momenta
+      // and gauge field.
+      hmc_param.traj_length *= -1.0;
+      performLeapfrogStep(out->V(), in->V(), &hmc_param, i);
+      hmc_param.traj_length *= -1.0;
+      
+      void *gauge_reversed[4];
+      for (int dir = 0; dir < 4; dir++) gauge_reversed[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      saveGaugeQuda((void *)gauge_reversed, &gauge_param);
+
+      // Momentum check
+      quda::blas::axpy(-1.0, *out, *check);
+      printfQuda("Momentum diff = %.16e\n", sqrt(quda::blas::norm2(*check)));
+
+      // Gauge check
+      check_gauge(gauge, gauge_reversed, 1e-6, QUDA_DOUBLE_PRECISION);
+      for (int dir = 0; dir < 4; dir++) host_free(gauge_reversed[dir]);
+    }
   }
   
   // Stop the timer
@@ -141,13 +173,15 @@ int main(int argc, char **argv)
   time0 /= CLOCKS_PER_SEC;
 
   printfQuda("Total time for leapfrog  = %g secs\n", time0);
+  
+  // Save if output string is specified
+  if (strcmp(gauge_outfile,"") != 0) {
+    //saveHostGaugeField(gauge, gauge_param, QUDA_WILSON_LINKS);
+  }
   //--------------------------------------------------------------------------
-
-  saveHostGaugeField(gauge, gauge_param, QUDA_WILSON_LINKS);
   
   // Clean up
-  freeGaugeQuda();
-  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
   delete in;
   delete out;
   delete check;
