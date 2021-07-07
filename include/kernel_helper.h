@@ -1,5 +1,7 @@
 #pragma once
 
+#include "comm_quda.h"
+
 namespace quda {
 
   struct kernel_t {
