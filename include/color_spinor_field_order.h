@@ -846,6 +846,35 @@ namespace quda {
       /** Returns the field geometric dimension */
       __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
+#endif
+
+      /**
+       * Returns the L2 norm squared of the field in a given dimension
+       * @param[in] global Whether to do a global or process local norm2 reduction
+       * @return L2 norm squared
+      */
+      __host__ double norm2(const ColorSpinorField &v, bool global = true) const
+      {
+        double nrm2 = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
+        if (global) comm_allreduce(&nrm2);
+        return nrm2;
+      }
+
+      /**
+       * Returns the Linfinity norm of the field
+       * @param[in] global Whether to do a global or process local Linfinity reduction
+       * @return Linfinity norm
+      */
+      __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
+      {
+        double absmax = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        if (global) comm_allreduce_max(&absmax);
+        return absmax;
+      }
+
+#ifndef DISABLE_GHOST
       /**
        * Returns the L2 norm squared of the field in a given dimension
        * @param[in] global Whether to do a global or process local norm2 reduction
