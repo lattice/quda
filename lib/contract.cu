@@ -29,8 +29,7 @@ namespace quda {
 		      const int *const source_position,
 		      const int *const mom_mode, const QudaFFTSymmType *const fft_type,
 		      const size_t s1, const size_t b1) :
-      TunableMultiReduction(x, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z ||
-				     cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
+      TunableMultiReduction(x, x.X()[cType == QUDA_CONTRACT_TYPE_DR_FT_Z || cType == QUDA_CONTRACT_TYPE_OPEN_SUM_Z ? 2 : 3]),
       x(x),
       y(y),
       result_global(result_global),
@@ -74,28 +73,25 @@ namespace quda {
       switch(cType) {
       case QUDA_CONTRACT_TYPE_DR_FT_T:
 	{
-	  constexpr int nSpin = 4;
-	  constexpr bool spin_project = true;
+	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 3;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
+	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_DR_FT_Z:
 	{
-	  constexpr int nSpin = 4;
-	  constexpr bool spin_project = true;
+	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 2;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
+	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T:
 	{
-	  constexpr int nSpin = 1;
-	  constexpr bool spin_project = false;
+	  constexpr int nSpin  = 1;
 	  constexpr int ft_dir = 3;
-	  ContractionSummedArg<Float, nSpin, nColor, spin_project, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
+	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
 	  launch<StaggeredContractFT>(result_local, tp, stream, arg);
 	}
 	break;
@@ -132,11 +128,11 @@ namespace quda {
 			  const size_t s1, const size_t b1)
   {
     checkPrecision(x, y);
-    if(x.Nspin() != y.Nspin()) errorQuda("Contraction between unequal number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+    if(x.Nspin()  != y.Nspin() ) errorQuda("Contraction between unequal number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     if(x.Ncolor() != y.Ncolor()) errorQuda("Contraction between unequal number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if(cType != QUDA_CONTRACT_TYPE_STAGGERED_FT_T)
       {
-	if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Expected four-spinors x=%d y=%d", x.Nspin(), y.Nspin());
+	if (x.Nspin() != 4 || y.Nspin() != 4)   errorQuda("Expected four-spinors x=%d y=%d", x.Nspin(), y.Nspin());
 	if ( x.GammaBasis() != y.GammaBasis() ) errorQuda("Contracting spinors in different gamma bases x=%d y=%d", x.GammaBasis(), y.GammaBasis());
       }
     if(cType == QUDA_CONTRACT_TYPE_DR_FT_T || cType == QUDA_CONTRACT_TYPE_DR_FT_Z )
@@ -208,6 +204,7 @@ public:
 	  constexpr int nSpin = 1;
 	  constexpr bool spin_project = false;
 	  ContractionArg<Float, nSpin, nColor, spin_project> arg(x, y, result);
+
 	  launch<StaggeredContract>(tp, stream, arg);
 	}; break;
       default: errorQuda("Unexpected contraction type %d", cType);

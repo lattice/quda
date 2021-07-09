@@ -73,8 +73,9 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device_ordinal);
-  int X[4] = {xdim, ydim, zdim, tdim};
+  int X[4] = {xdim, ydim, zdim, tdim}; // local dims
   setDims(X);
+  cudaDeviceSetLimit(cudaLimitPrintfFifoSize,64*1024*1024); // DEBUG-JNS
   //-----------------------------------------------------------------------------
 
   prec = QUDA_INVALID_PRECISION;
@@ -141,7 +142,7 @@ int test(int contractionType, QudaPrecision test_prec)
   cs_param.pad = 0;
   cs_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   cs_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  cs_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
+  cs_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
   cs_param.create = QUDA_ZERO_FIELD_CREATE;
   cs_param.location = QUDA_CPU_FIELD_LOCATION;
 
@@ -177,9 +178,26 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   const int source_position[4]{0,0,0,0};
-  const int n_mom = 1;
-  const int mom[4]{0,0,0,0};
-  const QudaFFTSymmType fft_type[4]{QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN,QUDA_FFT_SYMM_EVEN};
+  const int n_mom = 9;
+  const int mom[n_mom*4]{
+      0, 0, 0, 0,
+      1, 0, 0, 0,    -1, 0, 0, 0,
+      0, 1, 0, 0,     0,-1, 0, 0,
+      0, 0, 1, 0,     0, 0,-1, 0,
+      1, 1, 1, 0,    -1,-1,-1, 0
+      };
+  const QudaFFTSymmType ftype = QUDA_FFT_SYMM_EO;
+  const QudaFFTSymmType fft_type[n_mom*4]{
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO
+      };
 
   int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
   void *d_result = malloc(n_contract_results * sizeof(double)); // meson correlators are always double
@@ -193,10 +211,14 @@ int test(int contractionType, QudaPrecision test_prec)
   // Perform GPU contraction.
   contractFTQuda(spinorX, spinorY, &d_result, cType, (void*)(&cs_param), src_colors, X, source_position, n_mom, mom, fft_type);
 
-  printfQuda("contraction:");
-  for(int c=0; c < n_contract_results; c += 2) {
-    if( c % 8 == 0 ) printfQuda("\n%3d ",c/2);
-    printfQuda(" (%10.3e,%10.3e)",((double*)d_result)[c],((double*)d_result)[c+1]);
+  printfQuda("contractions:");
+  for(int k=0; k<n_mom; ++k) {
+    printfQuda("\np = %2d %2d %2d %2d",mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3]);
+    for(int c=0; c<red_size*nSpin*nSpin*2; c+= 2) {
+      int indx = k*red_size*nSpin*nSpin*2 + c;
+      if( c % 8 == 0 ) printfQuda("\n%3d",indx);
+      printfQuda(" (%10.3e,%10.3e)",((double*)d_result)[indx],((double*)d_result)[indx+1]);
+    }
   }
   printfQuda("\n");
   // Compare contraction from the host and device. Return the number of detected faults.
@@ -258,8 +280,8 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
   return str; // names[contractType] + "_" + prec_str[prec];
 }
 
-// Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(2, NcontractType)), getContractName);
+// Instantiate all test cases: prec 3==double, 2==float; contractType 2==staggered_FT
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 3), Range(2, NcontractType)), getContractName);
 
 
 

@@ -10,8 +10,10 @@
 namespace quda
 {
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
-  using contract_array = vector_type<double2, max_contract_results>;
   
+  using contract_array           = vector_type<double2, max_contract_results>;
+  using staggered_contract_array = vector_type<double2, 1>;
+
   template <typename real> class DRGammaMatrix {
   public:
     // Stores gamma matrix column index for non-zero complex value.
@@ -240,7 +242,7 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
    
-  template <typename Float, int nSpin_, int nColor_, bool spin_project_, int reduction_dim_ = 3>
+  template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3>
   struct ContractionSummedArg :  public ReduceArg<contract_array>
   {
     // This the direction we are performing reduction on. default to 3.
@@ -248,8 +250,8 @@ namespace quda
 
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = nSpin_;
-    static constexpr bool spin_project = spin_project_;
+    static constexpr int nSpin  = nSpin_;
+    static constexpr bool spin_project = nSpin_ == 1 ? false : true;
     static constexpr bool spinor_direct_load = false; // false means texture load
 
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
@@ -285,7 +287,7 @@ namespace quda
         source_position[i] = source_position_in[i];
 	mom_mode[i] = mom_mode_in[i];
 	fft_type[i] = fft_type_in[i];
-        offsets[i] = comm_coord(i) * x.X()[i];
+        offsets[i]  = comm_coord(i) * x.X()[i];
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
@@ -383,19 +385,21 @@ namespace quda
   template <typename Arg> struct StaggeredContractFT : plus<contract_array> {
     using reduce_t = contract_array;
     using plus<reduce_t>::operator();    
-    Arg &arg;
-    constexpr StaggeredContractFT(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr StaggeredContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
     // Final param is unused in the MultiReduce functor in this use case.
     __device__ __host__ inline reduce_t operator()(reduce_t &result, int xyz, int t, int)
     {
-      constexpr int nSpin = Arg::nSpin;
+      constexpr int nSpin  = Arg::nSpin;
       constexpr int nColor = Arg::nColor;
-      using real = typename Arg::real;
+      using real   = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
       reduce_t result_all_channels = contract_array();
+      //reduce_t result_all_channels = staggered_contract_array();
+      
       int mom_mode[4];
       QudaFFTSymmType fft_type[4];
       int source_position[4];
@@ -410,8 +414,7 @@ namespace quda
       }
       
       //The coordinate of the sink
-      int *sink;
-      sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+      int *sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
 
       // Collect vector data
       int parity = 0;
@@ -457,17 +460,12 @@ namespace quda
       // Staggered uses only the first element of result_all_channels
       result_all_channels[0].x += prop_prod.real()*phase_real - prop_prod.imag()*phase_imag;
       result_all_channels[0].y += prop_prod.imag()*phase_real + prop_prod.real()*phase_imag;
-      for(int i=1; i<max_contract_results; ++i) // zero unused elements
-	{
-	  result_all_channels[i].x = 0.;
-	  result_all_channels[i].y = 0.;
-	}
 
       return plus::operator()(result_all_channels, result);
     }
   };
   
-  template <typename Float, int nSpin_, int nColor_, bool spin_project_> struct ContractionArg {
+  template <typename Float, int nSpin_, int nColor_, bool spin_project_> struct ContractionArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     int X[4];    // grid dimensions
 
@@ -696,8 +694,8 @@ namespace quda
   };
 
   template <typename Arg> struct StaggeredContract {
-    Arg &arg;
-    constexpr StaggeredContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr StaggeredContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

@@ -290,7 +290,6 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 void constructPointSpinorSource(void *v, QudaPrecision precision, const int *const x,
                                 const int dil, const int *const source_position)
 {
-  int my_spinor_site_size = nSpin * nColor * 2;
   int X[4] = {x[0], x[1], x[2], x[3]};
   // Get local index
   int src_local[4];
@@ -322,8 +321,7 @@ void constructPointSpinorSource(void *v, QudaPrecision precision, const int *con
 
 void constructWallSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int dil)
 {
-  int my_spinor_site_size = nSpin * nColor * 2;
-  size_t bytes = V * my_spinor_site_size * host_spinor_data_type_size;
+  size_t bytes = V * spinor_site_size * host_spinor_data_type_size;
   memset(v, bytes, 0.0);
 
   for (int i = 0; i < V; i++) {

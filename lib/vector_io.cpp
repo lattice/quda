@@ -159,8 +159,8 @@ namespace quda
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
 
-      read_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
-                            spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec / 12, 0, (char **)0);
+      //read_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+      //                      spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec / 12, 0, (char **)0);
 
       host_free(V);
     } else {
@@ -393,8 +393,8 @@ namespace quda
         for (int j = 0; j < Ls; j++) { V[i * Ls + j] = static_cast<char *>(tmp[i]->V()) + j * stride; }
       }
 
-      write_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
-                             spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), (Nvec) / 12, 0, (char **)0);
+      //write_propagator_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+      //                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), (Nvec) / 12, 0, (char **)0);
 
       host_free(V);
     } else {

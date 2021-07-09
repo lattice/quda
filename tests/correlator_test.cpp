@@ -247,8 +247,8 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
     }
 
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
-    contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
-                   (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
+    //contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
+    //               (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
 
     //! Print and save correlators for this source
     if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
