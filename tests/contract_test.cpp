@@ -23,6 +23,7 @@ constexpr int NcontractType = 3;
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
 const char *names[] = {"OpenSpin", "DegrandRossi", "Staggered"};
+const char *prec_str[] = {"quarter", "half", "single", "double"};
 
 namespace quda
 {
@@ -126,9 +127,9 @@ int test(int contractionType, QudaPrecision test_prec)
     inv_param.dslash_type = QUDA_STAGGERED_DSLASH; }
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V * my_spinor_site_size * data_size);
-  void *spinorY = malloc(V * my_spinor_site_size * data_size);
-  void *d_result = malloc(V * nSpin*nSpin*2 * data_size);
+  void *spinorX = safe_malloc(V * my_spinor_site_size * data_size);
+  void *spinorY = safe_malloc(V * my_spinor_site_size * data_size);
+  void *d_result = safe_malloc(V * nSpin*nSpin*2 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
     for (int i = 0; i < V * my_spinor_site_size; i++) {
@@ -163,9 +164,9 @@ int test(int contractionType, QudaPrecision test_prec)
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
              faults, V * nSpin*nSpin * 2);
 
-  free(spinorX);
-  free(spinorY);
-  free(d_result);
+  host_free(spinorX);
+  host_free(spinorY);
+  host_free(d_result);
 
   return faults;
 }
@@ -204,8 +205,8 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
   int contractType = ::testing::get<1>(param.param);
   std::string str(names[contractType]);
   str += std::string("_");
-  str += std::string(get_prec_str(getPrecision(prec)));
-  return str; // names[contractType] + "_" + prec_str[prec];
+  str += std::string(prec_str[prec]);
+  return str;
 }
 
 // Instantiate all test cases

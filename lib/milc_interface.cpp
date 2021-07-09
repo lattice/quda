@@ -964,14 +964,14 @@ void qudaMultishiftInvert(int external_precision, int quda_precision, int num_of
 
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
 
-  void** sln_pointer = (void**)malloc(num_offsets*sizeof(void*));
+  void** sln_pointer = (void**)safe_malloc(num_offsets*sizeof(void*));
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
   void* src_pointer = static_cast<char*>(source) + quark_offset;
 
   for (int i = 0; i < num_offsets; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
 
   invertMultiShiftQuda(sln_pointer, src_pointer, &invertParam);
-  free(sln_pointer);
+  host_free(sln_pointer);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1167,16 +1167,16 @@ void qudaInvertMsrc(int external_precision, int quda_precision, double mass, Qud
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
 
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
-  void** sln_pointer = (void**)malloc(num_src*sizeof(void*));
-  void** src_pointer = (void**)malloc(num_src*sizeof(void*));
+  void** sln_pointer = (void**)safe_malloc(num_src*sizeof(void*));
+  void** src_pointer = (void**)safe_malloc(num_src*sizeof(void*));
 
   for (int i = 0; i < num_src; ++i) sln_pointer[i] = static_cast<char *>(solutionArray[i]) + quark_offset;
   for (int i = 0; i < num_src; ++i) src_pointer[i] = static_cast<char *>(sourceArray[i]) + quark_offset;
 
   invertMultiSrcQuda(sln_pointer, src_pointer, &invertParam, nullptr, nullptr);
 
-  free(sln_pointer);
-  free(src_pointer);
+  host_free(sln_pointer);
+  host_free(src_pointer);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1320,6 +1320,33 @@ struct mgInputStruct {
   double deflate_a_min; // ignored if no polynomial acceleration
   int deflate_poly_deg; // ignored if no polynomial acceleration
 
+  void setArrayDefaults()
+  {
+    // set dummy values so all elements are initialized
+    // some of these values get immediately overriden in the
+    // constructor, in some cases with identical values:
+    // this is to separate "initializing" with "best practices"
+    for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
+      nvec[i] = 24;
+      setup_inv[i] = QUDA_CGNR_INVERTER;
+      setup_tol[i] = 1e-5;
+      setup_maxiter[i] = 500;
+      mg_vec_infile[i][0] = 0;
+      mg_vec_outfile[i][0] = 0;
+      for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
+
+      coarse_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+      coarse_solver[i] = QUDA_GCR_INVERTER;
+      coarse_solver_tol[i] = 0.25;
+      coarse_solver_maxiter[i] = 16;
+      smoother_type[i] = QUDA_CA_GCR_INVERTER;
+      nu_pre[i] = 0;
+      nu_post[i] = 2;
+
+      mg_verbosity[i] = QUDA_SUMMARIZE;
+    }
+  }
+
   // set defaults
   mgInputStruct() :
     mg_levels(4),
@@ -1333,6 +1360,10 @@ struct mgInputStruct {
     deflate_a_min(1e-2),
     deflate_poly_deg(50)
   {
+    /* initialize internal arrays */
+    setArrayDefaults();
+
+    /* required or best-practice values for typical solves */
     nvec[0] = 24;             // must be this
     geo_block_size[0][0] = 2; // must be this...
     geo_block_size[0][1] = 2; // "

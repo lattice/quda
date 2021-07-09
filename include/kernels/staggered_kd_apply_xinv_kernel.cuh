@@ -10,7 +10,7 @@ namespace quda {
 
   template <typename vFloatSpinor_, typename vFloatGauge_, int coarseDof_, int fineColor_,
             bool dagger_, typename fineColorSpinor, typename xInvGauge>
-  struct ApplyStaggeredKDBlockArg {
+  struct ApplyStaggeredKDBlockArg : kernel_param<> {
 
     using vFloatSpinor = vFloatSpinor_;
     using vFloatGauge = vFloatGauge_;
@@ -40,17 +40,14 @@ namespace quda {
     const int fineVolumeCB;
     const int_fastdiv coarseVolumeCB;   /** Coarse grid volume */
 
-    SharedMemoryCache<complex<real>> cs_buffer; /** scratch storaged used for inter-thread exchange */
-    dim3 threads;
-
     ApplyStaggeredKDBlockArg(fineColorSpinor &out, const fineColorSpinor &in, const xInvGauge &xInv,
                              const int *x_size_, const int *xc_size_) :
+      kernel_param(dim3(2 * in.volumeCB, 1, 1)),
       out(out),
       in(in),
       xInv(xInv),
       fineVolumeCB(in.volumeCB),
-      coarseVolumeCB(xInv.VolumeCB()),
-      threads(2 * fineVolumeCB)
+      coarseVolumeCB(xInv.VolumeCB())
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
@@ -60,8 +57,8 @@ namespace quda {
   };
 
   template<typename Arg> struct StaggeredKDBlock {
-    Arg &arg;
-    constexpr StaggeredKDBlock(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr StaggeredKDBlock(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int tid)
@@ -118,11 +115,13 @@ namespace quda {
 
       // Which unit of spinor work am I within this block?
       const int unit_of_work = target::thread_idx().x / 256;
-      complex* in_buffer = arg.cs_buffer.data() + (2 * unit_of_work) * buffer_size;
-      complex* out_buffer = arg.cs_buffer.data() + (2 * unit_of_work + 1) * buffer_size;
+      SharedMemoryCache<complex> cs_buffer; /** scratch storaged used for inter-thread exchange */
+
+      complex* in_buffer = cs_buffer.data() + (2 * unit_of_work) * buffer_size;
+      complex* out_buffer = cs_buffer.data() + (2 * unit_of_work + 1) * buffer_size;
 
       // Which unit of Xinv tile am I?
-      complex* xinv_buffer = arg.cs_buffer.data() + 2 * (target::block_dim().x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
+      complex* xinv_buffer = cs_buffer.data() + 2 * (target::block_dim().x / 256) * buffer_size + unit_of_work * fullTileSize + mid_idx * Arg::xinvRowTileSize * Arg::xinvPaddedColTileSize;
 
       ////////////////////////
       // Load a ColorVector //
@@ -157,7 +156,7 @@ namespace quda {
       }
 
       // in reality we only need to sync over my chunk of 256 threads
-      arg.cs_buffer.sync();
+      cs_buffer.sync();
 
       //////////////////////
       // Multiply by Xinv //
@@ -201,7 +200,7 @@ namespace quda {
         }
       }
 
-      arg.cs_buffer.sync();
+      cs_buffer.sync();
 
       ///////////
       // Store //

@@ -97,7 +97,7 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
   corr_file.open(filepath.str());
 
   const int src_width = 6, mom_width = 3, precision = 8;
-  const int float_width = precision+9; //for scientific notation
+  const int float_width = precision+16; //for scientific notation
   corr_file << "#"
             << std::setw(src_width) << "src_x"
             << std::setw(src_width) << "src_y"
@@ -135,9 +135,9 @@ void save_correlators_to_file(const void* correlation_function_sum, const Correl
                         << std::setw(mom_width) << pt
                         << std::setw(src_width) << CorrelatorChannels[G_idx].c_str()
                         << std::setw(src_width) << t
-                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::setw(float_width) << std::setprecision(precision + 5)
                         << std::scientific << ((double *)correlation_function_sum)[index_real] * sign
-                        << std::setw(float_width) << std::setprecision(precision)
+                        << std::setw(float_width) << std::setprecision(precision + 5)
                         << std::scientific << ((double *)correlation_function_sum)[index_imag] * sign
                         << std::endl;
             }
@@ -211,8 +211,7 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // Loop over spin X color dilution positions, construct the sources and invert
     for (int i = 0; i < cs_param.nSpin * cs_param.nColor; i++) {
       // FIXME add the smearing
-      constructPointSpinorSource(source_array_ptr[i], cs_param.nSpin, cs_param.nColor, inv_param.cpu_prec,
-                                 gauge_param.X, i, source);
+      constructPointSpinorSource(source_array_ptr[i], inv_param.cpu_prec, gauge_param.X, i, source);
 
       // Gaussian smear the source.
       performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
@@ -350,7 +349,6 @@ int main(int argc, char **argv)
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
   int spinor_dim = cs_param.nColor * cs_param.nSpin;
-  setSpinorSiteSize(spinor_dim * 2); // this sets the global variable my_spinor_site_size
 
   // Allocate memory on host for one source for each of the 12x12 color+spinor combinations
   size_t bytes_per_float = sizeof(double);

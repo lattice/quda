@@ -8,21 +8,20 @@
 
 namespace quda {
 
-  struct rngArg {
+  struct rngArg : kernel_param<> {
     int commCoord[QUDA_MAX_DIM];
     int X[QUDA_MAX_DIM];
     int X_global[QUDA_MAX_DIM];
     RNGState *state;
     unsigned long long seed;
-    dim3 threads;
     rngArg(RNGState *state, unsigned long long seed, const LatticeField &meta) :
+      kernel_param(dim3(meta.LocalVolumeCB(), meta.SiteSubset(), 1)),
       state(state),
-      seed(seed),
-      threads(meta.VolumeCB(), meta.SiteSubset(), 1)
+      seed(seed)
     {
       for (int i=0; i<4; i++) {
         commCoord[i] = comm_coord(i);
-        X[i] = meta.X()[i];
+        X[i] = meta.LocalX()[i];
         X_global[i] = X[i] * comm_dim(i);
       }
     }
@@ -37,8 +36,8 @@ namespace quda {
   */
   template <typename Arg>
   struct init_random {
-    Arg &arg;
-    __device__ constexpr init_random(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    __device__ constexpr init_random(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ inline void operator()(int id, int parity)

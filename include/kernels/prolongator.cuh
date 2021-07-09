@@ -12,7 +12,7 @@ namespace quda {
       Kernel argument struct
   */
   template <typename Float, typename vFloat, int fineSpin_, int fineColor_, int coarseSpin_, int coarseColor_, QudaFieldOrder order>
-  struct ProlongateArg {
+  struct ProlongateArg : kernel_param<> {
     using real = Float;
     static constexpr int fineSpin = fineSpin_;
     static constexpr int coarseSpin = coarseSpin_;
@@ -26,12 +26,12 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     const int parity; // the parity of the output field (if single parity)
     const int nParity; // number of parities of input fine field
-    dim3 threads;
 
     ProlongateArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
                   const int *geo_map,  const int parity) :
-      out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset()),
-      threads(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread) { }
+      kernel_param(dim3(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread)),
+      out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset())
+    { }
   };
 
   /**
@@ -59,7 +59,7 @@ namespace quda {
      is the second step of applying the prolongator.
   */
   template <typename Arg>
-  __device__ __host__ inline void rotateFineColor(Arg &arg, const complex<typename Arg::real> in[], int parity, int x_cb, int fine_color_block)
+  __device__ __host__ inline void rotateFineColor(const Arg &arg, const complex<typename Arg::real> in[], int parity, int x_cb, int fine_color_block)
   {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
     const int v_parity = (arg.V.Nparity() == 2) ? parity : 0;
@@ -81,7 +81,7 @@ namespace quda {
           // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 #pragma unroll
           for (int k=0; k<color_unroll; k++)
-            partial[k] += arg.V(v_parity, x_cb, s, i, j+k) * in[s*Arg::coarseColor + j + k];
+            partial[k] += arg.V(v_parity, x_cb, s, i, j + k) * in[s * Arg::coarseColor + j + k];
         }
 
 #pragma unroll
@@ -94,8 +94,8 @@ namespace quda {
 
   template <typename Arg> struct Prolongator
   {
-    Arg &arg;
-    constexpr Prolongator(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr Prolongator(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int fine_color_thread)

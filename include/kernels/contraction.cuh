@@ -12,9 +12,7 @@ namespace quda
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
   using contract_array = vector_type<double2, max_contract_results>;
   
-  template <typename real> class DRGammaMatrix
-  {
-
+  template <typename real> class DRGammaMatrix {
   public:
     // Stores gamma matrix column index for non-zero complex value.
     // This is shared by g5gm, gmg5.
@@ -26,9 +24,7 @@ namespace quda
     // use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
     //the possible minus sign will be taken care of in the main function
     //! Constructor
-    DRGammaMatrix()
-    {
-
+    DRGammaMatrix() {
       const complex<real> i(0., 1.);
       // VECTORS
       // G_idx = 1: \gamma_1
@@ -213,7 +209,6 @@ namespace quda
       g5gm_z[15][3] = 1.;
     };
   };
-
   
   template <int reduction_dim, class T> __device__ int* sink_from_t_xyz(int t, int xyz, T X[4])
   {
@@ -296,13 +291,12 @@ namespace quda
     }
     __device__ __host__ contract_array init() const { return contract_array(); }
   };
-
   
   template <typename Arg> struct DegrandRossiContractFT : plus<contract_array> {
     using reduce_t = contract_array;
     using plus<reduce_t>::operator();    
-    Arg &arg;
-    constexpr DegrandRossiContractFT(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
     // Final param is unused in the MultiReduce functor in this use case.
@@ -488,21 +482,20 @@ namespace quda
     F x;
     F y;
     matrix_field<complex<Float>, nSpin> s;
-    dim3 threads;
 
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *s) :
+      kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),
-      s(s, x.VolumeCB()),
-      threads(x.VolumeCB(), 2)
+      s(s, x.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
 
   template <typename Arg> struct ColorContract {
-    Arg &arg;
-    constexpr ColorContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -530,8 +523,8 @@ namespace quda
   };
 
   template <typename Arg> struct DegrandRossiContract {
-    Arg &arg;
-    constexpr DegrandRossiContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

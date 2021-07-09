@@ -1,6 +1,6 @@
 #include <clover_field_order.h>
 #include <instantiate.h>
-#include <kernels/copy_field_offset.cuh>
+#include "copy_field_offset.hpp"
 
 namespace quda
 {

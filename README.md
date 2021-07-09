@@ -195,7 +195,7 @@ used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
-Please visit http://lattice.github.com/quda for contact information. Bug
+Please visit http://lattice.github.io/quda for contact information. Bug
 reports are especially welcome.
 
 
@@ -230,7 +230,7 @@ Implementations of Block-Krylov Space Solvers on GPUs,"
 To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
 
 Several other papers that might be of interest are listed at
-http://lattice.github.com/quda .
+http://lattice.github.io/quda .
 
 
 ## Authors:

@@ -62,8 +62,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
 #ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    ghostLonglinkEven[dir] = ghostLonglink[dir];
-    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
+    ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
+    ghostLonglinkOdd[dir] = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
 #endif
   }
 

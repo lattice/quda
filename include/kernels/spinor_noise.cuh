@@ -8,7 +8,7 @@ namespace quda {
   using namespace colorspinor;
 
   template <typename real_, int nSpin_, int nColor_, QudaFieldOrder order, QudaNoiseType noise_>
-  struct SpinorNoiseArg {
+  struct SpinorNoiseArg : kernel_param<> {
     using real = real_;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
@@ -16,11 +16,10 @@ namespace quda {
     using V = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, order>;
     V v;
     RNGState *rng;
-    dim3 threads;
     SpinorNoiseArg(ColorSpinorField &v, RNGState *rng) :
+      kernel_param(dim3(v.VolumeCB(), v.SiteSubset(), 1)),
       v(v),
-      rng(rng),
-      threads(v.VolumeCB(), v.SiteSubset(), 1) { }
+      rng(rng) { }
   };
 
   template<typename real, typename Arg> // Gauss
@@ -41,8 +40,8 @@ namespace quda {
   }
 
   template <typename Arg> struct NoiseSpinor {
-    Arg &arg;
-    constexpr NoiseSpinor(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr NoiseSpinor(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ void operator()(int x_cb, int parity)

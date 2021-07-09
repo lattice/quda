@@ -18,7 +18,7 @@ namespace quda {
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  struct DslashCoarseArg {
+  struct DslashCoarseArg : kernel_param<> {
     static constexpr bool dslash = dslash_;
     static constexpr bool clover = clover_;
     static constexpr bool dagger = dagger_;
@@ -48,10 +48,10 @@ namespace quda {
     const int_fastdiv dim[5];   // full lattice dimensions
     const int commDim[4]; // whether a given dimension is partitioned or not
     const int volumeCB;
-    dim3 threads;
 
     inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                            const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread()))),
       out(const_cast<ColorSpinorField &>(out)),
       inA(const_cast<ColorSpinorField &>(inA)),
       inB(const_cast<ColorSpinorField &>(inB)),
@@ -64,8 +64,7 @@ namespace quda {
       X0h(((3 - nParity) * out.X(0)) / 2),
       dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
       commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB((unsigned int)out.VolumeCB() / dim[4]),
-      threads(color_stride * X.VolumeCB(), nParity, 2 * dim_stride * 2 * (nColor / colors_per_thread()))
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {  }
   };
 
@@ -73,7 +72,7 @@ namespace quda {
      @brief Helper function to determine if should halo computation
   */
   template <DslashType type>
-  static __host__ __device__ bool doHalo() {
+  static constexpr bool doHalo() {
     switch(type) {
     case DSLASH_EXTERIOR:
     case DSLASH_FULL:
@@ -87,7 +86,7 @@ namespace quda {
      @brief Helper function to determine if should interior computation
   */
   template <DslashType type>
-  static __host__ __device__ bool doBulk() {
+  static constexpr bool doBulk() {
     switch(type) {
     case DSLASH_INTERIOR:
     case DSLASH_FULL:
@@ -99,24 +98,26 @@ namespace quda {
 
   /**
      Applies the coarse dslash on a given parity and checkerboard site index
+     /out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
 
-     @param out The result - kappa * Dslash in
-     @param Y The coarse gauge field
-     @param kappa Kappa value
-     @param in The input field
-     @param parity The site parity
+     @param out The result vector
+     @param thread_dir Direction
      @param x_cb The checkerboarded site index
+     @param src_idx dummy for now
+     @param parity The site parity
+     @param s_row Which spin row are acting on
+     @param color_block Which color row are we acting on
+     @param color_off Which color column offset are we acting on
+     @param arg Arguments
    */
-  template <int Mc, int thread_dir, int thread_dim, typename V, typename Arg>
-  __device__ __host__ inline void applyDslash(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset)
+  template <int Mc, int thread_dim, typename V, typename Arg>
+  __device__ __host__ inline void applyDslash(V &out, int thread_dir, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset, const Arg &arg)
   {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
 
     int coord[5];
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
-
-    SharedMemoryCache<V> cache(target::block_dim());
 
     if (!thread_dir || target::is_host()) {
 
@@ -171,9 +172,6 @@ namespace quda {
 	}
 
       } // nDim
-
-      // only need to write to shared memory if not master thread
-      if (target::is_device() && thread_dim > 0) cache.save(out);
     }
 
     if (thread_dir || target::is_host()) {
@@ -226,35 +224,7 @@ namespace quda {
 	}
 
       } //nDim
-
-      if (target::is_device()) cache.save(out);
     } // forwards / backwards thread split
-
-    if (target::is_device()) cache.sync(); // device path has to recombine the foward and backward results
-
-    // (colorspin * dim_stride + dim * 2 + dir)
-    if (target::is_device() && thread_dim == 0 && thread_dir == 0) {
-
-      // full split over dimension and direction
-#pragma unroll
-      for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward fathers (if any)
-	// 4-way 1,2,3  (stride = 4)
-	// 2-way 1      (stride = 2)
-        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
-      }
-
-#pragma unroll
-      for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
-        out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
-      }
-
-      out *= -arg.kappa;
-
-    } else if (target::is_host()) {
-
-      out *= -arg.kappa;
-
-    }
   }
 
   /**
@@ -268,7 +238,8 @@ namespace quda {
      @param x_cb The checkerboarded site index
    */
   template <int Mc, typename V, typename Arg>
-  __device__ __host__ inline void applyClover(V &out, Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset) {
+  __device__ __host__ inline void applyClover(V &out, const Arg &arg, int x_cb, int src_idx, int parity, int s, int color_block, int color_offset)
+  {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
@@ -291,40 +262,46 @@ namespace quda {
 	  }
 	}
     }
-
   }
 
-  //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template <int Mc, int dir, int dim, typename Arg>
-  __device__ __host__ inline void coarseDslash(Arg &arg, int x_cb, int parity, int s, int color_block, int color_offset)
-  {
-    constexpr int src_idx = 0;
-    vector_type<complex <typename Arg::real>, Mc> out;
-    if (Arg::dslash) applyDslash<Mc,dir,dim>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
-    if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+  template <bool is_device> struct dim_collapse {
+    template <typename T, typename Arg> void operator()(T &out, int, int, const Arg &arg)
+    {
+      out *= -arg.kappa;
+    }
+  };
 
-    if (dir==0 && dim==0) {
-      const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
+  template <> struct dim_collapse<true> {
+    template <typename T, typename Arg> __device__ __host__ inline void operator()(T &out, int dir, int dim, const Arg &arg)
+    {
+      SharedMemoryCache<T> cache(target::block_dim());
+      // only need to write to shared memory if not master thread
+      if (dim > 0 || dir) cache.save(out);
 
-      // reduce down to the first group of column-split threads
-      out = warp_combine<Arg::color_stride>(out);
+      cache.sync(); // recombine the foward and backward results
+
+      if (dir == 0 && dim == 0) {
+        // full split over dimension and direction
+#pragma unroll
+        for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
+          // 4-way 1,2,3  (stride = 4)
+          // 2-way 1      (stride = 2)
+          out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
+        }
 
 #pragma unroll
-      for (int color_local=0; color_local<Mc; color_local++) {
-	int c = color_block + color_local; // global color index
-	if (color_offset == 0) {
-	  // if not halo we just store, else we accumulate
-	  if (doBulk<Arg::type>()) arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) = out[color_local];
-	  else arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) += out[color_local];
-	}
+        for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
+          out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
+        }
+
+        out *= -arg.kappa;
       }
     }
-
-  }
+  };
 
   template <typename Arg> struct CoarseDslash {
-    Arg &arg;
-    constexpr CoarseDslash(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr CoarseDslash(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb_color_offset, int parity, int sMd)
@@ -352,16 +329,35 @@ namespace quda {
       int s = sM / (Arg::nColor/Mc);
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
-      if (dir == 0) {
-        if (dim == 0)      coarseDslash<Mc,0,0>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 1) coarseDslash<Mc,0,1>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 2) coarseDslash<Mc,0,2>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 3) coarseDslash<Mc,0,3>(arg, x_cb, parity, s, color_block, color_offset);
-      } else if (dir == 1) {
-        if (dim == 0)      coarseDslash<Mc,1,0>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 1) coarseDslash<Mc,1,1>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 2) coarseDslash<Mc,1,2>(arg, x_cb, parity, s, color_block, color_offset);
-        else if (dim == 3) coarseDslash<Mc,1,3>(arg, x_cb, parity, s, color_block, color_offset);
+      constexpr int src_idx = 0;
+      vector_type<complex <typename Arg::real>, Mc> out;
+
+      if (Arg::dslash) {
+        if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 1) applyDslash<Mc, 1>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 2) applyDslash<Mc, 2>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+        else if (dim == 3) applyDslash<Mc, 3>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
+
+        target::dispatch<dim_collapse>(out, dir, dim, arg);
+      }
+
+      if (doBulk<Arg::type>() && Arg::clover && dir==0 && dim==0) applyClover<Mc>(out, arg, x_cb, src_idx, parity, s, color_block, color_offset);
+
+      if (dir==0 && dim==0) {
+        const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
+
+        // reduce down to the first group of column-split threads
+        out = warp_combine<Arg::color_stride>(out);
+
+#pragma unroll
+        for (int color_local=0; color_local<Mc; color_local++) {
+          int c = color_block + color_local; // global color index
+          if (color_offset == 0) {
+            // if not halo we just store, else we accumulate
+            if (doBulk<Arg::type>()) arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) = out[color_local];
+            else arg.out(my_spinor_parity, x_cb+src_idx*arg.volumeCB, s, c) += out[color_local];
+          }
+        }
       }
     }
   };

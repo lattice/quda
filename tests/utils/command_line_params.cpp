@@ -266,7 +266,6 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
-
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // contract options
@@ -275,6 +274,17 @@ std::array<int,4> momentum = {0, 0, 0, 0};
 char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
+
+// GF Options
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
@@ -1044,7 +1054,6 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
                        "Number of measurement steps in heatbath before checkpointing (default 5)");
-
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1055,7 +1064,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
   
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gaueg field in the T dim prior to inversion (default false)");
+  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
   
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
@@ -1115,13 +1124,13 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Set the alpha(Wuppertal) or omega(Gaussian) source smearing value (default 0.2)");
 
   opgroup->add_option("--prop-source-smear-steps", prop_source_smear_steps,
-                      "Set the number of source smearing steps (default 50)");
+                      "Set the number of source smearing steps (default 0)");
 
   opgroup->add_option("--prop-sink-smear-coeff", prop_sink_smear_coeff,
                       "Set the alpha(Wuppertal) or omega(Gaussian) sink smearing value (default 0.2)");
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
-                      "Set the number of sink smearing steps (default 50)");
+                      "Set the number of sink smearing steps (default 0)");
 
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
@@ -1155,7 +1164,30 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
-    
+}
+
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -58,6 +58,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
@@ -102,13 +103,8 @@ namespace quda
       double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
-    // with symmetric dagger operator we must use kernel packing
-    if (dagger && !asymmetric) pushKernelPackT(true);
-
     instantiate<TwistedMassPreconditionedApply>(
         out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-
-    if (dagger && !asymmetric) popKernelPackT();
   }
 #else
   void ApplyTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,

@@ -6,7 +6,8 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_ > struct FmunuArg
+  template <typename Float_, int nColor_, QudaReconstructType recon_ >
+  struct FmunuArg : kernel_param<1>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -20,12 +21,11 @@ namespace quda
 
     int X[4];    // grid dimensions
     int border[4];
-    dim3 threads; // number of active threads required
 
     FmunuArg(GaugeField &f, const GaugeField &u) :
+      kernel_param(dim3(f.VolumeCB(), 2, 6)),
       u(u),
-      f(f),
-      threads(f.VolumeCB(), 2, 6)
+      f(f)
     {
       for (int dir = 0; dir < 4; ++dir) {
         X[dir] = f.X()[dir];
@@ -35,17 +35,17 @@ namespace quda
   };
 
   template <int mu, int nu, typename Arg>
-  __device__ __host__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
+  __device__ __host__ __forceinline__ void computeFmunuCore(const Arg &arg, int idx, int parity)
   {
     using Link = Matrix<complex<typename Arg::Float>, 3>;
 
     int x[4];
-    auto &X = arg.X;
+    int X[4];
 
-    getCoords(x, idx, X, parity);
+    getCoords(x, idx, arg.X, parity);
     for (int dir = 0; dir < 4; ++dir) {
       x[dir] += arg.border[dir];
-      X[dir] += 2 * arg.border[dir];
+      X[dir] = arg.X[dir] + 2 * arg.border[dir];
     }
 
     Link F;
@@ -174,8 +174,8 @@ namespace quda
   }
 
   template <typename Arg> struct ComputeFmunu {
-    Arg &arg;
-    constexpr ComputeFmunu(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ComputeFmunu(const Arg &arg) : arg(arg) {}
     static constexpr const char* filename() { return KERNEL_FILE; }
 
     __device__ __host__ __forceinline__ void operator()(int x_cb, int parity, int mu_nu)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <algorithm>
 #ifdef _NVHPC_CUDA
 #include <nv/target>
@@ -74,6 +75,19 @@ namespace quda {
     __device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
 
 
+    template <bool is_device> struct grid_dim_impl { dim3 operator()() { return dim3(1, 1, 1); } };
+#ifdef QUDA_CUDA_CC
+    template <> struct grid_dim_impl<true> { __device__ dim3 operator()() { return dim3(gridDim.x, gridDim.y, gridDim.z); } };
+#endif
+
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    __device__ __host__ inline dim3 grid_dim() { return dispatch<grid_dim_impl>(); }
+
+
     template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
 #ifdef QUDA_CUDA_CC
     template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
@@ -130,7 +144,7 @@ namespace quda {
        in a block in the x dimension for reduction kernels.
     */
     template <int block_size_y = 1, int block_size_z = 1>
-      constexpr unsigned int max_reduce_block_size()
+    constexpr unsigned int max_reduce_block_size()
       {
 #ifdef QUDA_FAST_COMPILE_REDUCE
         // This is the specialized variant used when we have fast-compilation mode enabled
@@ -144,13 +158,14 @@ namespace quda {
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension for reduction kernels.
     */
+    template <int block_size_y = 1, int block_size_z = 1>
     constexpr unsigned int max_multi_reduce_block_size()
     {
 #ifdef QUDA_FAST_COMPILE_REDUCE
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return 128;
+      return max_block_size<block_size_y, block_size_z>();
 #endif
     }
 
@@ -180,7 +195,10 @@ namespace quda {
        argument.  Otherwise the parameter struct is explicitly copied
        to the device prior to kernel launch.
     */
-    template <typename Arg> constexpr bool use_kernel_arg() { return sizeof(Arg) <= device::max_kernel_arg_size(); }
+    template <typename Arg> constexpr bool use_kernel_arg()
+    {
+      return (sizeof(Arg) <= device::max_kernel_arg_size() && Arg::use_kernel_arg);
+    }
 
     /**
        @brief Helper function that returns kernel argument from
@@ -189,7 +207,7 @@ namespace quda {
        translation units where constant memory is not used.
      */
     template <typename Arg>
-      constexpr std::enable_if_t<use_kernel_arg<Arg>(), Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
+      constexpr std::enable_if_t<use_kernel_arg<Arg>(), const Arg&> get_arg() { return reinterpret_cast<Arg&>(nullptr); }
 
     /**
        @brief Helper function that returns a pointer to the

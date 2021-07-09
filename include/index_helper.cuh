@@ -29,8 +29,8 @@ namespace quda {
      @param dx 4-d shift index
      @param X Full lattice dimensions
    */
-  template <typename I, typename J, typename K>
-  __device__ __host__ inline int linkIndexShift(I y[], const I x[], const J dx[], const K X[4]) {
+  template <typename I, typename J, typename K, typename L>
+  __device__ __host__ inline int linkIndexShift(I &y, const J &x, const K &dx, const L &X) {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -44,8 +44,8 @@ namespace quda {
      @param x 4-d lattice index
      @param X Full lattice dimensions
    */
-  template <typename I>
-  __device__ __host__ inline int linkIndex(const int x[], const I X[4]) {
+  template <typename I, typename J>
+  __device__ __host__ inline int linkIndex(const I &x, const J &X) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     return idx;
   }
@@ -58,8 +58,8 @@ namespace quda {
      @param x 4-d lattice index
      @param X Full lattice dimensions
    */
-  template <typename I>
-  __device__ __host__ inline int linkIndex(int y[], const int x[], const I X[4]) {
+  template <typename I, typename J, typename K>
+  __device__ __host__ inline int linkIndex(I &y, const J &x, const K &X) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     y[0] = x[0]; y[1] = x[1]; y[2] = x[2]; y[3] = x[3];
     return idx;
@@ -506,6 +506,7 @@ namespace quda {
     EXTERIOR_KERNEL_Y = 1,
     EXTERIOR_KERNEL_Z = 2,
     EXTERIOR_KERNEL_T = 3,
+    UBER_KERNEL = 4,
     KERNEL_POLICY = 7
   };
 
@@ -635,8 +636,8 @@ namespace quda {
      @param[in] arg Argument struct with required meta data
      @return Checkerboard lattice index
   */
-  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  inline __device__ __host__ int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
+  template <int nDim, typename Arg>
+  inline __device__ __host__ int indexFromFaceIndex(int dim, int face_num, int face_idx, int parity, int nLayers, QudaPCType type, const Arg &arg)
   {
     // intrinsic parity of the face depends on offset of first element
     int face_parity = (parity + face_num * (arg.dc.X[dim] - nLayers)) & 1;
@@ -725,13 +726,22 @@ namespace quda {
   }
 
   /**
+     @brief Overloaded variant of indexFromFaceIndex with templated parameters
+  */
+  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
+  __device__ __host__ inline int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
+  {
+    return indexFromFaceIndex<nDim>(dim, face_num, face_idx, parity, nLayers, type, arg);
+  }
+
+  /**
      @brief Overloaded variant of indexFromFaceIndex where we use the
      parity declared in arg.
    */
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  inline __device__ __host__ int indexFromFaceIndex(int face_idx, const Arg &arg)
+  __device__ __host__ inline int indexFromFaceIndex(int face_idx, const Arg &arg)
   {
-    return indexFromFaceIndex<nDim, type, dim, nLayers, face_num>(face_idx, arg.parity, arg);
+    return indexFromFaceIndex<nDim>(dim, face_num, face_idx, arg.parity, nLayers, type, arg);
   }
 
   /**
@@ -751,8 +761,8 @@ namespace quda {
 
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
-  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  template <int nDim, typename Arg>
+  inline __device__ __host__ int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
     const auto *dims = arg.dc.dims[dim]; // dimensions of the face
@@ -803,6 +813,12 @@ namespace quda {
     return (idx + s * V4) >> 1;
   }
 
+  template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
+  inline __device__ __host__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  {
+    return indexFromFaceIndexStaggered<nDim>(dim, face_num, face_idx_in, parity, nLayers, type, arg);
+  }
+
   /**
      @brief Determines which face a given thread is computing.  Also
      rescale face_idx so that is relative to a given dimension.  If 5-d
@@ -820,11 +836,10 @@ namespace quda {
   template <int nDim = 4, typename Arg>
   __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
   {
-
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-    const int s = (nDim == 5 ? tid / arg.threads : 0);
+    const int s = (nDim == 5 ? tid / arg.work_items : 0);
 
-    face_idx = tid - s * arg.threads; // face_idx = face_idx % arg.threads
+    face_idx = tid - s * arg.work_items; // face_idx = face_idx % arg.work_items
 
     if (face_idx < arg.threadDimMapUpper[0]) {
       face_idx += s * arg.threadDimMapUpper[0];
@@ -842,11 +857,6 @@ namespace quda {
       face_idx += s * (arg.threadDimMapUpper[3] - arg.threadDimMapLower[3]);
       return 3;
     }
-  }
-
-  template <int nDim = 4, typename Arg> __host__ __device__ inline int dimFromFaceIndex(int &face_idx, const Arg &arg)
-  {
-    return dimFromFaceIndex<nDim>(face_idx, face_idx, arg);
   }
 
   /**

@@ -22,7 +22,7 @@ namespace quda {
   namespace fermion_force {
 
     template <typename Float_, int nColor_, QudaReconstructType recon_, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
-    struct UnitarizeForceArg {
+    struct UnitarizeForceArg : kernel_param<> {
       using Float = Float_;
       static constexpr int nColor = nColor_;
       static constexpr QudaReconstructType recon = recon_;
@@ -40,11 +40,11 @@ namespace quda {
       const int svd_only;
       const double svd_rel_error;
       const double svd_abs_error;
-      dim3 threads;
 
       UnitarizeForceArg(GaugeField &force, const GaugeField &force_old, const GaugeField &u, int *fails,
 			double unitarize_eps, double force_filter, double max_det_error, int allow_svd,
 			int svd_only, double svd_rel_error, double svd_abs_error) :
+        kernel_param(dim3(u.VolumeCB(), 2, 1)),
         force(force),
         force_old(force_old),
         u(u),
@@ -55,8 +55,7 @@ namespace quda {
         allow_svd(allow_svd),
         svd_only(svd_only),
         svd_rel_error(svd_rel_error),
-        svd_abs_error(svd_abs_error),
-        threads(u.VolumeCB(), 2, 1) { }
+        svd_abs_error(svd_abs_error) { }
     };
 
     template <class Real> class DerivativeCoefficients {
@@ -159,7 +158,7 @@ namespace quda {
     // Also modify q if the eigenvalues are dangerously small.
     template<class Float, typename Arg>
     __device__  __host__  void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
-                                              Float f[3], Matrix<complex<Float>,3> & q, Arg &arg)
+                                              Float f[3], Matrix<complex<Float>,3> & q, const Arg &arg)
     {
       Matrix<complex<Float>,3> qsq, tempq;
 
@@ -278,7 +277,7 @@ namespace quda {
     // "v" denotes a "fattened" link variable
     template <class Float, typename Arg>
     __device__ __host__ void getUnitarizeForceSite(Matrix<complex<Float>,3>& result, const Matrix<complex<Float>,3> & v,
-                                                   const Matrix<complex<Float>,3> & outer_prod, Arg &arg)
+                                                   const Matrix<complex<Float>,3> & outer_prod, const Arg &arg)
     {
       typedef Matrix<complex<Float>,3> Link;
       Float f[3];
@@ -332,8 +331,8 @@ namespace quda {
 
     template <typename Arg> struct UnitarizeForce
     {
-      Arg &arg;
-      constexpr UnitarizeForce(Arg &arg) : arg(arg) {}
+      const Arg &arg;
+      constexpr UnitarizeForce(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       __device__ __host__ void operator()(int x_cb, int parity)

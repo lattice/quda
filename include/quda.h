@@ -1530,7 +1530,7 @@ extern "C" {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
@@ -1549,7 +1549,7 @@ extern "C" {
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
    * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
@@ -1574,7 +1574,14 @@ extern "C" {
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
 
-  
+  /**
+  * Convert a 4D point source to a 5D one
+  * @param in4D_ptr    Contains 4D pointsource
+  * @param out5D_ptr   5D source is written here
+  * @param X           an int array that contains Nx Ny Nz Nt
+  */
+  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, size_t spinor4D_size_in_floats);
+
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing

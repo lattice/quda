@@ -79,7 +79,7 @@ namespace quda {
       Kernel argument struct
   */
   template <typename Float, int fineSpin, int fineColor_, int coarseSpin, int coarseColor, QudaFieldOrder order, StaggeredTransferType theTransferType>
-  struct StaggeredProlongRestrictArg {
+  struct StaggeredProlongRestrictArg : kernel_param<> {
     static constexpr int fineColor = fineColor_;
     FieldOrderCB<Float, StaggeredTransferOutSpin<fineSpin,coarseSpin,theTransferType>::outSpin, StaggeredTransferOutColor<fineColor,coarseColor,theTransferType>::outColor,1,order> out;
     const FieldOrderCB<Float, StaggeredTransferInSpin<fineSpin,coarseSpin,theTransferType>::inSpin, StaggeredTransferInColor<fineColor,coarseColor,theTransferType>::inColor,1,order> in;
@@ -91,20 +91,20 @@ namespace quda {
     const int fineVolumeCB; // fine spatial volume
     const int coarseVolumeCB; // coarse spatial volume
     static constexpr StaggeredTransferType transferType = theTransferType;
-    dim3 threads;
 
     StaggeredProlongRestrictArg(ColorSpinorField &out, const ColorSpinorField &in,
-                  const int *geo_map, const int parity)
-      : out(out), in(in), geo_map(geo_map), spin_map(), parity(parity),
-        nParity(fineColorSpinorField<transferType>(in,out).SiteSubset()),
-        fineX{fineColorSpinorField<transferType>(in,out).X()[0],
-          fineColorSpinorField<transferType>(in,out).X()[1],
-          fineColorSpinorField<transferType>(in,out).X()[2],
-          fineColorSpinorField<transferType>(in,out).X()[3]},
-        fineVolumeCB(fineColorSpinorField<transferType>(in,out).VolumeCB()),
-        coarseVolumeCB(coarseColorSpinorField<transferType>(in,out).VolumeCB()),
-        threads(fineVolumeCB, nParity, fineColor)
-    {;}
+                                const int *geo_map, const int parity) :
+      out(out), in(in), geo_map(geo_map), spin_map(), parity(parity),
+      nParity(fineColorSpinorField<transferType>(in,out).SiteSubset()),
+      fineX{fineColorSpinorField<transferType>(in,out).X()[0],
+        fineColorSpinorField<transferType>(in,out).X()[1],
+        fineColorSpinorField<transferType>(in,out).X()[2],
+        fineColorSpinorField<transferType>(in,out).X()[3]},
+      fineVolumeCB(fineColorSpinorField<transferType>(in,out).VolumeCB()),
+      coarseVolumeCB(coarseColorSpinorField<transferType>(in,out).VolumeCB())
+    {
+      this->threads = dim3(fineVolumeCB, nParity, fineColor);
+    }
   };
 
   /**
@@ -112,8 +112,8 @@ namespace quda {
      fine degree of freedom
   */
   template <typename Arg> struct StaggeredProlongRestrict_ {
-    Arg &arg;
-    constexpr StaggeredProlongRestrict_(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr StaggeredProlongRestrict_(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int c)
