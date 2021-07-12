@@ -242,8 +242,8 @@ namespace quda
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
    
-  template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3>
-  struct ContractionSummedArg :  public ReduceArg<contract_array>
+  template <typename Float, int nColor_,  int nSpin_ = 4, int reduction_dim_ = 3, typename contract_t = contract_array>
+  struct ContractionSummedArg :  public ReduceArg<contract_t>
   {
     // This the direction we are performing reduction on. default to 3.
     static constexpr int reduction_dim = reduction_dim_; 
@@ -273,7 +273,7 @@ namespace quda
 			 const int source_position_in[4],
 			 const int mom_mode_in[4], const QudaFFTSymmType fft_type_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<contract_array>(x.X()[reduction_dim]),
+      ReduceArg<contract_t>(x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
@@ -291,7 +291,7 @@ namespace quda
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
-    __device__ __host__ contract_array init() const { return contract_array(); }
+    __device__ __host__ contract_t init() const { return contract_t(); }
   };
   
   template <typename Arg> struct DegrandRossiContractFT : plus<contract_array> {
@@ -382,8 +382,8 @@ namespace quda
     }
   };
 
-  template <typename Arg> struct StaggeredContractFT : plus<contract_array> {
-    using reduce_t = contract_array;
+  template <typename Arg> struct StaggeredContractFT : plus<staggered_contract_array> {
+    using reduce_t = staggered_contract_array;
     using plus<reduce_t>::operator();    
     const Arg &arg;
     constexpr StaggeredContractFT(const Arg &arg) : arg(arg) {}
@@ -396,9 +396,7 @@ namespace quda
       constexpr int nColor = Arg::nColor;
       using real   = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
-
-      reduce_t result_all_channels = contract_array();
-      //reduce_t result_all_channels = staggered_contract_array();
+      reduce_t result_all_channels = staggered_contract_array();
       
       int mom_mode[4];
       QudaFFTSymmType fft_type[4];
