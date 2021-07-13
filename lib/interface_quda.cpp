@@ -4385,7 +4385,7 @@ void destroyGaugeFieldQuda(void* gauge)
 }
 
 
-void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *, void **x,
+void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *, void **,
 			       QudaGaugeParam *gauge_param, QudaInvertParam *inv_param)
 {
   profileStaggeredForce.TPSTART(QUDA_PROFILE_TOTAL);
