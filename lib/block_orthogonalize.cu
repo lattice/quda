@@ -391,7 +391,7 @@ namespace quda {
   }
 #else
   void BlockOrthogonalize(ColorSpinorField &, const std::vector<ColorSpinorField *> &, const int *,
-                          const int *, const int *, int, int, int)
+                          const int *, const int *, int, int, bool)
   {
     errorQuda("Multigrid has not been built");
   }
