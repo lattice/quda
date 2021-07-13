@@ -5771,7 +5771,7 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   cs_param->create = QUDA_REFERENCE_FIELD_CREATE;
   
   // max results set by contraction kernel and sized for nSpin**2 = 16
-  const int max_contract_results = 16;
+  const int max_contract_results = nSpin * nSpin;//16;
   // The number of contraction results expected in the output
   size_t num_out_results = nSpin * nSpin;
 
