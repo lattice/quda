@@ -869,7 +869,7 @@ namespace quda {
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
         double absmax = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
         if (global) comm_allreduce_max(&absmax);
         return absmax;
       }
@@ -896,7 +896,7 @@ namespace quda {
       __host__ double abs_max(bool global = true) const
       {
         double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
         if (global) comm_allreduce_max(&absmax);
         return absmax;
       }

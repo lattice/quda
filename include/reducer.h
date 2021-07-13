@@ -79,4 +79,58 @@ namespace quda {
     { return abs(scale * complex<Float>(x.real(), x.imag())); }
   };
 
+  template<typename Float, typename storeFloat> struct abs_max_ {
+    abs_max_(const Float = 1.0) { }
+    __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const
+    { return maximum<Float>()(abs(x.real()), abs(x.imag())); }
+  };
+
+  template <typename Float> struct abs_max_<Float, int8_t> {
+    Float scale;
+    abs_max_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<int8_t> &x) const
+    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
+  template<typename Float> struct abs_max_<Float,short> {
+    Float scale;
+    abs_max_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<short> &x) const
+    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
+  template<typename Float> struct abs_max_<Float,int> {
+    Float scale;
+    abs_max_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<int> &x) const
+    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
+  template<typename Float, typename storeFloat> struct abs_min_ {
+    abs_min_(const Float = 1.0) { }
+    __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const
+    { return minimum<Float>()(abs(x.real()), abs(x.imag())); }
+  };
+
+  template <typename Float> struct abs_min_<Float, int8_t> {
+    Float scale;
+    abs_min_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<int8_t> &x) const
+    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
+  template<typename Float> struct abs_min_<Float,short> {
+    Float scale;
+    abs_min_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<short> &x) const
+    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
+  template<typename Float> struct abs_min_<Float,int> {
+    Float scale;
+    abs_min_(const Float scale) : scale(scale) { }
+    __host__ __device__ Float operator()(const quda::complex<int> &x) const
+    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+  };
+
 }

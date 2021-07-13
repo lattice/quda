@@ -859,7 +859,7 @@ namespace quda {
          * @return Linfinity norm
          */
         __host__ double abs_max(int dim=-1, bool global=true) const {
-          double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
+          double absmax = accessor.transform_reduce(location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
@@ -871,7 +871,7 @@ namespace quda {
          * @return Minimum norm
          */
         __host__ double abs_min(int dim=-1, bool global=true) const {
-          double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
+          double absmin = accessor.transform_reduce(location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
           return absmin;
@@ -879,7 +879,7 @@ namespace quda {
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
         size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
-    };
+      };
 
       /**
          @brief Generic reconstruction helper with no reconstruction

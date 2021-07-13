@@ -112,9 +112,9 @@ namespace quda {
 
       V.Scale(max); // by definition this is true
       apply(device::get_default_stream());
-      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION) {
+      if (two_pass && V.Precision() < QUDA_SINGLE_PRECISION) {  // recompute for more precision
         iter++;
-        V.Scale(1.1 * max); // recompute for more precision
+        V.Scale(1.05 * max); // the 1.05 gives us some margin
         apply(device::get_default_stream());
       }
     }
