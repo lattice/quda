@@ -145,6 +145,7 @@ int test(int contractionType, QudaPrecision test_prec)
   cs_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
   cs_param.create = QUDA_ZERO_FIELD_CREATE;
   cs_param.location = QUDA_CPU_FIELD_LOCATION;
+  cs_param.pc_type = QUDA_4D_PC;
 
   int my_spinor_site_size = nSpin * 3; //DMH: nSpin X nColor 
 
