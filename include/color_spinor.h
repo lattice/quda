@@ -1231,6 +1231,42 @@ namespace quda {
   }
 
   /**
+     @brief Compute the matrix-vector product z = A * x + y
+     @param[in] A Input matrix
+     @param[in] x Input vector
+     @param[in] z Input vector
+     @return The vector z = A * x + y
+  */
+  template<typename Float, int Nc, int Ns> __device__ __host__ inline
+  ColorSpinor<Float,Nc,Ns> mv_add(const Matrix<complex<Float>,Nc> &A, const ColorSpinor<Float,Nc,Ns> &x, const ColorSpinor<Float,Nc,Ns> &y)
+  {
+    ColorSpinor<Float,Nc,Ns> z;
+
+#pragma unroll
+    for (int i=0; i<Nc; i++) {
+#pragma unroll
+      for (int s=0; s<Ns; s++) {
+	z.data[s*Nc + i].x  = y.data[s*Nc + i].real() + A(i,0).real() * x.data[s*Nc + 0].real();
+	z.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
+	z.data[s*Nc + i].y  = y.data[s*Nc + i].imag() + A(i,0).real() * x.data[s*Nc + 0].imag();
+	z.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
+      }
+#pragma unroll
+      for (int j=1; j<Nc; j++) {
+#pragma unroll
+	for (int s=0; s<Ns; s++) {
+	  z.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
+	  z.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
+	  z.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
+	  z.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
+	}
+      }
+    }
+
+    return z;
+  }
+
+  /**
      @brief Compute the matrix-vector product y = A * x
      @param[in] A Input Hermitian matrix with dimensions NcxNs x NcxNs
      @param[in] x Input vector

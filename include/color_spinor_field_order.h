@@ -220,10 +220,12 @@ namespace quda {
                                            int parity, int x_cb, int chi) const
       {
         using vec_t = typename VectorType<Float, 2>::type;
-        int N = nSpin * nColor * nVec;
-        int M = nSpinBlock * nColor * nVec;
+        constexpr int N = nSpin * nColor * nVec;
+        constexpr int M = nSpinBlock * nColor * nVec;
+#pragma unroll
         for (int i = 0; i < M; i++) {
-          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), x_cb * N + chi * M + i);
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
+          memcpy(&out[i], &tmp, sizeof(vec_t));
         }
       }
     };
@@ -275,9 +277,11 @@ namespace quda {
                                            int parity, int x_cb, int chi) const
       {
         using vec_t = typename VectorType<Float, 2>::type;
-        int M = nSpinBlock * nColor * nVec;
+        constexpr int M = nSpinBlock * nColor * nVec;
+#pragma unroll
         for (int i = 0; i < M; i++) {
-          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          memcpy(&out[i], &tmp, sizeof(vec_t));
         }
       }
     };
@@ -320,10 +324,11 @@ namespace quda {
                                            int parity, int x_cb, int chi) const
       {
         using vec_t = typename VectorType<Float, 4>::type;
-        int M = (nSpinBlock * nColor * nVec * 2) / 4;
+        constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          ((vec_t *)out)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          memcpy(&out[i * 2], &tmp, sizeof(vec_t));
         }
       }
     };
@@ -374,7 +379,8 @@ namespace quda {
         Float tmp[N];
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          ((vec_t *)tmp)[i] = vector_load<vec_t>((vec_t *)(in + parity * offset_cb), i * stride + x_cb);
+          vec_t ld_tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
+          memcpy(&tmp[i * 8], &ld_tmp, sizeof(vec_t));
         }
         constexpr int N_chi = N / (nSpin / nSpinBlock);
 #pragma unroll
@@ -608,13 +614,13 @@ namespace quda {
       mutable complex<ghostFloat> *ghost[8];
       mutable norm_t *ghost_norm[8];
       mutable int x[QUDA_MAX_DIM];
-      const int volumeCB;
+      const unsigned int volumeCB;
       const int nDim;
       const QudaGammaBasis gammaBasis;
       const int siteSubset;
       const int nParity;
       const QudaFieldLocation location;
-    const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
+      const GhostAccessorCB<ghostFloat,nSpin,nColor,nVec,order> ghostAccessor;
       Float ghost_scale;
       Float ghost_scale_inv;
 #endif
@@ -711,8 +717,11 @@ namespace quda {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
           accessor.template load<nSpinBlock>(tmp, v, parity, x_cb, chi);
           Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
+#pragma unroll
           for (int s = 0; s < nSpinBlock; s++) {
+#pragma unroll
             for (int c = 0; c < nColor; c++) {
+#pragma unroll
               for (int v = 0; v < nVec; v++) {
                 int k = (s * nColor + c) * nVec + v;
                 out[k] = norm_ * complex<Float>(static_cast<Float>(tmp[k].real()), static_cast<Float>(tmp[k].imag()));
@@ -837,6 +846,35 @@ namespace quda {
       /** Returns the field geometric dimension */
       __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
+#endif
+
+      /**
+       * Returns the L2 norm squared of the field in a given dimension
+       * @param[in] global Whether to do a global or process local norm2 reduction
+       * @return L2 norm squared
+      */
+      __host__ double norm2(const ColorSpinorField &v, bool global = true) const
+      {
+        double nrm2 = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
+        if (global) comm_allreduce(&nrm2);
+        return nrm2;
+      }
+
+      /**
+       * Returns the Linfinity norm of the field
+       * @param[in] global Whether to do a global or process local Linfinity reduction
+       * @return Linfinity norm
+      */
+      __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
+      {
+        double absmax = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        if (global) comm_allreduce_max(&absmax);
+        return absmax;
+      }
+
+#ifndef DISABLE_GHOST
       /**
        * Returns the L2 norm squared of the field in a given dimension
        * @param[in] global Whether to do a global or process local norm2 reduction
@@ -858,7 +896,7 @@ namespace quda {
       __host__ double abs_max(bool global = true) const
       {
         double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
         if (global) comm_allreduce_max(&absmax);
         return absmax;
       }
