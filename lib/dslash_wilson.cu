@@ -20,7 +20,12 @@ namespace quda
     using Dslash = Dslash<wilson, Arg>;
 
   public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    {
+      if(in.Ndim() == 5) {
+        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      }
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -35,13 +40,25 @@ namespace quda
     inline WilsonApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
-      constexpr int nDim = 4;
-      WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      Wilson<decltype(arg)> wilson(arg, out, in);
+      if( in.Ndim() == 4 ){
+        constexpr int nDim = 4;
+        WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
+        Wilson<decltype(arg)> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(wilson)> policy(
+          wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+      } else {
+        // support for two-flavour fields (or fields with general fifth dim, where a Wilson Dslash
+        // is to be applied to each 4D subspace)
+        constexpr int nDim = 5;
+        WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
+        Wilson<decltype(arg)> wilson(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(wilson)> policy(
+          wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      }
     }
   };
 

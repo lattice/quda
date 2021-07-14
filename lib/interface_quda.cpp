@@ -897,13 +897,16 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     warningQuda("Uninverted clover term not loaded");
   }
 
-  bool twisted = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false;
+  QudaTwistFlavorType twist_flavor = inv_param->twist_flavor;
 
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   clover_param.csw = inv_param->clover_coeff;
-  clover_param.twisted = twisted;
-  clover_param.mu2 = twisted ? 4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.twist_flavor = twist_flavor;
+  clover_param.mu2 = twist_flavor != QUDA_TWIST_NO ? 
+                       4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.epsilon2 = twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
+                            4.*inv_param->kappa*inv_param->kappa*inv_param->epsilon*inv_param->epsilon : 0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;
@@ -3424,8 +3427,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         CloverFieldParam clover_param;
         clover_param.nDim = 4;
         clover_param.csw = param->clover_coeff;
-        clover_param.twisted = param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH;
-        clover_param.mu2 = clover_param.twisted ? 4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
+        clover_param.twist_flavor = param->twist_flavor;
+        clover_param.mu2 = clover_param.twist_flavor != QUDA_TWIST_NO ? 
+                             4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
+        clover_param.epsilon2 = clover_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? 
+                             4.0 * param->kappa * param->kappa * param->epsilon * param->epsilon : 0.0;
         clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
         for (int d = 0; d < 4; d++) { clover_param.x[d] = field_dim[d]; }
         clover_param.pad = param->cl_pad;

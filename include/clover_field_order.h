@@ -529,8 +529,9 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-	const bool twisted;
-	const real mu2;
+        const QudaTwistFlavorType twist_flavor;
+        const real mu2;
+        const real epsilon2;
         const real rho;
 
         size_t bytes;
@@ -543,8 +544,9 @@ namespace quda {
           norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
           volumeCB(clover.VolumeCB()),
           stride(clover.Stride()),
-          twisted(clover.Twisted()),
+          twist_flavor(clover.TwistFlavor()),
           mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2()),
           rho(clover.Rho()),
           bytes(clover.Bytes()),
           norm_bytes(clover.NormBytes()),
@@ -558,8 +560,9 @@ namespace quda {
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 	}
 
-	bool Twisted() const { return twisted; }
+	QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
 	real Mu2() const { return mu2; }
+	real Epsilon2() const { return epsilon2; }
 
         /**
 	   @brief This accessor routine returns a const clover_wrapper to this object,
@@ -700,26 +703,29 @@ namespace quda {
     */
     template <typename Float, int length = 72>
       struct QDPOrder {
-	typedef typename mapper<Float>::type RegType;
-	Float *clover;
-	const int volumeCB;
-	const int stride;
-	const int offset;
 
-	const bool twisted;
-	const Float mu2;
+      typedef typename mapper<Float>::type RegType;
+      Float *clover;
+      const int volumeCB;
+      const int stride;
+      const int offset;
+      
+      const QudaTwistFlavorType twist_flavor;
+      const Float mu2;
+      const Float epsilon2;
 
         QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
          volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
-	twisted(clover.Twisted()), mu2(clover.Mu2()) {
+         twist_flavor(clover.TwistFlavor()), mu2(clover.Mu2()), epsilon2(clover.Epsilon2()) {
         if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
         this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
       }
 
-	bool  Twisted()	const	{return twisted;}
-	Float Mu2()	const	{return mu2;}
+      QudaTwistFlavorType TwistFlavor()	const	{return twist_flavor;}
+      Float Mu2()	const	{ return mu2; }
+      Float Epsilon2() const { return epsilon2; }
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
@@ -748,11 +754,14 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-	const bool twisted;
+	const QudaTwistFlavorType twist_flavor;
 	const Float mu2;
+      const Float epsilon2;
+
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-          volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
+          volumeCB(clover.VolumeCB()), stride(volumeCB), twist_flavor(clover.TwistFlavor()), mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2()) {
         if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
@@ -760,8 +769,9 @@ namespace quda {
         diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
-      bool  Twisted()	const	{return twisted;}
+      QudaTwistFlavorType  TwistFlavor()	const	{return twist_flavor;}
       Float Mu2()	const	{return mu2;}
+      Float Epsilon2() const {return epsilon2;}
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
@@ -817,11 +827,13 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-	const bool twisted;
+	const QudaTwistFlavorType twist_flavor;
 	const Float mu2;
+  const Float epsilon2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-          volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
+          volumeCB(clover.Stride()), stride(volumeCB), twist_flavor(clover.TwistFlavor()), mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2()) {
         if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
           errorQuda("Invalid clover order %d for this accessor", clover.Order());
         }
@@ -830,8 +842,9 @@ namespace quda {
       }
 
 
-	bool  Twisted()	const	{return twisted;}
+	QudaTwistFlavorType  TwistFlavor()	const	{return twist_flavor;}
 	Float Mu2()	const	{return mu2;}
+  Float Epsilon2() const {return epsilon2;}
 
 	/**
 	   @param v The output clover matrix in QUDA order

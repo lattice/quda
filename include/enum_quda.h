@@ -398,7 +398,6 @@ typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QU
 typedef enum QudaTwistFlavorType_s {
   QUDA_TWIST_SINGLET = 1,
   QUDA_TWIST_NONDEG_DOUBLET = +2,
-  QUDA_TWIST_DEG_DOUBLET = -2,
   QUDA_TWIST_NO = 0,
   QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
 } QudaTwistFlavorType;

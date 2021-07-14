@@ -18,7 +18,8 @@ namespace quda {
     {
       writeAuxString("trlog=%s,twist=%s",
                      compute_tr_log ? "true" : "false",
-                     clover.Twisted() ? "true" : "false");
+                     (clover.TwistFlavor() == QUDA_TWIST_SINGLET || 
+                      clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) ? "true" : "false");
 
       apply(device::get_default_stream());
 
@@ -31,7 +32,8 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (clover.Twisted()) {
+      if (clover.TwistFlavor() == QUDA_TWIST_SINGLET ||
+          clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
         CloverInvertArg<store_t, true> arg(clover, compute_tr_log);
         launch<InvertClover>(clover.TrLog(), tp, stream, arg);
       } else {
