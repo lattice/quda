@@ -30,6 +30,8 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = 0;
   gauge_param.mom_ga_pad = 0;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
@@ -60,6 +62,8 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
@@ -102,6 +106,8 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setInvertParam(QudaInvertParam &inv_param)
@@ -248,6 +254,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   }
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 // Parameters defining the eigensolver
@@ -319,6 +327,8 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  eig_param.struct_size = sizeof(eig_param);
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param)
@@ -416,6 +426,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
+    mg_param.block_ortho_two_pass[i] = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -566,6 +577,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  mg_param.struct_size = sizeof(mg_param);
+
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -678,6 +691,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 // Parameters defining the eigensolver
@@ -733,6 +748,8 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
+
+  mg_eig_param.struct_size = sizeof(mg_eig_param);
 }
 
 void setContractInvertParam(QudaInvertParam &inv_param)
@@ -755,6 +772,8 @@ void setContractInvertParam(QudaInvertParam &inv_param)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
@@ -829,6 +848,8 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
@@ -910,6 +931,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
@@ -978,6 +1001,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];          // default to 64 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
+    mg_param.block_ortho_two_pass[i] = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -1139,6 +1163,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setDeflatedInvertParam(QudaInvertParam &inv_param)
@@ -1257,6 +1283,8 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setDeflationParam(QudaEigParam &df_param)

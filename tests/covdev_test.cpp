@@ -90,10 +90,7 @@ void init(int argc, char **argv)
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   for (int dir = 0; dir < 4; dir++) {
-    links[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    if (links[dir] == NULL) {
-      errorQuda("ERROR: malloc failed for gauge links");
-    }  
+    links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
   constructHostGaugeField(links, gauge_param, argc, argv);
 
@@ -140,7 +137,7 @@ void init(int argc, char **argv)
 void end(void) 
 {
   for (int dir = 0; dir < 4; dir++) {
-    free(links[dir]);
+    host_free(links[dir]);
   }
 
   delete dirac;

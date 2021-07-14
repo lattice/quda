@@ -118,7 +118,7 @@ namespace quda
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream)
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg)
   {
     // if launch requests the maximum shared memory and the device supports it then opt in
     if (tp.set_max_shared_bytes && device::max_dynamic_shared_memory() > device::max_default_shared_memory()) {
@@ -135,6 +135,7 @@ namespace quda
     }
 
     // no driver API variant here since we have C++ functions
+    void *args[] = {const_cast<void *>(arg)};
     PROFILE(cudaError_t error = cudaLaunchKernel(func, tp.grid, tp.block, args, tp.shared_bytes, device::get_cuda_stream(stream)),
             QUDA_PROFILE_LAUNCH_KERNEL);
     set_runtime_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
@@ -352,77 +353,6 @@ namespace quda
     if (count == 0) return;
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
     set_runtime_error(error, "cudaMemcpyAsync", func, file, line);
-  }
-
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     qudaMemcpyKind kind, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    CUDA_MEMCPY2D param;
-    param.srcPitch = spitch;
-    param.srcY = 0;
-    param.srcXInBytes = 0;
-    param.dstPitch = dpitch;
-    param.dstY = 0;
-    param.dstXInBytes = 0;
-    param.WidthInBytes = width;
-    param.Height = height;
-
-    switch (kind) {
-    case qudaMemcpyDeviceToHost:
-      param.srcDevice = (CUdeviceptr)src;
-      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-      param.dstHost = dst;
-      param.dstMemoryType = CU_MEMORYTYPE_HOST;
-      break;
-    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", qudaMemcpyKindToAPI(kind));
-    }
-    PROFILE(auto error = cuMemcpy2D(&param), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_driver_error(error, "cuMemcpy2D", func, file, line);
-#else
-    PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_runtime_error(error, "cudaMemcpy2D", func, file, line);
-#endif
-  }
-
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line)
-  {
-#ifdef USE_DRIVER_API
-    CUDA_MEMCPY2D param;
-    param.srcPitch = spitch;
-    param.srcY = 0;
-    param.srcXInBytes = 0;
-    param.dstPitch = dpitch;
-    param.dstY = 0;
-    param.dstXInBytes = 0;
-    param.WidthInBytes = width;
-    param.Height = height;
-
-    switch (kind) {
-    case qudaMemcpyDeviceToHost:
-      param.srcDevice = (CUdeviceptr)src;
-      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-      param.dstHost = dst;
-      param.dstMemoryType = CU_MEMORYTYPE_HOST;
-      break;
-    default:
-      errorQuda("Unsupported cuMemcpyType2DAsync %d", qudaMemcpyKindToAPI(kind));
-    }
-    PROFILE(auto error = cuMemcpy2DAsync(&param, device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_driver_error(error, "cuMemcpy2DAsync", func, file, line);
-#else
-    PROFILE(auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_runtime_error(error, "cudaMemcpy2DAsync", func, file, line);
-#endif
-  }
-
-  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                             const qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-    auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    set_runtime_error(error, "cudaMemcpy2DAsync", func, file, line);
   }
 
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)

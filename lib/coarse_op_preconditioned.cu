@@ -43,29 +43,34 @@ namespace quda
       Y(Y),
       Xinv(Xinv)
     {
-      arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
-        strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
+      if (Arg::compute_max) {
+        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+        if (location == QUDA_CUDA_FIELD_LOCATION) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+        arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       }
-      arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
+
+      if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
       if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());
 
-      double max_h_double = *arg.max_h;
-      comm_allreduce_max(&max_h_double);
-      *arg.max_h = static_cast<Float>(max_h_double);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
-      Yhat.Scale(*arg.max_h);
+      if (Arg::compute_max) {
+        double max_h_double = *arg.max_h;
+        comm_allreduce_max(&max_h_double);
+        *arg.max_h = static_cast<Float>(max_h_double);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
+        Yhat.Scale(*arg.max_h);
+      }
     }
 
     ~CalculateYhat()
     {
-      if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
-      pool_pinned_free(arg.max_h);
+      if (Arg::compute_max) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
+        pool_pinned_free(arg.max_h);
+      }
     }
 
     void apply(const qudaStream_t &stream)
