@@ -122,7 +122,7 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
 
 int Communicator::comm_rank(void) { return rank; }
 
-int Communicator::comm_size(void) { return size; }
+size_t Communicator::comm_size(void) { return size; }
 
 /**
  * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
@@ -319,6 +319,18 @@ void Communicator::comm_allreduce_array(double *data, size_t size)
     delete[] recv_buf;
     delete[] recv_trans;
   }
+}
+
+void Communicator::comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size)
+{
+  if(mh == nullptr){
+    mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));    	  
+    mh->custom = false;   
+  }	  
+
+  MPI_CHECK(MPI_Iallreduce(outdata, indata, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE, &mh->request));
+
+  return;
 }
 
 void Communicator::comm_allreduce_max_array(double *data, size_t size)

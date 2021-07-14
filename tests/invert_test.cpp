@@ -19,12 +19,13 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
+             "Ls_dimension   dslash_type  normalization\n");
+  printfQuda(
+    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
+    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
   if (inv_multigrid) {
     printfQuda("MG parameters\n");
@@ -161,7 +162,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaEigParam mg_eig_param[mg_levels];
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   QudaEigParam eig_param = newQudaEigParam();
 
   if (inv_multigrid) {
@@ -186,7 +187,7 @@ int main(int argc, char **argv)
   }
 
   if (inv_deflate) {
-    setEigParam(eig_param);
+    setEigParam(eig_param, inv_type);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
@@ -219,7 +220,7 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -230,8 +231,8 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
     if (inv_multigrid) {
       // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
@@ -303,11 +304,7 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
-
-  std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
-  std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
+  auto *rng = new quda::RNG(*check, 1234);
 
   for (int i = 0; i < Nsrc; i++) {
     // Populate the host spinor with random numbers.
@@ -320,7 +317,12 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < Nsrc; i++) {
       // If deflating, preserve the deflation space between solves
-      if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_deflate) eig_param.preserve_deflation = (i < Nsrc - 1 && eig_param.n_conv > 0) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+        if( eig_param.is_complete == QUDA_BOOLEAN_TRUE ) inv_param.inv_type = QUDA_CG_INVERTER;
+        eig_param.is_last_rhs = (i == (Nsrc-1)) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      }
+      
       // Perform QUDA inversions
       if (multishift > 1) {
         invertMultiShiftQuda(_hp_multi_x[i].data(), in[i]->V(), &inv_param);
@@ -363,7 +365,6 @@ int main(int argc, char **argv)
   // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
-  rng->Release();
   delete rng;
 
   // free the multigrid solver
@@ -390,12 +391,12 @@ int main(int argc, char **argv)
   for (auto p : out) { delete p; }
 
   freeGaugeQuda();
-  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
+    if (clover) host_free(clover);
+    if (clover_inv) host_free(clover_inv);
   }
 
   // finalize the QUDA library

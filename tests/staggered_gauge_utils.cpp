@@ -172,8 +172,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
   void *qdp_longlink_naik_temp[4];
   if (n_naiks == 2) {
     for (int dir = 0; dir < 4; dir++) {
-      qdp_fatlink_naik_temp[dir] = malloc(V * gauge_site_size * gauge_data_type_size);
-      qdp_longlink_naik_temp[dir] = malloc(V * gauge_site_size * gauge_data_type_size);
+      qdp_fatlink_naik_temp[dir] = safe_malloc(V * gauge_site_size * gauge_data_type_size);
+      qdp_longlink_naik_temp[dir] = safe_malloc(V * gauge_site_size * gauge_data_type_size);
     }
   }
 
@@ -192,10 +192,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gauge_data_type_size);
       memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gauge_data_type_size);
-      free(qdp_fatlink_naik_temp[dir]);
-      qdp_fatlink_naik_temp[dir] = nullptr;
-      free(qdp_longlink_naik_temp[dir]);
-      qdp_longlink_naik_temp[dir] = nullptr;
+      host_free(qdp_fatlink_naik_temp[dir]);
+      host_free(qdp_longlink_naik_temp[dir]);
     }
   }
 
@@ -219,8 +217,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   void *qdp_longlink_naik_temp[4];
   if (n_naiks == 2) {
     for (int dir = 0; dir < 4; dir++) {
-      qdp_fatlink_naik_temp[dir] = malloc(V * gauge_site_size * gauge_data_type_size);
-      qdp_longlink_naik_temp[dir] = malloc(V * gauge_site_size * gauge_data_type_size);
+      qdp_fatlink_naik_temp[dir] = safe_malloc(V * gauge_site_size * gauge_data_type_size);
+      qdp_longlink_naik_temp[dir] = safe_malloc(V * gauge_site_size * gauge_data_type_size);
       memset(qdp_fatlink_naik_temp[dir], 0, V * gauge_site_size * gauge_data_type_size);
       memset(qdp_longlink_naik_temp[dir], 0, V * gauge_site_size * gauge_data_type_size);
     }
@@ -259,10 +257,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gauge_data_type_size);
       memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gauge_data_type_size);
-      free(qdp_fatlink_naik_temp[dir]);
-      qdp_fatlink_naik_temp[dir] = nullptr;
-      free(qdp_longlink_naik_temp[dir]);
-      qdp_longlink_naik_temp[dir] = nullptr;
+      host_free(qdp_fatlink_naik_temp[dir]);
+      host_free(qdp_longlink_naik_temp[dir]);
     }
   }
 

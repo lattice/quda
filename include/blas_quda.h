@@ -1,6 +1,4 @@
-#ifndef _QUDA_BLAS_H
-#define _QUDA_BLAS_H
-
+#pragma once
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 
@@ -13,7 +11,7 @@ namespace quda {
     // creates and destroys reduction buffers
     void init();
     void destroy();
-
+    
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;
@@ -35,6 +33,8 @@ namespace quda {
     }
 
     void ax(double a, ColorSpinorField &x);
+    void ax(double a, std::vector<ColorSpinorField *> &x);
+    void ax(double *a, std::vector<ColorSpinorField *> &x); // not a true block-blas routine
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z);
 
@@ -108,18 +108,19 @@ namespace quda {
 
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
-
+    
+    double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
+    
     // multi-blas kernels - defined in multi_blas.cu
-
     /**
        @brief Compute the block "axpy" with over the set of
-              ColorSpinorFields.  E.g., it computes y = x * a + y
-              The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
+       ColorSpinorFields.  E.g., it computes y = x * a + y
+       The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
        @param a[in] Matrix of real coefficients
        @param x[in] vector of input ColorSpinorFields
-      @param y[in,out] vector of input/output ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+    void axpy(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
 
     /**
        @brief This is a wrapper for calling the block "axpy" with a
@@ -443,5 +444,3 @@ namespace quda {
   } // namespace blas
 
 } // namespace quda
-
-#endif // _QUDA_BLAS_H

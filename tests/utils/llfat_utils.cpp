@@ -20,8 +20,10 @@
 
 using namespace quda;
 
+#ifdef MULTI_GPU
 static int Vs[4];
 static int Vsh[4];
+#endif
 
 template <typename su3_matrix, typename Real>
 void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matrix *mulink, su3_matrix **sitelink,
@@ -137,17 +139,8 @@ void llfat_compute_gen_staple_field(su3_matrix *staple, int mu, int nu, su3_matr
 template <typename su3_matrix, typename Float>
 void llfat_cpu(void **fatlink, su3_matrix **sitelink, Float *act_path_coeff)
 {
-  su3_matrix *staple = (su3_matrix *)malloc(V * sizeof(su3_matrix));
-  if (staple == NULL) {
-    fprintf(stderr, "Error: malloc failed for staple in function %s\n", __FUNCTION__);
-    exit(1);
-  }
-
-  su3_matrix *tempmat1 = (su3_matrix *)malloc(V * sizeof(su3_matrix));
-  if (tempmat1 == NULL) {
-    fprintf(stderr, "ERROR:  malloc failed for tempmat1 in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  su3_matrix *staple = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
+  su3_matrix *tempmat1 = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
   // to fix up the Lepage term, included by a trick below
   Float one_link = (act_path_coeff[0] - 6.0 * act_path_coeff[5]);
@@ -187,22 +180,12 @@ void llfat_cpu(void **fatlink, su3_matrix **sitelink, Float *act_path_coeff)
     } // nu
   }   // dir
 
-  free(staple);
-  free(tempmat1);
+  host_free(staple);
+  host_free(tempmat1);
 }
 
 void llfat_reference(void **fatlink, void **sitelink, QudaPrecision prec, void *act_path_coeff)
 {
-  Vs[0] = Vs_x;
-  Vs[1] = Vs_y;
-  Vs[2] = Vs_z;
-  Vs[3] = Vs_t;
-
-  Vsh[0] = Vsh_x;
-  Vsh[1] = Vsh_y;
-  Vsh[2] = Vsh_z;
-  Vsh[3] = Vsh_t;
-
   switch (prec) {
   case QUDA_DOUBLE_PRECISION:
     llfat_cpu((void **)fatlink, (su3_matrix<double> **)sitelink, (double *)act_path_coeff);
@@ -454,34 +437,17 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
     prec = QUDA_DOUBLE_PRECISION;
   }
 
-  su3_matrix *staple = (su3_matrix *)malloc(V * sizeof(su3_matrix));
-  if (staple == NULL) {
-    fprintf(stderr, "Error: malloc failed for staple in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  su3_matrix *staple = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
   su3_matrix *ghost_staple[4];
   su3_matrix *ghost_staple1[4];
 
   for (int i = 0; i < 4; i++) {
-    ghost_staple[i] = (su3_matrix *)malloc(2 * Vs[i] * sizeof(su3_matrix));
-    if (ghost_staple[i] == NULL) {
-      fprintf(stderr, "Error: malloc failed for ghost staple in function %s\n", __FUNCTION__);
-      exit(1);
-    }
-
-    ghost_staple1[i] = (su3_matrix *)malloc(2 * Vs[i] * sizeof(su3_matrix));
-    if (ghost_staple1[i] == NULL) {
-      fprintf(stderr, "Error: malloc failed for ghost staple1 in function %s\n", __FUNCTION__);
-      exit(1);
-    }
+    ghost_staple[i] = (su3_matrix *)safe_malloc(2 * Vs[i] * sizeof(su3_matrix));
+    ghost_staple1[i] = (su3_matrix *)safe_malloc(2 * Vs[i] * sizeof(su3_matrix));
   }
 
-  su3_matrix *tempmat1 = (su3_matrix *)malloc(V * sizeof(su3_matrix));
-  if (tempmat1 == NULL) {
-    fprintf(stderr, "ERROR:  malloc failed for tempmat1 in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  su3_matrix *tempmat1 = (su3_matrix *)safe_malloc(V * sizeof(su3_matrix));
 
   // to fix up the Lepage term, included by a trick below
   Float one_link = (act_path_coeff[0] - 6.0 * act_path_coeff[5]);
@@ -530,12 +496,12 @@ void llfat_cpu_mg(void **fatlink, su3_matrix **sitelink, su3_matrix **ghost_site
     } // nu
   }   // dir
 
-  free(staple);
+  host_free(staple);
   for (int i = 0; i < 4; i++) {
-    free(ghost_staple[i]);
-    free(ghost_staple1[i]);
+    host_free(ghost_staple[i]);
+    host_free(ghost_staple1[i]);
   }
-  free(tempmat1);
+  host_free(tempmat1);
 }
 
 void llfat_reference_mg(void **fatlink, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,

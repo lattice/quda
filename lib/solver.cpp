@@ -3,6 +3,7 @@
 #include <multigrid.h>
 #include <eigensolve_quda.h>
 #include <cmath>
+#include <limits>
 
 namespace quda {
 
@@ -93,14 +94,6 @@ namespace quda {
       report("SD");
       solver = new SD(mat, param, profile);
       break;
-    case QUDA_XSD_INVERTER:
-#ifdef MULTI_GPU
-      report("XSD");
-      solver = new XSD(mat, param, profile);
-#else
-      errorQuda("Extended Steepest Descent is multi-gpu only");
-#endif
-      break;
     case QUDA_PCG_INVERTER:
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
@@ -168,6 +161,17 @@ namespace quda {
   {
     if (deflate_init) return;
 
+    if (param.eig_param.n_conv == 0) {
+      // This is a check required by EigCG. If the EigCG solver
+      // cannot find any eigenvectors, we must prevent
+      // the CG solver from attempting to use the non-existant
+      // deflation space.
+      deflate_init = true;
+      deflate_compute = false;
+      param.deflate = false;
+      return;
+    }
+    
     // Deflation requested + first instance of solver
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -225,6 +229,54 @@ namespace quda {
     if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
+  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const int size)
+  {
+    if (deflate_init || param.rhs_idx > 0) {
+      deflate_init = true; //for inc EigCG	    
+      return;
+    }
+
+    // Deflation requested + first instance of solver
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
+    if (size > 0) {
+      evecs.reserve(size);
+      evals.reserve(size);
+
+      deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+
+      if (space && space->evecs.size() != 0) {
+        errorQuda("Detected deflation space of size %lu, double allocation is prohibited.\n", space->evecs.size());
+      } else {
+        // Clone from an existing vector
+        ColorSpinorParam csParam(meta);
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        // This is the vector precision used by matPrecon
+        csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+        // Computing the deflation space, rather than transferring, so we create space.
+        for (int i = 0; i < size; i++) evecs.push_back(ColorSpinorField::Create(csParam));
+        for (int i = 0; i < size; i++) evals.push_back(0.0);
+        // Allocate defaltion space
+        auto *space = new deflation_space();
+        param.eig_param.preserve_deflation_space = reinterpret_cast<void *>(space);
+
+        for (auto &vec : evecs) space->evecs.push_back(vec);
+
+        space->evals.reserve(size);
+        for (int i = 0; i < size; i++) space->evals.push_back(evals[i]);
+      }
+    } else {
+      errorQuda("Cannot create deflation space.\n");
+    }
+
+    deflate_init = true;
+
+    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+
+    return;
+  }
+
   void Solver::destroyDeflationSpace()
   {
     if (deflate_init) {
@@ -253,32 +305,39 @@ namespace quda {
 
         param.eig_param.preserve_deflation_space = space;
       } else {
-        for (auto &vec : evecs)
-          if (vec) delete vec;
+        for (auto &vec : evecs) if (vec) delete vec;
+        if (param.eig_param.preserve_deflation_space) {
+          deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+          // first ensure that any existing space is freed
+          for (auto &vec : space->evecs) if (vec) delete vec;
+          space->evecs.resize(0);
+          delete space;
+        }	
       }
 
       evecs.resize(0);
       deflate_init = false;
     }
   }
-
-  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space, const bool destroy_defl_space)
   {
     if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
     // Create space for the eigenvalues
     evals.resize(defl_space.size());
     // Create space for the eigenvectors, destroy defl_space
     for (auto &e : defl_space) { evecs.push_back(e); }
-    defl_space.resize(0);
+    if (destroy_defl_space) defl_space.resize(0);
   }
 
   void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
   {
-    if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
+    if (!defl_space.empty())
+      errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
     // We do not care about the eigenvalues, they will be recomputed.
     evals.resize(0);
     // Create space for the eigenvectors, destroy evecs
-    for (auto &e : evecs ) { defl_space.push_back(e); }
+    for (auto &e : evecs) { defl_space.push_back(e); }
     evecs.resize(0);
   }
 
@@ -297,7 +356,7 @@ namespace quda {
     }
   }
 
-  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in)
+  void Solver::blocksolve(ColorSpinorField &out, ColorSpinorField &in)
   {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
@@ -343,8 +402,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceHQ(double, double hq2, double, double hq_tol)
+  {
     // check the heavy quark residual norm if necessary
     if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
       if (std::isnan(hq2) || std::isinf(hq2))
@@ -356,8 +415,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceL2(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceL2(double r2, double, double r2_tol, double)
+  {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", r2);

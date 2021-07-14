@@ -58,6 +58,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
@@ -81,7 +82,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
       } else {
         TwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, xpay, x, parity, dagger, comm_override);
         TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
@@ -89,7 +89,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
       }
     }
   };
@@ -99,21 +98,20 @@ namespace quda
 
     out = x + A^{-1} D * in = x + a*(1 + i*b*gamma_5)*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   */
+#ifdef GPU_TWISTED_MASS_DIRAC
   void ApplyTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
       double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_TWISTED_MASS_DIRAC
-    // with symmetric dagger operator we must use kernel packing
-    if (dagger && !asymmetric) pushKernelPackT(true);
-
     instantiate<TwistedMassPreconditionedApply>(
         out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-
-    if (dagger && !asymmetric) popKernelPackT();
-#else
-    errorQuda("Twisted-mass dslash has not been built");
-#endif // GPU_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
+                                      double, bool, const ColorSpinorField &, int, bool, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Twisted-mass dslash has not been built");
+  }
+#endif // GPU_TWISTED_MASS_DIRAC
 
 } // namespace quda

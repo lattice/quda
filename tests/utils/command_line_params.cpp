@@ -81,6 +81,7 @@ double eps_naik = 0.0;
 int n_naiks = 1;
 double clover_coeff = 0.1;
 bool compute_clover = false;
+bool compute_clover_trlog = true;
 bool compute_fatlong = false;
 double tol = 1e-7;
 double tol_precondition = 1e-1;
@@ -102,6 +103,7 @@ quda::mgarray<QudaFieldLocation> setup_location = {};
 quda::mgarray<int> nu_pre = {};
 quda::mgarray<int> nu_post = {};
 quda::mgarray<int> n_block_ortho = {};
+quda::mgarray<bool> block_ortho_two_pass = {};
 quda::mgarray<double> mu_factor = {};
 quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
@@ -148,15 +150,9 @@ bool mg_use_mma = true;
 bool mg_use_mma = false;
 #endif
 
-int n_ev = 8;
-int max_search_dim = 64;
-int deflation_grid = 16;
-double tol_restart = 5e+3 * tol;
-
-int eigcg_max_restarts = 3;
 int max_restart_num = 3;
 double inc_tol = 1e-2;
-double eigenval_tol = 1e-1;
+double tol_restart = 5e+3 * tol;
 
 QudaExtLibType solver_ext_lib = QUDA_EIGEN_EXTLIB;
 QudaExtLibType deflation_ext_lib = QUDA_EIGEN_EXTLIB;
@@ -243,6 +239,16 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 
+int gf_gauge_dir = 4;
+int gf_maxiter = 10000;
+int gf_verbosity_interval = 100;
+double gf_ovr_relaxation_boost = 1.5;
+double gf_fft_alpha = 0.8;
+int gf_reunit_interval = 10;
+double gf_tolerance = 1e-6;
+bool gf_theta_condition = false;
+bool gf_fft_autotune = false;
+
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
@@ -320,8 +326,6 @@ namespace
                                                            {"eigcg", QUDA_EIGCG_INVERTER},
                                                            {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
                                                            {"gmresdr", QUDA_GMRESDR_INVERTER},
-                                                           {"gmresdr-proj", QUDA_GMRESDR_PROJ_INVERTER},
-                                                           {"gmresdr-sh", QUDA_GMRESDR_SH_INVERTER},
                                                            {"fgmresdr", QUDA_FGMRESDR_INVERTER},
                                                            {"mg", QUDA_MG_INVERTER},
                                                            {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
@@ -365,10 +369,6 @@ namespace
   CLI::TransformPairs<QudaSolveType> solve_type_map {
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},
     {"normop-pc", QUDA_NORMOP_PC_SOLVE}, {"normerr", QUDA_NORMERR_SOLVE},     {"normerr-pc", QUDA_NORMERR_PC_SOLVE}};
-
-  CLI::TransformPairs<QudaEigSpectrumType> seig_pectrum_map {
-    {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
-    {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
   CLI::TransformPairs<QudaFieldLocation> field_location_map {{"cpu", QUDA_CPU_FIELD_LOCATION},
                                                              {"host", QUDA_CPU_FIELD_LOCATION},
@@ -424,9 +424,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
+  quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
+                       "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-
+  
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
@@ -664,9 +666,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       int p;
       auto retval = CLI::detail::lexical_cast(res[0], p);
       for (int j = 0; j < 4; j++) {
-        if (p & (1 << j)) {
-          dim_partitioned[j] = 1;
-        }
+        if (p & (1 << j)) { dim_partitioned[j] = 1; }
       }
       return retval;
     },
@@ -728,8 +728,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                  "to precision of eigensolver (default = double)")
     ->transform(prec_transform);
 
-  opgroup->add_option("--eig-io-parity-inflate", eig_io_parity_inflate,
-                      "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
+  opgroup->add_option(
+    "--eig-io-parity-inflate", eig_io_parity_inflate,
+    "Whether to inflate single-parity eigenvectors onto dual parity full fields for file I/O (default = false)");
 
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,
@@ -752,27 +753,14 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Deflation", "Options controlling deflation");
 
-  opgroup
-    ->add_option("--df-deflation-grid", deflation_grid,
-                 "Set maximum number of cycles needed to compute eigenvectors(default 1)")
-    ->check(CLI::PositiveNumber);
-  opgroup
-    ->add_option(
-      "--df-eigcg-max-restarts",
-      eigcg_max_restarts, "Set how many iterative refinement cycles will be solved with eigCG within a single physical right hand site solve (default 4)")
-    ->check(CLI::PositiveNumber);
-  ;
   opgroup->add_option("--df-ext-lib-type", deflation_ext_lib,
                       "Set external library for the deflation methods  (default Eigen library)");
   opgroup->add_option("--df-location-ritz", location_ritz,
                       "Set memory location for the ritz vectors  (default cuda memory location)");
   opgroup->add_option("--df-max-restart-num", max_restart_num,
                       "Set maximum number of the initCG restarts in the deflation stage (default 3)");
-  opgroup->add_option("--df-max-search-dim", max_search_dim, "Set the size of eigenvector search space (default 64)");
   opgroup->add_option("--df-mem-type-ritz", mem_type_ritz,
                       "Set memory type for the ritz vectors  (default device memory type)");
-  opgroup->add_option("--df-n-ev", n_ev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
-  opgroup->add_option("--df-tol-eigenval", eigenval_tol, "Set maximum eigenvalue residual norm (default 1e-1)");
   opgroup->add_option("--df-tol-inc", inc_tol,
                       "Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)");
   opgroup->add_option("--df-tol-restart", tol_restart,
@@ -870,7 +858,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option(
     "--mg-generate-all-levels",
     generate_all_levels, "true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)");
-  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates, "Utilize thin updates for multigrid evolution tests (default false)");
+  opgroup->add_option("--mg-evolve-thin-updates", mg_evolve_thin_updates,
+                      "Utilize thin updates for multigrid evolution tests (default false)");
   opgroup->add_option("--mg-generate-nullspace", generate_nullspace,
                       "Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't "
                       "set, creates free-field null vectors)");
@@ -895,6 +884,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)");
   quda_app->add_mgoption(opgroup, "--mg-n-block-ortho", n_block_ortho, CLI::PositiveNumber,
                          "The number of times to run Gram-Schmidt during block orthonormalization (default 1)");
+  quda_app->add_mgoption(opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
+                         "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
   quda_app->add_mgoption(opgroup, "--mg-nu-post", nu_post, CLI::PositiveNumber,
                          "The number of post-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nu-pre", nu_pre, CLI::PositiveNumber,
@@ -1014,6 +1005,47 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
+void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for heatbath related options
+  auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath tests");
+  opgroup->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
+  opgroup->add_option("--heatbath-coldstart", heatbath_coldstart,
+                      "Whether to use a cold or hot start in heatbath test (default false)");
+  opgroup->add_option("--heatbath-num-hb-per-step", heatbath_num_heatbath_per_step,
+                      "Number of heatbath hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-or-per-step", heatbath_num_overrelax_per_step,
+                      "Number of overrelaxation hits per heatbath step (default 5)");
+  opgroup->add_option("--heatbath-num-steps", heatbath_num_steps,
+                      "Number of measurement steps in heatbath test (default 10)");
+  opgroup->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
+                      "Number of warmup steps in heatbath test (default 10)");
+}
+
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)

@@ -2,33 +2,50 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <instantiate.h>
+#include <tunable_nd.h>
 #include <instantiate_dslash.h>
-
 #include <kernels/dslash_mobius_eofa.cuh>
 
 namespace quda
 {
   namespace mobius_eofa
   {
-    template <typename storage_type, int nColor> class Dslash5 : public TunableVectorYZ
+    template <typename store_t, int nColor> class Dslash5 : public TunableKernel3D
     {
-      Dslash5Arg<storage_type, nColor> arg;
-      const ColorSpinorField &meta;
+      ColorSpinorField &out;
+      const ColorSpinorField &in;
+      const ColorSpinorField &x;
+      double m_f;
+      double m_5;
+      const Complex *b_5;
+      const Complex *c_5;
+      double a;
+      bool eofa_pm;
+      double inv;
+      double kappa;
+      const double *eofa_u;
+      const double *eofa_x;
+      const double *eofa_y;
+      bool dagger;
+      bool xpay;
+      Dslash5Type type;
+      double sherman_morrison;
+
       static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
       long long flops() const
       {
         // FIXME: Fix the flop count
-        long long Ls = meta.X(4);
-        long long bulk = (Ls - 2) * (meta.Volume() / Ls);
-        long long wall = 2 * meta.Volume() / Ls;
-        long long n = meta.Ncolor() * meta.Nspin();
+        long long Ls = in.X(4);
+        long long bulk = (Ls - 2) * (in.Volume() / Ls);
+        long long wall = 2 * in.Volume() / Ls;
+        long long n = in.Ncolor() * in.Nspin();
 
         long long flops_ = 0;
-        switch (arg.type) {
+        switch (type) {
         case M5_EOFA:
-        case M5INV_EOFA: flops_ = n * (8ll * bulk + 10ll * wall + (arg.xpay ? 4ll * meta.Volume() : 0)); break;
-        default: errorQuda("Unknown Dslash5Type %d for EOFA", arg.type);
+        case M5INV_EOFA: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
+        default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
         }
 
         return flops_;
@@ -36,150 +53,140 @@ namespace quda
 
       long long bytes() const
       {
-        long long Ls = meta.X(4);
-        switch (arg.type) {
+        switch (type) {
         case M5_EOFA:
-        case M5INV_EOFA: return arg.out.Bytes() + 2 * arg.in.Bytes() + (arg.xpay ? arg.x.Bytes() : 0);
-        default: errorQuda("Unknown Dslash5Type %d for EOFA", arg.type);
+        case M5INV_EOFA: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
+        default: errorQuda("Unknown Dslash5Type %d for EOFA", type);
         }
         return 0ll;
       }
 
-      bool tuneGridDim() const { return false; }
-      unsigned int minThreads() const { return arg.volume_4d_cb; }
+      unsigned int minThreads() const { return in.VolumeCB() / in.X(4); }
       int blockStep() const { return 4; }
       int blockMin() const { return 4; }
       unsigned int sharedBytesPerThread() const
       {
         // spin components in shared depend on inversion algorithm
-        int nSpin = meta.Nspin();
-        return 2 * nSpin * nColor * sizeof(typename mapper<storage_type>::type);
+        int nSpin = in.Nspin();
+        return 2 * nSpin * nColor * sizeof(typename mapper<store_t>::type);
       }
-
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory
       // inverse
       unsigned int maxSharedBytesPerBlock() const
       {
-        if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
+        if (shared && (type == M5_EOFA || type == M5INV_EOFA)) {
           return maxDynamicSharedBytesPerBlock();
         } else {
-          return TunableVectorYZ::maxSharedBytesPerBlock();
+          return TunableKernel3D::maxSharedBytesPerBlock();
         }
       }
 
     public:
       Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double m_f,
-              const double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+              const double m_5, const Complex *b_5, const Complex *c_5, double a, bool eofa_pm, double inv,
               double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
               double sherman_morrison, bool dagger, Dslash5Type type) :
-        TunableVectorYZ(in.X(4), in.SiteSubset()),
-        arg(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison, dagger, type),
-        meta(in)
+        TunableKernel3D(in, in.X(4), in.SiteSubset()),
+        out(out),
+        in(in),
+        x(x),
+        m_f(m_f),
+        m_5(m_5),
+        b_5(b_5),
+        c_5(c_5),
+        a(a),
+        eofa_pm(eofa_pm),
+        inv(inv),
+        kappa(kappa),
+        eofa_u(eofa_u),
+        eofa_x(eofa_x),
+        eofa_y(eofa_y),
+        dagger(dagger),
+        xpay(a == 0.0 ? false : true),
+        type(type),
+        sherman_morrison(sherman_morrison)
       {
-        TunableVectorY::resizeStep(arg.Ls);
-        strcpy(aux, meta.AuxString());
-        if (arg.dagger) strcat(aux, ",Dagger");
-        if (arg.xpay) strcat(aux, ",xpay");
-        if (arg.eofa_pm) {
+        TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
+
+        if (dagger) strcat(aux, ",Dagger");
+        if (xpay) strcat(aux, ",xpay");
+        if (eofa_pm) {
           strcat(aux, ",eofa_plus");
         } else {
           strcat(aux, ",eofa_minus");
         }
-        switch (arg.type) {
+        switch (type) {
         case M5_EOFA: strcat(aux, ",mobius_M5_EOFA"); break;
         case M5INV_EOFA: strcat(aux, ",mobius_M5INV_EOFA"); break;
-        default: errorQuda("Unknown Dslash5Type %d", arg.type);
+        default: errorQuda("Unknown Dslash5Type %d", type);
         }
 
-        apply(streams[Nstream - 1]);
+        apply(device::get_default_stream());
       }
 
-      template <typename T, typename Arg> inline void launch(T *f, TuneParam &tp, Arg &arg, const qudaStream_t &stream)
+      template <bool pm, bool dagger, bool xpay, Dslash5Type type> using Arg = Dslash5Arg<store_t, nColor, pm, dagger, xpay, type>;
+
+      template <Dslash5Type type, template <typename> class F>
+      void Launch(TuneParam &tp, const qudaStream_t &stream)
       {
-        if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
-          // if inverse kernel uses shared memory then maximize total shared memory
-          tp.set_max_shared_bytes = true;
-        }
-        qudaLaunchKernel(f, tp, stream, arg);
+        if (eofa_pm)
+          if (xpay)
+            dagger ?
+              launch<F>(tp, stream, Arg<true, true, true, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison)) :
+              launch<F>(tp, stream, Arg<true, false, true, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison));
+          else
+            dagger ?
+              launch<F>(tp, stream, Arg<true, true, false, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison)) :
+              launch<F>(tp, stream, Arg<true, false, false, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison));
+        else
+          if (xpay)
+            dagger ?
+              launch<F>(tp, stream, Arg<false, true, true, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison)) :
+              launch<F>(tp, stream, Arg<false, false, true, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison));
+          else
+            dagger ?
+              launch<F>(tp, stream, Arg<false, true, false, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison)) :
+              launch<F>(tp, stream, Arg<false, false, false, type>(out, in, x, m_f, m_5, b_5, c_5, a, inv, kappa, eofa_u, eofa_x, eofa_y, sherman_morrison));
       }
 
       void apply(const qudaStream_t &stream)
       {
-        using Arg = decltype(arg);
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (arg.type == M5_EOFA) {
-          if (arg.eofa_pm) {
-            if (arg.xpay) {
-              arg.dagger ? launch(dslash5GPU<storage_type, nColor, true, true, true, M5_EOFA, Arg>, tp, arg, stream) :
-                           launch(dslash5GPU<storage_type, nColor, false, true, true, M5_EOFA, Arg>, tp, arg, stream);
-            } else {
-              arg.dagger ? launch(dslash5GPU<storage_type, nColor, true, true, false, M5_EOFA, Arg>, tp, arg, stream) :
-                           launch(dslash5GPU<storage_type, nColor, false, true, false, M5_EOFA, Arg>, tp, arg, stream);
-            }
-          } else {
-            if (arg.xpay) {
-              arg.dagger ? launch(dslash5GPU<storage_type, nColor, true, false, true, M5_EOFA, Arg>, tp, arg, stream) :
-                           launch(dslash5GPU<storage_type, nColor, false, false, true, M5_EOFA, Arg>, tp, arg, stream);
-            } else {
-              arg.dagger ? launch(dslash5GPU<storage_type, nColor, true, false, false, M5_EOFA, Arg>, tp, arg, stream) :
-                           launch(dslash5GPU<storage_type, nColor, false, false, false, M5_EOFA, Arg>, tp, arg, stream);
-            }
-          }
-        } else if (arg.type == M5INV_EOFA) {
-          if (arg.eofa_pm) {
-            if (arg.xpay) {
-              arg.dagger ? launch(dslash5GPU<storage_type, nColor, true, true, true, M5INV_EOFA, Arg>, tp, arg, stream) :
-                           launch(dslash5GPU<storage_type, nColor, false, true, true, M5INV_EOFA, Arg>, tp, arg, stream);
-            } else {
-              arg.dagger ?
-                launch(dslash5GPU<storage_type, nColor, true, true, false, M5INV_EOFA, Arg>, tp, arg, stream) :
-                launch(dslash5GPU<storage_type, nColor, false, true, false, M5INV_EOFA, Arg>, tp, arg, stream);
-            }
-          } else {
-            if (arg.xpay) {
-              arg.dagger ?
-                launch(dslash5GPU<storage_type, nColor, true, false, true, M5INV_EOFA, Arg>, tp, arg, stream) :
-                launch(dslash5GPU<storage_type, nColor, false, false, true, M5INV_EOFA, Arg>, tp, arg, stream);
-            } else {
-              arg.dagger ?
-                launch(dslash5GPU<storage_type, nColor, true, false, false, M5INV_EOFA, Arg>, tp, arg, stream) :
-                launch(dslash5GPU<storage_type, nColor, false, false, false, M5INV_EOFA, Arg>, tp, arg, stream);
-            }
-          }
-        } else {
-          errorQuda("Unknown Dslash5Type %d", arg.type);
+
+        if (shared && (type == M5_EOFA || type == M5INV_EOFA)) {
+          // if inverse kernel uses shared memory then maximize total shared memory
+          tp.set_max_shared_bytes = true;
+        }
+
+        switch (type) {
+        case M5_EOFA:    Launch<M5_EOFA, eofa_dslash5>(tp, stream); break;
+        case M5INV_EOFA: Launch<M5INV_EOFA, eofa_dslash5inv>(tp, stream); break;
+        default: errorQuda("Unknown Dslash5Type %d", type);
         }
       }
-
-      void initTuneParam(TuneParam &param) const
-      {
-        TunableVectorYZ::initTuneParam(param);
-        param.block.y = arg.Ls; // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
-
-      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
-
-      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     };
 
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5*in
+#ifdef GPU_DOMAIN_WALL_DIRAC
     void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                        double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
                        double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
                        double sherman_morrison, bool dagger, Dslash5Type type)
     {
-#ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in, x); // check all locations match
       instantiate<Dslash5>(out, in, x, m_f, m_5, b_5, c_5, a, eofa_pm, inv, kappa, eofa_u, eofa_x, eofa_y,
                            sherman_morrison, dagger, type);
-#else
-      errorQuda("Mobius EOFA dslash has not been built");
-#endif
     }
+#else
+    void apply_dslash5(ColorSpinorField &, const ColorSpinorField &, const ColorSpinorField &, double,
+                       double, const Complex *, const Complex *, double, int, double,
+                       double, const double *, const double *, const double *, double, bool, Dslash5Type)
+    {
+      errorQuda("Mobius EOFA dslash has not been built");
+    }
+#endif
+
   } // namespace mobius_eofa
 } // namespace quda

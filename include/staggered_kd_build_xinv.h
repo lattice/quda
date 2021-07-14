@@ -26,4 +26,4 @@ namespace quda
   // Note: see routine
   // void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv,
   // bool dagger); in dslash_quda.h as it is relevant for applying the above op.
-}; // namespace quda
+} // namespace quda

@@ -2,10 +2,9 @@
 
 namespace quda {
   
-  void copyGenericColorSpinorDD(ColorSpinorField &dst, const ColorSpinorField &src, 
-				QudaFieldLocation location, void *Dst, void *Src, 
-				void *dstNorm, void *srcNorm) {
-    CopyGenericColorSpinor<3>(dst, src, location, (double*)Dst, (double*)Src);
+  void copyGenericColorSpinorDD(const copy_pack_t &pack)
+  {
+    CopyGenericColorSpinor<3, double, double>(pack);
   }  
 
 } // namespace quda

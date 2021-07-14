@@ -96,24 +96,6 @@ if(QUDA_DIRAC_WILSON
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  if(QUDA_BLOCKSOLVER)
-    add_executable(invertmsrc_test invertmsrc_test.cpp)
-    target_link_libraries(invertmsrc_test ${TEST_LIBS})
-    quda_checkbuildtest(invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
-endif()
-
-if(QUDA_DIRAC_WILSON
-   OR QUDA_DIRAC_CLOVER
-   OR QUDA_DIRAC_TWISTED_MASS
-   OR QUDA_DIRAC_TWISTED_CLOVER
-   OR QUDA_DIRAC_DOMAIN_WALL
-   OR QUDA_DIRAC_STAGGERED)
-  add_executable(deflated_invert_test deflated_invert_test.cpp)
-  target_link_libraries(deflated_invert_test ${TEST_LIBS})
-  quda_checkbuildtest(deflated_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -135,13 +117,6 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-  if(QUDA_BLOCKSOLVER)
-    add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
-    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
-    quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
 
 endif()
 
@@ -495,10 +470,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+    set(DIRAC_NAME twisted-mass)
     # symmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
@@ -512,7 +488,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     # asymmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type twisted-mass
+                     --dslash-type ${DIRAC_NAME}
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
@@ -803,10 +779,29 @@ foreach(prec IN LISTS TEST_PRECS)
                      --gtest_output=xml:gauge_force_test_${prec}.xml)
   endif()
 
+  if(QUDA_DIRAC_STAGGERED)
+    add_test(NAME unitarize_link_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:unitarize_link_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 2 4 6 8 --prec ${prec}
+                     --gtest_output=xml:unitarize_link_test_${prec}.xml)
+  endif()
+
+  if(QUDA_FORCE_HISQ)
+    add_test(NAME hisq_paths_force_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_paths_force_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 2 4 6 8 --prec ${prec}
+                     --gtest_output=xml:hisq_paths_force_test_${prec}.xml)
+
+    add_test(NAME hisq_unitarize_force_${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:hisq_unitarize_force_test> ${MPIEXEC_POSTFLAGS}
+                     --dim 2 4 6 8 --prec ${prec}
+                     --gtest_output=xml:hisq_unitarize_force_test_${prec}.xml)
+  endif()
+
   if(QUDA_GAUGE_ALG)
     add_test(NAME gauge_alg_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
+                     --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:gauge_arg_test_${prec}.xml)
   endif()
 
