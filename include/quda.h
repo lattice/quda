@@ -90,6 +90,7 @@ extern "C" {
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
 
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
   } QudaGaugeParam;
 
 
@@ -399,6 +400,8 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
@@ -539,6 +542,8 @@ extern "C" {
     QudaExtLibType extlib_type;
     //-------------------------------------------------
 
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
@@ -727,6 +732,8 @@ extern "C" {
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
 
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
@@ -738,6 +745,7 @@ extern "C" {
     double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
   } QudaGaugeObservableParam;
 
   typedef struct QudaBLASParam_s {
@@ -765,6 +773,7 @@ extern "C" {
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
 
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
   } QudaBLASParam;
 
   /*

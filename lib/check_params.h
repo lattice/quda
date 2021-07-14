@@ -135,6 +135,13 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(site_size, (size_t)INVALID_INT);
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -232,6 +239,13 @@ void printQudaEigParam(QudaEigParam *param) {
   P(io_parity_inflate, QUDA_BOOLEAN_FALSE);
 #else
   P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -646,6 +660,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -892,10 +913,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(thin_update_only, QUDA_BOOLEAN_INVALID);
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
-
 }
 
 #if defined INIT_PARAM
@@ -922,6 +949,13 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
   P(compute_plaquette, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge, QUDA_BOOLEAN_INVALID);
   P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -978,6 +1012,13 @@ void printQudaBLASParam(QudaBLASParam *param)
   P(batch_count, INVALID_INT);
   P(data_type, QUDA_BLAS_DATATYPE_INVALID);
   P(data_order, QUDA_BLAS_DATAORDER_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
