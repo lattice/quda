@@ -103,6 +103,7 @@ quda::mgarray<QudaFieldLocation> setup_location = {};
 quda::mgarray<int> nu_pre = {};
 quda::mgarray<int> nu_post = {};
 quda::mgarray<int> n_block_ortho = {};
+quda::mgarray<bool> block_ortho_two_pass = {};
 quda::mgarray<double> mu_factor = {};
 quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
@@ -903,6 +904,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)");
   quda_app->add_mgoption(opgroup, "--mg-n-block-ortho", n_block_ortho, CLI::PositiveNumber,
                          "The number of times to run Gram-Schmidt during block orthonormalization (default 1)");
+  quda_app->add_mgoption(opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
+                         "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
   quda_app->add_mgoption(opgroup, "--mg-nu-post", nu_post, CLI::PositiveNumber,
                          "The number of post-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nu-pre", nu_pre, CLI::PositiveNumber,

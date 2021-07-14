@@ -48,9 +48,9 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
                                                       dim, -disp, sizeof(remote_handle));
       }
       // now send
-      cudaIpcMemHandle_t local_handle;
-      CHECK_CUDA_ERROR(cudaIpcGetMemHandle(&local_handle, local));
       if (comm_peer2peer_enabled(dir,dim)) {
+        cudaIpcMemHandle_t local_handle;
+        CHECK_CUDA_ERROR(cudaIpcGetMemHandle(&local_handle, local));
         sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
       }
       if (receiveHandle) comm_start(receiveHandle);

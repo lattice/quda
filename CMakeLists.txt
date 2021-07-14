@@ -27,7 +27,7 @@ find_package(PythonInterp)
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
-  set(DEFBUILD "DEVEL")
+  set(DEFBUILD "RELEASE")
 endif()
 
 set(VALID_BUILD_TYPES
@@ -223,7 +223,7 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
+option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
@@ -347,7 +347,7 @@ endif()
 
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if(${CPU_ARCH} STREQUAL "x86_64")
-  set(CXX_OPT "-march=native")
+  set(CXX_OPT "-mtune=native")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
@@ -637,7 +637,7 @@ if(QUDA_QMP)
     ExternalProject_Add(
       QMP
       GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-      GIT_TAG qmp2-5-2
+      GIT_TAG qmp2-5-3
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"

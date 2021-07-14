@@ -10,34 +10,6 @@
 
 namespace quda {
 
-  /**
-     @brief dummyClover is a helper function to allow us to create an
-     empty clover object - this allows us to use the the externally
-     linked reduction kernels when we do have a clover field.
-   */
-  inline std::unique_ptr<cudaCloverField> dummyClover()
-  {
-    CloverFieldParam cf_param;
-    cf_param.nDim = 4;
-    cf_param.pad = 0;
-    cf_param.setPrecision(QUDA_SINGLE_PRECISION);
-
-    for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = 0;
-
-    cf_param.direct = true;
-    cf_param.inverse = true;
-    cf_param.clover = nullptr;
-    cf_param.norm = 0;
-    cf_param.cloverInv = nullptr;
-    cf_param.invNorm = 0;
-    cf_param.create = QUDA_NULL_FIELD_CREATE;
-    cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-
-    // create a dummy cudaCloverField if one is not defined
-    cf_param.order = QUDA_INVALID_CLOVER_ORDER;
-    return std::make_unique<cudaCloverField>(cf_param);
-  }
-
   template <bool use_mma, typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   std::enable_if_t<!use_mma, void> calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, ColorSpinorField &uv,
                                                     const Transfer &T, const GaugeField &g, const GaugeField &clover, const GaugeField &cloverInv,
@@ -73,7 +45,7 @@ namespace quda {
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, g, *dummyClover(), kappa, mass, mu,
+        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu,
         mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
 
     } else {
@@ -107,7 +79,7 @@ namespace quda {
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
-        cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, g, *dummyClover(),
+        cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v,
         kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
 
@@ -155,8 +127,8 @@ namespace quda {
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
-        cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_, g,
-        *dummyClover(), kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_,
+        kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
     }
   }
