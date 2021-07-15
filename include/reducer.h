@@ -1,3 +1,5 @@
+#pragma once
+
 #include "complex_quda.h"
 
 namespace quda {
