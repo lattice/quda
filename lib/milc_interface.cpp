@@ -1716,6 +1716,7 @@ void qudaContractFT(int external_precision,
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
+  csParam.pc_type = QUDA_4D_PC; // must be set
 
   int const n_mom = cont_args->n_mom;
   int * const mom_modes = cont_args->mom_modes;
