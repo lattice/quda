@@ -179,16 +179,25 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   const int source_position[4]{0,0,0,0};
-  const int n_mom = 9;
+  const int n_mom = 15;
   const int mom[n_mom*4]{
       0, 0, 0, 0,
       1, 0, 0, 0,    -1, 0, 0, 0,
       0, 1, 0, 0,     0,-1, 0, 0,
       0, 0, 1, 0,     0, 0,-1, 0,
-      1, 1, 1, 0,    -1,-1,-1, 0
+      1, 1, 1, 0,    -1,-1,-1, 0,
+      0, 0,-1, 0,     0, 0, 1, 0,
+      0,-1, 0, 0,     0, 1, 0, 0,
+     -1, 0, 0, 0,     1, 0, 0, 0,
       };
-  const QudaFFTSymmType ftype = QUDA_FFT_SYMM_EO;
+  const QudaFFTSymmType ftype = QUDA_FFT_SYMM_EVEN;
   const QudaFFTSymmType fft_type[n_mom*4]{
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
+    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
     ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
     ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
     ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
