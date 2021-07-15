@@ -617,7 +617,7 @@ namespace quda {
   }
 
   /**
-     @brief Overloaded variant of indexFromFaceIndex where we use the
+     @brief Overloaded variant of coordsFromFaceIndex where we use the
      parity declared in arg.
    */
   template <int nDim, QudaPCType type, int dim_, int nLayers, typename Coord, typename Arg>
@@ -637,7 +637,7 @@ namespace quda {
      @return Checkerboard lattice index
   */
   template <int nDim, typename Arg>
-  inline __device__ __host__ int indexFromFaceIndex(int dim, int face_num, int face_idx, int parity, int nLayers, QudaPCType type, const Arg &arg)
+  constexpr int indexFromFaceIndex(int dim, int face_num, int face_idx, int parity, int nLayers, QudaPCType type, const Arg &arg)
   {
     // intrinsic parity of the face depends on offset of first element
     int face_parity = (parity + face_num * (arg.dc.X[dim] - nLayers)) & 1;
@@ -729,7 +729,7 @@ namespace quda {
      @brief Overloaded variant of indexFromFaceIndex with templated parameters
   */
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  __device__ __host__ inline int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
+  constexpr int indexFromFaceIndex(int face_idx, int parity, const Arg &arg)
   {
     return indexFromFaceIndex<nDim>(dim, face_num, face_idx, parity, nLayers, type, arg);
   }
@@ -739,7 +739,7 @@ namespace quda {
      parity declared in arg.
    */
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  __device__ __host__ inline int indexFromFaceIndex(int face_idx, const Arg &arg)
+  constexpr int indexFromFaceIndex(int face_idx, const Arg &arg)
   {
     return indexFromFaceIndex<nDim>(dim, face_num, face_idx, arg.parity, nLayers, type, arg);
   }
@@ -762,7 +762,7 @@ namespace quda {
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
   template <int nDim, typename Arg>
-  inline __device__ __host__ int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
+  constexpr int indexFromFaceIndexStaggered(int dim, int face_num, int face_idx_in, int parity, int nLayers, QudaPCType, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
     const auto *dims = arg.dc.dims[dim]; // dimensions of the face
@@ -814,7 +814,7 @@ namespace quda {
   }
 
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  inline __device__ __host__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  constexpr int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
   {
     return indexFromFaceIndexStaggered<nDim>(dim, face_num, face_idx_in, parity, nLayers, type, arg);
   }
@@ -834,7 +834,7 @@ namespace quda {
      @return dimension this face_idx corresponds to
   */
   template <int nDim = 4, typename Arg>
-  __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
+  constexpr int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
   {
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
     const int s = (nDim == 5 ? tid / arg.work_items : 0);
