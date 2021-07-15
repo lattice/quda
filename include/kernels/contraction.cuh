@@ -27,7 +27,8 @@ namespace quda
     //the possible minus sign will be taken care of in the main function
     //! Constructor
     DRGammaMatrix() {
-      if constexpr (nSpin == 4) {
+      //if constexpr (nSpin == 4) {
+      if (nSpin == 4) {	    
       const complex<real> i(0., 1.);
       // VECTORS
       // G_idx = 1: \gamma_1
