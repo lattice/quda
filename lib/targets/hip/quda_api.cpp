@@ -273,31 +273,6 @@ namespace quda {
     set_runtime_error(error, "hipMemcpyAsync", func, file, line);
   }
 
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     qudaMemcpyKind kind, const char *func, const char *file, const char *line)
-  {
-    PROFILE(auto error = hipMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    if (error != hipSuccess)
-      errorQuda("hipMemcpy2D returned error %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
-
-
-  }
-
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line)
-  {
-    PROFILE(hipError_t error = hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_runtime_error(error, "hipMemcpy2DAsync", func, file, line);
-  }
-
-  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                             const qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-    auto error = hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, hipMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    set_runtime_error(error, "hipMemcpy2DAsync", func, file, line);
-  }
-      
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
   {
     if (count == 0) return;

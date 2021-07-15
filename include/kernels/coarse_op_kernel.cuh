@@ -94,8 +94,10 @@ namespace quda {
     int_fastdiv grid_z; // this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled
     int_fastdiv coarse_color_grid_z; // constant we ned to divide by
 
-    Float max_h; // scalar that stores the maximum element of the dynamic clover inverse
-    Float *max_site; // array that stores the maximum element per lattice site of the dynamic clover inverse
+    static constexpr bool compute_max = false;
+    Float *max_h; // scalar that stores the maximum element on the host
+    Float *max_d; // scalar that stores the maximum elenent on the device
+    Float *max;   // points to either max_h or max_d, for host or device, respectively
 
     int dim;           // which dimension are we working on
     QudaDirection dir; // which direction are working on
@@ -136,7 +138,7 @@ namespace quda {
       fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
       fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
       bidirectional(bidirectional), shared_atomic(false), parity_flip(false),
-      aggregates_per_block(1), max_site(nullptr)
+        aggregates_per_block(1), max_h(nullptr), max_d(nullptr), max(nullptr)
     {
       if (V.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
         errorQuda("Gamma basis %d not supported", V.GammaBasis());
@@ -148,6 +150,12 @@ namespace quda {
         comm_dim[i] = comm_dim_partitioned(i);
       }
     }
+  };
+
+  template <typename T>
+  struct ArgMax : public T {
+    static constexpr bool compute_max = true;
+    ArgMax(const T& t) : T(t) { }
   };
 
   template <typename Arg> constexpr bool isHalo(const int coord[], int dim, int nFace, const Arg &arg)
@@ -193,12 +201,13 @@ namespace quda {
      or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
   */
   template <typename Wtype, typename Arg>
-  __device__ __host__ inline void computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  __device__ __host__ inline auto computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
     constexpr int uvSpin = Arg::fineSpin * (Arg::from_coarse ? 2 : 1);
     constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
-    using complex = complex<typename Arg::Float>;
+    using real = typename Arg::Float;
+    using complex = complex<real>;
     using TileType = typename Arg::uvTileType;
     auto &tile = arg.uvTile;
     auto dim = arg.dim;
@@ -301,8 +310,17 @@ namespace quda {
       }
     }
 
+    real uv_max = static_cast<real>(0.0);
 #pragma unroll
-    for (int s = 0; s < uvSpin; s++) UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+    for (int s = 0; s < uvSpin; s++) {
+      if (Arg::compute_max) {
+        uv_max = fmax(UV[s].abs_max(), uv_max);
+      } else {
+        UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+      }
+    }
+
+    return uv_max;
   } // computeUV
 
   template <typename Arg> struct compute_uv {
@@ -315,10 +333,13 @@ namespace quda {
       int ic = ic_parity % arg.uvTile.M_tiles;
       int parity = ic_parity / arg.uvTile.M_tiles;
 
+      typename Arg::Float max;
       if (arg.dir == QUDA_FORWARDS || arg.dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-        computeUV(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+        max = computeUV(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
       else
-        computeUV(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+        max = computeUV(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+
+      if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
     }
   };
 
@@ -369,10 +390,23 @@ namespace quda {
       auto AV = cholesky.backward(cholesky.forward(V));
 #endif
 
+      if (!Arg::compute_max) {
 #pragma unroll
-      for (int s = 0; s < Arg::fineSpin / 2; s++) {
+        for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
-        for (int ic = 0; ic < Arg::fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
+          for (int ic = 0; ic < Arg::fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
+        }
+      } else {
+        Float max = static_cast<Float>(0.0);
+#pragma unroll
+        for (int s = 0; s < Arg::fineSpin / 2; s++) {
+#pragma unroll
+          for (int ic = 0; ic < Arg::fineColor; ic++) {
+            auto abs_max = fmax(abs(AV(s, ic).real()), abs(AV(s, ic).imag()));
+            max = fmax(abs_max, max);
+          }
+        }
+        atomic_fetch_abs_max(arg.max, max);
       }
     }
   };
@@ -407,54 +441,6 @@ namespace quda {
         }
       }
 
-    }
-  };
-
-  /**
-     @brief Computes the clover field maximum, which is needed for
-     setting the scale when using fixed point
-   */
-  template <typename Arg> struct compute_clover_inv_max
-  {
-    using Float = typename Arg::Float;
-    const Arg &arg;
-    static constexpr const char *filename() { return KERNEL_FILE; }
-    constexpr compute_clover_inv_max(const Arg &arg) : arg(arg) { }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity, int)
-    {
-      Float max = 0.0;
-
-      constexpr int N = Arg::fineSpin * Arg::fineColor / 2;
-      using matrix = HMatrix<Float, N>;
-
-#pragma unroll
-      for (int ch = 0; ch < 2; ch++) { /* Loop over chiral blocks */
-        matrix A;
-
-#pragma unroll
-        for (int i = 0; i < N; i++) {
-#pragma unroll
-          for (int j = 0; j <= i; j++) {
-            A(i, j) = arg.C(0, parity, x_cb, 2 * ch + i / Arg::fineColor, 2 * ch + j / Arg::fineColor, i % Arg::fineColor, j % Arg::fineColor);
-          }
-        }
-
-        if (arg.twist) {
-          A = A.square();
-          A += arg.mu * arg.mu;
-        }
-
-        // compute the Colesky decomposition
-        linalg::Cholesky<HMatrix, Float, N> cholesky(A);
-
-        matrix Ainv = cholesky.invert();
-
-        Float inv_max = Ainv.max();
-        max = max > inv_max ? max : inv_max;
-      } // chirality
-
-      arg.max_site[parity + 2 * x_cb] = max;
     }
   };
 
@@ -523,12 +509,24 @@ namespace quda {
         }
         auto AV = Ainv * UV;
 
+        if (!Arg::compute_max) {
 #pragma unroll
-      for (int s = 0; s < Arg::fineSpin / 2; s++)
+          for (int s = 0; s < Arg::fineSpin / 2; s++)
 #pragma unroll
-        for (int c = 0; c < Arg::fineColor; c++)
-          arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
-
+            for (int c = 0; c < Arg::fineColor; c++)
+              arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
+        } else {
+          Float max = static_cast<Float>(0.0);
+#pragma unroll
+          for (int s = 0; s < Arg::fineSpin / 2; s++) {
+#pragma unroll
+            for (int c = 0; c < Arg::fineColor; c++) {
+              auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              max = fmax(abs_max, max);
+            }
+          }
+          atomic_fetch_abs_max(arg.max, max);
+        }
       } else {
         // compute the clover inverse matrix with the already loaded clover matrix
         A = A.square();
@@ -537,13 +535,25 @@ namespace quda {
         linalg::Cholesky<HMatrix, Float, N> cholesky(A);
         const auto AV = cholesky.backward(cholesky.forward(UV));
 
+        if (!Arg::compute_max) {
 #pragma unroll
-      for (int s = 0; s < Arg::fineSpin / 2; s++)
+          for (int s = 0; s < Arg::fineSpin / 2; s++)
 #pragma unroll
-        for (int c = 0; c < Arg::fineColor; c++)
-          arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
+            for (int c = 0; c < Arg::fineColor; c++)
+              arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
+        } else {
+          Float max = static_cast<Float>(0.0);
+#pragma unroll
+          for (int s = 0; s < Arg::fineSpin / 2; s++) {
+#pragma unroll
+            for (int c = 0; c < Arg::fineColor; c++) {
+              auto abs_max = fmax(abs(AV(s, c).real()), abs(AV(s, c).imag()));
+              max = fmax(abs_max, max);
+            }
+          }
+          atomic_fetch_abs_max(arg.max, max);
+        }
       }
-
     }
   };
 

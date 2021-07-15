@@ -48,8 +48,8 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
       }
 
       // now send
+      hipIpcMemHandle_t local_handle;
       if (comm_peer2peer_enabled(dir,dim)) {
-        hipIpcMemHandle_t local_handle;
         CHECK_HIP_ERROR(hipIpcGetMemHandle(&local_handle, local));
         sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
       }
