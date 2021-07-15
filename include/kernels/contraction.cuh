@@ -14,19 +14,20 @@ namespace quda
   using contract_array           = vector_type<double2, max_contract_results>;
   using staggered_contract_array = vector_type<double2, 1>;
 
-  template <typename real> class DRGammaMatrix {
+  template <typename real, int nSpin = 4> class DRGammaMatrix {
   public:
     // Stores gamma matrix column index for non-zero complex value.
     // This is shared by g5gm, gmg5.
-    int gm_i[16][4] {};
+    int gm_i[nSpin*nSpin][nSpin] {};
 
     // Stores gamma matrix non-zero complex value for the corresponding g5gm_i
-    complex<real> g5gm_z[16][4];
+    complex<real> g5gm_z[nSpin*nSpin][nSpin];
     
     // use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
     //the possible minus sign will be taken care of in the main function
     //! Constructor
     DRGammaMatrix() {
+      if constexpr (nSpin == 4) {
       const complex<real> i(0., 1.);
       // VECTORS
       // G_idx = 1: \gamma_1
@@ -209,6 +210,7 @@ namespace quda
       g5gm_z[15][1] = 1.;
       g5gm_z[15][2] = -1.;
       g5gm_z[15][3] = 1.;
+    } // end if constexpr
     };
   };
   
