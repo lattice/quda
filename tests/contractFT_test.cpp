@@ -181,32 +181,31 @@ int test(int contractionType, QudaPrecision test_prec)
   const int source_position[4]{0,0,0,0};
   const int n_mom = 15;
   const int mom[n_mom*4]{
-      0, 0, 0, 0,
-      1, 0, 0, 0,    -1, 0, 0, 0,
-      0, 1, 0, 0,     0,-1, 0, 0,
-      0, 0, 1, 0,     0, 0,-1, 0,
-      1, 1, 1, 0,    -1,-1,-1, 0,
-      0, 0,-1, 0,     0, 0, 1, 0,
-      0,-1, 0, 0,     0, 1, 0, 0,
-     -1, 0, 0, 0,     1, 0, 0, 0,
+      0, 0, 0, 0,     0, 0, 0, 0,     0, 0, 0, 0,
+      1, 0, 0, 0,    -1, 0, 0, 0,     1, 0, 0, 0,     1, 0, 0, 0,
+      0, 1, 0, 0,     0,-1, 0, 0,     0, 1, 0, 0,     0, 1, 0, 0,     
+      0, 0, 1, 0,     0, 0,-1, 0,     0, 0, 1, 0,     0, 0, 1, 0
       };
-  const QudaFFTSymmType ftype = QUDA_FFT_SYMM_EVEN;
+  const char* ftype[4]{"?","O","E","EO"};
+  const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
+  const QudaFFTSymmType ev = QUDA_FFT_SYMM_EVEN;
+  const QudaFFTSymmType od = QUDA_FFT_SYMM_ODD;
   const QudaFFTSymmType fft_type[n_mom*4]{
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO,
-    ftype, ftype, ftype, QUDA_FFT_SYMM_EO
+    eo, eo, eo, eo, // (0,0,0)
+    ev, ev, ev, eo,
+    od, od, od, eo,
+    eo, eo, eo, eo, // (1,0,0)
+    eo, eo, eo, eo,
+    ev, ev, ev, eo,
+    od, ev, ev, eo,
+    eo, eo, eo, eo, // (0,1,0)
+    eo, eo, eo, eo,
+    ev, ev, ev, eo,
+    ev, od, ev, eo,
+    eo, eo, eo, eo, // (0,0,1)
+    eo, eo, eo, eo,
+    ev, ev, ev, eo,
+    ev, ev, od, eo
       };
 
   int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
@@ -223,7 +222,9 @@ int test(int contractionType, QudaPrecision test_prec)
 
   printfQuda("contractions:");
   for(int k=0; k<n_mom; ++k) {
-    printfQuda("\np = %2d %2d %2d %2d",mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3]);
+    printfQuda("\np = %2d %2d %2d %2d;  sym = %2s %2s %2s %2s",
+	       mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3],
+	       ftype[fft_type[4*k+0]],ftype[fft_type[4*k+1]],ftype[fft_type[4*k+2]],ftype[fft_type[4*k+3]]);
     for(int c=0; c<red_size*nSpin*nSpin*2; c+= 2) {
       int indx = k*red_size*nSpin*nSpin*2 + c;
       if( c % 8 == 0 ) printfQuda("\n%3d",indx);
