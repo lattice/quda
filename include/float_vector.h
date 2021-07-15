@@ -98,7 +98,7 @@ namespace quda {
     return output;
   }
 #endif
-
+ 
   template <typename T> __device__ __host__ inline T zero() { return static_cast<T>(0); }
   template<> __device__ __host__ inline double2 zero() { return make_double2(0.0, 0.0); }
   template<> __device__ __host__ inline double3 zero() { return make_double3(0.0, 0.0, 0.0); }
@@ -137,6 +137,9 @@ namespace quda {
     vector_type(const vector_type<scalar, n> &) = default;
     vector_type(vector_type<scalar, n> &&) = default;
 
+    // This should only be attempted if we have the exact number of
+    // arguments. I am changing this to a head-tail pattern to 
+    // allow the dediction of the first argument 
     template <typename... T>
     constexpr vector_type(scalar first, const T... data) : data{first, data...} {}
 

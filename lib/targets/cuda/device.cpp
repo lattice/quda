@@ -3,6 +3,7 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
+#include <target_device.h>
 
 #ifdef QUDA_NVML
 #include <nvml.h>
@@ -315,6 +316,7 @@ namespace quda
         warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
                     deviceProp.major, deviceProp.minor);
         return 32;
+	break;
       }
 #endif
     }

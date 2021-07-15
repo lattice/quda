@@ -882,6 +882,7 @@ namespace quda {
         }
       }
     }
+
   };
 
   template <typename VUV, typename Arg>

@@ -1,5 +1,6 @@
 #include <random_quda.h>
 #include <timer.h>
+#include <quda_arch.h>
 
 namespace quda
 {

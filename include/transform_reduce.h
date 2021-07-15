@@ -13,7 +13,6 @@
 
 namespace quda
 {
-
   /**
      @brief QUDA implementation providing thrust::transform_reduce like
      functionality.  Improves upon thrust's implementation since a

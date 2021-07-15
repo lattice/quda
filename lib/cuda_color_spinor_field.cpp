@@ -594,6 +594,7 @@ namespace quda {
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
+
   }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, const qudaStream_t &stream,
@@ -664,12 +665,22 @@ namespace quda {
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (!comm_peer2peer_enabled(dir,dim)) {
-      if (dir == 0)
-	if (gdr) comm_start(mh_send_rdma_back[bufferIndex][dim]);
-	else comm_start(mh_send_back[bufferIndex][dim]);
-      else
-	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-	else comm_start(mh_send_fwd[bufferIndex][dim]);
+      if (dir == 0) { 
+	if (gdr) {
+	  comm_start(mh_send_rdma_back[bufferIndex][dim]);
+	}
+	else { 
+ 	  comm_start(mh_send_back[bufferIndex][dim]);
+	}
+      }
+      else {
+	if (gdr) {
+          comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
+	}
+	else { 
+	  comm_start(mh_send_fwd[bufferIndex][dim]); 
+	}
+      }
     } else { // doing peer-to-peer
 
       // if not using copy engine then the packing kernel will remotely write the halos

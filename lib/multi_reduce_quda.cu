@@ -575,7 +575,7 @@ namespace quda {
 
           delete[] result_trans;
         } else {
-          errorQuda("Unexpected transpose parameter %d", tp.aux.x);
+          errorQuda("Unexpected transpose parameter %d", static_cast<int>(tp.aux.x));
         }
       }
 

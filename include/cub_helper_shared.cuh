@@ -1,24 +1,7 @@
 #pragma once
 
+
 #include <target_device.h>
-
-/**
-   @file cub_helper.cuh
-
-   @section Description
-   Include this file as opposed to cub headers directly to ensure
-   correct compilation with clang and nvrtc
- */
-
-// ensures we use shfl_sync and not shfl when compiling with clang
-#if defined(__clang__) && defined(__CUDA__)
-#define CUB_USE_COOPERATIVE_GROUPS
-#endif
-
-using namespace quda;
-
-#include <cub/block/block_reduce.cuh>
-
 namespace quda {
 
   /**
@@ -28,9 +11,10 @@ namespace quda {
   template <typename T, int width> struct WarpReduce
   {
     static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-    using warp_reduce_t = cub::WarpReduce<T, width>;
+    using warp_reduce_t = QudaCub::WarpReduce<T, width>;
 
     __device__ __host__ inline WarpReduce() {}
+
 
     template <bool is_device, typename dummy = void> struct sum { T operator()(const T &value) { return value; } };
 
@@ -51,7 +35,7 @@ namespace quda {
   */
   template <typename T, int block_size_x, int batch_size = 1> struct BlockReduce
   {
-    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
+    using block_reduce_t = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS>;
     const int batch;
 
     __device__ __host__ inline BlockReduce(int batch = 0) : batch(batch) {}

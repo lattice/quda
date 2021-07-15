@@ -1,5 +1,6 @@
 #pragma once
 
+#include <quda_arch.h>
 #include <gauge_field.h>
 #include <random_quda.h>
 

@@ -253,14 +253,13 @@ namespace quda
   {
     PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
-      // now we are receive centric
-      int dir2 = 1-dir;
-
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
+
+       // now we are receive centric
+      int dir2 = 1-dir;
       if (comm_peer2peer_enabled(dir2,dim)) {
 	PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
-
         if (scatterIndex == -1) scatterIndex = 2 * dim + dir;
 
         if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
@@ -269,9 +268,7 @@ namespace quda
           // direction) so here just use dir not dir2
           PROFILE(if (dslash_copy) in.scatter(2*dim+dir, device::get_stream(scatterIndex)), profile, QUDA_PROFILE_SCATTER);
 	}
-
       }
-
     }
     return comms_test;
   }
@@ -285,6 +282,7 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
+#if defined(QUDA_ENABLE_P2P)
   template <typename T>
   inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
@@ -298,6 +296,12 @@ namespace quda
       }
     }
   }
+#else
+  // This version is if there is no IPC. Then the function is effecitvely empty
+  // we removed named arguments to stop the compiler complaining about unused arguments
+  template <typename T>
+  inline void completeDslash(const ColorSpinorField &, const T&) { }
+#endif
 
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets
@@ -1964,13 +1968,13 @@ namespace quda
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
-     if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
+     if (static_cast<QudaDslashPolicy>(int(tp.aux.x)) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
      bool p2p_enabled = comm_peer2peer_enabled_global();
      if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
-     DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+     DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(int(tp.aux.x)));
      (*dslashImp)(dslash, in, volume, ghostFace, profile);
      delete dslashImp;
 

@@ -5,23 +5,11 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
-target_link_libraries(quda_test PUBLIC quda)
-target_compile_options(quda_test PUBLIC -fPIC)
+target_link_libraries(quda_test PUBLIC Eigen)
+target_link_libraries(quda_test PUBLIC QUDA::quda)
+set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
-
-if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
-  add_dependencies(quda_test QIO)
-endif()
-
-if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
-  add_dependencies(quda_test QMP)
-endif()
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
@@ -31,22 +19,12 @@ set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16
-  set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
+  if( QUDA_TARGET_CUDA )
+    set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
+  endif()
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
-  endif()
-
-  if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
-    add_dependencies(${mytarget} QIO)
-  endif()
-
-  if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
-    add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
 
@@ -682,14 +660,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
         --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
-    add_test(NAME dslash_mobius_local-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type mobius
-                     --test MatPCDagMatPCLocal
-                     --matpc even-even
-                     --dim 2 4 6 8
-                     --Lsdim 4
-                     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+    # This is fixed precision only and requires tensor cores so only enable 
+    # for Green Team targets
+    if( QUDA_TARGET_CUDA )
+	    add_test(NAME dslash_mobius_local-policy${pol2}
+		     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+			     --dslash-type mobius
+			     --test MatPCDagMatPCLocal
+			     --matpc even-even
+			     --dim 2 4 6 8
+			     --Lsdim 4
+			     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+    endif()
 
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}

@@ -5,12 +5,13 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <device.h>
 #include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
-#include "qdp_quda.h"
-#include "qdp_config.h"
+#include "qdp_cache.h"
 #endif
 
 #ifdef QUDA_BACKWARDSCPP
@@ -223,10 +224,16 @@ namespace quda
 
     a.size = a.base_size = size;
 
+#ifndef USE_QDPJIT
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
+#else
+    // QDPJIT version -- barfs internally if it fails
+     QDP::QDP_get_global_cache().addDeviceStatic( &ptr , size , true );
+#endif
+
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
     cudaMemset(ptr, 0xff, size);
@@ -417,8 +424,15 @@ namespace quda
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
+
+#ifndef USE_QDPJIT
     cudaError_t err = cudaFree(ptr);
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+#else
+    // QDPJIT: Barfs if it fails internally
+    QDP::QDP_get_global_cache().signoffViaPtr( ptr ); 
+#endif
+
     track_free(DEVICE, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);

@@ -307,6 +307,7 @@ namespace quda {
 
     if (ghost_field_reset) destroyIPCComms();
     createIPCComms();
+
   }
 
   void cudaGaugeField::recvStart(int dim, int dir)
@@ -614,7 +615,7 @@ namespace quda {
               && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
             for (int d = 0; d < geometry; d++)
               qudaMemcpy(ghost_buffer[d], src.Ghost()[d], ghost_bytes[d], qudaMemcpyDefault);
-
+	  
           if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && src.GhostExchange() != QUDA_GHOST_EXCHANGE_EXTENDED) {
             copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, buffer, 0, ghost_buffer);
             if (geometry == QUDA_COARSE_GEOMETRY)

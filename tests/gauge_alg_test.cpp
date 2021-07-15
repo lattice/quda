@@ -379,7 +379,6 @@ int main(int argc, char **argv)
 {
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
-
   // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);

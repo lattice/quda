@@ -72,7 +72,7 @@ static bool redundant_comms = false;
 
 //for MAGMA lib:
 #include <blas_magma.h>
-
+#ifdef MAGMA_LIB
 static bool InitMagma = false;
 
 void openMagma() {
@@ -96,6 +96,7 @@ void closeMagma(){
   }
 
 }
+#endif
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -235,6 +236,8 @@ static TimeProfile profileEnd("endQuda");
 
 //!< Profiler for GaugeFixing
 static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
+
+// Too much CUB and Thrust here - so disabling it unless CUDA build
 static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
 
 //!< Profiler for toal time spend between init and end
@@ -545,6 +548,7 @@ void initQuda(int dev)
 
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
+  printfQuda("Max grid sizes=(%d, %d, %d\n", device::max_grid_size(0), device::max_grid_size(1), device::max_grid_size(2));
 }
 
 // This is a flag used to signal when we have downloaded new gauge

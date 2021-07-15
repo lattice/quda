@@ -384,7 +384,8 @@ namespace quda {
                                                  const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
@@ -486,7 +487,8 @@ namespace quda {
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
@@ -603,7 +605,8 @@ namespace quda {
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+
+        vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat,theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :

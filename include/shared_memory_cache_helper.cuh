@@ -69,6 +69,7 @@ namespace quda
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
      */
+
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
@@ -139,9 +140,15 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object 
     */
+#if defined (QUDA_TARGET_CUDA)
     constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
+    block(block),
+      stride(block.x * block.y * block.z) {}
+#else
+    __device__ __host__ SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block),
       stride(block.x * block.y * block.z) {}
+#endif
 
     /**
        @brief Grab the raw base address to shared memory.

@@ -1,16 +1,13 @@
+#include <quda_arch.h>
+#ifdef QUDA_MMA_AVAILABLE
 #include <gauge_field_order.h>
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mdw_dslash5_tensor_core.cuh>
-#endif
 #include <kernel.h>
 
 namespace quda {
 
   namespace mobius_tensor_core
   {
-
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
     constexpr int sm_m_pad_size(int m)
     {
       return quda::mma::pad_size(m);
@@ -443,9 +440,8 @@ namespace quda {
           s4_shift_base += gridDim.x * blockDim.x;
         } // while
       }
-    };
-    
-#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-  }
+    }; // class
 
-}
+  }// namespace mobius tensor core
+} // namespace quda 
+#endif
