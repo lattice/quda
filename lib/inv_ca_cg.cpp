@@ -340,26 +340,24 @@ namespace quda {
       case 11: compute_alpha_N<11>(Q_AQandg, alpha); break;
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
 #endif
-      default: // failsafe
-        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
-        typedef Matrix<Complex, Dynamic, 1> vector;
+    default: // failsafe
+      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<Complex, Dynamic, 1> vector;
 
-        const int N = Q.size();
-        matrix matQ_AQ(N,N);
-        vector vecg(N);
-        for (int i=0; i<N; i++) {
-          vecg(i) = Q_AQandg[i*(N+1)+N];
-          for (int j=0; j<N; j++) {
-            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-          }
-        }
-        Map<vector> vecalpha(alpha,N);
+      const int N = Q.size();
+      matrix matQ_AQ(N, N);
+      vector vecg(N);
+      for (int i = 0; i < N; i++) {
+        vecg(i) = Q_AQandg[i * (N + 1) + N];
+        for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
+      }
+      Map<vector> vecalpha(alpha, N);
 
-        vecalpha = matQ_AQ.fullPivLu().solve(vecg);
+      vecalpha = matQ_AQ.fullPivLu().solve(vecg);
 
-        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-        //psi = svd.solve(phi);
-        break;
+      // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+      // psi = svd.solve(phi);
+      break;
     }
 
     if (!param.is_preconditioner) {
@@ -414,23 +412,21 @@ namespace quda {
       case 11: compute_beta_N<11>(Q_AQandg, Q_AS, beta); break;
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
 #endif
-      default: // failsafe
-        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+    default: // failsafe
+      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
 
-        const int N = Q.size();
-        matrix matQ_AQ(N,N);
-        for (int i=0; i<N; i++) {
-          for (int j=0; j<N; j++) {
-            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-          }
-        }
-        Map<matrix> matQ_AS(Q_AS,N,N), matbeta(beta,N,N);
+      const int N = Q.size();
+      matrix matQ_AQ(N, N);
+      for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
+      }
+      Map<matrix> matQ_AS(Q_AS, N, N), matbeta(beta, N, N);
 
-        matQ_AQ = -matQ_AQ;
-        matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
+      matQ_AQ = -matQ_AQ;
+      matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
 
-        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-        //psi = svd.solve(phi);
+      // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+      // psi = svd.solve(phi);
     }
 
     if (!param.is_preconditioner) {

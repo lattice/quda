@@ -1,102 +1,18 @@
 #include <quda_internal.h>
-#include <quda_matrix.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-#include <gauge_field_order.h>
 #include <comm_quda.h>
 #include <pgauge_monte.h>
 #include <instantiate.h>
+#include <tunable_nd.h>
+#include <kernels/pgauge_exchange.cuh>
 
 namespace quda {
-
-  template <typename Float, QudaReconstructType recon>
-  struct GaugeFixUnPackArg {
-    int X[4]; // grid dimensions
-    using Gauge = typename gauge_mapper<Float, recon>::type;
-    Gauge dataOr;
-    int size;
-    complex<Float> *array;
-    int parity;
-    int face;
-    int dir;
-    int borderid;
-    GaugeFixUnPackArg(GaugeField & data)
-      : dataOr(data)
-    {
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-    }
-  };
-
-  template <int NElems, typename Float, bool pack, typename Arg>
-  __global__ void Kernel_UnPack(Arg arg)
-  {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if ( idx >= arg.size ) return;
-    int X[4];
-    for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
-    int x[4];
-    int za, xodd;
-    switch ( arg.face ) {
-    case 0: //X FACE
-      za = idx / ( X[1] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[0] = arg.borderid;
-      xodd = (arg.borderid + x[2] + x[3] + arg.parity) & 1;
-      x[1] = (2 * idx + xodd)  - za * X[1];
-      break;
-    case 1: //Y FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[2];
-      x[2] = za - x[3] * X[2];
-      x[1] = arg.borderid;
-      xodd = (arg.borderid  + x[2] + x[3] + arg.parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 2: //Z FACE
-      za = idx / ( X[0] / 2);
-      x[3] = za / X[1];
-      x[1] = za - x[3] * X[1];
-      x[2] = arg.borderid;
-      xodd = (arg.borderid  + x[1] + x[3] + arg.parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    case 3: //T FACE
-      za = idx / ( X[0] / 2);
-      x[2] = za / X[1];
-      x[1] = za - x[2] * X[1];
-      x[3] = arg.borderid;
-      xodd = (arg.borderid  + x[1] + x[2] + arg.parity) & 1;
-      x[0] = (2 * idx + xodd)  - za * X[0];
-      break;
-    }
-
-    int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    typedef complex<Float> Complex;
-    typedef typename mapper<Float>::type RegType;
-    RegType tmp[NElems];
-    Complex data[9];
-
-    if (pack) {
-      arg.dataOr.load(data, id, arg.dir, arg.parity);
-      arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) arg.array[idx + arg.size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
-    } else {
-      for ( int i = 0; i < NElems / 2; ++i ) {
-        tmp[2*i+0] = arg.array[idx + arg.size * i].real();
-        tmp[2*i+1] = arg.array[idx + arg.size * i].imag();
-      }
-      arg.dataOr.reconstruct.Unpack(data, tmp, id, arg.dir, 0, arg.dataOr.X, arg.dataOr.R);
-      arg.dataOr.save(data, id, arg.dir, arg.parity);
-    }
-  }
 
   static void *send_d[4];
   static void *recv_d[4];
   static void *sendg_d[4];
   static void *recvg_d[4];
   static void *hostbuffer_h[4];
-  static qudaStream_t GFStream[2];
   static MsgHandle *mh_recv_back[4];
   static MsgHandle *mh_recv_fwd[4];
   static MsgHandle *mh_send_fwd[4];
@@ -109,10 +25,8 @@ namespace quda {
    */
   void PGaugeExchangeFree()
   {
-    if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
+    if (comm_partitioned()) {
       if (init) {
-        cudaStreamDestroy(GFStream[0]);
-        cudaStreamDestroy(GFStream[1]);
         for (int d = 0; d < 4; d++ ) {
           if (commDimPartitioned(d)) {
             comm_free(mh_send_fwd[d]);
@@ -132,12 +46,21 @@ namespace quda {
     }
   }
 
-  template<typename Float, int nColor, QudaReconstructType recon> struct PGaugeExchanger {
-    PGaugeExchanger(GaugeField& data, const int dir, const int parity)
+  template<typename Float, int nColor, QudaReconstructType recon>
+  struct PGaugeExchanger : TunableKernel1D {
+    GaugeField &U;
+    GaugeFixUnPackArg<Float, recon> arg;
+    const char *dim_str[4] = { "0", "1", "2", "3" };
+    unsigned int minThreads() const { return arg.threads.x; }
+
+    PGaugeExchanger(GaugeField& U, const int dir, const int parity) :
+      TunableKernel1D(U),
+      U(U),
+      arg(U)
     {
       if (init) {
         for (int d = 0; d < 4; d++) {
-          if (X[d] != data.X()[d]) {
+          if (X[d] != U.X()[d]) {
             PGaugeExchangeFree();
             printfQuda("PGaugeExchange needs to be reinitialized...\n");
             break;
@@ -152,15 +75,13 @@ namespace quda {
       void *recvg[4];
       for (int d = 0; d < 4; d++) {
         if (!commDimPartitioned(d)) continue;
-        bytes[d] =  sizeof(Float) * data.SurfaceCB(d) * recon;
+        bytes[d] = sizeof(Float) * U.SurfaceCB(d) * recon;
       }
 
       if (!init) {
         X = (int*)safe_malloc(4 * sizeof(int));
-        for (int d = 0; d < 4; d++) X[d] = data.X()[d];
+        for (int d = 0; d < 4; d++) X[d] = U.X()[d];
 
-        cudaStreamCreate(&GFStream[0]);
-        cudaStreamCreate(&GFStream[1]);
         for (int d = 0; d < 4; d++ ) {
           if (!commDimPartitioned(d)) continue;
           // store both parities and directions in each
@@ -190,73 +111,87 @@ namespace quda {
         }
       }
 
-      GaugeFixUnPackArg<Float, recon> arg(data);
-
       qudaDeviceSynchronize();
       for (int d = 0; d < 4; d++) {
-        if ( !commDimPartitioned(d)) continue;
+        if (!commDimPartitioned(d)) continue;
         comm_start(mh_recv_back[d]);
         comm_start(mh_recv_fwd[d]);
 
-        TuneParam tp;
-        tp.block = make_uint3(128, 1, 1);
-        tp.grid = make_uint3((data.SurfaceCB(d) + tp.block.x - 1) / tp.block.x, 1, 1);
-
-        arg.size = data.SurfaceCB(d);
+        arg.threads.x = U.SurfaceCB(d);
         arg.parity = parity;
         arg.face = d;
         arg.dir = dir;
 
         //extract top face
-        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]); 
-        arg.borderid = X[d] - data.R()[d] - 1;
-        qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[0], arg);
+        arg.pack = true;
+        arg.array = reinterpret_cast<complex<Float>*>(send_d[d]);
+        arg.borderid = X[d] - U.R()[d] - 1;
+        apply(device::get_stream(0));
 
         //extract bottom
         arg.array = reinterpret_cast<complex<Float>*>(sendg_d[d]);
-        arg.borderid = data.R()[d];
-        qudaLaunchKernel(Kernel_UnPack<recon, Float, true, decltype(arg)>, tp, GFStream[1], arg);
+        arg.borderid = U.R()[d];
+        apply(device::get_stream(1));
 
-        qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
-        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
+        qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(0));
+        qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, device::get_stream(1));
 
-        qudaStreamSynchronize(GFStream[0]);
+        qudaStreamSynchronize(device::get_stream(0));
         comm_start(mh_send_fwd[d]);
 
-        qudaStreamSynchronize(GFStream[1]);
+        qudaStreamSynchronize(device::get_stream(1));
         comm_start(mh_send_back[d]);
 
         comm_wait(mh_recv_back[d]);
-        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[0]);
+        qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(0));
 
+        // insert
+        arg.pack = false;
         arg.array = reinterpret_cast<complex<Float>*>(recv_d[d]);
-        arg.borderid = data.R()[d] - 1;
-        qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[0], arg);
+        arg.borderid = U.R()[d] - 1;
+        apply(device::get_stream(0));
 
         comm_wait(mh_recv_fwd[d]);
-        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[1]);
+        qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, device::get_stream(1));
 
         arg.array = reinterpret_cast<complex<Float>*>(recvg_d[d]);
-        arg.borderid = X[d] - data.R()[d];
-        qudaLaunchKernel(Kernel_UnPack<recon, Float, false, decltype(arg)>, tp, GFStream[1], arg);
+        arg.borderid = X[d] - U.R()[d];
+        apply(device::get_stream(1));
 
         comm_wait(mh_send_back[d]);
         comm_wait(mh_send_fwd[d]);
-        qudaStreamSynchronize(GFStream[0]);
-        qudaStreamSynchronize(GFStream[1]);
+        qudaStreamSynchronize(device::get_stream(0));
+        qudaStreamSynchronize(device::get_stream(1));
       }
       qudaDeviceSynchronize();
     }
+
+    TuneKey tuneKey() const
+    {
+      std::string aux2 = std::string(aux) + ",dim=" + dim_str[arg.face] + ",geo_dir=" + dim_str[arg.dir] +
+        (arg.pack ? ",extract" : ",insert");
+      return TuneKey(vol, typeid(*this).name(), aux2.c_str());
+    }
+
+    void apply(const qudaStream_t &stream)
+    {
+      auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      launch<unpacker>(tp, stream, arg);
+    }
+
+    long long bytes() const { return 2 * U.SurfaceCB(arg.face) * U.Reconstruct() * U.Precision(); }
   };
 
-  void PGaugeExchange(GaugeField& data, const int dir, const int parity)
-  {
 #ifdef GPU_GAUGE_ALG
-    if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
-      instantiate<PGaugeExchanger>(data, dir, parity);
-    }
-#else
-    errorQuda("Pure gauge code has not been built");
-#endif
+  void PGaugeExchange(GaugeField& U, const int dir, const int parity)
+  {
+    if (comm_partitioned()) instantiate<PGaugeExchanger>(U, dir, parity);
   }
+#else
+  void PGaugeExchange(GaugeField&, const int, const int)
+  {
+    errorQuda("Pure gauge code has not been built");
+  }
+#endif
+
 }

@@ -35,8 +35,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct cloverHasenbusch : dslash_default {
 
-    Arg &arg;
-    constexpr cloverHasenbusch(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr cloverHasenbusch(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     
     /**
@@ -45,7 +45,7 @@ namespace quda
        Note this routine only exists in xpay form.
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;

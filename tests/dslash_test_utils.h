@@ -9,7 +9,6 @@
 #include <quda.h>
 #include <quda_internal.h>
 #include <dirac_quda.h>
-#include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
@@ -44,7 +43,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
 };
 
 struct DslashTestWrapper {
@@ -185,12 +184,12 @@ struct DslashTestWrapper {
     if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
 
     // construct input fields
-    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
+    for (int dir = 0; dir < 4; dir++) hostGauge[dir] = safe_malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
 
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
         || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-      hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-      hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostClover = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+      hostCloverInv = safe_malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
     }
 
     ColorSpinorParam csParam;
@@ -370,11 +369,11 @@ struct DslashTestWrapper {
     vp_spinorOut.clear();
     vp_spinorRef.clear();
 
-    for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
+    for (int dir = 0; dir < 4; dir++) host_free(hostGauge[dir]);
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
         || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-      free(hostClover);
-      free(hostCloverInv);
+      host_free(hostClover);
+      host_free(hostCloverInv);
     }
   }
 
@@ -647,7 +646,7 @@ struct DslashTestWrapper {
       default: printf("Test type not supported for domain wall\n"); exit(-1);
       }
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-      double *kappa_5 = (double *)malloc(Ls * sizeof(double));
+      double *kappa_5 = (double *)safe_malloc(Ls * sizeof(double));
       for (int xs = 0; xs < Ls; xs++) kappa_5[xs] = kappa5;
       switch (dtest_type) {
       case dslash_test_type::Dslash:
@@ -684,12 +683,12 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for domain wall\n"); exit(-1);
       }
-      free(kappa_5);
+      host_free(kappa_5);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
@@ -740,15 +739,15 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for Mobius domain wall\n"); exit(-1);
       }
-      free(kappa_b);
-      free(kappa_c);
-      free(kappa_5);
-      free(kappa_mdwf);
+      host_free(kappa_b);
+      host_free(kappa_c);
+      host_free(kappa_5);
+      host_free(kappa_mdwf);
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_5 = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_mdwf = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
@@ -805,10 +804,10 @@ struct DslashTestWrapper {
         break;
       default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
       }
-      free(kappa_b);
-      free(kappa_c);
-      free(kappa_5);
-      free(kappa_mdwf);
+      host_free(kappa_b);
+      host_free(kappa_c);
+      host_free(kappa_5);
+      host_free(kappa_mdwf);
     } else {
       printfQuda("Unsupported dslash_type\n");
       exit(-1);
@@ -820,16 +819,13 @@ struct DslashTestWrapper {
   // execute kernel
   DslashTime dslashCUDA(int niter)
   {
-
     DslashTime dslash_time;
-    timeval tstart, tstop;
 
-    cudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventCreate(&end);
+    host_timer_t host_timer;
+    device_timer_t device_timer;
 
     comm_barrier();
-    cudaEventRecord(start, 0);
+    device_timer.start();
 
     if (test_split_grid) {
 
@@ -852,7 +848,7 @@ struct DslashTestWrapper {
 
       for (int i = 0; i < niter; i++) {
 
-        gettimeofday(&tstart, NULL);
+        host_timer.start();
 
         if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
           switch (dtest_type) {
@@ -867,14 +863,14 @@ struct DslashTestWrapper {
             if (transfer) {
               dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
             if (transfer) {
               dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracDomainWall4DPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+              static_cast<quda::DiracDomainWall4DPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::MatPC:
@@ -909,21 +905,21 @@ struct DslashTestWrapper {
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::Dslash4pre:
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
             if (transfer) {
               dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
             } else {
-              static_cast<quda::DiracMobiusPC *>(dirac)->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusPC *>(dirac)->M5inv(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::MatPC:
@@ -972,7 +968,7 @@ struct DslashTestWrapper {
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
             } else {
-              static_cast<quda::DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+              static_cast<quda::DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor);
             }
             break;
           case dslash_test_type::M5inv:
@@ -1047,33 +1043,23 @@ struct DslashTestWrapper {
           }
         }
 
-        gettimeofday(&tstop, NULL);
-        long ds = tstop.tv_sec - tstart.tv_sec;
-        long dus = tstop.tv_usec - tstart.tv_usec;
-        double elapsed = ds + 0.000001 * dus;
+        host_timer.stop();
 
-        dslash_time.cpu_time += elapsed;
+        dslash_time.cpu_time += host_timer.last();
         // skip first and last iterations since they may skew these metrics if comms are not synchronous
-        if (i > 0 && i < niter) {
-          if (elapsed < dslash_time.cpu_min) dslash_time.cpu_min = elapsed;
-          if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
+        if (i>0 && i<niter) {
+          dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
+          dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
         }
       }
     }
-
-    cudaEventRecord(end, 0);
-    cudaEventSynchronize(end);
-    float runTime;
-    cudaEventElapsedTime(&runTime, start, end);
-    cudaEventDestroy(start);
-    cudaEventDestroy(end);
-
-    dslash_time.event_time = runTime / 1000;
+    device_timer.stop();
+    dslash_time.event_time = device_timer.last();
 
     return dslash_time;
   }
 
-  void run_test(int niter, bool print_metrics = false)
+  void run_test(int niter, bool = false)
   {
     {
       printfQuda("Tuning...\n");
@@ -1084,10 +1070,7 @@ struct DslashTestWrapper {
     DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
-    dslashRef();
-
     if (!test_split_grid) {
-
       if (!transfer) *spinorOut = *cudaSpinorOut;
 
       // print timing information

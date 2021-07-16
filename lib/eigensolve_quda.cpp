@@ -4,13 +4,16 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cfloat>
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
+#include <random_quda.h>
 #include <qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
+#include <tune_quda.h>
 #include <vector_io.h>
 #include <eigen_helper.h>
 
@@ -103,7 +106,9 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
-    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented");
+    case QUDA_EIG_BLK_IR_ARNOLDI:
+      errorQuda("Block IR Arnoldi not implemented");
+      break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);
@@ -144,11 +149,9 @@ namespace quda
       }
     } else {
       RNG *rng = new RNG(*kSpace[0], 1234);
-      rng->Init();
       for (int b = 0; b < block_size; b++) {
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
-      rng->Release();
       delete rng;
     }
     bool orthed = false;
@@ -181,8 +184,8 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
@@ -216,18 +219,10 @@ namespace quda
   {
     double eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      eps = DBL_EPSILON;
-      break;
-    case QUDA_SINGLE_PRECISION:
-      eps = FLT_EPSILON;
-      break;
-    case QUDA_HALF_PRECISION:
-      eps = 2e-3;
-      break;
-    case QUDA_QUARTER_PRECISION:
-      eps = 5e-2;
-      break;
+    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
+    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
+    case QUDA_HALF_PRECISION: eps = 2e-3; break;
+    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
     default: errorQuda("Invalid precision %d", prec);
     }
     return eps;
@@ -391,9 +386,7 @@ namespace quda
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
       RNG *rng = new RNG(in, 1234);
-      rng->Init();
       spinorNoise(in, *rng, QUDA_NOISE_UNIFORM);
-      rng->Release();
       delete rng;
     }
 
@@ -414,11 +407,11 @@ namespace quda
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
 
-    // Increase final result by 10% for safety
-    return result * 1.10;
-
     // Save Chebyshev Max tuning
     saveTuneCache();
+
+    // Increase final result by 10% for safety
+    return result * 1.10;
   }
 
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
@@ -436,7 +429,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
-        auto cnorm = H[i*size + j];
+        auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
@@ -726,8 +719,10 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evecs.size())
+      errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;

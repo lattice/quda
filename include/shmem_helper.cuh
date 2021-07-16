@@ -12,5 +12,8 @@
 #include <mpi.h>
 #include <nvshmem.h>
 #include <nvshmemx.h>
+#if defined(__CUDACC__) ||  defined(_NVHPC_CUDA) || (defined(__clang__) && defined(__CUDA__))
+// only include if using a CUDA compiler
 #include <cuda/atomic>
+#endif
 #endif

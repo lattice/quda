@@ -17,10 +17,10 @@ namespace quda {
        @param parity fine parity, for staggered
        @return Coarse spin coordinate
      */
-    __device__ __host__ constexpr inline int operator()( int s, int parity ) const
-    { return (spin_block_size == 0) ? parity : s / spin_block_size; }
+    constexpr int operator()(int s, int parity) const
+    {
+      return (spin_block_size == 0) ? parity : s / spin_block_size;
+    }
   };
-
-
 
 }

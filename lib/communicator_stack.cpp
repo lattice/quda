@@ -88,7 +88,7 @@ int comm_rank(void) { return get_current_communicator().comm_rank(); }
 
 int comm_rank_global(void) { return Communicator::comm_rank_global(); }
 
-int comm_size(void) { return get_current_communicator().comm_size(); }
+size_t comm_size(void) { return get_current_communicator().comm_size(); }
 
 // XXX:
 // Note here we are always using the **default** communicator.

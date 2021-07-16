@@ -1,4 +1,5 @@
 #include <quda.h>
+#include <timer.h>
 #include <blas_lapack.h>
 #include <tune_quda.h>
 
@@ -125,9 +126,9 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_nati
 
     // Transfer host data to device
     getProfileBLAS().TPSTART(QUDA_PROFILE_H2D);
-    qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
-    qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
-    qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
+    qudaMemcpy(A_d, arrayA, A_bytes, qudaMemcpyHostToDevice);
+    qudaMemcpy(B_d, arrayB, B_bytes, qudaMemcpyHostToDevice);
+    qudaMemcpy(C_d, arrayC, C_bytes, qudaMemcpyHostToDevice);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("QUDA: arrays copied susessfully.\n");
     getProfileBLAS().TPSTOP(QUDA_PROFILE_H2D);
 
@@ -141,7 +142,7 @@ void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean use_nati
 
     // Copy device C array back to host
     getProfileBLAS().TPSTART(QUDA_PROFILE_D2H);
-    qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
+    qudaMemcpy(arrayC, C_d, C_bytes, qudaMemcpyDeviceToHost);
     getProfileBLAS().TPSTOP(QUDA_PROFILE_D2H);
 
     // Clean up

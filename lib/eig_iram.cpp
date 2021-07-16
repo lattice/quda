@@ -11,6 +11,7 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
+#include <tune_quda.h>
 #include <eigen_helper.h>
 
 namespace quda

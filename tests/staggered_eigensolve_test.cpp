@@ -125,12 +125,12 @@ int main(int argc, char **argv)
   void *milc_longlink = nullptr;
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-  milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
 
@@ -155,11 +155,11 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
+  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
   for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
+    host_evecs[i] = (void *)safe_malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
 
   double time = 0.0;
 
@@ -187,33 +187,19 @@ int main(int argc, char **argv)
   } // switch
 
   // Deallocate host memory
-  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
-  free(host_evecs);
-  free(host_evals);
+  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
+  host_free(host_evecs);
+  host_free(host_evals);
 
   // Clean up gauge fields.
   for (int dir = 0; dir < 4; dir++) {
-    if (qdp_inlink[dir] != nullptr) {
-      free(qdp_inlink[dir]);
-      qdp_inlink[dir] = nullptr;
-    }
-    if (qdp_fatlink[dir] != nullptr) {
-      free(qdp_fatlink[dir]);
-      qdp_fatlink[dir] = nullptr;
-    }
-    if (qdp_longlink[dir] != nullptr) {
-      free(qdp_longlink[dir]);
-      qdp_longlink[dir] = nullptr;
-    }
+    host_free(qdp_inlink[dir]);
+    host_free(qdp_fatlink[dir]);
+    host_free(qdp_longlink[dir]);
   }
-  if (milc_fatlink != nullptr) {
-    free(milc_fatlink);
-    milc_fatlink = nullptr;
-  }
-  if (milc_longlink != nullptr) {
-    free(milc_longlink);
-    milc_longlink = nullptr;
-  }
+
+  host_free(milc_fatlink);
+  host_free(milc_longlink);
 
   endQuda();
   finalizeComms();

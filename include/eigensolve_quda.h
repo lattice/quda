@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
@@ -15,7 +16,7 @@ namespace quda
   {
     using range = std::pair<int, int>;
 
-protected:
+  protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
     TimeProfile &profile;
@@ -236,7 +237,8 @@ protected:
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+                     blockType b_type);
 
     /**
        @brief Rotate part of kSpace

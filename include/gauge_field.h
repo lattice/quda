@@ -1,5 +1,4 @@
-#ifndef _GAUGE_QUDA_H
-#define _GAUGE_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -133,7 +132,7 @@ namespace quda {
     {
     }
 
-    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+    GaugeFieldParam(const QudaGaugeParam &param, void *h_gauge = nullptr, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
       location(QUDA_CPU_FIELD_LOCATION),
       nColor(3),
@@ -513,7 +512,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, qudaStream_t *stream_p = nullptr);
+    void sendStart(int dim, int dir, const qudaStream_t &stream_p);
 
     /**
        @brief Wait for communication to complete
@@ -620,7 +619,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -815,10 +814,12 @@ namespace quda {
   void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true, int offset=0);
 
   /**
-     This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in extract_gauge_ghost.cu.
+     This function is used for extracting the extended gauge ghost
+     zone from a gauge field array.  Defined in
+     extract_gauge_ghost_extended.cu.
      @param u The gauge field from which we want to extract/pack the ghost zone
      @param dim The dimension in which we are packing/unpacking
+     @param R array holding the radius of the extended region
      @param ghost The array where we want to pack/unpack the ghost zone into/from
      @param extract Whether we are extracting into ghost or injecting from ghost
   */
@@ -876,5 +877,3 @@ namespace quda {
 #define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
-
-#endif // _GAUGE_QUDA_H

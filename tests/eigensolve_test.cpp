@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <math.h>
 #include <string.h>
 #include <algorithm>
 
+#include <timer.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include "misc.h"
@@ -122,7 +122,7 @@ int main(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   void *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -130,8 +130,8 @@ int main(int argc, char **argv)
   // Allocate host side memory for clover terms if needed.
   void *clover = 0, *clover_inv = 0;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, eig_inv_param);
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
@@ -140,41 +140,40 @@ int main(int argc, char **argv)
   // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_n_conv * sizeof(void *));
+  void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
   for (int i = 0; i < eig_n_conv; i++) {
-    host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
+    host_evecs[i] = (void *)safe_malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.n_ev * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
   // solve is in the eig_param container. If eig_param.arpack_check == true and
   // precision is double, the routine will use ARPACK rather than the GPU.
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  host_timer_t host_timer;
+  host_timer.start();
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
 
   eigensolveQuda(host_evecs, host_evals, &eig_param);
-  gettimeofday(&end, NULL);
-  double time = ((end.tv_sec - start.tv_sec) * 1000000u + end.tv_usec - start.tv_usec) / 1.e6;
-  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time);
+  host_timer.stop();
+  printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", host_timer.last());
   // QUDA eigensolver test COMPLETE
   //----------------------------------------------------------------------------
 
   // Clean up memory allocations
-  for (int i = 0; i < eig_n_conv; i++) free(host_evecs[i]);
-  free(host_evecs);
-  free(host_evals);
+  for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);
+  host_free(host_evecs);
+  host_free(host_evals);
 
   freeGaugeQuda();
-  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
+    if (clover) host_free(clover);
+    if (clover_inv) host_free(clover_inv);
   }
 
   // finalize the QUDA library

@@ -46,9 +46,10 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
 
-    inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                          const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-                          TimeProfile &profile)
+#if defined(BUILD_MILC_INTERFACE) || defined(BUILD_TIFR_INTERFACE)
+    StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                   TimeProfile &profile)
     {
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
 #ifdef BUILD_MILC_INTERFACE
@@ -62,7 +63,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(staggered)> policy(
           staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
         errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif
@@ -78,7 +78,6 @@ namespace quda
         dslash::DslashPolicyTune<decltype(staggered)> policy(
           staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-        policy.apply(0);
 #else
         errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif
@@ -86,16 +85,27 @@ namespace quda
         errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
       }
     }
+#else
+    StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, double,
+                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+    {
+      errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
+    }
+#endif
   };
 
+#ifdef GPU_STAGGERED_DIRAC
   void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_STAGGERED_DIRAC
     instantiate<StaggeredApply, StaggeredReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Staggered dslash has not been built");
-#endif
   }
+#else
+  void ApplyStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,  double,
+                      const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Staggered dslash has not been built");
+  }
+#endif
 
 } // namespace quda
