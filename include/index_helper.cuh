@@ -701,7 +701,7 @@ namespace quda {
     // compute index into the full local volume
     int gap = arg.dc.X[dim] - nLayers;
     int idx = face_idx;
-    int aux;
+    int aux = 0;
     switch (dim) {
     case 0:
       aux = face_idx / arg.dc.face_X[dim];
@@ -789,7 +789,7 @@ namespace quda {
     // compute index into the full local volume
     int gap = X[dim] - nLayers;
     int idx = face_idx;
-    int aux;
+    int aux = 0;
     switch (dim) {
     case 0:
       aux = face_idx;
