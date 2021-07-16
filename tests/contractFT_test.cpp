@@ -179,12 +179,13 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   const int source_position[4]{0,0,0,0};
-  const int n_mom = 15;
+  const int n_mom = 19;
   const int mom[n_mom*4]{
       0, 0, 0, 0,     0, 0, 0, 0,     0, 0, 0, 0,
       1, 0, 0, 0,    -1, 0, 0, 0,     1, 0, 0, 0,     1, 0, 0, 0,
       0, 1, 0, 0,     0,-1, 0, 0,     0, 1, 0, 0,     0, 1, 0, 0,     
-      0, 0, 1, 0,     0, 0,-1, 0,     0, 0, 1, 0,     0, 0, 1, 0
+      0, 0, 1, 0,     0, 0,-1, 0,     0, 0, 1, 0,     0, 0, 1, 0,
+      0, 1, 1, 0,     0,-1,-1, 0,     0, 1, 1, 0,     0, 1, 1, 0
       };
   const char* ftype[4]{"?","O","E","EO"};
   const QudaFFTSymmType eo = QUDA_FFT_SYMM_EO;
@@ -205,7 +206,11 @@ int test(int contractionType, QudaPrecision test_prec)
     eo, eo, eo, eo, // (0,0,1)
     eo, eo, eo, eo,
     ev, ev, ev, eo,
-    ev, ev, od, eo
+    ev, ev, od, eo,
+    eo, eo, eo, eo, // (0,1,1)
+    eo, eo, eo, eo,
+    ev, ev, ev, eo,
+    ev, od, od, eo
       };
 
   int const n_contract_results = red_size * n_mom * nSpin*nSpin * 2;
