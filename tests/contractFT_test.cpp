@@ -225,11 +225,13 @@ int test(int contractionType, QudaPrecision test_prec)
     printfQuda("\np = %2d %2d %2d %2d;  sym = %2s %2s %2s %2s",
 	       mom[4*k+0],mom[4*k+1],mom[4*k+2],mom[4*k+3],
 	       ftype[fft_type[4*k+0]],ftype[fft_type[4*k+1]],ftype[fft_type[4*k+2]],ftype[fft_type[4*k+3]]);
+    printfQuda("\n[");
     for(int c=0; c<red_size*nSpin*nSpin*2; c+= 2) {
       int indx = k*red_size*nSpin*nSpin*2 + c;
-      if( c % 8 == 0 ) printfQuda("\n%3d",indx);
-      printfQuda(" (%10.3e,%10.3e)",((double*)d_result)[indx],((double*)d_result)[indx+1]);
+      if( c > 0 && (c % 8) == 0 ) printfQuda("\n");
+      printfQuda(" (%10.3e+%10.3ej),",((double*)d_result)[indx],((double*)d_result)[indx+1]);
     }
+    printfQuda("]\n");
   }
   printfQuda("\n");
   // Compare contraction from the host and device. Return the number of detected faults.
