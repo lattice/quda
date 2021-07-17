@@ -96,7 +96,6 @@ int main(int argc, char **argv)
   // All user inputs now defined
   display_info();
   //----------------------------------------------------------------------------
-  
 
   // Construct an extended device gauge field
   //--------------------------------------------------------------------------
@@ -130,8 +129,7 @@ int main(int argc, char **argv)
   
   constructGaugeField(gauge_param, gaugeEx, gauge, randstates);
   //--------------------------------------------------------------------------
-  
-  
+    
   // Plaquette and Q charge measurement
   //--------------------------------------------------------------------------
   // start the timer
@@ -150,21 +148,18 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %.16e (spatial = %.16e, temporal = %.16e)\n", param.plaquette[0], param.plaquette[1], param.plaquette[2]);
   printfQuda("Computed q charge = %.16e\n", param.qcharge);
   //--------------------------------------------------------------------------
-  
-  
-  // Begin 
-  //--------------------------------------------------------------------------
-  // Start the timer
-  time0 = -((double)clock());
 
-  // Only the Laplace3D dslash type is applicable.
+  time0 = -((double)clock());
+  // (s)LapH set up
+  //--------------------------------------------------------------------------
+  // Only the Laplace3D dslash type is applicable. 
   if (dslash_type != QUDA_LAPLACE_DSLASH || laplace3D != 3) {
     printfQuda("dslash_type %s (ortho dim %d) not supported, defaulting to %s with orthodim 3\n", get_dslash_str(dslash_type), laplace3D, get_dslash_str(QUDA_LAPLACE_DSLASH));
     dslash_type = QUDA_LAPLACE_DSLASH;
     laplace3D = 3;
   }
   
-  // Load/Create eigenvectors
+  // Create eigenvector parameters
   setQudaStaggeredEigTestParams();
   // Set QUDA internal parameters
   // Though no inversions are performed, the inv_param
@@ -182,24 +177,114 @@ int main(int argc, char **argv)
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
-
-    // Host side arrays to store the eigenpairs computed by QUDA
+  
+  
+  // Create inverter parameters
+  QudaInvertParam inv_param = newQudaInvertParam();
+  QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+  if (inv_multigrid) {
+    
+    setQudaMgSolveTypes();
+    setMultigridInvertParam(inv_param);
+    // Set sub structures
+    mg_param.invert_param = &mg_inv_param;
+    for (int i = 0; i < mg_levels; i++) {
+      if (mg_eig[i]) {
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
+      } else {
+        mg_param.eig_param[i] = nullptr;
+      }
+    }
+    // Set MG
+    setMultigridParam(mg_param);
+  } else {
+    setInvertParam(inv_param);
+  }
+  inv_param.eig_param = nullptr;  
+  //--------------------------------------------------------------------------
+  
   void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
-  for (int i = 0; i < eig_n_conv; i++) {
+  for (int i = 0; i < eig_param.n_conv; i++) {
     host_evecs[i] = (void *)safe_malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
   }
+  
   int n_evals = eig_param.n_conv;
   if(eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= tdim;  
   double _Complex *host_evals = (double _Complex *)safe_malloc(n_evals * sizeof(double _Complex));
-  double time = 0.0;
 
-  // QUDA Laplace 3D eigensolver 
-  //----------------------------------------------------------------------------  
+  // Vector construct START
+  //----------------------------------------------------------------------------------
+  std::vector<quda::ColorSpinorField *> in(Nsrc);
+  std::vector<quda::ColorSpinorField *> out(Nsrc);
+  quda::ColorSpinorParam cs_param;
+  constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+
+  // Allocate memory for color spinor fields
+  for (int i = 0; i < Nsrc; i++) {
+    in[i] = quda::ColorSpinorField::Create(cs_param);
+    out[i] = quda::ColorSpinorField::Create(cs_param);
+  }
+  // Vector construct END
+  //-----------------------------------------------------------------------------------
+
+  // QUDA invert test BEGIN
+  //----------------------------------------------------------------------------
+
+
+  
+  // QUDA Laplace 3D eigensolver
+  // The 3D eigensolver is a Thick Restarted Lanczos that uses the 3D Laplace
+  // operator with the temporal dimension omitted. The 4D operator may be
+  // applied to all T independent eigensystems stacked in a 4D Krylov space.
+  // During the Lanczos step, the 4D vectors are broken into their respective
+  // 3D spaces and the necessary linear algebra is perfromed. Then, the T Ritz
+  // rotations are performed on each subsystem.
+  // The results are stored in 4D ColorSpinorField arrays. Each t component
+  // of the n^th 4D vector corresponds to the n^th eigevector of the t^th
+  // eigensystem.
+  //----------------------------------------------------------------------------
+
+  
+  double time = 0.0;
   time = -((double)clock());
   eigensolveQuda(host_evecs, host_evals, &eig_param);
   time += (double)clock();
-
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
+  //----------------------------------------------------------------------------
+  
+  // Compute Perambulators
+  // 1. Sources
+  // Sources are constructed from the above eigenvectors. A source emanates
+  // from a timeslice t, and is composed of an n^th eigenvector (colour vector)
+  // placed in the s^th spin position. All eigenvectors in the non-stochastic
+  // variant are used to compute perambulators. in sLapH, one takes a stochastic
+  // subset of the eigenvectors to produce sources. This introduces an extra
+  // loop over a dilution index, but reduces the number of eigenvectors one
+  // needs to employ.
+  //----------------------------------------------------------------------------
+  int t_sources = 1;
+  int n_spin = 4;
+  for(int t=0; t<t_sources; t++) {
+    int source_t = 0;
+    printfQuda("Source time t=%d\n", source_t);
+    for(int s=0; s<n_spin; s++) {
+      printfQuda("Source spin s=%d\n", s);
+
+      // Construct the source for this iteration
+      for(int n=0; n<eig_param.n_conv; n++) {
+	//createLAPHsource(source_t, s, n, host_evecs, *in[0]->V());
+
+	invertQuda(out[0]->V(), in[0]->V(), &inv_param);
+	
+      }
+    }
+  }
+  
+  //----------------------------------------------------------------------------
   
   // Deallocate host memory
   for (int i = 0; i < eig_n_conv; i++) host_free(host_evecs[i]);

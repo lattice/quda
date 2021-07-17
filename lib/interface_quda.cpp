@@ -2475,31 +2475,43 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
 
-  // Create device side ColorSpinorField vector space and to pass to the
-  // compute function.
+  // Create QUDA ColorSpinorParam.
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
+  ColorSpinorParam input_vec_param(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
-  // create wrappers around application vector set
-  std::vector<ColorSpinorField *> host_evecs_;
+  // Create wrappers around application vector set. If the vectors are CPU vectors,
+  // These will wrap around host data. If they are already on the GPU, they
+  // will around GPU memory.
+  std::vector<ColorSpinorField *> quda_evecs;
   for (int i = 0; i < eig_param->n_conv; i++) {
-    cpuParam.v = host_evecs[i];
-    host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
+    input_vec_param.v = host_evecs[i];
+    quda_evecs.push_back(ColorSpinorField::Create(input_vec_param));
   }
 
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaParam.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
+  // Create QUDA wrappers. If the input vectors are on the CPU, this creates device
+  // memory. If the input vectors are on the GPU, these are just pointers to the
+  // already allocated memory.
+  ColorSpinorParam quda_vec_param(input_vec_param);
+  quda_vec_param.location = QUDA_CUDA_FIELD_LOCATION;
+  quda_vec_param.create = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION ? QUDA_ZERO_FIELD_CREATE : QUDA_REFERENCE_FIELD_CREATE);
+  quda_vec_param.setPrecision(inv_param->cuda_prec_eigensolver, inv_param->cuda_prec_eigensolver, true);
   // Ensure device vectors are in UKQCD basis for Wilson type fermions
-  if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  if (quda_vec_param.nSpin != 1) quda_vec_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
+  // Create allocation for eigenvalues
   int n_evals = eig_param->n_conv;
   if(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= X[3];
   std::vector<Complex> evals(n_evals, 0.0);
+
+  // These GPU vectors are the ones we pass to the eigensolver.
   std::vector<ColorSpinorField *> kSpace;
   for (int i = 0; i < eig_param->n_conv; i++) {
-    kSpace.push_back(ColorSpinorField::Create(cudaParam));
+    // If CPU vectors were passed, create GPU vectors
+    if(inv_param->input_location == QUDA_CPU_FIELD_LOCATION) kSpace.push_back(ColorSpinorField::Create(quda_vec_param));
+    // GPU vectors were passed, reference the input vectors
+    else if(inv_param->input_location == QUDA_CUDA_FIELD_LOCATION) {
+      kSpace.push_back(ColorSpinorField::Create(*quda_evecs[i]));
+    }
   }
   
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
@@ -2528,8 +2540,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger && eig_param->compute_gamma5) {
     DiracG5M m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
+    if (eig_param->arpack_check && inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+      arpack_solve(quda_evecs, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2537,8 +2549,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     }
   } else if (!eig_param->use_norm_op && !eig_param->use_dagger && !eig_param->compute_gamma5) {
     DiracM m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
+    if (eig_param->arpack_check && inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+      arpack_solve(quda_evecs, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2546,8 +2558,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMdag m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
+    if (eig_param->arpack_check && inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+      arpack_solve(quda_evecs, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2555,8 +2567,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
     DiracMdagM m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
+    if (eig_param->arpack_check && inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+      arpack_solve(quda_evecs, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2564,8 +2576,8 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
     DiracMMdag m(dirac);
-    if (eig_param->arpack_check) {
-      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
+    if (eig_param->arpack_check && inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+      arpack_solve(quda_evecs, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2581,20 +2593,23 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // Transfer Eigenpairs back to host if using GPU eigensolver. The copy
   // will automatically rotate from device UKQCD gamma basis to the
   // host side gamma basis.
-  if (!(eig_param->arpack_check)) {
+  if (!(eig_param->arpack_check  && inv_param->input_location == QUDA_CPU_FIELD_LOCATION)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
-    for (int i = 0; i < eig_param->n_conv; i++) *host_evecs_[i] = *kSpace[i];
+    for (int i = 0; i < eig_param->n_conv; i++) *quda_evecs[i] = *kSpace[i];
     profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
-  for (int i = 0; i < eig_param->n_conv; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
+  if(inv_param->input_location == QUDA_CPU_FIELD_LOCATION) {
+    for (int i = 0; i < eig_param->n_conv; i++) delete kSpace[i];
+    for (int i = 0; i < eig_param->n_conv; i++) delete quda_evecs[i];
+  }
+  
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
-
+  
   popVerbosity();
 
   // cache is written out even if a long benchmarking job gets interrupted

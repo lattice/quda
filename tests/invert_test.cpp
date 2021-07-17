@@ -14,8 +14,6 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -263,7 +261,7 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // Vector construct START
-  //-----------------------------------------------------------------------------------
+  //----------------------------------------------------------------------------------
   std::vector<quda::ColorSpinorField *> in(Nsrc);
   std::vector<quda::ColorSpinorField *> out(Nsrc);
   std::vector<quda::ColorSpinorField *> out_multishift(multishift * Nsrc);
