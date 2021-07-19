@@ -215,9 +215,8 @@ namespace quda
     };
   };
   
-  template <int reduction_dim, class T> __device__ int* sink_from_t_xyz(int t, int xyz, T X[4])
+  template <int reduction_dim, class T> __device__ void sink_from_t_xyz(int sink[4], int t, int xyz, T X[4])
   {
-    static int sink[4];
 #pragma unroll
     for (int d = 0; d < 4; d++) {
       if (d != reduction_dim) {
@@ -226,7 +225,7 @@ namespace quda
       }
     }
     sink[reduction_dim] = t;    
-    return sink;
+    return;
   }
   
   template <class T> __device__ int idx_from_sink(T X[4], int* sink) { return ((sink[3] * X[2] + sink[2]) * X[1] + sink[1]) * X[0] + sink[0]; }
@@ -331,13 +330,13 @@ namespace quda
       complex<real> propagator_product;
       
       //The coordinate of the sink
-      int *sink;
+      int sink[4];
       
       double phase_real;
       double phase_imag;
       double Sum_dXi_dot_Pi;
       
-      sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+      sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
       
       // Calculate exp(-i * [x dot p])
       Sum_dXi_dot_Pi = (double)((source_position[0]-sink[0]-offsets[0])*mom_mode[0]*1./NxNyNzNt[0]+
@@ -415,7 +414,8 @@ namespace quda
       }
       
       //The coordinate of the sink
-      int *sink = sink_from_t_xyz<Arg::reduction_dim>(t, xyz, arg.X);
+      int sink[4];
+      sink_from_t_xyz<Arg::reduction_dim>(sink, t, xyz, arg.X);
 
       // Collect vector data
       int parity = 0;
