@@ -423,7 +423,14 @@ namespace quda
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
-      
+      #if 0 // JNS
+      printf("%2d %3d = %2d %2d %2d %2d : %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e ^ %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
+	     t, xyz,
+	     sink[3]+offsets[3],sink[2]+offsets[2],sink[1]+offsets[1],sink[0]+offsets[0],
+	     x.data[0].real(),x.data[0].imag(),x.data[1].real(),x.data[1].imag(),x.data[2].real(),x.data[2].imag(),
+	     y.data[0].real(),y.data[0].imag(),y.data[1].real(),y.data[1].imag(),y.data[2].real(),y.data[2].imag()
+	     );
+      #endif
       // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}> ; The Bra is conjugated
       complex<real> prop_prod = innerProduct(x, y, 0, 0);	
 

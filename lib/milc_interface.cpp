@@ -1715,16 +1715,27 @@ void qudaContractFT(int external_precision,
   qudamilc_called<true>(__func__, verbosity);
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   ColorSpinorParam csParam;
-  setColorSpinorParams(localDim, host_precision, &csParam);
-  csParam.pc_type = QUDA_4D_PC; // must be set
+  { // set ColorSpinorParam block
+    csParam.nColor = 3;
+    csParam.nSpin  = 1; // Support only staggered color fields for now
+    for (int dir = 0; dir < 4; ++dir) csParam.x[dir] = localDim[dir];
+    csParam.x[4] = 1;
+    csParam.setPrecision(host_precision);
+    csParam.pad = 0;
+    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
+    csParam.pc_type = QUDA_4D_PC; // must be set
+  }
 
   int const n_mom = cont_args->n_mom;
   int * const mom_modes = cont_args->mom_modes;
   const QudaFFTSymmType *const fft_type = cont_args->fft_type;
   int const *source_position = cont_args->source_position;
   
-  // Support only staggered color fields for now
-  csParam.nSpin = 1;
   QudaContractType cType = QUDA_CONTRACT_TYPE_STAGGERED_FT_T;
   int const src_colors = 1;
   // Only one pair of color fields and one result, so only one element in the arrays
