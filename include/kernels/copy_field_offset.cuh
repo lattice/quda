@@ -90,7 +90,7 @@ namespace quda
 
   template <class Arg>
   __device__ __host__ inline
-    typename std::enable_if<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>::type
+    std::enable_if_t<std::is_same<typename Arg::Field, ColorSpinorField>::value, void>
     copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
@@ -100,7 +100,7 @@ namespace quda
   }
 
   template <class Arg>
-  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, CloverField>::value, void>::type
+  __device__ __host__ inline std::enable_if_t<std::is_same<typename Arg::Field, CloverField>::value, void>
   copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
@@ -113,7 +113,7 @@ namespace quda
   }
 
   template <class Arg>
-  __device__ __host__ inline typename std::enable_if<std::is_same<typename Arg::Field, GaugeField>::value, void>::type
+  __device__ __host__ inline std::enable_if_t<std::is_same<typename Arg::Field, GaugeField>::value, void>
   copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;

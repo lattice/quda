@@ -321,6 +321,108 @@ namespace quda
     }
   }
 
+  // matrix a for m5inv: column major, M/M_sm(size/padded size) by k
+  // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
+  // one(spin).
+  // x by y
+  template <int ld, bool dagger, class Arg, class real>
+  __device__ inline void smem_construct_m5inv(Arg &arg, real *smem_a)
+  {
+    constexpr int Ls = Arg::Ls;
+    const float k = arg.kappa;
+    // if we rescale, then the actual matrix is alpha*m5inv+beta.
+    // Otherwise a = 1., b = 0.;
+    const float b = arg.beta;
+
+    const float inv = arg.alpha * arg.fac_inv;
+
+    auto offset_k = threadIdx.y * 4;
+    auto x = threadIdx.x;
+
+    while (x < Ls) {
+      int offset_m = x * 2;
+      real factorR;
+      real factorL;
+
+      {
+        int exponent;
+        if (dagger) {
+          exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
+          factorR = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+        } else {
+          exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
+          factorR = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+        }
+
+        if (dagger) {
+          exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
+          factorL = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+        } else {
+          exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
+          factorL = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+        }
+      }
+
+      real RpL = x == threadIdx.y ? factorR + factorL + b : factorR + factorL;
+      real RmL = factorR - factorL;
+
+      real *A = smem_a;
+
+      for (int s = 0; s < 4; s++) {
+        for (int c = 0; c < 2; c++) {
+          real value = (((s / 2 + c) % 2 == 0) ? RpL : RmL);
+          A[(offset_k + s) * ld + (offset_m + c) * 2 + 0] = (s % 2 == 0) ? value : 0;
+          A[(offset_k + s) * ld + (offset_m + c) * 2 + 1] = (s % 2 == 0) ? 0 : value;
+        }
+      }
+#if 0
+      A[(offset_k + 0) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(RpL, 0.0f);
+      A[(offset_k + 0) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(RmL, 0.0f);
+
+      A[(offset_k + 1) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RpL);
+      A[(offset_k + 1) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RmL);
+
+      A[(offset_k + 2) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(RmL, 0.0f);
+      A[(offset_k + 2) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(RpL, 0.0f);
+
+      A[(offset_k + 3) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RmL);
+      A[(offset_k + 3) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RpL);
+#endif
+      x += Arg::block_dim_x;
+    }
+  }
+  // store vector to smem
+  template <int ld, class Vector, class compute_t>
+  __device__ inline void smem_take_vector(const Vector &v, compute_t *smem_v)
+  {
+#pragma unroll
+    for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+      for (int color = 0; color < 3; color++) {
+        int idx = (threadIdx.y * 4 + spin) * ld + threadIdx.x * 6 + color * 2;
+        smem_v[idx + 0] = v(spin, color).real();
+        smem_v[idx + 1] = v(spin, color).imag();
+      }
+    }
+  }
+
+  // store vector to smem
+  template <int ld, class Vector, class compute_t>
+  __device__ inline Vector smem_give_vector(compute_t *smem_v)
+  {
+    Vector v;
+#pragma unroll
+    for (int spin = 0; spin < 4; spin++) {
+#pragma unroll
+      for (int color = 0; color < 3; color++) {
+        int idx = (threadIdx.y * 4 + spin) * ld + threadIdx.x * 6 + color * 2;
+        v(spin, color).real(smem_v[idx + 0]);
+        v(spin, color).imag(smem_v[idx + 1]);
+      }
+    }
+    return v;
+  }
+
   // Store results(scaled short/char values and scale) in shared memroy to global
   // memroy.
   template <class storage_type, int N_sm, class Output>

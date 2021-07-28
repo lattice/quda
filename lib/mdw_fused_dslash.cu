@@ -183,6 +183,7 @@ namespace quda
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
         switch (Ls) {
+#if 0
         case 4: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 4, block_dim_x, min_blocks, reload>
                                                (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
         case 8: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 8, block_dim_x, min_blocks, reload>
@@ -193,6 +194,7 @@ namespace quda
                                                 (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
         case 20: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 20, block_dim_x, min_blocks, reload>
                                                 (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
+#endif
         default: errorQuda("Ls = %d not instantiated\n", Ls);
         }          
       }
