@@ -60,7 +60,7 @@ namespace quda
 
       __syncthreads();
 
-      op_c.template store<smem_ld_v>(smem_c, warp_row, warp_col, wrm);
+      op_c.template store<smem_ld_v>(smem_c, warp_row * Mma::mma_m, warp_col * Mma::mma_n, wrm);
     }
   }
 

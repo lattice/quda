@@ -330,11 +330,7 @@ namespace quda
   {
     constexpr int Ls = Arg::Ls;
     const float k = arg.kappa;
-    // if we rescale, then the actual matrix is alpha*m5inv+beta.
-    // Otherwise a = 1., b = 0.;
-    const float b = arg.beta;
-
-    const float inv = arg.alpha * arg.fac_inv;
+    const float inv = arg.inv;
 
     auto offset_k = threadIdx.y * 4;
     auto x = threadIdx.x;
@@ -348,46 +344,61 @@ namespace quda
         int exponent;
         if (dagger) {
           exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          factorR = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          factorR = inv * p * (x > threadIdx.y ? -arg.m_f : 1.f);
         } else {
           exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          factorR = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          factorR = inv * p * (x < threadIdx.y ? -arg.m_f : 1.f);
         }
 
         if (dagger) {
           exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          factorL = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          factorL = inv * p * (x < threadIdx.y ? -arg.m_f : 1.f);
         } else {
           exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          factorL = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          factorL = inv * p * (x > threadIdx.y ? -arg.m_f : 1.f);
         }
       }
 
-      real RpL = x == threadIdx.y ? factorR + factorL + b : factorR + factorL;
+      real RpL = factorR + factorL;
       real RmL = factorR - factorL;
 
       real *A = smem_a;
-
+#if 0
+#pragma unroll
       for (int s = 0; s < 4; s++) {
+#pragma unroll
         for (int c = 0; c < 2; c++) {
           real value = (((s / 2 + c) % 2 == 0) ? RpL : RmL);
           A[(offset_k + s) * ld + (offset_m + c) * 2 + 0] = (s % 2 == 0) ? value : 0;
           A[(offset_k + s) * ld + (offset_m + c) * 2 + 1] = (s % 2 == 0) ? 0 : value;
         }
       }
-#if 0
-      A[(offset_k + 0) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(RpL, 0.0f);
-      A[(offset_k + 0) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(RmL, 0.0f);
+#else
+      A[(offset_k + 0) * ld + (offset_m + 0) * 2 + 0] = RpL;
+      A[(offset_k + 0) * ld + (offset_m + 0) * 2 + 1] = 0;
+      A[(offset_k + 0) * ld + (offset_m + 1) * 2 + 0] = RmL;
+      A[(offset_k + 0) * ld + (offset_m + 1) * 2 + 1] = 0;
 
-      A[(offset_k + 1) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RpL);
-      A[(offset_k + 1) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RmL);
+      A[(offset_k + 1) * ld + (offset_m + 0) * 2 + 0] = 0;
+      A[(offset_k + 1) * ld + (offset_m + 0) * 2 + 1] = RpL;
+      A[(offset_k + 1) * ld + (offset_m + 1) * 2 + 0] = 0;
+      A[(offset_k + 1) * ld + (offset_m + 1) * 2 + 1] = RmL;
 
-      A[(offset_k + 2) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(RmL, 0.0f);
-      A[(offset_k + 2) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(RpL, 0.0f);
+      A[(offset_k + 2) * ld + (offset_m + 0) * 2 + 0] = RmL;
+      A[(offset_k + 2) * ld + (offset_m + 0) * 2 + 1] = 0;
+      A[(offset_k + 2) * ld + (offset_m + 1) * 2 + 0] = RpL;
+      A[(offset_k + 2) * ld + (offset_m + 1) * 2 + 1] = 0;
 
-      A[(offset_k + 3) * (M_sm / 2) + (offset_m + 0)] = __floats2half2_rn(0.0f, RmL);
-      A[(offset_k + 3) * (M_sm / 2) + (offset_m + 1)] = __floats2half2_rn(0.0f, RpL);
+      A[(offset_k + 3) * ld + (offset_m + 0) * 2 + 0] = 0;
+      A[(offset_k + 3) * ld + (offset_m + 0) * 2 + 1] = RmL;
+      A[(offset_k + 3) * ld + (offset_m + 1) * 2 + 0] = 0;
+      A[(offset_k + 3) * ld + (offset_m + 1) * 2 + 1] = RpL;
 #endif
+
       x += Arg::block_dim_x;
     }
   }

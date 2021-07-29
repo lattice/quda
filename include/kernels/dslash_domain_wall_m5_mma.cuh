@@ -7,38 +7,23 @@
 
 namespace quda {
 
-  namespace mobius_tensor_core
-  {
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
-    constexpr int sm_m_pad_size(int m)
-    {
-      return quda::mma::pad_size(m);
-    }
-
-    constexpr int sm_n_pad_size(int n)
-    {
-      return quda::mma::pad_size(n);
-    }
-
-    /**
-      @brief Parameter structure for applying the Dslash
-    */
-    template <class store_t_, int nColor_, int Ls_, int block_dim_x_, bool dagger_, int min_blocks_per_sm, bool reload_>
+  /**
+    @brief Parameter structure for applying the Dslash
+   */
+  template <class store_t_, int nColor_, int Ls_, int block_dim_x_, bool dagger_, int min_blocks_per_sm, bool reload_>
     struct Dslash5MmaArg : kernel_param<> {
       using store_t = store_t_;
       using real = typename mapper<store_t>::type; // the compute type for the in kernel computation
       static constexpr int nColor = nColor_;
       static constexpr int Ls = Ls_;
-      static constexpr bool dagger = dagger_;
       static constexpr int block_dim_x = block_dim_x_;
       static constexpr int block_dim = block_dim_x * Ls;
       static constexpr int min_blocks = min_blocks_per_sm;
+      static constexpr bool dagger = dagger_;
       static constexpr bool reload = reload_; // Whether reload the m5inv matrix
-      static constexpr bool spin_project = true;
-      static constexpr bool spinor_direct_load = true; // false means texture load
-      using F = typename colorspinor_mapper<store_t, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
+      using F = typename colorspinor_mapper<store_t, 4, nColor>::type; // color spin field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -57,19 +42,11 @@ namespace quda {
       real a; // real xpay coefficient
 
       real kappa;
-      real fac_inv;
-
-      // (beta + alpha*m5inv) * in
-      real alpha = 1.;
-      real beta = 0.;
-
-      real m_scale = 1.; // scale factor for the matrix
-
-      bool small_kappa = false;
+      real inv;
 
       Dslash5MmaArg(ColorSpinorField &out, const ColorSpinorField &in,
-                     const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
-                     int parity) :
+          const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
+          double a, int parity) :
         out(out),
         in(in),
         x(x),
@@ -78,105 +55,102 @@ namespace quda {
         volume_cb(in.VolumeCB()),
         volume_4d_cb(volume_cb / Ls),
         m_f(m_f_),
-        m_5(m_5_)
+        m_5(m_5_),
+        a(a)
       {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
-
         if (nParity == 2) { errorQuda("nParity = 2 NOT supported, yet.\n"); }
-
         if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
         b = b_5[0].real();
         c = c_5[0].real();
-        kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
-
-        fac_inv
-          = 0.5 / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
+        kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.);
+        inv = 0.5 / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
       }
     };
 
-    /**
-      @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
-      The integer kernel types corresponds to the enum MdwfFusedDslashType.
-    */
-    template <typename Arg> struct Dslash5MmaKernel {
-      Arg &arg;
-      constexpr Dslash5MmaKernel(Arg &arg) : arg(arg) {}
-      static constexpr const char *filename() { return KERNEL_FILE; }
+  /**
+    @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
+    The integer kernel types corresponds to the enum MdwfFusedDslashType.
+   */
+  template <typename Arg> struct Dslash5MmaKernel {
+    const Arg &arg;
+    constexpr Dslash5MmaKernel(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __forceinline__ void operator()()
-      {
-        using real = typename Arg::real;
-        using Vector = ColorSpinor<real, 3, 4>;
-        constexpr int Ls = Arg::Ls;
-        const int parity = arg.nParity == 2 ? arg.parity : 0;
+    __device__ __forceinline__ void operator()()
+    {
+      using real = typename Arg::real;
+      using Vector = ColorSpinor<real, Arg::nColor, 4>;
+      constexpr int Ls = Arg::Ls;
+      const int parity = arg.nParity == 2 ? arg.parity : 0;
 
-        TensorCoreSharedMemory<real> shared_memory_data;
+      TensorCoreSharedMemory<real> shared_memory_data;
 
-        constexpr int m = 4 * Ls;
-        constexpr int n = 6 * Arg::block_dim_x;
-        constexpr int k = m;
+      constexpr int m = 4 * Ls;
+      constexpr int n = 6 * Arg::block_dim_x;
+      constexpr int k = m;
 
-        constexpr int smem_ld_v = n + sm_n_pad_size(n);
-        constexpr int smem_ld_a = m + sm_m_pad_size(m);
+      using Mma = Smma<tfloat32, 8, 1, 1>;
 
-        real *smem_a = shared_memory_data;
-        real *smem_v = Arg::reload ? smem_a + smem_ld_a * k : smem_a;
+      constexpr int smem_ld_v = n + Mma::t_pad;
+      constexpr int smem_ld_a = m + Mma::t_pad;
 
-        smem_construct_m5inv<smem_ld_a, Arg::dagger>(arg, smem_a);
+      real *smem_a = shared_memory_data;
+      real *smem_v = Arg::reload ? smem_a + smem_ld_a * k : smem_a;
+
+      smem_construct_m5inv<smem_ld_a, Arg::dagger>(arg, smem_a);
+      __syncthreads();
+
+      bool idle = false;
+      int x_cb_base = blockIdx.x * blockDim.x; // base.
+      int x_cb;
+
+      constexpr int tk_dim = k / Mma::mma_k;
+      Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+      Mma::OperandA op_a[Arg::reload ? 1 : tk_dim];
+      if (!Arg::reload) { // the data in registers can be resued.
+        constexpr int tm_dim = m / Mma::mma_m;
+        constexpr int tn_dim = n / Mma::mma_n;
+
+        constexpr int total_warp = Arg::block_dim_x * Ls / 32;
+        const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) / 32;
+
+        constexpr int total_tile = tm_dim * tn_dim;
+
+        constexpr int warp_cycle = total_tile / total_warp;
+        const int warp_m = this_warp * warp_cycle / tn_dim;
+#pragma unroll
+        for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<smem_ld_a>(smem_a, tile_k, warp_m, wrm); }
+      }
+
+      while (x_cb_base < arg.volume_4d_cb) {
+        x_cb = x_cb_base + threadIdx.x;
+        int s = threadIdx.y;
+        if (x_cb >= arg.volume_4d_cb) { idle = true; }
+
+        Vector in;
+        if (!idle) {
+          in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        }
+        smem_take_vector<smem_ld_v>(in, smem_v);
+
+        __syncthreads();
+        mma_sync_gemm<Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_v, Arg::reload>(op_a, smem_a, smem_v, smem_v, wrm);
         __syncthreads();
 
-        bool idle = false;
-        int x_cb_base = blockIdx.x * blockDim.x; // base.
-        int x_cb;
-
-        using Mma = Smma<tfloat32, 8, 1, 1>;
-
-        constexpr int tk_dim = k / Mma::mma_k;
-        Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
-        Mma::OperandA op_a[Arg::reload ? 1 : tk_dim];
-        if (!Arg::reload) { // the data in registers can be resued.
-          constexpr int tm_dim = m / Mma::mma_m;
-          constexpr int tn_dim = n / Mma::mma_n;
-
-          constexpr int total_warp = Arg::block_dim_x * Ls / 32;
-          const int this_warp = (threadIdx.y * Arg::block_dim_x + threadIdx.x) / 32;
-
-          constexpr int total_tile = tm_dim * tn_dim;
-
-          constexpr int warp_cycle = total_tile / total_warp;
-          const int warp_m = this_warp * warp_cycle / tn_dim;
-#pragma unroll
-          for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<smem_ld_a>(smem_a, tile_k, warp_m, wrm); }
+        if (!idle) {
+          Vector out = smem_give_vector<smem_ld_v, Vector>(smem_v);
+          arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
         }
+        __syncthreads();
 
-        while (x_cb_base < arg.volume_4d_cb) {
-          x_cb = x_cb_base + threadIdx.x;
-          int s = threadIdx.y;
-          if (x_cb >= arg.volume_4d_cb) { idle = true; }
+        x_cb_base += gridDim.x * blockDim.x;
+      } // while
+    }
+  };
 
-          Vector in;
-          if (!idle) {
-            in = arg.in(x_cb * Ls + s, parity);
-          }
-          smem_take_vector<smem_ld_v>(in, smem_v);
-
-          __syncthreads();
-          mma_sync_gemm<Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_v, Arg::reload>(op_a, smem_a, smem_v, smem_v, wrm);
-          __syncthreads();
-
-          if (!idle) {
-            Vector out = smem_give_vector<smem_ld_v, Vector>(smem_v);
-            arg.out(x_cb * Ls + s, parity) = out;
-          }
-
-          x_cb_base += gridDim.x * blockDim.x;
-        } // while
-      }
-    };
-    
-#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-  }
+#endif // #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
 }
 

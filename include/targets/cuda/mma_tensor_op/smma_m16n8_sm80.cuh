@@ -154,16 +154,9 @@ struct Smma {
             int k = tile_k * mma_k + (tk * 4 + wrm.thread_id_in_group) * input_vn;
             int n = tile_n * mma_n + wn * inst_n + (tn * 8 + wrm.group_id);
             float f[input_vn];
-            if (input_vn == 1) {
 #pragma unroll
-              for (int v = 0; v < input_vn; v++) {
-                f[v] = B[k + v + n * ldb];
-              }
-            } else {
-              float2 *B2 = reinterpret_cast<float2 *>(B);
-              float2 ff = B2[(k + n * ldb) / 2];
-              f[0] = ff.x;
-              f[1] = ff.y;
+            for (int v = 0; v < input_vn; v++) {
+              f[v] = B[(k + v) * ldb + n];
             }
 
             int rc = wn * thread_count + (tk * thread_n + tn);
@@ -203,7 +196,7 @@ struct Smma {
             for (int wm = 0; wm < warp_m; wm++) {
               int gmem_m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
               int gmem_n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-              C[gmem_m + gmem_n * ldc] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
+              C[gmem_m * ldc + gmem_n] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
             }
           }
         }

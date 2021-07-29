@@ -596,6 +596,9 @@ namespace quda {
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                     double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
 
+  void ApplyDslash5Mma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
+                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+
   // Tensor core functions for Mobius DWF
   namespace mobius_tensor_core
   {

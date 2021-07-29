@@ -546,12 +546,20 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
     // s = ls-2 ... 0
     for(int xs = Ls-2 ; xs >=0 ; --xs)
     {
+#if 1
+      for(int tmp_s = 0 ; tmp_s < Ls; tmp_s++)
+      {
+        Ftr[xs] = -pow(2.0*kappa[xs],xs+1)*mferm*inv_Ftr[xs]; 
+      }
+#endif
       for (int i = 0; i < Vh; i++) {
         axpy((sFloat)Ftr[xs], &res[24*(i+Vh*(Ls-1))], &res[24*(i+Vh*xs)], 12);
         axpy((sFloat)(2.0*kappa[xs]), &res[12+24*(i+Vh*(xs+1))], &res[12+24*(i+Vh*xs)], 12);
       }
+#if 0
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] /= 2.0*kappa[tmp_s];
+#endif
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
@@ -582,12 +590,20 @@ void dslashReference_5th_inv(sFloat *res, sFloat *spinorField, int, int daggerBi
     // s = ls-2 ... 0
     for(int xs = Ls-2 ; xs >=0 ; --xs)
     {
+#if 1
+      for(int tmp_s = 0 ; tmp_s < Ls; tmp_s++)
+      {
+        Ftr[xs] = -pow(2.0*kappa[xs],xs+1)*mferm*inv_Ftr[xs]; 
+      }
+#endif
       for (int i = 0; i < Vh; i++) {
         axpy((sFloat)(2.0*kappa[xs]), &res[24*(i+Vh*(xs+1))], &res[24*(i+Vh*xs)], 12);
         axpy((sFloat)Ftr[xs], &res[12+24*(i+Vh*(Ls-1))], &res[12+24*(i+Vh*xs)], 12);
       }
+#if 0
       for (int tmp_s = 0 ; tmp_s < Ls ; tmp_s++)
         Ftr[tmp_s] /= 2.0*kappa[tmp_s];
+#endif
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
@@ -640,12 +656,17 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int , int dagger
 
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#if 1
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] = -cpow(2.0 * kappa[tmp_s], xs + 1) * mferm * inv_Ftr[tmp_s];
+#endif
       for (int i = 0; i < Vh; i++) {
         axpy(Ftr[xs], (sComplex *)&res[24 * (i + Vh * (Ls - 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
         axpy((2.0 * kappa[xs]), (sComplex *)&res[12 + 24 * (i + Vh * (xs + 1))],
             (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
       }
+#if 0
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
+#endif
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
@@ -670,11 +691,16 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int , int dagger
 
     // s = ls-2 ... 0
     for (int xs = Ls - 2; xs >= 0; --xs) {
+#if 1
+      for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] = -cpow(2.0 * kappa[tmp_s], xs + 1) * mferm * inv_Ftr[tmp_s];
+#endif
       for (int i = 0; i < Vh; i++) {
         axpy((2.0 * kappa[xs]), (sComplex *)&res[24 * (i + Vh * (xs + 1))], (sComplex *)&res[24 * (i + Vh * xs)], 6);
         axpy(Ftr[xs], (sComplex *)&res[12 + 24 * (i + Vh * (Ls - 1))], (sComplex *)&res[12 + 24 * (i + Vh * xs)], 6);
       }
+#if 0
       for (int tmp_s = 0; tmp_s < Ls; tmp_s++) Ftr[tmp_s] /= 2.0 * kappa[tmp_s];
+#endif
     }
     // s = ls -1
     for (int i = 0; i < Vh; i++) {
