@@ -667,6 +667,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifdef INIT_PARAM
   return ret;
 #endif
+
+#ifdef INIT_PARAM
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
+  P(m5inv_use_mma, QUDA_BOOLEAN_TRUE);
+#else
+  P(m5inv_use_mma, QUDA_BOOLEAN_FALSE);
+#endif
+#else
+  P(m5inv_use_mma, QUDA_BOOLEAN_INVALID);
+#endif
 }
 
 

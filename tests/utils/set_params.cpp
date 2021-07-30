@@ -252,6 +252,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.struct_size = sizeof(inv_param);
+
+  inv_param.m5inv_use_mma = m5inv_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 // Parameters defining the eigensolver

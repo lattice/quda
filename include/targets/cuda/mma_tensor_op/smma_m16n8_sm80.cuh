@@ -62,6 +62,10 @@ struct Shuffle <tfloat32, 1>{
 template <class shuffle_t, int inst_k_, int warp_m_, int warp_n_>
 struct Smma {
 
+  static constexpr bool use_intermediate_accumulator() {
+    return true;
+  };
+
   static constexpr int warp_m = warp_m_;
   static constexpr int warp_n = warp_n_;
 
@@ -211,24 +215,31 @@ struct Smma {
 #pragma unroll
       for (int wn = 0; wn < warp_n; wn++) {
 
-        float acc[OperandC::thread_count];
-#pragma unroll
-        for (int c = 0; c < OperandC::thread_count; c++) {
-          acc[c] = 0;
-        }
-
         int a_offset = wm * OperandA::thread_count;
         int b_offset = wn * OperandB::thread_count;
+        int c_offset = (wn * warp_m + wm) * OperandC::thread_count;
 
         MmaInst<inst_m, inst_n, inst_k, shuffle_t, float> mma;
-        mma(acc, &op_a.big[a_offset], &op_b.big[b_offset]);
-        mma(acc, &op_a.big[a_offset], &op_b.small[b_offset]);
-        mma(acc, &op_a.small[a_offset], &op_b.big[b_offset]);
 
-        int c_offset = (wn * warp_m + wm) * OperandC::thread_count;
+        if (use_intermediate_accumulator()) {
+          float acc[OperandC::thread_count];
 #pragma unroll
-        for (int c = 0; c < OperandC::thread_count; c++) {
-          op_c.reg[c_offset + c] += acc[c];
+          for (int c = 0; c < OperandC::thread_count; c++) {
+            acc[c] = 0;
+          }
+
+          mma(acc, &op_a.big[a_offset], &op_b.big[b_offset]);
+          mma(acc, &op_a.big[a_offset], &op_b.small[b_offset]);
+          mma(acc, &op_a.small[a_offset], &op_b.big[b_offset]);
+
+#pragma unroll
+          for (int c = 0; c < OperandC::thread_count; c++) {
+            op_c.reg[c_offset + c] += acc[c];
+          }
+        } else {
+          mma(&op_c.reg[c_offset], &op_a.big[a_offset], &op_b.big[b_offset]);
+          mma(&op_c.reg[c_offset], &op_a.big[a_offset], &op_b.small[b_offset]);
+          mma(&op_c.reg[c_offset], &op_a.small[a_offset], &op_b.big[b_offset]);
         }
       }
     }

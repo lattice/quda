@@ -40,7 +40,7 @@ namespace quda
 
     long long bytes() const
     {
-      return in.Bytes();
+      return in.Bytes() + out.Bytes();
     }
 
     bool tuneAuxDim() const { return true; }
@@ -55,10 +55,9 @@ namespace quda
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const
     {
-      using Mma = Smma<tfloat32, 8, 1, 1>;
+      using Mma = typename mma_mapper<store_t>::type;
       const int a_size = (param.block.y * 4) * (param.block.y * 4 + Mma::t_pad);
       const int b_size = (param.block.y * 4) * (param.block.x * 6 + Mma::t_pad);
-      // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
       if (param.aux.x == 1) { // aux.x == 1 --> reload == true
         return (a_size + b_size) * sizeof(real);
       } else {
@@ -69,7 +68,7 @@ namespace quda
     bool advanceAux(TuneParam &param) const
     {
       bool aux_advanced = false;
-      if (param.aux.x == 0) { // first see if aux.x(ONLY 0(false) or 1(true))
+      if (param.aux.x == 0) { // first see if aux.x (reload 0 (false) or 1 (true))
         param.aux.x++;
         aux_advanced = true;
       } else {
@@ -113,9 +112,6 @@ namespace quda
     template <int Ls, int block_dim_x, bool dagger, int min_blocks, bool reload> using Arg =
       Dslash5MmaArg<store_t, nColor, Ls, block_dim_x, dagger, min_blocks, reload>;
 
-    // The following apply<...> functions are used to turn the tune parameters into template arguments.
-    // Specifically tp.aux.y dictates the minBlocksPerMultiprocessor in __launch_bounds__(..).
-    // tp.aux.x dictates whether or not to reload.
     template <int block_dim_x, int min_blocks, bool reload, bool dagger>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
@@ -180,11 +176,11 @@ namespace quda
     void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
   };
 
-#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#endif // #if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
 
   // Apply the 5th dimension dslash operator to a colorspinor field
   // out = Dslash5*in
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#if defined(GPU_DOMAIN_WALL_DIRAC) && (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
   void ApplyDslash5Mma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
       double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type)
   {

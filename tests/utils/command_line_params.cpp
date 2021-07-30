@@ -150,6 +150,12 @@ bool mg_use_mma = true;
 bool mg_use_mma = false;
 #endif
 
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
+bool m5inv_use_mma = true;
+#else
+bool m5inv_use_mma = false;
+#endif
+
 int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -541,6 +547,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
   quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
+  quda_app->add_option(
+    "--m5inv-use-mma", m5inv_use_mma,
+    "Use tensor-core to accelerate M5inv (default = true on Ampere or later with CUDA >=11.0, otherwise false)");
   quda_app->add_option(
     "--multishift", multishift,
     "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"

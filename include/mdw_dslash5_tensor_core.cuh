@@ -344,21 +344,21 @@ namespace quda
         int exponent;
         if (dagger) {
           exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          float p = powf(k, exponent);
           factorR = inv * p * (x > threadIdx.y ? -arg.m_f : 1.f);
         } else {
           exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          float p = powf(k, exponent);
           factorR = inv * p * (x < threadIdx.y ? -arg.m_f : 1.f);
         }
 
         if (dagger) {
           exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          float p = powf(k, exponent);
           factorL = inv * p * (x < threadIdx.y ? -arg.m_f : 1.f);
         } else {
           exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          float p = 1; for (int i = 0; i < exponent; i++) p *= k;
+          float p = powf(k, exponent);
           factorL = inv * p * (x > threadIdx.y ? -arg.m_f : 1.f);
         }
       }
@@ -367,7 +367,7 @@ namespace quda
       real RmL = factorR - factorL;
 
       real *A = smem_a;
-#if 0
+#if 1
 #pragma unroll
       for (int s = 0; s < 4; s++) {
 #pragma unroll

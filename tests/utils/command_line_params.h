@@ -277,6 +277,7 @@ extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
+extern bool m5inv_use_mma;
 
 extern int n_ev;
 extern int max_search_dim;

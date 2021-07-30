@@ -182,12 +182,12 @@ namespace quda {
     // do nothing
   }
 
-  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param), extended_gauge(nullptr)
+  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param), use_mma(param.m5inv_use_mma), extended_gauge(nullptr)
   {
     // do nothing
   }
 
-  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac), extended_gauge(nullptr)
+  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac), use_mma(dirac.use_mma), extended_gauge(nullptr)
   {
     // do nothing
   }
@@ -213,8 +213,14 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    // ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
-    ApplyDslash5Mma(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
+    if (use_mma) {
+      ApplyDslash5Mma(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+    } else
+#endif
+    {
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+    }
 
     long long Ls = in.X(4);
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);

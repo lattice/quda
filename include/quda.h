@@ -399,6 +399,9 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Whether to use tensor core to perform the m5inv for Mobius */
+    QudaBoolean m5inv_use_mma;
+
     /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     size_t struct_size;
   } QudaInvertParam;

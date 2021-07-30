@@ -91,7 +91,7 @@ namespace quda {
       constexpr int n = 6 * Arg::block_dim_x;
       constexpr int k = m;
 
-      using Mma = Smma<tfloat32, 8, 1, 1>;
+      using Mma = typename mma_mapper<typename Arg::store_t>::type;
 
       constexpr int smem_ld_v = n + Mma::t_pad;
       constexpr int smem_ld_a = m + Mma::t_pad;
@@ -107,8 +107,8 @@ namespace quda {
       int x_cb;
 
       constexpr int tk_dim = k / Mma::mma_k;
-      Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
-      Mma::OperandA op_a[Arg::reload ? 1 : tk_dim];
+      typename Mma::WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+      typename Mma::OperandA op_a[Arg::reload ? 1 : tk_dim];
       if (!Arg::reload) { // the data in registers can be resued.
         constexpr int tm_dim = m / Mma::mma_m;
         constexpr int tn_dim = n / Mma::mma_n;
@@ -136,7 +136,7 @@ namespace quda {
         smem_take_vector<smem_ld_v>(in, smem_v);
 
         __syncthreads();
-        mma_sync_gemm<Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_v, Arg::reload>(op_a, smem_a, smem_v, smem_v, wrm);
+        mma_sync_gemm<Mma, Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_v, Arg::reload>(op_a, smem_a, smem_v, smem_v, wrm);
         __syncthreads();
 
         if (!idle) {

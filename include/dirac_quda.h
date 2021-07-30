@@ -60,7 +60,8 @@ namespace quda {
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
-    bool use_mma;            // whether to use tensor cores where applicable
+    bool mg_use_mma;            // whether to use tensor cores where applicable
+    bool m5inv_use_mma;            // whether to use tensor cores where applicable
 
     // Default constructor
     DiracParam() :
@@ -79,9 +80,14 @@ namespace quda {
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
 #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-      use_mma(true)
+      mg_use_mma(true),
 #else
-      use_mma(false)
+      mg_use_mma(false),
+#endif
+#if (CUDA_VERSION >= 11000 && __COMPUTE_CAPABILITY__ >= 800)
+      m5inv_use_mma(true)
+#else
+      m5inv_use_mma(false)
 #endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
@@ -105,7 +111,8 @@ namespace quda {
       for (int i = 0; i < Ls; i++)
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
-      printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("mg_use_mma = %d\n", mg_use_mma);
+      printfQuda("m5inv_use_mma = %d\n", m5inv_use_mma);
     }
   };
 
@@ -853,6 +860,8 @@ public:
 
   protected:
     mutable cudaGaugeField *extended_gauge;
+
+    const bool use_mma;
 
   private:
   public:
