@@ -552,18 +552,19 @@ struct Communicator {
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    // We only want one (1) gpuid for all communicators, so gpuid is static.
-    // We initialize gpuid if it's still negative.
     if (gpuid < 0) {
 
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+
+      // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
         if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
 
-      int device_count;
-      cudaGetDeviceCount(&device_count);
-      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+      // At this point we had either pulled a gpuid from an env var or from the old way.
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -573,7 +574,7 @@ struct Communicator {
           errorQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
-    }
+    } // -ve gpuid
 
     comm_peer2peer_init(hostname_recv_buf);
 
