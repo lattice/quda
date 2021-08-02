@@ -519,43 +519,16 @@ struct Communicator {
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    if( gpuid < 0 ) { 
-
-      // Try PMI
-      char *local_rankstr = getenv( "PMI_RANK" );
-
-      // Try MVapich
-      if ( ! local_rankstr ) {
-        local_rankstr = getenv( "MV2_COMM_WORLD_LOCAL_RANK"  );
-      }
-
-      // Try OpenMPI
-      if ( ! local_rankstr ) {
-        local_rankstr = getenv( "OMPI_COMM_WORLD_LOCAL_RANK" );
-      }
-
-      // Try SLURM
-      if ( ! local_rankstr ) {
-       local_rankstr = getenv( "SLURM_LOCALID" );
-      }
-
+    if (gpuid < 0) {
       int device_count = quda::device::get_device_count();
-      if ( device_count == 0 ) { errorQuda("No devices found"); }
-    
-      if ( local_rankstr ) {
-        gpuid  = atoi(local_rankstr);
+      if (device_count == 0) { errorQuda("No devices found"); }
+
+      // We initialize gpuid if it's still negative.
+      gpuid = 0;
+      for (int i = 0; i < comm_rank(); i++) {
+        if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
-      else {
-    
-        // Old fashioned way to get local ID. Relies on hostname working
-        // We initialize gpuid if it's still negative.
-        gpuid = 0;
-        for (int i = 0; i < comm_rank(); i++) {
-          if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
-        }
-      }
-  
-      // At this point we had either pulled a gpuid from an env var or from the old way.  
+
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
