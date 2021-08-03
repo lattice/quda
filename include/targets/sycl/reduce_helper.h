@@ -195,8 +195,6 @@ namespace quda
 
   };
 
-#if 1 ///// TEST
-
 #ifdef HETEROGENEOUS_ATOMIC
     /**
        @brief Generic reduction function that reduces block-distributed
@@ -303,12 +301,13 @@ namespace quda
     return *reinterpret_cast<const sycl::vec<double,16>*>(&in);
   }
   inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 1> &in) {
-    //return sycl::vec{toGroupReduceType(in[0]),toGroupReduceTypein([1])};
-    return *reinterpret_cast<const sycl::vec<double,2>*>(&in);
+    //return *reinterpret_cast<const sycl::vec<double,2>*>(&in);
+    //return sycl::vec{in[0].x,in[0].y};
+    return sycl::double2{in[0].x,in[0].y};
   }
   inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 2> &in) {
-    //return sycl::vec{toGroupReduceType(in[0]),toGroupReduceTypein([1])};
-    return *reinterpret_cast<const sycl::vec<double,4>*>(&in);
+    //return *reinterpret_cast<const sycl::vec<double,4>*>(&in);
+    return sycl::vec{in[0].x,in[0].y,in[1].x,in[1].y};
   }
   inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 3> &in) {
     //return sycl::vec{in[0],in[1],in[2]};
@@ -319,8 +318,10 @@ namespace quda
     return *reinterpret_cast<const sycl::vec<double,8>*>(&in);
   }
   inline auto toGroupReduceType(const quda::vector_type<vec2<double>, 8> &in) {
+    //return *reinterpret_cast<const sycl::vec<double,16>*>(&in);
     //return sycl::vec{in[0],in[1],in[2],in[3],in[4],in[5],in[6],in[7]};
-    return *reinterpret_cast<const sycl::vec<double,16>*>(&in);
+    return sycl::vec{in[0].x,in[0].y,in[1].x,in[1].y,in[2].x,in[2].y,in[3].x,in[3].y,
+      in[4].x,in[4].y,in[5].x,in[5].y,in[6].x,in[6].y,in[7].x,in[7].y};
   }
   inline auto toGroupReduceType(const quda::vector_type<vec2<double>,16> &in) {
     //auto a = sycl::double4{in[0], in[1], in[2], in[3]};
@@ -330,6 +331,7 @@ namespace quda
     //return sycl::vec{a,b,c,d};
     return reinterpret_cast<const sycl::vec<double,16>*>(&in);
   }
+
   template<typename T> inline T fromGroupReduceType(float in) {
     return T{in};
   }
@@ -436,12 +438,14 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-    __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
+    template <int block_size_x, int block_size_y = 1,
+	      typename Reducer, typename Arg, typename T>
+    inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
       auto ndi = getNdItem();
       auto grp = getGroup();
       T aggregate;
+      //T tin = in;
       blockReduce(grp, aggregate, in, r);
 
       auto llid = ndi.get_local_linear_id();
@@ -484,7 +488,5 @@ namespace quda
       }
     }
 #endif
-
-#endif /////// TEST
 
 } // namespace quda

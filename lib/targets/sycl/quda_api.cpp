@@ -415,7 +415,8 @@ namespace quda
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
     auto q = device::get_target_stream(stream);
-    q.wait();
+    //q.wait();
+    q.wait_and_throw();
   }
 
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line)

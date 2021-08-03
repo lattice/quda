@@ -34,6 +34,8 @@ namespace quda
           else
             printfQuda("cublasCreated successfully\n");
           cublas_init = true;
+#else
+	  quda::blas_lapack::generic::init();
 #endif
         }
       }
@@ -46,6 +48,8 @@ namespace quda
           if (error != CUBLAS_STATUS_SUCCESS)
             errorQuda("\nError indestroying cublas context, error code = %d\n", error);
           cublas_init = false;
+#else
+	  quda::blas_lapack::generic::destroy();
 #endif
         }
       }
@@ -73,8 +77,8 @@ namespace quda
 
 #ifdef NATIVE_LAPACK_LIB
       // FIXME do this in pipelined fashion to reduce memory overhead.
-      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision prec,
-                                  QudaFieldLocation location)
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
+				  QudaPrecision prec, QudaFieldLocation location)
       {
         init();
         if (getVerbosity() >= QUDA_VERBOSE)
@@ -185,16 +189,17 @@ namespace quda
         return flops;
       }
 #else
-      long long BatchInvertMatrix(void *, void *, const int, const uint64_t, QudaPrecision, QudaFieldLocation)
+      long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
+				  QudaPrecision prec, QudaFieldLocation location)
       {
-        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
-        return 0; // Stops a compiler warning
+	return quda::blas_lapack::generic::BatchInvertMatrix(Ainv, A, n, batch,
+							     prec, location);
       }
 #endif
 
 #ifdef NATIVE_LAPACK_LIB
-      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data, QudaBLASParam blas_param,
-                                 QudaFieldLocation location)
+      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
+				 QudaBLASParam blas_param, QudaFieldLocation location)
       {
         long long flops = 0;
         timeval start, stop;
@@ -478,10 +483,11 @@ namespace quda
         return flops;
       }
 #else
-      long long stridedBatchGEMM(void *, void *, void *, QudaBLASParam, QudaFieldLocation)
+      long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
+				 QudaBLASParam blas_param, QudaFieldLocation location)
       {
-        errorQuda("Native BLAS not built. Please build and use native BLAS or use generic BLAS");
-        return 0;
+	return quda::blas_lapack::generic::stridedBatchGEMM(A_data, B_data, C_data,
+							    blas_param, location);
       }
 #endif
 

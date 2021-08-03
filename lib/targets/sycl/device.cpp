@@ -23,6 +23,17 @@ class mySelectorT : public sycl::device_selector {
 //static auto mySelector = sycl::gpu_selector();
 static auto mySelector = mySelectorT();
 
+void exception_handler(sycl::exception_list exceptions)
+{
+  for (std::exception_ptr const& e : exceptions) {
+    try {
+      std::rethrow_exception(e);
+    } catch(sycl::exception const& e) {
+      errorQuda("Caught asynchronous SYCL exception:\n %s\n",e.what());
+    }
+  }
+}
+
 namespace quda
 {
 
@@ -186,7 +197,8 @@ namespace quda
       sycl::property_list props{sycl::property::queue::in_order(),
 				sycl::property::queue::enable_profiling()};
       for (int i=0; i<Nstream-1; i++) {
-        streams[i] = sycl::queue(ctx, myDevice, props);
+        //streams[i] = sycl::queue(ctx, myDevice, props);
+        streams[i] = sycl::queue(ctx, myDevice, exception_handler, props);
       }
       streams[Nstream-1] = sycl::queue(ctx, myDevice, props);
       printfQuda(" done\n");

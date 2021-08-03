@@ -52,32 +52,28 @@ inline std::string str(std::vector<T> v)
   return ss.str();
 }
 
-//extern "C" {
-//size_t __builtin_get_global_id(size_t);
-//size_t __builtin_get_global_range(size_t);
-//size_t __builtin_get_local_id(size_t);
-//size_t __builtin_get_local_range(size_t);
-//}
-//#define GR_(i) cl::sycl::detail::Builder::getNDItem<3>().get_global_range(i)
-//#define GI_(i) (cl::sycl::detail::Builder::getNDItem<3>().get_global_id(i))
-//#define LR_(i) (cl::sycl::detail::Builder::getNDItem<3>().get_local_range(i))
-//#define LI_(i) (cl::sycl::detail::Builder::getNDItem<3>().get_local_id(i))
-//#define gridDim dim3{(uint)GR_(0),(uint)GR_(1),(uint)GR_(2)}
-//#define blockIdx dim3{(uint)GI_(0),(uint)GI_(1),(uint)GI_(2)}
-//#define blockDim dim3{(uint)LR_(0),(uint)LR_(1),(uint)LR_(2)}
-//#define threadIdx dim3{(uint)LI_(0),(uint)LI_(1),(uint)LI_(2)}
-//auto b = __spirv::initGlobalInvocationId<3, sycl::id<3>>();
-//auto c = __spirv::initGlobalSize<3, sycl::range<3>>();
-//auto gr = cl::sycl::detail::Builder::groupRange<3>();
-
-#ifdef __SYCL_DEVICE_ONLY__
 static inline auto getGroup()
 {
-  return sycl::detail::Builder::getElement(static_cast<sycl::group<3>*>(nullptr));
+  //return sycl::detail::Builder::getElement(static_cast<sycl::group<3>*>(nullptr));
+  return sycl::this_group<3>();
 }
 static inline auto getNdItem()
 {
-  return sycl::detail::Builder::getNDItem<3>();
+  //return sycl::detail::Builder::getNDItem<3>();
+  return sycl::this_nd_item<3>();
+}
+
+#if 0
+#ifdef __SYCL_DEVICE_ONLY__
+static inline auto getGroup()
+{
+  //return sycl::detail::Builder::getElement(static_cast<sycl::group<3>*>(nullptr));
+  return sycl::this_group<3>();
+}
+static inline auto getNdItem()
+{
+  //return sycl::detail::Builder::getNDItem<3>();
+  return sycl::this_nd_item<3>();
 }
 #else
 #include <util_quda.h>
@@ -98,13 +94,16 @@ static inline sycl::nd_item<3> getNdItem()
   return sycl::detail::Builder::createNDItem(g, l, getGroup());
 }
 #endif
+#endif
 
 
 inline dim3 getGridDim()
 {
   dim3 r;
 #ifdef __SYCL_DEVICE_ONLY__
-  auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  //auto ndi = getNDItem<3>();
+  auto ndi = sycl::this_nd_item<3>();
   r.x = ndi.get_group_range(0);
   r.y = ndi.get_group_range(1);
   r.z = ndi.get_group_range(2);
@@ -116,7 +115,8 @@ inline dim3 getBlockIdx()
 {
   dim3 r;
 #ifdef __SYCL_DEVICE_ONLY__
-  auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  auto ndi = sycl::this_nd_item<3>();
   r.x = ndi.get_group(0);
   r.y = ndi.get_group(1);
   r.z = ndi.get_group(2);
@@ -128,7 +128,8 @@ inline dim3 getBlockDim()
 {
   dim3 r;
 #ifdef __SYCL_DEVICE_ONLY__
-  auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  auto ndi = sycl::this_nd_item<3>();
   r.x = ndi.get_local_range(0);
   r.y = ndi.get_local_range(1);
   r.z = ndi.get_local_range(2);
@@ -140,13 +141,26 @@ inline dim3 getThreadIdx()
 {
   dim3 r;
 #ifdef __SYCL_DEVICE_ONLY__
-  auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
+  auto ndi = sycl::this_nd_item<3>();
   r.x = ndi.get_local_id(0);
   r.y = ndi.get_local_id(1);
   r.z = ndi.get_local_id(2);
 #endif
   return r;
 }
+
+inline uint getLocalLinearId()
+{
+  int id = 0;
+#ifdef __SYCL_DEVICE_ONLY__
+  //auto ndi = getNdItem();
+  auto ndi = sycl::this_nd_item<3>();
+  id = ndi.get_local_linear_id();
+#endif
+  return id;
+}
+
 
 inline void __syncthreads(void)
 {

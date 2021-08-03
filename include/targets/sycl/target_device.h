@@ -84,6 +84,8 @@ namespace quda {
     //__device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
     inline dim3 thread_idx() { return getThreadIdx(); }
 
+    inline uint local_linear_id() { return getLocalLinearId(); }
+
   }
 
 
@@ -130,13 +132,14 @@ namespace quda {
        @brief Helper function that returns the maximum number of threads
        in a block in the x dimension for reduction kernels.
     */
+    template <int block_size_y = 1, int block_size_z = 1>
     constexpr unsigned int max_multi_reduce_block_size()
     {
 #ifdef QUDA_FAST_COMPILE_REDUCE
       // This is the specialized variant used when we have fast-compilation mode enabled
       return warp_size();
 #else
-      return 128;
+      return max_block_size<block_size_y, block_size_z>();
 #endif
     }
 

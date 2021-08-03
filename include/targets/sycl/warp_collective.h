@@ -1,8 +1,8 @@
 namespace quda {
 
-  template <int warp_split, typename T> __device__ __host__ inline T warp_combine(T &x)
+  template <int warp_split, typename T> inline T warp_combine(T &x)
   {
-#ifdef __CUDA_ARCH__
+    auto sg = sycl::ONEAPI::this_sub_group();
     constexpr int warp_size = device::warp_size();
     if (warp_split > 1) {
 #pragma unroll
@@ -10,13 +10,11 @@ namespace quda {
         // reduce down to the first group of column-split threads
 #pragma unroll
         for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-          // TODO - add support for non-converged warps
-          x[i].real(x[i].real() + __shfl_down_sync(device::warp_converged_mask(), x[i].real(), offset));
-          x[i].imag(x[i].imag() + __shfl_down_sync(device::warp_converged_mask(), x[i].imag(), offset));
+          x[i].real(x[i].real() + sg.shuffle_down(x[i].real(), offset));
+          x[i].imag(x[i].imag() + sg.shuffle_down(x[i].imag(), offset));
         }
       }
     }
-#endif
     return x;
   }
 

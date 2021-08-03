@@ -17,7 +17,8 @@ namespace quda {
 #ifndef QUDA_FAST_COMPILE_REDUCE
     static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
 #else
-    static constexpr std::array<unsigned int, 1> block = {1024};
+    //static constexpr std::array<unsigned int, 1> block = {1024};
+    static constexpr std::array<unsigned int, 1> block = {std::min(1024u,device::max_block_size())};
 #endif
 
     /**

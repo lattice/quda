@@ -86,8 +86,14 @@ namespace quda
       __device__ inline atom_t* operator()()
       {
         //static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
-        atom_t *cache_ = nullptr;
-        return reinterpret_cast<atom_t*>(cache_);
+	using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
+	auto g = getGroup();
+	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
+	auto cache_ = sycl::group_local_memory<atype>(g);
+        //return reinterpret_cast<atom_t*>(cache_.get());
+        return *cache_.get();
+        //atom_t *cache_ = nullptr;
+	//return cache_;
       }
     };
 
@@ -139,7 +145,7 @@ namespace quda
        block_size_x.  Otherwise use the block sizes passed into the
        constructor.
 
-       @param[in] block Block dimensions for the 3-d shared memory object 
+       @param[in] block Block dimensions for the 3-d shared memory object
     */
     constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block),
@@ -149,6 +155,8 @@ namespace quda
        @brief Grab the raw base address to shared memory.
     */
     __device__ __host__ inline T* data() { return reinterpret_cast<T*>(cache<dynamic>()); }
+    //__device__ __host__ inline T* data() {
+    //  return reinterpret_cast<T*>(cache<dynamic>()); }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
@@ -235,14 +243,25 @@ namespace quda
 
     __device__ __host__ T& operator[](int i) { return array[i]; }
     __device__ __host__ const T& operator[](int i) const { return array[i]; }
+    //__device__ __host__ T& operator[](int i) { return array[0]; }
+    //__device__ __host__ const T& operator[](int i) const { return array[0]; }
   };
-#endif
-
+#else
   template <typename T, int n>
   struct thread_array {
-    vector_type<T, n> array;
-    T& operator[](int i) { return array[i]; }
-    const T& operator[](int i) const { return array[i]; }
+    //SharedMemoryCache<vector_type<T, n>, 1, 1, false, false> device_array;
+    //int offset;
+    vector_type<T, n> host_array;
+    //vector_type<T, n> &array;
+    thread_array() //:
+      //offset(target::local_linear_id()),
+      //array(*(device_array.data()+offset))
+    {
+      //array = vector_type<T, n>(); // call default constructor
+    }
+    T& operator[](int i) { return host_array[i]; }
+    const T& operator[](int i) const { return host_array[i]; }
   };
+#endif
 
 } // namespace quda
