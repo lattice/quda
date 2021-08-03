@@ -85,6 +85,8 @@ struct Smma {
   static constexpr int t_pad = input_vn % 2 == 0 ? 4 : 8;
   static constexpr int n_pad = input_vn % 2 == 0 ? 8 : 4;
 
+  static constexpr int acc_pad = 8;
+
   struct WarpRegisterMapping {
 
     int lane_id;
@@ -198,9 +200,9 @@ struct Smma {
           for (int wn = 0; wn < warp_n; wn++) {
 #pragma unroll
             for (int wm = 0; wm < warp_m; wm++) {
-              int gmem_m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
-              int gmem_n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
-              C[gmem_m * ldc + gmem_n] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
+              int m = m_offset + wm * inst_m + (wrm.group_id + tm * 8);
+              int n = n_offset + wn * inst_n + (wrm.thread_id_in_group * 2 + tn);
+              C[m * ldc + n] = reg[(wn * warp_m + wm) * thread_count + (tm * thread_n + tn)];
             }
           }
         }

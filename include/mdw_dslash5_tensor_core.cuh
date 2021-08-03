@@ -321,10 +321,7 @@ namespace quda
     }
   }
 
-  // matrix a for m5inv: column major, M/M_sm(size/padded size) by k
-  // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
-  // one(spin).
-  // x by y
+  // matrix a for m5inv: column major
   template <int ld, bool dagger, class Arg, class real>
   __device__ inline void smem_construct_m5inv(Arg &arg, real *smem_a)
   {
@@ -367,7 +364,7 @@ namespace quda
       real RmL = factorR - factorL;
 
       real *A = smem_a;
-#if 1
+
 #pragma unroll
       for (int s = 0; s < 4; s++) {
 #pragma unroll
@@ -377,27 +374,6 @@ namespace quda
           A[(offset_k + s) * ld + (offset_m + c) * 2 + 1] = (s % 2 == 0) ? 0 : value;
         }
       }
-#else
-      A[(offset_k + 0) * ld + (offset_m + 0) * 2 + 0] = RpL;
-      A[(offset_k + 0) * ld + (offset_m + 0) * 2 + 1] = 0;
-      A[(offset_k + 0) * ld + (offset_m + 1) * 2 + 0] = RmL;
-      A[(offset_k + 0) * ld + (offset_m + 1) * 2 + 1] = 0;
-
-      A[(offset_k + 1) * ld + (offset_m + 0) * 2 + 0] = 0;
-      A[(offset_k + 1) * ld + (offset_m + 0) * 2 + 1] = RpL;
-      A[(offset_k + 1) * ld + (offset_m + 1) * 2 + 0] = 0;
-      A[(offset_k + 1) * ld + (offset_m + 1) * 2 + 1] = RmL;
-
-      A[(offset_k + 2) * ld + (offset_m + 0) * 2 + 0] = RmL;
-      A[(offset_k + 2) * ld + (offset_m + 0) * 2 + 1] = 0;
-      A[(offset_k + 2) * ld + (offset_m + 1) * 2 + 0] = RpL;
-      A[(offset_k + 2) * ld + (offset_m + 1) * 2 + 1] = 0;
-
-      A[(offset_k + 3) * ld + (offset_m + 0) * 2 + 0] = 0;
-      A[(offset_k + 3) * ld + (offset_m + 0) * 2 + 1] = RmL;
-      A[(offset_k + 3) * ld + (offset_m + 1) * 2 + 0] = 0;
-      A[(offset_k + 3) * ld + (offset_m + 1) * 2 + 1] = RpL;
-#endif
 
       x += Arg::block_dim_x;
     }

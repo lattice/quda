@@ -93,11 +93,13 @@ namespace quda {
 
       using Mma = typename mma_mapper<typename Arg::store_t>::type;
 
-      constexpr int smem_ld_v = n + Mma::t_pad;
       constexpr int smem_ld_a = m + Mma::t_pad;
+      constexpr int smem_ld_b = n + Mma::t_pad;
+      constexpr int smem_ld_c = n + Mma::acc_pad;
 
       real *smem_a = shared_memory_data;
-      real *smem_v = Arg::reload ? smem_a + smem_ld_a * k : smem_a;
+      real *smem_b = Arg::reload ? smem_a + smem_ld_a * k : smem_a;
+      real *smem_c = smem_b + smem_ld_b * k;
 
       smem_construct_m5inv<smem_ld_a, Arg::dagger>(arg, smem_a);
       __syncthreads();
@@ -133,17 +135,17 @@ namespace quda {
         if (!idle) {
           in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
         }
-        smem_take_vector<smem_ld_v>(in, smem_v);
+        smem_take_vector<smem_ld_b>(in, smem_b);
 
         __syncthreads();
-        mma_sync_gemm<Mma, Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_v, Arg::reload>(op_a, smem_a, smem_v, smem_v, wrm);
+        mma_sync_gemm<Mma, Arg::block_dim_x, Arg::Ls, m, n, smem_ld_a, smem_ld_b, smem_ld_c, Arg::reload>(op_a, smem_a, smem_b, smem_c, wrm);
         __syncthreads();
 
         if (!idle) {
-          Vector out = smem_give_vector<smem_ld_v, Vector>(smem_v);
+          Vector out = smem_give_vector<smem_ld_c, Vector>(smem_c);
           arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
         }
-        __syncthreads();
+        // __syncthreads();
 
         x_cb_base += gridDim.x * blockDim.x;
       } // while

@@ -58,10 +58,11 @@ namespace quda
       using Mma = typename mma_mapper<store_t>::type;
       const int a_size = (param.block.y * 4) * (param.block.y * 4 + Mma::t_pad);
       const int b_size = (param.block.y * 4) * (param.block.x * 6 + Mma::t_pad);
+      const int c_size = (param.block.y * 4) * (param.block.x * 6 + Mma::acc_pad);
       if (param.aux.x == 1) { // aux.x == 1 --> reload == true
-        return (a_size + b_size) * sizeof(real);
+        return (a_size + b_size + c_size) * sizeof(real);
       } else {
-        return (a_size > b_size ? a_size : b_size) * sizeof(real);
+        return (a_size > b_size + c_size ? a_size : b_size + c_size) * sizeof(real);
       }
     }
 

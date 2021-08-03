@@ -5,7 +5,7 @@
 namespace quda
 {
 
-  template <class Mma, int block_dim_x, int Ls, int m, int n, int smem_ld_a, int smem_ld_v, bool reload, class T, class real, class S>
+  template <class Mma, int block_dim_x, int Ls, int m, int n, int smem_ld_a, int smem_ld_b, int smem_ld_c, bool reload, class T, class real, class S>
   __device__ inline void mma_sync_gemm(T op_a[], real *smem_a, real *smem_b, real *smem_c, const S &wrm)
   {
 
@@ -48,7 +48,7 @@ namespace quda
         }
 
         typename Mma::OperandB op_b;
-        op_b.template load<smem_ld_v>(smem_b, tile_k, warp_col, wrm);
+        op_b.template load<smem_ld_b>(smem_b, tile_k, warp_col, wrm);
 
         if (reload) {
           Mma::mma(op_c, op_a[0], op_b);
@@ -57,9 +57,9 @@ namespace quda
         }
       }
 
-      __syncthreads();
+      // __syncthreads();
 
-      op_c.template store<smem_ld_v>(smem_c, warp_row * Mma::mma_m, warp_col * Mma::mma_n, wrm);
+      op_c.template store<smem_ld_c>(smem_c, warp_row * Mma::mma_m, warp_col * Mma::mma_n, wrm);
     }
   }
 
