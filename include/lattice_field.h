@@ -89,7 +89,7 @@ namespace quda {
       siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
-      for (int i=0; i<nDim; i++) {
+      for (int i=0; i<QUDA_MAX_DIM; i++) {
 	x[i] = 0;
 	r[i] = 0;
       }
@@ -110,8 +110,8 @@ namespace quda {
       ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = x[i];
+      for (int i=0; i<QUDA_MAX_DIM; i++) {
+	this->x[i] = i < nDim ? x[i] : 0;
 	this->r[i] = 0;
       }
     }
@@ -127,8 +127,8 @@ namespace quda {
       siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = param.X[i];
+      for (int i=0; i<QUDA_MAX_DIM; i++) {
+	this->x[i] = i < nDim ? param.X[i] : 0;
 	this->r[i] = 0;
       }
     }
