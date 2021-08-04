@@ -36,11 +36,12 @@ namespace quda {
      with explicit calls to the load/save methods in the
      colorspinor-field accessors.
   */
-  template <typename Float, typename T>
+  template <typename Float, typename T, int Ns>
     struct colorspinor_wrapper {
       const T &field;
       const int x_cb;
       const int parity;
+      const int half_spinor_index;
 
       /**
          @brief colorspinor_wrapper constructor
@@ -48,10 +49,11 @@ namespace quda {
          @param[in] x_cb checkerboarded space-time index we are accessing
          @param[in] parity Parity we are accessing
       */
-      __device__ __host__ inline colorspinor_wrapper<Float, T>(const T &field, int x_cb, int parity) :
+      __device__ __host__ inline colorspinor_wrapper<Float, T, Ns>(const T &field, int x_cb, int parity, int half_spinor_index = 0) :
           field(field),
           x_cb(x_cb),
-          parity(parity)
+          parity(parity),
+          half_spinor_index(half_spinor_index)
       { }
 
       /**
@@ -63,38 +65,38 @@ namespace quda {
 
   template <typename T, int Nc, int Ns>
     template <typename S>
-    __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline void ColorSpinor<T,Nc,Ns>::operator=(const colorspinor_wrapper<T,S,Ns> &a) {
+    a.field.template load<Ns>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   template <typename T, int Nc, int Ns>
     template <typename S>
-    __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline ColorSpinor<T,Nc,Ns>::ColorSpinor(const colorspinor_wrapper<T,S,Ns> &a) {
+    a.field.template load<Ns>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   template <typename T, int Nc>
     template <typename S>
-    __device__ __host__ inline void ColorSpinor<T,Nc,2>::operator=(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline void ColorSpinor<T,Nc,2>::operator=(const colorspinor_wrapper<T,S,2> &a) {
+    a.field.template load<2>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   template <typename T, int Nc>
     template <typename S>
-    __device__ __host__ inline ColorSpinor<T,Nc,2>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline ColorSpinor<T,Nc,2>::ColorSpinor(const colorspinor_wrapper<T,S,2> &a) {
+    a.field.template load<2>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   template <typename T, int Nc>
     template <typename S>
-    __device__ __host__ inline void ColorSpinor<T,Nc,4>::operator=(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline void ColorSpinor<T,Nc,4>::operator=(const colorspinor_wrapper<T,S,4> &a) {
+    a.field.template load<4>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   template <typename T, int Nc>
     template <typename S>
-    __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity);
+    __device__ __host__ inline ColorSpinor<T,Nc,4>::ColorSpinor(const colorspinor_wrapper<T,S,4> &a) {
+    a.field.template load<4>(data, a.x_cb, a.parity, a.half_spinor_index);
   }
 
   /**
@@ -976,22 +978,26 @@ namespace quda {
         }
       }
 
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void load(complex out[length / (Ns / nTheirSpin)], int x, int parity, int half_spinor_index) const
   {
-    real v[length];
+    static_assert(Ns % nTheirSpin == 0, "Ns %% nTheirSpin == 0");
+    constexpr int spin_block = Ns / nTheirSpin;
+    static_assert(M % spin_block == 0, "M %% spin_block == 0");
+    real v[length / spin_block];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
 #pragma unroll
-    for (int i=0; i<M; i++) {
+    for (int i = 0; i < M / spin_block; i++) {
       // first load from memory
-      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
+      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * (i + half_spinor_index * M / spin_block));
       // now copy into output and scale
 #pragma unroll
       for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
 #pragma unroll
-    for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
+    for (int i = 0; i < length / 2 / spin_block; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
   __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
@@ -1041,7 +1047,13 @@ namespace quda {
   */
   __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor, Ns>(*this, x_cb, parity, 0);
+  }
+
+  template <int nTheirSpin>
+  __device__ __host__ inline auto operator()(int x_cb, int parity, int half_spinor_index) const
+  {
+    return colorspinor_wrapper<real, Accessor, nTheirSpin>(*this, x_cb, parity, half_spinor_index);
   }
 
   __device__ __host__ inline void loadGhost(complex out[length_ghost / 2], int x, int dim, int dir, int parity = 0) const
@@ -1164,7 +1176,8 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     auto in = &field[(parity * volumeCB + x) * length];
     complex v_[length/2];
@@ -1201,7 +1214,7 @@ namespace quda {
   */
   __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor, Ns>(*this, x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1252,7 +1265,8 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     auto in = &field[(parity * volumeCB + x) * length];
     block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
@@ -1275,7 +1289,7 @@ namespace quda {
   */
   __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor, Ns>(*this, x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1351,7 +1365,8 @@ namespace quda {
     return linkIndex(coord, exDim);
   }
 
-  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     int y = getPaddedIndex(x, parity);
     auto in = &field[(parity * exVolumeCB + y) * length];
@@ -1376,7 +1391,7 @@ namespace quda {
   */
   __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor, Ns>(*this, x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1418,7 +1433,8 @@ namespace quda {
         if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
       }
 
-  __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0, int half_spinor_index = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
@@ -1449,7 +1465,7 @@ namespace quda {
   */
   __device__ __host__ inline auto operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor, Ns>(*this, x_cb, parity);
   }
 
   size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }

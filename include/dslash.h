@@ -261,6 +261,7 @@ namespace quda
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL: launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
+#if 0
 #ifdef NVSHMEM_COMMS
         case UBER_KERNEL: launch<P, nParity, dagger, xpay, UBER_KERNEL>(tp, stream); break;
 #endif
@@ -269,6 +270,7 @@ namespace quda
         case EXTERIOR_KERNEL_Z: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
         case EXTERIOR_KERNEL_T: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
         case EXTERIOR_KERNEL_ALL: launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+#endif
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);

@@ -578,6 +578,10 @@ namespace quda {
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
+  void ApplyDomainWall4D2(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile);
+
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is

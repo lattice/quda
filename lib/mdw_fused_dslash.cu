@@ -253,9 +253,11 @@ namespace quda
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
+#if 0
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedDslash>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
+#endif
     }
 #else
     void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,

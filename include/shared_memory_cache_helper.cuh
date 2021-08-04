@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <float_vector.h>
 
 /**
    @file shared_memory_cache_helper.cuh

@@ -84,7 +84,9 @@ namespace quda
   void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
+#if 0
     instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
+#endif
   }
 #else
   void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,

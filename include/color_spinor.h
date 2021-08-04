@@ -14,7 +14,7 @@
  */
 namespace quda {
 
-  template<typename Float, typename T> struct colorspinor_wrapper;
+  template<typename Float, typename T, int Ns> struct colorspinor_wrapper;
   template<typename Float, typename T> struct colorspinor_ghost_wrapper;
 
   /**
@@ -76,10 +76,10 @@ namespace quda {
       }
 
       template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S, Ns> &s);
 
       template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S, Ns> &s);
 
       template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
@@ -614,10 +614,10 @@ namespace quda {
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
     template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S, Ns> &s);
 
     template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S, Ns> &s);
 
     template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
@@ -723,6 +723,133 @@ namespace quda {
       }
       return recon;
     }
+
+      __device__ __host__ inline void negate()
+      {
+#pragma unroll
+        for (int i = 0; i < size; i++) { data[i] = -data[i]; }
+      }
+
+    /**
+        Return this spinor spin projected, by loading the other half from `cache`
+        @param dim Which dimension projector are we using
+        @param sign Positive or negative projector
+        @return The spin-projected Spinor
+    */
+    template <class Cache>
+      __device__ __host__ inline ColorSpinor<Float, Nc, 2> project(int dim, int sign, Cache &cache, int x_offset) const
+      {
+        ColorSpinor<Float,Nc,2> proj;
+        const auto &t = *this;
+        auto tid = target::thread_idx();
+        auto s = cache.load(tid.x + x_offset, tid.y, tid.z);
+        if (x_offset == -1) { s.negate(); }
+        switch (dim) {
+          case 0: // x dimension
+            switch (sign) {
+              case 1: // positive projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) + i_(s(1, i));
+                  proj(1, i) = t(1, i) + i_(s(0, i));
+                }
+                break;
+              case -1: // negative projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) - i_(s(1, i));
+                  proj(1, i) = t(1, i) - i_(s(0, i));
+                }
+                break;
+            }
+            break;
+          case 1: // y dimension
+            switch (sign) {
+              case 1: // positive projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) + s(1, i);
+                  proj(1, i) = t(1, i) - s(0, i);
+                }
+                break;
+              case -1: // negative projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) - s(1, i);
+                  proj(1, i) = t(1, i) + s(0, i);
+                }
+                break;
+            }
+            break;
+          case 2: // z dimension
+            switch (sign) {
+              case 1: // positive projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) + i_(s(0, i));
+                  proj(1, i) = t(1, i) - i_(s(1, i));
+                }
+                break;
+              case -1: // negative projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  proj(0, i) = t(0, i) - i_(s(0, i));
+                  proj(1, i) = t(1, i) + i_(s(1, i));
+                }
+                break;
+            }
+            break;
+          case 3: // t dimension
+            switch (sign) {
+              case 1: // positive projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  if (x_offset == +1) {
+                    proj(0, i) = static_cast<Float>(2.0) * t(0, i);
+                    proj(1, i) = static_cast<Float>(2.0) * t(1, i);
+                  } else {
+                    proj(0, i) = 0;
+                    proj(1, i) = 0;
+                  }
+                }
+                break;
+              case -1: // negative projector
+#pragma unroll
+                for (int i=0; i<Nc; i++) {
+                  if (x_offset == -1) {
+                    proj(0, i) = static_cast<Float>(2.0) * t(0, i);
+                    proj(1, i) = static_cast<Float>(2.0) * t(1, i);
+                  } else {
+                    proj(0, i) = 0;
+                    proj(1, i) = 0;
+                  }
+                }
+                break;
+            }
+            break;
+          case 4:
+            // TODO: Fix this!!!
+            switch (sign) {
+              case 1: // positive projector
+#pragma unroll
+                for (int i = 0; i < Nc; i++) {
+                  proj(0, i) = t(0, i) + s(0, i);
+                  proj(1, i) = t(1, i) + s(1, i);
+                }
+                break;
+              case -1: // negative projector
+#pragma unroll
+                for (int i = 0; i < Nc; i++) {
+                  proj(0, i) = t(0, i) - s(0, i);
+                  proj(1, i) = t(1, i) - s(1, i);
+                }
+                break;
+            }
+            break;
+        }
+
+        return proj;
+      }
 
     /**
         @brief Spin reconstruct the full Spinor from the projected spinor
@@ -881,10 +1008,10 @@ namespace quda {
     __device__ __host__ inline const complex<Float>& operator()(int idx) const { return data[idx]; }
 
     template<typename S>
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_wrapper<Float, S, Ns> &s);
 
     template<typename S>
-      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S> &s);
+      __device__ __host__ inline void operator=(const colorspinor_wrapper<Float, S, Ns> &s);
 
     template<typename S>
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const colorspinor_ghost_wrapper<Float, S> &s);
@@ -901,6 +1028,19 @@ namespace quda {
       }
     }
   };
+
+  template <class Float, int Nc>
+  __device__ __host__ inline ColorSpinor<Float, Nc, 4> combine_half_spinors(const ColorSpinor<Float, Nc, 2> &a, const ColorSpinor<Float, Nc, 2> &b) {
+    ColorSpinor<Float, Nc, 4> out;
+#pragma unroll
+    for (int i=0; i<Nc; i++) {
+      out(0, i) = a(0, i);
+      out(1, i) = a(1, i);
+      out(2, i) = b(0, i);
+      out(3, i) = b(1, i);
+    }
+    return out;
+  }
 
   /**
      @brief Compute the inner product over color and spin

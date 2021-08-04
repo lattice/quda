@@ -7,6 +7,7 @@
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
 #include <kernels/dslash_pack.cuh> // for the packing kernel
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda
 {
