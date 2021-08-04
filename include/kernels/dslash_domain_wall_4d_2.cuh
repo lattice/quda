@@ -13,6 +13,20 @@ namespace quda
     return out;
   }
 
+  template <class Vector>
+  __device__ __host__ inline Vector shuffle_colorspinor(const Vector &src)
+  {
+    Vector out;
+#ifdef __CUDA_ARCH__
+#pragma unroll
+    for (int i = 0; i < Vector::size; i++) {
+      out.data[i].real(__shfl_xor_sync(0xffffffff, src.data[i].real(), 1));
+      out.data[i].imag(__shfl_xor_sync(0xffffffff, src.data[i].imag(), 1));
+    }
+#endif
+    return out;
+  }
+
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg>
   __device__ __host__ inline auto applyWilson2(const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active, int half_spinor_index)
   {
@@ -46,6 +60,7 @@ namespace quda
           // Load half spinor
           // Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           HalfVector in = arg.in.template operator()<2>(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity, half_spinor_index); // 0 or 1
+#if 0
 #ifdef __CUDA_ARCH__
           if (d > 0) { __syncwarp(); }
 #endif
@@ -54,6 +69,10 @@ namespace quda
           __syncwarp();
 #endif
           out += U * in.project(d, proj_dir, cache, 1 - half_spinor_index * 2);
+#else
+          HalfVector other_v = shuffle_colorspinor(in);
+          out += U * in.project(d, proj_dir, other_v, 1 - half_spinor_index * 2);
+#endif
         }
       }
 
@@ -71,6 +90,7 @@ namespace quda
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           HalfVector in = arg.in.template operator()<2>(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity, half_spinor_index);
 
+#if 0
 #ifdef __CUDA_ARCH__
           __syncwarp();
 #endif
@@ -80,6 +100,10 @@ namespace quda
           __syncwarp();
 #endif
           out += conj(U) * in.project(d, proj_dir, cache, 1 - half_spinor_index * 2);
+#else
+          HalfVector other_v = shuffle_colorspinor(in);
+          out += conj(U) * in.project(d, proj_dir, other_v, 1 - half_spinor_index * 2);
+#endif
         }
       }
 
@@ -114,6 +138,7 @@ namespace quda
 
       HalfVector stencil_out = applyWilson2<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, half_spinor_index);
 
+#if 0
       SharedMemoryCache<HalfVector> cache(target::block_dim());
 #ifdef __CUDA_ARCH__ 
       __syncwarp();
@@ -121,6 +146,9 @@ namespace quda
       cache.save(stencil_out);
 #ifdef __CUDA_ARCH__ 
       __syncwarp();
+#endif
+#else
+      HalfVector other_v = shuffle_colorspinor(stencil_out);
 #endif
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
@@ -134,8 +162,12 @@ namespace quda
       }
 #endif 
       if (half_spinor_index == 0) {
+#if 0
         auto tid = target::thread_idx();
         Vector out = combine_half_spinors(stencil_out, cache.load(tid.x + 1, tid.y, tid.z));
+#else
+        Vector out = combine_half_spinors(stencil_out, other_v);
+#endif
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
       }
     }

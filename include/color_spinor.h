@@ -736,13 +736,10 @@ namespace quda {
         @param sign Positive or negative projector
         @return The spin-projected Spinor
     */
-    template <class Cache>
-      __device__ __host__ inline ColorSpinor<Float, Nc, 2> project(int dim, int sign, Cache &cache, int x_offset) const
+      __device__ __host__ inline ColorSpinor<Float, Nc, 2> project(int dim, int sign, ColorSpinor<Float, Nc, 2> &s, int x_offset) const
       {
         ColorSpinor<Float,Nc,2> proj;
         const auto &t = *this;
-        auto tid = target::thread_idx();
-        auto s = cache.load(tid.x + x_offset, tid.y, tid.z);
         if (x_offset == -1) { s.negate(); }
         switch (dim) {
           case 0: // x dimension

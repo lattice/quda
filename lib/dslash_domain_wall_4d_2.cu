@@ -28,11 +28,13 @@ namespace quda
       TunableKernel3D::resizeVector(in.X(4), arg.nParity);
     }
 
+#if 0
     virtual unsigned int sharedBytesPerThread() const
     {
       using real = typename mapper<typename Arg::Float>::type;
       return (Arg::nColor * 2 * 2) * sizeof(real);
     }
+#endif
 
     void apply(const qudaStream_t &stream)
     {
@@ -51,8 +53,6 @@ namespace quda
       constexpr int nDim = 4;
       DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger,
                                                       comm_override);
-      // arg.threads = 2 * in.VolumeCB();
-
       DomainWall4D2<decltype(arg)> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(
