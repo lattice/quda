@@ -5545,7 +5545,7 @@ int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const u
   checkGaugeParam(param);
 
   profileGaugeFixOVR.TPSTART(QUDA_PROFILE_INIT);
-  GaugeFieldParam gParam(*param);
+  GaugeFieldParam gParam(*param, gauge);
   auto *cpuGauge = new cpuGaugeField(gParam);
 
   // gParam.pad = getFatLinkPadding(param->X);
