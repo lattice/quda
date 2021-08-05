@@ -378,6 +378,28 @@ namespace quda
     agg = *reinterpret_cast<T*>(x);
   }
 
+  template <typename T, typename U, int N>
+  void blockReduceSum(sycl::group<3> &grp, T &agg,
+		      const vector_type<quda::complex<U>, N> &in)
+  {
+    for(int i=0; i<in.size(); i++) {
+      auto t = in[i];
+      auto v = sycl::vec{t.real(),t.imag()};
+      auto r = sycl::ONEAPI::reduce(grp, v, sycl::ONEAPI::plus<>());
+      agg[i].real(r[0]);
+      agg[i].imag(r[1]);
+    }
+    //auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
+    //agg = fromGroupReduceType<T>(t);
+  }
+
+  template <typename T, typename U>
+  void blockReduceSum(T &agg, const U &in)
+  {
+    auto grp = getGroup();
+    blockReduceSum(grp, agg, in);
+  }
+
 
   template <typename T, typename U>
   void blockReduceMax(sycl::group<3> &grp, T &agg, const U &in)

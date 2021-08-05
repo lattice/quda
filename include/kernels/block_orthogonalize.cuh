@@ -127,7 +127,6 @@ namespace quda {
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
     {
-#if 0
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
       int chirality = block.y;
@@ -149,8 +148,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer;
-      BlockReduce<sum_t, block_size> norm_reducer;
+      //BlockReduce<dot_t, block_size> dot_reducer;
+      //BlockReduce<sum_t, block_size> norm_reducer;
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -188,7 +187,8 @@ namespace quda {
               for (int m = 0; m < mVec; m++) dot[m] += innerProduct(vi[tx], v[m][tx]);
             }
 
-            dot = dot_reducer.AllSum(dot);
+            //dot = dot_reducer.AllSum(dot);
+	    blockReduceSum(dot, dot);
 
             // subtract the blocks to orthogonalise
 #pragma unroll
@@ -210,9 +210,10 @@ namespace quda {
 #pragma unroll
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
-            
-            dot = dot_reducer.AllSum(dot);
-            
+
+            //dot = dot_reducer.AllSum(dot);
+            blockReduceSum(dot, dot);
+
             sum_t nrm = 0.0;
 #pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
@@ -222,7 +223,8 @@ namespace quda {
               nrm += norm2(v[m][tx]);
             }
 
-            nrm = norm_reducer.AllSum(nrm);
+            //nrm = norm_reducer.AllSum(nrm);
+            blockReduceSum(nrm, nrm);
             auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
 #pragma unroll
@@ -240,7 +242,6 @@ namespace quda {
           }
         } // j
       }   // n
-#endif
     }
   };
 

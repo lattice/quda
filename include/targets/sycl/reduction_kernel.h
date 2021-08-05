@@ -67,10 +67,11 @@ namespace quda {
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("launchReduction2D grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("Reduction2D grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
 #if 0
     //arg.debug();
@@ -121,7 +122,7 @@ namespace quda {
 	q.memcpy(result_h, result_d, sizeof(reduce_t));
       }
       q.wait_and_throw();
-      printfQuda("  end launchReduction2D result_h: %g\n", *(double *)result_h);
+      printfQuda("  end Reduction2D result_h: %g\n", *(double *)result_h);
     }
 #endif
     //warningQuda("end launchReduction2D");
@@ -185,7 +186,7 @@ namespace quda {
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       using reduce_t = typename Transformer<Arg>::reduce_t;
-      printfQuda("launchMultiReduction grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("MultiReduction grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
@@ -226,7 +227,7 @@ namespace quda {
     }
 #endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchMultiReduction\n");
+      printfQuda("  end MultiReduction\n");
     }
     return err;
   }

@@ -671,9 +671,9 @@ namespace quda
    */
   TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("begin tuneLaunch\n");
-    }
+    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    //  printfQuda("begin tuneLaunch\n");
+    //}
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
@@ -726,9 +726,9 @@ namespace quda
         trace_list.push_back(trace_entry);
       }
 
-      if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("used tune cache\nend tuneLaunch\n");
-      }
+      //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+      //printfQuda("used tune cache\nend tuneLaunch\n");
+      //}
       return param_tuned;
     }
 
@@ -748,9 +748,9 @@ namespace quda
                    tunable.paramString(param_default).c_str());
       }
 
-      if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("used default\nend tuneLaunch\n");
-      }
+      //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+      //printfQuda("used default\nend tuneLaunch\n");
+      //}
       return param_default;
     } else if (!tuning) {
 
@@ -780,17 +780,17 @@ namespace quda
         tune_timer.start(__func__, __FILE__, __LINE__);
 
         tunable.initTuneParam(param);
-        if (verbosity >= QUDA_DEBUG_VERBOSE) {
-          printfQuda("Starting tuning loop\n");
-        }
+        //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	//printfQuda("Starting tuning loop\n");
+        //}
         while (tuning) {
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("qudaDeviceSynchronize\n");
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //printfQuda("qudaDeviceSynchronize\n");
+	  //}
           qudaDeviceSynchronize();
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("tunable.checkLaunchParam\n");
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //printfQuda("tunable.checkLaunchParam\n");
+	  //}
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
@@ -800,23 +800,23 @@ namespace quda
 
           tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("timer.start\n");
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //printfQuda("timer.start\n");
+	  //}
           timer.start();
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("tunable.tuningIter\n");
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //printfQuda("tunable.tuningIter\n");
+	  //}
           for (int i = 0; i < tunable.tuningIter(); i++) {
-	    if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	      printfQuda("tunable.apply\n");
-	    }
+	    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	    //printfQuda("tunable.apply\n");
+	    //}
             tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
           timer.stop();
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    printfQuda("qudaDeviceSynchronize\n");
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //printfQuda("qudaDeviceSynchronize\n");
+	  //}
           qudaDeviceSynchronize();
           auto error = qudaGetLastError();
 
@@ -827,13 +827,13 @@ namespace quda
           }
 
           float elapsed_time = timer.last() / tunable.tuningIter();
-	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	    warningQuda("timer.last(): %g", timer.last());
-	    warningQuda("tunable.tuningIter(): %i", tunable.tuningIter());
-	    warningQuda("tune elapsed_time: %g", elapsed_time);
-	    warningQuda("error: %i", error);
-	    warningQuda("tunable.launchError(): %i", tunable.launchError());
-	  }
+	  //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	  //warningQuda("timer.last(): %g", timer.last());
+	  //warningQuda("tunable.tuningIter(): %i", tunable.tuningIter());
+	  //warningQuda("tune elapsed_time: %g", elapsed_time);
+	  //warningQuda("error: %i", error);
+	  //warningQuda("tunable.launchError(): %i", tunable.launchError());
+	  //}
           if ((elapsed_time < best_time) && (error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) {
             best_time = elapsed_time;
             best_param = param;
@@ -896,9 +896,9 @@ namespace quda
 
     param.n_calls = profile_count ? 1 : 0;
 
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("end tuneLaunch\n");
-    }
+    //if (verbosity >= QUDA_DEBUG_VERBOSE) {
+    //printfQuda("end tuneLaunch\n");
+    //}
     return param;
   }
 

@@ -34,31 +34,40 @@ namespace quda {
   qudaError_t
   Kernel1D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, 1, 1};
     sycl::range<3> localSize{tp.block.x, 1, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("launchKernel1D grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("Kernel1D grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class Kernel1D>
-	(ndRange,
-	 [=](sycl::nd_item<3> ndi) {
+    try {
+      q.submit([&](sycl::handler &h) {
+	h.parallel_for<class Kernel1D>
+	  (ndRange,
+	   [=](sycl::nd_item<3> ndi) {
 #ifdef QUDA_THREADS_BLOCKED
-	   quda::Kernel1DImplB<Functor, Arg, grid_stride>(arg, ndi);
+	     quda::Kernel1DImplB<Functor, Arg, grid_stride>(arg, ndi);
 #else
-	   quda::Kernel1DImpl<Functor, Arg, grid_stride>(arg, ndi);
+	     quda::Kernel1DImpl<Functor, Arg, grid_stride>(arg, ndi);
 #endif
-	 });
-    });
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchKernel1D\n");
+	   });
+      });
+    } catch (sycl::exception const& e) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
     }
-    return QUDA_SUCCESS;
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      printfQuda("  end Kernel1D\n");
+    }
+    return err;
   }
 
 
@@ -95,34 +104,43 @@ namespace quda {
   qudaError_t
   Kernel2D(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
   {
+    auto err = QUDA_SUCCESS;
     sycl::range<3> globalSize{tp.grid.x*tp.block.x, tp.grid.y*tp.block.y, 1};
     sycl::range<3> localSize{tp.block.x, tp.block.y, 1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("launchKernel2D grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("Kernel2D grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     //auto t0 = __rdtsc();
-    q.submit([&](sycl::handler &h) {
-      h.parallel_for<class Kernel2D>
-	(ndRange,
-	 [=](sycl::nd_item<3> ndi) {
+    try {
+      q.submit([&](sycl::handler &h) {
+	h.parallel_for<class Kernel2D>
+	  (ndRange,
+	   [=](sycl::nd_item<3> ndi) {
 #ifdef QUDA_THREADS_BLOCKED
-	   quda::Kernel2DImplB<Functor, Arg, grid_stride>(arg, ndi);
+	     quda::Kernel2DImplB<Functor, Arg, grid_stride>(arg, ndi);
 #else
-	   quda::Kernel2DImpl<Functor, Arg, grid_stride>(arg, ndi);
+	     quda::Kernel2DImpl<Functor, Arg, grid_stride>(arg, ndi);
 #endif
-	 });
-    });
+	   });
+      });
+    } catch (sycl::exception const& e) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+      }
+      err = QUDA_ERROR;
+    }
     //auto t1 = __rdtsc();
     //printf("%llu\n", t1-t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchKernel2D\n");
+      printfQuda("  end Kernel2D\n");
     }
-    return QUDA_SUCCESS;
+    return err;
   }
 #if 0
   template <typename F>
@@ -224,10 +242,11 @@ namespace quda {
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("launchKernel3D param grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("Kernel3D param grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     try {
       q.submit([&](sycl::handler& h) {
@@ -248,7 +267,7 @@ namespace quda {
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchKernel3D\n");
+      printfQuda("  end Kernel3D\n");
     }
     return err;
   }
@@ -266,10 +285,11 @@ namespace quda {
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("launchKernel3D const grid_stride: %s  sizeof(arg): %lu\n",
+      printfQuda("Kernel3D const grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     //warningQuda("allocating kernel args");
     //auto p = device_malloc(sizeof(arg));
@@ -306,7 +326,7 @@ namespace quda {
     //q.wait();
     //device_free(p);   //  FIXME: host task
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchKernel3D\n");
+      printfQuda("  end Kernel3D\n");
     }
     return err;
   }

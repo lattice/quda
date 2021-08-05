@@ -51,15 +51,15 @@ namespace quda
   static long total_host_bytes, max_total_host_bytes;
   static long total_pinned_bytes, max_total_pinned_bytes;
 
-  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+  size_t device_allocated_peak() { return max_total_bytes[DEVICE]; }
 
-  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+  size_t pinned_allocated_peak() { return max_total_bytes[PINNED]; }
 
-  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+  size_t mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
 
-  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+  size_t managed_allocated_peak() { return max_total_bytes[MANAGED]; }
 
-  long host_allocated_peak() { return max_total_bytes[HOST]; }
+  size_t host_allocated_peak() { return max_total_bytes[HOST]; }
 
   static void print_trace(void)
   {

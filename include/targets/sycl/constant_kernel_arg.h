@@ -10,4 +10,4 @@
    instantiation correctly.
  */
 
-/* constant memory not currently supported with SYCL */
+/* nothing needed here */
