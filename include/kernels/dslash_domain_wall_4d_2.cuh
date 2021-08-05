@@ -6,13 +6,6 @@
 namespace quda
 {
 
-  template <class Matrix, class Vector>
-  __device__ __host__ inline Vector stencil(const Matrix &u, const Vector &v, int d, int proj_dir, const Vector &w)
-  {
-    Vector out;
-    return out;
-  }
-
   template <class Vector>
   __device__ __host__ inline Vector shuffle_colorspinor(const Vector &src)
   {
@@ -26,6 +19,109 @@ namespace quda
 #endif
     return out;
   }
+
+  template <class Matrix, class Float, int Nc>
+    __device__ __host__ inline ColorSpinor<Float, Nc, 2> stencil(const Matrix &u, const ColorSpinor<Float, Nc, 2> &vv, int dim, int sign, const ColorSpinor<Float, Nc, 2> &ww, int half_spinor_index)
+    {
+      ColorSpinor<Float, Nc, 2> out;
+      using Coloror = ColorSpinor<Float, Nc, 1>;
+      Coloror v;
+      Coloror w;
+      switch (dim) {
+        case 0: // x dimension
+          v = vv.get_coloror(0);
+          w = shuffle_colorspinor(ww.get_coloror(1));
+          switch (sign) {
+            case 1: // positive projector
+              {
+                Coloror x = half_spinor_index ? v - i_(w) : v + i_(w);
+                x = u * x;
+                Coloror y = shuffle_colorspinor(half_spinor_index ? i_(x) : -i_(x));
+                out = combine_half_spinors(x, y);
+              }
+              break;
+            case -1: // negative projector
+              {
+                Coloror x = half_spinor_index ? v + i_(w) : v - i_(w);
+                x = u * x;
+                Coloror y = shuffle_colorspinor(half_spinor_index ? -i_(x) : i_(x));
+                out = combine_half_spinors(x, y);
+              }
+              break;
+          }
+          break;
+        case 1: // y dimension
+          v = vv.get_coloror(0);
+          w = shuffle_colorspinor(ww.get_coloror(1));
+          switch (sign) {
+            case 1: // positive projector
+              {
+                Coloror x = half_spinor_index ? v - w : v + w;
+                x = u * x;
+                Coloror y = shuffle_colorspinor(half_spinor_index ? -x : x);
+                out = combine_half_spinors(x, y);
+              }
+              break;
+            case -1: // negative projector
+              {
+                Coloror x = half_spinor_index ? v + w : v - w;
+                x = u * x;
+                Coloror y = shuffle_colorspinor(half_spinor_index ? x : -x);
+                out = combine_half_spinors(x, y);
+              }
+              break;
+          }
+          break;
+        case 2: // z dimension
+          v = half_spinor_index ? vv.get_coloror(1) : vv.get_coloror(0);
+          w = shuffle_colorspinor(half_spinor_index ? ww.get_coloror(0) : ww.get_coloror(1));
+          switch (sign) {
+            case 1: // positive projector
+              {
+                Coloror x = v + i_(w);
+                x = u * x;
+                Coloror y = shuffle_colorspinor(-i_(x));
+                out = half_spinor_index ? combine_half_spinors(y, x) : combine_half_spinors(x, y);
+              }
+              break;
+            case -1: // negative projector
+              {
+                Coloror x = v - i_(w);
+                x = u * x;
+                Coloror y = shuffle_colorspinor(i_(x));
+                out = half_spinor_index ? combine_half_spinors(y, x) : combine_half_spinors(x, y);
+              }
+              break;
+          }
+          break;
+        case 3: // t dimension
+          v = vv.get_coloror(0);
+          w = shuffle_colorspinor(ww.get_coloror(1));
+          switch (sign) {
+            case 1: // positive projector
+              {
+                Coloror x = half_spinor_index ? static_cast<Float>(2) * w : static_cast<Float>(2) * v;
+                x = u * x;
+                Coloror y = shuffle_colorspinor(x);
+                ColorSpinor<Float, Nc, 2> zero;
+                out = half_spinor_index ? zero : combine_half_spinors(x, y);
+              }
+              break;
+            case -1: // negative projector
+              {
+                Coloror x = half_spinor_index ? static_cast<Float>(2) * v : static_cast<Float>(2) * w;
+                x = u * x;
+                Coloror y = shuffle_colorspinor(x);
+                ColorSpinor<Float, Nc, 2> zero;
+                out = half_spinor_index ? combine_half_spinors(x, y) : zero;
+              }
+              break;
+          }
+          break;
+      }
+
+      return out;
+    }
 
   template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg>
   __device__ __host__ inline auto applyWilson2(const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active, int half_spinor_index)
@@ -58,20 +154,17 @@ namespace quda
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
           // Load half spinor
-          // Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
           HalfVector in = arg.in.template operator()<2>(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity, half_spinor_index); // 0 or 1
+
+          out += stencil(U, in, d, proj_dir, in, half_spinor_index);
 #if 0
 #ifdef __CUDA_ARCH__
-          if (d > 0) { __syncwarp(); }
+          if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+            for (int i = 0; i < HalfVector::size; i++) {
+              printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+            }
+          }
 #endif
-          cache.save(in);
-#ifdef __CUDA_ARCH__
-          __syncwarp();
-#endif
-          out += U * in.project(d, proj_dir, cache, 1 - half_spinor_index * 2);
-#else
-          HalfVector other_v = shuffle_colorspinor(in);
-          out += U * in.project(d, proj_dir, other_v, 1 - half_spinor_index * 2);
 #endif
         }
       }
@@ -90,19 +183,15 @@ namespace quda
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
           HalfVector in = arg.in.template operator()<2>(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity, half_spinor_index);
 
+          out += stencil(conj(U), in, d, proj_dir, in, half_spinor_index);
 #if 0
 #ifdef __CUDA_ARCH__
-          __syncwarp();
+          if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+            for (int i = 0; i < HalfVector::size; i++) {
+              printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+            }
+          }
 #endif
-          cache.save(in);
-
-#ifdef __CUDA_ARCH__
-          __syncwarp();
-#endif
-          out += conj(U) * in.project(d, proj_dir, cache, 1 - half_spinor_index * 2);
-#else
-          HalfVector other_v = shuffle_colorspinor(in);
-          out += conj(U) * in.project(d, proj_dir, other_v, 1 - half_spinor_index * 2);
 #endif
         }
       }
@@ -138,18 +227,7 @@ namespace quda
 
       HalfVector stencil_out = applyWilson2<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, half_spinor_index);
 
-#if 0
-      SharedMemoryCache<HalfVector> cache(target::block_dim());
-#ifdef __CUDA_ARCH__ 
-      __syncwarp();
-#endif
-      cache.save(stencil_out);
-#ifdef __CUDA_ARCH__ 
-      __syncwarp();
-#endif
-#else
       HalfVector other_v = shuffle_colorspinor(stencil_out);
-#endif
 
       int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
 #if 0
@@ -162,12 +240,7 @@ namespace quda
       }
 #endif 
       if (half_spinor_index == 0) {
-#if 0
-        auto tid = target::thread_idx();
-        Vector out = combine_half_spinors(stencil_out, cache.load(tid.x + 1, tid.y, tid.z));
-#else
         Vector out = combine_half_spinors(stencil_out, other_v);
-#endif
         if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
       }
     }

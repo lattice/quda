@@ -730,6 +730,17 @@ namespace quda {
         for (int i = 0; i < size; i++) { data[i] = -data[i]; }
       }
 
+    __device__ __host__ inline ColorSpinor<Float, Nc, 1> get_coloror(int spin) const
+    {
+      ColorSpinor<Float, Nc, 1> out;
+      const auto &t = *this;
+#pragma unroll
+      for (int i = 0; i < Nc; i++) {
+        out(0, i) = t(spin, i);
+      }
+      return out;
+    }
+
     /**
         Return this spinor spin projected, by loading the other half from `cache`
         @param dim Which dimension projector are we using
@@ -1035,6 +1046,17 @@ namespace quda {
       out(1, i) = a(1, i);
       out(2, i) = b(0, i);
       out(3, i) = b(1, i);
+    }
+    return out;
+  }
+
+  template <class Float, int Nc>
+  __device__ __host__ inline ColorSpinor<Float, Nc, 2> combine_half_spinors(const ColorSpinor<Float, Nc, 1> &a, const ColorSpinor<Float, Nc, 1> &b) {
+    ColorSpinor<Float, Nc, 2> out;
+#pragma unroll
+    for (int i = 0; i < Nc; i++) {
+      out(0, i) = a(0, i);
+      out(1, i) = b(0, i);
     }
     return out;
   }
@@ -1443,4 +1465,16 @@ namespace quda {
     return y;
   }
 
+  template <class Float, int Nc, int Ns>
+    __device__ __host__ inline ColorSpinor<Float, Nc, Ns> i_(const ColorSpinor<Float, Nc, Ns> &a) {
+      ColorSpinor<Float, Nc, Ns> out;
+#pragma unroll
+      for (int s = 0; s < Ns; s++) {
+#pragma unroll
+        for (int i = 0; i < Nc; i++) {
+          out(s, i) = i_(a(s, i));
+        }
+      }
+      return out;
+  }
 } // namespace quda
