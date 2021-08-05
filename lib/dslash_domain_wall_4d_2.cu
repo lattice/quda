@@ -28,14 +28,6 @@ namespace quda
       TunableKernel3D::resizeVector(in.X(4), arg.nParity);
     }
 
-#if 0
-    virtual unsigned int sharedBytesPerThread() const
-    {
-      using real = typename mapper<typename Arg::Float>::type;
-      return (Arg::nColor * 2 * 2) * sizeof(real);
-    }
-#endif
-
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -47,8 +39,8 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4D2Apply {
 
     inline DomainWall4D2Apply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-                             double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity,
-                             bool dagger, const int *comm_override, TimeProfile &profile)
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity,
+                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger,
@@ -65,14 +57,15 @@ namespace quda
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
 #ifdef GPU_DOMAIN_WALL_DIRAC
   void ApplyDomainWall4D2(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
+                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                          const int *comm_override, TimeProfile &profile)
   {
     instantiate<DomainWall4D2Apply>(out, in, U, a, m_5, b_5, c_5, x, parity, dagger, comm_override, profile);
   }
 #else
   void ApplyDomainWall4D2(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
-                         const Complex *, const Complex *, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+                          const Complex *, const Complex *, const ColorSpinorField &, int, bool, const int *,
+                          TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");
   }
