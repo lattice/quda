@@ -25,7 +25,18 @@ namespace quda
   public:
     DomainWall4D2(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      // TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      TunableKernel3D::resizeVector(1, arg.nParity);
+    }
+
+    virtual int blockStep() const override { return 32; }
+    virtual int blockMin() const override { return 32; }
+
+    virtual unsigned int sharedBytesPerThread() const
+    {
+      using real = typename mapper<typename Arg::Float>::type;
+      using Link = Matrix<complex<real>, Arg::nColor>;
+      return sizeof(Link) * 8 / 2;
     }
 
     void apply(const qudaStream_t &stream)

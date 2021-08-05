@@ -116,9 +116,9 @@ namespace quda
     return out;
   }
 
-  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg>
+  template <int nParity, bool dagger, KernelType kernel_type, bool load_cache, typename Coord, typename Arg, typename Cache>
   __device__ __host__ inline auto applyWilson2(const Arg &arg, Coord &coord, int parity, int idx, int thread_dim,
-                                               bool &active, int half_spinor_index)
+                                               bool &active, int half_spinor_index, Cache &cache)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -129,8 +129,6 @@ namespace quda
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
     HalfVector out;
-
-    SharedMemoryCache<HalfVector> cache(target::block_dim());
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
@@ -146,21 +144,28 @@ namespace quda
           // Do something
         } else if (doBulk<kernel_type>() && !ghost) {
 
-          Link U = arg.U(d, gauge_idx, gauge_parity);
-          // Load half spinor
-          HalfVector in = arg.in.template operator()<2>(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity,
-                                                        half_spinor_index); // 0 or 1
+          if (load_cache) {
+            Link U = arg.U(d, gauge_idx, gauge_parity);
+            auto tid = target::thread_idx();
+            if (half_spinor_index == 0) { cache.save(U, tid.x / 2, d * 2 + 0, tid.z); }
+          } else {
+            auto tid = target::thread_idx();
+            Link U = cache.load(tid.x / 2, d * 2 + 0, tid.z);
+            // Load half spinor
+            HalfVector in = arg.in.template operator()<2>(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity,
+                half_spinor_index); // 0 or 1
 
-          out += stencil(U, in, d, proj_dir, in, half_spinor_index);
+            out += stencil(U, in, d, proj_dir, in, half_spinor_index);
 #if 0
 #ifdef __CUDA_ARCH__
-          if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-            for (int i = 0; i < HalfVector::size; i++) {
-              printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+            if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+              for (int i = 0; i < HalfVector::size; i++) {
+                printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+              }
             }
+#endif
+#endif
           }
-#endif
-#endif
         }
       }
 
@@ -175,20 +180,28 @@ namespace quda
           // we need to compute the face index if we are updating a face that isn't ours
         } else if (doBulk<kernel_type>() && !ghost) {
 
-          Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          HalfVector in = arg.in.template operator()<2>(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity,
-                                                        half_spinor_index);
+          if (load_cache) {
+            Link cU = arg.U(d, gauge_idx, 1 - gauge_parity);
+            Link U = conj(cU);
+            auto tid = target::thread_idx();
+            if (half_spinor_index == 0) { cache.save(U, tid.x / 2, d * 2 + 1, tid.z); }
+          } else {
+            auto tid = target::thread_idx();
+            Link U = cache.load(tid.x / 2, d * 2 + 1, tid.z);
+            HalfVector in = arg.in.template operator()<2>(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity,
+                half_spinor_index);
 
-          out += stencil(conj(U), in, d, proj_dir, in, half_spinor_index);
+            out += stencil(U, in, d, proj_dir, in, half_spinor_index);
 #if 0
 #ifdef __CUDA_ARCH__
-          if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-            for (int i = 0; i < HalfVector::size; i++) {
-              printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+            if (blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+              for (int i = 0; i < HalfVector::size; i++) {
+                printf("%d: %d: %+10.6e %+10.6e\n", d, i, out.data[i].real(), out.data[i].imag());
+              }
             }
+#endif
+#endif
           }
-#endif
-#endif
         }
       }
 
@@ -221,22 +234,33 @@ namespace quda
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-      HalfVector stencil_out
-        = applyWilson2<nParity, dagger, mykernel_type>(arg, coord, parity, idx, thread_dim, active, half_spinor_index);
+      using Link = Matrix<complex<real>, Arg::nColor>;
+      auto bdm = target::block_dim();
+      SharedMemoryCache<Link> cache({bdm.x / 2, 8, bdm.z});
 
-      HalfVector other_v = shuffle_colorspinor(stencil_out);
-
-      int xs = coord.x_cb + s * arg.dc.volume_4d_cb;
-#if 0
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(xs, my_spinor_parity);
-        out = x + arg.a_5[s] * out;
-      } else if (mykernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(xs, my_spinor_parity);
-        out = x + (xpay ? arg.a_5[s] * out : out);
-      }
+      // Load gauge field
+      applyWilson2<nParity, dagger, mykernel_type, true>(arg, coord, parity, idx, thread_dim, active, half_spinor_index, cache);
+#ifdef __CUDA_ARCH__
+      __syncwarp();
 #endif
-      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out.template operator()<2>(xs, my_spinor_parity, half_spinor_index) = stencil_out;
+
+      for (int ss = 0; ss < arg.Ls; ss++) {
+        coord.s = ss;
+        HalfVector stencil_out
+          = applyWilson2<nParity, dagger, mykernel_type, false>(arg, coord, parity, idx, thread_dim, active, half_spinor_index, cache);
+
+        int xs = coord.x_cb + ss * arg.dc.volume_4d_cb;
+#if 0
+        if (xpay && mykernel_type == INTERIOR_KERNEL) {
+          Vector x = arg.x(xs, my_spinor_parity);
+          out = x + arg.a_5[s] * out;
+        } else if (mykernel_type != INTERIOR_KERNEL && active) {
+          Vector x = arg.out(xs, my_spinor_parity);
+          out = x + (xpay ? arg.a_5[s] * out : out);
+        }
+#endif
+        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out.template operator()<2>(xs, my_spinor_parity, half_spinor_index) = stencil_out;
+      }
     }
   };
 

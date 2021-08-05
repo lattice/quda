@@ -43,8 +43,8 @@ namespace quda
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
-    //using atom_t = sizeof(T) % 16 == 0 ? int4 : sizeof(T) % 8 == 0 ? int2 : int;
-    using atom_t = int;
+    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
+    // using atom_t = int;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
@@ -107,6 +107,7 @@ namespace quda
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
       for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
+      // for (int i = 0; i < n_element; i++) cache<dynamic>()[(i * stride / 32 + j / 32) * 32 + j % 32] = tmp[i];
     }
 
     __device__ __host__ inline T load_detail(int x, int y, int z)
@@ -115,6 +116,7 @@ namespace quda
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
       for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
+      // for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[(i * stride / 32 + j / 32) * 32 + j % 32];
       T a;
       memcpy((void*)&a, tmp, sizeof(T));
       return a;
@@ -154,9 +156,13 @@ namespace quda
        Implicitly store at coordinates given by thread_idx().
        @param[in] a The value to store in the shared memory cache
      */
-    __device__ __host__ inline void save(const T &a)
+    __device__ __host__ inline void save(const T &a, int x = -1, int y = -1, int z = -1)
     {
-      save_detail(a, target::thread_idx().x, target::thread_idx().y, target::thread_idx().z);
+      auto tid = target::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      y = (y == -1) ? tid.y : y;
+      z = (z == -1) ? tid.z : z;
+      save_detail(a, x, y, z);
     }
 
     /**
