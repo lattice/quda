@@ -60,7 +60,7 @@ namespace quda {
          @brief Assignment operator with ColorSpinor instance as input
          @param[in] C ColorSpinor we want to store in this accessor
       */
-      template <typename C> __device__ __host__ inline void operator=(const C &a) const { field.save(a.data, x_cb, parity); }
+      template <typename C> __device__ __host__ inline void operator=(const C &a) const { field.template save<Ns>(a.data, x_cb, parity, half_spinor_index); }
     };
 
   template <typename T, int Nc, int Ns>
@@ -979,7 +979,7 @@ namespace quda {
       }
 
   template <int nTheirSpin>
-  __device__ __host__ inline void load(complex out[length / (Ns / nTheirSpin)], int x, int parity, int half_spinor_index) const
+  __device__ __host__ inline void load(complex out[length / (2 * Ns / nTheirSpin)], int x, int parity, int half_spinor_index) const
   {
     static_assert(Ns % nTheirSpin == 0, "Ns %% nTheirSpin == 0");
     constexpr int spin_block = Ns / nTheirSpin;
@@ -1000,39 +1000,50 @@ namespace quda {
     for (int i = 0; i < length / 2 / spin_block; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void save(const complex in[length / (2 * Ns / nTheirSpin)], int x, int parity = 0, int half_spinor_index = 0) const
   {
-    real v[length];
+    static_assert(Ns % nTheirSpin == 0, "Ns %% nTheirSpin == 0");
+    constexpr int spin_block = Ns / nTheirSpin;
+    static_assert(M % spin_block == 0, "M %% spin_block == 0");
+    real v[length / spin_block];
 
 #pragma unroll
-    for (int i = 0; i < length / 2; i++) {
+    for (int i = 0; i < length / (2 * spin_block); i++) {
       v[2 * i + 0] = in[i].real();
       v[2 * i + 1] = in[i].imag();
     }
 
     if (isFixed<Float>::value) {
-      norm_type max_[length / 2];
+      norm_type max_[length / (2 * spin_block)];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
-      for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
+      for (int i = 0; i < length / (2 * spin_block); i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / (2 * spin_block)]));
       norm_type scale = 0.0;
 #pragma unroll
-      for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-      norm[x+parity*norm_offset] = scale;
+      for (int i = 0; i < length / (2 * spin_block); i++) scale = fmaxf(max_[i], scale);
+      if (spin_block > 1) {
+#ifdef __CUDA_ARCH__
+        scale = fmaxf(scale, __shfl_xor_sync(0xffffffff, scale, 1));
+#endif
+        if (half_spinor_index == 0) { norm[x + parity * norm_offset] = scale; }
+      } else {
+        norm[x+parity*norm_offset] = scale;
+      }
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
-      for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
+      for (int i = 0; i < length / spin_block; i++) v[i] = v[i] * scale_inv;
     }
 
 #pragma unroll
-    for (int i=0; i<M; i++) {
+    for (int i = 0; i < M / spin_block; i++) {
       Vector vecTmp;
       // first do scalar copy converting into storage type
 #pragma unroll
       for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
       // second do vectorized copy into memory
-      vector_store(field, parity * offset + x + stride * i, vecTmp);
+      vector_store(field, parity * offset + x + stride * (i + half_spinor_index * M / spin_block), vecTmp);
     }
   }
 
@@ -1190,7 +1201,8 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     auto out = &field[(parity * volumeCB + x) * length];
     complex v_[length/2];
@@ -1272,7 +1284,8 @@ namespace quda {
     block_load<complex, length/2>(v, reinterpret_cast<const complex*>(in));
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     auto out = &field[(parity * volumeCB + x) * length];
     block_store<complex, length/2>(reinterpret_cast<complex*>(out), v);
@@ -1373,7 +1386,8 @@ namespace quda {
     block_load<complex, length/2>(v, reinterpret_cast<const complex *>(in));
   }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0, int half_spinor_index = 0) const
   {
     int y = getPaddedIndex(x, parity);
     auto out = &field[(parity * exVolumeCB + y) * length];
@@ -1444,7 +1458,8 @@ namespace quda {
     }
   }
 
-  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0) const
+  template <int nTheirSpin>
+  __device__ __host__ inline void save(const complex v[Ns * Nc], int x, int parity = 0, int half_spinor_index = 0) const
   {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {

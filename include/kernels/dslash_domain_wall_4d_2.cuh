@@ -236,10 +236,7 @@ namespace quda
         out = x + (xpay ? arg.a_5[s] * out : out);
       }
 #endif
-      if (half_spinor_index == 0) {
-        Vector out = combine_half_spinors(stencil_out, other_v);
-        if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
-      }
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out.template operator()<2>(xs, my_spinor_parity, half_spinor_index) = stencil_out;
     }
   };
 
