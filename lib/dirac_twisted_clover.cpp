@@ -10,6 +10,7 @@ namespace quda {
     DiracWilson(param, nDim),
     mu(param.mu),
     epsilon(param.epsilon),
+    tm_rho(param.tm_rho),
     clover(param.clover)
   {
   }
@@ -17,6 +18,7 @@ namespace quda {
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) :
     DiracWilson(dirac),
     mu(dirac.mu),
+    tm_rho(dirac.tm_rho),
     epsilon(dirac.epsilon),
     clover(dirac.clover)
   {
@@ -77,8 +79,10 @@ namespace quda {
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      // k * D * in + (A + i*2*mu*kappa*gamma_5) *x
-      ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
+      // k * D * in + (A + i*2*(mu+tm_rho)*kappa*gamma_5) *x
+      // tm_rho is a Hasenbusch mass preconditioning parameter applied just like a twisted mass
+      // but *not* the inverse of M_ee or M_oo
+      ApplyTwistedClover(out, in, *gauge, *clover, k, 2 * (mu + tm_rho) * kappa, x, parity, dagger, commDim, profile);
       // wilson + chiral twist + clover
       flops += (1320ll + 48ll + 504ll) * in.Volume();
 
@@ -211,8 +215,8 @@ namespace quda {
       deleteTmp(&tmp2, reset);
     } else {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET){
-        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
-                                         commDim, profile);
+        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in,
+                                         parity, dagger, commDim, profile);
         flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
@@ -241,8 +245,8 @@ namespace quda {
       deleteTmp(&tmp2, reset);
     } else {
       if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger,
-                                         commDim, profile);
+        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity,
+                                         dagger, commDim, profile);
         flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
