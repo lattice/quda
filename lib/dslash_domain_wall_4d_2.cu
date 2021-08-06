@@ -25,7 +25,7 @@ namespace quda
   public:
     DomainWall4D2(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      TunableKernel3D::resizeVector(in.X(4) / 4, arg.nParity);
     }
 
     void apply(const qudaStream_t &stream)
