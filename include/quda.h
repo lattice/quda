@@ -128,6 +128,7 @@ extern "C" {
     double mq3;
 
     double mu;    /**< Twisted mass parameter */
+    double tm_rho; /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */

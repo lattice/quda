@@ -46,6 +46,8 @@ namespace quda {
     cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
+    double tm_rho; // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+                   // applied like a twisted mass and ignored in the inverse)
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
 
@@ -72,6 +74,7 @@ namespace quda {
       gauge(0),
       clover(0),
       mu(0.0),
+      tm_rho(0.0),
       mu_factor(0.0),
       epsilon(0.0),
       tmp1(0),
@@ -99,6 +102,7 @@ namespace quda {
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
+      printfQuda("tm_rho = %g\n", tm_rho);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
@@ -1038,6 +1042,7 @@ public:
 
   protected:
     double mu;
+    double tm_rho;
     double epsilon;
     cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
