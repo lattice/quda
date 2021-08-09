@@ -19,14 +19,14 @@
 namespace quda
 {
 
-  template <typename Arg> class Laplace : public Dslash<laplace, Arg>
+  template <typename Arg> class StaggeredQSmear : public Dslash<laplace, Arg>
   {
     using Dslash = Dslash<laplace, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
   public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    StaggeredQSmear(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const qudaStream_t &stream)
     {
@@ -146,14 +146,14 @@ namespace quda
     }
   };
 
-  template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
+  template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
 #if (defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)) && defined(GPU_LAPLACE)
-    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
+    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
                         double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
 #else
-    inline LaplaceApply(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &, int,
+    inline StaggeredQSmearApply(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &, int,
                         double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
 #endif
     {
@@ -161,27 +161,27 @@ namespace quda
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
-        Laplace<decltype(arg)> laplace(arg, out, in);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        StaggeredQSmear<decltype(arg)> laplace(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(laplace)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
-        errorQuda("nSpin=%d Laplace operator required staggered dslash and laplace to be enabled", in.Nspin());
+        errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash and laplace to be enabled", in.Nspin());
 #endif
       } else if (in.Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
         constexpr int nDim = 4;
         constexpr int nSpin = 4;
-        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);//arg!
-        Laplace<decltype(arg)> laplace(arg, out, in);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);//arg!
+        StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(laplace)> policy(
+        dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
           laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
-        errorQuda("nSpin=%d Laplace operator required wilson dslash and laplace to be enabled", in.Nspin());
+        errorQuda("nSpin=%d StaggeredQSmear operator required wilson dslash and laplace to be enabled", in.Nspin());
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
@@ -189,12 +189,12 @@ namespace quda
     }
   };
 
-  // Apply the Laplace operator
+  // Apply the StaggeredQSmear operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
+    instantiate<StaggeredQSmearApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda
