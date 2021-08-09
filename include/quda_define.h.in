@@ -6,8 +6,8 @@
 
 /**
  * @def   __COMPUTE_CAPABILITY__
- * @brief This macro sets the target GPU architecture.  Unlike
- * __CUDA_ARCH__, this is defined on host and device.
+ * @brief This macro sets the target GPU architecture, which is
+ * defined on both host and device.
  */
 #define __COMPUTE_CAPABILITY__ @COMP_CAP@
 
@@ -18,15 +18,15 @@
  */
 #define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
 
-#cmakedefine QUDA_TEX
-#ifdef QUDA_TEX
+#cmakedefine QUDA_HETEROGENEOUS_ATOMIC
+#ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
- * @def   USE_TEXTURE_OBJECTS
- * @brief This macro sets whether we are compiling QUDA with texture
+ * @def   HETEROGENEOUS_ATOMIC
+ * @brief This macro sets whether we are compiling QUDA with heterogeneous atomic
  * support enabled or not
  */
-#define USE_TEXTURE_OBJECTS
-#undef QUDA_TEX
+#define HETEROGENEOUS_ATOMIC
+#undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
 #cmakedefine QUDA_DYNAMIC_CLOVER
@@ -38,4 +38,29 @@
  */
 #define DYNAMIC_CLOVER
 #undef QUDA_DYNAMIC_CLOVER
+#endif
+
+#cmakedefine QUDA_FLOAT8
+#ifdef QUDA_FLOAT8
+/**
+ * @def FLOAT8
+ * @brief This macro set whether float8-ordered fields are enabled or
+ * not
+ */
+#define FLOAT8
+#undef QUDA_FLOAT8
+#endif
+
+/**
+ * If we are building for a QUDA Device this will be set by CMAKE
+ */
+#cmakedefine QUDA_TARGET_CUDA
+#cmakedefine QUDA_TARGET_HIP
+
+#if defined(QUDA_TARGET_CUDA) && defined(QUDA_TARGET_HIP)
+#error "Cannot define both QUDA_TARGET_CUDA and QUDA_TARGET_HIP at the same time"
+#endif
+
+#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
+#error "No QUDA_TARGET selected"
 #endif

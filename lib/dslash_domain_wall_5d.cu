@@ -22,10 +22,10 @@ namespace quda
   public:
     DomainWall5D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
-      TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
+      TunableKernel3D::resizeVector(in.X(4), arg.nParity);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -37,6 +37,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         int Ls = in.X(4);
         long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -50,11 +51,11 @@ namespace quda
 
     long long bytes() const
     {
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
       default: break;
       }
@@ -74,37 +75,23 @@ namespace quda
       dslash::DslashPolicyTune<decltype(dwf)> policy(
         dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-      policy.apply(0);
-
-      checkCudaError();
     }
   };
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
+#ifdef GPU_DOMAIN_WALL_DIRAC
   void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_DOMAIN_WALL_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, x, U);
-
-    // check all locations match
-    checkLocation(out, in, x, U);
-
-    // with 5-d checkerboarding we must use kernel packing
-    pushKernelPackT(true);
-
     instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-
-    popKernelPackT();
-#else
-    errorQuda("Domain-wall dslash has not been built");
-#endif // GPU_DOMAIN_WALL_DIRAC
   }
+#else
+  void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,
+                         const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Domain-wall dslash has not been built");
+  }
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 } // namespace quda

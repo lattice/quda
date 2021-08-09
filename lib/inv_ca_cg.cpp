@@ -1,6 +1,6 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 /**
    @file inv_ca_cg.cpp
@@ -12,11 +12,23 @@
 
 namespace quda {
 
-  CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      lambda_init(false), basis(param.ca_basis),
-      Q_AQandg(nullptr), Q_AS(nullptr), alpha(nullptr), beta(nullptr), rp(nullptr),
-      tmpp(nullptr), tmpp2(nullptr), tmp_sloppy(nullptr), tmp_sloppy2(nullptr) { }
+  CACG::CACG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    init(false),
+    lambda_init(false),
+    basis(param.ca_basis),
+    Q_AQandg(nullptr),
+    Q_AS(nullptr),
+    alpha(nullptr),
+    beta(nullptr),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmpp2(nullptr),
+    tmp_sloppy(nullptr),
+    tmp_sloppy2(nullptr)
+  {
+  }
 
   CACG::~CACG() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -48,19 +60,22 @@ namespace quda {
       if (rp) delete rp;
     }
 
-    if (deflate_init) {
-      for (auto veci : param.evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CACGNE::CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CACG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
-    xp(nullptr), yp(nullptr), init(false) {
+  CACGNE::CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CACG(mmdag, mmdagSloppy, mmdagPrecon, mmdagEig, param, profile),
+    mmdag(mat.Expose()),
+    mmdagSloppy(matSloppy.Expose()),
+    mmdagPrecon(matPrecon.Expose()),
+    mmdagEig(matEig.Expose()),
+    xp(nullptr),
+    yp(nullptr),
+    init(false)
+  {
   }
 
   CACGNE::~CACGNE() {
@@ -140,9 +155,16 @@ namespace quda {
 
   }
 
-  CACGNR::CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CACG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
-    bp(nullptr), init(false) {
+  CACGNR::CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    CACG(mdagm, mdagmSloppy, mdagmPrecon, mdagmEig, param, profile),
+    mdagm(mat.Expose()),
+    mdagmSloppy(matSloppy.Expose()),
+    mdagmPrecon(matPrecon.Expose()),
+    mdagmEig(matEig.Expose()),
+    bp(nullptr),
+    init(false)
+  {
   }
 
   CACGNR::~CACGNR() {
@@ -261,10 +283,6 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
 
-      // Once the CACG operator is called, we are able to construct an appropriate
-      // Krylov space for deflation
-      if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
-
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
       tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -279,7 +297,6 @@ namespace quda {
   template <int N>
   void compute_alpha_N(Complex* Q_AQandg, Complex* alpha)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, N, N, RowMajor> matrix;
     typedef Matrix<Complex, N, 1> vector;
 
@@ -309,6 +326,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_alpha_N<1>(Q_AQandg, alpha); break;
       case 2: compute_alpha_N<2>(Q_AQandg, alpha); break;
       case 3: compute_alpha_N<3>(Q_AQandg, alpha); break;
@@ -321,27 +339,25 @@ namespace quda {
       case 10: compute_alpha_N<10>(Q_AQandg, alpha); break;
       case 11: compute_alpha_N<11>(Q_AQandg, alpha); break;
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
-      default: // failsafe
-        using namespace Eigen;
-        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
-        typedef Matrix<Complex, Dynamic, 1> vector;
+#endif
+    default: // failsafe
+      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<Complex, Dynamic, 1> vector;
 
-        const int N = Q.size();
-        matrix matQ_AQ(N,N);
-        vector vecg(N);
-        for (int i=0; i<N; i++) {
-          vecg(i) = Q_AQandg[i*(N+1)+N];
-          for (int j=0; j<N; j++) {
-            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-          }
-        }
-        Map<vector> vecalpha(alpha,N);
+      const int N = Q.size();
+      matrix matQ_AQ(N, N);
+      vector vecg(N);
+      for (int i = 0; i < N; i++) {
+        vecg(i) = Q_AQandg[i * (N + 1) + N];
+        for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
+      }
+      Map<vector> vecalpha(alpha, N);
 
-        vecalpha = matQ_AQ.fullPivLu().solve(vecg);
+      vecalpha = matQ_AQ.fullPivLu().solve(vecg);
 
-        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-        //psi = svd.solve(phi);
-        break;
+      // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+      // psi = svd.solve(phi);
+      break;
     }
 
     if (!param.is_preconditioner) {
@@ -355,7 +371,6 @@ namespace quda {
   template <int N>
   void compute_beta_N(Complex* Q_AQandg, Complex* Q_AS, Complex* beta)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, N, N, RowMajor> matrix;
 
     matrix matQ_AQ(N,N);
@@ -383,6 +398,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_beta_N<1>(Q_AQandg, Q_AS, beta); break;
       case 2: compute_beta_N<2>(Q_AQandg, Q_AS, beta); break;
       case 3: compute_beta_N<3>(Q_AQandg, Q_AS, beta); break;
@@ -395,24 +411,22 @@ namespace quda {
       case 10: compute_beta_N<10>(Q_AQandg, Q_AS, beta); break;
       case 11: compute_beta_N<11>(Q_AQandg, Q_AS, beta); break;
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
-      default: // failsafe
-        using namespace Eigen;
-        typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+#endif
+    default: // failsafe
+      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
 
-        const int N = Q.size();
-        matrix matQ_AQ(N,N);
-        for (int i=0; i<N; i++) {
-          for (int j=0; j<N; j++) {
-            matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
-          }
-        }
-        Map<matrix> matQ_AS(Q_AS,N,N), matbeta(beta,N,N);
+      const int N = Q.size();
+      matrix matQ_AQ(N, N);
+      for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
+      }
+      Map<matrix> matQ_AS(Q_AS, N, N), matbeta(beta, N, N);
 
-        matQ_AQ = -matQ_AQ;
-        matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
+      matQ_AQ = -matQ_AQ;
+      matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
 
-        //JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
-        //psi = svd.solve(phi);
+      // JacobiSVD<matrix> svd(A, ComputeThinU | ComputeThinV);
+      // psi = svd.solve(phi);
     }
 
     if (!param.is_preconditioner) {
@@ -449,12 +463,12 @@ namespace quda {
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    const int nKrylov = param.Nkrylov;
+    const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
-    if (param.maxiter == 0 || nKrylov == 0) {
+    if (param.maxiter == 0 || n_krylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
@@ -470,9 +484,25 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
+
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space.
+      constructDeflationSpace(b, matEig);
+      if (deflate_compute) {
+        // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        (*eig_solve)(evecs, evals);
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matEig, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -490,22 +520,17 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `x` as a temp.
-      blas::copy(*defl_tmp2[0], r_);
-      rhs.push_back(defl_tmp2[0]);
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate and add solution to accumulator
+      eig_solve->deflate(x, r_, evecs, evals, true);
 
-      // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
-
-      // Compute r_defl = RHS - A * LHS
-      mat(r_, *defl_tmp1[0], tmp, tmp2);
-      r2 = blas::xmyNorm(*rhs[0], r_);
-
-      // defl_tmp1 must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);
+      mat(r_, x, tmp, tmp2);
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r_);
+      } else {
+        blas::xpay(b, -1.0, r_);
+        r2 = b2; // dummy setting
+      }
     }
 
     // Use power iterations to approx lambda_max
@@ -582,6 +607,7 @@ namespace quda {
     double delta = param.delta; // delta for reliable updates.
     double rNorm = sqrt(r2); // The current residual norm.
     double maxrr = rNorm; // The maximum residual norm since the last reliable update.
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
     double m_map = 2./(lambda_max-lambda_min);
@@ -592,16 +618,14 @@ namespace quda {
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
-      // build up a space of size nKrylov
+      // build up a space of size n_krylov
       if (basis == QUDA_POWER_BASIS) {
-        for (int k=0; k<nKrylov; k++) {
-          matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
-        }
+        for (int k = 0; k < n_krylov; k++) { matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2); }
       } else { // chebyshev basis
 
         matSloppy(*AS[0], *S[0], tmpSloppy, tmpSloppy2);
 
-        if (nKrylov > 1) {
+        if (n_krylov > 1) {
           // S_1 = m AS_0 + b S_0
           Complex facs1[] = { m_map, b_map };
           std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
@@ -611,10 +635,10 @@ namespace quda {
           matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
 
           // Enter recursion relation
-          if (nKrylov > 2) {
+          if (n_krylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
             Complex factors[] = { 2.*m_map, 2.*b_map, -1 };
-            for (int k = 2; k < nKrylov; k++) {
+            for (int k = 2; k < n_krylov; k++) {
               std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
               std::vector<ColorSpinorField*> Sk{S[k]};
               blas::zero(*S[k]);
@@ -623,14 +647,13 @@ namespace quda {
             }
           }
         }
-
       }
 
       // first iteration, copy S and AS into Q and AQ
       if (total_iter == 0) {
         // first iteration Q = S
-        for (int i=0; i<nKrylov; i++) *Q[i] = *S[i];
-        for (int i=0; i<nKrylov; i++) *AQ[i] = *AS[i];
+        for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
+        for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
 
       } else {
 
@@ -639,7 +662,7 @@ namespace quda {
         // 1. compute matrix Q_AS = -Q^\dagger AS
         // 2. Solve Q_AQ beta = Q_AS
         std::vector<ColorSpinorField*> R;
-        for (int i=0; i < nKrylov; i++) R.push_back(S[i]);
+        for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
         blas::cDotProduct(Q_AS, AQ, R);
         for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
 
@@ -647,10 +670,10 @@ namespace quda {
 
         // update direction vectors
         blas::caxpyz(beta, Q, R, Qtmp);
-        for (int i=0; i<nKrylov; i++) std::swap(Q[i],Qtmp[i]);
+        for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
         blas::caxpyz(beta, AQ, AS, Qtmp);
-        for (int i=0; i<nKrylov; i++) std::swap(AQ[i],Qtmp[i]);
+        for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
       }
 
       // compute the alpha coefficients
@@ -658,7 +681,7 @@ namespace quda {
       // 2. Solve Q_AQ alpha = g
       {
         std::vector<ColorSpinorField*> Q2;
-        for (int i=0; i<nKrylov; i++) Q2.push_back(AQ[i]);
+        for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
         Q2.push_back(S[0]);
         blas::cDotProduct(Q_AQandg, Q, Q2);
 
@@ -693,16 +716,27 @@ namespace quda {
         PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
       }
 
-      total_iter+=nKrylov;
+      total_iter += n_krylov;
 
-
-      // update since nKrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every nKrylov steps
+      // update since n_krylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every n_krylov steps
       // Note: this won't reliable update when the norm _increases_.
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and add solution to accumulator
+          eig_solve->deflate(x, r_, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r_, x, tmp, tmp2);
+          r2 = blas::xmyNorm(b, r_);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         blas::copy(*S[0], r_);
 
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r_).z);
@@ -750,7 +784,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;
@@ -759,6 +793,8 @@ namespace quda {
       blas::flops = 0;
       mat.flops();
       matSloppy.flops();
+      matPrecon.flops();
+      matEig.flops();
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }

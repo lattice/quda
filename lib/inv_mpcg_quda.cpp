@@ -87,14 +87,10 @@ namespace quda {
       return;
     }
 
-
-
-
-  MPCG::MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat)
-  {
-
-  }
+    MPCG::MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+      Solver(mat, mat, mat, mat, param, profile)
+    {
+    }
 
   MPCG::~MPCG() {
 
@@ -200,7 +196,7 @@ namespace quda {
   }
 #endif // SSTEP
 
-  void MPCG::operator()(ColorSpinorField &x, ColorSpinorField &b) 
+  void MPCG::operator()(ColorSpinorField &, ColorSpinorField &) 
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");

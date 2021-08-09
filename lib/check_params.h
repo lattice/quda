@@ -76,11 +76,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(reconstruct_refinement_sloppy, QUDA_RECONSTRUCT_INVALID);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
   P(reconstruct_precondition, QUDA_RECONSTRUCT_INVALID);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
+  P(reconstruct_eigensolver, QUDA_RECONSTRUCT_INVALID);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec;
   if (param->reconstruct_sloppy == QUDA_RECONSTRUCT_INVALID)
     param->reconstruct_sloppy = param->reconstruct;
+  if (param->reconstruct_eigensolver == QUDA_RECONSTRUCT_INVALID)
+    param->reconstruct_eigensolver = param->reconstruct_sloppy;
   if (param->cuda_prec_refinement_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->reconstruct_refinement_sloppy == QUDA_RECONSTRUCT_INVALID)
@@ -125,6 +130,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(make_resident_mom, INVALID_INT);
   P(return_result_gauge, INVALID_INT);
   P(return_result_mom, INVALID_INT);
+  P(gauge_offset, (size_t)INVALID_INT);
+  P(mom_offset, (size_t)INVALID_INT);
+  P(site_size, (size_t)INVALID_INT);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -145,56 +160,92 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(use_poly_acc, QUDA_BOOLEAN_NO);
+  P(use_eigen_qr, QUDA_BOOLEAN_FALSE);
+  P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
   P(a_max, 0.0);
-  P(use_dagger, QUDA_BOOLEAN_NO);
-  P(use_norm_op, QUDA_BOOLEAN_NO);
-  P(compute_svd, QUDA_BOOLEAN_NO);
-  P(require_convergence, QUDA_BOOLEAN_YES);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
+  P(preserve_deflation_space, 0);
+  P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_dagger, QUDA_BOOLEAN_FALSE);
+  P(use_norm_op, QUDA_BOOLEAN_FALSE);
+  P(compute_svd, QUDA_BOOLEAN_FALSE);
+  P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
-  P(nEv, 0);
-  P(nKr, 0);
-  P(nConv, 0);
+  P(n_ev, 0);
+  P(n_kr, 0);
+  P(n_conv, 0);
+  P(n_ev_deflate, -1);
+  P(batched_rotate, 0);
   P(tol, 0.0);
+  P(qr_tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
-  P(arpack_check, QUDA_BOOLEAN_NO);
+  P(arpack_check, QUDA_BOOLEAN_FALSE);
   P(nk, 0);
   P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
+  P(use_eigen_qr, QUDA_BOOLEAN_INVALID);
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
   P(a_max, INVALID_DOUBLE);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
+  P(preserve_evals, QUDA_BOOLEAN_INVALID);
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
-  P(nEv, INVALID_INT);
-  P(nKr, INVALID_INT);
-  P(nConv, INVALID_INT);
+  P(n_ev, INVALID_INT);
+  P(n_kr, INVALID_INT);
+  P(n_conv, INVALID_INT);
+  P(n_ev_deflate, INVALID_INT);
+  P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
+  P(qr_tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
-  P(check_interval, INVALID_INT);
-  P(max_restarts, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
 
+  // only need to enfore block size checking if doing a block eigen solve
+#ifdef CHECK__PARAM
+  if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
+#endif
+    P(block_size, INVALID_INT);
+
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
 #else
   P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
+#if defined INIT_PARAM
+  P(save_prec, QUDA_DOUBLE_PRECISION);
+#else
+  P(save_prec, QUDA_INVALID_PRECISION);
+#endif
+
+#if defined INIT_PARAM
+  P(io_parity_inflate, QUDA_BOOLEAN_FALSE);
+#else
+  P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -232,6 +283,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(clover_cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->clover_cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_sloppy = param->clover_cuda_prec;
@@ -239,10 +291,12 @@ void printQudaCloverParam(QudaInvertParam *param)
     param->clover_cuda_prec_refinement_sloppy = param->clover_cuda_prec_sloppy;
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
+  if (param->clover_cuda_prec_eigensolver == QUDA_INVALID_PRECISION)
+    param->clover_cuda_prec_eigensolver = param->clover_cuda_prec_sloppy;
 #endif
 
 #ifdef INIT_PARAM
-    P(compute_clover_trlog, 0);
+    P(compute_clover_trlog, 1);
     P(compute_clover, 0);
     P(compute_clover_inverse, 0);
     P(return_clover, 0);
@@ -359,6 +413,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  for (int d = 0; d < 4; d++) { P(split_grid[d], 1); } /**< Grid of sub-partitions */
+  P(num_src_per_sub_partition, 1);                     /**< Number of sources per sub-partitions */
+#else
+  for (int d = 0; d < 4; d++) { P(split_grid[d], INVALID_INT); } /**< Grid of sub-partitions */
+  P(num_src_per_sub_partition, INVALID_INT);                     /**< Number of sources per sub-partitions */
+#endif
+
+#ifdef INIT_PARAM
   P(compute_action, 0);
   P(compute_true_res, 1);
 #else
@@ -401,6 +463,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+  P(cuda_prec_eigensolver, QUDA_INVALID_PRECISION);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
@@ -408,6 +471,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
+  if (param->cuda_prec_eigensolver == QUDA_INVALID_PRECISION) param->cuda_prec_eigensolver = param->cuda_prec_sloppy;
 #endif
 
   // leave the default behaviour to cpu pointers
@@ -465,7 +529,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-  P(schwarz_type, QUDA_ADDITIVE_SCHWARZ); // defaults match previous interface behaviour
+  P(schwarz_type, QUDA_INVALID_SCHWARZ);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
@@ -473,9 +537,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
-    P(schwarz_type, QUDA_INVALID_SCHWARZ);
     P(precondition_cycle, 0);
   }
+#endif
+
+#if defined(INIT_PARAM)
+  P(eig_param, 0);
 #endif
 
 #ifdef INIT_PARAM
@@ -525,7 +592,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
 #if defined INIT_PARAM
   P(cuda_prec_ritz, QUDA_SINGLE_PRECISION);
-  P(nev, 8);
+  P(n_ev, 8);
   P(max_search_dim, 64);
   P(rhs_idx, 0);
   P(deflation_grid, 1);
@@ -537,7 +604,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(eigenval_tol, 1e-1);
 #else
   P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
-  P(nev, INVALID_INT);
+  P(n_ev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
   P(deflation_grid, INVALID_INT);
@@ -584,6 +651,19 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(extlib_type, QUDA_EXTLIB_INVALID);
 #endif
 
+#if defined INIT_PARAM
+  P(native_blas_lapack, QUDA_BOOLEAN_TRUE);
+#else
+  P(native_blas_lapack, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -623,13 +703,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+  P(pre_orthonormalize, QUDA_BOOLEAN_FALSE);
 #else
   P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
-  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+  P(post_orthonormalize, QUDA_BOOLEAN_TRUE);
 #else
   P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
@@ -651,7 +731,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
-    P(use_eig_solver[i], QUDA_BOOLEAN_NO);
+    P(use_eig_solver[i], QUDA_BOOLEAN_FALSE);
 #else
     P(use_eig_solver[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -679,8 +759,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 #ifdef INIT_PARAM
     P(n_block_ortho[i], 1);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_TRUE);
 #else
     P(n_block_ortho[i], INVALID_INT);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_INVALID);
 #endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
@@ -734,6 +816,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+    P(transfer_type[i], QUDA_TRANSFER_AGGREGATE);
+#else
+    P(transfer_type[i], QUDA_TRANSFER_INVALID);
+#endif
+
+#ifdef INIT_PARAM
     P(mu_factor[i], 1);
 #else
     P(mu_factor[i], INVALID_DOUBLE);
@@ -741,7 +829,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
-    P(global_reduction[i], QUDA_BOOLEAN_YES);
+    P(global_reduction[i], QUDA_BOOLEAN_TRUE);
 #else
     P(global_reduction[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -757,7 +845,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   }
 
 #ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
 #else
   P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
 #endif
@@ -768,7 +856,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #ifdef CHECK_PARAM
   // if only doing top-level null-space generation, check that n_vec
   // is equal on all levels
-  if (param->generate_all_levels == QUDA_BOOLEAN_NO && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+  if (param->generate_all_levels == QUDA_BOOLEAN_FALSE && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
     for (int i=1; i<n_level-1; i++)
       if (param->n_vec[0] != param->n_vec[i])
 	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
@@ -777,22 +865,26 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
-  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
-  P(coarse_guess, QUDA_BOOLEAN_NO);
+  P(run_low_mode_check, QUDA_BOOLEAN_FALSE);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_FALSE);
+  P(coarse_guess, QUDA_BOOLEAN_FALSE);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
 #else
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
 #endif
 
   for (int i = 0; i < n_level - 1; i++) {
 #ifdef INIT_PARAM
+    P(vec_load[i], QUDA_BOOLEAN_FALSE);
+    P(vec_store[i], QUDA_BOOLEAN_FALSE);
+#else
     P(vec_load[i], QUDA_BOOLEAN_INVALID);
     P(vec_store[i], QUDA_BOOLEAN_INVALID);
-#else
-    P(vec_load[i], QUDA_BOOLEAN_NO);
-    P(vec_store[i], QUDA_BOOLEAN_NO);
 #endif
   }
 
@@ -805,11 +897,133 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  return ret;
+#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+  P(use_mma, QUDA_BOOLEAN_TRUE);
+#else
+  P(use_mma, QUDA_BOOLEAN_FALSE);
+#endif
+#else
+  P(use_mma, QUDA_BOOLEAN_INVALID);
 #endif
 
+#ifdef INIT_PARAM
+  P(thin_update_only, QUDA_BOOLEAN_FALSE);
+#else
+  P(thin_update_only, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
 }
 
+#if defined INIT_PARAM
+QudaGaugeObservableParam newQudaGaugeObservableParam(void)
+{
+  QudaGaugeObservableParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeObservableParam(QudaGaugeObservableParam *param)
+{
+#else
+void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
+{
+  printfQuda("QUDA Gauge-Observable Parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(su_project, QUDA_BOOLEAN_FALSE);
+  P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
+  P(qcharge_density, nullptr);
+#else
+  P(su_project, QUDA_BOOLEAN_INVALID);
+  P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+#if defined INIT_PARAM
+QudaBLASParam newQudaBLASParam(void)
+{
+  QudaBLASParam ret;
+#elif defined CHECK_PARAM
+static void checkBLASParam(QudaBLASParam *param)
+{
+#else
+void printQudaBLASParam(QudaBLASParam *param)
+{
+  printfQuda("QUDA blas parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(trans_a, QUDA_BLAS_OP_N);
+  P(trans_b, QUDA_BLAS_OP_N);
+  P(m, INVALID_INT);
+  P(n, INVALID_INT);
+  P(k, INVALID_INT);
+  P(lda, INVALID_INT);
+  P(ldb, INVALID_INT);
+  P(ldc, INVALID_INT);
+  P(a_offset, 0);
+  P(b_offset, 0);
+  P(c_offset, 0);
+  P(a_stride, 1);
+  P(b_stride, 1);
+  P(c_stride, 1);
+  P(batch_count, 1);
+  P(data_type, QUDA_BLAS_DATATYPE_S);
+  P(data_order, QUDA_BLAS_DATAORDER_ROW);
+#else
+  P(trans_a, QUDA_BLAS_OP_INVALID);
+  P(trans_b, QUDA_BLAS_OP_INVALID);
+  P(m, INVALID_INT);
+  P(n, INVALID_INT);
+  P(k, INVALID_INT);
+  P(lda, INVALID_INT);
+  P(ldb, INVALID_INT);
+  P(ldc, INVALID_INT);
+  P(a_offset, INVALID_INT);
+  P(b_offset, INVALID_INT);
+  P(c_offset, INVALID_INT);
+  P(a_stride, INVALID_INT);
+  P(b_stride, INVALID_INT);
+  P(c_stride, INVALID_INT);
+  P(batch_count, INVALID_INT);
+  P(data_type, QUDA_BLAS_DATATYPE_INVALID);
+  P(data_order, QUDA_BLAS_DATAORDER_INVALID);
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 
 // clean up
 

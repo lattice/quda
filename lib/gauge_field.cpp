@@ -1,6 +1,7 @@
-#include <gauge_field.h>
 #include <typeinfo>
+#include <gauge_field.h>
 #include <blas_quda.h>
+#include <timer.h>
 
 namespace quda {
 
@@ -51,6 +52,7 @@ namespace quda {
     site_offset(param.site_offset),
     site_size(param.site_size)
   {
+    if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
@@ -73,6 +75,10 @@ namespace quda {
     } else if (geometry == QUDA_COARSE_GEOMETRY) {
       real_length = 2*nDim*volume*nInternal;
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
+    }
+
+    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SU3_LINKS) {
+      errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
     }
 
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
@@ -104,8 +110,11 @@ namespace quda {
   void GaugeField::setTuningString() {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
-    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride,
-                         precision, geometry, nColor);
+    int check = (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) ?
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d",
+               volume, stride, precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d",
+               volume, stride, precision, geometry, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
@@ -126,11 +135,13 @@ namespace quda {
       if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
       else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
 
-      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry_comms*nInternal;
-      ghostOffset[i][1] = (bidir ? ghostOffset[i][0] + ghostFace[i]*geometry_comms*nInternal : ghostOffset[i][0]);
-
       ghost_face_bytes[i] = ghostFace[i] * geometry_comms * nInternal * ghost_precision;
-      ghost_bytes += (bidir ? 2 : 1 ) * ghost_face_bytes[i]; // factor of two from direction
+      ghost_face_bytes_aligned[i] = ghost_face_bytes[i];
+
+      ghost_offset[i][0] = (i == 0) ? 0 : ghost_offset[i - 1][1] + ghost_face_bytes_aligned[i - 1];
+      ghost_offset[i][1] = (bidir ? ghost_offset[i][0] + ghost_face_bytes_aligned[i] : ghost_offset[i][0]);
+
+      ghost_bytes += (bidir ? 2 : 1) * ghost_face_bytes_aligned[i]; // factor of two from direction
     }
 
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
@@ -164,24 +175,6 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
-  bool GaugeField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      }
-    }
-    return false;
-  }
-
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
     MsgHandle *mh_recv[4];
@@ -212,9 +205,9 @@ namespace quda {
 	if (comm_dim_partitioned(i)) {
 	  send[i] = pool_pinned_malloc(bytes[i]);
 	  receive[i] = pool_pinned_malloc(bytes[i]);
-	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
+	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToHost);
 	} else {
-	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
+	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToDevice);
 	}
       }
     }
@@ -248,7 +241,7 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
-	qudaMemcpy(ghost_link[i], receive[i], bytes[i], cudaMemcpyHostToDevice);
+	qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
 	pool_pinned_free(send[i]);
 	pool_pinned_free(receive[i]);
       }
@@ -315,13 +308,12 @@ namespace quda {
     spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
+    spinor_param.pc_type = QUDA_4D_PC;
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
-    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ?
-      QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    spinor_param.setPrecision(a.Precision(), a.Precision(), true);
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();
@@ -368,6 +360,56 @@ namespace quda {
     }
 
     return field;
+  }
+
+  // helper for creating extended gauge fields
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile, bool redundant_comms,
+                                      QudaReconstructType recon)
+  {
+    profile.TPSTART(QUDA_PROFILE_INIT);
+    GaugeFieldParam gParamEx(in);
+    gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    gParamEx.pad = 0;
+    gParamEx.nFace = 1;
+    gParamEx.tadpole = in.Tadpole();
+    gParamEx.anisotropy = in.Anisotropy();
+    for (int d = 0; d < 4; d++) {
+      gParamEx.x[d] += 2 * R[d];
+      gParamEx.r[d] = R[d];
+    }
+    if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
+
+    auto *out = new cudaGaugeField(gParamEx);
+
+    // copy input field into the extended device gauge field
+    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+
+    // now fill up the halos
+    out->exchangeExtendedGhost(R, profile, redundant_comms);
+
+    return out;
+  }
+
+  // helper for creating extended (cpu) gauge fields
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
+  {
+    GaugeFieldParam gauge_field_param(gauge_param, gauge);
+    cpuGaugeField cpu(gauge_field_param);
+
+    gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+    gauge_field_param.create = QUDA_ZERO_FIELD_CREATE;
+    for (int d = 0; d < 4; d++) {
+      gauge_field_param.x[d] += 2 * R[d];
+      gauge_field_param.r[d] = R[d];
+    }
+    cpuGaugeField *padded_cpu = new cpuGaugeField(gauge_field_param);
+
+    copyExtendedGauge(*padded_cpu, cpu, QUDA_CPU_FIELD_LOCATION);
+    padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true
+
+    return padded_cpu;
   }
 
 } // namespace quda

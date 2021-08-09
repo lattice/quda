@@ -19,8 +19,6 @@
 namespace quda
 {
 
-#ifdef GPU_COVDEV
-
   template <typename Arg> class CovDev : public Dslash<covDev, Arg>
   {
     using Dslash = Dslash<covDev, Arg>;
@@ -30,7 +28,7 @@ namespace quda
   public:
     CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -64,6 +62,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = num_mv_multiply * mv_flops * sites; // SU(3) matrix-vector multiplies
@@ -83,8 +82,8 @@ namespace quda
     long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() +
+        (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int ghost_bytes = gauge_bytes + 3 * spinor_bytes; // 3 since we have to load the partial
       int dim = arg.mu % 4;
       long long bytes_ = 0;
@@ -103,6 +102,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (gauge_bytes + 2 * spinor_bytes) * sites;
@@ -146,38 +146,24 @@ namespace quda
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
-
-      checkCudaError();
+      policy.apply(device::get_default_stream());
     }
   };
-
-#endif
 
   // Apply the covariant derivative operator
   // out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   // out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
+#ifdef GPU_COVDEV
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_COVDEV
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
-    pushKernelPackT(true); // non-spin projection requires kernel packing
-
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-
-    popKernelPackT();
-#else
-    errorQuda("Covariant derivative kernels have not been built");
-#endif
   }
+#else
+  void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,
+                   bool, const int *, TimeProfile &)
+  {
+    errorQuda("Covariant derivative kernels have not been built");
+  }
+#endif
 } // namespace quda

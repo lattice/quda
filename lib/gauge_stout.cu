@@ -1,299 +1,97 @@
-#include <quda_internal.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-
-#define  DOUBLE_TOL	1e-15
-#define  SINGLE_TOL	2e-6
-
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
+#include <instantiate.h>
 #include <kernels/gauge_stout.cuh>
 
 namespace quda {
 
-#ifdef GPU_GAUGE_TOOLS
-
-  template <typename Float, typename Arg> class GaugeSTOUT : TunableVectorYZ
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeSTOUT : TunableKernel3D
   {
-    Arg &arg;
-    const GaugeField &meta;
+    GaugeField &out;
+    const GaugeField &in;
+    const bool improved;
+    const Float rho;
+    const Float epsilon;
+    const int stoutDim;
+    unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
-private:
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
-
-public:
+  public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 3), arg(arg), meta(meta)
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon = 0.0) :
+      TunableKernel3D(in, 2, improved ? 4 : 3),
+      out(out),
+      in(in),
+      improved(improved),
+      rho(static_cast<Float>(rho)),
+      epsilon(static_cast<Float>(epsilon)),
+      stoutDim(improved ? 4 : 3)
     {
-#ifdef JITIFY
-      create_jitify_program("kernels/gauge_stout.cuh");
-#endif
+      if (improved) strcat(aux, ",improved");
+      strcat(aux, comm_dim_partitioned_string());
+      apply(device::get_default_stream());
     }
-    virtual ~GaugeSTOUT() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::computeSTOUTStep")
-                           .instantiate(Type<Float>(), Type<Arg>())
-                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                           .launch(arg);
-#else
-        computeSTOUTStep<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#endif
-      } else {
-        errorQuda("CPU not supported yet\n");
-        // computeSTOUTStepCPU(arg);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if (!improved) {
+        launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho));
+      } else if (improved) {
+        launch<OvrImpSTOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, epsilon));
       }
     }
 
-    TuneKey tuneKey() const
+    void preTune() { if (out.Gauge_p() == in.Gauge_p()) out.backup(); }
+    void postTune() { if (out.Gauge_p() == in.Gauge_p()) out.restore(); }
+
+    long long flops() const // just counts matrix multiplication
     {
-      std::stringstream aux;
-      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
+      return (2 + (stoutDim - 1) * (improved ? 28 : 4)) * mat_flops * stoutDim * in.LocalVolume();
     }
 
-    void preTune() { arg.dest.save(); } // defensive measure in case they alias
-    void postTune() { arg.dest.load(); }
-
-    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3 * ((1 + 2 * 6) * arg.origin.Bytes() + arg.dest.Bytes()) * arg.threads; }
-  }; // GaugeSTOUT
-
-  template<typename Float,typename GaugeOr, typename GaugeDs>
-  void STOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho) {
-    GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
-    GaugeSTOUT<Float, GaugeSTOUTArg<Float, GaugeOr, GaugeDs>> gaugeSTOUT(arg, dataOr);
-    gaugeSTOUT.apply(0);
-    qudaDeviceSynchronize();
-  }
-
-  template<typename Float>
-  void STOUTStep(GaugeField &dataDs, const GaugeField& dataOr, Float rho) {
-
-    if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GDs;
-
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-    } else {
-      errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-    }
-
-  }
-
-#endif
-
-  void STOUTStep(GaugeField &dataDs, const GaugeField& dataOr, double rho) {
+    long long bytes() const // 6 links per dim, 1 in, 1 out.
+    {
+      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in.Reconstruct() * in.Precision() +
+              out.Reconstruct() * out.Precision()) * stoutDim * in.LocalVolume();    }
+  };
 
 #ifdef GPU_GAUGE_TOOLS
-
-    if(dataOr.Precision() != dataDs.Precision()) {
-      errorQuda("Origin and destination fields must have the same precision\n");
-    }
-
-    if(dataDs.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
-
-    if (!dataOr.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataOr.Order(), dataOr.Reconstruct());
-
-    if (!dataDs.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataDs.Order(), dataDs.Reconstruct());
-
-    if (dataDs.Precision() == QUDA_SINGLE_PRECISION){
-      STOUTStep<float>(dataDs, dataOr, (float) rho);
-    } else if(dataDs.Precision() == QUDA_DOUBLE_PRECISION) {
-      STOUTStep<double>(dataDs, dataOr, rho);
-    } else {
-      errorQuda("Precision %d not supported", dataDs.Precision());
-    }
-    return;
-#else
-    errorQuda("Gauge tools are not built");
-#endif
-  }
-
-  template <typename Float, typename Arg> class GaugeOvrImpSTOUT : TunableVectorYZ
+  void STOUTStep(GaugeField &out, GaugeField &in, double rho)
   {
-    Arg &arg;
-    const GaugeField &meta;
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
+    checkNative(out, in);
 
-private:
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
-
-public:
-    // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeOvrImpSTOUT(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 3), arg(arg), meta(meta) {}
-    virtual ~GaugeOvrImpSTOUT() {}
-
-    void apply(const cudaStream_t &stream)
-    {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::computeOvrImpSTOUTStep")
-                           .instantiate(Type<Float>(), Type<Arg>())
-                           .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                           .launch(arg);
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
+    instantiate<GaugeSTOUT>(out, in, false, rho);
+    out.exchangeExtendedGhost(out.R(), false);
+  }
 #else
-        computeOvrImpSTOUTStep<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+  void STOUTStep(GaugeField &, GaugeField &, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
 #endif
-      } else {
-        errorQuda("CPU not supported yet\n");
-        // computeOvrImpSTOUTStepCPU(arg);
-      }
-    }
-
-    TuneKey tuneKey() const
-    {
-      std::stringstream aux;
-      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
-    }
-
-    void preTune() { arg.dest.save(); } // defensive measure in case they alias
-    void postTune() { arg.dest.load(); }
-
-    long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 4*((1+2*12)*arg.origin.Bytes()+arg.dest.Bytes())*arg.threads; }
-  }; // GaugeOvrImpSTOUT
-
-  template<typename Float,typename GaugeOr, typename GaugeDs>
-  void OvrImpSTOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho, Float epsilon) {
-    GaugeOvrImpSTOUTArg<Float, GaugeOr, GaugeDs> arg(
-        origin, dest, dataOr, rho, epsilon, dataOr.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL);
-    GaugeOvrImpSTOUT<Float, GaugeOvrImpSTOUTArg<Float, GaugeOr, GaugeDs>> gaugeOvrImpSTOUT(arg, dataOr);
-    gaugeOvrImpSTOUT.apply(0);
-    qudaDeviceSynchronize();
-  }
-
-  template<typename Float>
-  void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField& dataOr, Float rho, Float epsilon) {
-
-    if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GDs;
-
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	OvrImpSTOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, epsilon);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-    } else {
-      errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-    }
-
-  }
-
-
-  void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField& dataOr, double rho, double epsilon) {
 
 #ifdef GPU_GAUGE_TOOLS
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
+  {
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
+    checkNative(out, in);
 
-    if(dataOr.Precision() != dataDs.Precision()) {
-      errorQuda("Origin and destination fields must have the same precision\n");
-    }
-
-    if(dataDs.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
-
-    if (!dataOr.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataOr.Order(), dataOr.Reconstruct());
-
-    if (!dataDs.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataDs.Order(), dataDs.Reconstruct());
-
-    if (dataDs.Precision() == QUDA_SINGLE_PRECISION){
-      OvrImpSTOUTStep<float>(dataDs, dataOr, (float) rho, epsilon);
-    } else if(dataDs.Precision() == QUDA_DOUBLE_PRECISION) {
-      OvrImpSTOUTStep<double>(dataDs, dataOr, rho, epsilon);
-    } else {
-      errorQuda("Precision %d not supported", dataDs.Precision());
-    }
-    return;
-#else
-    errorQuda("Gauge tools are not built");
-#endif
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
+    instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
+    out.exchangeExtendedGhost(out.R(), false);
   }
+#else
+  void OvrImpSTOUTStep(GaugeField &, GaugeField &, double, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

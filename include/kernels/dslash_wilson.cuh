@@ -31,20 +31,26 @@ namespace quda
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
+    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const F x;    /** input vector when doing xpay */
     const G U;    /** the gauge field */
-    const real a; /** xpay scale facotor - can be -kappa or -kappa^2 */
+    const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
-      U(U),
+      in_pack(in),
       x(x),
+      U(U),
       a(a)
     {
-      if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkPrecision(out, in, x, U); // check all precisions match
+      checkLocation(out, in, x, U);  // check all locations match
+      if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };
@@ -54,16 +60,14 @@ namespace quda
 
      @param[out] out The out result field
      @param[in,out] arg Parameter struct
-     @param[in] coord Site coordinate
-     @param[in] x_cb The checker-boarded site index (at present this is a 4-d index only)
+     @param[in] coord Site coordinate struct
      @param[in] s The fifth-dimension index
      @param[in] parity Site parity
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilson(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int s, int parity,
-                                              int idx, int thread_dim, bool &active)
+  template <int nParity, bool dagger, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyWilson(Vector &out, const Arg &arg, Coord &coord, int parity, int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
@@ -71,13 +75,13 @@ namespace quda
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
-    const int gauge_parity = (Arg::nDim == 5 ? (x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
+    const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
-        const int fwd_idx = getNeighborIndexCB<Arg::nDim>(coord, d, +1, arg.dc);
-        const int gauge_idx = (Arg::nDim == 5 ? x_cb % arg.dc.volume_4d_cb : x_cb);
+        const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
+        const int gauge_idx = (Arg::nDim == 5 ? coord.x_cb % arg.dc.volume_4d_cb : coord.x_cb);
         constexpr int proj_dir = dagger ? +1 : -1;
 
         const bool ghost
@@ -86,25 +90,23 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
-            idx;
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           out += (U * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          Vector in = arg.in(fwd_idx + s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in = arg.in(fwd_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
       }
 
       { // Backward gather - compute back offset for spinor and gauge fetch
-        const int back_idx = getNeighborIndexCB<Arg::nDim>(coord, d, -1, arg.dc);
+        const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
         const int gauge_idx = (Arg::nDim == 5 ? back_idx % arg.dc.volume_4d_cb : back_idx);
         constexpr int proj_dir = dagger ? -1 : +1;
 
@@ -113,19 +115,17 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
-            idx;
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           const int gauge_ghost_idx = (Arg::nDim == 5 ? ghost_idx % arg.dc.ghostFaceCB[d] : ghost_idx);
           Link U = arg.U.Ghost(d, gauge_ghost_idx, 1 - gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
-          if (d == 3) in *= arg.t_proj_scale;
+          HalfVector in = arg.in.Ghost(d, 0, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
 
           out += (conj(U) * in).reconstruct(d, proj_dir);
         } else if (doBulk<kernel_type>() && !ghost) {
 
           Link U = arg.U(d, gauge_idx, 1 - gauge_parity);
-          Vector in = arg.in(back_idx + s * arg.dc.volume_4d_cb, their_spinor_parity);
+          Vector in = arg.in(back_idx + coord.s * arg.dc.volume_4d_cb, their_spinor_parity);
 
           out += (conj(U) * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
@@ -135,36 +135,38 @@ namespace quda
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct wilson : dslash_default {
 
-    Arg &arg;
-    constexpr wilson(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr wilson(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    template <KernelType mykernel_type = kernel_type>
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
       bool active
-        = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
+        = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, mykernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      int xs = x_cb + s * arg.dc.volume_4d_cb;
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
+      int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
+      if (xpay && mykernel_type == INTERIOR_KERNEL) {
+
         Vector x = arg.x(xs, my_spinor_parity);
         out = x + arg.a * out;
-      } else if (kernel_type != INTERIOR_KERNEL && active) {
+      } else if (mykernel_type != INTERIOR_KERNEL && active) {
         Vector x = arg.out(xs, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
+      if (mykernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
   };
 

@@ -13,9 +13,10 @@
 namespace quda {
 
   using namespace blas;
-  
-  SD::SD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param,profile), mat(mat), init(false)
+
+  SD::SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, mat, mat, mat, param, profile),
+    init(false)
   {
 
   }

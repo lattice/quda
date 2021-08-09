@@ -2,19 +2,13 @@
 
 namespace quda {
   
-  void copyGenericColorSpinorMGHS(ColorSpinorField &dst, const ColorSpinorField &src, 
-				  QudaFieldLocation location, void *Dst, void *Src, 
-				  void *dstNorm, void *srcNorm) {
-
+  void copyGenericColorSpinorMGHS(const copy_pack_t &pack)
+  {
 #if defined(GPU_MULTIGRID)
-    short *dst_ptr = static_cast<short*>(Dst);
-    float *src_ptr = static_cast<float*>(Src);
-
-    INSTANTIATE_COLOR;
+    instantiateColor<short, float>(std::get<0>(pack), pack);
 #else
-    errorQuda("Double precision multigrid has not been enabled");
+    errorQuda("Multigrid has not been enabled (precision = %d %d)", std::get<0>(pack).Precision(), std::get<1>(pack).Precision());
 #endif
-
   }
 
 } // namespace quda

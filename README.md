@@ -1,4 +1,4 @@
-# QUDA 0.9.0                        
+# QUDA 1.0.0
 
 ## Overview
 
@@ -14,33 +14,42 @@ fermion actions:
 * Staggered fermions
 * Improved staggered (asqtad or HISQ) 
 * Domain wall (4-d or 5-d preconditioned)
-* Mobius fermion
+* Möbius fermion
 
 Implementations of CG, multi-shift CG, BiCGStab, BiCGStab(l), and
 DD-preconditioned GCR are provided, including robust mixed-precision
-variants supporting combinations of double, single, and half (16-bit
-"block floating point") precision.  The library also includes
-auxilliary routines necessary for Hybrid Monte Carlo, such as HISQ
-link fattening, force terms and clover- field construction.  Use of
-many GPUs in parallel is supported throughout, with communication
-handled by QMP or MPI.  Support for eigen-vector deflation solvers is
-also included (https://github.com/lattice/quda/wiki/Deflated-Solvers).
+variants supporting combinations of double, single, half and quarter
+precisions (where the latter two are 16-bit and 8-bit "block floating
+point", respectively).  The library also includes auxiliary routines
+necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
+terms and clover- field construction.  Use of many GPUs in parallel is
+supported throughout, with communication handled by QMP or MPI.
 
-We note that while this release of QUDA includes an initial
-implementation of adaptive multigrid, this is considered experimental
-and is undergoing continued evolution and improvement.  We highly
-recommend that those users interested in using adaptive multigrid use
-the present multigrid development branch "feature/multigrid".  More
-details can be found at https://github.com/lattice/quda/wiki/Multigrid-Solver.
+QUDA includes an implementations of adaptive multigrid for the Wilson,
+clover-improved, twisted-mass and twisted-clover fermion actions.  We
+note however that this is undergoing continued evolution and
+improvement and we highly recommend using adaptive multigrid use the
+latest develop branch.  More details can be found [here]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver).
+
+Support for eigen-vector deflation solvers is also included through
+the Thick Restarted Lanczos Method (TRLM), and we offer an Implicitly
+Restarted Arnoldi for observing non-hermitian operator spectra.
+For more details we refer the user to the wiki:
+[QUDA's eigensolvers]
+(https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers)
+[Deflating coarse grid solves in Multigrid]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos)
 
 ## Software Compatibility:
 
-The library has been tested under Linux (CentOS 6 and Ubuntu 16.04)
-using releases 7.5, 8.0 and 9.0, 9.1 and 9.2 of the CUDA toolkit.
-CUDA 7.0 is not supported, though they may continue to work fine.
-Eariler versions of the CUDA toolkit will not work.  QUDA has been
-tested in conjuction with both x86-64 and IBM POWER8/POWER9 CPUs.  The
-library also works on 64-bit Intel-based Macs.
+The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
+using releases 7.5 through 10.2 of the CUDA toolkit.  Earlier versions
+of the CUDA toolkit will not work, and we highly recommend the use of
+10.x.  QUDA has been tested in conjunction with x86-64, IBM
+POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
+supported, with the mininum version being 5.x and 3.6, respectively.
+CMake 3.14 or greater to required to build QUDA.
 
 See also Known Issues below.
 
@@ -56,19 +65,24 @@ capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
-QUDA 0.9.0, supports devices of compute capability 2.0 or greater.
+QUDA 1.0.0, supports devices of compute capability 3.0 or greater.
+While QUDA is no longer supported on the older Fermi architecture, it
+may continue to work (assuming the user disables the use of textures
+(QUDA_TEX=OFF).
+
 See also "Known Issues" below.
 
 
 ## Installation:
 
-The recommended method for compiling QUDA is to use cmake, and build
-QUDA in a separate directory from the source directory.  For
-instructions on how to build QUDA using cmake see this page
-https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note that
-this requires cmake version 3.1 or later. You can obtain cmake from
-https://cmake.org/download/. On Linux the binary tar.gz archives unpack
-into a cmake directory and usually run fine from that directory.
+It is recommended to build QUDA in a separate directory from the
+source directory.  For instructions on how to build QUDA using cmake
+see this page
+https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note
+that this requires cmake version 3.14 or later. You can obtain cmake
+from https://cmake.org/download/. On Linux the binary tar.gz archives
+unpack into a cmake directory and usually run fine from that
+directory.
 
 The basic steps for building cmake are: 
 
@@ -106,19 +120,24 @@ details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 cmake option `QUDA_MAGMA=ON`.
 
-Version 0.9.x of QUDA includes interface for the external (P)ARPACK
+Version 1.0.0 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
-CMake option `QUDA_ARPACK=ON`. Note that with a multi-gpu option, the
+CMake option `QUDA_ARPACK=ON`. Note that with a multi-GPU option, the
 build system will automatically use PARPACK library.
+
+Automatic download and installation of Eigen, (P)ARPACK, QMP and QIO
+is supported in QUDA through the CMake options QUDA_DOWNLOAD_EIGEN,
+QUDA_DOWNLOAD_ARPACK, and QUDA_DOWNLOAD_USQCD.
 
 ### Application Interfaces
 
 By default only the QDP and MILC interfaces are enabled.  For
-interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
-by setting the corresponding `QUDA_INTERFACE_<application>` variable e.g., `QUDA_INTERFACE_BQCD=ON`.
-To keep compilation time to a minimum it is recommended to only enable
-those interfaces that are used by a given application.  
+interfacing support with QDPJIT, BQCD, CPS or TIFR; this should be
+enabled at by setting the corresponding `QUDA_INTERFACE_<application>`
+variable e.g., `QUDA_INTERFACE_BQCD=ON`.  To keep compilation time to
+a minimum it is recommended to only enable those interfaces that are
+used by a given application.
 
 ## Tuning
 
@@ -146,10 +165,10 @@ directory.  Optionally, the output filename can be specified using the
 previously generated profile outputs.  In addition to the kernel
 profile, a policy profile, e.g., collections of kernels and/or other
 algorithms that are auto-tuned, is also output to the file
-"profile_async_async.tsv".  The policy profile for example includes
+"profile_async.tsv".  The policy profile for example includes
 the entire multi-GPU dslash, whose style and order of communication is
 autotuned.  Hence while the dslash kernel entries appearing the kernel
-profile do include communucation time, the entries in the policy
+profile do include communication time, the entries in the policy
 profile include all constituent parts (halo packing, interior update,
 communication and exterior update).
 
@@ -165,13 +184,6 @@ include/enum_quda.h.
 
 ## Known Issues:
 
-* For compatibility with CUDA, on 32-bit platforms the library is
-compiled with the GCC option -malign-double.  This differs from the
-GCC default and may affect the alignment of various structures,
-notably those of type QudaGaugeParam and QudaInvertParam, defined in
-quda.h.  Therefore, any code to be linked against QUDA should also be
-compiled with this option.
-
 * When the auto-tuner is active in a multi-GPU run it may cause issues
 with binary reproducibility of this run if domain-decomposition
 preconditioning is used. This is caused by the possibility of
@@ -183,7 +195,7 @@ used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
-Please visit http://lattice.github.com/quda for contact information. Bug
+Please visit http://lattice.github.io/quda for contact information. Bug
 reports are especially welcome.
 
 
@@ -204,7 +216,7 @@ Performance Computing, Networking, Storage and Analysis (SC), 2011
 
 When taking advantage of adaptive multigrid, please also cite:
 
-M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
 "Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
 Parallelization," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016
@@ -218,7 +230,7 @@ Implementations of Block-Krylov Space Solvers on GPUs,"
 To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
 
 Several other papers that might be of interest are listed at
-http://lattice.github.com/quda .
+http://lattice.github.io/quda .
 
 
 ## Authors:
@@ -232,24 +244,28 @@ http://lattice.github.com/quda .
 *  Kate Clark (NVIDIA)
 *  Michael Cheng (Boston University)
 *  Carleton DeTar (Utah University)
-*  Justin Foley (NIH) 
-*  Joel Giedt (Rensselaer Polytechnic Institute) 
+*  Justin Foley (NIH)
 *  Arjun Gambhir (William and Mary)
+*  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
-*  Dean Howarth (Boston University)
-*  Balint Joo (Jefferson Laboratory)
+*  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
+*  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
 *  Claudio Rebbi (Boston University) 
-*  Guochun Shi (NCSA)
+*  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
+*  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
+*  Jiqun Tu (NVIDIA)
 *  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
+*  Andre Walker-Loud (Lawrence Berkley Laboratory)
 *  Evan Weinberg (NVIDIA)
-*  Frank Winter (Jlab)
+*  Frank Winter (Jefferson Lab)
+*  Yi-Bo Yang (Chinese Academy of Sciences)
 
 
 Portions of this software were developed at the Innovative Systems Lab,

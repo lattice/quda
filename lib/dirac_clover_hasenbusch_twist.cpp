@@ -1,8 +1,10 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 
-namespace quda {
+namespace quda
+{
 
   DiracCloverHasenbuschTwist::DiracCloverHasenbuschTwist(const DiracParam &param) : DiracClover(param), mu(param.mu) {}
 
@@ -30,14 +32,14 @@ namespace quda {
 
     if (!asymmetric) {
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-        ApplyWilsonCloverHasenbuschTwist(out.Even(), in.Odd(), *gauge, clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY,
+        ApplyWilsonCloverHasenbuschTwist(out.Even(), in.Odd(), *gauge, *clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY,
                                          dagger, commDim, profile);
-        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
+        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
                           profile);
       } else {
-        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
+        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
                           profile);
-        ApplyWilsonCloverHasenbuschTwist(out.Odd(), in.Even(), *gauge, clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY,
+        ApplyWilsonCloverHasenbuschTwist(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY,
                                          dagger, commDim, profile);
       }
 
@@ -45,14 +47,14 @@ namespace quda {
       flops += 2 * 1872ll * in.VolumeCB() + (48ll + 504ll) * in.VolumeCB();
     } else {
       if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
+        ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
                           profile);
-        ApplyTwistedClover(out.Odd(), in.Even(), *gauge, clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
-                          profile);
+        ApplyTwistedClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger,
+                           commDim, profile);
       } else {
-        ApplyTwistedClover(out.Even(), in.Odd(), *gauge, clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger,
-                          commDim, profile);
-        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
+        ApplyTwistedClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger,
+                           commDim, profile);
+        ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
                           profile);
       }
       // 2 c/b applies of DiracClover + (1-imu gamma_5)psi_{!p}
@@ -73,8 +75,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                                  double mass, double mu, double mu_factor) const
+  void DiracCloverHasenbuschTwist::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double,
+                                                  double, double, double) const
   {
     // double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
@@ -116,7 +118,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverHasenbuschTwistPCClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+    ApplyWilsonCloverHasenbuschTwistPCClovInv(out, in, *gauge, *clover, k, b, x, parity, dagger, commDim, profile);
 
     // DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 ) A
     flops += (1872ll + 48ll + 504ll) * in.Volume();
@@ -130,7 +132,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverHasenbuschTwistPCNoClovInv(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+    ApplyWilsonCloverHasenbuschTwistPCNoClovInv(out, in, *gauge, *clover, k, b, x, parity, dagger, commDim, profile);
 
     //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 )
     flops += (1872ll + 48) * in.Volume();
@@ -154,8 +156,10 @@ namespace quda {
 
       // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, parity[0]);
-      // DiracClover::DslashXpay applies (A - kappa^2 D)-
-      DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2, mu);
+
+      // applies (A + imu*g5 - kappa^2 D)-
+      ApplyTwistedClover(out, *tmp1, *gauge, *clover, kappa2, mu, in, parity[1], dagger, commDim, profile);
+      flops += 1872ll * in.Volume();
     } else if (!dagger) { // symmetric preconditioning
       // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
       // where A is actually a clover inverse.
@@ -188,8 +192,8 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                                    double mass, double mu, double mu_factor) const
+  void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double,
+                                                    double, double, double) const
   {
     // double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     // CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);

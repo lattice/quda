@@ -2,10 +2,13 @@
 
 namespace quda {
   
-  void copyGenericColorSpinorQS(ColorSpinorField &dst, const ColorSpinorField &src, 
-				QudaFieldLocation location, void *Dst, void *Src, 
-				void *dstNorm, void *srcNorm) {
-    CopyGenericColorSpinor<3>(dst, src, location, (char*)Dst, (float*)Src, (float*)dstNorm, (float*)srcNorm);
-  }  
+  void copyGenericColorSpinorQS(const copy_pack_t &pack)
+  {
+#if (QUDA_PRECISION & 4) && (QUDA_PRECISION & 1)
+    CopyGenericColorSpinor<3, int8_t, float>(pack);
+#else
+    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, std::get<0>(pack).Precision(), std::get<1>(pack).Precision());
+#endif
+  }
 
 } // namespace quda

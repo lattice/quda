@@ -41,6 +41,8 @@ module quda_fortran
      QudaReconstructType :: reconstruct_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
      QudaReconstructType :: reconstruct_precondition
+     QudaPrecision :: cuda_prec_eigensolver
+     QudaReconstructType :: reconstruct_eigensolver
      QudaGaugeFixed :: gauge_fix
 
      integer(4) :: ga_pad
@@ -76,6 +78,7 @@ module quda_fortran
      integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
 
+     integer(8) :: struct_size  ! Size of this struct in bytes
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
@@ -95,6 +98,12 @@ module quda_fortran
 
      complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
      complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
+
+     real(8) :: eofa_shift; ! EOFA parameter
+     integer(4) :: eofa_pm; ! EOFA parameter
+     real(8) :: mq1; ! EOFA parameter
+     real(8) :: mq2; ! EOFA parameter
+     real(8) :: mq3; ! EOFA parameter
 
      real(8) :: mu    ! Twisted mass parameter
      real(8) :: epsilon ! Twisted mass parameter
@@ -122,6 +131,10 @@ module quda_fortran
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
      integer(4) :: num_src ! Number of sources in the multiple source solver
+     integer(4) :: num_src_per_sub_partition ! Number of sources in the multiple source solver, but per sub-partition
+
+     integer(4), dimension(QUDA_MAX_DIM) :: split_grid ! The grid of sub-partition according to which the processor grid will be partitioned
+
      integer(4) :: overlap ! width of domain overlaps
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
@@ -163,6 +176,7 @@ module quda_fortran
      QudaPrecision :: cuda_prec_sloppy
      QudaPrecision :: cuda_prec_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
+     QudaPrecision :: cuda_prec_eigensolver
 
      QudaDiracFieldOrder :: dirac_order
 
@@ -175,6 +189,7 @@ module quda_fortran
      QudaPrecision :: clover_cuda_prec_sloppy
      QudaPrecision :: clover_cuda_prec_refinement_sloppy
      QudaPrecision :: clover_cuda_prec_precondition
+     QudaPrecision :: clover_cuda_prec_eigensolver
 
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
@@ -213,9 +228,17 @@ module quda_fortran
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
 
-     integer(8) :: preconditioner ! pointer to preconditioner instance
+     ! pointer to preconditioner instance
+     integer(8) :: preconditioner
 
-     integer(8) :: deflation_op ! pointer to deflation instance
+     ! pointer to deflation instance
+     integer(8) :: deflation_op
+
+     ! pointer to QudaEigParam that defines any deflation
+     integer(8) :: eig_param
+
+     ! If true, deflate the initial guess
+     QudaBoolean :: deflate
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
@@ -283,9 +306,13 @@ module quda_fortran
      ! Precision to store the chronological basis in
      integer(4)::chrono_precision;
 
-    ! Which external library to use in the linear solvers (MAGMA or Eigen) */
-     QudaExtLibType::extlib_type
+     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType :: extlib_type
 
+     ! Whether to use the platform native or generic BLAS / LAPACK */
+     QudaBoolean :: native_blas_lapack;
+
+     integer(8) :: struct_size  ! Size of this struct in bytes
   end type quda_invert_param
 
 end module quda_fortran

@@ -1,6 +1,6 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
-#include <iostream>
 #include <multigrid.h>
 
 namespace quda {
@@ -10,7 +10,7 @@ namespace quda {
   DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : Dirac(param) { } 
+  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { } 
 
   DiracWilson::~DiracWilson() { }
 
@@ -76,29 +76,20 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracWilson::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
-  /* Creates the coarse grid dirac operator
-  Takes: multigrid transfer class, which knows
-  about the coarse grid blocking, as well as
-  having prolongate and restrict member functions
-  
-  Returns: Color matrices Y[0..2*dim] corresponding
-  to the coarse grid operator.  The first 2*dim
-  matrices correspond to the forward/backward
-  hopping terms on the coarse grid.  Y[2*dim] is
-  the color matrix that is diagonal on the coarse
-  grid
-  */
   void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double mass, double mu, double mu_factor) const {
+				   double kappa, double, double mu, double mu_factor) const
+  {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     cudaCloverField *c = NULL;
-    CoarseOp(Y, X, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

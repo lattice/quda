@@ -83,7 +83,7 @@ namespace quda {
   void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
       delete *a;
-      *a = NULL;
+      *a = nullptr;
     }
   }
 
@@ -111,11 +111,6 @@ namespace quda {
 	 in.Nspin() == 4) {
       errorQuda("CUDA Dirac operator requires UKQCD basis, out = %d, in = %d", 
 		out.GammaBasis(), in.GammaBasis());
-    }
-
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input precision %d and output spinor precision %d don't match in dslash_quda",
-		in.Precision(), out.Precision());
     }
 
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
@@ -191,18 +186,30 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofa operator\n");
+      return new DiracMobiusEofa(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofaPC operator\n");
+      return new DiracMobiusEofaPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
     } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);
+    } else if (param.type == QUDA_STAGGEREDKD_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredKD operator\n");
+      return new DiracStaggeredKD(param);
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
       return new DiracImprovedStaggered(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
       return new DiracImprovedStaggeredPC(param);
+    } else if (param.type == QUDA_ASQTADKD_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredKD operator\n");
+      return new DiracImprovedStaggeredKD(param);
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
       if (param.Ls == 1) {
@@ -293,6 +300,13 @@ namespace quda {
     }
     
     return steps; 
+  }
+
+  void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    if (gauge) gauge->prefetch(mem_space, stream);
+    if (tmp1) tmp1->prefetch(mem_space, stream);
+    if (tmp2) tmp2->prefetch(mem_space, stream);
   }
 
 } // namespace quda

@@ -28,7 +28,7 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, in, parity, dagger, comm_dim, profile);
+    ApplyLaplace(out, in, *gauge, laplace3D, 1.0, 1.0, in, parity, dagger, comm_dim, profile);
     flops += 1320ll*in.Volume(); // FIXME
   }
 
@@ -44,7 +44,7 @@ namespace quda {
       comm_dim[i] = comm_dim_partitioned(i);
       if (laplace3D == i) comm_dim[i] = 0;
     }
-    ApplyLaplace(out, in, *gauge, laplace3D, k, x, parity, dagger, comm_dim, profile);
+    ApplyLaplace(out, in, *gauge, laplace3D, k, 1.0, x, parity, dagger, comm_dim, profile);
     flops += 1368ll*in.Volume(); // FIXME
   }
 
@@ -77,8 +77,7 @@ namespace quda {
     sol = &x;
   }
 
-  void GaugeLaplace::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void GaugeLaplace::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }

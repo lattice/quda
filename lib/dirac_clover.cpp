@@ -1,10 +1,11 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 
 namespace quda {
 
-  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(*(param.clover)) {}
+  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(param.clover) {}
 
   DiracClover::DiracClover(const DiracClover &dirac) : DiracWilson(dirac), clover(dirac.clover) {}
 
@@ -23,8 +24,8 @@ namespace quda {
   {
     Dirac::checkParitySpinor(out, in);
 
-    if (out.Volume() != clover.VolumeCB()) {
-      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover.VolumeCB());
+    if (out.Volume() != clover->VolumeCB()) {
+      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
     }
   }
 
@@ -36,19 +37,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
+    ApplyWilsonClover(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
     flops += 1872ll*in.Volume();
-  }
-
-  /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &k, const double &b) const
-  {
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    ApplyTwistedClover(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-    flops += 1872ll * in.Volume();
   }
 
   // Public method to apply the clover term only
@@ -56,13 +46,13 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    ApplyClover(out, in, clover, false, parity);
+    ApplyClover(out, in, *clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    ApplyWilsonClover(out, in, *gauge, *clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1872ll * in.Volume();
   }
 
@@ -91,16 +81,25 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
   void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double mass, double mu, double mu_factor) const {
+				   double kappa, double, double mu, double mu_factor) const
+  {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+  }
+
+  void DiracClover::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
   /*******
@@ -110,7 +109,7 @@ namespace quda {
     DiracClover(param)
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
-    if (!clover.cloverInv) errorQuda("Clover inverse required for DiracCloverPC");
+    if (!clover->cloverInv) errorQuda("Clover inverse required for DiracCloverPC");
   }
 
   DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : DiracClover(dirac) { }
@@ -131,7 +130,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    ApplyClover(out, in, clover, true, parity);
+    ApplyClover(out, in, *clover, true, parity);
     flops += 504ll*in.Volume();
   }
 
@@ -144,7 +143,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, 0.0, in, parity, dagger, commDim, profile);
+    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, 0.0, in, parity, dagger, commDim, profile);
     flops += 1824ll*in.Volume();
   }
 
@@ -156,7 +155,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
+    ApplyWilsonCloverPreconditioned(out, in, *gauge, *clover, k, x, parity, dagger, commDim, profile);
     flops += 1872ll*in.Volume();
   }
 
@@ -297,10 +296,29 @@ namespace quda {
   }
 
   void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				     double kappa, double mass, double mu, double mu_factor) const {
+				     double kappa, double, double mu, double mu_factor) const
+  {
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Wilson-type operators only support aggregation coarsening");
+
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, clover, kappa, mass, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
+  void DiracCloverPC::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    if (symmetric) {
+      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
+    } else {
+      clover->prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
+      clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
+    }
+  }
 
 } // namespace quda

@@ -28,11 +28,23 @@ namespace quda
   public:
     Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
+
+      // operator is Hermitian so do not instantiate dagger
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+      } else if (arg.nParity == 2) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+      }
     }
 
     long long flops() const
@@ -44,9 +56,6 @@ namespace quda
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);      // 3D or 4D operator
 
       long long flops_ = 0;
-
-      // FIXME - should we count the xpay flops in the derived kernels
-      // since some kernels require the xpay in the exterior (preconditiond clover)
 
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
@@ -61,6 +70,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -86,8 +96,7 @@ namespace quda
     virtual long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
@@ -105,6 +114,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -140,41 +150,53 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
-                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+#if (defined(GPU_STAGGERED_DIRAC) || defined(GPU_WILSON_DIRAC)) && defined(GPU_LAPLACE)
+    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
+                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
+#else
+    inline LaplaceApply(ColorSpinorField &, const ColorSpinorField &in, const GaugeField &, int,
+                        double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+#endif
     {
-      constexpr int nDim = 4;
-      LaplaceArg<Float, nColor, nDim, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<decltype(arg)> laplace(arg, out, in);
+      if (in.Nspin() == 1) {
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
+        constexpr int nDim = 4;
+        constexpr int nSpin = 1;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(laplace)> policy(
-        laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
-      policy.apply(0);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+#else
+        errorQuda("nSpin=%d Laplace operator required staggered dslash and laplace to be enabled", in.Nspin());
+#endif
+      } else if (in.Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
+        constexpr int nDim = 4;
+        constexpr int nSpin = 4;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
 
-      checkCudaError();
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+#else
+        errorQuda("nSpin=%d Laplace operator required wilson dslash and laplace to be enabled", in.Nspin());
+#endif
+      } else {
+        errorQuda("Unsupported nSpin= %d", in.Nspin());
+      }
     }
   };
 
   // Apply the Laplace operator
-  // out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  // Uses the kappa normalization for the Wilson operator.
+  // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
-    instantiate<LaplaceApply>(out, in, U, dir, kappa, x, parity, dagger, comm_override, profile);
+    instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda

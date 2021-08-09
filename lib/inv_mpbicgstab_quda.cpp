@@ -12,8 +12,8 @@
 
 namespace quda {
 
-  MPBiCGstab::MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat)
+  MPBiCGstab::MPBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, mat, mat, mat, param, profile)
   {
   }
 
@@ -127,7 +127,7 @@ namespace quda {
   } 
 #endif
 
-  void MPBiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
+  void MPBiCGstab::operator()(ColorSpinorField &, ColorSpinorField &) 
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");

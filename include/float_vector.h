@@ -1,4 +1,4 @@
-#include <complex_quda.h>
+#pragma once
 
 /**
    @file float_vector.h
@@ -7,323 +7,169 @@
    Inline device functions for elementary operations on short vectors, e.g., float4, etc.
 */
 
-#pragma once
+#include <complex_quda.h>
+#include <register_traits.h>
 
 namespace quda {
 
-  __device__ __host__ inline void zero(double &a) { a = 0.0; }
-  __device__ __host__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
-  __device__ __host__ inline void zero(double3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
-  __device__ __host__ inline void zero(double4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
-
-  __device__ __host__ inline void zero(float &a) { a = 0.0; }
-  __device__ __host__ inline void zero(float2 &a) { a.x = 0.0; a.y = 0.0; }
-  __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
-  __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
-
-  __host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y)
+  {
     return make_double2(x.x + y.x, x.y + y.y);
   }
 
-  __host__ __device__ inline double2 operator-(const double2& x, const double2 &y) {
-    return make_double2(x.x - y.x, x.y - y.y);
-  }
-
-  __host__ __device__ inline float2 operator-(const float2& x, const float2 &y) {
-    return make_float2(x.x - y.x, x.y - y.y);
-  }
-
-  __host__ __device__ inline float4 operator-(const float4& x, const float4 &y) {
-    return make_float4(x.x - y.x, x.y - y.y, x.z - y.z, x.w - y.w);
-  }
-
-  __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
+  __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y)
+  {
     return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
   }
 
-  __host__ __device__ inline double4 operator+(const double4& x, const double4 &y) {
+  __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y)
+  {
     return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
-  __host__ __device__ inline float4 operator*(const float a, const float4 x) {
-    float4 y;
-    y.x = a*x.x;
-    y.y = a*x.y;
-    y.z = a*x.z;
-    y.w = a*x.w;
-    return y;
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y) {
+    return make_float2(x.x + y.x, x.y + y.y);
   }
 
-  __host__ __device__ inline float2 operator*(const float a, const float2 x) {
-    float2 y;
-    y.x = a*x.x;
-    y.y = a*x.y;
-    return y;
-  }
-
-  __host__ __device__ inline double2 operator*(const double a, const double2 x) {
-    double2 y;
-    y.x = a*x.x;
-    y.y = a*x.y;
-    return y;
-  }
-
-  __host__ __device__ inline double4 operator*(const double a, const double4 x) {
-    double4 y;
-    y.x = a*x.x;
-    y.y = a*x.y;
-    y.z = a*x.z;
-    y.w = a*x.w;
-    return y;
-  }
-
-  __host__ __device__ inline float2 operator+(const float2 x, const float2 y) {
-    float2 z;
-    z.x = x.x + y.x;
-    z.y = x.y + y.y;
-    return z;
-  }
-
-  __host__ __device__ inline float4 operator+(const float4 x, const float4 y) {
-    float4 z;
-    z.x = x.x + y.x;
-    z.y = x.y + y.y;
-    z.z = x.z + y.z;
-    z.w = x.w + y.w;
-    return z;
-  }
-
-  __host__ __device__ inline float4 operator+=(float4 &x, const float4 y) {
-    x.x += y.x;
-    x.y += y.y;
-    x.z += y.z;
-    x.w += y.w;
-    return x;
-  }
-
-  __host__ __device__ inline float2 operator+=(float2 &x, const float2 y) {
-    x.x += y.x;
-    x.y += y.y;
-    return x;
-  }
-
-  __host__ __device__  inline double2 operator+=(double2 &x, const double2 y) {
-    x.x += y.x;
-    x.y += y.y;
-    return x;
-  }
-
-  __host__ __device__ inline double3 operator+=(double3 &x, const double3 y) {
-    x.x += y.x;
-    x.y += y.y;
-    x.z += y.z;
-    return x;
-  }
-
-  __host__ __device__ inline double4 operator+=(double4 &x, const double4 y) {
-    x.x += y.x;
-    x.y += y.y;
-    x.z += y.z;
-    x.w += y.w;
-    return x;
-  }
-
-  __host__ __device__ inline float4 operator-=(float4 &x, const float4 y) {
-    x.x -= y.x;
-    x.y -= y.y;
-    x.z -= y.z;
-    x.w -= y.w;
-    return x;
-  }
-
-  __host__ __device__ inline float2 operator-=(float2 &x, const float2 y) {
-    x.x -= y.x;
-    x.y -= y.y;
-    return x;
-  }
-
-  __host__ __device__ inline double2 operator-=(double2 &x, const double2 y) {
-    x.x -= y.x;
-    x.y -= y.y;
-    return x;
-  }
-
-  __host__ __device__ inline float2 operator*=(float2 &x, const float a) {
-    x.x *= a;
-    x.y *= a;
-    return x;
-  }
-
-  __host__ __device__ inline double2 operator*=(double2 &x, const float a) {
-    x.x *= a;
-    x.y *= a;
-    return x;
-  }
-
-  __host__ __device__ inline float4 operator*=(float4 &a, const float &b) {
-    a.x *= b;
-    a.y *= b;
-    a.z *= b;
-    a.w *= b;
-    return a;
-  }
-
-  __host__ __device__ inline double2 operator*=(double2 &a, const double &b) {
-    a.x *= b;
-    a.y *= b;
-    return a;
-  }
-
-  __host__ __device__ inline double4 operator*=(double4 &a, const double &b) {
-    a.x *= b;
-    a.y *= b;
-    a.z *= b;
-    a.w *= b;
-    return a;
-  }
-
-  __host__ __device__ inline float2 operator-(const float2 &x) {
-    return make_float2(-x.x, -x.y);
-  }
-
-  __host__ __device__ inline double2 operator-(const double2 &x) {
-    return make_double2(-x.x, -x.y);
-  }
-
-
-  /*
-    Operations to return the maximium absolute value of a FloatN vector
-  */
-
-  __forceinline__ __host__ __device__ float max_fabs(const float4 &c) {
-    float a = fmaxf(fabsf(c.x), fabsf(c.y));
-    float b = fmaxf(fabsf(c.z), fabsf(c.w));
-    return fmaxf(a, b);
+  template <typename T> struct RealType {
+  };
+  template <> struct RealType<double> {
+    typedef double type;
+  };
+  template <> struct RealType<double2> {
+    typedef double type;
+  };
+  template <> struct RealType<complex<double>> {
+    typedef double type;
+  };
+  template <> struct RealType<float> {
+    typedef float type;
+  };
+  template <> struct RealType<float2> {
+    typedef float type;
+  };
+  template <> struct RealType<complex<float>> {
+    typedef float type;
+  };
+  template <> struct RealType<float4> {
+    typedef float type;
+  };
+  template <> struct RealType<short> {
+    typedef short type;
+  };
+  template <> struct RealType<short2> {
+    typedef short type;
+  };
+  template <> struct RealType<complex<short>> {
+    typedef short type;
+  };
+  template <> struct RealType<short4> {
+    typedef short type;
+  };
+  template <> struct RealType<int8_t> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<char2> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<complex<int8_t>> {
+    typedef int8_t type;
+  };
+  template <> struct RealType<char4> {
+    typedef int8_t type;
   };
 
-  __forceinline__ __host__ __device__ float max_fabs(const float2 &b) {
-    return fmaxf(fabsf(b.x), fabsf(b.y));
+#ifndef __CUDACC_RTC__
+  inline std::ostream &operator<<(std::ostream &output, const double2 &a)
+  {
+    output << "(" << a.x << ", " << a.y << ")";
+    return output;
+  }
+
+  inline std::ostream &operator<<(std::ostream &output, const double3 &a)
+  {
+    output << "(" << a.x << ", " << a.y << "," << a.z << ")";
+    return output;
+  }
+
+  inline std::ostream &operator<<(std::ostream &output, const double4 &a)
+  {
+    output << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
+    return output;
+  }
+#endif
+
+  template <typename T> __device__ __host__ inline T zero() { return static_cast<T>(0); }
+  template<> __device__ __host__ inline double2 zero() { return make_double2(0.0, 0.0); }
+  template<> __device__ __host__ inline double3 zero() { return make_double3(0.0, 0.0, 0.0); }
+  template<> __device__ __host__ inline double4 zero() { return make_double4(0.0, 0.0, 0.0, 0.0); }
+
+  template<> __device__ __host__ inline float2 zero() { return make_float2(0.0, 0.0); }
+  template<> __device__ __host__ inline float3 zero() { return make_float3(0.0, 0.0, 0.0); }
+  template<> __device__ __host__ inline float4 zero() { return make_float4(0.0, 0.0, 0.0, 0.0); }
+
+#ifdef QUAD_SUM
+  template<> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
+  template<> __device__ __host__ inline doubledouble zero() { return doubledouble2(); }
+  template<> __device__ __host__ inline doubledouble zero() { return doubledouble3(); }
+#endif
+
+  /**
+     struct which acts as a wrapper to a vector of data.
+   */
+  template <typename scalar_, int n> struct vector_type {
+    using scalar = scalar_;
+    scalar data[n];
+    __device__ __host__ inline scalar &operator[](int i) { return data[i]; }
+    __device__ __host__ inline const scalar &operator[](int i) const { return data[i]; }
+    __device__ __host__ inline static constexpr int size() { return n; }
+    __device__ __host__ inline void operator+=(const vector_type &a)
+    {
+#pragma unroll
+      for (int i = 0; i < n; i++) data[i] += a[i];
+    }
+    __device__ __host__ vector_type()
+    {
+#pragma unroll
+      for (int i = 0; i < n; i++) data[i] = zero<scalar>();
+    }
+
+    vector_type(const vector_type<scalar, n> &) = default;
+    vector_type(vector_type<scalar, n> &&) = default;
+
+    template <typename... T>
+    constexpr vector_type(scalar first, const T... data) : data{first, data...} {}
+
+    template <typename... T>
+    constexpr vector_type(const scalar &a) { for (auto &e : data) e = a; }
+
+    vector_type<scalar, n>& operator=(const vector_type<scalar, n> &) = default;
+    vector_type<scalar, n>& operator=(vector_type<scalar, n> &&) = default;
   };
 
-  __forceinline__ __host__ __device__ double max_fabs(const double4 &c) {
-    double a = fmax(fabs(c.x), fabs(c.y));
-    double b = fmax(fabs(c.z), fabs(c.w));
-    return fmax(a, b);
-  };
-
-  __forceinline__ __host__ __device__ double max_fabs(const double2 &b) {
-    return fmax(fabs(b.x), fabs(b.y));
-  };
-
-
-  /*
-    Precision conversion routines for vector types
-  */
-
-  __forceinline__ __host__ __device__ float2 make_FloatN(const double2 &a) {
-    return make_float2(a.x, a.y);
-}
-
-  __forceinline__ __host__ __device__ float4 make_FloatN(const double4 &a) {
-    return make_float4(a.x, a.y, a.z, a.w);
+  template <typename T, int n> std::ostream &operator<<(std::ostream &output, const vector_type<T, n> &a)
+  {
+    output << "{ ";
+    for (int i = 0; i < n - 1; i++) output << a[i] << ", ";
+    output << a[n - 1] << " }";
+    return output;
   }
 
-  __forceinline__ __host__ __device__ double2 make_FloatN(const float2 &a) {
-    return make_double2(a.x, a.y);
+  template <typename scalar, int n> __device__ __host__ inline vector_type<scalar, n> zero()
+  {
+    vector_type<scalar, n> v;
+#pragma unroll
+    for (int i = 0; i < n; i++) v.data[i] = zero<scalar>();
+    return v;
   }
 
-  __forceinline__ __host__ __device__ double4 make_FloatN(const float4 &a) {
-    return make_double4(a.x, a.y, a.z, a.w);
+  template <typename scalar, int n>
+  __device__ __host__ inline vector_type<scalar, n> operator+(const vector_type<scalar, n> &a,
+                                                              const vector_type<scalar, n> &b)
+  {
+    vector_type<scalar, n> c;
+#pragma unroll
+    for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
+    return c;
   }
-
-  __forceinline__ __host__ __device__ short4 make_shortN(const char4 &a) {
-    return make_short4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short2 make_shortN(const char2 &a) {
-    return make_short2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ short4 make_shortN(const float4 &a) {
-    return make_short4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short2 make_shortN(const float2 &a) {
-    return make_short2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ short4 make_shortN(const double4 &a) {
-    return make_short4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ short2 make_shortN(const double2 &a) {
-    return make_short2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ char4 make_charN(const short4 &a) {
-    return make_char4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ char2 make_charN(const short2 &a) {
-    return make_char2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ char4 make_charN(const float4 &a) {
-    return make_char4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ char2 make_charN(const float2 &a) {
-    return make_char2(a.x, a.y);
-  }
-
-  __forceinline__ __host__ __device__ char4 make_charN(const double4 &a) {
-    return make_char4(a.x, a.y, a.z, a.w);
-  }
-
-  __forceinline__ __host__ __device__ char2 make_charN(const double2 &a) {
-    return make_char2(a.x, a.y);
-  }
-  /* Helper functions for converting between float2/double2 and complex */
-  template<typename Float2, typename Complex>
-    inline Float2 make_Float2(const Complex &a) { return (Float2)0; }
-
-  template<>
-    inline double2 make_Float2(const complex<double> &a) { return make_double2( a.real(), a.imag() ); }
-  template<>
-    inline double2 make_Float2(const complex<float> &a) { return make_double2( a.real(), a.imag() ); }
-  template<>
-    inline float2 make_Float2(const complex<double> &a) { return make_float2( a.real(), a.imag() ); }
-  template<>
-    inline float2 make_Float2(const complex<float> &a) { return make_float2( a.real(), a.imag() ); }
-
-    template<>
-      inline double2 make_Float2(const std::complex<double> &a) { return make_double2( a.real(), a.imag() ); }
-    template<>
-      inline double2 make_Float2(const std::complex<float> &a) { return make_double2( a.real(), a.imag() ); }
-    template<>
-      inline float2 make_Float2(const std::complex<double> &a) { return make_float2( a.real(), a.imag() ); }
-    template<>
-      inline float2 make_Float2(const std::complex<float> &a) { return make_float2( a.real(), a.imag() ); }
-
-
-  inline complex<double> make_Complex(const double2 &a) { return complex<double>(a.x, a.y); }
-  inline complex<float> make_Complex(const float2 &a) { return complex<float>(a.x, a.y); }
-
-  template<typename T> struct RealType {};
-  template<> struct RealType<double> { typedef double type; };
-  template<> struct RealType<double2> { typedef double type; };
-  template<> struct RealType<complex<double> > { typedef double type; };
-  template<> struct RealType<float> { typedef float type; };
-  template<> struct RealType<float2> { typedef float type; };
-  template<> struct RealType<complex<float> > { typedef float type; };
-  template<> struct RealType<float4> { typedef float type; };
-  template<> struct RealType<short> { typedef short type; };
-  template<> struct RealType<short2> { typedef short type; };
-  template<> struct RealType<complex<short> > { typedef short type; };
-  template<> struct RealType<short4> { typedef short type; };
-  template<> struct RealType<char> { typedef char type; };
-  template<> struct RealType<char2> { typedef char type; };
-  template<> struct RealType<complex<char> > { typedef char type; };
-  template<> struct RealType<char4> { typedef char type; };
-
 }

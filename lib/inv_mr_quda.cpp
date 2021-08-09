@@ -13,9 +13,15 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), rp(nullptr), r_sloppy(nullptr),
-    Arp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), x_sloppy(nullptr), init(false)
+  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile),
+    rp(nullptr),
+    r_sloppy(nullptr),
+    Arp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    x_sloppy(nullptr),
+    init(false)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);
@@ -114,7 +120,7 @@ namespace quda {
 	commGlobalReductionSet(param.global_reduction); // use local reductions for DD solver
 
 	blas::zero(xSloppy);  // can get rid of this for a special first update kernel
-	double c2 = param.global_reduction == QUDA_BOOLEAN_YES ? r2 : blas::norm2(r);  // c2 holds the initial r2
+	double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r);  // c2 holds the initial r2
 	scale = c2 > 0.0 ? sqrt(c2) : 1.0;
 
 	// domain-wise normalization of the initial residual to prevent underflow

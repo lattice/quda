@@ -2,12 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 #include "quda.h"
-#include "test_util.h"
-#include "llfat_reference.h"
+#include "host_utils.h"
+#include "llfat_utils.h"
+#include <command_line_params.h>
 #include "misc.h"
 #include "util_quda.h"
 #include "malloc_quda.h"
@@ -18,37 +17,20 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-extern void usage(char** argv);
-extern bool verify_results;
-
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern int niter;
-
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-//static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
-
-static size_t gSize;
 
 static void llfat_test()
 {
-
   QudaGaugeParam qudaGaugeParam;
 #ifdef MULTI_GPU
   void* ghost_sitelink[4];
   void* ghost_sitelink_diag[16];
 #endif
 
-
-  initQuda(device);
+  initQuda(device_ordinal);
 
   cpu_prec = prec;
-  gSize = cpu_prec;  
+  host_gauge_data_type_size = cpu_prec;
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
@@ -70,20 +52,20 @@ static void llfat_test()
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad = 0;
 
-  void* fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
-  void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++) sitelink[i] = pinned_malloc(V*gaugeSiteSize*gSize);
+  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
   void* sitelink_ex[4];
-  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gaugeSiteSize*gSize);
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
 
   void* milc_sitelink;
-  milc_sitelink = (void*)safe_malloc(4*V*gaugeSiteSize*gSize);
+  milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void* milc_sitelink_ex;
-  milc_sitelink_ex = (void*)safe_malloc(4*V_ex*gaugeSiteSize*gSize);
+  milc_sitelink_ex = (void *)safe_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
 
@@ -91,7 +73,8 @@ static void llfat_test()
     for(int i=0; i<V; ++i){
       for(int dir=0; dir<4; ++dir){
         char* src = (char*)sitelink[dir];
-        memcpy((char*)milc_sitelink + (i*4 + dir)*gaugeSiteSize*gSize, src+i*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+        memcpy((char *)milc_sitelink + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
+               src + i * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
       }	
     }
   }
@@ -128,8 +111,6 @@ static void llfat_test()
 #endif
     }
 
-
-
     x1 = (x1 - 2 + X1) % X1;
     x2 = (x2 - 2 + X2) % X2;
     x3 = (x3 - 2 + X3) % X3;
@@ -142,10 +123,12 @@ static void llfat_test()
     for(int dir= 0; dir < 4; dir++){
       char* src = (char*)sitelink[dir];
       char* dst = (char*)sitelink_ex[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+      memcpy(dst + i * gauge_site_size * host_gauge_data_type_size,
+             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
 
-      // milc ordering 
-      memcpy((char*)milc_sitelink_ex + (i*4 + dir)*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+      // milc ordering
+      memcpy((char *)milc_sitelink_ex + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
+             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
     }//dir
   }//i
 
@@ -177,8 +160,8 @@ static void llfat_test()
   void* fat_reflink[4];
   void* long_reflink[4];
   for(int i=0;i < 4;i++){
-    fat_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    long_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
+    fat_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    long_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   if (verify_results){
@@ -196,13 +179,14 @@ static void llfat_test()
     //we need x,y,z site links in the back and forward T slice
     // so it is 3*2*Vs_t
     int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-    for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
+    for (int i = 0; i < 4; i++)
+      ghost_sitelink[i] = safe_malloc(8 * Vs[i] * gauge_site_size * host_gauge_data_type_size);
 
     /*
        nu |     |
           |_____|
             mu
-       */
+    */
 
     for(int nu=0;nu < 4;nu++){
       for(int mu=0; mu < 4;mu++){
@@ -221,8 +205,8 @@ static void llfat_test()
               break;
             }
           }
-          ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-          memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+          ghost_sitelink_diag[nu * 4 + mu] = safe_malloc(Z[dir1] * Z[dir2] * gauge_site_size * host_gauge_data_type_size);
+          memset(ghost_sitelink_diag[nu * 4 + mu], 0, Z[dir1] * Z[dir2] * gauge_site_size * host_gauge_data_type_size);
         }
 
       }
@@ -247,21 +231,21 @@ static void llfat_test()
   void* myfatlink[4];
   void* mylonglink[4];
   for(int i=0; i < 4; i++){
-    myfatlink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    mylonglink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
-    memset(mylonglink[i], 0, V*gaugeSiteSize*gSize);
+    myfatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    mylonglink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    memset(myfatlink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
+    memset(mylonglink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
   }
 
   for(int i=0; i < V; i++){
     for(int dir=0; dir< 4; dir++){
-      char* src = ((char*)fatlink)+ (4*i+dir)*gaugeSiteSize*gSize;
-      char* dst = ((char*)myfatlink[dir]) + i*gaugeSiteSize*gSize;
-      memcpy(dst, src, gaugeSiteSize*gSize);
+      char *src = ((char *)fatlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
+      char *dst = ((char *)myfatlink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
+      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
 
-      src = ((char*)longlink)+ (4*i+dir)*gaugeSiteSize*gSize;
-      dst = ((char*)mylonglink[dir]) + i*gaugeSiteSize*gSize;
-      memcpy(dst, src, gaugeSiteSize*gSize);
+      src = ((char *)longlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
+      dst = ((char *)mylonglink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
+      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
     }
   }
 
@@ -269,7 +253,7 @@ static void llfat_test()
     printfQuda("Checking fat links...\n");
     int res=1;
     for(int dir=0; dir<4; dir++){
-      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
     
     strong_check_link(myfatlink, "GPU results: ",
@@ -281,7 +265,7 @@ static void llfat_test()
     printfQuda("Checking long links...\n");
     res = 1;
     for(int dir=0; dir<4; ++dir){
-      res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
       
     strong_check_link(mylonglink, "GPU results: ",
@@ -353,12 +337,6 @@ static void display_test_info()
 
 }
 
-void usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
-  return ;
-}
 
 int main(int argc, char **argv)
 {
@@ -368,31 +346,18 @@ int main(int argc, char **argv)
   xdim=ydim=zdim=tdim=8;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
-  for (int i = 1; i < argc; i++){
-
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-    if( strcmp(argv[i], "--gauge-order") == 0){
-      if(i+1 >= argc){
-        usage(argv);
-      }
-
-      if(strcmp(argv[i+1], "milc") == 0){
-        gauge_order = QUDA_MILC_GAUGE_ORDER;
-      }else if(strcmp(argv[i+1], "qdp") == 0){
-        gauge_order = QUDA_QDP_GAUGE_ORDER;
-      }else{
-        fprintf(stderr, "Error: unsupported gauge-field order\n");
-        exit(1);
-      }
-      i++;	
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
+  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

@@ -1,16 +1,19 @@
-#ifndef _TUNE_QUDA_H
-#define _TUNE_QUDA_H
+#pragma once
 
 #include <string>
 #include <iostream>
-#include <iomanip>
 #include <cstring>
 #include <cfloat>
-#include <stdarg.h>
+#include <algorithm>
+#include <cstdarg>
+#include <iomanip>
+#include <typeinfo>
 #include <map>
 
 #include <tune_key.h>
 #include <quda_internal.h>
+#include <device.h>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -19,32 +22,19 @@ namespace quda {
   public:
     dim3 block;
     dim3 grid;
-    int shared_bytes;
+    unsigned int shared_bytes;
+    bool set_max_shared_bytes; // whether to opt in to max shared bytes per thread block
     int4 aux; // free parameter that can be used as an arbitrary autotuning dimension outside of launch parameters
 
     std::string comment;
     float time;
     long long n_calls;
 
-    inline TuneParam() : block(32, 1, 1), grid(1, 1, 1), shared_bytes(0), aux(), time(FLT_MAX), n_calls(0) {
-      aux = make_int4(1,1,1,1);
-    }
-
-    inline TuneParam(const TuneParam &param)
-      : block(param.block), grid(param.grid), shared_bytes(param.shared_bytes), aux(param.aux), comment(param.comment), time(param.time), n_calls(param.n_calls) { }
-
-    inline TuneParam& operator=(const TuneParam &param) {
-      if (&param != this) {
-	block = param.block;
-	grid = param.grid;
-	shared_bytes = param.shared_bytes;
-	aux = param.aux;
-	comment = param.comment;
-	time = param.time;
-	n_calls = param.n_calls;
-      }
-      return *this;
-    }
+    TuneParam();
+    TuneParam(const TuneParam &) = default;
+    TuneParam(TuneParam &&) = default;
+    TuneParam& operator=(const TuneParam &) = default;
+    TuneParam& operator=(TuneParam &&) = default;
 
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
@@ -53,6 +43,7 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
+
   };
 
   /**
@@ -64,8 +55,8 @@ namespace quda {
   class Tunable {
 
   protected:
-    virtual long long flops() const = 0;
-    virtual long long bytes() const { return 0; } // FIXME
+    virtual long long flops() const { return 0; }
+    virtual long long bytes() const { return 0; }
 
     // the minimum number of shared bytes per thread
     virtual unsigned int sharedBytesPerThread() const = 0;
@@ -86,7 +77,7 @@ namespace quda {
         param.grid.x += step;
         if (param.grid.x > maxGridSize()) {
           param.grid.x = minGridSize();
-	  return false;
+          return false;
         } else {
           return true;
         }
@@ -95,8 +86,26 @@ namespace quda {
       }
     }
 
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / (param.block.y*param.block.z); }
-    virtual unsigned int maxGridSize() const { return 2*deviceProp.multiProcessorCount; }
+    /**
+       @brief Return the maximum block size in the x dimension
+       explored by the autotuner.
+     */
+    virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_threads_per_block() / (param.block.y*param.block.z); }
+
+    /**
+       @brief Return the maximum grid size in the x dimension explored
+       by the autotuner.  This defaults to twice the number of
+       processors on the GPU, since it's unlikely a large grid size
+       will help (if a kernels needs more parallelism, the autotuner
+       will find this through increased block size.
+     */
+    virtual unsigned int maxGridSize() const { return 2*device::processor_count(); }
+
+    /**
+       @brief Return the minimum grid size in the x dimension explored
+       by the autotuner.  Default is 1, but it may be desirable to
+       increase this to pare down the tuning dimension size.
+    */
     virtual unsigned int minGridSize() const { return 1; }
 
     /**
@@ -106,8 +115,8 @@ namespace quda {
     */
     virtual int gridStep() const { return 1; }
 
-    virtual int blockStep() const { return deviceProp.warpSize; }
-    virtual int blockMin() const { return deviceProp.warpSize; }
+    virtual int blockStep() const;
+    virtual int blockMin() const;
 
     virtual void resetBlockDim(TuneParam &param) const {
       if (tuneGridDim()) {
@@ -115,11 +124,11 @@ namespace quda {
       } else { // not tuning the grid dimension so have to set a valid grid size
         const auto step = blockStep();
         const auto max_threads = maxBlockSize(param);
-        const auto max_blocks = deviceProp.maxGridSize[0];
+        const auto max_blocks = device::max_grid_size(0);
 
         // ensure the blockDim is large enough given the limit on gridDim
-        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
-	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
+        param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
+        param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
       }
@@ -132,101 +141,40 @@ namespace quda {
       bool ret;
 
       param.block.x += blockStep();
-      int nthreads = param.block.x*param.block.y*param.block.z;
-      if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
-          || sharedBytesPerBlock(param) > max_shared) {
+      int nthreads = param.block.x * param.block.y * param.block.z;
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
+
+      if (param.block.x > max_threads || param.shared_bytes > max_shared) {
         resetBlockDim(param);
+        int nthreads = param.block.x * param.block.y * param.block.z;
+        param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 	ret = false;
       } else {
         ret = true;
       }
 
-      if (!tuneGridDim()) 
-	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
+      if (!tuneGridDim()) param.grid.x = (minThreads() + param.block.x - 1) / param.block.x;
 
       return ret;
     }
 
     /**
-     * @brief For some reason this can't be queried from the device
-     * properties, so here we set set this.  Based on Table 14 of the
-     * CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability)
-     * @return The maximum number of simultaneously resident blocks per SM
-     */
-    unsigned int maxBlocksPerSM() const
-    {
-      switch (deviceProp.major) {
-      case 2:
-	return 8;
-      case 3:
-	return 16;
-      case 5:
-      case 6: return 32;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 32;
-        case 2: return 32;
-        case 5: return 16;
-        }
-      default: errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor); return 0;
-      }
-    }
-
-    /**
-     * @brief Enable the maximum dynamic shared bytes for the kernel
-     * "func" (values given by maxDynamicSharedBytesPerBlock()).
-     * @param[in] func Function pointer to the kernel we want to
-     * enable max shared memory per block for
-     */
-    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
-    {
-#if CUDA_VERSION >= 9000
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
-#endif
-    }
-
-    /**
-     * @brief This can't be correctly queried in CUDA for all
-     * architectures so here we set set this.  Based on Table 14 of
-     * the CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability).
+     * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
-    unsigned int maxDynamicSharedBytesPerBlock() const
-    {
-      switch (deviceProp.major) {
-      case 2:
-      case 3:
-      case 5:
-      case 6: return 48 * 1024;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 96 * 1024;
-        case 2: return 96 * 1024;
-        case 5: return 64 * 1024;
-        }
-      default:
-	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
-	return 0;
-      }
-    }
+    unsigned int maxDynamicSharedBytesPerBlock() const { return device::max_dynamic_shared_memory(); }
 
     /**
      * @brief The maximum shared memory that a CUDA thread block can
      * use in the autotuner.  This isn't necessarily the same as
      * maxDynamicSharedMemoryPerBlock since that may need explicit opt
-     * in to enable (by calling setMaxDynamicSharedBytes for the
-     * kernel in question).  If the CUDA kernel in question does this
-     * opt in then this function can be overloaded to return
+     * in to enable.  If the kernel in question does this opt in then
+     * this function can be overloaded to return
      * maxDynamicSharedBytesPerBlock.
      * @return The maximum shared bytes limit per block the autotung
      * will utilize.
      */
-    virtual unsigned int maxSharedBytesPerBlock() const { return deviceProp.sharedMemPerBlock; }
+    virtual unsigned int maxSharedBytesPerBlock() const { return device::max_default_shared_memory(); }
 
     /**
      * The goal here is to throttle the number of thread blocks per SM
@@ -238,8 +186,8 @@ namespace quda {
     virtual bool advanceSharedBytes(TuneParam &param) const
     {
       if (tuneSharedBytes()) {
-        const int max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm = std::min(deviceProp.maxThreadsPerMultiProcessor / (param.block.x*param.block.y*param.block.z), maxBlocksPerSM());
+        const auto max_shared = maxSharedBytesPerBlock();
+        const int max_blocks_per_sm = std::min(device::max_threads_per_processor() / (param.block.x*param.block.y*param.block.z), device::max_blocks_per_processor());
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
@@ -248,9 +196,7 @@ namespace quda {
 	  TuneParam next(param);
 	  advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
-          param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(next) ?
-              sharedBytesPerThread() * nthreads :
-              sharedBytesPerBlock(next);
+          param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
           return false;
 	} else {
 	  return true;
@@ -260,20 +206,24 @@ namespace quda {
       }
     }
 
-    virtual bool advanceAux(TuneParam &param) const { return false; }
+    virtual bool advanceAux(TuneParam &) const { return false; }
 
+    char vol[TuneKey::volume_n];
     char aux[TuneKey::aux_n];
 
     int writeAuxString(const char *format, ...) {
+      int n = 0;
       va_list arguments;
       va_start(arguments, format);
-      int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
+      if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
       return n;
     }
 
-    /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    /** This is the return result from kernels launched using jitify,
+        and can also be used to allow user invalidation of a tuning
+        configuration */
+    qudaError_t launch_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -291,35 +241,35 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : launch_error(QUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
-    virtual void apply(const cudaStream_t &stream) = 0;
+    virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
     virtual std::string paramString(const TuneParam &param) const
-      {
-	std::stringstream ps;
-	ps << param;
-	return ps.str();
-      }
+    {
+      std::stringstream ps;
+      ps << param;
+      return ps.str();
+    }
 
     virtual std::string perfString(float time) const
-      {
-	float gflops = flops() / (1e9 * time);
-	float gbytes = bytes() / (1e9 * time);
-	std::stringstream ss;
-	ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
-	ss << gbytes << " GB/s";
-	return ss.str();
-      }
+    {
+      float gflops = flops() / (1e9 * time);
+      float gbytes = bytes() / (1e9 * time);
+      std::stringstream ss;
+      ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
+      ss << gbytes << " GB/s";
+      return ss.str();
+    }
 
     virtual void initTuneParam(TuneParam &param) const
     {
-      const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
+      const unsigned int max_threads = device::max_threads_per_block_dim(0);
+      const unsigned int max_blocks = device::max_grid_size(0);
       const int min_grid_size = minGridSize();
       const int min_block_size = blockMin();
 
@@ -336,15 +286,14 @@ namespace quda {
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }
       int nthreads = param.block.x*param.block.y*param.block.z;
-      param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
-	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
+      param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
     }
 
     /** sets default values for when tuning is disabled */
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
+      if (tuneGridDim()) param.grid.x = maxGridSize(); // don't set y and z in case derived initTuneParam has
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
@@ -356,202 +305,40 @@ namespace quda {
      * Check the launch parameters of the kernel to ensure that they are
      * valid for the current device.
      */
-    void checkLaunchParam(TuneParam &param) {
-
-      if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
-        errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
-                  param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
-      
-      if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
-		  param.block.x, deviceProp.maxThreadsDim[0]);
-      
-      if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", 
-		  param.block.y, deviceProp.maxThreadsDim[1]);
-	
-      if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
-		  param.block.z, deviceProp.maxThreadsDim[2]);
-	  
-      if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
-		  param.grid.x, deviceProp.maxGridSize[0]);
-
-      if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
-		  param.grid.y, deviceProp.maxGridSize[1]);
-    
-      if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", 
-		  param.grid.z, deviceProp.maxGridSize[2]);
-    }
-
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
-  };
-
-  
-  /**
-     This derived class is for algorithms that deploy parity across
-     the y dimension of the thread block with no shared memory tuning.
-     The x threads will typically correspond to the checkboarded
-     volume.
-   */
-  class TunableLocalParity : public Tunable {
-
-  protected:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    // don't tune the grid dimension
-    virtual bool tuneGridDim() const { return false; }
-
-    /**
-       The maximum block size in the x dimension is the total number
-       of threads divided by the size of the y dimension
-     */
-    unsigned int maxBlockSize(const TuneParam &param) const { return deviceProp.maxThreadsPerBlock / 2; }
-
-  public:
-    bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.block.y = 2;
-      return rtn;
-    }
-    
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.block.y = 2;
-    }
-
-    void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.block.y = 2;
-    }
-
-  };
-  
-  /**
-     This derived class is for algorithms that deploy a vector of
-     computations across the y dimension of both the threads block and
-     grid.  For example this could be parity in the y dimension and
-     checkerboarded volume in x.
-   */
-  class TunableVectorY : public Tunable {
-
-  protected:
-    virtual unsigned int sharedBytesPerThread() const { return 0; }
-    virtual unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    mutable unsigned int vector_length_y;
-    mutable unsigned int step_y;
-    bool tune_block_x;
-
-  public:
-  TunableVectorY(unsigned int vector_length_y) : vector_length_y(vector_length_y),
-      step_y(1), tune_block_x(true) { }
-
-    bool advanceBlockDim(TuneParam &param) const
+    void checkLaunchParam(TuneParam &tp)
     {
-      dim3 block = param.block;
-      dim3 grid = param.grid;
-      bool ret = tune_block_x ? Tunable::advanceBlockDim(param) : false;
-      param.block.y = block.y;
-      param.grid.y = grid.y;
+      if (tp.block.x*tp.block.y*tp.block.z > device::max_threads_per_block())
+        errorQuda("Requested block size %dx%dx%d=%d greater than max %d",
+                  tp.block.x, tp.block.y, tp.block.z, tp.block.x*tp.block.y*tp.block.z,
+                  device::max_threads_per_block());
 
-      if (ret) {
-	return true;
-      } else { // block.x (spacetime) was reset
+      if (tp.block.x > device::max_threads_per_block_dim(0))
+        errorQuda("Requested X-dimension block size %d greater than max %d",
+                  tp.block.x, device::max_threads_per_block_dim(0));
 
-	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < (unsigned int)deviceProp.maxThreadsDim[1] &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= (unsigned int)deviceProp.maxThreadsPerBlock) {
-	  param.block.y += step_y;
-	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return true;
-	} else { // we have run off the end so let's reset
-	  param.block.y = step_y;
-	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return false;
-	}
-      }
+      if (tp.block.y > device::max_threads_per_block_dim(1))
+        errorQuda("Requested Y-dimension block size %d greater than max %d",
+                  tp.block.y, device::max_threads_per_block_dim(1));
+
+      if (tp.block.z > device::max_threads_per_block_dim(2))
+        errorQuda("Requested Z-dimension block size %d greater than max %d",
+                  tp.block.z, device::max_threads_per_block_dim(2));
+
+      if (tp.grid.x > device::max_grid_size(0))
+        errorQuda("Requested X-dimension grid size %d greater than max %d",
+                  tp.grid.x, device::max_grid_size(0));
+
+      if (tp.grid.y > device::max_grid_size(1))
+        errorQuda("Requested Y-dimension grid size %d greater than max %d",
+                  tp.grid.y, device::max_grid_size(1));
+
+      if (tp.grid.z > device::max_grid_size(2))
+        errorQuda("Requested Z-dimension grid size %d greater than max %d",
+                  tp.grid.z, device::max_grid_size(2));
     }
 
-    void initTuneParam(TuneParam &param) const
-    {
-      Tunable::initTuneParam(param);
-      param.block.y = step_y;
-      param.grid.y = (vector_length_y + step_y - 1) / step_y;
-    }
-
-    /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const
-    {
-      Tunable::defaultTuneParam(param);
-      param.block.y = step_y;
-      param.grid.y = (vector_length_y + step_y - 1) / step_y;
-    }
-
-    void resizeVector(int y) const { vector_length_y = y; }
-    void resizeStep(int y) const { step_y = y; }
-  };
-
-  class TunableVectorYZ : public TunableVectorY {
-
-    mutable unsigned vector_length_z;
-    mutable unsigned step_z;
-    bool tune_block_y;
-
-  public:
-    TunableVectorYZ(unsigned int vector_length_y, unsigned int vector_length_z)
-      : TunableVectorY(vector_length_y), vector_length_z(vector_length_z),
-      step_z(1), tune_block_y(true) { }
-
-    bool advanceBlockDim(TuneParam &param) const
-    {
-      dim3 block = param.block;
-      dim3 grid = param.grid;
-      bool ret = tune_block_y ? TunableVectorY::advanceBlockDim(param) : tune_block_x ? Tunable::advanceBlockDim(param) : false;
-      param.block.z = block.z;
-      param.grid.z = grid.z;
-
-      if (ret) {
-	// we advanced the block.x / block.y so we're done
-	return true;
-      } else { // block.x/block.y (spacetime) was reset
-
-	// we can advance spin/block-color since this is valid
-	if (param.block.z < vector_length_z && param.block.z < (unsigned int)deviceProp.maxThreadsDim[2] &&
-	    param.block.x*param.block.y*(param.block.z+step_z) <= (unsigned int)deviceProp.maxThreadsPerBlock) {
-	  param.block.z += step_z;
-	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
-	  return true;
-	} else { // we have run off the end so let's reset
-	  param.block.z = step_z;
-	  param.grid.z = (vector_length_z + param.block.z - 1) / param.block.z;
-	  return false;
-	}
-      }
-    }
-
-    void initTuneParam(TuneParam &param) const
-    {
-      TunableVectorY::initTuneParam(param);
-      param.block.z = step_z;
-      param.grid.z = (vector_length_z + step_z - 1) / step_z;
-    }
-
-    /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const
-    {
-      TunableVectorY::defaultTuneParam(param);
-      param.block.z = step_z;
-      param.grid.z = (vector_length_z + step_z - 1) / step_z;
-    }
-
-    void resizeVector(int y, int z) const { vector_length_z = z;  TunableVectorY::resizeVector(y); }
-    void resizeStep(int y, int z) const { step_z = z;  TunableVectorY::resizeStep(y); }
+    qudaError_t launchError() const { return launch_error; }
+    qudaError_t& launchError() { return launch_error; }
   };
 
   /**
@@ -573,7 +360,7 @@ namespace quda {
    */
   void flushProfile();
 
-  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
   /**
    * @brief Post an event in the trace, recording where it was posted
@@ -595,8 +382,21 @@ namespace quda {
    */
   void setPolicyTuning(bool);
 
+  /**
+   * @brief Query whether we are currently tuning a policy
+   */
+  bool policyTuning();
+
+  /**
+   * @brief Enable / disable whether we are tuning an uber kernel
+   */
+  void setUberTuning(bool);
+
+  /**
+   * @brief Query whether we are tuning an uber kernel
+   */
+  bool uberTuning();
+
 } // namespace quda
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
-
-#endif // _TUNE_QUDA_H

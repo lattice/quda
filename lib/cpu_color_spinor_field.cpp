@@ -130,10 +130,8 @@ namespace quda {
     bytes = length * precision;
     if (isNative()) bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-
-    if (pad != 0) errorQuda("Non-zero pad not supported");  
-    if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
-    if (precision == QUDA_QUARTER_PRECISION) errorQuda("Quarter precision not supported");
+    if (pad != 0) errorQuda("Non-zero pad not supported");
+    if (precision < QUDA_SINGLE_PRECISION) errorQuda("Fixed-point precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
@@ -259,6 +257,8 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
+    createGhostZone(nFace, false);
+
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 
@@ -299,19 +299,17 @@ namespace quda {
   void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
     genericPackGhost(ghost, *this, parity, nFace, dagger);
-    return;
   }
 
-  void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
-					const QudaDirection dir, const int dagger)
+  void cpuColorSpinorField::unpackGhost(void *, const int, const QudaDirection)
   {
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in unpackGhost for cpu");
     }
   }
 
-  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
-					  const MemoryLocation *dummy2, bool dummy3, bool dummy4, QudaPrecision dummy5) const
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *,
+					  const MemoryLocation *, bool, bool, QudaPrecision) const
   {
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer(nFace);
@@ -330,6 +328,18 @@ namespace quda {
     exchange(ghost_buf, sendbuf, nFace);
 
     host_free(sendbuf);
+  }
+
+  void cpuColorSpinorField::copy_to_buffer(void *buffer) const
+  {
+    std::memcpy(buffer, v, bytes);
+    if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes); }
+  }
+
+  void cpuColorSpinorField::copy_from_buffer(void *buffer)
+  {
+    std::memcpy(v, buffer, bytes);
+    if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes); }
   }
 
 } // namespace quda
