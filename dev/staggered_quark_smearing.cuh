@@ -14,7 +14,7 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nDim, QudaReconstructType reconstruct_>
+  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct StaggeredQSmearArg : DslashArg<Float, nDim> {//DslashArg has kernel_type, see dslash_helper.cuh
     static constexpr int nColor = 3;
     static constexpr int nSpin  = 1;
