@@ -6453,7 +6453,7 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     accepted += (int)accept;
   }
   
-  if(getVerbosity() == QUDA_SUMMARIZE) {
+  if(getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Trajectory %d: acceptance %d dH %+.16e expdH %.16e plaq %.16e Q %+.16e", step, (int)accept, dH, expdH, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge);
     if(step >= hmc_param->therm_updates) {
       printfQuda(" rate %f\n", (1.0*accepted)/trajectories);
