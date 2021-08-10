@@ -20,11 +20,6 @@ namespace quda
 
     bool tuneSharedBytes() const { return false; }
 
-    bool advanceTuneParam(TuneParam &param) const // only do autotuning if we have device fields
-    {
-      return location == QUDA_CUDA_FIELD_LOCATION ? Tunable::advanceTuneParam(param) : false;
-    }
-
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
@@ -93,91 +88,95 @@ namespace quda
 
   // explicit instantiation list for transform_reduce
 
-  template void transform_reduce<double, complex<float>, int, square_<double, float>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, int, square_<double, float>,
+  template void transform_reduce<double, complex<float>, unsigned int, square_<double, float>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int, square_<double, float>,
     double, plus<double>);
-  template void transform_reduce<double, complex<int>, int, abs_<double, int>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int> *> const &, int, abs_<double, int>, double,
+  template void transform_reduce<double, complex<int>, unsigned int, abs_<double, int>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<quda::complex<int> *> const &, unsigned int, abs_<double, int>, double,
     plus<double>);
-  template void transform_reduce<double, complex<double>, int, abs_<double, double>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, int, abs_<double, double>, double,
+  template void transform_reduce<double, complex<double>, unsigned int, abs_<double, double>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int, abs_<double, double>, double,
     plus<double>);
-  template void transform_reduce<double, complex<float>, int, abs_<float, float>, minimum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, int, abs_<float, float>, double,
+  template void transform_reduce<double, complex<float>, unsigned int, abs_min_<float, float>, minimum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int, abs_min_<float, float>, double,
     minimum<float>);
-  template void transform_reduce<double, complex<int>, int, square_<double, int>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, int, square_<double, int>, double,
+  template void transform_reduce<double, complex<int>, unsigned int, square_<double, int>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, unsigned int, square_<double, int>, double,
     plus<double>);
-  template void transform_reduce<double, complex<int>, int, abs_<float, int>, maximum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, int, abs_<float, int>, double,
+  template void transform_reduce<double, complex<int>, unsigned int, abs_max_<float, int>, maximum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, unsigned int, abs_max_<float, int>, double,
     maximum<float>);
-  template void transform_reduce<double, complex<double>, int, abs_<double, double>, minimum<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, int, abs_<double, double>, double,
+  template void transform_reduce<double, complex<double>, unsigned int, abs_min_<double, double>, minimum<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int, abs_min_<double, double>, double,
     minimum<double>);
-  template void transform_reduce<double, complex<float>, int, abs_<float, float>, maximum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, int, abs_<float, float>, double,
+  template void transform_reduce<double, complex<float>, unsigned int, abs_max_<float, float>, maximum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int, abs_max_<float, float>, double,
     maximum<float>);
-  template void transform_reduce<double, complex<double>, int, square_<double, double>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, int, square_<double, double>,
+  template void transform_reduce<double, complex<double>, unsigned int, square_<double, double>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int, square_<double, double>,
     double, plus<double>);
-  template void transform_reduce<double, complex<int>, int, abs_<float, int>, minimum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, int, abs_<float, int>, double,
+  template void transform_reduce<double, complex<int>, unsigned int, abs_min_<float, int>, minimum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<int> *> const &, unsigned int, abs_min_<float, int>, double,
     minimum<float>);
-  template void transform_reduce<double, complex<double>, int, abs_<double, double>, maximum<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, int, abs_<double, double>, double,
+  template void transform_reduce<double, complex<double>, unsigned int, abs_max_<double, double>, maximum<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<double> *> const &, unsigned int, abs_max_<double, double>, double,
     maximum<double>);
-  template void transform_reduce<double, complex<float>, int, abs_<double, float>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, int, abs_<double, float>, double,
+  template void transform_reduce<double, complex<float>, unsigned int, abs_<double, float>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<float> *> const &, unsigned int, abs_<double, float>, double,
     plus<double>);
-  template void transform_reduce<double, complex<signed char>, int, square_<double, signed char>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, int,
+  template void transform_reduce<double, complex<signed char>, unsigned int, square_<double, signed char>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
     square_<double, signed char>, double, plus<double>);
-  template void transform_reduce<double, complex<short>, int, abs_<float, short>, minimum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, int, abs_<float, short>, double,
+  template void transform_reduce<double, complex<short>, unsigned int, abs_min_<float, short>, minimum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int, abs_min_<float, short>, double,
     minimum<float>);
-  template void transform_reduce<double, complex<short>, int, square_<double, short>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, int, square_<double, short>,
+  template void transform_reduce<double, complex<short>, unsigned int, square_<double, short>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int, square_<double, short>,
     double, plus<double>);
-  template void transform_reduce<double, complex<signed char>, int, abs_<float, signed char>, maximum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, int,
-    abs_<float, signed char>, double, maximum<float>);
-  template void transform_reduce<double, complex<signed char>, int, abs_<float, signed char>, minimum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, int,
-    abs_<float, signed char>, double, minimum<float>);
-  template void transform_reduce<double, complex<signed char>, int, abs_<double, signed char>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, int,
+  template void transform_reduce<double, complex<signed char>, unsigned int, abs_max_<float, signed char>, maximum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
+    abs_max_<float, signed char>, double, maximum<float>);
+  template void transform_reduce<double, complex<signed char>, unsigned int, abs_min_<float, signed char>, minimum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
+    abs_min_<float, signed char>, double, minimum<float>);
+  template void transform_reduce<double, complex<signed char>, unsigned int, abs_<double, signed char>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<signed char> *> const &, unsigned int,
     abs_<double, signed char>, double, plus<double>);
-  template void transform_reduce<double, complex<short>, int, abs_<double, short>, plus<double>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, int, abs_<double, short>, double,
+  template void transform_reduce<double, complex<short>, unsigned int, abs_<double, short>, plus<double>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int, abs_<double, short>, double,
     plus<double>);
-  template void transform_reduce<double, complex<short>, int, abs_<float, short>, maximum<float>>(
-    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, int, abs_<float, short>, double,
+  template void transform_reduce<double, complex<short>, unsigned int, abs_max_<float, short>, maximum<float>>(
+    QudaFieldLocation, std::vector<double> &, std::vector<complex<short> *> const &, unsigned int, abs_max_<float, short>, double,
     maximum<float>);
 
-  template double transform_reduce<double, complex<double>, unsigned long, abs_<double, double>, minimum<double>>(
-    QudaFieldLocation, complex<double> const *, unsigned long, abs_<double, double>, double, minimum<double>);
-  template double transform_reduce<double, complex<float>, int, abs_<double, float>, maximum<double>>(
-    QudaFieldLocation, complex<float> const *, int, abs_<double, float>, double, maximum<double>);
+  template double transform_reduce<double, complex<double>, unsigned long, abs_min_<double, double>, minimum<double>>(
+    QudaFieldLocation, complex<double> const *, unsigned long, abs_min_<double, double>, double, minimum<double>);
+  template double transform_reduce<double, complex<float>, unsigned int, abs_max_<double, float>, maximum<double>>(
+    QudaFieldLocation, complex<float> const *, unsigned int, abs_max_<double, float>, double, maximum<double>);
   template double transform_reduce<double, complex<double>, unsigned long, square_<double, double>, plus<double>>(
     QudaFieldLocation, complex<double> const *, unsigned long, square_<double, double>, double, plus<double>);
-  template double transform_reduce<double, complex<double>, int, abs_<double, double>, maximum<double>>(
-    QudaFieldLocation, complex<double> const *, int, abs_<double, double>, double, maximum<double>);
+  template double transform_reduce<double, complex<double>, unsigned int, abs_max_<double, double>, maximum<double>>(
+    QudaFieldLocation, complex<double> const *, unsigned int, abs_max_<double, double>, double, maximum<double>);
   template double transform_reduce<double, complex<float>, unsigned long, abs_<double, float>, plus<double>>(
     QudaFieldLocation, complex<float> const *, unsigned long, abs_<double, float>, double, plus<double>);
   template double transform_reduce<double, complex<double>, unsigned long, abs_<double, double>, plus<double>>(
     QudaFieldLocation, complex<double> const *, unsigned long, abs_<double, double>, double, plus<double>);
-  template double transform_reduce<double, complex<float>, unsigned long, abs_<float, float>, maximum<float>>(
-    QudaFieldLocation, complex<float> const *, unsigned long, abs_<float, float>, double, maximum<float>);
+  template double transform_reduce<double, complex<float>, unsigned long, abs_max_<float, float>, maximum<float>>(
+    QudaFieldLocation, complex<float> const *, unsigned long, abs_max_<float, float>, double, maximum<float>);
+  template double transform_reduce<double, complex<short>, unsigned long, abs_max_<float, short>, maximum<float>>(
+    QudaFieldLocation, complex<short> const *, unsigned long, abs_max_<float, short>, double, maximum<float>);
   template double transform_reduce<double, complex<float>, unsigned long, square_<double, float>, plus<double>>(
     QudaFieldLocation, complex<float> const *, unsigned long, square_<double, float>, double, plus<double>);
-  template double transform_reduce<double, complex<float>, unsigned long, abs_<float, float>, minimum<float>>(
-    QudaFieldLocation, complex<float> const *, unsigned long, abs_<float, float>, double, minimum<float>);
-  template double transform_reduce<double, complex<double>, unsigned long, abs_<double, double>, maximum<double>>(
-    QudaFieldLocation, complex<double> const *, unsigned long, abs_<double, double>, double, maximum<double>);
-  template double transform_reduce<double, complex<float>, int, square_<double, float>, plus<double>>(
-    QudaFieldLocation, complex<float> const *, int, square_<double, float>, double, plus<double>);
-  template double transform_reduce<double, complex<short>, int, square_<double, short>, plus<double>>(
-    QudaFieldLocation, complex<short> const *, int, square_<double, short>, double, plus<double>);
+  template double transform_reduce<double, complex<float>, unsigned long, abs_min_<float, float>, minimum<float>>(
+    QudaFieldLocation, complex<float> const *, unsigned long, abs_min_<float, float>, double, minimum<float>);
+  template double transform_reduce<double, complex<double>, unsigned long, abs_max_<double, double>, maximum<double>>(
+    QudaFieldLocation, complex<double> const *, unsigned long, abs_max_<double, double>, double, maximum<double>);
+  template double transform_reduce<double, complex<float>, unsigned int, square_<double, float>, plus<double>>(
+    QudaFieldLocation, complex<float> const *, unsigned int, square_<double, float>, double, plus<double>);
+  template double transform_reduce<double, complex<short>, unsigned int, square_<double, short>, plus<double>>(
+    QudaFieldLocation, complex<short> const *, unsigned int, square_<double, short>, double, plus<double>);
+  template double transform_reduce<double, complex<short>, unsigned int, abs_max_<double, short>, maximum<double>>(
+    QudaFieldLocation, complex<short> const*, unsigned int, abs_max_<double, short>, double, maximum<double>);
 
   template float reduce<float, float, int, maximum<float>>(QudaFieldLocation, float const *, int, float, maximum<float>);
 

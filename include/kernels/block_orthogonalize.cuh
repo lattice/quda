@@ -82,8 +82,9 @@ namespace quda {
     }
   };
 
-  template <int block_size, typename Arg> struct BlockOrtho_ {
+  template <typename Arg> struct BlockOrtho_ {
     const Arg &arg;
+    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int spinBlock = (fineSpin == 1) ? 1 : fineSpin / Arg::coarseSpin; // size of spin block
     static constexpr int nColor = Arg::nColor;
@@ -160,11 +161,16 @@ namespace quda {
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
             if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
+              if (chirality == 0) {
 #pragma unroll
-              for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], chirality);
+                for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], 0);
+              } else {
+#pragma unroll
+                for (int m = 0; m < mVec; m++) arg.B[j+m].template load<spinBlock>(v[m][tx].data, parity[tx], x_cb[tx], 1);
+              }
             } else {
 #pragma unroll
-              for (int m = 0; m < mVec; m++) load(v[tx][m], parity[tx], x_cb[tx], chirality, j + m);
+              for (int m = 0; m < mVec; m++) load(v[m][tx], parity[tx], x_cb[tx], chirality, j + m);
             }
           }
 

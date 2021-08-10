@@ -13,39 +13,6 @@
 
 namespace quda {
 
-  // these should not be namespaced!!
-  // determines whether the temporal ghost zones are packed with a gather kernel,
-  // as opposed to multiple memcpys
-  static bool kernelPackT = false;
-
-  void setKernelPackT(bool packT) { kernelPackT = packT; }
-
-  bool getKernelPackT() { return kernelPackT; }
-
-  static std::stack<bool> kptstack;
-
-  void pushKernelPackT(bool packT)
-  {
-    kptstack.push(getKernelPackT());
-    setKernelPackT(packT);
-
-    if (kptstack.size() > 10)
-    {
-      warningQuda("KernelPackT stack contains %u elements.  Is there a missing popKernelPackT() somewhere?",
-      static_cast<unsigned int>(kptstack.size()));
-    }
-  }
-
-  void popKernelPackT()
-  {
-    if (kptstack.empty())
-    {
-      errorQuda("popKernelPackT() called with empty stack");
-    }
-    setKernelPackT(kptstack.top());
-    kptstack.pop();
-  }
-
   namespace dslash {
     int it = 0;
 
