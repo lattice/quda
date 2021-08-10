@@ -484,7 +484,7 @@ namespace quda {
          * @return Linfinity norm
          */
         __host__ double abs_max(int =-1, bool global=true) const {
-          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
+          double absmax = accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
         }
@@ -495,7 +495,7 @@ namespace quda {
          * @return Minimum norm
          */
         __host__ double abs_min(int =-1, bool global=true) const {
-          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
+          double absmax = accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
           return absmax;

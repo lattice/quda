@@ -216,7 +216,7 @@ Performance Computing, Networking, Storage and Analysis (SC), 2011
 
 When taking advantage of adaptive multigrid, please also cite:
 
-M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
 "Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
 Parallelization," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016

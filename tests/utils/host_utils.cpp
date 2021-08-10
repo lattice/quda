@@ -110,6 +110,7 @@ void setQudaDefaultMgTestParams()
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
+    block_ortho_two_pass[i] = true;
 
     // Default eigensolver params
     mg_eig[i] = false;
