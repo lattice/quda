@@ -370,6 +370,7 @@ extern quda::mgarray<QudaFieldLocation> setup_location;
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
+extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
