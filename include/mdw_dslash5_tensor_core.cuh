@@ -243,7 +243,7 @@ namespace quda
 
   __inline__ __device__ void __float_max_abs_floats__(float &max, const float &input)
   {
-    static constexpr uint32_t maximum_mask = 0x7fffffffu; // 0111 1111 1111 1111 1111 1111 1111 1111
+    constexpr uint32_t maximum_mask = 0x7fffffffu; // 0111 1111 1111 1111 1111 1111 1111 1111
     uint32_t input_masked = *reinterpret_cast<const uint32_t *>(&input) & maximum_mask;
     if (*reinterpret_cast<float *>(&input_masked) > max) { max = *reinterpret_cast<float *>(&input_masked); }
   }
