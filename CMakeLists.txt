@@ -203,7 +203,6 @@ option(QUDA_COVDEV "build code for covariant derivative" OFF)
 
 option(QUDA_LAPLACE "build laplace operator" OFF)
 # Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
