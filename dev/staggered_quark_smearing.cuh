@@ -97,22 +97,15 @@ namespace quda
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
 
-            const int _2hop_fwd_idx = linkIndexP2(coord, arg.dim, d);
-            const int _1hop_fwd_idx = linkIndexP1(coord, arg.dim, d);            
-            const Link U_1hop_link  = arg.U(d, _1hop_fwd_idx, 1-parity);
-
-            const Vector in_2hop = arg.in(_2hop_fwd_idx, their_spinor_parity);
-            const Vector tmp     = U_1hop_link * in;           
-            const Link U         = arg.U(d, coord.x_cb, parity);            
-            out += U * tmp;
+            const Vector in_2hop = arg.in(_2hop_fwd_idx, parity);
+            const Link U_2link = arg.U(d, coord.x_cb, parity);            
+            out += U_2link * in_2hop;
           }
         }
         {
           // Backward gather - compute back offset for spinor and gauge fetch
 
           const int _1hop_back_idx = linkIndexM1(coord, arg.dim, d);
-          const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);          
-          const int _1hop_gauge_idx= _1hop_back_idx;
           const int _2hop_gauge_idx= _2hop_back_idx;          
 
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
@@ -129,12 +122,9 @@ namespace quda
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//?
 
-            const Link U_2hop_link = arg.U(d, _2hop_gauge_idx, parity);
-            const Vector in_2hop   = arg.in(_2hop_back_idx, parity);
-            const Vector tmp       = conj(U_1hop_link) * in;               
-                    
-            const Link U_1hop_link = arg.U(d, _1hop_gauge_idx, 1 - parity);
-            out += conj(U_1hop_link) * tmp;
+            const Link   U_2link = arg.U(d, _1hop_gauge_idx, parity);
+            const Vector in_2hop = arg.in(_2hop_back_idx, parity);
+            out += conj(U_2link) * in_2hop;
           }
         }
       }
