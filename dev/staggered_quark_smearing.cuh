@@ -105,7 +105,7 @@ namespace quda
         {
           // Backward gather - compute back offset for spinor and gauge fetch
 
-          const int _1hop_back_idx = linkIndexM1(coord, arg.dim, d);
+          const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);
           const int _2hop_gauge_idx= _2hop_back_idx;          
 
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
@@ -122,7 +122,7 @@ namespace quda
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//?
 
-            const Link   U_2link = arg.U(d, _1hop_gauge_idx, parity);
+            const Link   U_2link = arg.U(d, _2hop_gauge_idx, parity);
             const Vector in_2hop = arg.in(_2hop_back_idx, parity);
             out += conj(U_2link) * in_2hop;
           }
