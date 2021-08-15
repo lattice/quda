@@ -102,12 +102,12 @@ namespace quda
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          out += (U * in);
+          out = mv_add(U, in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
           const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
-          out += (U * in);
+          out = mv_add(U, in, out);
         }
       }
 
@@ -118,12 +118,12 @@ namespace quda
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
           const Link L = arg.L(d, coord.x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
-          out += L * in;
+          out = mv_add(L, in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
           const Link L = arg.L(d, coord.x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
-          out += L * in;
+          out = mv_add(L, in, out);
         }
       }
 
@@ -137,14 +137,14 @@ namespace quda
           const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
             arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-          out -= (conj(U) * in);
+          out = mv_add(conj(U), -in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
           const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
             arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in(back_idx, their_spinor_parity);
-          out -= (conj(U) * in);
+          out = mv_add(conj(U), -in, out);
         }
       }
 
@@ -156,13 +156,13 @@ namespace quda
           const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
           const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-          out -= conj(L) * in;
+          out = mv_add(conj(L), -in, out);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back3_idx = linkIndexM3(coord, arg.dim, d);
           const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1 - parity);
           const Vector in = arg.in(back3_idx, their_spinor_parity);
-          out -= conj(L) * in;
+          out = mv_add(conj(L), -in, out);
         }
       }
     } // nDim

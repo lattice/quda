@@ -21,7 +21,7 @@ void constructGaugeField(QudaGaugeParam &gauge_param, cudaGaugeField *gaugeEx,
   
   if (strcmp(latfile, "")) { // We loaded in a gauge field
     // copy internal extended field to gaugeEx
-    copyExtendedResidentGaugeQuda((void*)gaugeEx);
+    copyExtendedResidentGaugeQuda((void*)gaugeEx, QUDA_CUDA_FIELD_LOCATION);
   } else {
     if (heatbath_coldstart) InitGaugeField(*gaugeEx);
     else InitGaugeField(*gaugeEx, *randstates);
@@ -159,8 +159,9 @@ int main(int argc, char **argv)
     laplace3D = 3;
   }
   
-  // Create eigenvector parameters
+  // Create eigenvector parameters for the Laplace operator
   setQudaStaggeredEigTestParams();
+  
   // Set QUDA internal parameters
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
@@ -171,13 +172,14 @@ int main(int argc, char **argv)
   setStaggeredInvertParam(eig_inv_param);
   QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
+  
   // We encapsulate the eigensolver parameters inside the invert parameter structure
   eig_param.invert_param = &eig_inv_param;
 
+  // No ARPACK check for single prec solves
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
-  
   
   // Create inverter parameters
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -206,24 +208,24 @@ int main(int argc, char **argv)
   }
   inv_param.eig_param = nullptr;  
   //--------------------------------------------------------------------------
-  
+
+  // Vector construct START
+  //----------------------------------------------------------------------------------
+  // Allocate host side memory for the eigenspace
   void **host_evecs = (void **)safe_malloc(eig_n_conv * sizeof(void *));
   for (int i = 0; i < eig_param.n_conv; i++) {
     host_evecs[i] = (void *)safe_malloc(V * stag_spinor_site_size * eig_inv_param.cpu_prec);
   }
-  
   int n_evals = eig_param.n_conv;
   if(eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= tdim;  
   double _Complex *host_evals = (double _Complex *)safe_malloc(n_evals * sizeof(double _Complex));
 
-  // Vector construct START
-  //----------------------------------------------------------------------------------
+  // Allocate host side memory for the inverter
   std::vector<quda::ColorSpinorField *> in(Nsrc);
   std::vector<quda::ColorSpinorField *> out(Nsrc);
   quda::ColorSpinorParam cs_param;
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
-
-  // Allocate memory for color spinor fields
+  
   for (int i = 0; i < Nsrc; i++) {
     in[i] = quda::ColorSpinorField::Create(cs_param);
     out[i] = quda::ColorSpinorField::Create(cs_param);
@@ -231,10 +233,8 @@ int main(int argc, char **argv)
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
-  // QUDA invert test BEGIN
+  // QUDA (s)LapH test BEGIN
   //----------------------------------------------------------------------------
-
-
   
   // QUDA Laplace 3D eigensolver
   // The 3D eigensolver is a Thick Restarted Lanczos that uses the 3D Laplace
@@ -248,7 +248,6 @@ int main(int argc, char **argv)
   // eigensystem.
   //----------------------------------------------------------------------------
 
-  
   double time = 0.0;
   time = -((double)clock());
   eigensolveQuda(host_evecs, host_evals, &eig_param);
@@ -277,13 +276,10 @@ int main(int argc, char **argv)
       // Construct the source for this iteration
       for(int n=0; n<eig_param.n_conv; n++) {
 	//createLAPHsource(source_t, s, n, host_evecs, *in[0]->V());
-
 	invertQuda(out[0]->V(), in[0]->V(), &inv_param);
-	
       }
     }
-  }
-  
+  }  
   //----------------------------------------------------------------------------
   
   // Deallocate host memory
@@ -311,3 +307,4 @@ int main(int argc, char **argv)
   
   return 0;
 }
+
