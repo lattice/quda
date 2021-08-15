@@ -166,7 +166,7 @@ int main(int argc, char **argv)
 
     if (strcmp(latfile, "") || !coldstart) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
-      copyExtendedResidentGaugeQuda((void*)gaugeEx);
+      copyExtendedResidentGaugeQuda((void*)gaugeEx, QUDA_CUDA_FIELD_LOCATION);
     } else {
       if (coldstart) InitGaugeField(*gaugeEx);
       //else InitGaugeField(*gaugeEx, *randstates);
