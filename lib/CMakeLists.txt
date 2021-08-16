@@ -498,7 +498,7 @@ endif()
 
 if(QUDA_QDPJIT)
   target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_link_libraries(quda PUBLIC QDPXX::qdp) 
+  target_link_libraries(quda PUBLIC QDPXX::qdp)
 endif()
 
 if(QUDA_ARPACK)
