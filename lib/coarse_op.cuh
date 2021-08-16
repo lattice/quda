@@ -903,7 +903,7 @@ namespace quda {
 	// this is just a trivial rescaling kernel, find the maximum
 	complex<Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
 	complex<Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
-	double max = std::max(abs(fp), abs(fm));
+	double max = std::max({abs(fp.real()), abs(fp.imag()), abs(fm.real()), abs(fm.imag())}) * v.Scale();
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tm max %e\n", max);
 	av.Scale(max);
 	arg.AV.resetScale(max);
