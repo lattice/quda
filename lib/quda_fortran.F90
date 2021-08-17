@@ -196,6 +196,7 @@ module quda_fortran
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
 
+     real(8) :: clover_csw   ! Csw coefficient of the clover term
      real(8) :: clover_coeff ! Coefficient of the clover term
      real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
