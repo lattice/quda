@@ -129,7 +129,6 @@ namespace quda
 
       // Get min step
       int step_min = getArrayMinMax3D(num_locked_3D, n_kr, true);
-      printfQuda("step min = %d\n", step_min);
       for (int step = step_min; step < n_kr; step++) lanczosStep3D(kSpace, step);
       iter += (n_kr - step_min);
       
@@ -150,7 +149,7 @@ namespace quda
 	iter_locked_3D[t] = 0;
 	for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
 	  if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_VERBOSE)
+	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	      printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]],
 			 epsilon * mat_norm_3D[t]);
 	    iter_locked_3D[t] = i;	    
@@ -166,9 +165,9 @@ namespace quda
 	iter_converged_3D[t] = iter_locked_3D[t];
 	for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
 	  if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_VERBOSE)
+	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	      printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
-	    iter_converged_3D[t] = i;
+	    iter_converged = i;
 	  } else {
 	    // Unlikely to find new converged pairs
 	    break;
@@ -176,7 +175,7 @@ namespace quda
 	}
       }
 
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
+      for (int t = 0; t < ortho_dim_size  && !converged_3D[t]; t++) {
 	iter_keep_3D[t] = std::min(iter_converged_3D[t] + (n_kr - num_converged_3D[t]) / 2, n_kr - num_locked_3D[t] - 12);
       }
       
@@ -190,8 +189,7 @@ namespace quda
 	num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
 	num_locked_3D[t] += iter_locked_3D[t];
 
-	//if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
-	if (getVerbosity() >= QUDA_VERBOSE) {
+	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
 	  printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t_offset + t, restart_iter + 1);
 	  printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
 	  printf("iter Keep[%d] = %d\n", t_offset + t, iter_keep_3D[t]);
@@ -212,14 +210,10 @@ namespace quda
       for (int t = 0; t < ortho_dim_size; t++) {
 	if (num_converged_3D[t] >= n_conv) {
 	  converged_3D[t] = true;
-	  printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
 	} else {
 	  all_converged = false;
-	  printf("t=%d converged = %s from rank %d\n", t, converged_3D[t] ? "true" : "false", comm_rank());
 	}
       }
-
-      printf("All converged = %s from rank %d\n", all_converged ? "true" : "false", comm_rank());
       
       if(all_converged) {
 	reorder3D(kSpace);
