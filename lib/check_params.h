@@ -45,7 +45,7 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
     errorQuda("Unexpected QudaGaugeParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
 #else
-  P(struct_size, (size_t)INVALID_INT-1);
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #if defined INIT_PARAM
