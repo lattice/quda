@@ -38,7 +38,8 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    double csw;  //! Clover coefficient
+    double csw;  //! C_sw clover coefficient
+    double coeff;  //! Overall clover coefficient
     bool twisted; // whether to create twisted mass clover
     double mu2;
     double rho;
@@ -117,6 +118,7 @@ namespace quda {
     void *invNorm;
 
     double csw;
+    double coeff;
     bool twisted; 
     double mu2;
     double rho;
@@ -194,9 +196,14 @@ namespace quda {
     int Nspin() const { return nSpin; }
 
     /**
-       @return Clover coefficient (usually includes kappa)
+       @return Csw coefficient (does not include kappa)
     */
     double Csw() const { return csw; }
+
+    /**
+       @return Clover coefficient (explicitly includes kappa)
+    */
+    double Coeff() const { return coeff; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
