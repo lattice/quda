@@ -273,19 +273,27 @@ namespace quda {
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
         calculateYcoarse<float, float>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu, mu_factor, dirac,
                                        matpc, need_bidirectional, use_mma);
       } else {
 	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
         calculateYcoarse<float, short>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mass, mu, mu_factor, dirac,
                                        matpc, need_bidirectional, use_mma);
       } else {
 	errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }

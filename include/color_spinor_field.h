@@ -644,7 +644,7 @@ namespace quda {
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
-    ColorSpinorField* CreateAlias(const ColorSpinorParam &param);
+    ColorSpinorField *CreateAlias(const ColorSpinorParam &param);
 
     /**
        @brief Create a coarse color-spinor field, using this field to set the meta data

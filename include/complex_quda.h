@@ -459,8 +459,7 @@ template<>
 {
 public:
   typedef float value_type;
-  __host__ __device__
-    inline complex<float>(){};
+  __host__ __device__ inline complex<float>() {};
   __host__ __device__
     inline complex<float>(const float & re, const float& im = float())
     {
@@ -581,8 +580,7 @@ template<>
 {
 public:
   typedef double value_type;
-  __host__ __device__
-    inline complex<double>(){};
+  __host__ __device__ inline complex<double>() {};
   __host__ __device__
     inline complex<double>(const double & re, const double& im = double())
     {
@@ -710,7 +708,7 @@ template <> struct complex<int8_t> : public char2 {
 public:
   typedef int8_t value_type;
 
-  __host__ __device__ inline complex<int8_t>() {};
+  __host__ __device__ inline complex<int8_t>() : char2() {};
 
   __host__ __device__ inline complex<int8_t>(const int8_t &re, const int8_t &im = float())
   {
@@ -718,7 +716,7 @@ public:
     imag(im);
   }
 
-  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) { }
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) {}
 
   __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
   {
@@ -757,7 +755,7 @@ struct complex <short> : public short2
 public:
   typedef short value_type;
 
-  __host__ __device__ inline complex<short>(){};
+  __host__ __device__ inline complex<short>() {};
 
   __host__ __device__ inline complex<short>(const short & re, const short& im = float())
     {
@@ -803,7 +801,7 @@ struct complex <int> : public int2
 public:
   typedef int value_type;
 
-  __host__ __device__ inline complex<int>(){};
+  __host__ __device__ inline complex<int>() {};
 
   __host__ __device__ inline complex<int>(const int& re, const int& im = float())
     {

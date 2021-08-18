@@ -92,7 +92,7 @@ namespace quda {
 	if (arg.nDim == 5) GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,5,Arg>(arg);
 	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
-	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	arg.nParity2dim_threads = arg.nParity*2*tp.aux.x;
 #ifdef JITIFY
         using namespace jitify::reflection;

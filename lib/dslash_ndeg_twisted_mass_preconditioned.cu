@@ -82,6 +82,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;

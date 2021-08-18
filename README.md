@@ -195,7 +195,7 @@ used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
-Please visit http://lattice.github.com/quda for contact information. Bug
+Please visit http://lattice.github.io/quda for contact information. Bug
 reports are especially welcome.
 
 
@@ -216,7 +216,7 @@ Performance Computing, Networking, Storage and Analysis (SC), 2011
 
 When taking advantage of adaptive multigrid, please also cite:
 
-M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
 "Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
 Parallelization," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016
@@ -230,7 +230,7 @@ Implementations of Block-Krylov Space Solvers on GPUs,"
 To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
 
 Several other papers that might be of interest are listed at
-http://lattice.github.com/quda .
+http://lattice.github.io/quda .
 
 
 ## Authors:

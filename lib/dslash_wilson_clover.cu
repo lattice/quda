@@ -40,6 +40,7 @@ namespace quda
 
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
       default: break; // all clover flops are in the interior kernel
       }

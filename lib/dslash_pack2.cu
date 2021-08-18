@@ -285,7 +285,7 @@ public:
 #endif
       } else if (in.Nspin() == 1) {
         using Arg = PackArg<Float, nColor, 1, false>;
-        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c);
+        Arg arg(ghost, in, nFace, dagger, parity, threads, a, b, c, shmem);
         arg.counter = dslash::get_shmem_sync_counter();
         arg.swizzle = tp.aux.x;
         arg.sites_per_block = (arg.threads + tp.grid.x - 1) / tp.grid.x;

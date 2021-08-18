@@ -44,7 +44,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
 };
 
 struct DslashTestWrapper {
@@ -1084,10 +1084,7 @@ struct DslashTestWrapper {
     DslashTime dslash_time = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
-    dslashRef();
-
     if (!test_split_grid) {
-
       if (!transfer) *spinorOut = *cudaSpinorOut;
 
       // print timing information

@@ -98,9 +98,9 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  host_free(topo->ranks);
-  host_free(topo->coords);
-  host_free(topo);
+  delete [] topo->ranks;
+  delete [] topo->coords;
+  delete topo;
 }
 
 inline int comm_ndim(const Topology *topo) { return topo->ndim; }
@@ -458,7 +458,11 @@ struct Communicator {
              comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
 
+#ifdef MULTI_GPU
   int comm_dim_partitioned(int dim) { return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1)); }
+#else
+  int comm_dim_partitioned(int) { return 0; }
+#endif
 
   int comm_partitioned()
   {
@@ -548,18 +552,19 @@ struct Communicator {
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    // We only want one (1) gpuid for all communicators, so gpuid is static.
-    // We initialize gpuid if it's still negative.
     if (gpuid < 0) {
 
+      int device_count;
+      cudaGetDeviceCount(&device_count);
+      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+
+      // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
         if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
 
-      int device_count;
-      cudaGetDeviceCount(&device_count);
-      if (device_count == 0) { errorQuda("No CUDA devices found"); }
+      // At this point we had either pulled a gpuid from an env var or from the old way.
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -569,7 +574,7 @@ struct Communicator {
           errorQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
-    }
+    } // -ve gpuid
 
     comm_peer2peer_init(hostname_recv_buf);
 
@@ -635,19 +640,10 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
-                         comm_dim_override[0]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(1) ? '0' :
-                         comm_dim_override[1]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(2) ? '0' :
-                         comm_dim_override[2]   ? '1' :
-                                                  '0'),
-                      (!comm_dim_partitioned(3) ? '0' :
-                         comm_dim_override[3]   ? '1' :
-                                                  '0'),
-                      '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;
@@ -699,18 +695,18 @@ struct Communicator {
 
 #if defined(QMP_COMMS)
   QMP_comm_t QMP_COMM_HANDLE;
-  
+
   /**
-  * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
-  * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
-  */
+   * A bool indicating if the QMP handle here is the default one, which we should not free at the end,
+   * or a one that QUDA creates through `QMP_comm_split`, which we should free at the end.
+   */
   bool is_qmp_handle_default;
 #endif
 
   int rank = -1;
   int size = -1;
 
-  Communicator() { }
+  Communicator() {}
 
   Communicator(Communicator &other, const int *comm_split);
 

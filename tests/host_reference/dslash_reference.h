@@ -306,8 +306,8 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 }
 
 template <typename Float>
-static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, 
-					   Float** back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
+                                           Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;
@@ -444,7 +444,7 @@ template <QudaPCType type> int x4_5d_mgpu(int i, int oddBit)
 
 template <QudaPCType type, typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float **fwd_nbr_spinor,
-    Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+                              Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;

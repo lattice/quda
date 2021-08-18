@@ -436,7 +436,12 @@ namespace quda {
     instantiate<Staple_, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
-  void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField& u, const double *coeff)
+  void longKSLink(GaugeField *lng, const GaugeField &u, const double *coeff)
+  {
+    computeLongLink(*lng, u, coeff[1]);
+  }
+
+  void fatKSLink(GaugeField *fat, const GaugeField& u, const double *coeff)
   {
 #ifdef GPU_FATLINK
     GaugeFieldParam gParam(u);
@@ -453,9 +458,6 @@ namespace quda {
     }
 
     computeOneLink(*fat, u, coeff[0]-6.0*coeff[5]);
-
-    // if this pointer is not NULL, compute the long link
-    if (lng) computeLongLink(*lng, u, coeff[1]);
 
     // Check the coefficients. If all of the following are zero, return.
     if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF ||

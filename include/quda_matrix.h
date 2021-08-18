@@ -56,7 +56,7 @@ namespace quda {
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
   template<typename Float, typename T> struct clover_wrapper;
-  template<typename T, int N> class HMatrix;
+  template <typename T, int N> class HMatrix;
 
   template<class T, int N>
     class Matrix
@@ -73,10 +73,11 @@ namespace quda {
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        __device__ __host__ inline Matrix(const Matrix<T,N> &a) {
+        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
+        {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-	}
+        }
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -193,11 +194,10 @@ namespace quda {
 	__device__ __host__ inline uint64_t checksum() const {
           // ensure length is rounded up to 64-bit multiple
           constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
-          uint64_t base_[length] = { };
-          T *data_ = reinterpret_cast<T*>( static_cast<void*>(base_) );
-          for (int i=0; i<N*N; i++) data_[i] = data[i];
-          uint64_t checksum_ = base_[0];
-          for (int i=1; i<length; i++) checksum_ ^= base_[i];
+          uint64_t base[length] = { };
+          memcpy(base, data, N * N * sizeof(T));
+          uint64_t checksum_ = base[0];
+          for (int i=1; i<length; i++) checksum_ ^= base[i];
           return checksum_;
         }
 
@@ -570,8 +570,7 @@ namespace quda {
 	}
       }
       return result;
-    }
-
+  }
 
   template<class T>
     __device__ __host__ inline

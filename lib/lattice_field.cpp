@@ -426,6 +426,7 @@ namespace quda {
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
 
     for (int b=0; b<2; b++) {
+#ifndef NVSHMEM_COMMS
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
 	for (int dir=0; dir<2; ++dir) {
@@ -459,7 +460,7 @@ namespace quda {
       }
 
       checkCudaError();
-
+#endif
       // open the remote memory handles and set the send ghost pointers
       for (int dim = 0; dim < 4; ++dim) {
 #ifndef NVSHMEM_COMMS

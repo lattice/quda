@@ -39,7 +39,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
 };
 
 struct StaggeredDslashTestWrapper {
@@ -290,9 +290,8 @@ struct StaggeredDslashTestWrapper {
     gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-                                             QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 :
-                                             link_recon;
+        QUDA_RECONSTRUCT_13 :
+        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
     } else {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     }
@@ -312,9 +311,8 @@ struct StaggeredDslashTestWrapper {
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-                                             QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 :
-                                             link_recon;
+        QUDA_RECONSTRUCT_13 :
+        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
       printfQuda("Sending long links to GPU\n");
       loadGaugeQuda(milc_longlink_gpu, &gauge_param);
     }
@@ -539,8 +537,6 @@ struct StaggeredDslashTestWrapper {
 
     DslashTime dslash_time = dslashCUDA(niter);
     *spinorOut = *cudaSpinorOut;
-
-    staggeredDslashRef();
 
     if (print_metrics) {
       printfQuda("%fus per kernel call\n", 1e6 * dslash_time.event_time / niter);
