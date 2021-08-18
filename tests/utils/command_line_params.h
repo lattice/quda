@@ -214,6 +214,7 @@ extern double anisotropy;
 extern double tadpole_factor;
 extern double eps_naik;
 extern int n_naiks;
+extern double clover_csw;
 extern double clover_coeff;
 extern bool compute_clover;
 extern bool compute_fatlong;

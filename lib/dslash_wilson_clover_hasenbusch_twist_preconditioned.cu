@@ -156,7 +156,7 @@ namespace quda
     instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                              profile);
 #else
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
 #endif
   }
 
@@ -299,7 +299,7 @@ namespace quda
     instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                            profile);
 #else
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
 #endif
   }
 
