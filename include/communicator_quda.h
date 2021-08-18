@@ -427,7 +427,11 @@ struct Communicator {
              comm_dim_partitioned(2), comm_dim_partitioned(3));
   }
 
+#ifdef MULTI_GPU
   int comm_dim_partitioned(int dim) { return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1)); }
+#else
+  int comm_dim_partitioned(int) { return 0; }
+#endif
 
   int comm_partitioned()
   {
@@ -510,21 +514,21 @@ struct Communicator {
     Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
 
+    
     // determine which GPU this rank will use
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    // We only want one (1) gpuid for all communicators, so gpuid is static.
-    // We initialize gpuid if it's still negative.
     if (gpuid < 0) {
+      int device_count = quda::device::get_device_count();
+      if (device_count == 0) { errorQuda("No devices found"); }
 
+      // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
         if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
 
-      int device_count = quda::device::get_device_count();
-      if (device_count == 0) { errorQuda("No devices found"); }
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -534,7 +538,7 @@ struct Communicator {
           errorQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
-    }
+    } // -ve gpuid
 
     comm_peer2peer_init(hostname_recv_buf);
 

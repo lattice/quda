@@ -68,14 +68,12 @@ namespace quda {
     using Field = typename colorspinor::FieldOrderCB<real,nSpin,nColor,1,order,store_t,ghost_store_t>;
 
     Field field;
-    int_fastdiv X[QUDA_MAX_DIM];
     const int_fastdiv volumeCB;
     const int nFace;
     const int parity;
     const int_fastdiv nParity;
     const int dagger;
     const QudaPCType pc_type;
-    int commDim[4]; // whether a given dimension is partitioned or not
     DslashConstant dc; // pre-computed dslash constants for optimized indexing
     int_fastdiv work_items;
     int threadDimMapLower[4];
@@ -94,20 +92,14 @@ namespace quda {
       threadDimMapLower{ },
       threadDimMapUpper{ }
     {
-      X[0] = ((nParity == 1) ? 2 : 1) * a.X(0); // set to full lattice dimensions
-      for (int d=1; d<nDim; d++) X[d] = a.X(d);
-      X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
-      for (int i=0; i<4; i++) {
-	commDim[i] = comm_dim_partitioned(i);
-      }
-
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
-        if (!commDim[i]) continue;
+        if (!comm_dim_partitioned(i)) continue;
+        // unlike the dslash kernels, we include the fifth dimension here
+        dc.ghostFaceCB[i] *= nFace * (nDim == 5 ? dc.Ls : 1);
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * dc.ghostFaceCB[i];
         prev = i;
-        dc.ghostFaceCB[i] *= nFace * (pc_type == QUDA_5D_PC ? dc.Ls : 1);
       }
     }
   };
@@ -177,8 +169,32 @@ namespace quda {
     return target::dispatch<site_max>(std::max(thread_max_r, thread_max_i), arg);
   }
 
+  /**
+     This is distinct from the variant in index_helper.cuh in that the
+     fifth dimension is included in the thread map array.  At some
+     point we should replace that one with this one, which has less
+     division for the 5-d operators.
+  */
   template <typename Arg>
-  __device__ __host__ inline auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
+  constexpr int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
+  {
+    face_idx = tid;
+    if (face_idx < arg.threadDimMapUpper[0]) {
+      return 0;
+    } else if (face_idx < arg.threadDimMapUpper[1]) {
+      face_idx -= arg.threadDimMapLower[1];
+      return 1;
+    } else if (face_idx < arg.threadDimMapUpper[2]) {
+      face_idx -= arg.threadDimMapLower[2];
+      return 2;
+    } else {
+      face_idx -= arg.threadDimMapLower[3];
+      return 3;
+    }
+  }
+
+  template <typename Arg>
+  constexpr auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
   {
     if (arg.nFace == 1) {
       return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);
@@ -197,13 +213,13 @@ namespace quda {
       const int Ms = spins_per_thread<Arg::nSpin>();
       const int Mc = colors_per_thread<Arg::nColor>();
 
-      parity = (arg.nParity == 2) ? parity : arg.parity;
+      if (arg.nParity == 1) parity = arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;
       const int spin_block = (spin_color_block / (Arg::nColor / Mc)) * Ms;
       const int color_block = (spin_color_block % (Arg::nColor / Mc)) * Mc;
 
       int ghost_idx;
-      const int dim = dimFromFaceIndex(ghost_idx, tid, arg);
+      const int dim = dimFromFaceIndex<Arg>(ghost_idx, tid, arg);
 
       // determine which end of the lattice we are packing: 0 = start, 1 = end
       const int dir = (ghost_idx >= arg.dc.ghostFaceCB[dim]) ? 1 : 0;

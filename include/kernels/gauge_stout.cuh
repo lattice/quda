@@ -66,8 +66,7 @@ namespace quda
       }
 
       int dx[4] = {0, 0, 0, 0};
-      Link U, Stap, Omega, OmegaDiff, Q;
-      Complex i_2(0, 0.5);
+      Link U, Stap, Omega, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
@@ -137,9 +136,7 @@ namespace quda
       real rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
 
       int dx[4] = {0, 0, 0, 0};
-      Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+      Link U, UDag, Stap, Rect, Omega, ODT, Q;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
