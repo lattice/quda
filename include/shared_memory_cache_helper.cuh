@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <float_vector.h>
 
 /**
    @file shared_memory_cache_helper.cuh
@@ -42,8 +43,7 @@ namespace quda
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
-    //using atom_t = sizeof(T) % 16 == 0 ? int4 : sizeof(T) % 8 == 0 ? int2 : int;
-    using atom_t = int;
+    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
@@ -72,7 +72,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-        extern __shared__ atom_t cache_[];
+        extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
       }
     };

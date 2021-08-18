@@ -446,7 +446,7 @@ template<>
 {
 public:
   typedef float value_type;
-  __host__ __device__ inline complex<float>() {};
+  complex<float>() = default;
   constexpr complex<float>(const float & re, const float& im = float()) :
     float2{re, im} { }
 
@@ -518,7 +518,7 @@ template<>
 {
 public:
   typedef double value_type;
-  __host__ __device__ inline complex<double>() {};
+  complex<double>() = default;
   constexpr complex<double>(const double & re, const double& im = double()) :
     double2{re, im} { }
 
@@ -597,7 +597,7 @@ template <> struct complex<int8_t> : public char2 {
 public:
   typedef int8_t value_type;
 
-  __host__ __device__ inline complex<int8_t>() : char2() {};
+  complex<int8_t>() = default;
 
   constexpr complex<int8_t>(const int8_t &re, const int8_t &im = int8_t()) :
     char2{re, im} { }
@@ -634,7 +634,7 @@ struct complex <short> : public short2
 public:
   typedef short value_type;
 
-  __host__ __device__ inline complex<short>() {};
+  complex<short>() = default;
 
   constexpr complex<short>(const short & re, const short& im = short()) :
     short2{re, im} { }
@@ -670,7 +670,7 @@ struct complex <int> : public int2
 public:
   typedef int value_type;
 
-  __host__ __device__ inline complex<int>() {};
+  complex<int>() = default;
 
   constexpr complex<int>(const int& re, const int& im = int()) :
     int2{re, im} { }
@@ -770,7 +770,6 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     __host__ __device__
     inline complex<float> operator/(const complex<float>& lhs, const complex<float>& rhs){
 
-    complex<float> quot;
     float s = fabsf(rhs.real()) + fabsf(rhs.imag());
     float oos = 1.0f / s;
     float ars = lhs.real() * oos;
@@ -787,7 +786,6 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     __host__ __device__
     inline complex<double> operator/(const complex<double>& lhs, const complex<double>& rhs){
 
-    complex<double> quot;
     double s = fabs(rhs.real()) + fabs(rhs.imag());
     double oos = 1.0 / s;
     double ars = lhs.real() * oos;
