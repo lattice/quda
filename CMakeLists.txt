@@ -27,7 +27,7 @@ find_package(PythonInterp)
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
-  set(DEFBUILD "RELEASE")
+  set(DEFBUILD "DEVEL")
 endif()
 
 set(VALID_BUILD_TYPES
