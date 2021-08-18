@@ -19,8 +19,6 @@ static char FIXME[]="OMP FIXME";
 
 #define cudaMemcpy(a,b,c,d) ompwip([&](){ompwipMemcpy(a,(void*)b,c,d);},"memcpy %p <- %p %ld",a,b,c)
 #define cudaMemcpyAsync(a,b,c,d,e) ompwip([&](){ompwipMemcpy(a,(void*)b,c,d);},"memcpy %p <- %p %ld",a,b,c)
-#define cudaMemcpy2D(d,dp,s,sp,w,h,k) ompwip([&](){ompwipMemcpy2D(d,dp,(void*)s,sp,w,h,k);},"memcpy %p(%ld) <- %p(%ld) %ld %ld",d,dp,s,sp,w,h)
-#define cudaMemcpy2DAsync(d,dp,s,sp,w,h,k,st) ompwip([&](){ompwipMemcpy2D(d,dp,(void*)s,sp,w,h,k);},"memcpy %p(%ld) <- %p(%ld) %ld %ld",d,dp,s,sp,w,h)
 #define cudaMemset(a,b,c) ompwip([&](){ompwipMemset(a,b,c);},"memset %p %d %ld",a,b,c)
 #define cudaMemsetAsync(a,b,c,d) ompwip([&](){ompwipMemset(a,b,c);},"memset %p %d %ld",a,b,c)
 #define cudaMemset2D(a,b,c,d,e) ompwip([&](){ompwipMemset2D(a,b,c,d,e);},"memset %p(%ld) %d %ld %ld",a,b,c,d,e)
@@ -30,8 +28,6 @@ static char FIXME[]="OMP FIXME";
 
 #define cudaMemcpy(a,b,c,d) ompwipMemcpy(a,(void*)b,c,d)
 #define cudaMemcpyAsync(a,b,c,d,e) ompwipMemcpy(a,(void*)b,c,d)
-#define cudaMemcpy2D(d,dp,s,sp,w,h,k) ompwipMemcpy2D(d,dp,(void*)s,sp,w,h,k)
-#define cudaMemcpy2DAsync(d,dp,s,sp,w,h,k,st) ompwipMemcpy2D(d,dp,(void*)s,sp,w,h,k)
 #define cudaMemset(a,b,c) ompwipMemset(a,b,c)
 #define cudaMemsetAsync(a,b,c,d) ompwipMemset(a,b,c)
 #define cudaMemset2D(a,b,c,d,e) ompwipMemset2D(a,b,c,d,e)
@@ -166,89 +162,6 @@ ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
       warningQuda("cudaMemcpyDefault without a device, calling memcpy");
       printmem(s,c,1);
       memcpy(d,s,c);
-      printmem(d,c,1);
-    }
-    break;
-  default: errorQuda("Unsupported cudaMemcpyType %d", k);
-  }
-  return r;
-}
-
-static inline int
-ompwipMemcpy2D(void *d, std::size_t dp, void *s, std::size_t sp, std::size_t w, std::size_t h, cudaMemcpyKind k)
-{
-  int r = 0;  // return value from omp_target_memcpy, note that no return value is reserved for memcpy.
-  std::size_t v[2] = {w,h}, z[2] = {0,0}, dd[2] = {dp,h}, sd[2] = {sp,h};
-  unsigned char *cd = reinterpret_cast<unsigned char *>(d), *cs = reinterpret_cast<unsigned char *>(s);
-  switch(k){
-  case cudaMemcpyHostToHost:
-    printmem(s,c,1);
-    #pragma omp parallel for
-    for(std::size_t i=0;i<h;++i) memcpy(cd+i*dp,cs+i*sp,w);
-    printmem(d,c,1);
-    break;
-  case cudaMemcpyHostToDevice:
-    printmem(s,c,1);
-    if(0<omp_get_num_devices()){
-      r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_default_device(),omp_get_initial_device());
-      printmem(d,c,0);
-    }else{
-      warningQuda("cudaMemcpyHostToDevice without a device, calling memcpy");
-      #pragma omp parallel for
-      for(std::size_t i=0;i<h;++i) memcpy(cd+i*dp,cs+i*sp,w);
-      printmem(d,c,1);
-    }
-    break;
-  case cudaMemcpyDeviceToHost:
-    if(0<omp_get_num_devices()){
-      printmem(s,c,0);
-      r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_initial_device(),omp_get_default_device());
-    }else{
-      warningQuda("cudaMemcpyDeviceToHost without a device, calling memcpy");
-      printmem(s,c,1);
-      #pragma omp parallel for
-      for(std::size_t i=0;i<h;++i) memcpy(cd+i*dp,cs+i*sp,w);
-    }
-    printmem(d,c,1);
-    break;
-  case cudaMemcpyDeviceToDevice:
-    printmem(s,c,0);
-    r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_default_device(),omp_get_default_device());
-    printmem(d,c,0);
-    break;
-  case cudaMemcpyDefault:
-    if(0<omp_get_num_devices()){
-      if(QUDA_CUDA_FIELD_LOCATION==get_pointer_location(d)){
-        if(QUDA_CUDA_FIELD_LOCATION==get_pointer_location(s)){
-          // ompwip("cudaMemcpyDefault calling device to device");
-          printmem(s,c,0);
-          r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_default_device(),omp_get_default_device());
-          printmem(d,c,0);
-        }else{
-          // ompwip("cudaMemcpyDefault calling host to device");
-          printmem(s,c,1);
-          r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_default_device(),omp_get_initial_device());
-          printmem(d,c,0);
-        }
-      }else{
-        if(QUDA_CUDA_FIELD_LOCATION==get_pointer_location(s)){
-          // ompwip("cudaMemcpyDefault calling device to host");
-          printmem(s,c,0);
-          r = omp_target_memcpy_rect(d,s,1,2,v,z,z,dd,sd,omp_get_initial_device(),omp_get_default_device());
-          printmem(d,c,1);
-        }else{
-          // ompwip("cudaMemcpyDefault calling host to host");
-          printmem(s,c,1);
-          #pragma omp parallel for
-          for(std::size_t i=0;i<h;++i) memcpy(cd+i*dp,cs+i*sp,w);
-          printmem(d,c,1);
-        }
-      }
-    }else{
-      warningQuda("cudaMemcpyDefault without a device, calling memcpy");
-      printmem(s,c,1);
-      #pragma omp parallel for
-      for(std::size_t i=0;i<h;++i) memcpy(cd+i*dp,cs+i*sp,w);
       printmem(d,c,1);
     }
     break;
@@ -507,29 +420,6 @@ namespace quda
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
     if (error != cudaSuccess)
       errorQuda("cudaMemcpyAsync returned %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     qudaMemcpyKind kind, const char *func, const char *file, const char *line)
-  {
-    PROFILE(auto error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    if (error != cudaSuccess)
-      errorQuda("cudaMemcpy2D returned error %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line)
-  {
-    PROFILE(auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
-    set_runtime_error(error, "cudaMemcpy2DAsync", func, file, line);
-  }
-
-  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                             const qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-    auto error = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, cudaMemcpyDeviceToDevice, device::get_cuda_stream(stream));
-    set_runtime_error(error, "cudaMemcpy2DAsync", func, file, line);
   }
 
   void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
