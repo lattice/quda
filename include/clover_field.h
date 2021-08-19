@@ -1,6 +1,6 @@
 #pragma once
 
-#include <algorithm>
+#include <array>
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <comm_key.h>
