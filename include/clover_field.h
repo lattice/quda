@@ -1,8 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <quda_internal.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -126,7 +126,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable std::vector<double> trlog;
+    mutable std::array<double, 2> trlog;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -158,7 +158,7 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    std::vector<double>& TrLog() const { return trlog; }
+    std::array<double, 2>& TrLog() const { return trlog; }
     
     /**
        @return The order of the field
