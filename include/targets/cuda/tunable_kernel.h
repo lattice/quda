@@ -6,7 +6,7 @@
 #include <kernel.h>
 
 #ifdef JITIFY
-#include <jitify_helper2.cuh>
+#include <jitify_helper.h>
 #endif
 
 namespace quda {

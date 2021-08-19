@@ -256,6 +256,7 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
   add_subdirectory(targets/cuda)		
   target_include_directories(quda PRIVATE ../include/targets/cuda)
+  target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda> $<INSTALL_INTERFACE:include/targets/cuda>)
   target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
 endif()		
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
@@ -620,8 +621,8 @@ configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 if(QUDA_JITIFY)
-  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
-  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+  configure_file(../include/targets/cuda/jitify_options.hpp.in ../include/targets/cuda/jitify_options.hpp)
+  install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory
