@@ -167,7 +167,7 @@ namespace quda
 	  if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
 	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
 	      printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
-	    iter_converged = i;
+	    iter_converged_3D[t] = i;
 	  } else {
 	    // Unlikely to find new converged pairs
 	    break;

@@ -1640,6 +1640,8 @@ extern "C" {
 					   double _Complex *return_array);
 
   void laphBaryonKernelComputeModeTripletEnd();
+
+  void createLAPHsource(void *source, void **evecs, int source_t, int source_s, int eig_n);
   
   /**
   * Convert a 4D point source to a 5D one

@@ -11,7 +11,6 @@
 #include <command_line_params.h>
 #include <gauge_tools.h>
 #include <misc.h>
-
 #include <pgauge_monte.h>
 #include <random_quda.h>
 #include <unitarization_links.h>
@@ -186,8 +185,7 @@ int main(int argc, char **argv)
   QudaMultigridParam mg_param = newQudaMultigridParam();
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
-  if (inv_multigrid) {
-    
+  if (inv_multigrid) {    
     setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
     // Set sub structures
@@ -235,7 +233,7 @@ int main(int argc, char **argv)
 
   // QUDA (s)LapH test BEGIN
   //----------------------------------------------------------------------------
-  
+  //
   // QUDA Laplace 3D eigensolver
   // The 3D eigensolver is a Thick Restarted Lanczos that uses the 3D Laplace
   // operator with the temporal dimension omitted. The 4D operator may be
@@ -246,14 +244,11 @@ int main(int argc, char **argv)
   // The results are stored in 4D ColorSpinorField arrays. Each t component
   // of the n^th 4D vector corresponds to the n^th eigevector of the t^th
   // eigensystem.
-  //----------------------------------------------------------------------------
-
   double time = 0.0;
   time = -((double)clock());
   eigensolveQuda(host_evecs, host_evals, &eig_param);
   time += (double)clock();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
-  //----------------------------------------------------------------------------
   
   // Compute Perambulators
   // 1. Sources
@@ -272,10 +267,10 @@ int main(int argc, char **argv)
     printfQuda("Source time t=%d\n", source_t);
     for(int s=0; s<n_spin; s++) {
       printfQuda("Source spin s=%d\n", s);
-
+      
       // Construct the source for this iteration
       for(int n=0; n<eig_param.n_conv; n++) {
-	//createLAPHsource(source_t, s, n, host_evecs, *in[0]->V());
+	createLAPHsource(in[0]->V(), host_evecs, source_t, s, n);
 	invertQuda(out[0]->V(), in[0]->V(), &inv_param);
       }
     }
