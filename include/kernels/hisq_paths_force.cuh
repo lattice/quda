@@ -29,6 +29,7 @@ namespace quda {
       FORCE_LONG_LINK,
       FORCE_COMPLETE,
       FORCE_ONE_LINK,
+      FORCE_TWO_LINK,      
       FORCE_INVALID
     };
 
@@ -705,6 +706,70 @@ namespace quda {
         } // loop over sig
       }
     };
+    
+    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    struct TwoLinkArg : public BaseForceArg<real, nColor, reconstruct> {
+
+      typedef typename gauge::FloatNOrder<real,18,2,11> M;
+      typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
+      F outA;
+
+      TwoLinkArg(GaugeField &twoLink, const GaugeField &link)
+        : BaseForceArg<real, nColor, reconstruct>(link,0), outA(twoLink)
+      { }
+
+    };
+
+    template <typename Arg> struct TwoLink
+    {
+      using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
+      const Arg &arg;
+      constexpr TwoLink(const Arg &arg) : arg(arg) {}
+      constexpr static const char *filename() { return KERNEL_FILE; }
+
+      // Flops count, in two-number pair (matrix_mult, matrix_add)
+      // 				   (24, 12)
+      // 4968 Flops per site in total
+      __device__ __host__ void operator()(int x_cb, int parity)
+      {
+        int x[4];
+        int dx[4] = {0,0,0,0};
+
+        getCoords(x, x_cb, arg.X, parity);
+
+        for (int i=0; i<4; i++) x[i] += arg.border[i];
+        int e_cb = linkIndex(x,arg.E);
+
+        /*
+         *
+         *    C    D    
+         *    ---- ----
+         *
+         *   ---> sig direction
+         *
+         *   C is the current point (sid)
+         *
+         */
+
+        // compute the forward two links
+#pragma unroll
+        for (int mu=0; mu<4; mu++) {
+          int point_c = e_cb;
+
+          dx[mu]++;
+          int point_d = linkIndexShift(x,dx,arg.E);
+
+
+          Link Ucd = arg.link(mu, point_c, parity);
+          Link Ude = arg.link(mu, point_d, 1-parity);
+
+          Link temp = Ucd*Ude;
+
+          arg.outA(mu, e_cb, parity) = temp;//force + arg.coeff*temp;
+        } // loop over mu
+      }
+    };
+    
 
   }
 }

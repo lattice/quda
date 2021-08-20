@@ -97,6 +97,19 @@ namespace quda {
   {
     return linkIndexDn<I, -1>(x, X, mu);
   }
+  
+  /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] -2 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to subtract 1
+   */
+  template <typename I, typename Coord> __device__ __host__ inline int linkIndexM2(const Coord &x, const I X[4], const int mu)
+  {
+    return linkIndexDn<I, -2>(x, X, mu);
+  }  
 
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -3 in the mu direction
@@ -141,6 +154,20 @@ namespace quda {
   __device__ __host__ inline int linkIndexP1(const Coord &x, const I X[4], const int mu) {
     return linkIndexDn<I, 1>(x, X, mu);
   }
+  
+ /**
+     Compute the checkerboard 1-d index from the 4-d coordinate x[] +2 in the mu direction
+
+     @return 1-d checkerboard index
+     @param x 4-d lattice index
+     @param X Full lattice dimensions
+     @param mu direction in which to add 1
+   */
+  template <typename I, typename Coord>
+  __device__ __host__ inline int linkIndexP2(const Coord &x, const I X[4], const int mu) {
+    return linkIndexDn<I, 2>(x, X, mu);
+  }
+  
 
   /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] +3 in the mu direction
