@@ -96,7 +96,7 @@ namespace quda
             out += U * in;
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
-
+            const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
             const Vector in_2hop = arg.in(_2hop_fwd_idx, parity);
             const Link U_2link = arg.U(d, coord.x_cb, parity);            
             out += U_2link * in_2hop;
