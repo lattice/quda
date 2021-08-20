@@ -224,7 +224,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-p
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda SYSTEM PUBLIC $<$<OR:$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>,$<COMPILE_LANG_AND_ID:CUDA,Clang>>:${CUDAToolkit_INCLUDE_DIRS}>)
+target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
 
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
@@ -256,6 +256,7 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
   add_subdirectory(targets/cuda)		
   target_include_directories(quda PRIVATE ../include/targets/cuda)
+  target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda> $<INSTALL_INTERFACE:include/targets/cuda>)
   target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
 endif()		
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
@@ -620,8 +621,8 @@ configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 if(QUDA_JITIFY)
-  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
-  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+  configure_file(../include/targets/cuda/jitify_options.hpp.in ../include/targets/cuda/jitify_options.hpp)
+  install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory

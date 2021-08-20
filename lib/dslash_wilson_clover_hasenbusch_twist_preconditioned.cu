@@ -160,7 +160,7 @@ namespace quda
                                                    const GaugeField &, const CloverField &, double, double,
                                                    const ColorSpinorField &, int, bool, const int *, TimeProfile &)
   {
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
   }
 #endif
 
@@ -307,7 +307,7 @@ namespace quda
                                                  const CloverField &, double, double, const ColorSpinorField &,
                                                  int, bool, const int *, TimeProfile &)
   {
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
   }
 #endif
 

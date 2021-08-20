@@ -21,7 +21,7 @@ namespace quda {
     /**
        @brief The __constant__ buffer used for kernel parameters
     */
-#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE) // what is the equivalent macro for nvc++?
+#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE)
     // rdc is enabled when NVSHMEM is enabled, so we need to make the
     // buffer as extern and define it in one place only
     extern __constant__ char buffer[max_constant_size()];
