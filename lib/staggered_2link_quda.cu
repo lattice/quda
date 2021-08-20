@@ -13,17 +13,16 @@ using namespace fermion_force;
 
   namespace staggered_two_link {
 
-    template <typename Arg> class TwoLink : public TunableKernel3D {
+    template <typename Arg> class TwoLink_ : public TunableKernel3D {
       Arg &arg;
       const GaugeField &outA;
       unsigned int minThreads() const { return arg.threads.x; }
 
     public:
-      TwoLink(Arg &arg, const GaugeField &link, const GaugeField &outA) :
+      TwoLink_(Arg &arg, const GaugeField &link, const GaugeField &outA) :
         TunableKernel3D(link, 2, 4),
         arg(arg),
-        outA(outA),
-        link(link)
+        outA(outA)
       {
         strcat(aux, (std::string(comm_dim_partitioned_string()) + "threads=" + std::to_string(arg.threads.x)).c_str());
         strcat(aux, ",TWO_LINK");
@@ -47,7 +46,7 @@ using namespace fermion_force;
 
       long long flops() const { return 2*4*arg.threads.x*36ll;}
 
-      long long bytes() const { return 2*4*arg.threads.x*( arg.oProd.Bytes() + 2*arg.outA.Bytes() );}
+      long long bytes() const { return 2*4*arg.threads.x*( 2*arg.outA.Bytes() );}
     };
 
     template <typename real, int nColor, QudaReconstructType recon>
@@ -55,7 +54,7 @@ using namespace fermion_force;
       ComputeTwoLink(GaugeField &newTwoLink, const GaugeField &link)
       {
         TwoLinkArg<real, nColor> arg(newTwoLink, link);
-        TwoLink<decltype(arg)>   twolnk(arg, link, newTwoLink);
+        TwoLink_<decltype(arg)>  twolnk(arg, link, newTwoLink);
       }
     };
 

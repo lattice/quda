@@ -730,7 +730,7 @@ namespace quda {
       // Flops count, in two-number pair (matrix_mult, matrix_add)
       // 				   (24, 12)
       // 4968 Flops per site in total
-      __device__ __host__ void operator()(int x_cb, int parity)
+      __device__ __host__ void operator()(int x_cb, int parity, int)
       {
         int x[4];
         int dx[4] = {0,0,0,0};
