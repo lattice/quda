@@ -86,7 +86,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
-  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
+  dslash_mdw_fused.cu dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
