@@ -1153,6 +1153,17 @@ extern "C" {
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
+   * Apply the covariant derivative.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The destination parity of the field
+   * @param dir    Only relevant for the covariant derivative, direction of application
+   */
+  void covDevQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int dir);
+
+  /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
    * sub-partitions: each sub-partition does one or more rhs'.
    * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
