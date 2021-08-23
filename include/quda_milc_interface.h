@@ -238,8 +238,8 @@ extern "C" {
 		  const void* const milc_fatlink,
 		  void* source,
 		  void* solution,
-		  int* dir,
-		  int* sym);
+		  int dir,
+		  int sym);
 
   /**
    * Apply the improved staggered operator to a field. All fields
