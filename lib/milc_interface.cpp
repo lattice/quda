@@ -368,7 +368,7 @@ void qudaUpdateUPhasedPipeline(int prec, double eps, QudaMILCSiteArg_t *arg, int
 
 void qudaUpdateUPhased(int prec, double eps, QudaMILCSiteArg_t *arg, int phase_in)
 {
-  qudaUpdateUPhasedPipeline(prec, eps, arg, 0, 0);
+  qudaUpdateUPhasedPipeline(prec, eps, arg, phase_in, 0);
 }
 
 void qudaUpdateU(int prec, double eps, QudaMILCSiteArg_t *arg) { qudaUpdateUPhased(prec, eps, arg, 0); }
