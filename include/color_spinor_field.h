@@ -827,7 +827,6 @@ namespace quda {
        @brief Wait on halo communication to complete
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
