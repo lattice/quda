@@ -86,6 +86,7 @@ namespace quda {
       printfQuda("BlockKernel2D sizeof(arg): %lu\n", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
+      printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
     try {
