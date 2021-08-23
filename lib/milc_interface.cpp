@@ -1104,8 +1104,66 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   int dst_offset = getColorVectorOffset(local_parity, false, localDim);
 
   dslashQuda(static_cast<char*>(dst) + dst_offset*host_precision,
-	     static_cast<char*>(src) + src_offset*host_precision,
-	     &invertParam, local_parity);
+             static_cast<char*>(src) + src_offset*host_precision,
+             &invertParam, local_parity);
+
+  if (!create_quda_gauge) invalidateGaugeQuda();
+
+  qudamilc_called<false>(__func__, verbosity);
+} // qudaDslash
+
+void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const fatlink,
+               void* src, void* dst, int dir, int sym)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy = device_precision;
+
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, fatlink, nullptr, localDim, host_precision, device_precision,
+                 device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd;
+  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
+
+  setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity,
+                  verbosity, QUDA_CG_INVERTER, &invertParam);
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+
+  if (invalidate_quda_gauge || !create_quda_gauge) {
+    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    invalidate_quda_gauge = false;
+  }
+
+  int src_offset = getColorVectorOffset(other_parity, false, localDim);
+  int dst_offset = getColorVectorOffset(local_parity, false, localDim);
+
+  if ((sym < 1) || (sym > 3)) {
+    printf("Wrong shift. Selecto forward (1), backward (2) or ymmetric (3).\n");
+  } else {
+    if (sym & 1) {
+      covDevQuda(static_cast<char*>(dst) + dst_offset*host_precision,
+                 static_cast<char*>(src) + src_offset*host_precision,
+                 &invertParam, local_parity, dir);
+    }
+    if (sym & 2) {
+      covDevQuda(static_cast<char*>(dst) + dst_offset*host_precision,
+                 static_cast<char*>(src) + src_offset*host_precision,
+                 &invertParam, local_parity, dir+4);
+    }
+  }
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
