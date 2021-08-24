@@ -149,7 +149,7 @@ namespace quda {
 #else
   void contractSummedQuda(const ColorSpinorField &, const ColorSpinorField &,
 			  std::vector<Complex> &, const QudaContractType,
-			  const int *const, int *const,
+			  const int *const, const int *const,  const QudaFFTSymmType *const,
 			  const size_t, const size_t)
   {
     errorQuda("Contraction code has not been built");
