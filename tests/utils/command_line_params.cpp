@@ -287,8 +287,6 @@ double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
-
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 namespace
