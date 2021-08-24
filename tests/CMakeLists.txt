@@ -94,7 +94,8 @@ if(QUDA_DIRAC_WILSON
   add_executable(eigensolve_test eigensolve_test.cpp)
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
 endif()
 
@@ -130,6 +131,19 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  if(QUDA_CONTRACT)
+    add_executable(contractFT_test contractFT_test.cpp)
+    target_link_libraries(contractFT_test ${TEST_LIBS})
+    quda_checkbuildtest(contractFT_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS contractFT_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+  
+  if(QUDA_BLOCKSOLVER)
+    add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
+    target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
+    quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
+    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -196,6 +210,11 @@ if(QUDA_CONTRACT)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+  add_executable(correlator_test correlator_test.cpp)
+  target_link_libraries(correlator_test ${TEST_LIBS})
+  quda_checkbuildtest(correlator_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS correlator_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)

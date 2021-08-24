@@ -425,7 +425,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    std::unique_ptr<double[]> alpha(new double[Np]);
+    auto alpha = std::make_unique<double[]>(Np);
     double pAp;
     int rUpdate = 0;
 

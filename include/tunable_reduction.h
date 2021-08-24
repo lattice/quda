@@ -237,7 +237,7 @@ namespace quda {
     {
       if (tp.block.x == block_size_x) {
         using Arg = ReduceKernelArg<block_size_x, block_size_y, FunctorArg>;
-        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));
+        return TunableKernel::launch_device<Functor, grid_stride>(KERNEL(MultiReduction), tp, stream, Arg(arg));//!!
       } else {
         return launch<block_size_x / 2, Functor>(arg, tp, stream);
       }
@@ -259,7 +259,7 @@ namespace quda {
     template <template <typename> class Functor, typename Arg, typename T>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
+      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);//!!
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -305,7 +305,7 @@ namespace quda {
     launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);//!!
       } else {
 	errorQuda("CPU not supported yet");
       }

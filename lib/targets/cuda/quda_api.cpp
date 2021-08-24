@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
+#include <quda_cuda_api.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -44,7 +45,7 @@ namespace quda
   namespace cuda {
 
     void set_runtime_error(cudaError_t error, const char *api_func, const char *func, const char *file, const char *line,
-                           bool allow_error = false)
+                           bool allow_error)
     {
       if (error == cudaSuccess) return;
       last_error = error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
@@ -54,7 +55,7 @@ namespace quda
     }
 
     void set_driver_error(CUresult error, const char *api_func, const char *func, const char *file, const char *line,
-                          bool allow_error = false)
+                          bool allow_error)
     {
       if (error == CUDA_SUCCESS) return;
       last_error = error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;

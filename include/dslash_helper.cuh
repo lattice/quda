@@ -349,7 +349,7 @@ namespace quda
       for (int d = 0; d < 4; d++) {
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
-
+      
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
         ColorSpinorField *in_ = const_cast<ColorSpinorField *>(&in);
@@ -664,7 +664,8 @@ namespace quda
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
-      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) && target::block_idx().x < (unsigned)arg.pack_blocks) {
+      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
+          target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
         // first few blocks do packing kernel
         typename Arg::template P<dslash.pc_type()> packer;
         packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input

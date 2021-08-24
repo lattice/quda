@@ -285,6 +285,11 @@ extern "C" {
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
+    QudaBoolean gauge_smear;             /** Whether or not to perfrom gauge smearing */
+    double gauge_smear_coeff;            /** The coefficient of the gauge smearing */ 
+    int gauge_smear_steps;               /** The number of smearing steps to perform */
+    QudaGaugeSmearType gauge_smear_type; /** The type of smearing to perfrom */
+    
     /*
      * The following parameters are related to the solver
      * preconditioner, if enabled.
@@ -1433,17 +1438,16 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field
+   * Performs Gaussian smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage and operator which will be applied to the spinor
+   * @param h_in    Input spinor field to smear
+   * @param param   Contains all metadata regarding host and device
+   *                storage and operator which will be applied to the spinor
    * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for Wuppertal smearing.
+   * @param omega   The width of the Gaussian 
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
-
+  void performGaussianSmearNStep(void *h_in, QudaInvertParam *param, const int n_steps, const double omega);
+  
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
@@ -1489,13 +1493,38 @@ extern "C" {
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
-   * Public function to perform color contractions of the host spinors x and y.
-   * @param[in] x pointer to host data
-   * @param[in] y pointer to host data
-   * @param[out] result pointer to the 16 spin projections per lattice site
-   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * Public function to perform color contractions of the host propagators described by the
+   * first two arguments. The contraction includes a Fourier phase and is summed over
+   * either the T or Z direction. Each input propagator has nSpin * src_nColor ColorSpinorFields components.
+   * The output result must be able to hold nSpin*nSpin * dim(T or Z) * n_mom values. 
+   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
+   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
+   * @param[out] h_result adress of host pointer to the output complex correlators in double precision
+   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
+   * @param[in] cs_param_ptr Pointer to a ColorSpinorParam meta data for
+   *            construction of ColorSpinorFields
+   * @param[in] src_colors the number of source colors for the input propagators
+   * @param[in] X spacetime data for construction of ColorSpinorFields
+   * @param[in] source_position needed in Fourier phases
+   * @param[in] n_mom number of momentum modes
+   * @param[in] mom_modes[n_mom][4] in Fourier phase
+   * @param[in] fft_type[n_mom][4] selects exp, cos, or sin FFT for each direction
+   */
+  void contractFTQuda(void **h_prop_array_flavor_1, void **h_prop_array_flavor_2, void **h_result,
+		      const QudaContractType cType, void *cs_param_ptr, const int src_colors,
+		      const int *X, const int *const source_position,
+		      const int n_mom, const int *const mom_modes, const QudaFFTSymmType *const fft_type);
+  
+  /**
+   * Public function to perform color contractions of the host spinorfields contained
+   * inside first two arguments.
+   * @param[in] x pointer to ColorSpinorField host data
+   * @param[in] y pointer to ColorSpinorField host data
+   * @param[out] h_result adress of pointer to the nSpin*nSpin*V complex numbers of the
+   *            result correlators
+   * @param[in] cType Which type of contraction (open, degrand-rossi, staggered, etc)
    * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   * @param[in] X spacetime data for construction of ColorSpinorFields
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
@@ -1517,6 +1546,7 @@ extern "C" {
                                 const unsigned int verbose_interval, const double relax_boost, const double tolerance,
                                 const unsigned int reunit_interval, const unsigned int stopWtheta,
                                 QudaGaugeParam *param, double *timeinfo);
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1545,6 +1575,20 @@ extern "C" {
    * @param[in] param The data defining the problem execution.
    */
   void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
+
+  void make4DChiralProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+			const int *X);
+  
+  void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
+                          const int *X);
+
+  /**
+  * Convert a 4D point source to a 5D one
+  * @param in4D_ptr    Contains 4D pointsource
+  * @param out5D_ptr   5D source is written here
+  * @param X           an int array that contains Nx Ny Nz Nt
+  */
+  void convert4Dto5DpointSource(void *in4D_ptr, void *out5D_ptr, QudaInvertParam *inv_param, QudaInvertParam *inv_param4D, const int *X, size_t spinor4D_size_in_floats);
 
   /**
    * @brief Flush the chronological history for the given index

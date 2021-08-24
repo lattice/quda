@@ -38,20 +38,20 @@ void display_test_info()
   case 0:
     printfQuda("\nAPE smearing\n");
     printfQuda(" - rho %f\n", ape_smear_rho);
-    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 1:
     printfQuda("\nStout smearing\n");
     printfQuda(" - rho %f\n", stout_smear_rho);
-    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 2:
     printfQuda("\nOver-Improved Stout smearing\n");
     printfQuda(" - rho %f\n", stout_smear_rho);
     printfQuda(" - epsilon %f\n", stout_smear_epsilon);
-    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - smearing steps %d\n", gauge_smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   case 3:
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
     // APE
     // start the timer
     time0 = -((double)clock());
-    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval);
+    performAPEnStep(gauge_smear_steps, ape_smear_rho, measurement_interval);
     // stop the timer
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
     // STOUT
     // start the timer
     time0 = -((double)clock());
-    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval);
+    performSTOUTnStep(gauge_smear_steps, stout_smear_rho, measurement_interval);
     // stop the timer
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
     // Over-Improved STOUT
     // start the timer
     time0 = -((double)clock());
-    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);
+    performOvrImpSTOUTnStep(gauge_smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);
     // stop the timer
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;

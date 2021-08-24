@@ -251,59 +251,29 @@ namespace quda {
         elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
       }
-      cache.sync();
-      if (mu == 1) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 2) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 3) {
+        if (mu_ == mu) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
         }
       }
-      cache.sync();
-      if (mu == 4) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 5) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 6) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 4; mu_ < 4 + gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 7) {
+        if (mu_ == mu) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
         }
       }
+
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
       cache.sync();
       if (mu == 0) {
@@ -537,29 +507,18 @@ namespace quda {
         elems[tid + blockSize * 2] = (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
-      cache.sync();
-      if (mu == 1) {
-        elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 2) {
-        elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 3) {
+        if (mu_ == mu) {
           elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
         }
       }
+
       cache.sync();
       if (mu == 0) {
         Float asq =  elems[tid + blockSize] * elems[tid + blockSize];

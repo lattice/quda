@@ -161,27 +161,26 @@ template <typename Float> void contractDegrandRossi(Float *h_result_)
   }
 }
 
-template <typename Float> void contractColor(Float *spinorX, Float *spinorY, Float *h_result)
+template <typename Float> void contractColor(Float *spinorX, Float *spinorY, int nSpin, Float *h_result)
 {
-
-  Float re = 0.0, im = 0.0;
-
+  // Float spinor[site,spin,color,cmpx]  site-stride=24=4*3*2, spin-stride=6=3*2, color-stride=2
   // Conjugate spinorX
   for (int i = 0; i < V; i++) {
-    for (int s1 = 0; s1 < 4; s1++) {
-      for (int s2 = 0; s2 < 4; s2++) {
+    int site_idx = nSpin*3*2 * i;
+    for (int s1 = 0; s1 < nSpin; s1++) {
+      for (int s2 = 0; s2 < nSpin; s2++) {
 
-        re = im = 0.0;
+        Float re = 0.0; Float im = 0.0;
         for (int c = 0; c < 3; c++) {
-          re += (((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 0]
-                 + ((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 1]);
+          re += (((Float *)spinorX)[site_idx + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[site_idx + 6 * s2 + 2 * c + 0]
+               + ((Float *)spinorX)[site_idx + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[site_idx + 6 * s2 + 2 * c + 1]);
 
-          im += (((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 1]
-                 - ((Float *)spinorX)[24 * i + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[24 * i + 6 * s2 + 2 * c + 0]);
+          im += (((Float *)spinorX)[site_idx + 6 * s1 + 2 * c + 0] * ((Float *)spinorY)[site_idx + 6 * s2 + 2 * c + 1]
+               - ((Float *)spinorX)[site_idx + 6 * s1 + 2 * c + 1] * ((Float *)spinorY)[site_idx + 6 * s2 + 2 * c + 0]);
         }
 
-        ((Float *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 0] = re;
-        ((Float *)h_result)[2 * (i * 16 + 4 * s1 + s2) + 1] = im;
+        ((Float *)h_result)[2 * (i * nSpin*nSpin + nSpin * s1 + s2) + 0] = re;
+        ((Float *)h_result)[2 * (i * nSpin*nSpin + nSpin * s1 + s2) + 1] = im;
       }
     }
   }
@@ -193,34 +192,47 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
 
   int faults = 0;
   Float tol = (sizeof(Float) == sizeof(double) ? 1e-9 : 2e-5);
-  void *h_result = safe_malloc(V * 2 * 16 * sizeof(Float));
+
+  int nSpin = 0;
+  switch(cType) {
+  case QUDA_CONTRACT_TYPE_OPEN:
+  case QUDA_CONTRACT_TYPE_DR:
+    nSpin = 4; break;
+  case QUDA_CONTRACT_TYPE_STAGGERED:
+    nSpin = 1; break;
+  default:
+    printfQuda("Unknown contraction type %d\n",cType);
+    ++faults;
+    return faults;
+  }
+  void *h_result = safe_malloc(V * 2 * nSpin*nSpin * sizeof(Float));
 
   // compute spin elementals
-  contractColor(spinorX, spinorY, (Float *)h_result);
+  contractColor(spinorX, spinorY, nSpin, (Float *)h_result);
 
   // Apply gamma insertion on host spin elementals
   if (cType == QUDA_CONTRACT_TYPE_DR) contractDegrandRossi((Float *)h_result);
 
   // compare each contraction
-  for (int j = 0; j < 16; j++) {
+  for (int j = 0; j < nSpin*nSpin; j++) {
     bool pass = true;
     for (int i = 0; i < V; i++) {
-      if (abs(((Float *)h_result)[32 * i + 2 * j] - ((Float *)d_result)[32 * i + 2 * j]) > tol) {
+      int site_idx = nSpin*nSpin*2 * i;
+      Float rdiff = abs(((Float *)h_result)[site_idx + 2 * j + 0] - ((Float *)d_result)[site_idx + 2 * j + 0]);
+      Float idiff = abs(((Float *)h_result)[site_idx + 2 * j + 1] - ((Float *)d_result)[site_idx + 2 * j + 1]);
+      if ( (rdiff > tol) || (idiff > tol) ) {
         faults++;
         pass = false;
-        // printfQuda("Contraction %d %d failed\n", i, j);
+        /*
+	printfQuda("Contraction %d %d failed\n", i, j);
+	printfQuda("(%.16e %.16e) (%.16e %.16e)\n",
+		   ((Float*)h_result)[site_idx + 2*j + 0],((Float*)h_result)[site_idx + 2*j + 1],
+		   ((Float*)d_result)[site_idx + 2*j + 0],((Float*)d_result)[site_idx + 2*j + 1]
+		   );
+	*/
       } else {
         // printfQuda("Contraction %d %d passed\n", i, j);
       }
-      // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i + 2*j],((Float*)d_result)[32*i + 2*j]);
-      if (abs(((Float *)h_result)[32 * i + 2 * j + 1] - ((Float *)d_result)[32 * i + 2 * j + 1]) > tol) {
-        faults++;
-        pass = false;
-        // printfQuda("Contraction %d %d failed\n", i, j);
-      } else {
-        // printfQuda("Contraction %d %d passed\n", i, j);
-      }
-      // printfQuda("%.16f %.16f\n", ((Float*)h_result)[32*i+2*j+1],((Float*)d_result)[32*i+2*j+1]);
     }
     if (pass)
       printfQuda("Contraction %d passed\n", j);
@@ -231,3 +243,4 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
   host_free(h_result);
   return faults;
 };
+
