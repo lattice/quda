@@ -539,15 +539,3 @@ extern std::array<int,4> momentum;
 extern bool open_flavor;
 
 extern std::array<int, 4> grid_partition;
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
-
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;

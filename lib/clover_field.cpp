@@ -21,6 +21,7 @@ namespace quda {
     cloverInv(nullptr),
     invNorm(nullptr),
     csw(a.Csw()),
+    coeff(a.Coeff()),
     twisted(a.Twisted()),
     mu2(a.Mu2()),
     rho(a.Rho()),
@@ -37,7 +38,7 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff),
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff), 
     rho(param.rho), order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);

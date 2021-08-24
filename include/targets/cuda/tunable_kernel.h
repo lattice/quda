@@ -6,7 +6,7 @@
 #include <kernel.h>
 
 #ifdef JITIFY
-#include <jitify_helper2.cuh>
+#include <jitify_helper.h>
 #endif
 
 namespace quda {
@@ -46,6 +46,7 @@ namespace quda {
       launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
 #ifdef JITIFY
+      // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
