@@ -287,7 +287,7 @@ double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
-QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
+//QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
@@ -410,7 +410,6 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-<<<<<<< HEAD
   CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
                                                      {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
 
@@ -421,8 +420,6 @@ namespace
   CLI::TransformPairs<QudaFermionSmearType> fermion_smear_type_map {{"gaussian", QUDA_FERMION_SMEAR_TYPE_GAUSSIAN},
                                                                     {"wuppertal", QUDA_FERMION_SMEAR_TYPE_WUPPERTAL}};
 
-=======
->>>>>>> feature/generic_kernel
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
@@ -445,76 +442,20 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-<<<<<<< HEAD
-  
-  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0. Will be inferred from clover-csw and kappa. "
-		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
-  
-=======
   quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default 1.0) and kappa. "
 		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
 
->>>>>>> feature/generic_kernel
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
                        "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-  quda_app
-    ->add_option("--contraction-type", contract_type,
+  quda_app->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
                  "spin (default open)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-
-<<<<<<< HEAD
-  quda_app
-    ->add_option("--blas-data-type", blas_data_type,
-                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
-    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
-
-  quda_app
-    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
-    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-a", blas_trans_a,
-      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-b", blas_trans_b,
-      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app
-    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
-    ->expected(3);
-
-  quda_app
-    ->add_option("--blas-leading-dims", blas_leading_dims,
-                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
-    ->expected(3);
-
-  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
-
-
-=======
->>>>>>> feature/generic_kernel
+  
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
@@ -1017,7 +958,6 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 }
 
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
-<<<<<<< HEAD
 {
   // Option group for heatbath related options
   auto opgroup = quda_app->add_option_group("heatbath", "Options controlling heatbath routines");
@@ -1074,8 +1014,6 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
-=======
->>>>>>> feature/generic_kernel
 {
 
   CLI::QUDACheckedTransformer fermion_smear_transform(fermion_smear_type_map);
