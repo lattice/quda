@@ -52,8 +52,8 @@ auto &blas_a_stride = blas_strides[0];
 auto &blas_b_stride = blas_strides[1];
 auto &blas_c_stride = blas_strides[2];
 
-std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
-std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
+std::array<double, 2> blas_alpha_re_im = {M_PI, M_E};
+std::array<double, 2> blas_beta_re_im = {M_LN2, M_LN10};
 int blas_batch = 16;
 
 namespace quda
@@ -96,8 +96,8 @@ double test(int data_type)
   blas_param.a_stride = blas_strides[0];
   blas_param.b_stride = blas_strides[1];
   blas_param.c_stride = blas_strides[2];
-  blas_param.alpha = (__complex__ double)blas_alpha_re_im[0];
-  blas_param.beta = (__complex__ double)blas_beta_re_im[0];
+  memcpy(&blas_param.alpha, blas_alpha_re_im.data(), sizeof(__complex__ double));
+  memcpy(&blas_param.beta, blas_beta_re_im.data(), sizeof(__complex__ double));
   blas_param.data_order = blas_data_order;
   blas_param.data_type = test_data_type;
   blas_param.batch_count = blas_batch;
