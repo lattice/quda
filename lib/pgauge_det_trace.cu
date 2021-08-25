@@ -38,10 +38,8 @@ namespace quda {
         launch<DetTrace>(result, tp, stream, arg);
       }
 
-      if (!activeTuning()) {
-        result.x /= (double)(4*u.LocalVolume()*comm_size());
-        result.y /= (double)(4*u.LocalVolume()*comm_size());
-      }
+      result.x /= (double)(4*u.LocalVolume()*comm_size());
+      result.y /= (double)(4*u.LocalVolume()*comm_size());
     }
 
     long long flops() const {
