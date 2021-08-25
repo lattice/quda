@@ -287,8 +287,6 @@ double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
-//QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
-
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 namespace
@@ -442,7 +440,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-  
+
   quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default 1.0) and kappa. "
 		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
 
@@ -456,7 +454,52 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
                  "spin (default open)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-  
+
+  quda_app
+    ->add_option("--blas-data-type", blas_data_type,
+                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
+
+  quda_app
+    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
+    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
+
+  quda_app
+    ->add_option(
+      "--blas-trans-a", blas_trans_a,
+      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+
+  quda_app
+    ->add_option(
+      "--blas-trans-b", blas_trans_b,
+      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
+
+  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
+    ->expected(2);
+
+  quda_app
+    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+    ->expected(3);
+
+  quda_app
+    ->add_option("--blas-leading-dims", blas_leading_dims,
+                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+    ->expected(3);
+
+  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
+    ->expected(3);
+
+  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
+    ->expected(3);
+
+  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
+
+
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
