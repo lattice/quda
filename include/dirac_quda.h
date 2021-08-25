@@ -1444,6 +1444,8 @@ public:
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
+    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;    
   };
 
   // Even-odd preconditioned staggered

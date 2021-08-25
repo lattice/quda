@@ -89,39 +89,36 @@ namespace quda
 	  
           if (doHalo<kernel_type>(d) && ghost) {//?
 #if 0	    
-            const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);//?
-            const Link U = arg.U(d, coord.x_cb, parity);//?
+            const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
+            const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);//?
 
             out += U * in;
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
             const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
-            const Vector in_2hop = arg.in(_2hop_fwd_idx, parity);
-            const Link U_2link = arg.U(d, coord.x_cb, parity);            
+            const Vector in_2hop       = arg.in(_2hop_fwd_idx, parity);
+            const Link U_2link         = arg.U(d, coord.x_cb, parity);            
             out += U_2link * in_2hop;
           }
         }
         {
           // Backward gather - compute back offset for spinor and gauge fetch
-
-          const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);
-          const int _2hop_gauge_idx= _2hop_back_idx;          
-
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
 
           if (doHalo<kernel_type>(d) && ghost) {
 #if 0
-            // const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-
-            const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
+            // when updating replace arg.nFace with 1 here
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 	    
-            out += conj(U) * in;
+            out += in;
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//?
-
+          
+            const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);
+            const int _2hop_gauge_idx= _2hop_back_idx;          
+          
             const Link   U_2link = arg.U(d, _2hop_gauge_idx, parity);
             const Vector in_2hop = arg.in(_2hop_back_idx, parity);
             out += conj(U_2link) * in_2hop;
