@@ -31,9 +31,9 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
 
-    typedef typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat> F;
-    typedef typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat> G;
-    typedef typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat> GY;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
+    using G = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
+    using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
     F out;
     const F inA;
