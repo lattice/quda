@@ -40,11 +40,9 @@ namespace quda
         launch<qCharge>(result, tp, stream, arg);
       }
 
-      if (!activeTuning()) {
-        for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
-        energy[0] = energy[1] + energy[2];
-        qcharge = result[2];
-      }
+      for (int i=0; i<2; i++) energy[i+1] = result[i] / (Fmunu.Volume() * comm_size());
+      energy[0] = energy[1] + energy[2];
+      qcharge = result[2];
     }
 
     long long flops() const
