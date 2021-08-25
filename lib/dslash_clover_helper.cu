@@ -3,7 +3,7 @@
 #include "dslash_quda.h"
 #include "tunable_nd.h"
 #include "instantiate.h"
-#include "kernels/dslash_misc.cuh"
+#include "kernels/dslash_clover_helper.cuh"
 
 namespace quda {
 
