@@ -185,14 +185,14 @@ namespace quda {
 	}
 	if (fabs(cosTheta) > static_cast<Float>(1.0)) {
           if (r > static_cast<Float>(0.0)) theta = static_cast<Float>(0.0);
-          else theta = HISQ_UNITARIZE_PI/static_cast<Float>(3.0);
+          else theta = static_cast<Float>(HISQ_UNITARIZE_PI)/static_cast<Float>(3.0);
         } else {
           theta = acos(cosTheta) / static_cast<Float>(3.0);
         }
 
 	s = 2.0 * sqrt(s);
 	for (int i=0; i<3; ++i) {
-	  g[i] += s * cos(theta + (i-1) * HISQ_UNITARIZE_PI23);
+	  g[i] += s * cos(theta + (i-1) * static_cast<Float>(HISQ_UNITARIZE_PI23));
 	}
 
       } // !REUNIT_SVD_ONLY?
