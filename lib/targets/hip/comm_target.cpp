@@ -5,7 +5,7 @@
 #include <hip/hip_runtime_api.h>
 
 #define CHECK_HIP_ERROR(func)						\
-  quda::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+  quda::target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
 {

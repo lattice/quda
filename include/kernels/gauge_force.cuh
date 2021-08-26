@@ -45,6 +45,7 @@ namespace quda {
       host_free(path_h);
 
       // finally set the pointers to the correct offsets in the buffer
+      // FIXME we should clean up this pointer and casting mess
       for (int d=0; d < 4; d++) this->input_path[d] = (int*)((char*)buffer + d*num_paths*max_length*sizeof(int));
       length = (int*)((char*)buffer + 4*num_paths*max_length*sizeof(int));
       path_coeff = (double*)((char*)buffer + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int));

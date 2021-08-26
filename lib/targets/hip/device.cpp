@@ -9,7 +9,8 @@ static hipStream_t *streams;
 static const int Nstream = 9;
 
 #define CHECK_HIP_ERROR(func)						\
-  hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+  target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
 
 namespace quda
 {
@@ -183,4 +184,13 @@ namespace quda
     } // namespace profile
 
   } // namespace device
+
+  namespace target { 
+    namespace hip { 
+       hipStream_t get_cuda_stream(const qudaStream_t &stream)
+       {
+          return streams[stream.idx];
+       }
+     }
+   }
 } // namespace quda

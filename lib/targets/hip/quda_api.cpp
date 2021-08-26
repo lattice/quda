@@ -41,37 +41,38 @@ namespace quda {
     last_error_str = "HIP_SUCCESS"; // Clear the error prior to returning.
     return rtn;  
   }
+ 
+  namespace target { 
+    namespace hip {
 
-  namespace hip {
+      void set_runtime_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
+          bool allow_error = false)
+      {
+        if (error == hipSuccess) return;
+        last_error = QUDA_ERROR;
+        last_error_str = hipGetErrorString(error);
+        if (!allow_error) {
+          errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
+        }
+        else hipGetLastError(); // Clear the error 
 
-    void set_runtime_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
-                           bool allow_error = false)
-    {
-      if (error == hipSuccess) return;
-      last_error = QUDA_ERROR;
-      last_error_str = hipGetErrorString(error);
-      if (!allow_error) {
-	      errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
       }
-      else hipGetLastError(); // Clear the error 
 
-    }
-
-    void set_driver_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
-                          bool allow_error = false)
-    {
-      if (error == hipSuccess) return;
-      last_error = QUDA_ERROR;
-      last_error_str  = hipGetErrorString(error);
-      if (!allow_error) {
-	errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
+      void set_driver_error(hipError_t error, const char *api_func, const char *func, const char *file, const char *line,
+          bool allow_error = false)
+      {
+        if (error == hipSuccess) return;
+        last_error = QUDA_ERROR;
+        last_error_str  = hipGetErrorString(error);
+        if (!allow_error) {
+          errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
+        }
+        else hipGetLastError();
       }
-      else hipGetLastError();
     }
-
   }
 
-  using namespace hip;
+  using namespace target::hip;
   
   // Agnostic way to return a hipAPI flag
   namespace {

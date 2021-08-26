@@ -283,7 +283,6 @@ namespace quda
      updating the local buffers on a subsequent computation before we
      have finished sending.
   */
-#if defined(QUDA_ENABLE_P2P)
   template <typename T>
   inline void completeDslash(const ColorSpinorField &in, const T&dslashParam) {
     // this ensures that the p2p sending is completed before any
@@ -297,12 +296,6 @@ namespace quda
       }
     }
   }
-#else
-  // This version is if there is no IPC. Then the function is effecitvely empty
-  // we removed named arguments to stop the compiler complaining about unused arguments
-  template <typename T>
-  inline void completeDslash(const ColorSpinorField &, const T&) { }
-#endif
 
   /**
      @brief Set the ghosts to the mapped CPU ghost buffer, or unsets
@@ -1960,7 +1953,9 @@ namespace quda
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const qudaStream_t &) {
+  private:
+   void apply(const qudaStream_t &)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
