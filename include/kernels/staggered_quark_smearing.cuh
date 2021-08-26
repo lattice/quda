@@ -91,7 +91,7 @@ namespace quda
 #if 0	    
             const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);//?
+            const Vector in = arg.in.Ghost(d, 1, ghost_idx, parity);//?
 
             out += U * in;
 #endif            
@@ -110,9 +110,10 @@ namespace quda
 #if 0
             // when updating replace arg.nFace with 1 here
             const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
-            const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+            const Link U = arg.U.Ghost(d, ghost_idx, parity);
+            const Vector in = arg.in.Ghost(d, 0, ghost_idx, parity);
 	    
-            out += in;
+            out += conj(U) * in;	    
 #endif            
           } else if (doBulk<kernel_type>() && !ghost) {//?
           
