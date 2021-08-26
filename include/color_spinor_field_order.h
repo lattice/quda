@@ -857,9 +857,10 @@ namespace quda {
       */
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
+        commGlobalReductionPush(global);
         double nrm2 = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
                                                square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
-        if (global) comm_allreduce(&nrm2);
+        commGlobalReductionPop();
         return nrm2;
       }
 
@@ -870,9 +871,10 @@ namespace quda {
       */
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
+        commGlobalReductionPush(global);
         double absmax = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
                                                  abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
-        if (global) comm_allreduce_max(&absmax);
+        commGlobalReductionPop();
         return absmax;
       }
 
@@ -884,9 +886,10 @@ namespace quda {
       */
       __host__ double norm2(bool global = true) const
       {
+        commGlobalReductionPush(global);
         double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
                                                square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
-        if (global) comm_allreduce(&nrm2);
+        commGlobalReductionPop();
         return nrm2;
       }
 
@@ -897,9 +900,10 @@ namespace quda {
       */
       __host__ double abs_max(bool global = true) const
       {
+        commGlobalReductionPush(global);
         double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
                                                  abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
-        if (global) comm_allreduce_max(&absmax);
+        commGlobalReductionPop();
         return absmax;
       }
 

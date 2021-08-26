@@ -137,8 +137,8 @@ namespace quda {
       g[2] = c[0]*one_third + 2*sqrt_s*(-0.5*ac + as*0.8660254037844386467637);
 #else
       g[0] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third );
-      g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + FL_UNITARIZE_PI23 );
-      g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
+      g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + static_cast<real>(FL_UNITARIZE_PI23) );
+      g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*static_cast<real>(FL_UNITARIZE_PI23) );
 #endif
     }
 
