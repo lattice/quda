@@ -93,15 +93,13 @@ namespace quda {
   template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
 
   template <> struct fpow_impl<true> {
-    template <typename real> __device__ inline real operator()(real a, int b)
+    __device__ inline double operator()(double a, int b) { return ::pow(a, b); }
+
+    __device__ inline float operator()(float a, int b)
     {
-      if (sizeof(real) == sizeof(double)) {
-        return ::pow(a, b);
-      } else {
-        float sign = signbit(a) ? -1.0f : 1.0f;
-        float power = __powf(fabsf(a), b);
-        return b & 1 ? sign * power : power;
-      }
+      float sign = signbit(a) ? -1.0f : 1.0f;
+      float power = __powf(fabsf(a), b);
+      return b & 1 ? sign * power : power;
     }
   };
 
