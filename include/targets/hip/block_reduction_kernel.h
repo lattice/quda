@@ -48,13 +48,19 @@ namespace quda {
   };
 
   /**
-     @brief Generic block kernel.  Here, we split the block and thread
-     indices in the x and y dimension and pass these indices
-     separately to the transform functor.  The x thread dimension is
-     templated, e.g., for efficient reductions, and typically the y
-     thread dimension is a trivial vectorizable dimension.
+     @brief BlockKernel2D_impl is the implementation of the Generic
+     block kernel.  Here, we split the block (CTA) and thread indices
+     in the x and y dimension and pass these indices separately to the
+     transform functor.  The x thread dimension is templated
+     (Arg::block_size), e.g., for efficient reductions, and typically
+     the y thread dimension is a trivial vectorizable dimension.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @param[in] arg Kernel argument
   */
-  template <template <typename> class Transformer, typename Arg>
+  template <template <typename> class Functor, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
@@ -62,42 +68,98 @@ namespace quda {
     auto j = blockDim.y*blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
-    Transformer<Arg> t(arg);
+    Functor<Arg> t(arg);
     t(block_idx, thread_idx);
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is passed by value directly to the kernel.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __launch_bounds__(Arg::block_size)
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>() && 
-                                ( Arg::launch_bounds || Arg::block_size > 512 ), void> BlockKernel2D(Arg arg)
+       ( Arg::launch_bounds || Arg::block_size > 512 ), void> BlockKernel2D(Arg arg)
 
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    BlockKernel2D_impl<Transformer, Arg>(arg);
+    BlockKernel2D_impl<Functor, Arg>(arg);
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is copied to the device prior to kernel launch.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<device::use_kernel_arg<Arg>()
     				&& !(  ( Arg::launch_bounds || Arg::block_size > 512 ) ), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    BlockKernel2D_impl<Transformer, Arg>(arg);
+    BlockKernel2D_impl<Functor, Arg>(arg);
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is copied to the device prior to kernel launch.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __launch_bounds__(Arg::block_size)
     __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>())
    				&& ( Arg::launch_bounds || Arg::block_size > 512 ), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    BlockKernel2D_impl<Transformer, Arg>(device::get_arg<Arg>());
+    BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is copied to the device prior to kernel launch.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
     __global__ std::enable_if_t<(!device::use_kernel_arg<Arg>())
                                 && !(Arg::launch_bounds || Arg::block_size > 512 ), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
-    BlockKernel2D_impl<Transformer, Arg>(device::get_arg<Arg>());
+    BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
   }
 }
