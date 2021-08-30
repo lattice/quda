@@ -600,7 +600,7 @@ if(QUDA_NVSHMEM)
                         PREFIX nvshmem
                         CONFIGURE_COMMAND ""
                         BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make -j8 MPICC=${MPI_CXX_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
+                        BUILD_COMMAND  make -j8 MPICC=${MPI_C_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
                         INSTALL_COMMAND ""
                         LOG_INSTALL ON
                         LOG_BUILD ON
