@@ -836,8 +836,6 @@ namespace quda {
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
-    int geo_bs[QUDA_MAX_DIM] = { };
-    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
     // If doing a preconditioned operator with a clover term then we
@@ -854,7 +852,7 @@ namespace quda {
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
-	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 

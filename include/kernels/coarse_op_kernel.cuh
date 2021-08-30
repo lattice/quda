@@ -377,7 +377,6 @@ namespace quda {
     return uv_max;
   } // computeUV
 
-
   /**
      Functor for the UV computation.
 
@@ -386,6 +385,7 @@ namespace quda {
      setting the scale for fixed point.
   */
   template <typename Arg> struct compute_uv {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_uv(const Arg &arg) : arg(arg) { }
@@ -401,7 +401,7 @@ namespace quda {
       int ic = ic_parity % arg.uvTile.M_tiles;
       int parity = ic_parity / arg.uvTile.M_tiles;
 
-      typename Arg::Float max;
+      real max;
       if (arg.dir == QUDA_FORWARDS || arg.dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
         max = computeUV(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
       else
@@ -420,7 +420,7 @@ namespace quda {
      setting the scale for fixed point.
   */
   template <typename Arg> struct compute_av {
-    using Float = typename Arg::Float;
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_av(const Arg &arg) : arg(arg) { }
@@ -437,7 +437,7 @@ namespace quda {
       int parity = ch_parity / 2;
 
       constexpr int N = Arg::fineSpin * Arg::fineColor / 2;
-      HMatrix<Float, N> A;
+      HMatrix<real, N> A;
 
 #pragma unroll
       for (int i = 0; i < N; i++) {
@@ -455,7 +455,7 @@ namespace quda {
         }
       }
 
-      ColorSpinor<Float, Arg::fineColor, Arg::fineSpin / 2> V;
+      ColorSpinor<real, Arg::fineColor, Arg::fineSpin / 2> V;
       for (int s = 0; s < Arg::fineSpin / 2; s++) {
         for (int c = 0; c < Arg::fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
       }
@@ -464,7 +464,7 @@ namespace quda {
       auto AV = A * V;
 #else
       // solve for the matrix
-      linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+      linalg::Cholesky<HMatrix, real, N> cholesky(A);
       auto AV = cholesky.backward(cholesky.forward(V));
 #endif
 
@@ -475,7 +475,7 @@ namespace quda {
           for (int ic = 0; ic < Arg::fineColor; ic++) { arg.AV(parity, x_cb, 2 * ch + s, ic, ic_c) = AV(s, ic); }
         }
       } else {
-        Float max = static_cast<Float>(0.0);
+        real max = static_cast<real>(0.0);
 #pragma unroll
         for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
@@ -494,6 +494,7 @@ namespace quda {
      Where: s = fine spin, c' = coarse color, c = fine color
   */
   template <typename Arg> struct compute_tmav {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_tmav(const Arg &arg) : arg(arg) { }
@@ -506,8 +507,8 @@ namespace quda {
     */
     __device__ __host__ inline void operator()(int x_cb, int parity, int v)
     {
-      complex<typename Arg::Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
-      complex<typename Arg::Float> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
+      complex<real> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
+      complex<real> fm(1./(1.+arg.mu*arg.mu),+arg.mu/(1.+arg.mu*arg.mu));
 
 #pragma unroll
       for (int s = 0; s < Arg::fineSpin/2; s++) {
@@ -537,7 +538,7 @@ namespace quda {
      setting the scale for fixed point.
   */
   template <typename Arg> struct compute_tmcav {
-    using Float = typename Arg::Float;
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_tmcav(const Arg &arg) : arg(arg) { }
@@ -553,7 +554,7 @@ namespace quda {
       int ch = ch_parity % 2;
       int parity = ch_parity / 2;
       constexpr int N = Arg::fineSpin * Arg::fineColor / 2;
-      HMatrix<Float, N> A;
+      HMatrix<real, N> A;
 
 #pragma unroll
       for (int i = 0; i < N; i++) {
@@ -567,10 +568,10 @@ namespace quda {
         }
       }
 
-      complex<Float> mu(0., arg.mu);
-      if (ch == 0) mu *= static_cast<Float>(-1.0);
+      complex<real> mu(0., arg.mu);
+      if (ch == 0) mu *= static_cast<real>(-1.0);
 
-      ColorSpinor<Float, Arg::fineColor, Arg::fineSpin / 2> V;
+      ColorSpinor<real, Arg::fineColor, Arg::fineSpin / 2> V;
 
 #pragma unroll
       for (int s = 0; s < Arg::fineSpin / 2; s++) {
@@ -589,7 +590,7 @@ namespace quda {
 
       if (!dynamic_clover_inverse()) {
         // load in the clover inverse matrix
-        HMatrix<Float, N> Ainv;
+        HMatrix<real, N> Ainv;
 #pragma unroll
         for (int i = 0; i < N; i++) {
           int s_i = 2 * ch + i / Arg::fineColor;
@@ -610,7 +611,7 @@ namespace quda {
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
-          Float max = static_cast<Float>(0.0);
+          real max = static_cast<real>(0.0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
@@ -626,7 +627,7 @@ namespace quda {
         A = A.square();
         A += arg.mu * arg.mu;
 
-        linalg::Cholesky<HMatrix, Float, N> cholesky(A);
+        linalg::Cholesky<HMatrix, real, N> cholesky(A);
         const auto AV = cholesky.backward(cholesky.forward(UV));
 
         if (!Arg::compute_max) {
@@ -636,7 +637,7 @@ namespace quda {
             for (int c = 0; c < Arg::fineColor; c++)
               arg.AV(parity, x_cb, 2 * ch + s, c, ic_c) = AV(s, c);
         } else {
-          Float max = static_cast<Float>(0.0);
+          real max = static_cast<real>(0.0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin / 2; s++) {
 #pragma unroll
@@ -689,7 +690,8 @@ namespace quda {
   template <int dim, typename Out, typename Arg>
   __device__ __host__ inline void multiplyVUV(Out &vuv, const Arg &arg, int parity, int x_cb, int i0, int j0)
   {
-    using complex = complex<typename Arg::Float>;
+    using real = typename Arg::Float;
+    using complex = complex<real>;
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
@@ -706,7 +708,7 @@ namespace quda {
       // column index.  Diagonal coupling is always 1.
       // If computing the backwards (forwards) direction link then
       // we desire the positive (negative) projector
-      Gamma<typename Arg::Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
+      Gamma<real, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
 
       const int s_col = gamma.getcol(s);
       const int s_c_col = 1 - s_c_row; // always off-diagonal relative to row coord
@@ -804,7 +806,8 @@ namespace quda {
   __device__ __host__ inline std::enable_if_t<!Arg::from_coarse && Arg::fineSpin == 1, void>
   multiplyVUV(Out &vuv, const Arg &arg, int parity, int x_cb, int i0, int j0)
   {
-    using complex = complex<typename Arg::Float>;
+    using real = typename Arg::Float;
+    using complex = complex<real>;
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
@@ -828,7 +831,7 @@ namespace quda {
       } else {
         auto AV = make_tile_At<complex, false>(tile);
         AV.loadCS(arg.AV, 0, 0, parity, x_cb, 0, k, i0);
-        AV *= static_cast<typename Arg::Float>(-1.);
+        AV *= static_cast<real>(-1.);
 
         auto UV = make_tile_B<complex, false>(tile);
         UV.loadCS(arg.UV, 0, 0, parity, x_cb, 0, k, j0);
@@ -854,7 +857,8 @@ namespace quda {
   __device__ __host__ inline std::enable_if_t<Arg::from_coarse, void>
   multiplyVUV(Out &vuv, const Arg &arg, int parity, int x_cb, int i0, int j0)
   {
-    using complex = complex<typename Arg::Float>;
+    using real = typename Arg::Float;
+    using complex = complex<real>;
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
@@ -874,15 +878,15 @@ namespace quda {
     }
   }
 
-  template <typename Float, typename storeType, typename Accessor>
-  inline __host__ __device__ void atomic_helper(complex<storeType> *Y, const Accessor &A, const complex<Float> &vuv)
+  template <typename real, typename store_t, typename Accessor>
+  inline __host__ __device__ void atomic_helper(complex<store_t> *Y, const Accessor &A, const complex<real> &vuv)
   {
-    if (gauge::fixed_point<Float,storeType>()) {
-      Float scale = A.accessor.scale;
-      complex<storeType> a(round(scale * vuv.real()), round(scale * vuv.imag()));
+    if (gauge::fixed_point<real, store_t>()) {
+      real scale = A.accessor.scale;
+      complex<store_t> a(round(scale * vuv.real()), round(scale * vuv.imag()));
       atomic_fetch_add(Y, a);
     } else {
-      atomic_fetch_add(Y, reinterpret_cast<const complex<storeType>&>(vuv));
+      atomic_fetch_add(Y, reinterpret_cast<const complex<store_t>&>(vuv));
     }
   }
 
@@ -902,7 +906,7 @@ namespace quda {
     template <typename VUV, typename Pack, typename Arg>
     inline __device__ void operator()(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, int parity, const Pack &pack, const Arg &arg)
     {
-      using Float = typename Arg::Float;
+      using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
       __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
@@ -940,8 +944,8 @@ namespace quda {
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-                atomic_helper<Float, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                                arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+                atomic_helper<real, storeType>(&X[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                               arg.X_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
               }
             }
           } else {
@@ -949,8 +953,8 @@ namespace quda {
             for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
               for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-                atomic_helper<Float, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
-                                                arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
+                atomic_helper<real, storeType>(&Y[i_block0+i][j_block0+j][x_][s_row][s_col],
+                                               arg.Y_atomic, vuv[s_row*Arg::coarseSpin+s_col](i,j));
               }
             }
           }
@@ -1012,7 +1016,7 @@ namespace quda {
   template <typename VUV, typename Arg>
   inline __device__ __host__ void storeCoarseGlobalAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb, int coarse_parity, int i0, int j0, const Arg &arg)
   {
-    using Float = typename Arg::Float;
+    using real = typename Arg::Float;
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
     using TileType = typename Arg::vuvTileType;
 
@@ -1074,7 +1078,7 @@ namespace quda {
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { // Chiral row block
 #pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { // Chiral column block
-            if (s_row != s_col) vuv[s_row * Arg::coarseSpin + s_col] *= static_cast<Float>(-1.0);
+            if (s_row != s_col) vuv[s_row * Arg::coarseSpin + s_col] *= static_cast<real>(-1.0);
             if (Arg::fineSpin != 1 || s_row != s_col) {
 #pragma unroll
               for (int i = 0; i < TileType::M; i++)
@@ -1092,7 +1096,7 @@ namespace quda {
   template <typename Arg>
   __device__ __host__ void computeVUV(const Arg &arg, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_)
   {
-    using Float = typename Arg::Float;
+    using real = typename Arg::Float;
     constexpr int nDim = 4;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
@@ -1113,7 +1117,7 @@ namespace quda {
     }
     int coarse_x_cb = arg.shared_atomic ? coarse_x_cb_ : ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
 
-    using Ctype = decltype(make_tile_C<complex<Float>, false>(arg.vuvTile));
+    using Ctype = decltype(make_tile_C<complex<real>, false>(arg.vuvTile));
     Ctype vuv[Arg::coarseSpin * Arg::coarseSpin];
     multiplyVUV(vuv, arg, parity, x_cb, i0, j0);
 
@@ -1225,6 +1229,7 @@ namespace quda {
     */
     __device__ __host__ inline void operator()(int x_cb, int parity_c_col, int c_row)
     {
+      using real = typename Arg::Float;
       int c_col = parity_c_col % Arg::coarseColor; // coarse color col index
       int parity = parity_c_col / Arg::coarseColor;
       constexpr int nDim = 4;
@@ -1243,7 +1248,7 @@ namespace quda {
 
       coord[0] /= 2;
 
-      complex<typename Arg::Float> X[Arg::coarseSpin*Arg::coarseSpin];
+      complex<real> X[Arg::coarseSpin*Arg::coarseSpin];
       for (int i = 0; i < Arg::coarseSpin * Arg::coarseSpin; i++) X[i] = 0.0;
 
       // If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
@@ -1256,7 +1261,7 @@ namespace quda {
         for (int s_col = s_c * arg.spin_bs; s_col < (s_c+1) * arg.spin_bs; s_col++) { // Loop over fine spin column
 #pragma unroll
           for (int ic = 0; ic < Arg::fineColor; ic++) { // Sum over fine color row
-            complex<typename Arg::Float> CV = 0.0;
+            complex<real> CV = 0.0;
 #pragma unroll
             for (int jc = 0; jc < Arg::fineColor; jc++) {  // Sum over fine color column
               CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, c_col), CV);
@@ -1318,6 +1323,7 @@ namespace quda {
    * Adds the identity matrix to the coarse local term.
    */
   template <typename Arg> struct add_coarse_diagonal {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_diagonal(const Arg &arg) : arg(arg) { }
@@ -1331,7 +1337,7 @@ namespace quda {
     __device__ __host__ void operator()(int x_cb, int parity, int c)
     {
       for (int s = 0; s < Arg::coarseSpin; s++) { //Spin
-        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<typename Arg::Float>(1.0, 0.0);
+        arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<real>(1.0, 0.0);
       } //Spin
     }
   };
@@ -1340,6 +1346,7 @@ namespace quda {
    * Adds the staggered mass to the coarse local term.
    */
   template <typename Arg> struct add_coarse_staggered_mass {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_staggered_mass(const Arg &arg) : arg(arg) { }
@@ -1353,7 +1360,7 @@ namespace quda {
     {
       for (int s = 0; s < Arg::coarseSpin; s++) { //Spin
         for (int c = 0; c < Arg::coarseColor; c++) { //Color
-          arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<typename Arg::Float>(static_cast<typename Arg::Float>(2) * arg.mass, 0.0);
+          arg.X_atomic(0,parity,x_cb,s,s,c,c) += complex<real>(static_cast<real>(2) * arg.mass, 0.0);
         } //Color
       } //Spin
     }
@@ -1363,6 +1370,7 @@ namespace quda {
    * Adds the twisted-mass term to the coarse local term.
    */
   template <typename Arg> struct add_coarse_tm {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_tm(const Arg &arg) : arg(arg) { }
@@ -1375,7 +1383,7 @@ namespace quda {
     */
     __device__ __host__ void operator()(int x_cb, int parity, int c)
     {
-      const complex<typename Arg::Float> mu(0., arg.mu*arg.mu_factor);
+      const complex<real> mu(0., arg.mu*arg.mu_factor);
 
       for (int s = 0; s < Arg::coarseSpin/2; s++) { //Spin
         arg.X_atomic(0, parity, x_cb, s, s, c, c) += mu;
@@ -1390,6 +1398,7 @@ namespace quda {
    * Convert the field from the atomic format to the required computation format, e.g. fixed point to floating point
    */
   template <typename Arg> struct convert {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr convert(const Arg &arg) : arg(arg) { }
@@ -1414,7 +1423,7 @@ namespace quda {
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
-            complex<typename Arg::Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
+            complex<real> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
             arg.Y(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
           } //Spin column
         } //Spin row
@@ -1427,7 +1436,7 @@ namespace quda {
         for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
           for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
-            complex<typename Arg::Float> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
+            complex<real> M = in(d_in,parity,x_cb,s_row,s_col,c_row,c_col);
             arg.X(d_out,parity,x_cb,s_row,s_col,c_row,c_col) = M;
           } //Spin column
         } //Spin row
@@ -1439,6 +1448,7 @@ namespace quda {
    * Rescale the matrix elements by arg.rescale
    */
   template <typename Arg> struct rescale {
+    using real = typename Arg::Float;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr rescale(const Arg &arg) : arg(arg) { }
@@ -1458,7 +1468,7 @@ namespace quda {
       for (int s_row = 0; s_row < Arg::coarseSpin; s_row++) { //Spin row
 #pragma unroll
         for (int s_col = 0; s_col < Arg::coarseSpin; s_col++) { //Spin column
-          complex<typename Arg::Float> M = arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col);
+          complex<real> M = arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col);
           arg.Y(arg.dim_index,parity,x_cb,s_row,s_col,c_row,c_col) = arg.rescale*M;
         } //Spin column
       } //Spin row
