@@ -13,27 +13,30 @@
 
 namespace quda {
 
-  // this is the storage type used when computing the coarse link variables
-  // by using integers we have deterministic atomics
-  typedef int storeType;
+  /** This is the storage type used when computing the coarse link
+      variables: by using integers we have deterministic atomics */
+  using storeType = int;
 
+  /** This is the arg struct used for all multigrid coarse-grid
+      construction.  The same instance is reused for different
+      kernels */
   template <bool from_coarse_, typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
             typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor, typename fineSpinorTmp,
             typename fineSpinorV, typename fineClover>
   struct CalculateYArg : kernel_param<> {
-    using Float = Float_;
+    using Float = Float_; /** Float Precision of the computation */
 
-    static constexpr int fineSpin = fineSpin_;
-    static constexpr int coarseSpin = coarseSpin_;
+    static constexpr int fineSpin = fineSpin_; /** Number of spins on the fine grid */
+    static constexpr int coarseSpin = coarseSpin_; /** Number of spins on the coarse grid */
 
-    static constexpr int fineColor = fineColor_;
-    static constexpr int coarseColor = coarseColor_;
+    static constexpr int fineColor = fineColor_;  /** Number of colors on the fine grid */
+    static constexpr int coarseColor = coarseColor_;  /** Number of colors on the coarse grid */
 
     static constexpr int fineDof = fineSpin * fineColor;
     static constexpr int coarseDof = coarseSpin * coarseColor;
 
-    static constexpr bool from_coarse = from_coarse_;
-    static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible;
+    static constexpr bool from_coarse = from_coarse_; /** Whether the fine grid is itself a coarse grid */
+    static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible; /** Whether tensor-core acceleration is applicable */
 
     coarseGauge Y;           /** Computed coarse link field */
     coarseGauge X;           /** Computed coarse clover field */
@@ -67,56 +70,55 @@ namespace quda {
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    const int *fine_to_coarse;
-    const int *coarse_to_fine;
+    const int *fine_to_coarse;  /** Pointer to the fine-to-coarse look-up table */
+    const int *coarse_to_fine;  /** Pointer to the coarse-to-fine look-up table */
 
-    const bool bidirectional;
+    const bool bidirectional;   /** Whether the operator we are coarsening requires bi-directional coarsening */
 
-    // To increase L2 locality we can schedule the geometry to grid.y and
-    // the coarse colors to grid.x.  This will increase the potential for
-    // L2 reuse since a given wave of thread blocks will be for different
-    // coarse color but the same coarse grid point which will have common
-    // loads.
+    /** To increase L2 locality we can schedule the geometry to grid.y
+        and the coarse colors to grid.x.  This will increase the
+        potential for L2 reuse since a given wave of thread blocks
+        will be for different coarse color but the same coarse grid
+        point which will have common loads. */
     bool coarse_color_wave = false;
 
-    // Enable this for shared-memory atomics instead of global atomics.
-    // Doing so means that all (modulo the parity) of the coarsening for a
-    // coarse degree of freedom is handled by a single thread block.
-    // For computeVUV only at present
+    /** Enable this for shared-memory atomics instead of global
+        atomics.  Doing so means that all (modulo the parity) of the
+        coarsening for a coarse degree of freedom is handled by a
+        single thread block.  For computeVUV only at present. */
     bool shared_atomic;
 
-    // With parity_flip enabled we make parity the slowest running
-    // dimension in the y-thread axis, and coarse color runs faster.  This
-    // improves read locality at the expense of write locality
+    /** With parity_flip enabled we make parity the slowest running
+        dimension in the y-thread axis, and coarse color runs faster.
+        This improves read locality at the expense of write
+        locality */
     bool parity_flip;
 
-    int_fastdiv aggregates_per_block; // number of aggregates per thread block
-    int_fastdiv grid_z; // this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled
-    int_fastdiv coarse_color_grid_z; // constant we ned to divide by
+    int_fastdiv aggregates_per_block; /** number of aggregates per thread block */
+    int_fastdiv grid_z; /** this is the coarseColor grid that is wrapped into the x grid when coarse_color_wave is enabled */
+    int_fastdiv coarse_color_grid_z; /** constant we ned to divide by */
 
     static constexpr bool compute_max = false;
-    Float *max_h; // scalar that stores the maximum element on the host
-    Float *max_d; // scalar that stores the maximum elenent on the device
-    Float *max;   // points to either max_h or max_d, for host or device, respectively
+    Float *max_h; /** scalar that stores the maximum element on the host */
+    Float *max_d; /** scalar that stores the maximum elenent on the device */
+    Float *max;   /** points to either max_h or max_d, for host or device, respectively */
 
-    int dim;           // which dimension are we working on
-    QudaDirection dir; // which direction are working on
-    int dim_index;     // which direction / dimension we are working on
+    int dim;           /** which dimension are we working on */
+    QudaDirection dir; /** which direction are working on */
+    int dim_index;     /** which direction / dimension we are working on */
 
-    bool twist; // whether we are doing twisted or non-twisted
+    bool twist; /** whether we are doing twisted or non-twisted */
 
-    // tile used for computeUV
-    static constexpr int tile_height_uv = fineColor % 4 == 0 ? 4 : fineColor % 3 == 0 ? 3 : fineColor % 2 ? 2 : 1;
-    static constexpr int tile_width_uv = coarseColor % 2 == 0 ? 2 : 1;
-
-    using uvTileType = TileSize<fineColor, coarseColor, fineColor, tile_height_uv, tile_width_uv, 1>;
-    uvTileType uvTile;
+    static constexpr int tile_height_uv = fineColor % 4 == 0 ? 4 : fineColor % 3 == 0 ? 3 : fineColor % 2 ? 2 : 1; /** tile height used for computeUV */
+    static constexpr int tile_width_uv = coarseColor % 2 == 0 ? 2 : 1;                                             /** tile width used for computeUV */
+    using uvTileType = TileSize<fineColor, coarseColor, fineColor, tile_height_uv, tile_width_uv, 1>;              /** tile type used for computeUV */
+    uvTileType uvTile;                                                                                             /** tile instance used for computeUV */
 
     // tile used for computeVUV - for fine grids best to use 4, else use max of 3
-    static constexpr int tile_height_vuv = (coarseColor % 4 == 0 && fineSpin == 4) ? 4 : coarseColor % 3 == 0 ? 3 : 2;
-    static constexpr int tile_width_vuv = coarseColor % 2 == 0 ? 2 : 1;
-    using vuvTileType = TileSize<coarseColor, coarseColor, fineColor, tile_height_vuv, tile_width_vuv, 1>;
-    vuvTileType vuvTile;
+    static constexpr int tile_height_vuv = (coarseColor % 4 == 0 && fineSpin == 4) ? 4 : coarseColor % 3 == 0 ? 3 : 2; /** tile height used for computeVUV */
+    static constexpr int tile_width_vuv = coarseColor % 2 == 0 ? 2 : 1;                                                /** tile width used for computeVUV */
+    using vuvTileType = TileSize<coarseColor, coarseColor, fineColor, tile_height_vuv, tile_width_vuv, 1>;             /** tile type used for computeVUV */
+    vuvTileType vuvTile;                                                                                               /** tile instance used for computeUV */
 
     // max colors per block is 8, rounded up to whole multiples of tile size
     static constexpr int max_color_height_per_block = coarseColor < 8 ? coarseColor : ((8 + tile_height_vuv - 1) / tile_height_vuv) * tile_height_vuv;
@@ -126,11 +128,33 @@ namespace quda {
     static_assert(max_color_height_per_block % tile_height_vuv == 0, "max_color_height_per_block must be divisible by tile height");
     static_assert(max_color_width_per_block % tile_width_vuv == 0, "max_color_width_per_block must be divisible by tile width");
 
+    /**
+       @brief Constructor for CalculateYArg
+       @param[out] Y Accessor to the coarse gauge field
+       @param[out] X Accessor to the coarse clover field
+       @param[in,out] Y Atomic accessor to the coarse gauge field
+       @param[in,out] X Atomic accessor to the coarse clover field
+       @param[in,out] UV Accessor to the uv temp packed colorspinor field
+       @param[in,out] AV Accessor to the av temp packed colorspinor field
+       @param[in] U Accessor to the fine gauge field
+       @param[in] V Accessor to the packed nullspace colorspinor field
+       @param[in] C Accessor to the fine clover field
+       @param[in] Cinv Accessor to the fine inverse clover field
+       @param[in] kappa Kappa parameter from the fine operator
+       @param[in] mass Mass parameter from the fine operator
+       @param[in] mu Twisted mass parameter from the fine operator
+       @param[in] mu_factor Additional twisted mass parameter for coarse-grid stability
+       @param[in] x_size_ Fine-grid geometric dimensions
+       @param[in] xc_size_ Coarse-grid geometric dimensions
+       @param[in] Pointer to fine-to-coarse look-up table (memory space is same compute)
+       @param[in] Pointer to coarse-to-fine look-up table (memory space is same compute)
+       @param[in] Whether the operator we are coarsening requires bi-directional coarsening
+     */
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
       fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
       const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
-      const int *x_size_, const int *xc_size_, int *geo_bs_, int spin_bs_,
+      const int *x_size_, const int *xc_size_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
       UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
@@ -146,18 +170,27 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
         xc_size[i] = xc_size_[i];
-        geo_bs[i] = geo_bs_[i];
+        geo_bs[i] = x_size[i] / xc_size[i];
         comm_dim[i] = comm_dim_partitioned(i);
       }
     }
   };
 
-  template <typename T>
-  struct ArgMax : public T {
+  /** This is a wrapper class that derives from the kernel argument
+      struct, and is used to enable the maximum element computation */
+  template <typename T>  struct ArgMax : public T {
     static constexpr bool compute_max = true;
     ArgMax(const T& t) : T(t) { }
   };
 
+  /**
+     @brief Helper for computing if the present site is within the
+     forwards halo region
+     @param[in] coord Grid coordinates
+     @param[in] dim Dimension of the shift
+     @param[in] nFace Depth of the halo
+     @param[in] arg Kernel argument
+  */
   template <typename Arg> constexpr bool isHalo(const int coord[], int dim, int nFace, const Arg &arg)
   {
     switch (dim) {
@@ -169,13 +202,21 @@ namespace quda {
     return false;
   }
 
+  /**
+     @brief Helper for computing checkerboard index from from a shift
+     of length nFace in the direction dim
+     @param[in] x Grid coordinates
+     @param[in] X Grid dimensions
+     @param[in] dim Dimension of the shift
+     @param[in] nFace Depth of the halo
+  */
   template <typename I, typename Coord>
-  __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int mu, int nFace)
+  __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int dim, int nFace)
   {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    switch (mu) {
+    switch (dim) {
     case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
     case 1: y[1] = (y[1] + nFace + X[1]) % X[1]; break;
     case 2: y[2] = (y[2] + nFace + X[2]) % X[2]; break;
@@ -184,6 +225,13 @@ namespace quda {
     return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
   }
 
+  /**
+     @brief Helper for computing if we are on the edge of an aggregate
+     @param[in] coord Fine grid coordinates
+     @param[in] coord_coarse Coarse grid coordinates
+     @param[in] dim Dimension
+     @param[in] arg Kernel argument
+  */
   template <typename Arg> constexpr bool isCoarseDiagonal(const int coord[], const int coord_coarse[], int dim, const Arg &arg)
   {
     switch (dim) {
@@ -196,9 +244,15 @@ namespace quda {
   }
 
   /**
-     Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
-     Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
+     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
+     Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
      or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
+     @param[in] arg Kernel argumnt
+     @param[in] Wacc Input vector accessor
+     @param[in] parity Parity index
+     @param[in] x_cb Checkerboard index
+     @param[in] i0 Color color row index (coarse)
+     @param[in] j0 Color column index (fine)
   */
   template <typename Wtype, typename Arg>
   __device__ __host__ inline auto computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
@@ -323,11 +377,25 @@ namespace quda {
     return uv_max;
   } // computeUV
 
+
+  /**
+     Functor for the UV computation.
+
+     If Arg::compute_max is true, then we do not save the result, and
+     instead merely compute the maximum element.  This is used for
+     setting the scale for fixed point.
+  */
   template <typename Arg> struct compute_uv {
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_uv(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] ic_parity parity * output color column
+       @param[in] jc output color row
+    */
     __device__ __host__ void operator()(int x_cb, int ic_parity, int jc)
     {
       int ic = ic_parity % arg.uvTile.M_tiles;
@@ -346,6 +414,10 @@ namespace quda {
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x)
      Where: s = fine spin, c' = coarse color, c = fine color
+
+     If Arg::compute_max is true, then we do not save the result, and
+     instead merely compute the maximum element.  This is used for
+     setting the scale for fixed point.
   */
   template <typename Arg> struct compute_av {
     using Float = typename Arg::Float;
@@ -353,6 +425,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_av(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] ch_parity chirality * parity
+       @param[in] ic_c output color
+    */
     __device__ __host__ inline void operator()(int x_cb, int ch_parity, int ic_c)
     {
       int ch = ch_parity % 2;
@@ -420,6 +498,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_tmav(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] parity parity index
+       @param[in] v output color
+    */
     __device__ __host__ inline void operator()(int x_cb, int parity, int v)
     {
       complex<typename Arg::Float> fp(1./(1.+arg.mu*arg.mu),-arg.mu/(1.+arg.mu*arg.mu));
@@ -447,6 +531,10 @@ namespace quda {
   /**
      Calculates the matrix A V^{s,c'}(x) = \sum_c A^{c}(x) * V^{s,c}(x) for twisted-clover fermions
      Where: s = fine spin, c' = coarse color, c = fine color
+
+     If Arg::compute_max is true, then we do not save the result, and
+     instead merely compute the maximum element.  This is used for
+     setting the scale for fixed point.
   */
   template <typename Arg> struct compute_tmcav {
     using Float = typename Arg::Float;
@@ -454,6 +542,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_tmcav(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] ch_parity chirality * parity
+       @param[in] c_row output color column
+    */
     __device__ __host__ inline void operator()(int x_cb, int ch_parity, int ic_c)
     {
       int ch = ch_parity % 2;
@@ -578,6 +672,20 @@ namespace quda {
     return x_coarse;
   }
 
+  /**
+     @brief Do a single (AV)^\dagger * UV product, where for
+     preconditioned clover, AV correspond to the clover inverse
+     multiplied by the packed null space vectors, else AV is simply
+     the packed null space vectors. This is the specialized form for
+     fine-grid Wilson-type fermions.
+
+     @param[out] vuv Result array
+     @param[in,out] arg Arg storing the fields and parameters
+     @param[in] parity Fine grid parity we're working on
+     @param[in] x_cb Checkboarded x dimension
+     @param[in] i0 Color row
+     @param[in] j0 Color column
+   */
   template <int dim, typename Out, typename Arg>
   __device__ __host__ inline void multiplyVUV(Out &vuv, const Arg &arg, int parity, int x_cb, int i0, int j0)
   {
@@ -657,7 +765,7 @@ namespace quda {
      preconditioned clover, AV correspond to the clover inverse
      multiplied by the packed null space vectors, else AV is simply
      the packed null space vectors. This is the specialized form for
-     fine-grid Wilson-type fermions, where we template on the
+     fine-grid Wilson-type fermions, where we first template on the
      dimension to ensure the spin projector structure is known to the
      compiler.
 
@@ -665,6 +773,8 @@ namespace quda {
      @param[in,out] arg Arg storing the fields and parameters
      @param[in] Fine grid parity we're working on
      @param[in] x_cb Checkboarded x dimension
+     @param[in] i0 Color row
+     @param[in] j0 Color column
    */
   template <typename Arg, typename Out>
   __device__ __host__ inline std::enable_if_t<!Arg::from_coarse && Arg::fineSpin == 4, void>
@@ -1081,6 +1191,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_vuv(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] parity_c_row parity * output color row
+       @param[in] c_col output coarse color column
+    */
     __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
     {
       int parity, parity_coarse, x_coarse_cb, c_row;
@@ -1101,6 +1217,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_coarse_clover(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] parity_c_col parity * output color column
+       @param[in] c_row output coarse color row
+    */
     __device__ __host__ inline void operator()(int x_cb, int parity_c_col, int c_row)
     {
       int c_col = parity_c_col % Arg::coarseColor; // coarse color col index
@@ -1164,6 +1286,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr reverse(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity_c_col parity * color column
+       @param[in] c_row coarse color row
+    */
     __device__ __host__ void operator()(int x_cb, int parity_c_col, int c_row)
     {
       int parity = parity_c_col / Arg::coarseColor;
@@ -1194,6 +1322,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_diagonal(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity parity index
+       @param[in] c coarse color
+    */
     __device__ __host__ void operator()(int x_cb, int parity, int c)
     {
       for (int s = 0; s < Arg::coarseSpin; s++) { //Spin
@@ -1210,6 +1344,11 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_staggered_mass(const Arg &arg) : arg(arg) { }
 
+    /**
+       2-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity parity index
+    */
     __device__ __host__ void operator()(int x_cb, int parity, int)
     {
       for (int s = 0; s < Arg::coarseSpin; s++) { //Spin
@@ -1228,6 +1367,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr add_coarse_tm(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity parity index
+       @param[in] c coarse color
+    */
     __device__ __host__ void operator()(int x_cb, int parity, int c)
     {
       const complex<typename Arg::Float> mu(0., arg.mu*arg.mu_factor);
@@ -1249,6 +1394,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr convert(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity_c_col parity * output coarse color column
+       @param[in] c_row output coarse color row
+    */
     __device__ __host__ void operator()(int x_cb, int parity_c_col, int c_row)
     {
       int c_col = parity_c_col % Arg::coarseColor; // color col index
@@ -1292,6 +1443,12 @@ namespace quda {
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr rescale(const Arg &arg) : arg(arg) { }
 
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o coarse-grid spacetime
+       @param[in] parity_c_col parity * output coarse color column
+       @param[in] c_row output coarse color row
+    */
     __device__ __host__ void operator()(int x_cb, int parity_c_col, int c_row)
     {
       int c_col = parity_c_col % Arg::coarseColor; // color col index
