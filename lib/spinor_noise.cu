@@ -132,9 +132,8 @@ namespace quda {
 
   void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type)
   {
-    RNG *randstates = new RNG(src, seed);
-    spinorNoise(src, *randstates, type);
-    delete randstates;
+    RNG randstates(src, seed);
+    spinorNoise(src, randstates, type);
   }
 
 } // namespace quda

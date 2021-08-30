@@ -222,7 +222,7 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -425,7 +425,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    std::unique_ptr<double[]> alpha(new double[Np]);
+    auto alpha = std::make_unique<double[]>(Np);
     double pAp;
     int rUpdate = 0;
 
@@ -783,7 +783,7 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)

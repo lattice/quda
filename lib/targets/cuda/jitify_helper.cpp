@@ -32,7 +32,7 @@
 #endif // !HOST_DEBUG
 
 #include "jitify_options.hpp"
-#include <jitify_helper2.cuh>
+#include "jitify_helper.h"
 
 namespace quda {
 

@@ -8,7 +8,7 @@
 #include <tunable_nd.h>
 #include <dslash_quda.h>
 #include <instantiate_dslash.h>
-#include <kernels/mdw_fused_dslash.cuh>
+#include <kernels/dslash_mdw_fused.cuh>
 
 namespace quda
 {
