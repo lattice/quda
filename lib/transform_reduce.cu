@@ -48,8 +48,10 @@ namespace quda
       init(init),
       r(r)
     {
-      strcpy(aux, "batch_size=");
-      u32toa(aux + 11, v.size());
+      char aux2[TuneKey::aux_n];
+      strcpy(aux2, "batch_size=");
+      u32toa(aux2 + 11, v.size());
+      strcat(aux, aux2);
       apply(device::get_default_stream());
     }
 
