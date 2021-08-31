@@ -146,9 +146,9 @@ namespace quda {
        @param[in] mu_factor Additional twisted mass parameter for coarse-grid stability
        @param[in] x_size_ Fine-grid geometric dimensions
        @param[in] xc_size_ Coarse-grid geometric dimensions
-       @param[in] Pointer to fine-to-coarse look-up table (memory space is same compute)
-       @param[in] Pointer to coarse-to-fine look-up table (memory space is same compute)
-       @param[in] Whether the operator we are coarsening requires bi-directional coarsening
+       @param[in] fine_to_coarse Pointer to fine-to-coarse look-up table (memory space is same compute)
+       @param[in] coarse_to_fine Pointer to coarse-to-fine look-up table (memory space is same compute)
+       @param[in] bidirectional Whether the operator we are coarsening requires bi-directional coarsening
      */
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
@@ -186,6 +186,8 @@ namespace quda {
   /**
      @brief Helper for computing if the present site is within the
      forwards halo region
+
+     @return If we within the halo
      @param[in] coord Grid coordinates
      @param[in] dim Dimension of the shift
      @param[in] nFace Depth of the halo
@@ -203,30 +205,10 @@ namespace quda {
   }
 
   /**
-     @brief Helper for computing checkerboard index from from a shift
-     of length nFace in the direction dim
-     @param[in] x Grid coordinates
-     @param[in] X Grid dimensions
-     @param[in] dim Dimension of the shift
-     @param[in] nFace Depth of the halo
-  */
-  template <typename I, typename Coord>
-  __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int dim, int nFace)
-  {
-    int y[4];
-#pragma unroll
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    switch (dim) {
-    case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
-    case 1: y[1] = (y[1] + nFace + X[1]) % X[1]; break;
-    case 2: y[2] = (y[2] + nFace + X[2]) % X[2]; break;
-    case 3: y[3] = (y[3] + nFace + X[3]) % X[3]; break;
-    }
-    return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-  }
+     @brief Helper for computing if the fine site we are on
+     corresponds to the coarse operator diagaonl
 
-  /**
-     @brief Helper for computing if we are on the edge of an aggregate
+     @return If we are on the coarse diagonal
      @param[in] coord Fine grid coordinates
      @param[in] coord_coarse Coarse grid coordinates
      @param[in] dim Dimension
@@ -247,6 +229,8 @@ namespace quda {
      @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
      Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
      or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
+
+     @return The maximum element of the result (if Arg::compute_max == true)
      @param[in] arg Kernel argumnt
      @param[in] Wacc Input vector accessor
      @param[in] parity Parity index
@@ -264,7 +248,6 @@ namespace quda {
     using complex = complex<real>;
     using TileType = typename Arg::uvTileType;
     auto &tile = arg.uvTile;
-    auto dim = arg.dim;
     using Ctype = decltype(make_tile_C<complex, false>(tile));
     Ctype UV[uvSpin];
 
@@ -288,19 +271,19 @@ namespace quda {
         }  //Fine Spin
       }    // Fine color columns
 
-    } else if ( isHalo(coord, dim, nFace, arg) ) {
+    } else if ( isHalo(coord, arg.dim, nFace, arg) ) {
 
-      int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
+      int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
       if (!Arg::from_coarse) {
 
 #pragma unroll
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
-          U.load(arg.U, dim, parity, x_cb, i0, k);
+          U.load(arg.U, arg.dim, parity, x_cb, i0, k);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             auto W = make_tile_B<complex, true>(tile);
-            W.loadCS(Wacc, dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
+            W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
             UV[s].mma_nn(U, W);
           } // Fine color columns
         }   // Fine spin (tensor)
@@ -312,12 +295,12 @@ namespace quda {
 #pragma unroll
           for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
             auto W = make_tile_B<complex, true>(tile);
-            W.loadCS(Wacc, dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
+            W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
 #pragma unroll
             for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
               // on coarse lattice, if forwards then use forwards links
               auto U = make_tile_A<complex, false>(tile);
-              U.load(arg.U, dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
+              U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
               UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
             } // which chiral block
@@ -328,13 +311,13 @@ namespace quda {
 
     } else {
 
-      int y_cb = linkIndexHop(coord, arg.x_size, dim, nFace);
+      int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
       if (!Arg::from_coarse) {
 
 #pragma unroll
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
           auto U = make_tile_A<complex, false>(tile);
-          U.load(arg.U, dim, parity, x_cb, i0, k);
+          U.load(arg.U, arg.dim, parity, x_cb, i0, k);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
             auto W = make_tile_B<complex, false>(tile);
@@ -355,7 +338,7 @@ namespace quda {
             for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
               // on coarse lattice, if forwards then use forwards links
               auto U = make_tile_A<complex, false>(tile);
-              U.load(arg.U, dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
+              U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
               UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
             } // which chiral block

@@ -180,7 +180,7 @@ namespace quda {
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if (/*arg.shared_atomic && */type == COMPUTE_VUV)
+      if (type == COMPUTE_VUV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
