@@ -222,7 +222,7 @@ namespace quda {
 
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         if (compute_max) launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
-        else launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
+        else launch_host<compute_av>(tp, stream, arg);
 #else
         errorQuda("Clover dslash has not been built");
 #endif
