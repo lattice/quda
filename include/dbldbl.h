@@ -43,10 +43,9 @@
  *     observed maximum relative error.
  */
 
-#include <math_helper.cuh>
+#pragma once
 
-#if !defined(DBLDBL_H_)
-#define DBLDBL_H_
+#include <math_helper.cuh>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -380,5 +379,3 @@ __device__ doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &
 
 __device__ doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
 { return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
-
-#endif /* DBLDBL_H_ */

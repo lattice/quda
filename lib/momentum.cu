@@ -58,8 +58,6 @@ namespace quda {
 
   void forceRecord(std::vector<double> &force, double dt, const char *fname)
   {
-    comm_allreduce_max_array(force.data(), 2); // FIXME - this needs to be subsumed into the reduction launch
-
     if (comm_rank()==0) {
       force_stream << fname << "\t" << std::setprecision(5) << force[0] << "\t"
                    << std::setprecision(5) << force[1] << "\t"
@@ -127,7 +125,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       UpdateMomArg<Float, nColor, recon> arg(mom, coeff, force);
-      launch<MomUpdate>(force_max, tp, stream, arg);
+      launch<MomUpdate, double, comm_reduce_max<double>>(force_max, tp, stream, arg);
     }
 
     void preTune() { mom.backup();}

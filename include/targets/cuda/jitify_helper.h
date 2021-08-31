@@ -1,7 +1,7 @@
 #pragma once
 
 /**
-   @file jitify_helper.cuh
+   @file jitify_helper.h
 
    @brief Helper file when using jitify run-time compilation.  This
    file should be included in source code, and not jitify.hpp

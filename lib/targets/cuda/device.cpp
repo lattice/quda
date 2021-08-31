@@ -17,7 +17,7 @@ static cudaStream_t *streams;
 static const int Nstream = 9;
 
 #define CHECK_CUDA_ERROR(func)                                          \
-  cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+  target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {
@@ -218,11 +218,6 @@ namespace quda
       }
     }
 
-    cudaStream_t get_cuda_stream(const qudaStream_t &stream)
-    {
-      return streams[stream.idx];
-    }
-
     qudaStream_t get_stream(unsigned int i)
     {
       if (i > Nstream) errorQuda("Invalid stream index %u", i);
@@ -329,4 +324,19 @@ namespace quda
     } // namespace profile
 
   } // namespace device
+
+
+  namespace target {
+
+    namespace cuda {
+
+      cudaStream_t get_stream(const qudaStream_t &stream)
+      {
+        return streams[stream.idx];
+      }
+
+    }
+
+  }
+
 } // namespace quda

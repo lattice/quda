@@ -972,7 +972,7 @@ double test(Kernel kernel)
     *yD = *yH;
     *zD = *zH;
 
-    commGlobalReductionSet(false); // switch off global reductions for this test
+    commGlobalReductionPush(false); // switch off global reductions for this test
 
     commAsyncReductionSet(true);
     blas::cDotProductNormA(*zD, *xD);
@@ -990,7 +990,7 @@ double test(Kernel kernel)
     *xH = *vD;
     *yH = *wD;
 
-    commGlobalReductionSet(true); // restore global reductions
+    commGlobalReductionPop(); // restore global reductions
 
     error = ERROR(x) + ERROR(y);
     break;
