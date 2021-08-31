@@ -168,10 +168,10 @@ namespace quda {
         errorQuda("Gamma basis %d not supported", V.GammaBasis());
 
       for (int i=0; i<QUDA_MAX_DIM; i++) {
-        x_size[i] = x_size_[i];
-        xc_size[i] = xc_size_[i];
+        x_size[i] = i < 4 ? x_size_[i] : 1;
+        xc_size[i] = i < 4 ? xc_size_[i] : 1;
         geo_bs[i] = x_size[i] / xc_size[i];
-        comm_dim[i] = comm_dim_partitioned(i);
+        comm_dim[i] = i < 4 ? comm_dim_partitioned(i) : 1;
       }
     }
   };
