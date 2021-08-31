@@ -6374,7 +6374,7 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   double hmc_coeff = hmc_param->beta*epsilon/3.0;
 
   // Initial half step
-  //P_{1/2} = P_0 - dtau/2 * (fU - fD) 
+  // P_{1/2} = P_0 - dtau/2 * (fU - fD) 
   profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
   // Inside the gauge force calculation is a momentum update too.
@@ -6387,7 +6387,7 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     // Now we have the gauge field force accumulated in the momentum
     // field, we apply the impulse to the gauge field, reunitarize,
     // and start the next leapfrog step in the integration.
-    //U_{k} = exp(i dtau P_{k-1/2}) * U_{k-1}
+    // U_{k} = exp(i dtau P_{k-1/2}) * U_{k-1}
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
     updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
@@ -6402,7 +6402,7 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     
     // We just evolved the gauge field, so we must recompute the fermion fields
     // and invert to calculate the impulse from the fermion field.
-    //P_{k+1/2} = P_{k-1/2} - dtau * (fU - fD)
+    // P_{k+1/2} = P_{k-1/2} - dtau * (fU - fD)
     profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
     gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff, path_coeff);
@@ -6412,7 +6412,7 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   }
 
   // Final half step
-  //U_{n} = exp(i dtau P_{n-1/2}) * U_{n-1}
+  // U_{n} = exp(i dtau P_{n-1/2}) * U_{n-1}
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
   updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
