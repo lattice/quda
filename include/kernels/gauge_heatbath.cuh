@@ -5,13 +5,6 @@
 #include <random_helper.h>
 #include <kernel.h>
 
-#ifndef PI
-#define PI    3.1415926535897932384626433832795    // pi
-#endif
-#ifndef PII
-#define PII   6.2831853071795864769252867665590    // 2 * pi
-#endif
-
 namespace quda {
 
   /**
@@ -89,7 +82,7 @@ namespace quda {
     xr2 = (log((xr2 + static_cast<T>(1.e-10))));
     xr3 = uniform<T>::rand(localState);
     xr4 = uniform<T>::rand(localState);
-    xr3 = cos(static_cast<T>(PII) * xr3);
+    xr3 = cos(static_cast<T>(2.0 * M_PI) * xr3);
     d = -(xr2  + xr1 * xr3 * xr3 ) / al;
     //now  beat each  site into submission
     int nacd = 0;
@@ -103,7 +96,7 @@ namespace quda {
         xr2 = (log((xr2 + 1.e-10)));
         xr3 = uniform<T>::rand(localState);
         xr4 = uniform<T>::rand(localState);
-        xr3 = cos(PII * xr3);
+        xr3 = cos(static_cast<T>(2.0 * M_PI) * xr3);
         d = -(xr2 + xr1 * xr3 * xr3) / al;
         if ((1.00 - 0.5 * d) > xr4 * xr4 ) break;
       }
@@ -136,7 +129,7 @@ namespace quda {
     xr1 = abs(xr1);
     xr1 = sqrt(xr1);
     //xr2 is a random number between 0 and 2*pi
-    xr2 = PII * uniform<T>::rand(localState);
+    xr2 = static_cast<T>(2.0 * M_PI) * uniform<T>::rand(localState);
     a(0,1) = xr1 * cos(xr2);
     a(1,0) = xr1 * sin(xr2);
     return a;
