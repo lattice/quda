@@ -7,7 +7,7 @@ namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_ >
-  struct FmunuArg : kernel_param<1>
+  struct FmunuArg : kernel_param<>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
