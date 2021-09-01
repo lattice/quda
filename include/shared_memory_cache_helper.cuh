@@ -72,7 +72,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-        extern __shared__ atom_t cache_[];
+        extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
       }
     };
