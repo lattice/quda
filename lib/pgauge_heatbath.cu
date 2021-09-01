@@ -104,7 +104,7 @@ namespace quda {
     MonteAlg(GaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover)
     {
       host_timer_t timer;
-      double hb_time, ovr_time;
+      double hb_time = 0.0, ovr_time = 0.0;
       if (getVerbosity() >= QUDA_VERBOSE) timer.start();
 
       for (int step = 0; step < nhb; step++) {
