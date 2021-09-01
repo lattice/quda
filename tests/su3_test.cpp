@@ -17,10 +17,11 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
-int smear_steps = 50;
+int gauge_smear_steps = 50;
 double wflow_epsilon = 0.01;
 int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
@@ -85,7 +86,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
                       "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
 
-  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
 
   opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
 

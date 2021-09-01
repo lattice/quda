@@ -276,17 +276,6 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
-// GF Options
-int gf_gauge_dir = 4;
-int gf_maxiter = 10000;
-int gf_verbosity_interval = 100;
-double gf_ovr_relaxation_boost = 1.5;
-double gf_fft_alpha = 0.8;
-int gf_reunit_interval = 10;
-double gf_tolerance = 1e-6;
-bool gf_theta_condition = false;
-bool gf_fft_autotune = false;
-
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
 
 namespace
@@ -1032,9 +1021,6 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
                       "Set the number of sink smearing steps (default 0)");
-
-  opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
-    ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 
   quda_app->add_psoption(opgroup, "--prop-source-position", prop_source_position, CLI::Validator(),
                          "Set the position of the nth point source <Nth source> (X Y Z T) (default(0,0,0,0))");

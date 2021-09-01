@@ -197,13 +197,6 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
-  // Gauge smear param
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
-  
   // General parameter setup
   inv_param.inv_type = inv_type;
   inv_param.solution_type = solution_type;
@@ -987,13 +980,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.sp_pad = 0;
-
-  // Gauge smear param
-  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
-  inv_param.gauge_smear_type = gauge_smear_type;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
-  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
-  inv_param.gauge_smear_steps = gauge_smear_steps;
   
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
