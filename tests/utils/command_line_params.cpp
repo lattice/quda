@@ -288,10 +288,46 @@ bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
+QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
+QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
+QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
+QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
+
+std::array<int, 3> blas_mnk = {64, 64, 64};
+auto &blas_m = blas_mnk[0];
+auto &blas_n = blas_mnk[1];
+auto &blas_k = blas_mnk[2];
+
+std::array<int, 3> blas_leading_dims = {128, 128, 128};
+auto &blas_lda = blas_leading_dims[0];
+auto &blas_ldb = blas_leading_dims[1];
+auto &blas_ldc = blas_leading_dims[2];
+
+std::array<int, 3> blas_offsets = {0, 0, 0};
+auto &blas_a_offset = blas_offsets[0];
+auto &blas_b_offset = blas_offsets[1];
+auto &blas_c_offset = blas_offsets[2];
+
+std::array<int, 3> blas_strides = {1, 1, 1};
+auto &blas_a_stride = blas_strides[0];
+auto &blas_b_stride = blas_strides[1];
+auto &blas_c_stride = blas_strides[2];
+
+std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
+std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
+int blas_batch = 16;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
+
+  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
+    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
+
+  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
+                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
+
+  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
@@ -300,9 +336,8 @@ namespace
                                                            {"open-ft-z", QUDA_CONTRACT_TYPE_OPEN_FT_Z},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR},
 							   {"dr-ft-t", QUDA_CONTRACT_TYPE_DR_FT_T},
-							   {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z},
-							   {"stag", QUDA_CONTRACT_TYPE_STAGGERED},
-							   {"stag-ft-t", QUDA_CONTRACT_TYPE_STAGGERED_FT_T}
+                                                           {"dr-ft-z", QUDA_CONTRACT_TYPE_DR_FT_Z}
+
   };
 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
@@ -440,10 +475,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-
-  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default 1.0) and kappa. "
+  
+  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0. Will be inferred from clover-csw and kappa. "
 		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
-
+  
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
@@ -1130,6 +1165,30 @@ void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
     
     quda_app->add_massoption(opgroup, "--mass-array", kappa_array, CLI::Validator(),
 			     "set the Nth<INT> mass value<FLOAT> of the Dirac operator)");
+}
+
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
 }
 
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
