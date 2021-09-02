@@ -51,61 +51,7 @@ namespace quda
 
     const dim3 block;
     const int stride;
-
-    /**
-       @brief This is a dummy instantiation for the host compiler
-    */
-    template <bool, typename dummy = void> struct cache_dynamic {
-      atom_t* operator()()
-      {
-        static atom_t *cache_;
-        return reinterpret_cast<atom_t*>(cache_);
-      }
-    };
-
-    template <bool is_device, typename dummy = void> struct cache_static : cache_dynamic<is_device> {};
-
-    /**
-       @brief This is the handle to the shared memory, dynamic specialization
-       @return Shared memory pointer
-     */
-    template <typename dummy> struct cache_dynamic<true, dummy> {
-      __device__ inline atom_t* operator()()
-      {
-        //extern __shared__ atom_t cache_[];
-        atom_t *cache_ = nullptr;
-        return reinterpret_cast<atom_t*>(cache_);
-      }
-    };
-
-    /**
-       @brief This is the handle to the shared memory, static specialization
-       @return Shared memory pointer
-     */
-    template <typename dummy> struct cache_static<true, dummy> {
-      __device__ inline atom_t* operator()()
-      {
-        //static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
-	using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
-	auto g = getGroup();
-	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
-	auto cache_ = sycl::group_local_memory<atype>(g);
-        //return reinterpret_cast<atom_t*>(cache_.get());
-        return *cache_.get();
-        //atom_t *cache_ = nullptr;
-	//return cache_;
-      }
-    };
-
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<dynamic_shared, atom_t*> cache()
-    {
-      return target::dispatch<cache_dynamic>();
-    }
-
-    template <bool dynamic_shared> __device__ __host__ inline std::enable_if_t<!dynamic_shared, atom_t*> cache()
-    {
-      return target::dispatch<cache_static>();
-    }
+    atom_t *cache_;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
     {
@@ -113,7 +59,7 @@ namespace quda
       memcpy(tmp, (void*)&a, sizeof(T));
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) cache<dynamic>()[i * stride + j] = tmp[i];
+      for (int i = 0; i < n_element; i++) cache_[i * stride + j] = tmp[i];
     }
 
     __device__ __host__ inline T load_detail(int x, int y, int z)
@@ -121,7 +67,7 @@ namespace quda
       atom_t tmp[n_element];
       int j = (z * block.y + y) * block.x + x;
 #pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * stride + j];
+      for (int i = 0; i < n_element; i++) tmp[i] = cache_[i * stride + j];
       T a;
       memcpy((void*)&a, tmp, sizeof(T));
       return a;
@@ -130,12 +76,16 @@ namespace quda
     /**
        @brief Dummy instantiation for the host compiler
     */
-    template <bool is_device, typename dummy = void> struct sync_impl { void operator()() { } };
+    template <bool is_device, typename dummy = void> struct sync_impl {
+      void operator()() { }
+    };
 
     /**
        @brief Synchronize the cache when on the device
     */
-    template <typename dummy> struct sync_impl<true, dummy> { __device__ inline void operator()() { __syncthreads(); } };
+    template <typename dummy> struct sync_impl<true, dummy> {
+      inline void operator()() { __syncthreads(); }
+    };
 
   public:
     /**
@@ -147,16 +97,22 @@ namespace quda
 
        @param[in] block Block dimensions for the 3-d shared memory object
     */
-    constexpr SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
+    SharedMemoryCache(dim3 block = dim3(block_size_x, block_size_y, block_size_z)) :
       block(block),
-      stride(block.x * block.y * block.z) {}
+      stride(block.x * block.y * block.z)
+    {
+	using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
+	auto g = getGroup();
+	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
+	auto mem = sycl::group_local_memory<atype>(g);
+        //return reinterpret_cast<atom_t*>(cache_.get());
+        cache_ = *mem.get();
+    }
 
     /**
        @brief Grab the raw base address to shared memory.
     */
-    __device__ __host__ inline T* data() { return reinterpret_cast<T*>(cache<dynamic>()); }
-    //__device__ __host__ inline T* data() {
-    //  return reinterpret_cast<T*>(cache<dynamic>()); }
+    inline T* data() { return reinterpret_cast<T*>(cache_); }
 
     /**
        @brief Save the value into the 3-d shared memory cache.
