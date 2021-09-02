@@ -59,47 +59,47 @@ namespace quda {
       Real b[6];
       constexpr Real computeC00(const Real &u, const Real &v, const Real &w)
       {
-        return -pow(w,3) * pow(u,6) + 3*v*pow(w,3)*pow(u,4) + 3*pow(v,4)*w*pow(u,4)
-          - pow(v,6)*pow(u,3) - 4*pow(w,4)*pow(u,3) - 12*pow(v,3)*pow(w,2)*pow(u,3)
-          + 16*pow(v,2)*pow(w,3)*pow(u,2) + 3*pow(v,5)*w*pow(u,2) - 8*v*pow(w,4)*u
-          - 3*pow(v,4)*pow(w,2)*u + pow(w,5) + pow(v,3)*pow(w,3);
+        return -fpow(w,3) * fpow(u,6) + 3*v*fpow(w,3)*fpow(u,4) + 3*fpow(v,4)*w*fpow(u,4)
+          - fpow(v,6)*fpow(u,3) - 4*fpow(w,4)*fpow(u,3) - 12*fpow(v,3)*fpow(w,2)*fpow(u,3)
+          + 16*fpow(v,2)*fpow(w,3)*fpow(u,2) + 3*fpow(v,5)*w*fpow(u,2) - 8*v*fpow(w,4)*u
+          - 3*fpow(v,4)*fpow(w,2)*u + fpow(w,5) + fpow(v,3)*fpow(w,3);
       }
 
       constexpr Real computeC01(const Real & u, const Real & v, const Real & w)
       {
-        return -pow(w,2)*pow(u,7) - pow(v,2)*w*pow(u,6) + pow(v,4)*pow(u,5) + 6*v*pow(w,2)*pow(u,5)
-          - 5*pow(w,3)*pow(u,4) - pow(v,3)*w*pow(u,4)- 2*pow(v,5)*pow(u,3) - 6*pow(v,2)*pow(w,2)*pow(u,3)
-          + 10*v*pow(w,3)*pow(u,2) + 6*pow(v,4)*w*pow(u,2) - 3*pow(w,4)*u - 6*pow(v,3)*pow(w,2)*u + 2*pow(v,2)*pow(w,3);
+        return -fpow(w,2)*fpow(u,7) - fpow(v,2)*w*fpow(u,6) + fpow(v,4)*fpow(u,5) + 6*v*fpow(w,2)*fpow(u,5)
+          - 5*fpow(w,3)*fpow(u,4) - fpow(v,3)*w*fpow(u,4)- 2*fpow(v,5)*fpow(u,3) - 6*fpow(v,2)*fpow(w,2)*fpow(u,3)
+          + 10*v*fpow(w,3)*fpow(u,2) + 6*fpow(v,4)*w*fpow(u,2) - 3*fpow(w,4)*u - 6*fpow(v,3)*fpow(w,2)*u + 2*fpow(v,2)*fpow(w,3);
       }
 
       constexpr Real computeC02(const Real & u, const Real & v, const Real & w)
       {
-        return pow(w,2)*pow(u,5) + pow(v,2)*w*pow(u,4)- pow(v,4)*pow(u,3)- 4*v*pow(w,2)*pow(u,3)
-          + 4*pow(w,3)*pow(u,2) + 3*pow(v,3)*w*pow(u,2) - 3*pow(v,2)*pow(w,2)*u + v*pow(w,3);
+        return fpow(w,2)*fpow(u,5) + fpow(v,2)*w*fpow(u,4)- fpow(v,4)*fpow(u,3)- 4*v*fpow(w,2)*fpow(u,3)
+          + 4*fpow(w,3)*fpow(u,2) + 3*fpow(v,3)*w*fpow(u,2) - 3*fpow(v,2)*fpow(w,2)*u + v*fpow(w,3);
       }
 
       constexpr Real computeC11(const Real & u, const Real & v, const Real & w)
       {
-        return -w*pow(u,8) - pow(v,2)*pow(u,7) + 7*v*w*pow(u,6) + 4*pow(v,3)*pow(u,5)
-          - 5*pow(w,2)*pow(u,5) - 16*pow(v,2)*w*pow(u,4) - 4*pow(v,4)*pow(u,3) + 16*v*pow(w,2)*pow(u,3)
-          - 3*pow(w,3)*pow(u,2) + 12*pow(v,3)*w*pow(u,2) - 12*pow(v,2)*pow(w,2)*u + 3*v*pow(w,3);
+        return -w*fpow(u,8) - fpow(v,2)*fpow(u,7) + 7*v*w*fpow(u,6) + 4*fpow(v,3)*fpow(u,5)
+          - 5*fpow(w,2)*fpow(u,5) - 16*fpow(v,2)*w*fpow(u,4) - 4*fpow(v,4)*fpow(u,3) + 16*v*fpow(w,2)*fpow(u,3)
+          - 3*fpow(w,3)*fpow(u,2) + 12*fpow(v,3)*w*fpow(u,2) - 12*fpow(v,2)*fpow(w,2)*u + 3*v*fpow(w,3);
       }
 
       constexpr Real computeC12(const Real &u, const Real &v, const Real &w)
       {
-        return w*pow(u,6) + pow(v,2)*pow(u,5) - 5*v*w*pow(u,4) - 2*pow(v,3)*pow(u,3)
-          + 4*pow(w,2)*pow(u,3) + 6*pow(v,2)*w*pow(u,2) - 6*v*pow(w,2)*u + pow(w,3);
+        return w*fpow(u,6) + fpow(v,2)*fpow(u,5) - 5*v*w*fpow(u,4) - 2*fpow(v,3)*fpow(u,3)
+          + 4*fpow(w,2)*fpow(u,3) + 6*fpow(v,2)*w*fpow(u,2) - 6*v*fpow(w,2)*u + fpow(w,3);
       }
 
       constexpr Real computeC22(const Real &u, const Real &v, const Real &w)
       {
-        return -w*pow(u,4) - pow(v,2)*pow(u,3) + 3*v*w*pow(u,2) - 3*pow(w,2)*u;
+        return -w*fpow(u,4) - fpow(v,2)*fpow(u,3) + 3*v*w*fpow(u,2) - 3*fpow(w,2)*u;
       }
 
     public:
       constexpr void set(const Real &u, const Real &v, const Real &w)
       {
-        const Real denominator = 1.0 / (2.0*pow(w*(u*v-w),3));
+        const Real denominator = 1.0 / (2.0*fpow(w*(u*v-w),3));
         b[0] = computeC00(u,v,w) * denominator;
         b[1] = computeC01(u,v,w) * denominator;
         b[2] = computeC02(u,v,w) * denominator;
