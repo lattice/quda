@@ -1,8 +1,9 @@
 #pragma once
 
+#include <quda_cuda_api.h>
+#include <cufft.h>
 #include <quda_internal.h>
 #include <quda_matrix.h>
-#include <cufft.h>
 
 using FFTPlanHandle = cufftHandle;
 #define FFT_FORWARD     CUFFT_FORWARD
@@ -14,40 +15,64 @@ using FFTPlanHandle = cufftHandle;
 
 inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)
 {
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
 inline void ApplyFFT(FFTPlanHandle &, double2 *, double2 *, int)
 {
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
 inline void SetPlanFFTMany(FFTPlanHandle &, int4, int, QudaPrecision)
 {
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
 inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
 {
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
 inline void FFTDestroyPlan(FFTPlanHandle &)
 {
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
+  errorQuda("GPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
 #else
 
-/*-------------------------------------------------------------------------------*/
-#define CUFFT_SAFE_CALL( call) {                                      \
-    cufftResult err = call;                                         \
+/**
+   @brief Helper function for decoding cuFFT return codes
+*/
+static const char* cufftGetErrorEnum(cufftResult error)
+{
+  switch (error) {
+  case CUFFT_SUCCESS: return "CUFFT_SUCCESS";
+  case CUFFT_INVALID_PLAN: return "CUFFT_INVALID_PLAN";
+  case CUFFT_ALLOC_FAILED: return "CUFFT_ALLOC_FAILED";
+  case CUFFT_INVALID_TYPE: return "CUFFT_INVALID_TYPE";
+  case CUFFT_INVALID_VALUE: return "CUFFT_INVALID_VALUE";
+  case CUFFT_INTERNAL_ERROR: return "CUFFT_INTERNAL_ERROR";
+  case CUFFT_EXEC_FAILED: return "CUFFT_EXEC_FAILED";
+  case CUFFT_SETUP_FAILED: return "CUFFT_SETUP_FAILED";
+  case CUFFT_INVALID_SIZE: return "CUFFT_INVALID_SIZE";
+  case CUFFT_UNALIGNED_DATA: return "CUFFT_UNALIGNED_DATA";
+  case CUFFT_INCOMPLETE_PARAMETER_LIST: return "CUFFT_INCOMPLETE_PARAMETER_LIST";
+  case CUFFT_INVALID_DEVICE: return "CUFFT_INVALID_DEVICE";
+  case CUFFT_PARSE_ERROR: return "CUFFT_PARSE_ERROR";
+  case CUFFT_NO_WORKSPACE: return "CUFFT_NO_WORKSPACE";
+  case CUFFT_NOT_IMPLEMENTED: return "CUFFT_NOT_IMPLEMENTED";
+  case CUFFT_LICENSE_ERROR: return "CUFFT_LICENSE_ERROR";
+  case CUFFT_NOT_SUPPORTED: return "CUFFT_NOT_SUPPORTED";
+  default: return "<unknown error>";
+  }
+}
+
+#define CUFFT_SAFE_CALL(call) {                                       \
+    cufftResult err = call;                                           \
     if ( CUFFT_SUCCESS != err ) {                                     \
-      fprintf(stderr, "CUFFT error in file '%s' in line %i.\n",   \
-              __FILE__, __LINE__);                                \
-      exit(EXIT_FAILURE);                                         \
+      errorQuda("CUFFT error %s", cufftGetErrorEnum(err));            \
     } }
-/*-------------------------------------------------------------------------------*/
+
 
 /**
  * @brief Call CUFFT to perform a single-precision complex-to-complex
@@ -99,6 +124,7 @@ inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecisio
   }
   break;
   }
+  CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
 }
 
 /**
@@ -125,9 +151,10 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
   }
   break;
   }
+  CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
 }
 
-inline void FFTDestroyPlan( FFTPlanHandle &plan) {
+inline void FFTDestroyPlan(FFTPlanHandle &plan) {
    CUFFT_SAFE_CALL(cufftDestroy(plan));
 }
 

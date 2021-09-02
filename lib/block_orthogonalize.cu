@@ -46,8 +46,10 @@ namespace quda {
   template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #ifdef FLOAT8
   template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
+  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
 #else
   template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #endif
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
@@ -122,8 +124,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void CPU(const TuneParam &tp, const qudaStream_t &stream,
-             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_host_(const TuneParam &tp, const qudaStream_t &stream,
+                     const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
       Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
@@ -131,8 +133,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const qudaStream_t &stream,
-             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_device_(const TuneParam &tp, const qudaStream_t &stream,
+                        const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
       Arg<true, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle_factor = tp.aux.x;
@@ -148,7 +150,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
-          CPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_host_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
@@ -156,7 +158,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
-          GPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_device_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0]->FieldOrder());
         }

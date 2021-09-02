@@ -110,8 +110,8 @@ namespace quda {
 
 #ifdef QUAD_SUM
   template<> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
-  template<> __device__ __host__ inline doubledouble zero() { return doubledouble2(); }
-  template<> __device__ __host__ inline doubledouble zero() { return doubledouble3(); }
+  template<> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
+  template<> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
 #endif
 
   /**

@@ -9,14 +9,14 @@ namespace quda {
 
   /**
    * Retrieve the SU(N) indices for the current block number
-   * @param[in] block, current block number, from 0 to (NCOLORS * (NCOLORS - 1) / 2)
+   * @param[in] block, current block number, from 0 to (Nc * (Nc - 1) / 2)
    * @param[out] p, row index pointing to the SU(N) matrix 
    * @param[out] q, column index pointing to the SU(N) matrix
   */
-  template<int NCOLORS>
+  template <int nColor>
   __host__ __device__ inline void IndexBlock(int block, int &p, int &q)
   {
-    if ( NCOLORS == 3 ) {
+    if ( nColor == 3 ) {
       if ( block == 0 ) { p = 0; q = 1; }
       else if ( block == 1 ) { p = 1; q = 2; }
       else{ p = 0; q = 2; }
@@ -25,9 +25,9 @@ namespace quda {
       int found = 0;
       int del_i = 0;
       int index = -1;
-      while ( del_i < (NCOLORS - 1) && found == 0 ) {
+      while ( del_i < (nColor - 1) && found == 0 ) {
         del_i++;
-        for ( i1 = 0; i1 < (NCOLORS - del_i); i1++ ) {
+        for ( i1 = 0; i1 < (nColor - del_i); i1++ ) {
           index++;
           if ( index == block ) {
             found = 1;
@@ -45,8 +45,8 @@ namespace quda {
    * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
@@ -66,10 +66,10 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for ( int block = 0; block < (nColor * (nColor - 1) / 2); block++ ) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
       Float asq = 1.0;
       if (mu < 4) asq = -1.0;
       //FOR COULOMB AND LANDAU!!!!!!!!
@@ -112,7 +112,7 @@ namespace quda {
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(p,j);
           link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
           link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
@@ -124,20 +124,20 @@ namespace quda {
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(j,p);
           link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
           link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
-      //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-      if (block < (NCOLORS * (NCOLORS - 1) / 2) - 1) {
+      //_____________ //FLOP per lattice site = 8 * Nc * 2 * (2*6+2) = Nc * 224
+      if (block < (nColor * (nColor - 1) / 2) - 1) {
         cache.sync();
         //reset shared memory SU(2) elements
         if (mu < 4) elems[mu * blockSize + tid] = 0.0;
         cache.sync();
       }
-    } //FLOP per lattice site = (block < NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
+    } //FLOP per lattice site = (block < Nc * ( Nc - 1) / 2) * (22 + 28 gauge_dir + 224 Nc)
      //write updated link to global memory
   }
 
@@ -145,8 +145,8 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
@@ -162,10 +162,10 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for ( int block = 0; block < (nColor * (nColor - 1) / 2); block++ ) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
       if (mu < gauge_dir) {
         elems[mu * blockSize + tid] = link(p,p).x + link(q,q).x;
@@ -210,7 +210,7 @@ namespace quda {
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(p,j);
           link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
           link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
@@ -221,15 +221,15 @@ namespace quda {
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(j,p);
           link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
           link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>(elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
-      //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { cache.sync(); }
-    } //FLOP per lattice site = (NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
+      //_____________ //FLOP per lattice site = 8 * Nc * 2 * (2*6+2) = Nc * 224
+      if ( block < (nColor * (nColor - 1) / 2) - 1 ) { cache.sync(); }
+    } //FLOP per lattice site = (Nc * ( Nc - 1) / 2) * (22 + 28 gauge_dir + 224 Nc)
      //write updated link to global memory
   }
 
@@ -238,8 +238,8 @@ namespace quda {
    * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, const Float relax_boost, int mu)
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
@@ -255,10 +255,10 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for ( int block = 0; block < (nColor * (nColor - 1) / 2); block++ ) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
 
       if (mu == 0) {
         elems[tid] = link(p,p).x + link(q,q).x;
@@ -266,59 +266,29 @@ namespace quda {
         elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
       }
-      cache.sync();
-      if (mu == 1) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 2) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 3) {
+        if (mu_ == mu) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
         }
       }
-      cache.sync();
-      if (mu == 4) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 5) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 6) {
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 4; mu_ < 4 + gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 7) {
+        if (mu_ == mu) {
           elems[tid] += link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
         }
       }
+
       //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
       cache.sync();
       if (mu == 0) {
@@ -341,7 +311,7 @@ namespace quda {
         //left multiply an su3_matrix by an su2 matrix
         //link <- u * link
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(p,j);
           link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
           link(q,j) = complex<Float>(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
@@ -353,15 +323,15 @@ namespace quda {
         //right multiply an su3_matrix by an su2 matrix
         //link <- link * u_adj
         //#pragma unroll
-        for ( int j = 0; j < NCOLORS; j++ ) {
+        for ( int j = 0; j < nColor; j++ ) {
           m0 = link(j,p);
           link(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 + complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
           link(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
         }
       }
-      //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { cache.sync(); }
-    } //FLOP per lattice site = (NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
+      //_____________ //FLOP per lattice site = 8 * Nc * 2 * (2*6+2) = nColor * 224
+      if ( block < (nColor * (nColor - 1) / 2) - 1 ) { cache.sync(); }
+    } //FLOP per lattice site = (Nc * ( Nc - 1) / 2) * (22 + 28 gauge_dir + 224 Nc)
      //write updated link to global memory
   }
 
@@ -370,8 +340,8 @@ namespace quda {
    * Uses 8 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation needs 8x more shared memory than the implementation using atomicadd 
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_AtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
 							const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
@@ -392,10 +362,10 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for ( int block = 0; block < (nColor * (nColor - 1) / 2); block++ ) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
       if (mu < gauge_dir) {
         //Retrieve the four SU(2) parameters...
         // a0
@@ -427,7 +397,7 @@ namespace quda {
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
-      for (int j = 0; j < NCOLORS; j++) {
+      for (int j = 0; j < nColor; j++) {
         m0 = link(p,j);
         link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
@@ -438,14 +408,14 @@ namespace quda {
       //right multiply an su3_matrix by an su2 matrix
       //link <- link * u_adj
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for ( int j = 0; j < nColor; j++ ) {
         m0 = link1(j,p);
         link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
         link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
 	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) {
+      if ( block < (nColor * (nColor - 1) / 2) - 1 ) {
         cache.sync();
         //reset shared memory SU(2) elements
         if (mu < 4) elems[mu * blockSize + tid] = 0.0;
@@ -458,8 +428,8 @@ namespace quda {
    * Device function to perform gauge fixing with overrelxation.
    * Uses 4 threads per lattice site, the reduction is performed by shared memory using atomicadd.
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1,
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1,
                                                  const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
@@ -476,10 +446,10 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for (int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++) {
+    for (int block = 0; block < (nColor * (nColor - 1) / 2); block++) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
       if (mu < gauge_dir) {
         elems[mu * blockSize + tid] = link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
         elems[mu * blockSize + tid + blockSize * 4] = (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
@@ -513,7 +483,7 @@ namespace quda {
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for ( int j = 0; j < nColor; j++ ) {
         m0 = link(p,j);
         link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
@@ -524,14 +494,14 @@ namespace quda {
       //right multiply an su3_matrix by an su2 matrix
       //link <- link * u_adj
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for ( int j = 0; j < nColor; j++ ) {
         m0 = link1(j,p);
         link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
         link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
 	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { cache.sync(); }
+      if ( block < (nColor * (nColor - 1) / 2) - 1 ) { cache.sync(); }
     }
   }
 
@@ -540,8 +510,8 @@ namespace quda {
    * Uses 4 threads per lattice site, the reduction is performed by shared memory without using atomicadd.
    * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
    */
-  template <typename Float, int gauge_dir, int NCOLORS>
-  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,NCOLORS> &link, Matrix<complex<Float>,NCOLORS> &link1, const Float relax_boost, int mu)
+  template <typename Float, int gauge_dir, int nColor>
+  inline __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<complex<Float>,nColor> &link, Matrix<complex<Float>,nColor> &link1, const Float relax_boost, int mu)
   {
     auto blockSize = target::block_dim().x;
     auto tid = target::thread_idx().x;
@@ -557,39 +527,28 @@ namespace quda {
 
     //Loop over all SU(2) subroups of SU(N)
     //#pragma unroll
-    for ( int block = 0; block < (NCOLORS * (NCOLORS - 1) / 2); block++ ) {
+    for ( int block = 0; block < (nColor * (nColor - 1) / 2); block++ ) {
       int p, q;
       //Get the two indices for the SU(N) matrix
-      IndexBlock<NCOLORS>(block, p, q);
+      IndexBlock<nColor>(block, p, q);
       if (mu == 0) {
         elems[tid] = link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
         elems[tid + blockSize] = (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
         elems[tid + blockSize * 2] = (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
         elems[tid + blockSize * 3] = (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
       }
-      cache.sync();
-      if (mu == 1) {
-        elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
-      }
-      cache.sync();
-      if (mu == 2) {
-        elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
-      }
-      if ( gauge_dir == 4 ) {
+
+#pragma unroll
+      for (int mu_ = 1; mu_ < gauge_dir; mu_++) {
         cache.sync();
-        if (mu == 3) {
+        if (mu_ == mu) {
           elems[tid] += link1(p,p).x + link1(q,q).x + link(p,p).x + link(q,q).x;
           elems[tid + blockSize] += (link1(p,q).y + link1(q,p).y) - (link(p,q).y + link(q,p).y);
           elems[tid + blockSize * 2] += (link1(p,q).x - link1(q,p).x) - (link(p,q).x - link(q,p).x);
           elems[tid + blockSize * 3] += (link1(p,p).y - link1(q,q).y) - (link(p,p).y - link(q,q).y);
         }
       }
+
       cache.sync();
       if (mu == 0) {
         Float asq =  elems[tid + blockSize] * elems[tid + blockSize];
@@ -609,7 +568,7 @@ namespace quda {
       //left multiply an su3_matrix by an su2 matrix
       //link <- u * link
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for ( int j = 0; j < nColor; j++ ) {
         m0 = link(p,j);
         link(p,j) = complex<Float>( elems[tid], elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
@@ -620,14 +579,14 @@ namespace quda {
       //right multiply an su3_matrix by an su2 matrix
       //link <- link * u_adj
       //#pragma unroll
-      for ( int j = 0; j < NCOLORS; j++ ) {
+      for ( int j = 0; j < nColor; j++ ) {
         m0 = link1(j,p);
         link1(j,p) = complex<Float>( elems[tid], -elems[tid + blockSize * 3] ) * m0 +
 	  complex<Float>( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link1(j,q);
         link1(j,q) = complex<Float>(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 +
 	  complex<Float>( elems[tid],elems[tid + blockSize * 3] ) * link1(j,q);
       }
-      if ( block < (NCOLORS * (NCOLORS - 1) / 2) - 1 ) { cache.sync(); }
+      if ( block < (nColor * (nColor - 1) / 2) - 1 ) { cache.sync(); }
     }
   }
 

@@ -151,7 +151,7 @@ namespace quda
       case M5_INV_MOBIUS:
         b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
         c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
-        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
+        a *= std::pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
         break;
       case M5_INV_ZMOBIUS: {
         complex<double> k = 1.0;

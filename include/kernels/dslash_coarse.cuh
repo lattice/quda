@@ -31,9 +31,9 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int nDim = 4;
 
-    typedef typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat> F;
-    typedef typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat> G;
-    typedef typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat> GY;
+    using F = typename colorspinor::FieldOrderCB<real, nSpin, nColor, 1, csOrder, Float, ghostFloat>;
+    using G = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
+    using GY = typename gauge::FieldOrder<real, nColor * nSpin, nSpin, gOrder, true, yFloat>;
 
     F out;
     const F inA;
@@ -141,11 +141,11 @@ namespace quda {
 		for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
-		    out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
-		      * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+                    out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
+                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		  else
-		    out[color_local] += arg.Y(d, parity, x_cb, row, col)
-		      * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		    out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
+                                            arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		}
 	      }
 	    }
@@ -161,11 +161,11 @@ namespace quda {
 	      for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) { //Color column
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
-		  out[color_local] += arg.Y(d+4, parity, x_cb, row, col)
-		    * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		  out[color_local] = cmac(arg.Y(d+4, parity, x_cb, row, col),
+                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		else
-		  out[color_local] += arg.Y(d, parity, x_cb, row, col)
-		    * arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		  out[color_local] = cmac(arg.Y(d, parity, x_cb, row, col),
+                                          arg.inA(their_spinor_parity, fwd_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 	      }
 	    }
 	  }
@@ -195,11 +195,11 @@ namespace quda {
 		for (int c_col=0; c_col < Arg::nColor; c_col += Arg::color_stride) {
 		  int col = s_col * Arg::nColor + c_col + color_offset;
 		  if (!Arg::dagger)
-		    out[color_local] += conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row))
-		      * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		    out[color_local] = cmac(conj(arg.Y.Ghost(d, 1-parity, ghost_idx, col, row)),
+                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		  else
-		    out[color_local] += conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row))
-		      * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		    out[color_local] = cmac(conj(arg.Y.Ghost(d+4, 1-parity, ghost_idx, col, row)),
+                                            arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		}
 	    }
 	  }
@@ -214,11 +214,11 @@ namespace quda {
 	      for(int c_col = 0; c_col < Arg::nColor; c_col += Arg::color_stride) {
 		int col = s_col * Arg::nColor + c_col + color_offset;
 		if (!Arg::dagger)
-		  out[color_local] += conj(arg.Y(d, 1-parity, gauge_idx, col, row))
-		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		  out[color_local] = cmac(conj(arg.Y(d, 1-parity, gauge_idx, col, row)),
+                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 		else
-		  out[color_local] += conj(arg.Y(d+4, 1-parity, gauge_idx, col, row))
-		    * arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset);
+		  out[color_local] = cmac(conj(arg.Y(d+4, 1-parity, gauge_idx, col, row)),
+                                          arg.inA(their_spinor_parity, back_idx + src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 	      }
 	  }
 	}
@@ -254,11 +254,9 @@ namespace quda {
 	  //Factor of kappa and diagonal addition now incorporated in X
 	  int col = s_col * Arg::nColor + c_col + color_offset;
 	  if (!Arg::dagger) {
-	    out[color_local] += arg.X(0, parity, x_cb, row, col)
-	      * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	    out[color_local] = cmac(arg.X(0, parity, x_cb, row, col), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 	  } else {
-	    out[color_local] += conj(arg.X(0, parity, x_cb, col, row))
-	      * arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset);
+	    out[color_local] = cmac(conj(arg.X(0, parity, x_cb, col, row)), arg.inB(spinor_parity, x_cb+src_idx*arg.volumeCB, s_col, c_col+color_offset), out[color_local]);
 	  }
 	}
     }
@@ -286,12 +284,12 @@ namespace quda {
         for (int d=1; d < Arg::dim_stride; d++) { // get remaining forward gathers (if any)
           // 4-way 1,2,3  (stride = 4)
           // 2-way 1      (stride = 2)
-          out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 0);
+          out += cache.load_z(target::thread_idx().z + d * 2 + 0);
         }
 
 #pragma unroll
         for (int d=0; d < Arg::dim_stride; d++) { // get all backward gathers
-          out += cache.load_z((target::thread_idx().z / (2 * Arg::dim_stride)) * (2 * Arg::dim_stride) + d * 2 + 1);
+          out += cache.load_z(target::thread_idx().z + d * 2 + 1);
         }
 
         out *= -arg.kappa;

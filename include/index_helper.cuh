@@ -89,6 +89,30 @@ namespace quda {
   }
 
   /**
+     @brief Compute the checkerboard 1-d index from the 4-d coordinate x[] + nFace in the mu direction
+
+     @return 1-d checkboard index
+     @param[in] x Grid coordinates
+     @param[in] X Grid dimensions
+     @param[in] dim Dimension of the shift
+     @param[in] nFace Depth of the halo
+  */
+  template <typename I, typename Coord>
+  __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int mu, int nFace)
+  {
+    int y[4];
+#pragma unroll
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    switch (mu) {
+    case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
+    case 1: y[1] = (y[1] + nFace + X[1]) % X[1]; break;
+    case 2: y[2] = (y[2] + nFace + X[2]) % X[2]; break;
+    case 3: y[3] = (y[3] + nFace + X[3]) % X[3]; break;
+    }
+    return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+  }
+
+  /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
      @return 1-d checkerboard index
