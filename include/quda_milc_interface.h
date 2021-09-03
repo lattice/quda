@@ -221,12 +221,8 @@ extern "C" {
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
-<<<<<<< HEAD
-   * @param links              Gauge field on the host
-=======
    * @param inv_args           Struct setting some solver metadata
-   * @param milc_fatlink       Fat-link field on the host
->>>>>>> dbb48c41a... First implementation of the shifts required for the staggered spin-taste operator.
+   * @param links              Gauge field on the host
    * @param source             Right-hand side source field
    * @param solution           Solution spinor field
    * @param dir                Direction of application of the spin-taste operator 
@@ -235,7 +231,7 @@ extern "C" {
   void qudaShift (int external_precision,
 		  int quda_precision,
 		  QudaInvertArgs_t inv_args,
-		  const void* const milc_fatlink,
+		  const void* const links,
 		  void* source,
 		  void* solution,
 		  int dir,
