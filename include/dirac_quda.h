@@ -46,10 +46,10 @@ namespace quda {
     cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
-    double tm_rho; // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
-                   // applied like a twisted mass and ignored in the inverse)
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
+    double tm_rho; // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+                   // applied like a twisted mass and ignored in the inverse)
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only

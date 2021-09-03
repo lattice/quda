@@ -18,8 +18,8 @@ namespace quda {
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) :
     DiracWilson(dirac),
     mu(dirac.mu),
-    tm_rho(dirac.tm_rho),
     epsilon(dirac.epsilon),
+    tm_rho(dirac.tm_rho),
     clover(dirac.clover)
   {
   }
