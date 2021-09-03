@@ -1,8 +1,9 @@
 #pragma once
 
+#include <quda_cuda_api.h>
+#include <cufft.h>
 #include <quda_internal.h>
 #include <quda_matrix.h>
-#include <cufft.h>
 
 using FFTPlanHandle = cufftHandle;
 #define FFT_FORWARD     CUFFT_FORWARD
@@ -123,6 +124,7 @@ inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecisio
   }
   break;
   }
+  CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
 }
 
 /**
@@ -149,9 +151,10 @@ inline void SetPlanFFT2DMany(cufftHandle &plan, int4 size, int dim, QudaPrecisio
   }
   break;
   }
+  CUFFT_SAFE_CALL(cufftSetStream(plan, target::cuda::get_stream(device::get_default_stream())));
 }
 
-inline void FFTDestroyPlan( FFTPlanHandle &plan) {
+inline void FFTDestroyPlan(FFTPlanHandle &plan) {
    CUFFT_SAFE_CALL(cufftDestroy(plan));
 }
 

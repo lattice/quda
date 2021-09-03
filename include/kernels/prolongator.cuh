@@ -81,7 +81,7 @@ namespace quda {
           // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 #pragma unroll
           for (int k=0; k<color_unroll; k++)
-            partial[k] += arg.V(v_parity, x_cb, s, i, j + k) * in[s * Arg::coarseColor + j + k];
+            partial[k] = cmac(arg.V(v_parity, x_cb, s, i, j + k), in[s * Arg::coarseColor + j + k], partial[k]);
         }
 
 #pragma unroll
