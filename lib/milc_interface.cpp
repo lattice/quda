@@ -1116,9 +1116,10 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   qudamilc_called<false>(__func__, verbosity);
 } // qudaDslash
 
-void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const fatlink,
+void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const links,
                void* src, void* dst, int dir, int sym)
 {
+printf("Calling qudaShift\n"); fflush(stdout);
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1127,10 +1128,11 @@ void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy = device_precision;
 
-  QudaGaugeParam fat_param = newQudaGaugeParam();
-  QudaGaugeParam long_param = newQudaGaugeParam();
-  setGaugeParams(fat_param, long_param, fatlink, nullptr, localDim, host_precision, device_precision,
+  QudaGaugeParam gparam = newQudaGaugeParam();
+  QudaGaugeParam dparam = newQudaGaugeParam();
+  setGaugeParams(gparam, dparam, links, nullptr, localDim, host_precision, device_precision,
                  device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
+  gparam.type = QUDA_SMEARED_LINKS;
 
   QudaInvertParam invertParam = newQudaInvertParam();
 
@@ -1147,7 +1149,7 @@ void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_
   if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
-    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
 
@@ -1155,7 +1157,7 @@ void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_
   int dst_offset = getColorVectorOffset(local_parity, false, localDim);
 
   if ((sym < 1) || (sym > 3)) {
-    printf("Wrong shift. Selecto forward (1), backward (2) or ymmetric (3).\n");
+    printf("Wrong shift. Select forward (1), backward (2) or symmetric (3).\n");
   } else {
     if (sym & 1) {
       covDevQuda(static_cast<char*>(dst) + dst_offset*host_precision,
