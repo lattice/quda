@@ -74,9 +74,9 @@ namespace quda {
       gauge(0),
       clover(0),
       mu(0.0),
-      tm_rho(0.0),
       mu_factor(0.0),
       epsilon(0.0),
+      tm_rho(0.0),
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
@@ -1042,8 +1042,8 @@ public:
 
   protected:
     double mu;
-    double tm_rho;
     double epsilon;
+    double tm_rho;
     cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
