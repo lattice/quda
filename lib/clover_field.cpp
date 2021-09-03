@@ -21,6 +21,7 @@ namespace quda {
     cloverInv(nullptr),
     invNorm(nullptr),
     csw(a.Csw()),
+    coeff(a.Coeff()),
     twist_flavor(a.TwistFlavor()),
     mu2(a.Mu2()),
     epsilon2(a.Epsilon2()),
@@ -38,7 +39,7 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff), rho(param.rho),
     order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
@@ -56,9 +57,9 @@ namespace quda {
       if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
     //for twisted mass only:
-    twist_flavor = QUDA_TWIST_NO;
+    twist_flavor = QUDA_TWIST_NO; // param.twist_flavor;
     mu2 = 0.0; //param.mu2;
-    epsilon2 = 0.0;
+    epsilon2 = 0.0; // param.epsilon2
 
     setTuningString();
   }
@@ -509,6 +510,7 @@ namespace quda {
     output << "cloverInv = "        << param.cloverInv << std::endl;
     output << "invNorm = "          << param.invNorm << std::endl;
     output << "csw = "              << param.csw << std::endl;
+    output << "coeff = "     << param.coeff << std::endl;
     output << "twist_flavor = "     << param.twist_flavor << std::endl;
     output << "mu2 = "              << param.mu2 << std::endl;
     output << "epsilon2 = "         << param.epsilon2 << std::endl;

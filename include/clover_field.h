@@ -1,8 +1,8 @@
 #pragma once
 
+#include <array>
 #include <quda_internal.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -39,6 +39,7 @@ namespace quda {
     void *cloverInv;
     void *invNorm;
     double csw;  //! Clover coefficient
+    double coeff;  //! Overall clover coefficient
     QudaTwistFlavorType twist_flavor;
     double mu2;
     double epsilon2;
@@ -120,6 +121,7 @@ namespace quda {
     void *invNorm;
 
     double csw;
+    double coeff;
     double mu2; // chiral twisted mass squared
     double epsilon2; // flavour twisted mass squared
     double rho;
@@ -128,7 +130,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable std::vector<double> trlog;
+    mutable std::array<double, 2> trlog;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -160,7 +162,7 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    std::vector<double>& TrLog() const { return trlog; }
+    std::array<double, 2>& TrLog() const { return trlog; }
     
     /**
        @return The order of the field
@@ -198,9 +200,14 @@ namespace quda {
     int Nspin() const { return nSpin; }
 
     /**
-       @return Clover coefficient (usually includes kappa)
+       @return Csw coefficient (does not include kappa)
     */
     double Csw() const { return csw; }
+
+    /**
+       @return Clover coefficient (explicitly includes kappa)
+    */
+    double Coeff() const { return coeff; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
@@ -211,7 +218,7 @@ namespace quda {
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
     */
     double Mu2() const { return mu2; }
-    
+
     /**
        @return epsilon^2 factor baked into inverse clover field (for non-deg twisted-clover inverse)
     */
@@ -529,7 +536,7 @@ namespace quda {
 
   /**
      @brief Helper function that returns whether we have enabled
-     dyanmic clover inversion or not.
+     dynamic clover inversion or not.
    */
   constexpr bool dynamic_clover_inverse()
   {

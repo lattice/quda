@@ -84,7 +84,7 @@ namespace quda {
    */
   template <>
     struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b)/M_PI; }
+    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b) / static_cast<float>(M_PI); }
     __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a * static_cast<float>(M_PI)); }
     __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a * static_cast<float>(M_PI)); }
     __device__ __host__ static void SinCos(const float &a, float *s, float *c) { target::dispatch<sincosf_impl>(a * static_cast<float>(M_PI), s, c); }
@@ -93,15 +93,13 @@ namespace quda {
   template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
 
   template <> struct fpow_impl<true> {
-    template <typename real> __device__ inline real operator()(real a, int b)
+    __device__ inline double operator()(double a, int b) { return ::pow(a, b); }
+
+    __device__ inline float operator()(float a, int b)
     {
-      if (sizeof(real) == sizeof(double)) {
-        return ::pow(a, b);
-      } else {
-        float sign = signbit(a) ? -1.0f : 1.0f;
-        float power = __powf(fabsf(a), b);
-        return b & 1 ? sign * power : power;
-      }
+      float sign = signbit(a) ? -1.0f : 1.0f;
+      float power = __powf(fabsf(a), b);
+      return b & 1 ? sign * power : power;
     }
   };
 
