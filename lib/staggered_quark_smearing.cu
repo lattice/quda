@@ -42,6 +42,7 @@ namespace quda
      */
       //template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
       //inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
+      /*
       if (arg.nParity == 1) {
         if (arg.xpay)
           Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
@@ -53,6 +54,7 @@ namespace quda
         else
           Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
       }
+      */
     }
 
     long long flops() const
@@ -161,10 +163,10 @@ namespace quda
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
-#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
+#ifdef GPU_STAGGERED_DIRAC
         constexpr int nDim  = 4;
         constexpr int nSpin = 1;
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, x, parity, dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, 0.0, 0.0, x, parity, dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
