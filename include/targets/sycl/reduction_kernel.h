@@ -104,7 +104,8 @@ namespace quda {
 				       sycl::ONEAPI::plus<da>());
     try {
       q.submit([&](sycl::handler& h) {
-	h.parallel_for<class Reduction2Dn>
+	//h.parallel_for<class Reduction2Dn>
+	h.parallel_for<>
 	  (ndRange, red,
 	   [=](sycl::nd_item<3> ndi, auto &sum) {
 	     using Sum = decltype(sum);
@@ -122,7 +123,7 @@ namespace quda {
 	q.memcpy(result_h, result_d, sizeof(reduce_t));
       }
       q.wait_and_throw();
-      printfQuda("  end Reduction2D result_h: %g\n", *(double *)result_h);
+      printfQuda("end Reduction2D result_h: %g\n", *(double *)result_h);
     }
 #endif
     //warningQuda("end launchReduction2D");
@@ -195,7 +196,8 @@ namespace quda {
 #if 1
     try {
       q.submit([&](sycl::handler& h) {
-	h.parallel_for<class MultiReductionx>
+	//h.parallel_for<class MultiReductionx>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 	     MultiReductionImpl<Transformer,Arg,grid_stride>(arg,ndi);
@@ -227,7 +229,7 @@ namespace quda {
     }
 #endif
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end MultiReduction\n");
+      printfQuda("end MultiReduction\n");
     }
     return err;
   }

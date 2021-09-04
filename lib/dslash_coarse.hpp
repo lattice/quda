@@ -42,6 +42,20 @@ namespace quda {
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      bool ret = true;
+      int vector_length_x = minThreads();
+      //printfQuda("vector_length_x: %i  block.x: %i\n",vector_length_x,param.block.x);
+      while(ret) {
+	ret = TunableKernel3D::advanceBlockDim(param);
+	if((vector_length_x%param.block.x==0) &&
+	   (vector_length_y%param.block.y==0) &&
+	   (vector_length_z%param.block.z==0)) break;
+      }
+      return ret;
+    }
+
     /**
        @param Helper function to check that the present launch parameters are valid
     */
@@ -105,6 +119,10 @@ namespace quda {
     {
       param.aux = make_int4(1,1,1,1);
       color_col_stride = param.aux.x;
+      while(minThreads()%blockMin()!=0) {
+	color_col_stride *= 2;
+	param.aux.x = color_col_stride;
+      }
       dim_threads = param.aux.y;
       resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));

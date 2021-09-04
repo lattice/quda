@@ -49,7 +49,8 @@ namespace quda {
     }
     try {
       q.submit([&](sycl::handler &h) {
-	h.parallel_for<class Kernel1D>
+	//h.parallel_for<class Kernel1D>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 #ifdef QUDA_THREADS_BLOCKED
@@ -66,7 +67,7 @@ namespace quda {
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end Kernel1D\n");
+      printfQuda("end Kernel1D\n");
     }
     return err;
   }
@@ -121,7 +122,8 @@ namespace quda {
     //auto t0 = __rdtsc();
     try {
       q.submit([&](sycl::handler &h) {
-	h.parallel_for<class Kernel2D>
+	//h.parallel_for<class Kernel2D>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 #ifdef QUDA_THREADS_BLOCKED
@@ -140,7 +142,7 @@ namespace quda {
     //auto t1 = __rdtsc();
     //printf("%llu\n", t1-t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end Kernel2D\n");
+      printfQuda("end Kernel2D\n");
     }
     return err;
   }
@@ -191,7 +193,7 @@ namespace quda {
     //auto t1 = __rdtsc();
     //printf("%llu\n", t1-t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end launchKernel2D\n");
+      printfQuda("end launchKernel2D\n");
     }
     return QUDA_SUCCESS;
   }
@@ -250,10 +252,12 @@ namespace quda {
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      //fflush(stdout);
     }
     try {
       q.submit([&](sycl::handler& h) {
-	h.parallel_for<struct Kernel3Da>
+	//h.parallel_for<struct Kernel3Da>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 #ifdef QUDA_THREADS_BLOCKED
@@ -270,7 +274,8 @@ namespace quda {
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end Kernel3D\n");
+      printfQuda("end Kernel3D\n");
+      //fflush(stdout);
     }
     return err;
   }
@@ -307,7 +312,8 @@ namespace quda {
 	//auto a = buf.get_access<sycl::access_mode::read>(h);
 	auto a = buf.get_access<sycl::access::mode::read,
 				sycl::access::target::constant_buffer>(h);
-	h.parallel_for<class Kernel3Dc>
+	//h.parallel_for<class Kernel3Dc>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 	     //Arg *arg2 = static_cast<Arg *>(p);
@@ -330,7 +336,7 @@ namespace quda {
     //q.wait();
     //device_free(p);   //  FIXME: host task
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end Kernel3D\n");
+      printfQuda("end Kernel3D\n");
     }
     return err;
   }

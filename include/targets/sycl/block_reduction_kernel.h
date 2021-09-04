@@ -91,7 +91,8 @@ namespace quda {
     }
     try {
       q.submit([&](sycl::handler& h) {
-	h.parallel_for<class BlockKernel2D>
+	//h.parallel_for<class BlockKernel2D>
+	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
 	     quda::BlockKernel2DImpl<Transformer, Arg>(arg, ndi);
@@ -104,7 +105,7 @@ namespace quda {
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("  end BlockKernel2D\n");
+      printfQuda("end BlockKernel2D\n");
     }
     return err;
   }

@@ -273,10 +273,11 @@ namespace quda
 
     bool shared_memory_atomic_supported()
     {
-      auto val = myDevice.has(sycl::aspect::int64_base_atomics);
+      //auto val = myDevice.has(sycl::aspect::int64_base_atomics);
       // atomic_memory_scope_capabilities
       // work_item, sub_group, work_group, device and system
-      return val;
+      //return val;
+      return false;  // used in coarse_op, but not portable yet
     }
 
     size_t max_default_shared_memory() {
