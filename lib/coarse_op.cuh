@@ -421,7 +421,7 @@ namespace quda {
         errorQuda("add_coarse_staggered_mass not enabled for non-staggered coarsenings");
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
-#if defined(WILSONCOARSE)
+#if defined(WILSONCOARSE) || defined(COARSECOARSE)
         launch_device<add_coarse_tm>(tp, stream, arg);
 #else
         errorQuda("add_coarse_tm not enabled for non-wilson coarsenings");
