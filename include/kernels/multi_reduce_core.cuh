@@ -13,13 +13,15 @@ namespace quda
   {
 
     /**
-       @brief Parameter struct for generic multi-blas kernel.
-       @tparam NXZ is dimension of input vectors: X,Z,V
+       @brief Parameter struct for generic multi-reduce blas kernel.
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam NXZ_ the dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
-       @tparam N Y-field vector i/o length
-       @tparam Reducer Functor used to operate on data
+       @tparam Ny Y-field vector i/o length
+       @tparam Reducer_ Functor used to operate on data
     */
     template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :

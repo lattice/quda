@@ -11,6 +11,16 @@ namespace quda
   namespace blas
   {
 
+    /**
+       @brief Parameter struct for generic reduction blas kernel.
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam store_t Default store type for the fields
+       @tparam N Default field vector i/o length
+       @tparam y_store_t Store type for the y fields
+       @tparam Ny Y-field vector i/o length
+       @tparam Reducer_ Functor used to operate on data
+    */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct ReductionArg : public ReduceArg<typename Reducer_::reduce_t> {
       using real = real_;
