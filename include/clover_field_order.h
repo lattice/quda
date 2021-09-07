@@ -72,6 +72,77 @@ namespace quda {
 
   namespace clover {
 
+#ifdef RECONSTRUCT_CLOVER
+
+    template <typename real, int block> struct reconstruct {
+
+      // map from storage order to in-kernel internal order for a chiral block with Nc = 3
+      constexpr auto pack_idx(int i) const
+      {
+        constexpr int order[] = {0, 1, 2, 3, 28, 29, // diagonal elements
+                                 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // off diagonals
+                                 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+                                 30, 31, 32, 33, 34, 35};
+        return order[i];
+      }
+
+      constexpr auto unpack_idx(int i) const
+      {
+        constexpr int order[] = {0, 1, 2, 3,
+                                 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                                 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                                 4, 5,
+                                 30, 31, 32, 33, 34, 35};
+        return order[i];
+      }
+
+      template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
+      {
+#pragma unroll
+        for (int i = 0; i < block; i++) out[i] = in[pack_idx(i)];
+
+        // reconstruct matrix entries from symmetry
+        auto d = static_cast<real>(0.5) * (out[0] + out[3]);
+        auto d_inv = static_cast<real>(1.0) / d;
+
+        out[4] = d * (static_cast<real>(2.0) - out[1] * d_inv);
+        out[5] = d * (static_cast<real>(2.0) - out[2] * d_inv);
+
+        out[30] = -out[6];
+        out[31] = -out[7];
+        out[32] = -out[8];
+        out[33] = -out[9];
+        out[34] = -out[16];
+        out[35] = -out[17];
+      }
+
+      template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
+      {
+#pragma unroll
+        for (int i = 0; i < block; i++) out[pack_idx(i)] = in[i];
+      }
+    };
+
+#else
+
+    template <typename real, int block> struct reconstruct {
+
+      template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
+      {
+#pragma unroll
+        for (int i = 0; i < block; i++) out[i] = in[i];
+      }
+
+      template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
+      {
+#pragma unroll
+        for (int i = 0; i < block; i++) out[i] = in[i];
+      }
+
+    };
+
+#endif
+
     /**
        The internal ordering for each clover matrix has chirality as the
        slowest running dimension, with the internal 36 degrees of
@@ -526,6 +597,7 @@ namespace quda {
       typedef float norm_type;
       static const int M = length / (N * 2); // number of short vectors per chiral block
       static const int block = length / 2;   // chiral block size
+      reconstruct<real, block> recon;
       Float *clover;
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
@@ -587,9 +659,10 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
+        __device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
         {
           norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, parity * norm_offset + chirality * stride + x) : 0;
+          vector_type<real, block> tmp;
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
@@ -597,8 +670,10 @@ namespace quda {
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
             // second do scalar copy converting into register type
 #pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
           }
+
+          recon.unpack(v, tmp);
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }
@@ -612,7 +687,7 @@ namespace quda {
 	 */
 	__device__ __host__ inline void save(const real v[block], int x, int parity, int chirality) const
         {
-          real tmp[block];
+          vector_type<real, block> tmp;
 
           // find the norm of each chiral block
           if (isFixed<Float>::value) {
@@ -629,11 +704,14 @@ namespace quda {
             for (int i = 0; i < block; i++) tmp[i] = v[i];
           }
 
+          vector_type<real, block> tmp2;
+          recon.pack(tmp2, tmp);
+
 #pragma unroll
           for (int i = 0; i < M; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp2[i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
@@ -646,7 +724,7 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void load(real v[length], int x, int parity) const {
+        __device__ __host__ inline void load(real v[length], int x, int parity) const {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
         }
@@ -874,20 +952,26 @@ namespace quda {
   } // namespace clover
 
   // Use traits to reduce the template explosion
-  template<typename Float,int N=72, bool add_rho=false> struct clover_mapper { };
+  template<typename Float, int N=72, bool add_rho = false> struct clover_mapper { };
 
   // double precision uses Float2
-  template<int N, bool add_rho> struct clover_mapper<double,N,add_rho> { typedef clover::FloatNOrder<double, N, 2, add_rho> type; };
+  template<int N, bool add_rho> struct clover_mapper<double, N, add_rho> {
+    using type = clover::FloatNOrder<double, N, 2, add_rho>;
+  };
 
   // single precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<float,N,add_rho> { typedef clover::FloatNOrder<float, N, 4, add_rho> type; };
+  template<int N, bool add_rho> struct clover_mapper<float, N, add_rho> {
+    using type = clover::FloatNOrder<float, N, 4, add_rho>;
+  };
 
   // half precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
+  template<int N, bool add_rho> struct clover_mapper<short, N, add_rho> {
+    using type = clover::FloatNOrder<short, N, 4, add_rho>;
+  };
 
   // quarter precision uses Float4
   template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
-    typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type;
+    using type = clover::FloatNOrder<int8_t, N, 4, add_rho>;
   };
 
 } // namespace quda
