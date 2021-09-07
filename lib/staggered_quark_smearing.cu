@@ -134,10 +134,10 @@ namespace quda
       strcpy(aux,
              (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
                                                                            Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",laplace=");
-      char laplace[32];
-      u32toa(laplace, arg.dir);
-      strcat(aux, laplace);
+      strcat(aux, ",staggered_qsmear=");
+      char staggered_qsmear_[32];
+      u32toa(staggered_qsmear_, arg.dir);
+      strcat(aux, staggered_qsmear_);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
@@ -145,7 +145,7 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
     inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
-                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
@@ -170,9 +170,9 @@ namespace quda
   // Apply the StaggeredQSmear operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<StaggeredQSmearApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
+    instantiate<StaggeredQSmearApply>(out, in, U, dir, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda
