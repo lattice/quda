@@ -11,7 +11,7 @@ namespace quda {
 
 using namespace fermion_force;
 
-  namespace staggered_two_link {
+  namespace staggered_qsmear {
 
     template <typename Arg> class TwoLink_ : public TunableKernel3D {
       Arg &arg;
@@ -75,6 +75,6 @@ using namespace fermion_force;
     }
 #endif
 
-  } // namespace fermion_force
+  } // namespace staggered_qsmear
 
 } // namespace quda

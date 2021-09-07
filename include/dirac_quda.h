@@ -1240,6 +1240,9 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
       double kappa, double mass, double mu=0., double mu_factor=0.) const;
+      
+    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;          
   };
 
   // Even-odd preconditioned staggered

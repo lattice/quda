@@ -137,6 +137,23 @@ namespace quda {
     const cudaGaugeField *XinvKD = nullptr;
     StaggeredCoarseOp(Y, X, T, *gauge, XinvKD, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
+  
+  void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
+                             const double &a, const double &b) const
+  {
+    checkSpinorAlias(in, out);
+
+    int comm_dim[4] = {};
+    // only switch on comms needed for directions with a derivative
+    for (int i = 0; i < 4; i++) {
+      comm_dim[i] = comm_dim_partitioned(i);
+      if (laplace3D == i) comm_dim[i] = 0;
+    }
+
+    ApplyStaggeredQSmear(out, in, *gauge, laplace3D, in, QUDA_INVALID_PARITY, dagger, comm_dim, profile);
+    flops += 1368ll*in.Volume(); // FIXME
+  }  
+  
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
     : DiracStaggered(param)

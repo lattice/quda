@@ -25,7 +25,6 @@
 #include <algorithm>
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
-#include <ks_force_quda.h>
 #include <random_quda.h>
 #include <mpi_comm_handle.h>
 
@@ -35,6 +34,7 @@
 #include <split_grid.h>
 
 #include <ks_force_quda.h>
+#include <ks_qsmear.h>
 
 #include <gauge_force_quda.h>
 #include <gauge_update_quda.h>
@@ -5468,7 +5468,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
 }
 
 //////*************************************************************************************************/////////
-void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, const int n_steps, const double width)
+void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link)
 {
   if(n_steps == 0) return;
   
@@ -5478,18 +5478,18 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
   
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-  
-  cudaGaugeField *two_link_ptr = nullptr;//this is a 2-link gauge field
 
-  if (gaugeSmeared != nullptr) {
+  if ( gaugeSmeared == nullptr || compute_2link != 0 ) {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
+    if ( gaugeSmeared != nullptr) delete gaugeSmeared;
+    
+    //compute 2link 
     GaugeFieldParam gParam(*gaugePrecise);
     gParam.create = QUDA_NULL_FIELD_CREATE;
-    two_link_ptr = new cudaGaugeField(gParam);
-    copyExtendedGauge(*two_link_ptr, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    two_link_ptr->exchangeGhost();
-  } else {
-    errorQuda("Gaussian smearing requires precomputed 2-link field\n");
+    cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
+
+    staggered_qsmear::computeTwoLink(*two_link_ptr, *gaugePrecise);
+    gaugeSmeared = two_link_ptr;
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -5500,7 +5500,7 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const int *X = two_link_ptr->X();
+  const int *X = gaugeSmeared->X();
   ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
   cpuParam.nSpin = 1;
   // QUDA style pointer for host data.
@@ -5519,11 +5519,34 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
 
   // Create the smearing operator
   //------------------------------------------------------
-  bool pc_solve  = false;
+  //bool pc_solve  = false;//staggered field
   Dirac *d       = nullptr;
-  Dirac *dSloppy = nullptr;
-  Dirac *dPre    = nullptr;
-  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+  DiracParam diracParam;
+  //
+  if ( inv_param->dslash_type == QUDA_STAGGERED_DSLASH )
+    diracParam.type = QUDA_STAGGERED_DIRAC;
+
+  else if ( inv_param->dslash_type == QUDA_ASQTAD_DSLASH )
+    diracParam.type = QUDA_ASQTAD_DIRAC;
+
+  diracParam.matpcType = inv_param->matpc_type;
+  diracParam.dagger    = inv_param->dagger;
+  diracParam.gauge     = gaugeSmeared;
+  diracParam.fatGauge  = gaugeFatPrecise;
+  diracParam.longGauge = gaugeLongPrecise;
+  diracParam.clover = cloverPrecise;
+  diracParam.kappa  = inv_param->kappa;
+  diracParam.mass   = inv_param->mass;
+  diracParam.m5     = inv_param->m5;
+  diracParam.mu     = inv_param->mu;
+
+  for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
+
+  if (diracParam.gauge->Precision() != inv_param->cuda_prec)
+    errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(), inv_param->cuda_prec);
+  //
+  d = Dirac::create(diracParam); // create the Dirac operator
+  
   Dirac &dirac = *d;
   DiracM qsmear_op(dirac);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
@@ -5539,7 +5562,8 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
   blas::ax(ftmp, *in);  
   
   const double msq     = 1. / ftmp;  
-  const double a       = 6 + msq; 
+  const double a       = 6.0 + msq;
+  const double b       = 0.0; 
   
   blas::axpy(a, *in, *temp1); //
   
@@ -5549,7 +5573,7 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
     // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
     // Which gives the use finer control over the operation that DslashXpay and
     // allows us to omit a vector rescaling.
-    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0);
+    qsmear_op.Expose()->SmearOp(*out, *in, a, b);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5567,15 +5591,13 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
-  if (gaugeSmeared != nullptr) delete two_link_ptr;
+
   delete temp1;
   delete temp2;
   delete out;
   delete in;
   delete in_h;
   delete d;
-  delete dSloppy;
-  delete dPre;
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
