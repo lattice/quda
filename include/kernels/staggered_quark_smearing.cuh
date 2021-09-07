@@ -15,10 +15,10 @@ namespace quda
      @brief Parameter structure for driving the covariatnt derivative operator
   */
   template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
-  struct StaggeredQSmearArg : DslashArg<Float, nDim> {//DslashArg has kernel_type, see dslash_helper.cuh
+  struct StaggeredQSmearArg : DslashArg<Float, nDim> {
     static constexpr int nColor = 3;
     static constexpr int nSpin  = 1;
-    static constexpr bool spin_project       = false;
+    static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
@@ -34,21 +34,17 @@ namespace quda
     const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
-    const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
-    const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
+    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, false, comm_override),
       out(out),
       in(in),
       in_pack(in),
       x(x),
       U(U),
-      a(a),
-      b(b),
       dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
@@ -132,8 +128,8 @@ namespace quda
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
 
-    Arg &arg;
-    constexpr staggered_qsmear(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr staggered_qsmear(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
@@ -164,12 +160,9 @@ namespace quda
         break;
       }
 
-      if (xpay && mykernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(coord.x_cb, my_spinor_parity);
-        out = arg.a * out + arg.b * x;
-      } else if (mykernel_type != INTERIOR_KERNEL) {
+      if (mykernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
-        out = x + (xpay ? arg.a * out : out);
+        out = x;
       }
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;

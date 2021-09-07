@@ -33,28 +33,12 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
 
-      // operator is Hermitian so do not instantiate dagger from dslash.h (direct call in line 255)
-      /**
-       @brief This instantiate function is used to instantiate the
-       the KernelType template required for the multi-GPU dslash kernels.
-       @param[in] tp The tuning parameters to use for this kernel
-       @param[in] stream The qudaStream_t where the kernel will run
-     */
-      //template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
-      //inline void instantiate(TuneParam &tp, const qudaStream_t &stream)
-      /*
+      // operator is Hermitian so do not instantiate dagger
       if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+        Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
       } else if (arg.nParity == 2) {
-        if (arg.xpay)
-          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
-        else
-          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+        Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
       }
-      */
     }
 
     long long flops() const
@@ -80,6 +64,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -123,6 +108,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -148,10 +134,10 @@ namespace quda
       strcpy(aux,
              (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
                                                                            Dslash::aux[arg.kernel_type]);
-      strcat(aux, ",staggered_qsmear=");
-      char staggered_qsmear[32];
-      u32toa(staggered_qsmear, arg.dir);
-      strcat(aux, staggered_qsmear);
+      strcat(aux, ",laplace=");
+      char laplace[32];
+      u32toa(laplace, arg.dir);
+      strcat(aux, laplace);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
@@ -159,21 +145,21 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
     inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
-                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
       if (in.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
-        constexpr int nDim  = 4;
+#if defined(GPU_STAGGERED_DIRAC) // && defined(GPU_LAPLACE) => GPU_QSMEARING
+        constexpr int nDim = 4;
         constexpr int nSpin = 1;
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, 0.0, 0.0, x, parity, dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, x, parity, dagger, comm_override);
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
           staggered_qsmear, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
-        errorQuda("StaggeredQSmear operator required staggered dslash and laplace to be enabled");
+        errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash and laplace to be enabled", in.Nspin());
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());
@@ -184,9 +170,9 @@ namespace quda
   // Apply the StaggeredQSmear operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<StaggeredQSmearApply>(out, in, U, dir, x, parity, dagger, comm_override, profile);
+    instantiate<StaggeredQSmearApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda
