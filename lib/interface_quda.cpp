@@ -5467,7 +5467,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   saveTuneCache();
 }
 
-void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0)
 {
   if(n_steps == 0) return;
   

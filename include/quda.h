@@ -1618,6 +1618,12 @@ extern "C" {
 
   void setMPICommHandleQuda(void *mycomm);
 
+  /** 
+   * Currently WIP
+   */
+
+  void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0);  
+
 #ifdef __cplusplus
 }
 #endif
