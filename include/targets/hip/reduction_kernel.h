@@ -1,5 +1,4 @@
 #pragma once
-
 #include <target_device.h>
 #include <reduce_helper.h>
 
@@ -39,13 +38,15 @@ namespace quda {
   }
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> 
+  __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) Reduction2D(Arg arg)
   {
     Reduction2D_impl<Transformer, Arg, grid_stride>(arg);
   }
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> 
+    __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) Reduction2D()
   {
     Reduction2D_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
   }
@@ -75,13 +76,16 @@ namespace quda {
   }
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> 
+  __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) MultiReduction(Arg arg)
   {
     MultiReduction_impl<Transformer, Arg, grid_stride>(arg);
   }
 
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> 
+    __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) )  MultiReduction()
+
   {
     MultiReduction_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
   }

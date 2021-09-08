@@ -202,6 +202,43 @@ namespace quda {
       @return CUDA stream
     */
     hipStream_t get_cuda_stream(const qudaStream_t& stream);
+
+    /**
+      @brief Return default launch bounds for 1D Kernels, for HIP
+       implementations where it is useful to set launch bounds
+       Right now leaving it unconstrained. Templating on a Tag
+       can allow further specialization if needed
+    */
+    template <typename Tag>
+    constexpr int get_default_kernel1D_launch_bounds() { return 1024 ; }
+
+    /**
+      @brief Return the default launch bounds for 2D Kernels for HIP
+      implementations where it is useful to explicitly set launch bounds.
+      Right now based on experience will set this to 256 threads per block
+      which seems to avoid most spilling. A template Tag is given to
+      enable later Kernel specialization
+    */
+    template <typename Tag>
+    constexpr int get_default_kernel2D_launch_bounds() { return 256 ; }
+
+    /**
+     @brief Return the default launch bonds for a 3D Kernel for HIP
+      implementations where it is useful to explicitly set launch bounds>
+      Right now based on experience we will leave this constrained
+      to 256 threads to prevent spilling. However templating on a tag
+      type will allow further specialization
+    */
+    template< typename Tag>
+    constexpr int get_default_kernel3D_launch_bounds() { return 256 ; }
+
+    /**
+     @brief Return the maximum number of threads per block for block
+     ortho routines. Templating on a Tag allows later specialization if
+     needed.
+    */
+    template <typename Tag>
+    constexpr int get_max_ortho_block_size() { return 1024; }
   }
 
 }
