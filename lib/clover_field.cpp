@@ -286,13 +286,13 @@ namespace quda {
       // we know we are copying from GPU to CPU here, so for now just
       // assume that reordering is on CPU
       void *packClover = pool_pinned_malloc(src.Bytes() + src.NormBytes());
-      void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + bytes : 0;
+      void *packCloverNorm = (src.Precision() == QUDA_HALF_PRECISION) ? static_cast<char*>(packClover) + src.Bytes() : 0;
 
       // first copy over the direct part (if it exists)
       if (!inverse) {
       if (V(false) && src.V(false)) {
         qudaMemcpy(packClover, src.V(false), src.Bytes(), qudaMemcpyDeviceToHost);
-        if (precision == QUDA_HALF_PRECISION) qudaMemcpy(packCloverNorm, src.Norm(false), norm_bytes, qudaMemcpyDeviceToHost);
+        if (src.Precision() == QUDA_HALF_PRECISION) qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), qudaMemcpyDeviceToHost);
         copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       } else if ((V(false) && !src.V(false)) || (!V(false) && src.V(false))) {
         errorQuda("Mismatch between Clover field GPU V(false) and CPU.V(false)");
@@ -301,7 +301,7 @@ namespace quda {
       // now copy the inverse part (if it exists)
       if (V(true) && src.V(true) && inverse) {
         qudaMemcpy(packClover, src.V(true), src.Bytes(), qudaMemcpyDeviceToHost);
-	if (precision == QUDA_HALF_PRECISION) qudaMemcpy(packCloverNorm, src.Norm(true), norm_bytes, qudaMemcpyDeviceToHost);
+	if (src.Precision() == QUDA_HALF_PRECISION) qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), qudaMemcpyDeviceToHost);
         copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       } else if ((V(true) && !src.V(true)) || (!V(true) && src.V(true))) {
         errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
