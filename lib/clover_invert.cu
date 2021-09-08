@@ -49,6 +49,7 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
+    if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
     instantiate<CloverInvert>(clover, computeTraceLog);
   }
 #else

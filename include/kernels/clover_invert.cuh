@@ -13,7 +13,8 @@ namespace quda
     static constexpr bool twist = twist_;
     static constexpr int nColor = 3;
     static constexpr int nSpin = 4;
-    using Clover = typename clover_mapper<store_t>::type;
+    // we must disable clover reconstruction when writing the inverse
+    using Clover = typename clover_mapper<store_t, 72, false, false>::type;
 
     Clover inverse;
     const Clover clover;

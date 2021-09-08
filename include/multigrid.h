@@ -445,7 +445,7 @@ public:
      even-odd preconditioned and we coarsen the full operator.
    */
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                const cudaCloverField *clover, double kappa, double mass, double mu, double mu_factor,
+                const CloverField *clover, double kappa, double mass, double mu, double mu_factor,
                 QudaDiracType dirac, QudaMatPCType matpc);
 
   /**

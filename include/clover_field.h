@@ -10,6 +10,32 @@ namespace quda {
   namespace clover
   {
 
+    /**
+       @brief Helper function that returns whether we have enabled
+       dynamic clover inversion or not.
+    */
+    constexpr bool dynamic_inverse()
+    {
+#ifdef DYNAMIC_CLOVER
+      return true;
+#else
+      return false;
+#endif
+    }
+
+    /**
+       @brief Helper function that returns whether we have enabled
+       clover reconstruction or not.
+    */
+    constexpr bool reconstruct()
+    {
+#ifdef RECONSTRUCT_CLOVER
+      return true;
+#else
+      return false;
+#endif
+    }
+
     inline bool isNative(QudaCloverFieldOrder order, QudaPrecision precision)
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
@@ -32,6 +58,7 @@ namespace quda {
   };
 
   struct CloverFieldParam : public LatticeFieldParam {
+    bool reconstruct; /** Whether to create a compressed that requires reconstruction */
     bool direct; // whether to create the direct clover 
     bool inverse; // whether to create the inverse clover
     void *clover;
@@ -69,6 +96,7 @@ namespace quda {
 
     CloverFieldParam() :
       LatticeFieldParam(),
+      reconstruct(clover::reconstruct()),
       direct(true),
       inverse(true),
       clover(nullptr),
@@ -84,6 +112,7 @@ namespace quda {
 
     CloverFieldParam(const CloverFieldParam &param) :
       LatticeFieldParam(param),
+      reconstruct(param.reconstruct),
       direct(param.direct),
       inverse(param.inverse),
       clover(param.clover),
@@ -105,6 +134,8 @@ namespace quda {
   class CloverField : public LatticeField {
 
   protected:
+    const bool reconstruct; /** Whether this field is compressed and requires reconstruction */
+
     size_t bytes; // bytes allocated per clover full field 
     size_t norm_bytes; // sizeof each norm full field
     size_t length;
@@ -125,6 +156,8 @@ namespace quda {
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
+
+    QudaFieldLocation location;
 
     mutable std::array<double, 2> trlog;
 
@@ -150,10 +183,20 @@ namespace quda {
     using param_type = CloverFieldParam;
 
     /**
+       @return If the field is compressed and requires reconstruction
+    */
+    bool Reconstruct() const { return reconstruct; }
+
+    /**
        @return True if the field is stored in an internal field order
        for the given precision.
     */
     bool isNative() const { return clover::isNative(order, precision); }
+
+    /**
+       @return The location of the field
+    */
+    QudaFieldLocation Location() const { return location; }
 
     /**
        @return Pointer to array storing trlog on each parity
@@ -228,6 +271,13 @@ namespace quda {
     void setRho(double rho);
 
     /**
+       @brief Copy into this CloverField from CloverField src
+       @param src The clover field from which we want to copy
+       @param inverse Are we copying the inverse or direct field
+     */
+    void copy(const CloverField &src, bool inverse=true);
+
+    /**
        @brief Compute the L1 norm of the field
        @return L1 norm
      */
@@ -261,47 +311,6 @@ namespace quda {
     */
     void restore() const;
 
-    virtual int full_dim(int d) const { return x[d]; }
-  };
-
-  class cudaCloverField : public CloverField {
-
-  private:
-    void *even, *odd;
-    void *evenNorm, *oddNorm;
-
-    void *evenInv, *oddInv;
-    void *evenInvNorm, *oddInvNorm;
-
-    // computes the clover field given the input gauge field
-    void compute(const cudaGaugeField &gauge);
-
-  public:
-    // create a cudaCloverField from a CloverFieldParam
-    cudaCloverField(const CloverFieldParam &param);
-
-    virtual ~cudaCloverField();
-
-    /**
-       @brief Copy into this CloverField from the generic CloverField src
-       @param src The clover field from which we want to copy
-       @param inverse Are we copying the inverse or direct field
-     */
-    void copy(const CloverField &src, bool inverse=true);
-
-    /**
-       Copy into this CloverField from the cpuCloverField cpu
-       @param cpu The cpu clover field from which we want to copy
-     */
-    void loadCPUField(const cpuCloverField &cpu);
-
-  
-    /**
-      Copy from this CloverField into cpuCloverField cpu
-      @param cpu The cpu clover destination field
-    */
-    void saveCPUField(cpuCloverField &cpu) const;
-
     /**
       @brief If managed memory and prefetch is enabled, prefetch
       the clover, the norm field (as appropriate), and the inverse
@@ -323,45 +332,24 @@ namespace quda {
     void prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                   QudaParity parity = QUDA_INVALID_PARITY) const;
 
+    int full_dim(int d) const { return x[d]; }
+
     /**
       @brief Copy all contents of the field to a host buffer.
       @param[in] the host buffer to copy to.
     */
-    virtual void copy_to_buffer(void *buffer) const;
+    void copy_to_buffer(void *buffer) const;
 
     /**
       @brief Copy all contents of the field from a host buffer to this field.
       @param[in] the host buffer to copy from.
     */
-    virtual void copy_from_buffer(void *buffer);
+    void copy_from_buffer(void *buffer);
 
     friend class DiracClover;
     friend class DiracCloverPC;
     friend class DiracTwistedClover;
     friend class DiracTwistedCloverPC;
-    friend struct FullClover;
-  };
-
-  // this is a place holder for a future host-side clover object
-  class cpuCloverField : public CloverField {
-
-  private:
-
-  public:
-    cpuCloverField(const CloverFieldParam &param);
-    virtual ~cpuCloverField();
-
-    /**
-      @brief Copy all contents of the field to a host buffer.
-      @param[in] the host buffer to copy to.
-    */
-    virtual void copy_to_buffer(void *buffer) const;
-
-    /**
-      @brief Copy all contents of the field from a host buffer to this field.
-      @param[in] the host buffer to copy from.
-    */
-    virtual void copy_from_buffer(void *buffer);
   };
 
   /**
@@ -379,40 +367,6 @@ namespace quda {
      @return The L2 norm squared of the gauge field
   */
   double norm2(const CloverField &a, bool inverse=false);
-
-
-  // lightweight struct used to send pointers to cuda driver code
-  struct FullClover {
-    void *even;
-    void *odd;
-    void *evenNorm;
-    void *oddNorm;
-    QudaPrecision precision;
-    size_t bytes; // sizeof each clover field (per parity)
-    size_t norm_bytes; // sizeof each norm field (per parity)
-    int stride; // stride (volume + pad)
-    double rho; // rho additive factor
-
-    FullClover(const cudaCloverField &clover, bool inverse = false) :
-      precision(clover.precision),
-      bytes(clover.bytes),
-      norm_bytes(clover.norm_bytes),
-      stride(clover.stride),
-      rho(clover.rho)
-    {
-      if (inverse) {
-        even = clover.evenInv;
-        evenNorm = clover.evenInvNorm;
-        odd = clover.oddInv;
-        oddNorm = clover.oddInvNorm;
-      } else {
-        even = clover.even;
-        evenNorm = clover.evenNorm;
-        odd = clover.odd;
-        oddNorm = clover.oddNorm;
-      }
-    }
-  };
 
   /**
      @brief Driver for computing the clover field from the field
@@ -524,18 +478,5 @@ namespace quda {
     @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
  */
   void copyFieldOffset(CloverField &out, const CloverField &in, CommKey offset, QudaPCType pc_type);
-
-  /**
-     @brief Helper function that returns whether we have enabled
-     dynamic clover inversion or not.
-   */
-  constexpr bool dynamic_clover_inverse()
-  {
-#ifdef DYNAMIC_CLOVER
-    return true;
-#else
-    return false;
-#endif
-  }
 
 } // namespace quda

@@ -22,7 +22,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool inverse = inverse_;
-    static constexpr bool dynamic_clover = dynamic_clover_inverse();
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
 
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;

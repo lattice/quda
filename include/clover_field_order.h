@@ -72,9 +72,7 @@ namespace quda {
 
   namespace clover {
 
-#ifdef RECONSTRUCT_CLOVER
-
-    template <typename real, int block> struct reconstruct {
+    template <typename real, int block, bool enable_reconstruct> struct reconstruct_t {
 
       // map from storage order to in-kernel internal order for a chiral block with Nc = 3
       constexpr auto pack_idx(int i) const
@@ -123,9 +121,7 @@ namespace quda {
       }
     };
 
-#else
-
-    template <typename real, int block> struct reconstruct {
+    template <typename real, int block> struct reconstruct_t<real, block, false> {
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
@@ -140,8 +136,6 @@ namespace quda {
       }
 
     };
-
-#endif
 
     /**
        The internal ordering for each clover matrix has chirality as the
@@ -588,16 +582,16 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
     */
-    template <typename Float, int length, int N, bool add_rho=false, bool huge_alloc=false>
+    template <typename Float, int length, int N, bool add_rho=false, bool enable_reconstruct = clover::reconstruct(), bool huge_alloc=false>
     struct FloatNOrder {
-      using Accessor = FloatNOrder<Float, length, N, add_rho, huge_alloc>;
+      using Accessor = FloatNOrder<Float, length, N, add_rho, enable_reconstruct, huge_alloc>;
       using real = typename mapper<Float>::type;
       typedef typename VectorType<Float, N>::type Vector;
       typedef typename AllocType<huge_alloc>::type AllocInt;
       typedef float norm_type;
       static const int M = length / (N * 2); // number of short vectors per chiral block
       static const int block = length / 2;   // chiral block size
-      reconstruct<real, block> recon;
+      reconstruct_t<real, block, enable_reconstruct> recon;
       Float *clover;
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
@@ -630,6 +624,8 @@ namespace quda {
           if (clover.Order() != N) {
             errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           }
+          if (clover.Reconstruct() != enable_reconstruct)
+            errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct, clover.Reconstruct());
           this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 	}
@@ -952,26 +948,26 @@ namespace quda {
   } // namespace clover
 
   // Use traits to reduce the template explosion
-  template<typename Float, int N=72, bool add_rho = false> struct clover_mapper { };
+  template<typename Float, int N=72, bool add_rho = false, bool enable_reconstruct = clover::reconstruct()> struct clover_mapper { };
 
   // double precision uses Float2
-  template<int N, bool add_rho> struct clover_mapper<double, N, add_rho> {
-    using type = clover::FloatNOrder<double, N, 2, add_rho>;
+  template<int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<double, N, add_rho, enable_reconstruct> {
+    using type = clover::FloatNOrder<double, N, 2, add_rho, enable_reconstruct>;
   };
 
   // single precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<float, N, add_rho> {
-    using type = clover::FloatNOrder<float, N, 4, add_rho>;
+  template<int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<float, N, add_rho, enable_reconstruct> {
+    using type = clover::FloatNOrder<float, N, 4, add_rho, enable_reconstruct>;
   };
 
   // half precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<short, N, add_rho> {
-    using type = clover::FloatNOrder<short, N, 4, add_rho>;
+  template<int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
+    using type = clover::FloatNOrder<short, N, 4, add_rho, enable_reconstruct>;
   };
 
   // quarter precision uses Float4
-  template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
-    using type = clover::FloatNOrder<int8_t, N, 4, add_rho>;
+  template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
+    using type = clover::FloatNOrder<int8_t, N, 4, add_rho, enable_reconstruct>;
   };
 
 } // namespace quda

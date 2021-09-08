@@ -571,7 +571,7 @@ namespace quda {
       // Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
       // for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
 
-      if (!dynamic_clover_inverse()) {
+      if (!clover::dynamic_inverse()) {
         // load in the clover inverse matrix
         HMatrix<real, N> Ainv;
 #pragma unroll

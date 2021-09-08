@@ -30,7 +30,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverCopy>(tp, stream, arg);
+      launch<CloverCopy, true>(tp, stream, arg);
     }
 
     long long flops() const { return 0; } 
@@ -42,8 +42,13 @@ namespace quda {
                   void *Out, void *In, float *outNorm, float *inNorm)
   {
     if (out.isNative()) {
-      typedef typename clover_mapper<FloatOut>::type C;
-      CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      if (out.Reconstruct()) {
+        using C = typename clover_mapper<FloatOut, 72, false, true>::type;
+        CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      } else {
+        using C = typename clover_mapper<FloatOut, 72, false, false>::type;
+        CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      }
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       CopyClover<QDPOrder<FloatOut>, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
     } else if (out.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
@@ -64,8 +69,13 @@ namespace quda {
                   void *Out, void *In, float *outNorm, float *inNorm)
     {
       if (in.isNative()) {
-        typedef typename clover_mapper<FloatIn>::type C;
-        copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        if (in.Reconstruct()) {
+          using C = typename clover_mapper<FloatIn, 72, false, true>::type;
+          copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        } else {
+          using C = typename clover_mapper<FloatIn, 72, false, false>::type;
+          copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        }
       } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
         copyClover<QDPOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
       } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {

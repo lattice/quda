@@ -212,7 +212,7 @@ namespace quda
   }
 
   void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *,
-                                      cudaGaugeField *, cudaCloverField *)
+                                      cudaGaugeField *, CloverField *)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
 

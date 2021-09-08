@@ -214,14 +214,14 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		const cudaGaugeField &gauge, const cudaCloverField *clover,
+		const cudaGaugeField &gauge, const CloverField *clover,
 		double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
     GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
-    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaCloverField*>(clover) : nullptr;
+    CloverField *C = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<CloverField*>(clover) : nullptr;
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
       //First make a cpu gauge field from the cuda gauge field
@@ -259,7 +259,7 @@ namespace quda {
     cf_param.setPrecision(clover ? clover->Precision() : QUDA_SINGLE_PRECISION);
 
     // if we have no clover term then create an empty clover field
-    for(int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
+    for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = clover ? clover->X()[i] : 0;
 
     cf_param.direct = true;
     cf_param.inverse = true;
@@ -269,16 +269,17 @@ namespace quda {
     cf_param.invNorm = 0;
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    cf_param.location = location;
 
     if (location == QUDA_CUDA_FIELD_LOCATION && !clover) {
-      // create a dummy cudaCloverField if one is not defined
+      // create a dummy CloverField if one is not defined
       cf_param.order = QUDA_INVALID_CLOVER_ORDER;
-      C = new cudaCloverField(cf_param);
+      C = new CloverField(cf_param);
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      //Create a cpuCloverField from the cudaCloverField
+      // Create a host field from the device one
       cf_param.order = QUDA_PACKED_CLOVER_ORDER;
-      C = new cpuCloverField(cf_param);
-      if (clover) clover->saveCPUField(*static_cast<cpuCloverField*>(C));
+      C = new CloverField(cf_param);
+      if (clover) C->copy(*clover);
     }
 
     //Create a field UV which holds U*V.  Has the same structure as V.
