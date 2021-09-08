@@ -1750,6 +1750,9 @@ void qudaContractFT(int external_precision,
   qudamilc_called<false>(__func__, verbosity);
 } // qudaContractFT
 
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertArgs_t inv_args, const int n_steps, const double width, const int compute_2link) {
+} // performTwoLinkQuda
+
 // Internal structure that maintains `QudaMultigridParam`,
 // `QudaInvertParam`, `QudaEigParam`s, and the traditional
 // void* returned by `newMultigridQuda`.

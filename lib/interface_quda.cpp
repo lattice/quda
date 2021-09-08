@@ -5467,8 +5467,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   saveTuneCache();
 }
 
-//////*************************************************************************************************/////////
-void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link)
+void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0)
 {
   if(n_steps == 0) return;
   
@@ -5565,19 +5564,18 @@ void performTwoLinkGaussianSmearNStep(void **h_in, QudaInvertParam *inv_param, c
   const double a       = 6.0 + msq;
   const double b       = 0.0; 
   
-  blas::axpy(a, *in, *temp1); //
-  
   for (int i = 0; i < n_steps; i++) {
-    if (i > 0) std::swap(temp1, out);
-    // The SmearOp computes:
-    // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
-    // Which gives the use finer control over the operation that DslashXpay and
-    // allows us to omit a vector rescaling.
+    if (i > 0) std::swap(in, out);
+    blas::ax(ftmp, *in); //
+    blas::axpy(a, *in, *temp1); //
+    
     qsmear_op.Expose()->SmearOp(*out, *in, a, b);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
+    blas::xpay(*temp1, -1.0, *out);
+    blas::zero(*temp1);
   }
   
   // Normalise the source
