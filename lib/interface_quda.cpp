@@ -2328,6 +2328,9 @@ namespace quda
   bool canReuseResidentGauge(QudaInvertParam *param)
   {
     if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+bool caca = (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
+bool caco = (gaugePrecise != nullptr);
+printf("\n\nGaugePrecise %p, Full %s, Half %s, ip-CudaPrec %d\n\n", gaugePrecise, caca ? "True" : "False", caco ? "True" : "False", param->cuda_prec);
       return (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
     } else {
       return (gaugeFatPrecise != nullptr) and param->cuda_prec == gaugeFatPrecise->Precision();
