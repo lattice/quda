@@ -1129,6 +1129,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
   setGaugeParams(gparam, dparam, links, nullptr, localDim, host_precision, device_precision,
                  device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
+  gparam.make_resident_gauge = true;
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
                   verbosity, QUDA_CG_INVERTER, &invertParam);
@@ -1143,9 +1144,8 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) {invalidateGaugeQuda(); printf("Um, no persistence here\n"); }
-
+printf("%s\n", canReuseResidentGauge(&invertParam) ? "True" : "False"); fflush(stdout);
   if (invalidate_quda_gauge || !create_quda_gauge) {
-printf("Reloading Gauge field, NO PERSISTENCE!!!\n"); fflush(stdout);
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
@@ -1156,8 +1156,6 @@ printf("Reloading Gauge field, NO PERSISTENCE!!!\n"); fflush(stdout);
   } else {
       shiftQuda(dst, src, dir, sym, invertParam);
   }
-
-  if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 } // qudaShift
