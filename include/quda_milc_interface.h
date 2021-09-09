@@ -221,7 +221,6 @@ extern "C" {
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
-   * @param inv_args           Struct setting some solver metadata
    * @param links              Gauge field on the host
    * @param source             Right-hand side source field
    * @param solution           Solution spinor field
@@ -230,7 +229,6 @@ extern "C" {
    */
   void qudaShift (int external_precision,
 		  int quda_precision,
-		  QudaInvertArgs_t inv_args,
 		  const void* const links,
 		  void* source,
 		  void* solution,
