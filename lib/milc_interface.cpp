@@ -1143,7 +1143,7 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   if (!canReuseResidentGauge(&invertParam)) {invalidateGaugeQuda(); printf("Um, no persistence here\n"); }
-
+printf("%s\n", canReuseResidentGauge(&invertParam) ? "True" : "False"); fflush(stdout);
   if (invalidate_quda_gauge || !create_quda_gauge) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
