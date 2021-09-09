@@ -153,9 +153,17 @@ namespace quda
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
-       statically allocated with length NXZ, we can statically compute how
-       the maximum size of YW is and allocate this amount of space.  This
-       allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
+       statically allocated with length NXZ, we can statically compute
+       how the maximum size of YW is and allocate this amount of
+       space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
+       is small.  This is the constexpr variant which we use after
+       template instantiation.
+
+       @tparam[in] NXZ The dimension of the SpinorX and SpinorZ arrays
+       @tparam[in] xType The underlying type of the SpinorX and SpinorZ objects
+       @tparam[in] yType The underlying type of the SpinorY and SpinorW objects
+       @tparam Functor The functor we are applying
+       @return The maximum NYW size possible
     */
     template <int NXZ, typename xType, typename yType, typename Functor>
     inline constexpr int max_YW_size()
@@ -187,12 +195,17 @@ namespace quda
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
-       statically allocated with length NXZ, we can statically compute how
-       the maximum size of YW is and allocate this amount of space.  This
-       allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
+       statically allocated with length NXZ, we can statically compute
+       how the maximum size of YW is and allocate this amount of
+       space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
+       is small.  This is the run-time variant which we can call prior
+       to template instantiation.
 
-       @param[in] scalar_width Width of the scalar that we're
-       multiplying by (1 = real, 2 = complex)
+       @tparam Functor The functor we are applying
+       @param[in] NXZ The dimension of the SpinorX and SpinorZ arrays
+       @param[in] x_prec The precision of the SpinorX and SpinorZ objects
+       @param[in] y_prec The precision of the SpinorY and SpinorW objects
+       @return The maximum NYW size possible
     */
     template <typename Functor>
     inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec)

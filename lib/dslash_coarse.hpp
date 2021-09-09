@@ -202,22 +202,18 @@ namespace quda {
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;

@@ -220,7 +220,7 @@ namespace quda
 
     qudaStream_t get_stream(unsigned int i)
     {
-      if (i > Nstream) errorQuda("Invalid stream index %u", i);
+      if (i >= Nstream) errorQuda("Invalid stream index %u", i);
       qudaStream_t stream;
       stream.idx = i;
       return stream;
