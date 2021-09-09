@@ -37,7 +37,7 @@ namespace quda
 
       constexpr bool xpay = false;
       constexpr int nParity = 2;
-      Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem, nParity, xpay>(tp, stream);
     }
 
     long long flops() const
@@ -125,9 +125,13 @@ namespace quda
       strcpy(aux,
              (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
                                                                            Dslash::aux[arg.kernel_type]);
+      strcat(aux, ",spin=");
+      char sp[8];
+      u32toa(sp, arg.nSpin);
       strcat(aux, ",mu=");
       char mu[8];
       u32toa(mu, arg.mu);
+      strcat(aux, sp);
       strcat(aux, mu);
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
@@ -140,12 +144,26 @@ namespace quda
 
     {
       constexpr int nDim = 4;
-      CovDevArg<Float, nColor, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
-      CovDev<decltype(arg)> covDev(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(covDev)> policy(
-        covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      if (in.Nspin() == 4) {
+        CovDevArg<Float, nColor, 4, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(covDev)> policy(
+          covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        //policy.apply(0);
+      } else if (in.Nspin() == 1) {
+        CovDevArg<Float, nColor, 1, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
+        CovDev<decltype(arg)> covDev(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(covDev)> policy(
+          covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        //policy.apply(0);
+      } else {
+        errorQuda("Spin not supported\n");
+      }
     }
   };
 

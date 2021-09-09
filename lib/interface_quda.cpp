@@ -637,14 +637,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       if (gaugeLongPrecise) delete gaugeLongPrecise;
 
       break;
-    case QUDA_SMEARED_LINKS:
-      if (gaugeSmeared) delete gaugeSmeared;
       break;
     default:
       errorQuda("Invalid gauge type %d", param->type);
   }
 
-printf("Here we are, and param->type is %s\n", param->type == QUDA_SMEARED_LINKS ? "Ok" : "Wrong"); fflush(stdout);
   // if not preserving then copy the gauge field passed in
   cudaGaugeField *precise = nullptr;
 
@@ -668,7 +665,6 @@ printf("Here we are, and param->type is %s\n", param->type == QUDA_SMEARED_LINKS
   } else {
     profileGauge.TPSTOP(QUDA_PROFILE_INIT);
     profileGauge.TPSTART(QUDA_PROFILE_H2D);
-printf("Copying the gauge field\n"); fflush(stdout);
     precise->copy(*in);
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
@@ -676,7 +672,6 @@ printf("Copying the gauge field\n"); fflush(stdout);
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {
     gaugeSmeared = createExtendedGauge(*precise, R, profileGauge);
-printf("Is gaugeSmeared nullptr? %s\n", gaugeSmeared == nullptr ? "Yes" : "No!"); fflush(stdout);
 
     profileGauge.TPSTART(QUDA_PROFILE_FREE);
     delete precise;
@@ -2030,27 +2025,113 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void covDevQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int dir)
+void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam inv_param)
 {
   profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
   profileCovDev.TPSTART(QUDA_PROFILE_INIT);
-  // FIXME Which gauge field??
-  const auto &gauge = *gaugeSmeared; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (!gaugePrecise)
+    errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
+
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, inv_param);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param.output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField in(*in_h, cudaParam);
+  cudaColorSpinorField out(in, cudaParam);
+  cudaColorSpinorField tmp(in, cudaParam);
+
+  profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_H2D);
+  in = *in_h;
+  profileCovDev.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param, false);
+
+  GaugeCovDev *myCovDev = new GaugeCovDev(diracParam); // create the Dirac operator
+
+  if (sym & 1) {
+    myCovDev->MCD(out, in, dir);                // apply the operator
+  }  if (sym & 2) {
+    myCovDev->MCD(tmp, in, dir+4);              // apply the operator
+  }
+
+  quda::blas::xpy(tmp, out);
+
+  if (sym == 3)
+    quda::blas::ax(0.5, out);
+
+  profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_D2H);
+  *out_h = out;
+  profileCovDev.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  profileCovDev.TPSTART(QUDA_PROFILE_FREE);
+  delete myCovDev; // clean up
+
+  delete out_h;
+  delete in_h;
+  profileCovDev.TPSTOP(QUDA_PROFILE_FREE);
+
+  popVerbosity();
+  profileCovDev.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void covDevQuda(void *h_out, void *h_in, int dir, QudaInvertParam inv_param)
+{
+  profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
+  profileCovDev.TPSTART(QUDA_PROFILE_INIT);
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
   //if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
   //    || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
-  if (!gaugeSmeared)
+  if (!gaugePrecise)
     errorQuda("Gauge field not allocated");
 
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
 
-  ColorSpinorParam cpuParam(h_in, *inv_param, gauge.X(), true, inv_param->input_location);
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
-  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  ColorSpinorParam cudaParam(cpuParam, inv_param);
 
   cpuParam.v = h_out;
-  cpuParam.location = inv_param->output_location;
+  cpuParam.location = inv_param.output_location;
   ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -2071,29 +2152,12 @@ void covDevQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
-  if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
-      (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
-       inv_param->dslash_type == QUDA_ASQTAD_DSLASH) )
-    blas::ax(1.0/(2.0*inv_param->mass), in);
-
-  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
-    if (parity == QUDA_EVEN_PARITY) {
-      parity = QUDA_ODD_PARITY;
-    } else {
-      parity = QUDA_EVEN_PARITY;
-    }
-    blas::ax(gauge.Anisotropy(), in);
-  }
-
-  bool pc = true;
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
   DiracParam diracParam;
-  inv_param->dslash_type = QUDA_COVDEV_DSLASH;
-  setDiracParam(diracParam, inv_param, pc);
+  setDiracParam(diracParam, &inv_param, false);
 
-  Dirac *dirac = Dirac::create(diracParam);                         // create the Dirac operator
-  static_cast<GaugeCovDev *>(dirac)->DslashCD(out, in, parity, dir); // apply the operator
-  //GaugeCovDev *myCovDev = GaugeCovDev::create(diracParam); // create the Dirac operator
-  //myCovDev->DslashCD(out, in, parity, dir);                // apply the operator
+  GaugeCovDev *myCovDev = new GaugeCovDev(diracParam); // create the Dirac operator
+  myCovDev->MCD(out, in, dir);                // apply the operator
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileCovDev.TPSTART(QUDA_PROFILE_D2H);
@@ -2107,8 +2171,7 @@ void covDevQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   }
 
   profileCovDev.TPSTART(QUDA_PROFILE_FREE);
-  delete dirac; // clean up
-  //delete myCovDev; // clean up
+  delete myCovDev; // clean up
 
   delete out_h;
   delete in_h;

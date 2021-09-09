@@ -1112,10 +1112,9 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
   qudamilc_called<false>(__func__, verbosity);
 } // qudaDslash
 
-void qudaShift(int external_precision, int quda_precision, QudaInvertArgs_t inv_args, const void *const links,
+void qudaShift(int external_precision, int quda_precision, const void *const links,
                void* src, void* dst, int dir, int sym)
 {
-printf("Calling qudaShift\n"); fflush(stdout);
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1127,50 +1126,40 @@ printf("Calling qudaShift\n"); fflush(stdout);
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
   setGaugeParams(gparam, dparam, links, nullptr, localDim, host_precision, device_precision,
-                 device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
-  gparam.type = QUDA_SMEARED_LINKS;
-
+                 device_precision_sloppy, 1.0, 0.0);
+  gparam.type = QUDA_WILSON_LINKS;
   QudaInvertParam invertParam = newQudaInvertParam();
-
-  QudaParity local_parity = inv_args.evenodd;
-  QudaParity other_parity = local_parity == QUDA_EVEN_PARITY ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY;
-
-  setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, local_parity,
+  setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
                   verbosity, QUDA_CG_INVERTER, &invertParam);
+  invertParam.solution_type = QUDA_MAT_SOLUTION;
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
+  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  csParam.x[0] *= 2;
+  QudaDslashType saveDslash = invertParam.dslash_type;
+  invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  if (!canReuseResidentGauge(&invertParam)) {invalidateGaugeQuda(); printf("Um, no persistence here\n"); }
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
+printf("Reloading Gauge field, NO PERSISTENCE!!!\n"); fflush(stdout);
     loadGaugeQuda(const_cast<void *>(links), &gparam);
     invalidate_quda_gauge = false;
   }
-
-  int src_offset = getColorVectorOffset(other_parity, false, localDim);
-  int dst_offset = getColorVectorOffset(local_parity, false, localDim);
+  invertParam.dslash_type = saveDslash;
 
   if ((sym < 1) || (sym > 3)) {
     printf("Wrong shift. Select forward (1), backward (2) or symmetric (3).\n");
   } else {
-    if (sym & 1) {
-      covDevQuda(static_cast<char*>(dst) + dst_offset*host_precision,
-                 static_cast<char*>(src) + src_offset*host_precision,
-                 &invertParam, local_parity, dir);
-    }
-    if (sym & 2) {
-      covDevQuda(static_cast<char*>(dst) + dst_offset*host_precision,
-                 static_cast<char*>(src) + src_offset*host_precision,
-                 &invertParam, local_parity, dir+4);
-    }
+      shiftQuda(dst, src, dir, sym, invertParam);
   }
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
-} // qudaDslash
+} // qudaShift
 
 void qudaInvertMsrc(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                     double target_residual, double target_fermilab_residual, const void *const fatlink,
