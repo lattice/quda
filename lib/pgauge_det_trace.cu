@@ -12,15 +12,15 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   class CalcFunc : TunableReduction2D<> {
-    double2 &result;
     const GaugeField &u;
+    std::vector<double> &result;
     const compute_type type;
 
   public:
-    CalcFunc(const GaugeField &u, double2 &result, compute_type type) :
+    CalcFunc(const GaugeField &u, std::vector<double> &result, compute_type type) :
       TunableReduction2D(u),
-      result(result),
       u(u),
+      result(result),
       type(type)
     {
       strcat(aux, type == compute_type::determinant ? ",det" : ",trace");
@@ -38,8 +38,7 @@ namespace quda {
         launch<DetTrace>(result, tp, stream, arg);
       }
 
-      result.x /= (double)(4*u.LocalVolume()*comm_size());
-      result.y /= (double)(4*u.LocalVolume()*comm_size());
+      for (int i = 0; i < 2; i++) result[i] /= (double)(4*u.LocalVolume()*comm_size());
     }
 
     long long flops() const {
@@ -54,16 +53,16 @@ namespace quda {
 #ifdef GPU_GAUGE_ALG
   double2 getLinkDeterminant(GaugeField& data)
   {
-    double2 det = make_double2(0.0,0.0);
+    std::vector<double> det{0.0, 0.0};
     instantiate<CalcFunc>(data, det, compute_type::determinant);
-    return det;
+    return make_double2(det[0], det[1]);
   }
 
   double2 getLinkTrace(GaugeField& data)
   {
-    double2 tr = make_double2(0.0,0.0);
+    std::vector<double> tr{0.0, 0.0};
     instantiate<CalcFunc>(data, tr, compute_type::trace);
-    return tr;
+    return make_double2(tr[0], tr[1]);
   }
 #else
   double2 getLinkDeterminant(GaugeField&)

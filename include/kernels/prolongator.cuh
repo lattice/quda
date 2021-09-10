@@ -6,7 +6,10 @@ namespace quda {
 
   using namespace quda::colorspinor;
   
-  static constexpr int fine_colors_per_thread = 1; // for all grids use 1 color per thread
+  template <int fineColor, int coarseColor> constexpr int fine_colors_per_thread()
+  {
+    return 1; // for now, all grids use 1 color per thread
+  }
 
   /** 
       Kernel argument struct
@@ -29,7 +32,7 @@ namespace quda {
 
     ProlongateArg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
                   const int *geo_map,  const int parity) :
-      kernel_param(dim3(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread)),
+      kernel_param(dim3(out.VolumeCB(), out.SiteSubset(), fineColor/fine_colors_per_thread<fineColor, coarseColor>())),
       out(out), in(in), V(V), geo_map(geo_map), spin_map(), parity(parity), nParity(out.SiteSubset())
     { }
   };
@@ -61,6 +64,7 @@ namespace quda {
   template <typename Arg>
   __device__ __host__ inline void rotateFineColor(const Arg &arg, const complex<typename Arg::real> in[], int parity, int x_cb, int fine_color_block)
   {
+    constexpr int fine_color_per_thread = fine_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
     const int v_parity = (arg.V.Nparity() == 2) ? parity : 0;
 
@@ -69,7 +73,7 @@ namespace quda {
 #pragma unroll
     for (int s=0; s<Arg::fineSpin; s++) {
 #pragma unroll
-      for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
+      for (int fine_color_local = 0; fine_color_local < fine_color_per_thread; fine_color_local++) {
         int i = fine_color_block + fine_color_local; // global fine color index
 
         complex<typename Arg::real> partial[color_unroll];
@@ -94,6 +98,7 @@ namespace quda {
 
   template <typename Arg> struct Prolongator
   {
+    static constexpr int fine_color_per_thread = fine_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     const Arg &arg;
     constexpr Prolongator(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -101,7 +106,7 @@ namespace quda {
     __device__ __host__ inline void operator()(int x_cb, int parity, int fine_color_thread)
     {
       if (arg.nParity == 1) parity = arg.parity;
-      const int fine_color_block = fine_color_thread * fine_colors_per_thread;
+      const int fine_color_block = fine_color_thread * fine_color_per_thread;
       complex<typename Arg::real> tmp[Arg::fineSpin*Arg::coarseColor];
       prolongate(tmp, arg, parity, x_cb);
       rotateFineColor(arg, tmp, parity, x_cb, fine_color_block);
