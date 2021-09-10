@@ -3429,7 +3429,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       gauge_param->ga_pad *= split_key[d];
     }
 
-    // Deal with clover field
+    // Deal with clover field. For Multi source computatons, clover field construction is done
+    // exclusively on the GPU.
+    if (param->clover_coeff == 0.0 && param->clover_csw == 0.0) errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
+    if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
+
     quda::CloverField *input_clover = nullptr;
     quda::CloverField *collected_clover = nullptr;
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -3437,7 +3441,14 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       if (h_clover || h_clovinv) {
         CloverFieldParam clover_param;
         clover_param.nDim = 4;
-        clover_param.csw = param->clover_coeff;
+	// If clover_coeff is not set manually, then it is the product Csw * kappa.
+	// If the user has set the clover_coeff manually, that value takes precedent.
+	clover_param.csw = param->clover_csw;
+	clover_param.coeff = param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff;
+	// We must also adjust param->clover_coeff here. If a user has set kappa and
+	// Csw, we must populate param->clover_coeff for them as the computeClover
+	// routines uses that value
+	param->clover_coeff = (param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff);
         clover_param.twisted = param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH;
         clover_param.mu2 = clover_param.twisted ? 4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
         clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
