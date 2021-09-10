@@ -20,10 +20,9 @@ namespace quda {
     Gauge u;
 
     KernelArg(const GaugeField &u) :
-      ReduceArg<reduce_t>(),
+      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, 1)),
       u(u)
     {
-      this->threads = dim3(u.LocalVolumeCB(), 2, 1);
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];
         X[dir] = u.X()[dir] - border[dir]*2;
