@@ -791,7 +791,6 @@ namespace quda {
        @brief Initiate halo communication receive
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] stream (presently unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
     void recvStart(int dir, const qudaStream_t &stream, bool gdr = false);

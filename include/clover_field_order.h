@@ -613,7 +613,7 @@ namespace quda {
 
           // find the norm of each chiral block
           if (isFixed<Float>::value) {
-            norm_type scale = 0.0;
+            norm_type scale = static_cast<norm_type>(1.0);
 #pragma unroll
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;

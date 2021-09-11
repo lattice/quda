@@ -21,6 +21,8 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
+     integer(8) :: struct_size  ! Size of this struct in bytes
+
      QudaFieldLocation :: location !The location of the gauge field
 
      integer(4), dimension(4) :: x
@@ -77,12 +79,12 @@ module quda_fortran
      integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
-
-     integer(8) :: struct_size  ! Size of this struct in bytes
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
+
+     integer(8) :: struct_size  ! Size of this struct in bytes
 
      QudaFieldLocation :: input_location  ! The location of the input field
      QudaFieldLocation :: output_location ! The location of the output field
@@ -194,6 +196,7 @@ module quda_fortran
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
 
+     real(8) :: clover_csw   ! Csw coefficient of the clover term
      real(8) :: clover_coeff ! Coefficient of the clover term
      real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
@@ -311,8 +314,6 @@ module quda_fortran
 
      ! Whether to use the platform native or generic BLAS / LAPACK */
      QudaBoolean :: native_blas_lapack;
-
-     integer(8) :: struct_size  ! Size of this struct in bytes
   end type quda_invert_param
 
 end module quda_fortran
