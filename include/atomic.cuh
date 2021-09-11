@@ -16,7 +16,7 @@ __float_as_uint(float x)
 {
   return reinterpret_cast<unsigned int &>(x);  // FIXME UB?
 }
-static inline unsigned int
+static inline float
 __uint_as_float(unsigned int x)
 {
   return reinterpret_cast<float &>(x);  // FIXME UB?
