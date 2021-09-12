@@ -286,11 +286,23 @@ namespace quda {
     QudaMem copy(ptr, value, count, stream, true, func, file, line);
   }
 
+   __global__ void set2Dbuffer(char *ptr, size_t pitch, int value, size_t width, size_t height) {
+       size_t ix=blockIdx.x * blockDim.x + threadIdx.x;
+       if(ix<width) {
+         ptr[ix+blockIdx.y*pitch]= value;
+       }
+     }
+
   void qudaMemset2D_(void *ptr, size_t pitch, int value, size_t width, size_t height,
                      const char *func, const char *file, const char *line)
   {
-    hipError_t error = hipMemset2D(ptr, pitch, value, width, height);
-    set_runtime_error(error, __func__, func, file, line);
+      int nthreads=256;
+      dim3 grid((width+nthreads-1)/nthreads, height,1);
+      dim3 block(nthreads,1,1);
+      hipLaunchKernelGGL(set2Dbuffer, grid,block, 0,0, (char*)ptr, pitch, value, width, height);
+      hipStreamSynchronize(0);
+    //hipError_t error = hipMemset2D(ptr, pitch, value, width, height);
+    //set_runtime_error(error, __func__, func, file, line);
   }
   
   void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width, size_t height,
