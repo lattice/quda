@@ -236,7 +236,9 @@ int path_dir_t[][5] = {
 static double force_check;
 static double deviation;
 
-void gauge_force_test(void)
+// The same function is used to test computePath.
+// If compute_force is false then a path is computed
+void gauge_force_test(bool compute_force=true)
 {
   int max_length = 6;
 
@@ -291,9 +293,11 @@ void gauge_force_test(void)
   param.order = QUDA_MILC_GAUGE_ORDER;
   auto U_milc = new quda::cpuGaugeField(param);
   if (gauge_order == QUDA_MILC_GAUGE_ORDER) U_milc->copy(*U_qdp);
-  param.reconstruct = QUDA_RECONSTRUCT_10;
+  if (compute_force) {
+    param.reconstruct = QUDA_RECONSTRUCT_10;
+    param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  }
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.link_type = QUDA_ASQTAD_MOM_LINKS;
   auto Mom_milc = new quda::cpuGaugeField(param);
   auto Mom_ref_milc = new quda::cpuGaugeField(param);
 
@@ -301,9 +305,11 @@ void gauge_force_test(void)
   auto Mom_qdp = new quda::cpuGaugeField(param);
 
   // initialize some data in cpuMom
-  createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
-  if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
-  if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
+  if(compute_force) {
+    createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
+    if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
+    if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
+  }
   void *mom = nullptr;
   void *sitelink = nullptr;
 
@@ -317,9 +323,13 @@ void gauge_force_test(void)
     errorQuda("Unsupported gauge order %d", gauge_order);
   }
 
-  if (getTuning() == QUDA_TUNE_YES)
-    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
-
+  if (getTuning() == QUDA_TUNE_YES) {
+    if(compute_force)
+      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    else
+      computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+  }
+    
   struct timeval t0, t1;
   double total_time = 0.0;
   // Multiple execution to exclude warmup time in the first run
@@ -328,7 +338,10 @@ void gauge_force_test(void)
   for (int i = 0; i < niter; i++) {
     Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
-    computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    if(compute_force)
+      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    else
+      computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);      
     gettimeofday(&t1, NULL);
     total_time += t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   }
@@ -340,18 +353,21 @@ void gauge_force_test(void)
   void *refmom = Mom_ref_milc->Gauge_p();
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
-                          loop_coeff, num_paths);
+                          loop_coeff, num_paths, compute_force);
     force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
                                  gauge_param.cpu_prec);
-    strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+    if(compute_force)
+      strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
-  printfQuda("\nComputing momentum action\n");
-  auto action_quda = momActionQuda(mom, &gauge_param);
-  auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
-  deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
-  printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
-
+  if(compute_force) {
+    printfQuda("\nComputing momentum action\n");
+    auto action_quda = momActionQuda(mom, &gauge_param);
+    auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
+    deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
+    printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
+  }
+  
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
   printfQuda("total time = %.2f ms\n", total_time * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
@@ -409,6 +425,9 @@ int main(int argc, char **argv)
   display_test_info();
 
   gauge_force_test();
+
+  // The same test is also used for gauge path (compute_force=false)
+  gauge_force_test(false);
 
   if (verify_results) {
     // Ensure gtest prints only from rank 0
