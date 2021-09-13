@@ -82,7 +82,9 @@ namespace quda {
         char NYW_str[8];
         u32toa(NXZ_str, NXZ);
         u32toa(NYW_str, NYW);
-        strcpy(name, NXZ_str);
+        strcpy(name, "Nxz");
+        strcat(name, NXZ_str);
+        strcat(name, "Nyw");
         strcat(name, NYW_str);
         strcat(name, typeid(f).name());
         return TuneKey(vol, name, aux);
