@@ -204,7 +204,7 @@ namespace quda
                                  - sizeof(dim3)                                                // threads parameter
                                  - (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
                                  - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                 - 12) // extra 12 bytes subtracted for alignment roundup
+                                 )
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
@@ -249,7 +249,7 @@ namespace quda
                              - sizeof(dim3)                                                // threads parameter
                              - (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
                              - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                             - 12) // extra 12 bytes subtracted for alignment roundup
+                             )
         / (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
