@@ -198,7 +198,7 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
@@ -267,7 +267,7 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
