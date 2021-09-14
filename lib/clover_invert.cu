@@ -42,8 +42,8 @@ namespace quda {
     
     long long flops() const { return 0; }
     long long bytes() const { return 2 * clover.Bytes(); }
-    void preTune() { if (clover.V(true) == clover.V(false)) clover.backup(); }
-    void postTune() { if (clover.V(true) == clover.V(false)) clover.restore(); }
+    void preTune() { if (clover::dynamic_inverse()) clover.backup(); }
+    void postTune() { if (clover::dynamic_inverse()) clover.restore(); }
   };
 
 #ifdef GPU_CLOVER_DIRAC

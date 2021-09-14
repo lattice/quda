@@ -166,6 +166,16 @@ namespace quda {
     */
     void setTuningString();
 
+    /**
+       @brief Backs up the CloverField (called by public backup function)
+    */
+    void backup(bool which) const;
+
+    /**
+       @brief Restores the CloverField (called by public restore function)
+    */
+    void restore(bool which) const;
+
   public:
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
@@ -221,12 +231,7 @@ namespace quda {
     /**
        @return The total bytes of allocation
      */
-    size_t TotalBytes() const
-    {
-      int direct = V(false) ? 1 : 0;
-      int inverse = V(true) ? 1 : 0;
-      return (direct + inverse) * (bytes + norm_bytes);
-    }
+    size_t TotalBytes() const { return total_bytes; }
 
     /**
        @return Number of colors
@@ -273,9 +278,16 @@ namespace quda {
     /**
        @brief Copy into this CloverField from CloverField src
        @param src The clover field from which we want to copy
-       @param inverse Are we copying the inverse or direct field
+       @param inverse Are we copying the inverse or direct field?
      */
-    void copy(const CloverField &src, bool inverse=true);
+    void copy(const CloverField &src, bool inverse);
+
+    /**
+       @brief Copy into this CloverField from CloverField src.  Will
+       copy both the field and its inverse (if it exists).
+       @param src The clover field from which we want to copy
+     */
+    void copy(const CloverField &src);
 
     /**
        @brief Compute the L1 norm of the field
@@ -391,7 +403,7 @@ namespace quda {
      @param inNorm The input norm buffer (optional)
   */
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
-			 QudaFieldLocation location, void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
+			 QudaFieldLocation location, void *Out=0, const void *In=0, void *outNorm=0, const void *inNorm=0);
   
 
 

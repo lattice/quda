@@ -15,10 +15,12 @@ namespace quda {
     static constexpr int length = 72;
     Out out;
     const In in;
-    CopyCloverArg(const Out &out, const In &in, const CloverField &meta) :
-      kernel_param(dim3(meta.VolumeCB(), 2, 1)),
-      out(out),
-      in(in) { }
+    CopyCloverArg(CloverField &out, const CloverField &in, bool inverse,
+                  store_out_t *out_p, float *out_norm,
+                  const store_in_t *in_p, const float *in_norm) :
+      kernel_param(dim3(in.VolumeCB(), 2, 1)),
+      out(out, inverse, out_p, out_norm),
+      in(in, inverse, const_cast<store_in_t*>(in_p), const_cast<float*>(in_norm)) { }
   };
 
   /** 

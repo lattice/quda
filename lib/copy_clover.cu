@@ -19,9 +19,9 @@ namespace quda {
 
   public:
     CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-               void *Out, void *In, float *outNorm, float *inNorm) :
+               void *Out, const void *In, float *outNorm, const float *inNorm) :
       TunableKernel2D(in, 2, location),
-      arg(OutOrder(out, inverse, static_cast<FloatOut*>(Out), outNorm), InOrder(in, inverse, static_cast<FloatIn*>(In), inNorm), in),
+      arg(out, in, inverse, static_cast<FloatOut*>(Out), outNorm, static_cast<const FloatIn*>(In), inNorm),
       out(out),
       in(in)
     {
@@ -39,7 +39,7 @@ namespace quda {
 
   template <typename InOrder, typename FloatOut, typename FloatIn>
   void copyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-                  void *Out, void *In, float *outNorm, float *inNorm)
+                  void *Out, const void *In, float *outNorm, const float *inNorm)
   {
     if (out.isNative()) {
       if (out.Reconstruct()) {
@@ -66,7 +66,7 @@ namespace quda {
 
   template <typename FloatOut, typename FloatIn> struct CloverCopyOut {
     CloverCopyOut(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location, 
-                  void *Out, void *In, float *outNorm, float *inNorm)
+                  void *Out, const void *In, float *outNorm, const float *inNorm)
     {
       if (in.isNative()) {
         if (in.Reconstruct()) {
@@ -98,7 +98,7 @@ namespace quda {
 
   template <typename FloatIn> struct CloverCopyIn {
     CloverCopyIn(const CloverField &in, CloverField &out, bool inverse, QudaFieldLocation location, 
-                 void *Out, void *In, float *outNorm, float *inNorm)
+                 void *Out, const void *In, float *outNorm, const float *inNorm)
     {
       // swizzle in/out back to instantiate out precision
       instantiatePrecision2<CloverCopyOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
@@ -107,7 +107,7 @@ namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-                         void *Out, void *In, void *outNorm, void *inNorm)
+                         void *Out, const void *In, void *outNorm, const void *inNorm)
   {
     if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) 
       errorQuda("Fixed-point precision not supported for order %d", out.Order());
@@ -116,10 +116,10 @@ namespace quda {
 
     // swizzle in/out since we first want to instantiate precision
     instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In,
-                                       reinterpret_cast<float*>(outNorm), reinterpret_cast<float*>(inNorm));
+                                       reinterpret_cast<float*>(outNorm), reinterpret_cast<const float*>(inNorm));
   }
 #else
-  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, void *, void *, void *)
+  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, const void *, void *, const void *)
   {
     errorQuda("Clover has not been built");
   }

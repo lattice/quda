@@ -959,8 +959,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     if (!device_calc) {
       profileClover.TPSTART(QUDA_PROFILE_H2D);
-      bool inverse = (h_clovinv && !inv_param->compute_clover_inverse && !clover::dynamic_inverse());
-      cloverPrecise->copy(*in, inverse);
+      cloverPrecise->copy(*in);
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
       profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -992,15 +991,16 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   // if requested, copy back the clover / inverse field
   if (inv_param->return_clover || inv_param->return_clover_inverse) {
-    if (!h_clover && !h_clovinv) errorQuda("Requested clover field return but no clover host pointers set");
 
     if (inv_param->return_clover) {
+      if (!h_clover) errorQuda("Requested clover field return but no clover host pointer set");
       profileClover.TPSTART(QUDA_PROFILE_D2H);
       in->copy(*cloverPrecise, false);
       profileClover.TPSTOP(QUDA_PROFILE_D2H);
     }
 
     if (inv_param->return_clover_inverse) {
+      if (!h_clovinv) errorQuda("Requested clover field inverse return but no clover host pointer set");
       if (!clover::dynamic_inverse()) {
         profileClover.TPSTART(QUDA_PROFILE_D2H);
         in->copy(*cloverPrecise, true);
@@ -1046,14 +1046,6 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
     // create the mirror sloppy clover field
     CloverFieldParam clover_param(*cloverPrecise);
     clover_param.setPrecision(prec[0], true);
-
-    if (cloverPrecise->V(false) != cloverPrecise->V(true)) {
-      clover_param.direct = true;
-      clover_param.inverse = true;
-    } else {
-      clover_param.direct = false;
-      clover_param.inverse = true;
-    }
 
     if (clover_param.Precision() != cloverPrecise->Precision()) {
       cloverSloppy = new CloverField(clover_param);

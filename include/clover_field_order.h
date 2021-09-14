@@ -280,8 +280,10 @@ namespace quda {
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
         double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
-        return 2.0 * result; // factor of two is normalization
+        return result; // factor of two is normalization
       }
+
+      constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
     };
 
     template<int N>
@@ -338,23 +340,22 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
-        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
-        return 2.0 * result; // factor of two is normalization
+        return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
       }
+
+      constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
     };
 
     template<typename Float, int nColor, int nSpin> 
       struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> { 
-      Float *a[2];
+      Float *a;
+      size_t offset_cb;
       const int N = nSpin * nColor / 2;
-      complex<Float> zero;
-      Accessor(const CloverField &A, bool inverse=false) {
-	// even
-	a[0] = static_cast<Float*>(const_cast<void*>(A.V(inverse)));
-	// odd
-	a[1] = static_cast<Float*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/(2*sizeof(Float));
-	zero = complex<Float>(0.0,0.0);
-      }
+      const complex<Float> zero;
+      Accessor(const CloverField &A, bool inverse=false) :
+        a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
+        offset_cb(A.Bytes()/(2*sizeof(Float))),
+        zero(complex<Float>(0.0,0.0)) { }
 
       __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
 	// if not in the diagonal chiral block then return 0.0
@@ -366,27 +367,28 @@ namespace quda {
 	unsigned int col = s_col%2 * nColor + c_col;
 
 	if (row == col) {
-	  complex<Float> tmp = a[parity][(x*2 + chirality)*N*N + row];
+	  complex<Float> tmp = a[parity * offset_cb + (x*2 + chirality)*N*N + row];
 	  return tmp;
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
-          return complex<Float>(a[parity][idx], a[parity][idx+1]);
+          return complex<Float>(a[parity * offset_cb + idx], a[parity * offset_cb + idx + 1]);
 	} else {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
-          return complex<Float>(a[parity][idx], -a[parity][idx+1]);
+          return complex<Float>(a[parity * offset_cb + idx], -a[parity * offset_cb + idx + 1]);
 	}
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
-        errorQuda("Not implemented");
-	return 0.0;
+        return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
       }
+
+      constexpr Float scale() const { return static_cast<Float>(1.0); } // normalization of native storage
     };
 
     /**
@@ -494,7 +496,7 @@ namespace quda {
 	 */
 	__host__ double norm1(int =-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
+          double nrm1 = accessor.scale() * accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
           commGlobalReductionPop();
           return nrm1;
         }
@@ -506,7 +508,8 @@ namespace quda {
          */
         __host__ double norm2(int =-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
+          double nrm2 = accessor.scale() * accessor.scale() *
+            accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           commGlobalReductionPop();
           return nrm2;
         }
@@ -518,7 +521,7 @@ namespace quda {
          */
         __host__ double abs_max(int =-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double absmax = accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
+          double absmax = accessor.scale() * accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
           commGlobalReductionPop();
           return absmax;
         }
@@ -530,8 +533,8 @@ namespace quda {
          */
         __host__ double abs_min(int =-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double absmax = accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
-                                                    minimum<Float>());
+          double absmax = accessor.scale() * accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
+                                                                       minimum<Float>());
           commGlobalReductionPop();
           return absmax;
         }

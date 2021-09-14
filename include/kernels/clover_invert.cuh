@@ -23,7 +23,8 @@ namespace quda
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
       ReduceArg<reduce_t>(),
-      inverse(field, true),
+      // if dynamic_inverse, then we alias to the direct term
+      inverse(field, clover::dynamic_inverse() ? false : true),
       clover(field, false),
       compute_tr_log(compute_tr_log),
       mu2(field.Mu2())
