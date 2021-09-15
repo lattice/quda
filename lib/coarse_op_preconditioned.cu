@@ -94,6 +94,7 @@ namespace quda
     int blockMin() const { return 8; }
     int blockStep() const { return 8; }
     unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
+    bool tuneAuxDim() const { return use_mma; } // tune aux if doing mma
 
   public:
     CalculateYhat(Arg &arg, const LatticeField &meta, bool use_mma) :
@@ -135,9 +136,9 @@ namespace quda
 
     bool advanceSharedBytes(TuneParam &param) const { return false; }
 
-    bool advanceTuneParam(TuneParam &param) const {
+    bool advanceAux(TuneParam &param) const
+    {
       if (use_mma) {
-
         constexpr bool compute_max_only_dummy = true;
         constexpr bool query_max = true;
         int max = mma::template launch_yhat_kernel<compute_max_only_dummy, query_max>(arg, 1, param, 0);
@@ -146,14 +147,33 @@ namespace quda
           return true;
         }
         return false;
-
       } else {
+        return false;
+      }
+    }
 
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      if (!use_mma) {
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && meta.MemType() == QUDA_MEMORY_DEVICE)
           return Tunable::advanceTuneParam(param);
         else
           return false;
+      } else {
+        return false;
       }
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableVectorYZ::initTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
+    }
+
+    void defaultTuneParam(TuneParam &param) const
+    {
+      TunableVectorYZ::defaultTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
     }
 
     TuneKey tuneKey() const {
