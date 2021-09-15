@@ -31,11 +31,11 @@ namespace quda {
   {
     static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
 #ifdef QUDA_BACKEND_OMPTARGET
-    struct warp_reduce_t {  // FIXME
+    struct warp_reduce_t {  // FIXME THIS IS COMPLETELY WRONG, ONLY TO MAKE IT COMPILE
       using TempStorage = int;
     };
 #else
-    using warp_reduce_t = cub::WarpReduce<T, width>;
+    using warp_reduce_t = cub::WarpReduce<T, width, __COMPUTE_CAPABILITY__>;
 #endif
 
     __device__ __host__ inline WarpReduce() {}
@@ -64,7 +64,7 @@ namespace quda {
       using TempStorage = int;
     };
 #else
-    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
+    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 1, 1, __COMPUTE_CAPABILITY__>;
 #endif
     const int batch;
 
