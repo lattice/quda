@@ -24,6 +24,16 @@ namespace quda
     template <typename Functor>
     constexpr size_t max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
 
+    /**
+       @brief set_param sets the matrix coefficient parameters for the
+       multi-blas kernels.  If a precision change is required this
+       occurs here.  This is the multi-1d specialization where the a,
+       b, c arrays are stored in the functor directly.
+
+       @param[in,out] arg The kernel argument struct
+       @param[in] select Which array we are setting ('a', 'b', or 'c')
+       @param[in] Pointer to host copy of the matrix
+     */
     template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<multi_1d, void>
     set_param(Arg &arg, char select, const T &h)
     {
@@ -39,6 +49,17 @@ namespace quda
       for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
     }
 
+    /**
+       @brief set_param sets the matrix coefficient parameters for the
+       multi-blas kernels.  If a precision change is required this
+       occurs here.  This is the multi-2d specialization where
+       the a, b, c arrays are stored in separate arrays, which are
+       stored in the MultiBlasParam struct.
+
+       @param[in,out] arg The kernel argument struct
+       @param[in] select Which array we are setting ('a', 'b', or 'c')
+       @param[in] Pointer to host copy of the matrix
+     */
     template <bool multi_1d = false, typename Arg, typename T> std::enable_if_t<!multi_1d, void>
     set_param(Arg &arg, char select, const T &h)
     {
@@ -153,9 +174,17 @@ namespace quda
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
-       statically allocated with length NXZ, we can statically compute how
-       the maximum size of YW is and allocate this amount of space.  This
-       allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
+       statically allocated with length NXZ, we can statically compute
+       how the maximum size of YW is and allocate this amount of
+       space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
+       is small.  This is the constexpr variant which we use after
+       template instantiation.
+
+       @tparam[in] NXZ The dimension of the SpinorX and SpinorZ arrays
+       @tparam[in] xType The underlying type of the SpinorX and SpinorZ objects
+       @tparam[in] yType The underlying type of the SpinorY and SpinorW objects
+       @tparam Functor The functor we are applying
+       @return The maximum NYW size possible
     */
     template <int NXZ, typename xType, typename yType, typename Functor>
     inline constexpr int max_YW_size()
@@ -175,7 +204,7 @@ namespace quda
                                  - sizeof(dim3)                                                // threads parameter
                                  - (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
                                  - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                 - 12) // extra 12 bytes subtracted for alignment roundup
+                                 )
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
@@ -187,12 +216,17 @@ namespace quda
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
-       statically allocated with length NXZ, we can statically compute how
-       the maximum size of YW is and allocate this amount of space.  This
-       allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
+       statically allocated with length NXZ, we can statically compute
+       how the maximum size of YW is and allocate this amount of
+       space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
+       is small.  This is the run-time variant which we can call prior
+       to template instantiation.
 
-       @param[in] scalar_width Width of the scalar that we're
-       multiplying by (1 = real, 2 = complex)
+       @tparam Functor The functor we are applying
+       @param[in] NXZ The dimension of the SpinorX and SpinorZ arrays
+       @param[in] x_prec The precision of the SpinorX and SpinorZ objects
+       @param[in] y_prec The precision of the SpinorY and SpinorW objects
+       @return The maximum NYW size possible
     */
     template <typename Functor>
     inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec)
@@ -215,7 +249,7 @@ namespace quda
                              - sizeof(dim3)                                                // threads parameter
                              - (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
                              - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                             - 12) // extra 12 bytes subtracted for alignment roundup
+                             )
         / (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays

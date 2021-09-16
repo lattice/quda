@@ -129,7 +129,7 @@ namespace quda {
   public:
     DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                  const GaugeField &Y, const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location)
-      : TunableKernel3D(out, out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1), 2 * (Nc / colors_per_thread(Nc, dim_threads)) * 2),
+      : TunableKernel3D(out, out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1), 1),
         out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
         nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1), color_col_stride(-1)
     {
@@ -202,22 +202,18 @@ namespace quda {
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;
@@ -537,6 +533,10 @@ namespace quda {
       if (dslash.commDim)
         for (int i = 0; i < 4; i++) comm_sum -= (1 - dslash.commDim[i]);
       strcat(aux, comm_sum ? ",full" : ",interior");
+
+#ifdef QUDA_FAST_COMPILE_DSLASH
+      strcat(aux, ",fast_compile");
+#endif
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning

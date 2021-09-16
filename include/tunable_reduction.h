@@ -176,10 +176,12 @@ namespace quda {
     {
       strcpy(vol, field.VolString());
       strcpy(aux, compile_type_str(field, location));
-      strcat(aux, field.AuxString());
 #ifdef QUDA_FAST_COMPILE_REDUCE
-      strcat(aux, ",fast_compile");
+      strcat(aux, "fast_compile,");
 #endif
+      if (commAsyncReduction()) strcat(aux, "async,");
+      strcat(aux, field.SiteSubset() == QUDA_FULL_SITE_SUBSET ? "nParity=2," : "nParity=1,");
+      strcat(aux, field.AuxString());
     }
 
     TunableReduction2D(size_t n_items, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
