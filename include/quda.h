@@ -387,6 +387,7 @@ extern "C" {
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+
     /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     size_t struct_size;
 
@@ -523,8 +524,6 @@ extern "C" {
     /** Whether this is the last rhs solve */
     QudaBoolean is_last_rhs;    
 
-    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
-    size_t struct_size;
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
