@@ -181,7 +181,8 @@ namespace quda {
         if (out.FieldOrder() != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER || Y.FieldOrder() != QUDA_QDP_GAUGE_ORDER)
           errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
 
-        launch_host<CoarseDslash>(tp, stream, Arg<1, 1>(out, inA, inB, Y, X, (Float)kappa, parity));
+        launch_host<CoarseDslash>
+          (tp, stream, Arg<1, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, QUDA_QDP_GAUGE_ORDER>(out, inA, inB, Y, X, (Float)kappa, parity));
       } else {
         if (out.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER || Y.FieldOrder() != QUDA_FLOAT2_GAUGE_ORDER)
           errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());

@@ -53,7 +53,7 @@ namespace quda {
   __device__ __host__ bool isUnitarizedLinkConsistent(const mat &initial_matrix,
                                                       const mat &unitary_matrix, double max_error)
   {
-    auto n = initial_matrix.size();
+    auto n = initial_matrix.rows();
     mat temporary = conj(initial_matrix)*unitary_matrix;
     temporary = temporary*temporary - conj(initial_matrix)*initial_matrix;
 
