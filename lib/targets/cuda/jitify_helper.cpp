@@ -32,7 +32,7 @@
 #endif // !HOST_DEBUG
 
 #include "jitify_options.hpp"
-#include <jitify_helper2.cuh>
+#include "jitify_helper.h"
 
 namespace quda {
 
@@ -109,11 +109,11 @@ namespace quda {
       }
     }
 
-    auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, device::get_cuda_stream(stream));
+    auto configured_instance = instance.configure(tp.grid, tp.block, tp.shared_bytes, target::cuda::get_stream(stream));
     auto error = configured_instance.launch(arg_ptrs, arg_types);
 
     if (error != CUDA_SUCCESS)
-      cuda::set_driver_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
+      target::cuda::set_driver_error(error, __func__, __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
 
     return error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
   }

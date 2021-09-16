@@ -136,9 +136,9 @@ namespace quda {
      @param link SU(Nc) matrix
      @param id indices
   */
-  template <class T, int NCOLORS>
-  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,NCOLORS> &link, int2 id ){
-    for ( int j = 0; j < NCOLORS; j++ ) {
+  template <class T, int nColor>
+  __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,nColor> &link, int2 id ){
+    for ( int j = 0; j < nColor; j++ ) {
       complex<T> tmp = complex<T>( u(0,0), u(1,1) ) * link(id.x, j) + complex<T>( u(1,0), u(0,1) ) * link(id.y, j);
       link(id.y, j) = complex<T>(-u(1,0), u(0,1) ) * link(id.x, j) + complex<T>( u(0,0),-u(1,1) ) * link(id.y, j);
       link(id.x, j) = tmp;
@@ -147,19 +147,19 @@ namespace quda {
 
   /**
      @brief Calculate the SU(2) index block in the SU(Nc) matrix
-     @param block number to calculate the index's, the total number of blocks is NCOLORS * ( NCOLORS - 1) / 2.
+     @param block number to calculate the index's, the total number of blocks is Nc * ( Nc - 1) / 2.
      @return Returns two index's in int2 type, accessed by .x and .y.
   */
-  template<int NCOLORS>
+  template<int nColor>
   __host__ __device__ static inline int2 IndexBlock(int block){
     int2 id;
     int i1;
     int found = 0;
     int del_i = 0;
     int index = -1;
-    while ( del_i < (NCOLORS - 1) && found == 0 ) {
+    while ( del_i < (nColor - 1) && found == 0 ) {
       del_i++;
-      for ( i1 = 0; i1 < (NCOLORS - del_i); i1++ ) {
+      for ( i1 = 0; i1 < (nColor - del_i); i1++ ) {
         index++;
         if ( index == block ) {
           found = 1;
@@ -177,22 +177,22 @@ namespace quda {
      @param localstate CURAND rng state
      @return SU(Nc) matrix
   */
-  template <class Float, int NCOLORS>
-  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( RNGState& localState )
+  template <class Float, int nColor>
+  __device__ inline Matrix<complex<Float>,nColor> randomize( RNGState& localState )
   {
-    Matrix<complex<Float>,NCOLORS> U;
+    Matrix<complex<Float>,nColor> U;
 
-    for ( int i = 0; i < NCOLORS; i++ )
-      for ( int j = 0; j < NCOLORS; j++ )
+    for ( int i = 0; i < nColor; i++ )
+      for ( int j = 0; j < nColor; j++ )
         U(i,j) = complex<Float>( (Float)(uniform<Float>::rand(localState) - 0.5), (Float)(uniform<Float>::rand(localState) - 0.5) );
     reunit_link<Float>(U);
     return U;
 
     /*setIdentity(&U);
-       for( int block = 0; block < NCOLORS * ( NCOLORS - 1) / 2; block++ ) {
+       for( int block = 0; block < nColor * ( nColor - 1) / 2; block++ ) {
        Matrix<Float,2> rr = randomSU2<Float>(localState);
-       int2 id = IndexBlock<NCOLORS>( block );
-       mul_block_sun<Float, NCOLORS>(rr, U, id);
+       int2 id = IndexBlock<nColor>( block );
+       mul_block_sun<Float, nColor>(rr, U, id);
        //U = block_su2_to_su3<Float>( U, a00, a01, a10, a11, block );
        }
        return U;*/

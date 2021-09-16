@@ -11,9 +11,11 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
                            bool, void *)
 {
   comm_init(nDim, commDims, rank_from_coords, map_data);
+  globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split)
+Communicator::Communicator(Communicator &other, const int *comm_split) :
+  globalReduce(other.globalReduce)
 {
   constexpr int nDim = 4;
 
@@ -96,6 +98,8 @@ void Communicator::comm_allreduce_array(double *, size_t) {}
 void Communicator::comm_nonblocking_allreduce_array(MsgHandle *&, double *, double *, size_t ) {}
 
 void Communicator::comm_allreduce_max_array(double *, size_t) {}
+
+void Communicator::comm_allreduce_min_array(double *, size_t) {}
 
 void Communicator::comm_allreduce_int(int *) {}
 

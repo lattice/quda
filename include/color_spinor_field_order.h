@@ -280,7 +280,8 @@ namespace quda {
         constexpr int M = nSpinBlock * nColor * nVec;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+                                         (chi * M + i) * stride + x_cb);
           memcpy(&out[i], &tmp, sizeof(vec_t));
         }
       }
@@ -327,7 +328,8 @@ namespace quda {
         constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
 #pragma unroll
         for (int i = 0; i < M; i++) {
-          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), (chi * M + i) * stride + x_cb);
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+                                         (chi * M + i) * stride + x_cb);
           memcpy(&out[i * 2], &tmp, sizeof(vec_t));
         }
       }
@@ -426,20 +428,17 @@ namespace quda {
     */
     template <typename Float, typename storeFloat, bool block_float_, typename norm_t>
       struct fieldorder_wrapper {
-        /**
-         * computing type and storage types that can be inferred from this object.
-         */
-        using value_type = Float;
-        using store_type = storeFloat;
-        complex<storeFloat> *v;
-        const int idx;
-        const Float scale;
-        const Float scale_inv;
-        norm_t *norm;
-        const int norm_idx;
-        const bool norm_write;
-        static constexpr bool fixed = fixed_point<Float, storeFloat>();
-        static constexpr bool block_float = block_float_;
+        using value_type = Float;                                       /**< Compute type */
+        using store_type = storeFloat;                                  /**< Storage type */
+        complex<storeFloat> *v;                                         /**< Field memory address this wrapper encompasses */
+        const int idx;                                                  /**< Index into field */
+        const Float scale;                                              /**< Float to fixed-point scale factor */
+        const Float scale_inv;                                          /**< Fixed-point to float scale factor */
+        norm_t *norm;                                                   /**< Address of norm field (if it exists) */
+        const int norm_idx;                                             /**< Index into norm field */
+        const bool norm_write;                                          /**< Whether we need to write to the norm field */
+        static constexpr bool fixed = fixed_point<Float, storeFloat>(); /**< Whether this is a fixed point field */
+        static constexpr bool block_float = block_float_;               /**< Whether this is a block float field */
 
         /**
            @brief fieldorder_wrapper constructor
@@ -467,6 +466,9 @@ namespace quda {
         template<typename theirFloat>
         __device__ __host__ inline void operator=(const complex<theirFloat> &a) const
         {
+          // we only ever write the norm out if we are doing block
+          // float format, and if specifically requested (in general,
+          // this will be a specific thread that requests this (norm_write = true)
           if (block_float && norm_write) norm[norm_idx] = scale_inv;
           if (match<storeFloat,theirFloat>()) {
             v[idx] = complex<storeFloat>(a.real(), a.imag());
@@ -855,9 +857,10 @@ namespace quda {
       */
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
+        commGlobalReductionPush(global);
         double nrm2 = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
                                                square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
-        if (global) comm_allreduce(&nrm2);
+        commGlobalReductionPop();
         return nrm2;
       }
 
@@ -868,9 +871,10 @@ namespace quda {
       */
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
+        commGlobalReductionPush(global);
         double absmax = ::quda::transform_reduce(v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
                                                  abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
-        if (global) comm_allreduce_max(&absmax);
+        commGlobalReductionPop();
         return absmax;
       }
 
@@ -882,9 +886,10 @@ namespace quda {
       */
       __host__ double norm2(bool global = true) const
       {
+        commGlobalReductionPush(global);
         double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
                                                square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
-        if (global) comm_allreduce(&nrm2);
+        commGlobalReductionPop();
         return nrm2;
       }
 
@@ -895,9 +900,10 @@ namespace quda {
       */
       __host__ double abs_max(bool global = true) const
       {
+        commGlobalReductionPush(global);
         double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
                                                  abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
-        if (global) comm_allreduce_max(&absmax);
+        commGlobalReductionPop();
         return absmax;
       }
 

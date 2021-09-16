@@ -1,3 +1,4 @@
+#include <memory>
 #include <tune_quda.h>
 #include <index_helper.cuh>
 #include <timer.h>
@@ -33,6 +34,10 @@ namespace quda
     struct DslashCommsPattern {
       static constexpr int nDim = 4;
       static constexpr int nDir = 2;
+      // nStream here is not tied to the number underlying CUDA
+      // streams (although historically it was), rather it signifies
+      // the number of logical parallel streams we have when
+      // overlapping comms in 4 dimensions * 2 directions and compute
       static constexpr int nStream = nDim * nDir + 1;
 
       std::array<int, nStream> gatherCompleted;
@@ -312,7 +317,6 @@ namespace quda
    */
   template <typename Dslash> inline void setMappedGhost(Dslash &dslash, ColorSpinorField &in, bool to_mapped)
   {
-
     static char aux_copy[TuneKey::aux_n];
     static bool set_mapped = false;
 
@@ -337,9 +341,7 @@ namespace quda
 
   template <typename Dslash> struct DslashPolicyImp {
 
-    virtual void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
-        = 0;
+    virtual void operator()(Dslash &, cudaColorSpinorField *, const int, const int *, TimeProfile &) { }
 
     virtual ~DslashPolicyImp() { }
   };
@@ -1699,33 +1701,34 @@ namespace quda
       }
     }
 
-    static DslashPolicyImp<Dslash> *create(const QudaDslashPolicy &policy_)
+    static std::unique_ptr<DslashPolicyImp<Dslash>> create(const QudaDslashPolicy &policy_)
     {
       // if GDR policy and blacklist enabled, create the non-GDR equivalent
       QudaDslashPolicy policy = comm_gdr_blacklist() ? blacklist_map(policy_) : policy_;
 
       switch (policy) {
-      case QudaDslashPolicy::QUDA_DSLASH: return new DslashBasic<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_DSLASH: return new DslashFusedExterior<Dslash>;
-      case QudaDslashPolicy::QUDA_GDR_DSLASH: return new DslashGDR<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH: return new DslashFusedGDR<Dslash>;
-      case QudaDslashPolicy::QUDA_GDR_RECV_DSLASH: return new DslashGDRRecv<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH: return new DslashFusedGDRRecv<Dslash>;
-      case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH: return new DslashZeroCopyPack<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH: return new DslashFusedZeroCopyPack<Dslash>;
-      case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH: return new DslashZeroCopyPackGDRRecv<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH: return new DslashFusedZeroCopyPackGDRRecv<Dslash>;
-      case QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH: return new DslashZeroCopy<Dslash>;
-      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH: return new DslashFusedZeroCopy<Dslash>;
-      case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK: return new DslashFusedPack<Dslash>;
-      case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO: return new DslashFusedPackFusedHalo<Dslash>;
-      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH: return new DslashShmemUberPackIntra<Dslash>;
-      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH: return new DslashShmemUberPackFull<Dslash>;
-      case QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH: return new DslashShmemPackIntra<Dslash>;
-      case QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH: return new DslashShmemPackFull<Dslash>;
+      case QudaDslashPolicy::QUDA_DSLASH: return std::make_unique<DslashBasic<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_DSLASH: return std::make_unique<DslashFusedExterior<Dslash>>();
+      case QudaDslashPolicy::QUDA_GDR_DSLASH: return std::make_unique<DslashGDR<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH: return std::make_unique<DslashFusedGDR<Dslash>>();
+      case QudaDslashPolicy::QUDA_GDR_RECV_DSLASH: return std::make_unique<DslashGDRRecv<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH: return std::make_unique<DslashFusedGDRRecv<Dslash>>();
+      case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH: return std::make_unique<DslashZeroCopyPack<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH: return std::make_unique<DslashFusedZeroCopyPack<Dslash>>();
+      case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH: return std::make_unique<DslashZeroCopyPackGDRRecv<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH: return std::make_unique<DslashFusedZeroCopyPackGDRRecv<Dslash>>();
+      case QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH: return std::make_unique<DslashZeroCopy<Dslash>>();
+      case QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH: return std::make_unique<DslashFusedZeroCopy<Dslash>>();
+      case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK: return std::make_unique<DslashFusedPack<Dslash>>();
+      case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO: return std::make_unique<DslashFusedPackFusedHalo<Dslash>>();
+      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKINTRA_DSLASH: return std::make_unique<DslashShmemUberPackIntra<Dslash>>();
+      case QudaDslashPolicy::QUDA_SHMEM_UBER_PACKFULL_DSLASH: return std::make_unique<DslashShmemUberPackFull<Dslash>>();
+      case QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH: return std::make_unique<DslashShmemPackIntra<Dslash>>();
+      case QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH: return std::make_unique<DslashShmemPackFull<Dslash>>();
       default: errorQuda("Dslash policy %d not recognized", static_cast<int>(policy));
       }
-      return nullptr;
+
+      return std::make_unique<DslashPolicyImp<Dslash>>();
     }
   };
 
@@ -1915,9 +1918,8 @@ namespace quda
                 i == QudaDslashPolicy::QUDA_SHMEM_PACKINTRA_DSLASH ||
                 i == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH) {
 
-              DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(i);
+              auto dslashImp = DslashFactory<Dslash>::create(i);
               (*dslashImp)(dslash, in, volume, ghostFace, profile);
-              delete dslashImp;
 
           } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
                      i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
@@ -1932,14 +1934,12 @@ namespace quda
               // are blacklisted.
               {
                 QudaDslashPolicy policy = DslashFactory<Dslash>::blacklist_map(i);
-                DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(policy);
+                auto dslashImp = DslashFactory<Dslash>::create(policy);
                 (*dslashImp)(dslash, in, volume, ghostFace, profile);
-                delete dslashImp;
               }
 
-              DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(i);
+              auto dslashImp = DslashFactory<Dslash>::create(i);
               (*dslashImp)(dslash, in, volume, ghostFace, profile);
-              delete dslashImp;
 
             } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) {
               errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -1960,7 +1960,9 @@ namespace quda
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const qudaStream_t &) {
+  private:
+   void apply(const qudaStream_t &)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
@@ -1970,9 +1972,8 @@ namespace quda
      if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
-     DslashPolicyImp<Dslash> *dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+     auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
      (*dslashImp)(dslash, in, volume, ghostFace, profile);
-     delete dslashImp;
 
      // restore p2p state
      comm_enable_peer2peer(p2p_enabled);

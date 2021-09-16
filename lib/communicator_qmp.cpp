@@ -62,9 +62,11 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   is_qmp_handle_default = true; // the QMP handle is the default one.
 
   comm_init(nDim, commDims, rank_from_coords, map_data);
+  globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split)
+Communicator::Communicator(Communicator &other, const int *comm_split) :
+  globalReduce(other.globalReduce)
 {
   user_set_comm_handle = false;
 
@@ -398,8 +400,12 @@ void Communicator::comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outd
 
 void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
-
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data + i)); }
+}
+
+void Communicator::comm_allreduce_min_array(double *data, size_t size)
+{
+  for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data + i)); }
 }
 
 void Communicator::comm_allreduce_int(int *data) { QMP_CHECK(QMP_comm_sum_int(QMP_COMM_HANDLE, data)); }

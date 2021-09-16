@@ -12,7 +12,6 @@ namespace quda {
   class DslashCoarse : public TunableKernel3D {
 
     static constexpr int nDim = 4;
-    static constexpr int Mc = colors_per_thread();
 
     ColorSpinorField &out;
     const ColorSpinorField &inA;
@@ -38,7 +37,7 @@ namespace quda {
        nSrc*nParity*(dslash*Y.Bytes()*Y.VolumeCB()/(2*Y.Stride()) + clover*X.Bytes()/2);
     }
 
-    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * Mc); }
+    unsigned int sharedBytesPerThread() const { return (sizeof(complex<Float>) * colors_per_thread(Nc, dim_threads)); }
     bool tuneAuxDim() const { return true; } // Do tune the aux dimensions
     unsigned int minThreads() const { return color_col_stride * X.VolumeCB(); }
 
@@ -89,7 +88,7 @@ namespace quda {
       dim_threads = param.aux.y;
       // need to reset z-block/grid size/shared_bytes since dim_threads has changed
       resizeStep(step_y, 2 * dim_threads);
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       TunableKernel3D::initTuneParam(param);
 
       return rtn;
@@ -107,7 +106,7 @@ namespace quda {
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
       resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       TunableKernel3D::initTuneParam(param);
     }
 
@@ -118,7 +117,7 @@ namespace quda {
       color_col_stride = param.aux.x;
       dim_threads = param.aux.y;
       resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       TunableKernel3D::defaultTuneParam(param);
 
       // ensure that the default x block size is divisible by the warpSize
@@ -130,7 +129,7 @@ namespace quda {
   public:
     DslashCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                  const GaugeField &Y, const GaugeField &X, double kappa, int parity, MemoryLocation *halo_location)
-      : TunableKernel3D(out, out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1), 2 * (Nc / Mc) * 2),
+      : TunableKernel3D(out, out.SiteSubset() * (out.Ndim()==5 ? out.X(4) : 1), 1),
         out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
         nParity(out.SiteSubset()), nSrc(out.Ndim()==5 ? out.X(4) : 1), color_col_stride(-1)
     {
@@ -175,7 +174,7 @@ namespace quda {
       const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       color_col_stride = tp.aux.x;
       dim_threads = tp.aux.y;
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       if (!checkParam(tp)) errorQuda("Invalid launch param");
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -203,22 +202,18 @@ namespace quda {
         case 2:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;
         case 4:
           switch (tp.aux.x) { // this is color_col_stride
           case 1: launch_device<CoarseDslash>(tp, stream, Arg<1, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#ifndef QUDA_FAST_COMPILE_DSLASH
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-#endif
           default: errorQuda("Color column stride %d not valid", tp.aux.x);
           }
           break;
@@ -538,6 +533,10 @@ namespace quda {
       if (dslash.commDim)
         for (int i = 0; i < 4; i++) comm_sum -= (1 - dslash.commDim[i]);
       strcat(aux, comm_sum ? ",full" : ",interior");
+
+#ifdef QUDA_FAST_COMPILE_DSLASH
+      strcat(aux, ",fast_compile");
+#endif
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning

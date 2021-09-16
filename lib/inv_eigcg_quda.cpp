@@ -1050,10 +1050,10 @@ namespace quda {
       ColorSpinorField &pPre = *p_pre;
 
       blas::copy(rPre, r);
-      commGlobalReductionSet(false);
+      commGlobalReductionPush(false);
       (*K)(pPre, rPre);
-      commGlobalReductionSet(true);
-      blas::copy(z, pPre);
+      commGlobalReductionPop();
+      blas::copy(*z, pPre);
     }
 
     p = z;
@@ -1105,12 +1105,10 @@ namespace quda {
         ColorSpinorField &pPre = *p_pre;
 
         blas::copy(rPre, r);
-
-        commGlobalReductionSet(false);
+        commGlobalReductionPush(false);
         (*K)(pPre, rPre);
-        commGlobalReductionSet(true);
-
-        blas::copy(z, pPre);
+        commGlobalReductionPop();
+        blas::copy(*z, pPre);
       }
       //
 

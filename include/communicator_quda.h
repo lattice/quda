@@ -3,6 +3,7 @@
 #include <unistd.h> // for gethostname()
 #include <assert.h>
 #include <limits>
+#include <stack>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -514,21 +515,21 @@ struct Communicator {
     Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
 
+    
     // determine which GPU this rank will use
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
 
-    // We only want one (1) gpuid for all communicators, so gpuid is static.
-    // We initialize gpuid if it's still negative.
     if (gpuid < 0) {
+      int device_count = quda::device::get_device_count();
+      if (device_count == 0) { errorQuda("No devices found"); }
 
+      // We initialize gpuid if it's still negative.
       gpuid = 0;
       for (int i = 0; i < comm_rank(); i++) {
         if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
       }
 
-      int device_count = quda::device::get_device_count();
-      if (device_count == 0) { errorQuda("No devices found"); }
       if (gpuid >= device_count) {
         char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
         if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
@@ -538,7 +539,7 @@ struct Communicator {
           errorQuda("Too few GPUs available on %s", comm_hostname());
         }
       }
-    }
+    } // -ve gpuid
 
     comm_peer2peer_init(hostname_recv_buf);
 
@@ -618,20 +619,8 @@ struct Communicator {
 
   bool comm_deterministic_reduce() { return use_deterministic_reduce; }
 
-  bool globalReduce = true;
+  std::stack<bool> globalReduce;
   bool asyncReduce = false;
-
-  void reduceMaxDouble(double &max) { comm_allreduce_max(&max); }
-
-  void reduceDouble(double &sum)
-  {
-    if (globalReduce) comm_allreduce(&sum);
-  }
-
-  void reduceDoubleArray(double *sum, const int len)
-  {
-    if (globalReduce) comm_allreduce_array(sum, len);
-  }
 
   int commDim(int dir) { return comm_dim(dir); }
 
@@ -643,9 +632,17 @@ struct Communicator {
 
   void commDimPartitionedReset() { comm_dim_partitioned_reset(); }
 
-  bool commGlobalReduction() { return globalReduce; }
+  bool commGlobalReduction() { return globalReduce.top(); }
 
-  void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduction; }
+  void commGlobalReductionPush(bool global_reduction) { globalReduce.push(global_reduction); }
+
+  void commGlobalReductionPop() { globalReduce.pop(); }
+
+  void reduceMaxDouble(double &max) { if (commGlobalReduction()) comm_allreduce_max(&max); }
+
+  void reduceDouble(double &sum) { if (commGlobalReduction()) comm_allreduce(&sum); }
+
+  void reduceDoubleArray(double *sum, const int len) { if (commGlobalReduction()) comm_allreduce_array(sum, len); }
 
   bool commAsyncReduction() { return asyncReduce; }
 
@@ -750,6 +747,8 @@ struct Communicator {
   void comm_nonblocking_allreduce_array(MsgHandle *&mh, double *outdata, double *indata, size_t size);  
 
   void comm_allreduce_max_array(double *data, size_t size);
+
+  void comm_allreduce_min_array(double *data, size_t size);
 
   void comm_allreduce_int(int *data);
 
