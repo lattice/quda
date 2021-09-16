@@ -102,23 +102,23 @@ namespace quda {
 
     void initTuneParam(TuneParam &param) const
     {
-      param.aux = make_int4(1,1,1,1);
-      color_col_stride = param.aux.x;
-      dim_threads = param.aux.y;
-      resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
+      color_col_stride = 1;
+      dim_threads = 1;
+      resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       TunableKernel3D::initTuneParam(param);
+      param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const
     {
-      param.aux = make_int4(1,1,1,1);
-      color_col_stride = param.aux.x;
-      dim_threads = param.aux.y;
-      resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
+      color_col_stride = 1;
+      dim_threads = 1;
+      resizeStep(step_y, 2 * dim_threads); // 2 is forwards/backwards
       resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
       TunableKernel3D::defaultTuneParam(param);
+      param.aux = make_int4(color_col_stride, dim_threads, 1, 1);
 
       // ensure that the default x block size is divisible by the warpSize
       param.block.x = device::warp_size();
@@ -573,20 +573,14 @@ namespace quda {
 
    bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
-   void initTuneParam(TuneParam &param) const  {
+   void initTuneParam(TuneParam &param) const {
      Tunable::initTuneParam(param);
-     param.aux.x = first_active_policy;
-     param.aux.y = 0;
-     param.aux.z = 0;
-     param.aux.w = 0;
+     param.aux = make_int4(first_active_policy, 0, 0, 0);
    }
 
-   void defaultTuneParam(TuneParam &param) const  {
+   void defaultTuneParam(TuneParam &param) const {
      Tunable::defaultTuneParam(param);
-     param.aux.x = first_active_policy;
-     param.aux.y = 0;
-     param.aux.z = 0;
-     param.aux.w = 0;
+     param.aux = make_int4(first_active_policy, 0, 0, 0);
    }
 
    TuneKey tuneKey() const {
