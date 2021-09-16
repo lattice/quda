@@ -1053,7 +1053,7 @@ namespace quda {
       commGlobalReductionPush(false);
       (*K)(pPre, rPre);
       commGlobalReductionPop();
-      blas::copy(*z, pPre);
+      blas::copy(z, pPre);
     }
 
     p = z;
@@ -1108,7 +1108,7 @@ namespace quda {
         commGlobalReductionPush(false);
         (*K)(pPre, rPre);
         commGlobalReductionPop();
-        blas::copy(*z, pPre);
+        blas::copy(z, pPre);
       }
       //
 
@@ -1248,12 +1248,12 @@ namespace quda {
     double &delta = local_buffer.z;
     double &mu = local_buffer.w;
 
-    commGlobalReductionSet(false);
+    commGlobalReductionPush(false);
     nu = blas::norm2(r);
     gamma = blas::norm2(s);
     delta = blas::reDotProduct(r, s);
     mu = blas::reDotProduct(p, s);
-    commGlobalReductionSet(true);
+    commGlobalReductionPop();//restore global reduction
 
     if (comm_size() > 1)
       comm_nonblocking_allreduce_array(iallreduce_request_handle, reinterpret_cast<double *>(&local_buffer),
@@ -1311,9 +1311,9 @@ namespace quda {
       lanczos_offdiag = (-sqrt(beta) * alpha_inv);
 
       blas::axpy(+alpha, p, y);
-      commGlobalReductionSet(false);
+      commGlobalReductionPush(false);
       local_buffer = quadrupleEigCGUpdate(alpha, beta, r, s, u, w, p);
-      commGlobalReductionSet(true);
+      commGlobalReductionPop();
 
       if (comm_size() > 1)
         comm_nonblocking_allreduce_array(iallreduce_request_handle, reinterpret_cast<double *>(&local_buffer),
