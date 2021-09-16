@@ -421,9 +421,10 @@ namespace quda {
     if (!initComms) errorQuda("Can only be called after create comms");
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
-
+#ifndef NVSHMEM_COMMS
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
+#endif
 
     for (int b=0; b<2; b++) {
 #ifndef NVSHMEM_COMMS
