@@ -293,7 +293,14 @@ namespace quda
       complex<real> a[N];
       complex<real> b[N];
       complex<real> c[N];
-      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
+      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW)
+      {
+        for (int i = 0; i < N; i++) {
+          a[i] = 0.0;
+          b[i] = 0.0;
+          c[i] = 0.0;
+        }
+      }
 
       // i loops over NYW, j loops over NXZ
       template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
