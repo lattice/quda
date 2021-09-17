@@ -32,25 +32,23 @@ namespace quda
     F out;        /** output vector field */
     const F in;   /** input vector field */
     const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
-    const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     int dir;      /** The direction from which to omit the derivative */
 
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
-               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+               bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, false, comm_override),
+      DslashArg<Float, nDim>(in, U, QUDA_INVALID_PARITY, dagger, false, 1, false, comm_override),
       out(out),
       in(in),
       in_pack(in),
-      x(x),
       U(U),
       dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      checkOrder(out, in, x);        // check all orders match
-      checkPrecision(out, in, x, U); // check all precisions match
-      checkLocation(out, in, x, U);  // check all locations match
+      checkOrder(out, in);        // check all orders match
+      checkPrecision(out, in, U); // check all precisions match
+      checkLocation(out, in, U);  // check all locations match
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
@@ -84,7 +82,7 @@ namespace quda
           const bool ghost = (coord[d] + 2 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
 	  
           if (doHalo<kernel_type>(d) && ghost) {//?
-#if 0	    
+#if 1	    
             const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, parity);//?
@@ -103,7 +101,7 @@ namespace quda
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
 
           if (doHalo<kernel_type>(d) && ghost) {
-#if 0
+#if 1
             // when updating replace arg.nFace with 1 here
             const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
             const Link U = arg.U.Ghost(d, ghost_idx, parity);

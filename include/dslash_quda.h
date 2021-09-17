@@ -705,10 +705,9 @@ namespace quda {
      @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
      @param[in] a Scale factor applied to derivative
      @param[in] b Scale factor applied to aux field
-     @param[in] x Vector field we accumulate onto to     
   */
   void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
-                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);                             
+                    bool dagger, const int *comm_override, TimeProfile &profile);                             
 
   /**
      @brief Apply the (improved) staggered Kahler-Dirac inverse block to a color-spinor field.

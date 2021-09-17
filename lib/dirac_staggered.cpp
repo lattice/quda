@@ -150,7 +150,7 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
 
-    ApplyStaggeredQSmear(out, in, *gauge, laplace3D, in, QUDA_INVALID_PARITY, dagger, comm_dim, profile);
+    ApplyStaggeredQSmear(out, in, *gauge, laplace3D, dagger, comm_dim, profile);
     flops += 1368ll*in.Volume(); // FIXME
   }  
   
