@@ -127,9 +127,6 @@ namespace quda {
 
     __device__ __host__ inline void operator()(dim3 block, dim3 thread)
     {
-#ifdef QUDA_BACKEND_OMPTARGET
-      ompwip("unimplemented");
-#else
       int x_coarse = block.x;
       int x_fine_offset = thread.x;
       int chirality = block.y;
@@ -242,7 +239,6 @@ namespace quda {
           }
         } // j
       }   // n
-#endif
     }
   };
 

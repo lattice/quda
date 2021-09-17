@@ -1,9 +1,7 @@
 #pragma once
 
 #include <float_vector.h>
-#ifndef QUDA_BACKEND_OMPTARGET
 #include <cub_helper.cuh>
-#endif
 #include <target_device.h>
 #include <reducer.h>
 #include <kernel_helper.h>
