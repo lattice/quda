@@ -17,9 +17,7 @@
 
 using namespace quda;
 
-#ifndef QUDA_BACKEND_OMPTARGET
 #include <cub/block/block_reduce.cuh>
-#endif
 
 namespace quda {
 
@@ -30,13 +28,7 @@ namespace quda {
   template <typename T, int width> struct WarpReduce
   {
     static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-#ifdef QUDA_BACKEND_OMPTARGET
-    struct warp_reduce_t {  // FIXME THIS IS COMPLETELY WRONG, ONLY TO MAKE IT COMPILE
-      using TempStorage = int;
-    };
-#else
     using warp_reduce_t = cub::WarpReduce<T, width, __COMPUTE_CAPABILITY__>;
-#endif
 
     __device__ __host__ inline WarpReduce() {}
 
@@ -59,13 +51,7 @@ namespace quda {
   */
   template <typename T, int block_size_x, int batch_size = 1> struct BlockReduce
   {
-#ifdef QUDA_BACKEND_OMPTARGET
-    struct block_reduce_t {  // FIXME THIS IS COMPLETELY WRONG, ONLY TO MAKE IT COMPILE
-      using TempStorage = int;
-    };
-#else
     using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 1, 1, __COMPUTE_CAPABILITY__>;
-#endif
     const int batch;
 
     __device__ __host__ inline BlockReduce(int batch = 0) : batch(batch) {}
@@ -76,7 +62,11 @@ namespace quda {
       __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all_sum)
       {
         QUDA_RT_CONSTS;
+#ifndef QUDA_BACKEND_OMPTARGET
         static __shared__ typename block_reduce_t::TempStorage storage[batch_size];
+#else
+        typename block_reduce_t::TempStorage *storage = reinterpret_cast<typename block_reduce_t::TempStorage *>(shared_cache.addr);
+#endif
         block_reduce_t block_reduce(storage[batch]);
         if (!pipeline) {
           __syncthreads(); // only synchronize if we are not pipelining
