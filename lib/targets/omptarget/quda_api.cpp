@@ -184,6 +184,10 @@ ompwipMemcpy(void *d, void *s, std::size_t c, cudaMemcpyKind k)
 #define PROFILE(f, idx) f;
 #endif
 
+#pragma omp declare target
+SharedCache shared_cache;
+#pragma omp end declare target
+
 LaunchParam launch_param;
 #pragma omp declare target to(launch_param)
 

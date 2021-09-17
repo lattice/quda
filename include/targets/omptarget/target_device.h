@@ -156,6 +156,12 @@ namespace quda {
     constexpr int shared_memory_bank_width() { return 32; }
 
     /**
+       @brief Use a compile time fixed size for the shared local memory,
+       until we can find a way to set it dynamically.
+    */
+    constexpr unsigned int max_shared_memory_size() { return 48*1024; /* Some amount below maximum */ }
+
+    /**
        @brief Helper function that returns true if we are to pass the
        kernel parameter struct to the kernel as an explicit kernel
        argument.  Otherwise the parameter struct is explicitly copied

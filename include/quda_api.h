@@ -4,7 +4,6 @@
 // OMPTARGET SPECIFIC workarounds
 #define __host__
 #define __device__
-#define __shared__
 #define __global__
 #define __constant__ static
 #define __launch_bounds__(...)
@@ -85,6 +84,11 @@ ompwip_(const char * const file, const size_t line, const char * const func, std
 
 using cudaStream_t = int;  // device.h:/cudaStream_t
 using CUresult = int;  // ../lib/coarse_op.cuh:/CUresult
+
+struct SharedCache{
+  int *addr;
+};
+extern SharedCache shared_cache;
 
 struct LaunchParam{
   dim3 block;

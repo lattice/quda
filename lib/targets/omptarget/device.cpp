@@ -2,6 +2,7 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
+#include <target_device.h>
 
 #ifdef QUDA_NVML
 #include <nvml.h>
@@ -346,7 +347,7 @@ namespace quda
 
     size_t max_default_shared_memory() { return deviceProp.sharedMemPerBlock; }
 
-    size_t max_dynamic_shared_memory() { return 65536; }
+    size_t max_dynamic_shared_memory() { return device::max_shared_memory_size(); }
 
     unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
 

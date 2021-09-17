@@ -82,6 +82,9 @@ namespace quda {
     // printf("dparg %p\n", dparg);
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
+    {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
     #pragma omp parallel num_threads(ld)
     {
       // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -90,6 +93,7 @@ namespace quda {
       //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
       //          omp_get_num_teams(), omp_get_num_threads());
       BlockKernel2D_impl<Transformer, Arg>(arg);
+    }
     }
     omp_target_free(dparg, omp_get_default_device());
   }
@@ -103,6 +107,9 @@ namespace quda {
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
     // printf("Kernel2D: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
+    {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
     #pragma omp parallel num_threads(ld)
     {
       // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
@@ -111,6 +118,7 @@ namespace quda {
       //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
       //          omp_get_num_teams(), omp_get_num_threads());
       BlockKernel2D_impl<Transformer, Arg>(device::get_arg<Arg>());
+    }
     }
   }
 

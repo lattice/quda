@@ -896,8 +896,14 @@ namespace quda {
       using real = typename Arg::Float;
       using TileType = typename Arg::vuvTileType;
       const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
+#ifndef QUDA_BACKEND_OMPTARGET
       __shared__ complex<storeType> X[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
       __shared__ complex<storeType> Y[Arg::max_color_height_per_block][Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+#else
+      typedef complex<storeType> TyX0[Arg::max_color_width_per_block][4][Arg::coarseSpin][Arg::coarseSpin];
+      TyX0 *X = reinterpret_cast<TyX0 *>(shared_cache.addr);
+      TyX0 *Y = X+Arg::max_color_height_per_block;
+#endif
 
       int x_ = coarse_x_cb % arg.aggregates_per_block;
       int tx = virtualThreadIdx(arg);

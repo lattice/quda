@@ -69,6 +69,8 @@ namespace quda {
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
       // Reduction2D_impl<Transformer, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
@@ -161,6 +163,8 @@ namespace quda {
     // printf("Reduction2D: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
       // Reduction2D_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
       Arg *dparg = &device::get_arg<Arg>();
       const dim3
@@ -299,6 +303,8 @@ namespace quda {
     omp_target_memcpy(dparg, (void *)(&arg), sizeof(Arg), 0, 0, omp_get_default_device(), omp_get_initial_device());
     #pragma omp target teams num_teams(gd) thread_limit(ld) is_device_ptr(dparg)
     {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
       // MultiReduction_impl<Transformer, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
@@ -393,6 +399,8 @@ namespace quda {
     // printf("MultiReduction: launch parameter: gd %d ld %d\n", gd, ld);
     #pragma omp target teams num_teams(gd) thread_limit(ld)
     {
+      int cache[device::max_shared_memory_size()/sizeof(int)];
+      shared_cache.addr = cache;
       // MultiReduction_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
       Arg *dparg = &device::get_arg<Arg>();
       const dim3
