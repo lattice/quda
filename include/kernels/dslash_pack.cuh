@@ -48,7 +48,6 @@ namespace quda
     int_fastdiv blocks_per_dir;
     int dim_map[4];
 
-    int_fastdiv swizzle;
     int sites_per_block;
 
     char *packBuffer[4 * QUDA_MAX_DIM];
@@ -72,7 +71,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a,
-            double b, double c, unsigned int block, unsigned int grid, unsigned int swizzle,
+            double b, double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
@@ -90,7 +89,6 @@ namespace quda
       work_items(work_items),
       threadDimMapLower{ },
       threadDimMapUpper{ },
-      swizzle(swizzle),
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,

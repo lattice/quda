@@ -359,6 +359,9 @@ namespace quda {
       if (tp.grid.z > device::max_grid_size(2))
         errorQuda("Requested Z-dimension grid size %d greater than max %d",
                   tp.grid.z, device::max_grid_size(2));
+
+      if (tuneAuxDim() && tp.aux.x == -1 && tp.aux.y == -1 && tp.aux.z == -1 && tp.aux.w == -1)
+          errorQuda("aux tuning enabled but param.aux is not initialized");
     }
 
     qudaError_t launchError() const { return launch_error; }
