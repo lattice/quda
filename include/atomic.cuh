@@ -22,26 +22,44 @@ __uint_as_float(unsigned int x)
   return reinterpret_cast<float &>(x);  // FIXME UB?
 }
 
-template<typename T>
-static inline T atomicAdd(T*x,T v)
+static inline int atomicAdd(int *x, int v)
 {
-  T z;
+  int z;
 #pragma omp atomic capture
   {z=*x; *x+=v;}
   return z;
 }
-template<typename T>
-static inline T atomicCAS(T*x,T c,T v)
+static inline unsigned int atomicAdd(unsigned int *x, unsigned int v)
 {
-  T z;
+  unsigned int z;
+#pragma omp atomic capture
+  {z=*x; *x+=v;}
+  return z;
+}
+static inline float atomicAdd(float *x, float v)
+{
+  float z;
+#pragma omp atomic capture
+  {z=*x; *x+=v;}
+  return z;
+}
+static inline double atomicAdd(double *x, double v)
+{
+  double z;
+#pragma omp atomic capture
+  {z=*x; *x+=v;}
+  return z;
+}
+static inline unsigned int atomicCAS(unsigned int*x, unsigned int c, unsigned int v)
+{
+  unsigned int z;
 #pragma omp atomic capture
   {z=*x; *x=z==c?v:z;}
   return z;
 }
-template<typename T>
-static inline T atomicMax(T*x,T v)
+static inline uint32_t atomicMax(uint32_t *x, uint32_t v)
 {
-  T z;
+  uint32_t z;
 #pragma omp atomic capture
   {z=*x; *x=z<v?v:z;}
   return z;
