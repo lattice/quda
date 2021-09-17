@@ -5,7 +5,7 @@
 #include <shmem_helper.cuh>
 
 #define CHECK_CUDA_ERROR(func)                                          \
-  quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+  quda::target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
 {

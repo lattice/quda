@@ -22,7 +22,7 @@ namespace quda {
     Gauge U;
 
     GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<reduce_t>(),
+      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 1, 1)),
       U(U_)
     {
       int R = 0;
@@ -32,7 +32,6 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      this->threads.x = X[0]*X[1]*X[2]*X[3]/2;
     }
 
     __device__ __host__ reduce_t init() const { return reduce_t(); }

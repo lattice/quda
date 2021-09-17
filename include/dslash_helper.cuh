@@ -664,7 +664,8 @@ namespace quda
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
-      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) && target::block_idx().x < (unsigned)arg.pack_blocks) {
+      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
+          target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
         // first few blocks do packing kernel
         typename Arg::template P<dslash.pc_type()> packer;
         packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
@@ -676,8 +677,8 @@ namespace quda
       } else if (arg.shmem > 0
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
-                         && target::block_idx.x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_typen, Parity>(dslash, arg, s);
+                         && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
+        shmem_exterior<kernel_type, nParity>(dslash, arg, s);
 #endif
       } else {
         const int dslash_block_offset

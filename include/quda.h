@@ -29,7 +29,7 @@ extern "C" {
    * interpretation of the gauge field by various Dirac operators
    */
   typedef struct QudaGaugeParam_s {
-
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     QudaFieldLocation location; /**< The location of the gauge field */
 
     int X[4];             /**< The local space-time dimensions (without checkboarding) */
@@ -89,8 +89,6 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
-
-    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
   } QudaGaugeParam;
 
 
@@ -98,6 +96,9 @@ extern "C" {
    * Parameters relating to the solver and the choice of Dirac operator.
    */
   typedef struct QudaInvertParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaFieldLocation input_location; /**< The location of the input field */
     QudaFieldLocation output_location; /**< The location of the output field */
@@ -256,7 +257,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_csw;                     /**< Csw coefficient of the clover term */
-    double clover_coeff;                   /**< Overall kappa * Csw coefficient of the clover term */
+    double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
@@ -404,13 +405,12 @@ extern "C" {
 
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
-
-    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
-    size_t struct_size;
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     // EIGENSOLVER PARAMS
     //-------------------------------------------------
@@ -546,12 +546,12 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
-
-    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
-    size_t struct_size;
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaInvertParam *invert_param;
 
@@ -739,12 +739,10 @@ extern "C" {
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
-
-    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
-    size_t struct_size;
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
@@ -753,10 +751,10 @@ extern "C" {
     double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
-    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
   } QudaGaugeObservableParam;
 
   typedef struct QudaBLASParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
@@ -780,8 +778,6 @@ extern "C" {
 
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
-
-    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
   } QudaBLASParam;
 
   /*

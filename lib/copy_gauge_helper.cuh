@@ -34,6 +34,7 @@ namespace quda {
       in(in)
     {
       set_ghost(is_ghost); // initial state is not ghost
+      strcat(aux, ",");
       strcat(aux, out.AuxString());
       if (fine_grain()) strcat(aux,",fine-grained");
     }

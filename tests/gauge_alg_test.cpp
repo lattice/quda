@@ -375,6 +375,30 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   }
 }
 
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // Option group for gauge fixing related options
+  auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
+  opgroup->add_option("--gf-dir", gf_gauge_dir,
+                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+  opgroup->add_option("--gf-maxiter", gf_maxiter,
+                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+  opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
+                      "Print the gauge fixing progress every N steps (default 100)");
+  opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
+                      "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
+  opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
+                      "Reunitarise the gauge field every N steps (default 10)");
+  opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option(
+    "--gf-fft-autotune", gf_fft_autotune,
+    "In the FFT method, automatically adjust the alpha parameter if the quality begins to diverge (default false)");
+}
+
 int main(int argc, char **argv)
 {
   // initalize google test, includes command line options

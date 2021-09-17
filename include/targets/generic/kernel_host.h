@@ -6,7 +6,7 @@ namespace quda {
   void Kernel1D_host(const Arg &arg)
   {
     Functor<Arg> f(const_cast<Arg &>(arg));
-    for (int i = 0; i < (int)arg.threads.x; i++) {
+    for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
       f(i);
     }
   }
@@ -15,8 +15,8 @@ namespace quda {
   void Kernel2D_host(const Arg &arg)
   {
     Functor<Arg> f(const_cast<Arg &>(arg));
-    for (int i = 0; i < (int)arg.threads.x; i++) {
-      for (int j = 0; j < (int)arg.threads.y; j++) {
+    for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
+      for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
         f(i, j);
       }
     }
@@ -26,9 +26,9 @@ namespace quda {
   void Kernel3D_host(const Arg &arg)
   {
     Functor<Arg> f(const_cast<Arg &>(arg));
-    for (int i = 0; i < (int)arg.threads.x; i++) {
-      for (int j = 0; j < (int)arg.threads.y; j++) {
-        for (int k = 0; k < (int)arg.threads.z; k++) {
+    for (int i = 0; i < static_cast<int>(arg.threads.x); i++) {
+      for (int j = 0; j < static_cast<int>(arg.threads.y); j++) {
+        for (int k = 0; k < static_cast<int>(arg.threads.z); k++) {
           f(i, j, k);
         }
       }
