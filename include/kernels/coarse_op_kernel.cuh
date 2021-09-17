@@ -398,7 +398,7 @@ namespace quda {
       else
         max = computeUV(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
 
-      IF_CONSTEXPR (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
+      if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
     }
   };
 
