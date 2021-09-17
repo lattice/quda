@@ -12,16 +12,7 @@ namespace quda {
   struct MatrixTile {
     using real = typename RealType<T>::type;
     T tile[m*n];
-    constexpr MatrixTile()
-    {
-#pragma unroll
-      for (int i=0; i<m; i++) {
-#pragma unroll
-        for (int j=0; j<n; j++) {
-          tile[i*n+j] = 0.0;
-        }
-      }
-    }
+    constexpr MatrixTile() : tile{0.0} { }
 
     constexpr const T& operator()(int i, int j) const { return tile[i*n+j]; }
 
