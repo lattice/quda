@@ -11,6 +11,12 @@
 #include <target_device.h>
 #include <kernel.h>
 
+#if __cplusplus >= 201703L
+#define IF_CONSTEXPR if constexpr
+#else
+#define IF_CONSTEXPR if
+#endif
+
 namespace quda {
 
   /** This is the storage type used when computing the coarse link
@@ -256,25 +262,27 @@ namespace quda {
 
     if (arg.dir == QUDA_IN_PLACE) {
 
+      IF_CONSTEXPR (Arg::from_coarse) {
 #pragma unroll
-      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
+        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
 #pragma unroll
-        for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
-          auto W = make_tile_B<complex, false>(tile);
-          W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
+          for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
+            auto W = make_tile_B<complex, false>(tile);
+            W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
 #pragma unroll
-          for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-            auto C = make_tile_A<complex, false>(tile);
-            C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
-            UV[s_col * Arg::fineSpin + s].mma_nn(C, W);
-          } // which chiral block
-        }  //Fine Spin
-      }    // Fine color columns
+            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
+              auto C = make_tile_A<complex, false>(tile);
+              C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
+              UV[s_col * Arg::fineSpin + s].mma_nn(C, W);
+            } // which chiral block
+          }  //Fine Spin
+        }    // Fine color columns
+      }
 
     } else if ( isHalo(coord, arg.dim, nFace, arg) ) {
 
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
-      if (!Arg::from_coarse) {
+      IF_CONSTEXPR (!Arg::from_coarse) {
 
 #pragma unroll
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
@@ -312,7 +320,7 @@ namespace quda {
     } else {
 
       int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
-      if (!Arg::from_coarse) {
+      IF_CONSTEXPR (!Arg::from_coarse) {
 
 #pragma unroll
         for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
@@ -350,7 +358,7 @@ namespace quda {
     real uv_max = static_cast<real>(0.0);
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
-      if (Arg::compute_max) {
+      IF_CONSTEXPR (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
@@ -390,7 +398,7 @@ namespace quda {
       else
         max = computeUV(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
 
-      if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
+      IF_CONSTEXPR (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
     }
   };
 
