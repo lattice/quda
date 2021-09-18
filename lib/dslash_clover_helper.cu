@@ -53,7 +53,7 @@ namespace quda {
   {
     errorQuda("Clover dslash has not been built");
   }
-#endif // GPU_TWISTED_MASS_DIRAC
+#endif // GPU_CLOVER_DIRAC
 
   template <typename Float, int nColor> class TwistClover : public TunableKernel2D {
     ColorSpinorField &out;
@@ -111,7 +111,7 @@ namespace quda {
     }
   };
 
-#ifdef GPU_CLOVER_DIRAC
+#ifdef GPU_TWISTED_CLOVER_DIRAC
   //Apply the twisted-clover matrix field to a colorspinor field
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist)
@@ -122,7 +122,7 @@ namespace quda {
   void ApplyTwistClover(ColorSpinorField &, const ColorSpinorField &, const CloverField &,
 			double, double, double, int, int, QudaTwistGamma5Type)
   {
-    errorQuda("Clover dslash has not been built");
+    errorQuda("Twisted-clover dslash has not been built");
   }
 #endif // GPU_TWISTED_MASS_DIRAC
 

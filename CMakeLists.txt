@@ -585,7 +585,7 @@ if(QUDA_NVSHMEM)
   if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
     set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
   else()
-    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.2.1/source/nvshmem_2.2.1.txz" CACHE STRING "location of NVSHMEM tarball")
+    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.2.1/source/nvshmem_src_2.2.1-0.txz" CACHE STRING "location of NVSHMEM tarball")
   endif()
     get_filename_component(NVSHMEM_CUDA_HOME ${CUDAToolkit_INCLUDE_DIRS} DIRECTORY)
     find_path(GDRCOPY_HOME NAME gdrapi.h PATHS "/usr/local/gdrcopy" ${QUDA_GDRCOPY_HOME} PATH_SUFFIXES "include")
@@ -599,7 +599,7 @@ if(QUDA_NVSHMEM)
                         PREFIX nvshmem
                         CONFIGURE_COMMAND ""
                         BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make -j8 CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
+                        BUILD_COMMAND  make -j8 MPICC=${MPI_C_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
                         INSTALL_COMMAND ""
                         LOG_INSTALL ON
                         LOG_BUILD ON

@@ -903,11 +903,10 @@ namespace quda {
   };
 
   /**
-     @brief Compute the inner product over color and spin
-     dot = \sum_s,c conj(a(s,c)) * b(s,c)
-     @param a Left-hand side ColorSpinor
-     @param b Right-hand side ColorSpinor
-     @return The inner product
+     @brief caxpy operation on ColorSpinor objects
+     @param[in] a complex scalar
+     @param[in] x Vector that is scaled
+     @param[in,out] y Accumulation vector
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,

@@ -533,10 +533,10 @@ namespace quda {
          */
         __host__ double abs_min(int =-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double absmax = accessor.scale() * accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
+          double absmin = accessor.scale() * accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
                                                                        minimum<Float>());
           commGlobalReductionPop();
-          return absmax;
+          return absmin;
         }
       };
 
