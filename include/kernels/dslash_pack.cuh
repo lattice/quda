@@ -354,8 +354,8 @@ namespace quda
           // is we are in the uber kernel signal here
           if (!arg.packkernel) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_inter[shmemidx].store(0); // this could probably be relaxed
         }
@@ -365,7 +365,8 @@ namespace quda
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-          nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, getNeighborRank(2 * dim + dir, arg));
+          nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                             getNeighborRank(2 * dim + dir, arg));
       }
     }
 
@@ -382,8 +383,8 @@ namespace quda
         if (amLast) {
           if (arg.shmem & 8) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_intra[shmemidx].store(0); // this could probably be relaxed
         }
