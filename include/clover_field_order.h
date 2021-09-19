@@ -237,12 +237,20 @@ namespace quda {
       }
     };
 
+    template<int N> constexpr int indexFloatN(int k, int stride, int x)
+    {
+      int j = k / N;
+      int i = k % N;
+      return (j * stride + x) * N + i;
+    };
+
     template<typename Float, int nColor, int nSpin>
       struct Accessor<Float,nColor,nSpin,QUDA_FLOAT2_CLOVER_ORDER> {
       Float *a;
       int stride;
       size_t offset_cb;
       static constexpr int N = nSpin * nColor / 2;
+      reconstruct_t<Float, N * N, clover::reconstruct()> recon;
     Accessor(const CloverField &A, bool inverse=false)
       : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
 	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
@@ -258,7 +266,7 @@ namespace quda {
 	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
 
 	if (row == col) {
-	  return 2*a_[ row*stride+x ];
+	  return 2*a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_idx(row), stride, x) ];
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
@@ -274,23 +282,14 @@ namespace quda {
 	}
 
       }
-
       template <typename helper, typename reducer>
       __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
-        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
-        return result; // factor of two is normalization
+        return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
       }
 
       constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
-    };
-
-    template<int N>
-      __device__ __host__ inline int indexFloatN(int k, int stride, int x) {
-      int j = k / N;
-      int i = k % N;
-      return (j*stride+x)*N + i;
     };
 
     template<typename Float, int nColor, int nSpin>
@@ -298,7 +297,8 @@ namespace quda {
       Float *a;
       int stride;
       size_t offset_cb;
-      static constexpr int N = nSpin * nColor / 2;
+      static constexpr int N = nColor * nSpin / 2;
+      reconstruct_t<Float, N * N, clover::reconstruct()> recon;
     Accessor(const CloverField &A, bool inverse=false)
       : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
 	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
@@ -314,15 +314,15 @@ namespace quda {
 	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
 
 	if (row == col) {
-	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(row, stride, x) ];
+	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(row), stride, x) ];
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = N + 2*k;
 
           return static_cast<Float>(2) * complex<Float>
-            (a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x) ],
-             a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x) ]);
+            (a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 0), stride, x) ],
+             a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 1), stride, x) ]);
 	} else {
 	  // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
@@ -330,8 +330,8 @@ namespace quda {
           int idx = N + 2*k;
 
           return static_cast<Float>(2) * complex<Float>
-            ( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x) ],
-              -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x) ]);
+            ( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 0), stride, x) ],
+              -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 1), stride, x) ]);
 	}
 
       }
