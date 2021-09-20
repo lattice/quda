@@ -74,7 +74,7 @@ namespace quda {
 
     template <typename real, int block, bool enable_reconstruct> struct reconstruct_t {
 
-      // map from storage order to in-kernel internal order for a chiral block with Nc = 3
+      // map from in-kernel internal order to storaage order for a chiral block with Nc = 3
       constexpr auto pack_idx(int i) const
       {
         constexpr int order[] = {0, 1, 2, 3, 28, 29, // diagonal elements
@@ -84,6 +84,7 @@ namespace quda {
         return order[i];
       }
 
+      // inverse of pack_idx
       constexpr auto unpack_idx(int i) const
       {
         constexpr int order[] = {0, 1, 2, 3,
@@ -92,6 +93,46 @@ namespace quda {
                                  4, 5,
                                  30, 31, 32, 33, 34, 35};
         return order[i];
+      }
+
+      constexpr auto compress_idx(int i) const
+      {
+        constexpr int order[] = {0, 1, 2, // uncompressed diagonals
+                                 0, 1, 2, // compressed diagonals
+                                 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, // uncompressed off diagonals
+                                 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, // uncompressed off diagonals
+                                 6, 7, 8, 9, 16, 17}; // compressed off diagonals
+        return order[i];
+      }
+
+      constexpr auto pack_compress_idx(int i) const
+      {
+        constexpr int order[] = {0, 1, 2, // uncompressed diagonals
+                                 0, 1, 2, // compressed diagonals
+                                 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // uncompressed off diagonals
+                                 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, // uncompressed off diagonals
+                                 4, 5, 6, 7, 14, 15}; // compressed off diagonals
+        return order[i];
+      }
+
+      template <typename T>
+      __device__ __host__ inline T decompress(const T &in, int k) const
+      {
+        switch (k) {
+        case 3:
+        case 4:
+        case 5:
+          return static_cast<T>(1.0) - in;
+        case 30:
+        case 31:
+        case 32:
+        case 33:
+        case 34:
+        case 35:
+          return -in;
+        default:
+          return in;
+        }
       }
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
@@ -120,6 +161,12 @@ namespace quda {
     };
 
     template <typename real, int block> struct reconstruct_t<real, block, false> {
+
+      constexpr auto pack_idx(int i) const { return i; }
+      constexpr auto compress_idx(int i) const { return i; }
+      constexpr auto pack_compress_idx(int i) const { return i; }
+
+      template <typename T> __device__ __host__ inline T decompress(const T &in, int k) const { return in; }
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
@@ -260,25 +307,31 @@ namespace quda {
       {
 	int row = s_row * nColor + c_row;
 	int col = s_col * nColor + c_col;
-	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
+	Float *a_ = a + parity * offset_cb + stride * chirality * N * N;
 
 	if (row == col) {
-	  return 2*a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_idx(row), stride, x) ];
+	  auto a = a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(row), stride, x) ];
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a, row));
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
-          complex<Float> *off = reinterpret_cast<complex<Float>*>(a_ + N);
+          int idx = N + 2*k;
 
-          return 2*off[k*stride + x];
+          auto a = complex<Float>(a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(idx + 0), stride, x) ],
+                                  a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(idx + 1), stride, x) ]);
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a.real(), idx), recon.decompress(a.imag(), idx + 1));
 	} else {
 	  // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
-          complex<Float> *off = reinterpret_cast<complex<Float>*>(a_ + N);
-          return 2*conj(off[k*stride + x]);
-	}
+          int idx = N + 2*k;
 
+          auto a = complex<Float>( a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(idx + 0), stride, x) ],
+                                   a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(idx + 1), stride, x) ]);
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a.real(), idx), -recon.decompress(a.imag(), idx + 1));
+        }
       }
+
       template <typename helper, typename reducer>
       __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
@@ -308,26 +361,26 @@ namespace quda {
 	Float *a_ = a + parity * offset_cb + stride * chirality * N * N;
 
 	if (row == col) {
-	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(row), stride, x) ];
+	  auto a = a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(row), stride, x) ];
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a, row));
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = N + 2*k;
 
-          return static_cast<Float>(2) * complex<Float>
-            (a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 0), stride, x) ],
-             a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 1), stride, x) ]);
+          auto a = complex<Float>(a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(idx + 0), stride, x) ],
+                                  a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(idx + 1), stride, x) ]);
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a.real(), idx), recon.decompress(a.imag(), idx + 1));
 	} else {
 	  // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = N + 2*k;
 
-          return static_cast<Float>(2) * complex<Float>
-            ( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 0), stride, x) ],
-              -a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(idx + 1), stride, x) ]);
-	}
-
+          auto a = complex<Float>( a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(idx + 0), stride, x) ],
+                                   a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(idx + 1), stride, x) ]);
+          return static_cast<Float>(2.0) * complex<Float>(recon.decompress(a.real(), idx), -recon.decompress(a.imag(), idx + 1));
+        }
       }
 
       template <typename helper, typename reducer>
