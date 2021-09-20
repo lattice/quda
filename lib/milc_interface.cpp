@@ -1129,12 +1129,12 @@ void qudaShift(int external_precision, int quda_precision, const void *const lin
 
   QudaGaugeParam gparam = newQudaGaugeParam();
   QudaGaugeParam dparam = newQudaGaugeParam();
-  setGaugeParams(gparam, dparam, links, nullptr, localDim, host_precision, device_precision,
+  setGaugeParams(gparam, dparam, links, localDim, host_precision, device_precision,
                  device_precision_sloppy, 1.0, 0.0);
   gparam.type = QUDA_WILSON_LINKS;
   gparam.make_resident_gauge = true;
   QudaInvertParam invertParam = newQudaInvertParam();
-  setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
+  setInvertParams(host_precision, device_precision, device_precision_sloppy, 0.0, 0, 0, 0, 0.0, QUDA_EVEN_PARITY,
                   verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.solution_type = QUDA_MAT_SOLUTION;
 
