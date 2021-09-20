@@ -6,6 +6,16 @@
 namespace quda
 {
 
+  /**
+     Trait that returns the correct comm reduce class for a given reducer
+   */
+  template <typename T, typename reducer> struct get_comm_reducer_t { };
+  template <> struct get_comm_reducer_t<double, plus<double>> { using type = comm_reduce_sum<double>; };
+  template <> struct get_comm_reducer_t<double, maximum<double>> { using type = comm_reduce_max<double>; };
+  template <> struct get_comm_reducer_t<double, maximum<float>> { using type = comm_reduce_max<double>; };
+  template <> struct get_comm_reducer_t<double, minimum<double>> { using type = comm_reduce_min<double>; };
+  template <> struct get_comm_reducer_t<double, minimum<float>> { using type = comm_reduce_min<double>; };
+
   template <typename reduce_t, typename T, typename count_t, typename transformer, typename reducer>
   class TransformReduce : TunableMultiReduction<1>
   {
@@ -38,8 +48,10 @@ namespace quda
       init(init),
       r(r)
     {
-      strcpy(aux, "batch_size=");
-      u32toa(aux + 11, v.size());
+      char aux2[TuneKey::aux_n];
+      strcpy(aux2, "batch_size=");
+      u32toa(aux2 + 11, v.size());
+      strcat(aux, aux2);
       apply(device::get_default_stream());
     }
 
@@ -47,7 +59,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Arg arg(v, n_items, h, init, r);
-      launch<transform_reducer, true>(result, tp, stream, arg);
+      launch<transform_reducer, reduce_t, typename get_comm_reducer_t<reduce_t, reducer>::type, true>(result, tp, stream, arg);
     }
 
     long long bytes() const { return v.size() * n_items * sizeof(T); }
@@ -177,7 +189,5 @@ namespace quda
     QudaFieldLocation, complex<short> const *, unsigned int, square_<double, short>, double, plus<double>);
   template double transform_reduce<double, complex<short>, unsigned int, abs_max_<double, short>, maximum<double>>(
     QudaFieldLocation, complex<short> const*, unsigned int, abs_max_<double, short>, double, maximum<double>);
-
-  template float reduce<float, float, int, maximum<float>>(QudaFieldLocation, float const *, int, float, maximum<float>);
 
 } // namespace quda

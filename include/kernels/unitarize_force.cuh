@@ -8,9 +8,6 @@
 
 namespace quda {
 
-#define HISQ_UNITARIZE_PI 3.14159265358979323846
-#define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
-
   static double unitarize_eps;
   static double force_filter;
   static double max_det_error;
@@ -160,7 +157,7 @@ namespace quda {
     __device__  __host__  void reciprocalRoot(Matrix<complex<Float>,3>* res, DerivativeCoefficients<Float>* deriv_coeffs,
                                               Float f[3], Matrix<complex<Float>,3> & q, const Arg &arg)
     {
-      Matrix<complex<Float>,3> qsq, tempq;
+      Matrix<complex<Float>, 3> qsq, tempq;
 
       Float c[3];
       Float g[3];
@@ -170,25 +167,29 @@ namespace quda {
 	tempq = qsq*q;
 
 	c[0] = getTrace(q).x;
-	c[1] = getTrace(qsq).x/2.0;
-	c[2] = getTrace(tempq).x/3.0;
+	c[1] = getTrace(qsq).x / static_cast<Float>(2.0);
+	c[2] = getTrace(tempq).x / static_cast<Float>(3.0);
 
-	g[0] = g[1] = g[2] = c[0]/3.;
+	g[0] = g[1] = g[2] = c[0] / static_cast<Float>(3.0);
 	Float r,s,theta;
-	s = c[1]/3. - c[0]*c[0]/18;
-	r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
+	s = c[1]/3. - c[0] * c[0] / static_cast<Float>(18.0);
+	r = c[2]/2. - (c[0] / static_cast<Float>(3.0)) * (c[1] - c[0] * c[0] / static_cast<Float>(9.0));
 
-	Float cosTheta = r*quda::rsqrt(s*s*s);
+	Float cosTheta = r * quda::rsqrt(s * s * s);
 	if (fabs(s) < arg.unitarize_eps) {
-	  cosTheta = 1.;
-	  s = 0.0;
+	  cosTheta = static_cast<Float>(1.0);
+	  s = static_cast<Float>(0.0);
 	}
-	if(fabs(cosTheta)>1.0){ r>0 ? theta=0.0 : theta=HISQ_UNITARIZE_PI/3.0; }
-	else{ theta = acos(cosTheta)/3.0; }
+	if (fabs(cosTheta) > static_cast<Float>(1.0)) {
+          if (r > static_cast<Float>(0.0)) theta = static_cast<Float>(0.0);
+          else theta = static_cast<Float>(M_PI)/static_cast<Float>(3.0);
+        } else {
+          theta = acos(cosTheta) / static_cast<Float>(3.0);
+        }
 
-	s = 2.0*sqrt(s);
+	s = 2.0 * sqrt(s);
 	for (int i=0; i<3; ++i) {
-	  g[i] += s*cos(theta + (i-1)*HISQ_UNITARIZE_PI23);
+	  g[i] += s * cos(theta + (i-1) * static_cast<Float>(M_PI * 2.0 / 3.0));
 	}
 
       } // !REUNIT_SVD_ONLY?

@@ -28,10 +28,10 @@ namespace quda {
   };
 
   /**
-     @brief CUDA kernel to initialize CURAND RNG states
-     @param state CURAND RNG state array
+     @brief functor to initialize the RNG states
+     @param state RNG state array
      @param seed initial seed for RNG
-     @param size size of the CURAND RNG state array
+     @param size size of the RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
   template <typename Arg>
