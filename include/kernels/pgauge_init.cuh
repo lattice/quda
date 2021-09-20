@@ -237,7 +237,7 @@ namespace quda {
     return U;
 
     /*setIdentity(&U);
-       for( int block = 0; block < nColors * ( nColors - 1) / 2; block++ ) {
+      for( int block = 0; block < nColors * ( nColors - 1) / 2; block++ ) {
        Matrix<Float,2> rr = randomSU2<Float>(localState);
        int2 id = IndexBlock<nColors>( block );
        mul_block_sun<Float, nColors>(rr, U, id);

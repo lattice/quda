@@ -34,6 +34,7 @@ namespace quda
     int blockMin() const { return 8; }
     int blockStep() const { return 8; }
     unsigned int maxBlockSize(const TuneParam &) const { return 8u; }
+    bool tuneAuxDim() const { return use_mma; } // tune aux if doing mma
 
   public:
     CalculateYhat(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv) :
@@ -95,7 +96,7 @@ namespace quda
 
     bool advanceSharedBytes(TuneParam &) const { return false; }
 
-    bool advanceTuneParam(TuneParam &param) const
+    bool advanceAux(TuneParam &param) const
     {
       if (use_mma) {
         constexpr bool query_max = true;
@@ -106,11 +107,32 @@ namespace quda
         }
         return false;
       } else {
+        return false;
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      if (!use_mma) {
         if (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
           return TunableKernel3D::advanceTuneParam(param);
         else
           return false;
+      } else {
+        return false;
       }
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableKernel3D::initTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
+    }
+
+    void defaultTuneParam(TuneParam &param) const
+    {
+      TunableKernel3D::defaultTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
     }
   };
 

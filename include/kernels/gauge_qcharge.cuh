@@ -20,12 +20,9 @@ namespace quda
     Float *qDensity;
 
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
-      ReduceArg<reduce_t>(),
+      ReduceArg<reduce_t>(dim3(Fmunu.VolumeCB(), 2, 1)),
       f(Fmunu),
-      qDensity(qDensity)
-    {
-      threads = dim3(Fmunu.VolumeCB(), 2, 1);
-    }
+      qDensity(qDensity) { }
 
     __device__ __host__ auto init() const { return reduce_t(); }
   };

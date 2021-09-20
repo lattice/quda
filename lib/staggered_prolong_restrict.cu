@@ -36,20 +36,18 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-          launch_host<StaggeredProlongRestrict_>(tp, stream, Arg<QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(out, in, fine_to_coarse, parity));
+          launch_host<StaggeredProlongRestrict>(tp, stream, Arg<QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(out, in, fine_to_coarse, parity));
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }
       } else {
         if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-          launch<StaggeredProlongRestrict_>(tp, stream, Arg<QUDA_FLOAT2_FIELD_ORDER>(out, in, fine_to_coarse, parity));
+          launch<StaggeredProlongRestrict>(tp, stream, Arg<QUDA_FLOAT2_FIELD_ORDER>(out, in, fine_to_coarse, parity));
         } else {
           errorQuda("Unsupported field order %d", out.FieldOrder());
         }
       }
     }
-
-    long long flops() const { return 0; }
 
     long long bytes() const {
       return in.Bytes() + out.Bytes() + fineColorSpinorField<transferType>(in,out).SiteSubset()*fineColorSpinorField<transferType>(in,out).VolumeCB()*sizeof(int);
@@ -58,7 +56,7 @@ namespace quda {
   };
 
   template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, StaggeredTransferType transferType>
-  void StaggeredProlongRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse, int parity)
+  void StaggeredProlongateRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse, int parity)
   {
     // check precision
     QudaPrecision precision = checkPrecision(out, in);
@@ -77,7 +75,7 @@ namespace quda {
   }
 
   template <StaggeredTransferType transferType>
-  void StaggeredProlongRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse, const int * const * spin_map, int parity)
+  void StaggeredProlongateRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
     checkOrder(out, in);
     checkLocation(out, in);
@@ -104,20 +102,20 @@ namespace quda {
       errorQuda("Unsupported coarse nColor %d", coarseColorSpinorField<transferType>(in,out).Ncolor());
     const int coarseColor = 8*fineColor;
 
-    StaggeredProlongRestrict<fineSpin,fineColor,coarseSpin,coarseColor,transferType>(out, in, fine_to_coarse, parity);
+    StaggeredProlongateRestrict<fineSpin,fineColor,coarseSpin,coarseColor,transferType>(out, in, fine_to_coarse, parity);
   }
 
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in,
                            const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-    StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(out, in, fine_to_coarse, spin_map, parity);
+    StaggeredProlongateRestrict<StaggeredTransferType::STAGGERED_TRANSFER_PROLONG>(out, in, fine_to_coarse, spin_map, parity);
   }
 
   void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in,
                          const int *fine_to_coarse, const int * const * spin_map, int parity)
   {
-    StaggeredProlongRestrict<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(out, in, fine_to_coarse, spin_map, parity);
+    StaggeredProlongateRestrict<StaggeredTransferType::STAGGERED_TRANSFER_RESTRICT>(out, in, fine_to_coarse, spin_map, parity);
   }
 #else
   void StaggeredProlongate(ColorSpinorField &, const ColorSpinorField &, const int *, const int * const *, int) { errorQuda("Staggered multigrid has not been build");  }

@@ -6,7 +6,7 @@ namespace quda {
 
   template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_,
             typename coarseGauge, typename fineGauge, bool kd_build_x_ = false>
-  struct CalculateStaggeredYArg : kernel_param<1> {
+  struct CalculateStaggeredYArg : kernel_param<> {
 
     using real = typename mapper<Float_>::type;
     static constexpr int coarseSpin = coarseSpin_;

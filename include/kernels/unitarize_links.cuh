@@ -8,13 +8,6 @@
 #include <svd_quda.h>
 #include <kernel.h>
 
-#ifndef FL_UNITARIZE_PI
-#define FL_UNITARIZE_PI 3.14159265358979323846
-#endif
-#ifndef FL_UNITARIZE_PI23
-#define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*0.66666666666666666666
-#endif
-
 namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
@@ -60,7 +53,7 @@ namespace quda {
   __device__ __host__ bool isUnitarizedLinkConsistent(const mat &initial_matrix,
                                                       const mat &unitary_matrix, double max_error)
   {
-    auto n = initial_matrix.size();
+    auto n = initial_matrix.rows();
     mat temporary = conj(initial_matrix)*unitary_matrix;
     temporary = temporary*temporary - conj(initial_matrix)*initial_matrix;
 
@@ -97,35 +90,29 @@ namespace quda {
   template <typename real, typename mat, typename Arg>
   __device__  __host__ bool reciprocalRoot(mat &res, const mat& q, const Arg &arg)
   {
-    auto Nc = res.size();
-    mat qsq, tempq;
     real c[3];
     real g[3];
-    
-    const real one_third = 0.333333333333333333333;
-    const real one_ninth = 0.111111111111111111111;
-    const real one_eighteenth = 0.055555555555555555555;
-    
-    qsq = q*q;
-    tempq = qsq*q;
-    
-    c[0] = getTrace(q).x;
-    c[1] = getTrace(qsq).x * 0.5;
-    c[2] = getTrace(tempq).x * one_third;;
-    
-    g[0] = g[1] = g[2] = c[0] * one_third;
-    real r,s,theta;
-    s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
-    
+
+    mat qsq = q*q;
+    mat tempq = qsq*q;
+
+    c[0] = getTrace(q).real();
+    c[1] = getTrace(qsq).real() * static_cast<real>(0.5);
+    c[2] = getTrace(tempq).real() * static_cast<real>(1.0 / 3.0);
+
+    g[0] = g[1] = g[2] = c[0] * static_cast<real>(1.0 / 3.0);
+    real r,theta;
+    real s = c[1] * static_cast<real>(1.0 / 3.0) - c[0] * c[0] * static_cast<real>(1.0 / 18.0);
+
     real cosTheta;
     if (fabs(s) >= arg.unitarize_eps) { // faster when this conditional is removed?
       const real rsqrt_s = quda::rsqrt(s);
-      r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
+      r = c[2]*0.5 - (c[0] * static_cast<real>(1.0 / 3.0)) * (c[1] - c[0] * c[0] * static_cast<real>(1.0 / 9.0));
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
-      
-      if(fabs(cosTheta) >= 1.0){
-	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
-      }else{
+
+      if (fabs(cosTheta) >= static_cast<real>(1.0)) {
+	theta = (r > 0) ? 0.0 : M_PI;
+      } else {
 	theta = acos(cosTheta); // this is the primary performance limiter
       }
       
@@ -133,22 +120,22 @@ namespace quda {
       
 #if 0 // experimental version
       real as, ac;
-      quda::sincos( theta*one_third, &as, &ac );
-      g[0] = c[0]*one_third + 2*sqrt_s*ac;
-      //g[1] = c[0]*one_third + 2*sqrt_s*(ac*cos(1*FL_UNITARIZE_PI23) - as*sin(1*FL_UNITARIZE_PI23));
-      g[1] = c[0]*one_third - 2*sqrt_s*(0.5*ac + as*0.8660254037844386467637);
-      //g[2] = c[0]*one_third + 2*sqrt_s*(ac*cos(2*FL_UNITARIZE_PI23) - as*sin(2*FL_UNITARIZE_PI23));
-      g[2] = c[0]*one_third + 2*sqrt_s*(-0.5*ac + as*0.8660254037844386467637);
+      quda::sincos( theta*static_cast<real>(1.0 / 3.0), &as, &ac );
+      g[0] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*ac;
+      //g[1] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*(ac*cos(2 * M_PI / 3.0) - as*sin(2 * M_PI / 3));
+      g[1] = c[0]*static_cast<real>(1.0 / 3.0) - 2*sqrt_s*(0.5*ac + as*0.8660254037844386467637);
+      //g[2] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*(ac*cos(4 * M_PI / 3.0) - as*sin(4 * M_PI / 3));
+      g[2] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*(-0.5*ac + as*0.8660254037844386467637);
 #else
-      g[0] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third );
-      g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + FL_UNITARIZE_PI23 );
-      g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
+      g[0] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*cos( theta*static_cast<real>(1.0 / 3.0) );
+      g[1] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*cos( theta*static_cast<real>(1.0 / 3.0) + static_cast<real>(2.0 * M_PI / 3.0));
+      g[2] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*cos( theta*static_cast<real>(1.0 / 3.0) + static_cast<real>(4.0 * M_PI / 3.0));
 #endif
     }
     
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
-    real det = getDeterminant(q).x;
+    real det = getDeterminant(q).real();
     if (fabs(det) < arg.svd_abs_error) return false;
     if (!checkRelativeError<double>(g[0]*g[1]*g[2], det, arg.svd_rel_error)) return false;
       

@@ -63,10 +63,6 @@
 #cmakedefine QUDA_TARGET_CUDA
 #cmakedefine QUDA_TARGET_HIP
 
-#if defined(QUDA_TARGET_CUDA) && defined(QUDA_TARGET_HIP)
-#error "Cannot define both QUDA_TARGET_CUDA and QUDA_TARGET_HIP at the same time"
-#endif
-
 #if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
 #error "No QUDA_TARGET selected"
 #endif

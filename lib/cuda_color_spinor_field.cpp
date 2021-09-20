@@ -504,7 +504,7 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger,
-                                       qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                       const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
                                        MemoryLocation location_label, bool spin_project,
                                        double a, double b, double c, int shmem)
   {
@@ -545,14 +545,14 @@ namespace quda {
   }
  
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream)
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream)
   {
     void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
     qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
   }
 
   void cudaColorSpinorField::unpackGhost(const void *ghost_spinor, const int dim,
-                                         const QudaDirection dir, qudaStream_t stream)
+                                         const QudaDirection dir, const qudaStream_t &stream)
   {
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
