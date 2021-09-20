@@ -183,7 +183,7 @@ namespace quda {
        diagonal entries.  The following 30 entries correspond to the
        15 complex numbers on the strictly lower triangular.
 
-       E.g., N = 6 (2 spins x 3 colors) and 
+       E.g., N = 6 (2 spins x 3 colors) and
        # entries = 1/2 * N * (N-1)
 
        The storage order on the strictly lower triangular is column
@@ -251,18 +251,15 @@ namespace quda {
       size_t offset_cb;
       static constexpr int N = nSpin * nColor / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
-    Accessor(const CloverField &A, bool inverse=false)
-      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
+      Accessor(const CloverField &A, bool inverse=false) :
+        a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
+        stride(A.Stride()),
 	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
 
-      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
-	// if not in the diagonal chiral block then return 0.0
-	if (s_col / 2 != s_row / 2) { return complex<Float>(0.0); }
-
-	const int chirality = s_col / 2;
-
-	int row = s_row%2 * nColor + c_row;
-	int col = s_col%2 * nColor + c_col;
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
+      {
+	int row = s_row * nColor + c_row;
+	int col = s_col * nColor + c_col;
 	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
 
 	if (row == col) {
@@ -299,19 +296,16 @@ namespace quda {
       size_t offset_cb;
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
-    Accessor(const CloverField &A, bool inverse=false)
-      : a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))), stride(A.Stride()),
+      Accessor(const CloverField &A, bool inverse=false) :
+        a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
+        stride(A.Stride()),
 	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
 
-      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
-	// if not in the diagonal chiral block then return 0.0
-	if (s_col / 2 != s_row / 2) { return complex<Float>(0.0); }
-
-	const int chirality = s_col / 2;
-
-	int row = s_row%2 * nColor + c_row;
-	int col = s_col%2 * nColor + c_col;
-	Float *a_ = a+parity*offset_cb+stride*chirality*N*N;
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
+      {
+	int row = s_row * nColor + c_row;
+	int col = s_col * nColor + c_col;
+	Float *a_ = a + parity * offset_cb + stride * chirality * N * N;
 
 	if (row == col) {
 	  return 2*a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_idx(row), stride, x) ];
@@ -346,8 +340,8 @@ namespace quda {
       constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
     };
 
-    template<typename Float, int nColor, int nSpin> 
-      struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> { 
+    template<typename Float, int nColor, int nSpin>
+      struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> {
       Float *a;
       size_t offset_cb;
       const int N = nSpin * nColor / 2;
@@ -357,14 +351,10 @@ namespace quda {
         offset_cb(A.Bytes()/(2*sizeof(Float))),
         zero(complex<Float>(0.0,0.0)) { }
 
-      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
-	// if not in the diagonal chiral block then return 0.0
-	if (s_col / 2 != s_row / 2) { return zero; }
-
-	const int chirality = s_col / 2;
-
-	unsigned int row = s_row%2 * nColor + c_row;
-	unsigned int col = s_col%2 * nColor + c_col;
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
+      {
+	unsigned int row = s_row * nColor + c_row;
+	unsigned int col = s_col * nColor + c_col;
 
 	if (row == col) {
 	  complex<Float> tmp = a[parity * offset_cb + (x*2 + chirality)*N*N + row];
@@ -415,76 +405,47 @@ namespace quda {
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-      FieldOrder(CloverField &A, bool inverse=false)
-      : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse), location(A.Location())
-	{ }
-	
+      FieldOrder(CloverField &A, bool inverse=false) :
+        A(A),
+        volumeCB(A.VolumeCB()),
+        accessor(A,inverse),
+        inverse(inverse),
+        location(A.Location()) { }
+
 	CloverField& Field() { return A; }
-	
-    	/**
-	 * @brief Read-only complex-member accessor function
-	 *
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ inline const complex<Float> operator()(int parity, int x, int s_row,
-								   int s_col, int c_row, int c_col) const {
-	  return accessor(parity, x, s_row, s_col, c_row, c_col);
-	}
-	
+
     	/**
 	 * @brief Read-only complex-member accessor function.  This is a
 	 * special variant that is compatible with the equivalent
 	 * gauge::FieldOrder accessor so these can be used
 	 * interchangebly in templated code
 	 *
-	 * @param dummy Dummy parameter that is ignored
 	 * @param parity Parity index
-	 * @param x 1-d site index
+	 * @param x_cb checkerboard site index
+         * @param chirality Chirality index
 	 * @param s_row row spin index
 	 * @param c_row row color index
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline complex<Float> operator()(int, int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) const {
-	  return accessor(parity,x,s_row,s_col,c_row,c_col);
+	__device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row,
+							     int s_col, int c_row, int c_col) const
+        {
+	  return accessor(parity, x, chirality, s_row, s_col, c_row, c_col);
 	}
 
-	/**
-	 * @brief Complex-member accessor function
-	 *
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	/*
-	__device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) {
-	  //errorQuda("Clover accessor not implemented as a lvalue");
-	  return accessor(parity, x, s_row, s_col, c_row, c_col);
-	  }
-	*/
-	
 	/** Returns the number of field colors */
-	__device__ __host__ inline int Ncolor() const { return nColor; }
+	constexpr int Ncolor() const { return nColor; }
 
 	/** Returns the field volume */
-	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+	constexpr int Volume() const { return 2*volumeCB; }
 
 	/** Returns the field volume */
-	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+	constexpr int VolumeCB() const { return volumeCB; }
 
 	/** Return the size of the allocation (parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const {
-	  constexpr int n = (nSpin * nColor) / 2;
+	  constexpr int n = nColor * nSpin / 2;
 	  constexpr int chiral_block = n * n / 2;
 	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
 	}
@@ -643,7 +604,7 @@ namespace quda {
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }
-  
+
 	/**
 	   @brief Store accessor for a single chiral block
 	   @param[out] v Vector of elements to be stored
@@ -775,7 +736,7 @@ namespace quda {
           block_load<Float, length>(v_, &clover[parity*offset + x*length]);
           for (int i=0; i<length; i++) v[i] = 0.5*v_[i];
 	}
-  
+
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
           Float v_[length];
           for (int i=0; i<length; i++) v_[i] = 2.0*v[i];
@@ -807,7 +768,7 @@ namespace quda {
         offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
         diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
-	
+
       bool  Twisted()	const	{return twisted;}
       Float Mu2()	const	{return mu2;}
 
@@ -829,7 +790,7 @@ namespace quda {
 
 	  }
 	}
-  
+
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
 	  // the factor of 2.0 comes from undoing the basis change
 	  for (int chirality=0; chirality<2; chirality++) {
@@ -847,10 +808,10 @@ namespace quda {
 	    }
 	  }
 	}
-	
+
 	size_t Bytes() const { return length*sizeof(Float); }
       };
-      
+
 
     /**
        BQCD ordering for clover fields
@@ -893,7 +854,7 @@ namespace quda {
 			 10, 11, 18, 19, 26, 27,                  // column 3  24
 			 2,  3,  4,  5,                           // column 4  30
 			 12, 13};
-	  
+
 	  // flip the sign of the imaginary components
 	  int sign[36];
 	  for (int i=0; i<6; i++) sign[i] = 1;
@@ -901,14 +862,14 @@ namespace quda {
 	    if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
 	  }
-	
+
 	  const int M=length/2;
-	  for (int chirality=0; chirality<2; chirality++) 
-	    for (int i=0; i<M; i++) 
+	  for (int chirality=0; chirality<2; chirality++)
+	    for (int i=0; i<M; i++)
 	      v[chirality*M+i] = sign[i] * clover[parity][x*length+chirality*M+bq[i]];
-	
+
 	}
-  
+
 	// FIXME implement the save routine for BQCD ordered fields
 	__device__ __host__ inline void save(RegType [length], int, int) const { }
 
