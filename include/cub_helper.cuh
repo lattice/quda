@@ -28,7 +28,7 @@ namespace quda {
   template <typename T, int width> struct WarpReduce
   {
     static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-    using warp_reduce_t = cub::WarpReduce<T, width>;
+    using warp_reduce_t = cub::WarpReduce<T, width, __COMPUTE_CAPABILITY__>;
 
     __device__ __host__ inline WarpReduce() {}
 
@@ -51,7 +51,7 @@ namespace quda {
   */
   template <typename T, int block_size_x, int batch_size = 1> struct BlockReduce
   {
-    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS>;
+    using block_reduce_t = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 1, 1, __COMPUTE_CAPABILITY__>;
     const int batch;
 
     __device__ __host__ inline BlockReduce(int batch = 0) : batch(batch) {}

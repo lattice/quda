@@ -14,7 +14,8 @@ namespace quda {
     DSLASH_FULL
   };
 
-  constexpr int colors_per_thread() { return 1; }
+  // we use two colors per thread unless we have large dim_stride, when we're aiming for maximum parallelism
+  constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && dim_stride <= 2) ? 2 : 1; }
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
@@ -51,7 +52,7 @@ namespace quda {
 
     inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
                            const GaugeField &Y, const GaugeField &X, real kappa, int parity) :
-      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread()))),
+      kernel_param(dim3(color_stride * X.VolumeCB(), out.SiteSubset(), 2 * dim_stride * 2 * (nColor / colors_per_thread(nColor, dim_stride)))),
       out(const_cast<ColorSpinorField &>(out)),
       inA(const_cast<ColorSpinorField &>(inA)),
       inB(const_cast<ColorSpinorField &>(inB)),
@@ -319,7 +320,7 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       // z thread dimension is (( s*(Nc/Mc) + color_block )*dim_thread_split + dim)*2 + dir
-      constexpr int Mc = colors_per_thread();
+      constexpr int Mc = colors_per_thread(Arg::nColor, Arg::dim_stride);
       int dir = sMd & 1;
       int sMdim = sMd >> 1;
       int dim = sMdim % Arg::dim_stride;
