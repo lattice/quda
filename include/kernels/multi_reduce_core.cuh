@@ -45,13 +45,12 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(NYW),
+        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
         nParity(nParity)
       {
-        this->threads = dim3(length, NYW, 1);
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {

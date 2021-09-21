@@ -5,12 +5,6 @@
 #include <coarse_op_mma_launch.h>
 #include <tunable_nd.h>
 
-#if __cplusplus >= 201703L
-#define IF_CONSTEXPR if constexpr
-#else
-#define IF_CONSTEXPR if
-#endif
-
 namespace quda {
 
   // For coarsening un-preconditioned operators we use uni-directional

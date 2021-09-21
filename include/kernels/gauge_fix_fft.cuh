@@ -163,12 +163,11 @@ namespace quda {
     int volume;
 
     GaugeFixQualityFFTArg(const GaugeField &data, complex<real> *delta) :
-      ReduceArg<reduce_t>(1, true), // reset = true
+      ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
       volume(data.Volume())
     {
-      this->threads = dim3(data.VolumeCB(), 2, 1);
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 

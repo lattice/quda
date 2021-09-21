@@ -122,7 +122,7 @@ namespace quda {
     scalar data[n];
     __device__ __host__ inline scalar &operator[](int i) { return data[i]; }
     __device__ __host__ inline const scalar &operator[](int i) const { return data[i]; }
-    __device__ __host__ inline static constexpr int size() { return n; }
+    constexpr int size() const { return n; }
     __device__ __host__ inline void operator+=(const vector_type &a)
     {
 #pragma unroll

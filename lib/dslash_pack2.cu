@@ -133,7 +133,6 @@ protected:
 #endif
     }
 
-    bool tuneAuxDim() const { return true; } // Do tune the aux dimensions.
     unsigned int minThreads() const { return work_items; }
 
     void fillAux()
@@ -220,19 +219,19 @@ public:
           if (dagger) {
             switch (twist) {
             case 0: launch_device<pack_wilson>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 1: launch_device<pack_wilson>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 2: launch_device<pack_wilson>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                           a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             }
           } else {
             switch (twist) {
             case 0: launch_device<pack_wilson>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                            a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                            a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             default: errorQuda("Twisted packing only for dagger");
             }
@@ -241,10 +240,10 @@ public:
           if (twist) errorQuda("Twist packing not defined");
           if (dagger) {
             launch_device<pack_wilson>(tp, stream, Arg<4, true, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                               a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                               a, b, c, tp.block.x, tp.grid.x, shmem));
           } else {
             launch_device<pack_wilson>(tp, stream, Arg<4, false, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                                a, b, c, tp.block.x, tp.grid.x, shmem));
           }
         } else {
           errorQuda("Unexpected preconditioning type %d", in.PCType());
@@ -256,26 +255,26 @@ public:
             case 0:
               if (location & Host || location & Shmem)
                 launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
               else
                 launch_device<pack_wilson>(tp, stream, Arg<4, true, 0>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 1:
               if (location & Host || location & Shmem)
                 launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
               else
                 launch_device<pack_wilson>(tp, stream, Arg<4, true, 1>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             case 2:
               if (location & Host || location & Shmem)
                 launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                             a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                             a, b, c, tp.block.x, tp.grid.x, shmem));
               else
                 launch_device<pack_wilson>(tp, stream, Arg<4, true, 2>(ghost, in, nFace, parity, work_items,
-                                                                       a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                       a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             }
           } else {
@@ -283,10 +282,10 @@ public:
             case 0:
               if (location & Host || location & Shmem)
                 launch_device<pack_wilson_shmem>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                              a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                              a, b, c, tp.block.x, tp.grid.x, shmem));
               else
                 launch_device<pack_wilson>(tp, stream, Arg<4, false, 0>(ghost, in, nFace, parity, work_items,
-                                                                        a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                        a, b, c, tp.block.x, tp.grid.x, shmem));
               break;
             default: errorQuda("Twisted packing only for dagger");
             }
@@ -295,10 +294,10 @@ public:
           if (twist) errorQuda("Twist packing not defined");
           if (dagger) {
             launch_device<pack_wilson_shmem>(tp, stream, Arg<4, true, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                     a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                                     a, b, c, tp.block.x, tp.grid.x, shmem));
           } else {
             launch_device<pack_wilson_shmem>(tp, stream, Arg<4, false, 0, QUDA_5D_PC>(ghost, in, nFace, parity, work_items,
-                                                                                      a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                                      a, b, c, tp.block.x, tp.grid.x, shmem));
           }
         }
 #endif
@@ -307,14 +306,14 @@ public:
 
 #ifdef STRIPED
         launch_device<pack_staggered>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                         a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                         a, b, c, tp.block.x, tp.grid.x, shmem));
 #else
         if (location & Host || location & Shmem)
           launch_device<pack_staggered_shmem>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                                 a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                                 a, b, c, tp.block.x, tp.grid.x, shmem));
         else
           launch_device<pack_staggered>(tp, stream, Arg<1>(ghost, in, nFace, parity, work_items,
-                                                           a, b, c, tp.block.x, tp.grid.x, tp.aux.x, shmem));
+                                                           a, b, c, tp.block.x, tp.grid.x, shmem));
 #endif
 
     } else {

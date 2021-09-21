@@ -26,10 +26,9 @@ namespace quda {
     reduce_t result;
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
-      ReduceArg<reduce_t>(1, true), // reset = true
+      ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true
       data(data)
     {
-      this->threads = dim3(data.LocalVolumeCB(), 2, 1);
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
