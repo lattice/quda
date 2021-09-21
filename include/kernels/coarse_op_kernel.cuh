@@ -245,9 +245,86 @@ namespace quda {
      @param[in] j0 Color column index (fine)
   */
   template <typename Wtype, typename Arg>
-  __device__ __host__ inline auto computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  __device__ __host__ inline std::enable_if_t<!Arg::from_coarse, typename Arg::Float>
+  computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
-    constexpr int uvSpin = Arg::fineSpin * (Arg::from_coarse ? 2 : 1);
+    constexpr int uvSpin = Arg::fineSpin;
+    constexpr int nFace = 1; // to do: nFace == 3 version for long links
+
+    using real = typename Arg::Float;
+    using complex = complex<real>;
+    using TileType = typename Arg::uvTileType;
+    auto &tile = arg.uvTile;
+    using Ctype = decltype(make_tile_C<complex, false>(tile));
+    Ctype UV[uvSpin];
+
+    int coord[4];
+    getCoords(coord, x_cb, arg.x_size, parity);
+
+    if ( isHalo(coord, arg.dim, nFace, arg) ) {
+
+      int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
+
+#pragma unroll
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
+        auto U = make_tile_A<complex, false>(tile);
+        U.load(arg.U, arg.dim, parity, x_cb, i0, k);
+#pragma unroll
+        for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
+          auto W = make_tile_B<complex, true>(tile);
+          W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
+          UV[s].mma_nn(U, W);
+        } // Fine color columns
+      }   // Fine spin (tensor)
+
+    } else {
+
+      int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
+
+#pragma unroll
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
+        auto U = make_tile_A<complex, false>(tile);
+        U.load(arg.U, arg.dim, parity, x_cb, i0, k);
+#pragma unroll
+        for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
+          auto W = make_tile_B<complex, false>(tile);
+          W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
+          UV[s].mma_nn(U, W);
+        }  //Fine color columns
+      }    // Fine Spin
+    }
+
+    real uv_max = static_cast<real>(0.0);
+#pragma unroll
+    for (int s = 0; s < uvSpin; s++) {
+      IF_CONSTEXPR (Arg::compute_max) {
+        uv_max = fmax(UV[s].abs_max(), uv_max);
+      } else {
+        UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+      }
+    }
+
+    return uv_max;
+  } // computeUV
+
+  /**
+     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
+     Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
+     or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
+
+     @return The maximum element of the result (if Arg::compute_max == true)
+     @param[in] arg Kernel argumnt
+     @param[in] Wacc Input vector accessor
+     @param[in] parity Parity index
+     @param[in] x_cb Checkerboard index
+     @param[in] i0 Color color row index (coarse)
+     @param[in] j0 Color column index (fine)
+  */
+  template <typename Wtype, typename Arg>
+  __device__ __host__ inline std::enable_if_t<Arg::from_coarse, typename Arg::Float>
+  computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  {
+    constexpr int uvSpin = Arg::fineSpin * 2;
     constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using real = typename Arg::Float;
@@ -262,97 +339,62 @@ namespace quda {
 
     if (arg.dir == QUDA_IN_PLACE) {
 
-      IF_CONSTEXPR (Arg::from_coarse) {
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of coarse clover field
 #pragma unroll
-          for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
-            auto W = make_tile_B<complex, false>(tile);
-            W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
+        for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
+          auto W = make_tile_B<complex, false>(tile);
+          W.loadCS(Wacc, 0, 0, parity, x_cb, s_col, k, j0);
 #pragma unroll
-            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-              auto C = make_tile_A<complex, false>(tile);
-              C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
-              UV[s_col * Arg::fineSpin + s].mma_nn(C, W);
-            } // which chiral block
-          }  //Fine Spin
-        }    // Fine color columns
-      }
+          for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
+            auto C = make_tile_A<complex, false>(tile);
+            C.load(arg.C, 0, parity, x_cb, s, s_col, i0, k);
+            UV[s_col * Arg::fineSpin + s].mma_nn(C, W);
+          } // which chiral block
+        }  //Fine Spin
+      }    // Fine color columns
 
     } else if ( isHalo(coord, arg.dim, nFace, arg) ) {
 
       int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, arg.dim, nFace);
-      IF_CONSTEXPR (!Arg::from_coarse) {
 
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-          auto U = make_tile_A<complex, false>(tile);
-          U.load(arg.U, arg.dim, parity, x_cb, i0, k);
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
+#pragma unroll
+        for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
+          auto W = make_tile_B<complex, true>(tile);
+          W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-            auto W = make_tile_B<complex, true>(tile);
-            W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s, k, j0);
-            UV[s].mma_nn(U, W);
-          } // Fine color columns
-        }   // Fine spin (tensor)
+            // on coarse lattice, if forwards then use forwards links
+            auto U = make_tile_A<complex, false>(tile);
+            U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
-      } else {
-
-#pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-#pragma unroll
-          for (int s_col=0; s_col<Arg::fineSpin; s_col++) {
-            auto W = make_tile_B<complex, true>(tile);
-            W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, s_col, k, j0);
-#pragma unroll
-            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-              // on coarse lattice, if forwards then use forwards links
-              auto U = make_tile_A<complex, false>(tile);
-              U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
-
-              UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
-            } // which chiral block
-          }  //Fine color columns
-        }    // Fine Spin
-
-      } // Arg::from_coarse
+            UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
+          } // which chiral block
+        }  //Fine color columns
+      }    // Fine Spin
 
     } else {
 
       int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
-      IF_CONSTEXPR (!Arg::from_coarse) {
 
 #pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-          auto U = make_tile_A<complex, false>(tile);
-          U.load(arg.U, arg.dim, parity, x_cb, i0, k);
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
+#pragma unroll
+        for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
+          auto W = make_tile_B<complex, false>(tile);
+          W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s_col, k, j0);
 #pragma unroll
           for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-            auto W = make_tile_B<complex, false>(tile);
-            W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s, k, j0);
-            UV[s].mma_nn(U, W);
-          }  //Fine color columns
-        }    // Fine Spin
+            // on coarse lattice, if forwards then use forwards links
+            auto U = make_tile_A<complex, false>(tile);
+            U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
-      } else {
-
-#pragma unroll
-        for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of gauge field
-#pragma unroll
-          for (int s_col = 0; s_col < Arg::fineSpin; s_col++) {
-            auto W = make_tile_B<complex, false>(tile);
-            W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, s_col, k, j0);
-#pragma unroll
-            for (int s = 0; s < Arg::fineSpin; s++) {  //Fine Spin
-              // on coarse lattice, if forwards then use forwards links
-              auto U = make_tile_A<complex, false>(tile);
-              U.load(arg.U, arg.dim + (arg.dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
-
-              UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
-            } // which chiral block
-          }  //Fine Spin
-        }    // Fine color columns
-      }
+            UV[s_col * Arg::fineSpin + s].mma_nn(U, W);
+          } // which chiral block
+        }  //Fine Spin
+      }    // Fine color columns
     }
 
     real uv_max = static_cast<real>(0.0);
