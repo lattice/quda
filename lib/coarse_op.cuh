@@ -5,12 +5,6 @@
 #include <coarse_op_mma_launch.h>
 #include <tunable_nd.h>
 
-#if __cplusplus >= 201703L
-#define IF_CONSTEXPR if constexpr
-#else
-#define IF_CONSTEXPR if
-#endif
-
 namespace quda {
 
   // For coarsening un-preconditioned operators we use uni-directional
@@ -180,7 +174,7 @@ namespace quda {
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if (/*arg.shared_atomic && */type == COMPUTE_VUV)
+      if (type == COMPUTE_VUV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
@@ -222,7 +216,7 @@ namespace quda {
 
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         if (compute_max) launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
-        else launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
+        else launch_host<compute_av>(tp, stream, arg);
 #else
         errorQuda("Clover dslash has not been built");
 #endif
@@ -421,7 +415,7 @@ namespace quda {
         errorQuda("add_coarse_staggered_mass not enabled for non-staggered coarsenings");
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
-#if defined(WILSONCOARSE)
+#if defined(WILSONCOARSE) || defined(COARSECOARSE)
         launch_device<add_coarse_tm>(tp, stream, arg);
 #else
         errorQuda("add_coarse_tm not enabled for non-wilson coarsenings");
@@ -836,8 +830,6 @@ namespace quda {
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
-    int geo_bs[QUDA_MAX_DIM] = { };
-    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
     // If doing a preconditioned operator with a clover term then we
@@ -854,7 +846,7 @@ namespace quda {
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
-	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 

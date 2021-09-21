@@ -56,8 +56,8 @@ void setPrec(ColorSpinorParam &param, QudaPrecision precision) { param.setPrecis
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
-  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
+  printfQuda("S_dimension T_dimension Nspin Ncolor Msrc Nsrc\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d     %3d  %3d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor, Msrc, Nsrc);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
