@@ -74,6 +74,9 @@ namespace quda {
 
     template <typename real, int block, bool enable_reconstruct> struct reconstruct_t {
 
+      /** Length of compressed block */
+      static constexpr int compressed_block_size() { return 28; }
+
       // map from in-kernel internal order to storaage order for a chiral block with Nc = 3
       constexpr auto pack_idx(int i) const
       {
@@ -162,6 +165,7 @@ namespace quda {
 
     template <typename real, int block> struct reconstruct_t<real, block, false> {
 
+      static constexpr auto compressed_block_size() { return block; }     /** Length of compressed block */
       constexpr auto pack_idx(int i) const { return i; }
       constexpr auto compress_idx(int i) const { return i; }
       constexpr auto pack_compress_idx(int i) const { return i; }
@@ -267,21 +271,10 @@ namespace quda {
     */
 
     template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
-      mutable complex<Float> dummy;
-      Accessor(const CloverField &, bool = false) {
-	errorQuda("Not implemented for order %d", order);
-      }
-
-      __device__ __host__ inline complex<Float>& operator()(int, int, int, int, int, int) const
-      {
-	return dummy;
-      }
-
+      Accessor(const CloverField &, bool = false) { errorQuda("Not implemented for order %d", order); }
+      constexpr complex<Float>& operator()(int, int, int, int, int, int) const { return complex<Float>(0.0); }
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation, helper, double, reducer) const
-      {
-        return 0.0;
-      }
+      constexpr double transform_reduce(QudaFieldLocation, helper, double, reducer) const { return 0.0; }
     };
 
     template<int N> constexpr int indexFloatN(int k, int stride, int x)
@@ -296,7 +289,7 @@ namespace quda {
       Float *a;
       int stride;
       size_t offset_cb;
-      static constexpr int N = nSpin * nColor / 2;
+      static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       Accessor(const CloverField &A, bool inverse=false) :
         a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
@@ -573,9 +566,13 @@ namespace quda {
       typedef typename VectorType<Float, N>::type Vector;
       typedef typename AllocType<huge_alloc>::type AllocInt;
       typedef float norm_type;
-      static const int M = length / (N * 2); // number of short vectors per chiral block
-      static const int block = length / 2;   // chiral block size
+      static constexpr int Ns = 4;
+      static constexpr int Nc = 3;
+      static constexpr int block = (Nc * Ns / 2) * (Nc * Ns / 2); // elements in a chiral block
+      static_assert(2 * block == length, "2 * block != length");
       reconstruct_t<real, block, enable_reconstruct> recon;
+      static constexpr int M = block / N; // number of short vectors per chiral block
+      static constexpr int Mcompressed = decltype(recon)::compressed_block_size() / N; // number of short vectors per chiral block
       Float *clover;
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
@@ -645,7 +642,7 @@ namespace quda {
           vector_type<real, block> tmp;
 
 #pragma unroll
-	  for (int i=0; i<M; i++) {
+	  for (int i=0; i<Mcompressed; i++) {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
             // second do scalar copy converting into register type
@@ -688,7 +685,7 @@ namespace quda {
           recon.pack(tmp2, tmp);
 
 #pragma unroll
-          for (int i = 0; i < M; i++) {
+          for (int i = 0; i < Mcompressed; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
             for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp2[i * N + j]);
@@ -704,7 +701,8 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-        __device__ __host__ inline void load(real v[length], int x, int parity) const {
+        __device__ __host__ inline void load(real v[], int x, int parity) const
+        {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
         }
@@ -716,7 +714,8 @@ namespace quda {
 	   @param[in] parity Field parity
 	   @param[in] chirality Chiral block index
 	 */
-	__device__ __host__ inline void save(const real v[length], int x, int parity) const {
+	__device__ __host__ inline void save(const real v[], int x, int parity) const
+        {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
         }
@@ -749,13 +748,13 @@ namespace quda {
           }
         }
 
-        size_t Bytes() const
-        {
-          size_t bytes = length * sizeof(Float);
-          if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
-          return bytes;
-        }
-      };
+      size_t Bytes() const
+      {
+        size_t bytes = length * sizeof(Float);
+        if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
+        return bytes;
+      }
+    };
 
     /**
        QDP ordering for clover fields
