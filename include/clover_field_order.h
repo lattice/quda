@@ -286,21 +286,23 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin>
       struct Accessor<Float,nColor,nSpin,QUDA_FLOAT2_CLOVER_ORDER> {
-      Float *a;
-      int stride;
-      size_t offset_cb;
+      const Float *a;
+      const int stride;
+      const size_t offset_cb;
+      const int compressed_block_size;
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       Accessor(const CloverField &A, bool inverse=false) :
         a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
         stride(A.Stride()),
-	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
+        offset_cb(A.Bytes()/(2*sizeof(Float))),
+        compressed_block_size(A.compressed_block_size()) { }
 
       __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
       {
 	int row = s_row * nColor + c_row;
 	int col = s_col * nColor + c_col;
-	Float *a_ = a + parity * offset_cb + stride * chirality * N * N;
+	const Float *a_ = a + parity * offset_cb + stride * chirality * compressed_block_size;
 
 	if (row == col) {
 	  auto a = a_[ indexFloatN<QUDA_FLOAT2_CLOVER_ORDER>(recon.pack_compress_idx(row), stride, x) ];
@@ -329,7 +331,7 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
-        return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
+        return ::quda::transform_reduce(location, reinterpret_cast<const complex<Float> *>(a), offset_cb, h, init, r);
       }
 
       constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
@@ -337,21 +339,23 @@ namespace quda {
 
     template<typename Float, int nColor, int nSpin>
       struct Accessor<Float,nColor,nSpin,QUDA_FLOAT4_CLOVER_ORDER> {
-      Float *a;
-      int stride;
-      size_t offset_cb;
+      const Float *a;
+      const int stride;
+      const size_t offset_cb;
+      const int compressed_block_size;
       static constexpr int N = nColor * nSpin / 2;
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       Accessor(const CloverField &A, bool inverse=false) :
         a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
         stride(A.Stride()),
-	offset_cb(A.Bytes()/(2*sizeof(Float))) { }
+        offset_cb(A.Bytes()/(2*sizeof(Float))),
+        compressed_block_size(A.compressed_block_size()) { }
 
       __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
       {
 	int row = s_row * nColor + c_row;
 	int col = s_col * nColor + c_col;
-	Float *a_ = a + parity * offset_cb + stride * chirality * N * N;
+	const Float *a_ = a + parity * offset_cb + stride * chirality * compressed_block_size;
 
 	if (row == col) {
 	  auto a = a_[ indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(recon.pack_compress_idx(row), stride, x) ];
@@ -380,7 +384,7 @@ namespace quda {
       __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         // just use offset_cb, since factor of two from parity is equivalent to complexity
-        return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
+        return ::quda::transform_reduce(location, reinterpret_cast<const complex<Float> *>(a), offset_cb, h, init, r);
       }
 
       constexpr Float scale() const { return static_cast<Float>(2.0); } // normalization of native storage
@@ -491,9 +495,7 @@ namespace quda {
 
 	/** Return the size of the allocation (parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const {
-	  constexpr int n = nColor * nSpin / 2;
-	  constexpr int chiral_block = n * n / 2;
-	  return static_cast<size_t>(volumeCB) * chiral_block * 2ll * 2ll * sizeof(Float); // 2 from complex, 2 from chirality
+	  return static_cast<size_t>(volumeCB) * A.compressed_block_size() * 2ll * sizeof(Float); // 2 from chirality
 	}
 
 	/**
@@ -571,8 +573,7 @@ namespace quda {
       static constexpr int block = (Nc * Ns / 2) * (Nc * Ns / 2); // elements in a chiral block
       static_assert(2 * block == length, "2 * block != length");
       reconstruct_t<real, block, enable_reconstruct> recon;
-      static constexpr int M = block / N; // number of short vectors per chiral block
-      static constexpr int Mcompressed = decltype(recon)::compressed_block_size() / N; // number of short vectors per chiral block
+      static constexpr int M = decltype(recon)::compressed_block_size() / N; // number of short vectors per chiral block
       Float *clover;
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
@@ -642,7 +643,7 @@ namespace quda {
           vector_type<real, block> tmp;
 
 #pragma unroll
-	  for (int i=0; i<Mcompressed; i++) {
+	  for (int i=0; i<M; i++) {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
             // second do scalar copy converting into register type
@@ -685,7 +686,7 @@ namespace quda {
           recon.pack(tmp2, tmp);
 
 #pragma unroll
-          for (int i = 0; i < Mcompressed; i++) {
+          for (int i = 0; i < M; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
             for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp2[i * N + j]);
@@ -750,7 +751,7 @@ namespace quda {
 
       size_t Bytes() const
       {
-        size_t bytes = length * sizeof(Float);
+        size_t bytes = 2 * decltype(recon)::compressed_block_size() * sizeof(Float);
         if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
         return bytes;
       }

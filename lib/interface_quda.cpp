@@ -953,6 +953,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       inParam.cloverInv = h_clovinv;
       inParam.create = QUDA_REFERENCE_FIELD_CREATE;
       inParam.location = inv_param->clover_location;
+      inParam.reconstruct = false;
       in = new CloverField(inParam);
     }
     profileClover.TPSTOP(QUDA_PROFILE_INIT);

@@ -47,8 +47,11 @@ namespace quda {
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
 
-    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (72 reals)
-    length = 2 * ((size_t)stride) * nColor * nColor * nSpin * nSpin / 2;
+    // for now we only support compressed blocks for Nc = 3
+    if (reconstruct && !isNative()) errorQuda("Clover reconstruct only supported on native fields");
+    compressed_block = (reconstruct && nColor == 3 && nSpin == 4) ? 28 : (nColor * nSpin / 2) * (nColor * nSpin / 2);
+    real_length = 2 * ((size_t)volumeCB) * 2 * compressed_block; // block-diagonal Hermitian (72 reals)
+    length = 2 * ((size_t)stride) * 2 * compressed_block;
 
     bytes = length * precision;
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
@@ -362,6 +365,7 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param)
   {
     output << static_cast<const LatticeFieldParam&>(param);
+    output << "reconstruct = "  << param.reconstruct << std::endl;
     output << "direct = "    << param.direct << std::endl;
     output << "inverse = "   << param.inverse << std::endl;
     output << "clover = "    << param.clover << std::endl;
@@ -384,9 +388,8 @@ namespace quda {
       errorQuda("Casting a CloverField into ColorSpinorField not possible in half precision");
 
     ColorSpinorParam spinor_param;
-    // 72 = 9 * 4 * 2
-    spinor_param.nColor = 9;
-    spinor_param.nSpin = 4;
+    spinor_param.nColor = (2 * a.compressed_block_size()) / (2 * a.Nspin());
+    spinor_param.nSpin = a.Nspin();
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.setPrecision(a.Precision());

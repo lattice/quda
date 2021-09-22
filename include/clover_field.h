@@ -59,7 +59,7 @@ namespace quda {
 
   struct CloverFieldParam : public LatticeFieldParam {
     bool reconstruct; /** Whether to create a compressed that requires reconstruction */
-    bool direct; // whether to create the direct clover 
+    bool direct; // whether to create the direct clover
     bool inverse; // whether to create the inverse clover
     void *clover;
     void *norm;
@@ -136,10 +136,11 @@ namespace quda {
   protected:
     const bool reconstruct; /** Whether this field is compressed and requires reconstruction */
 
-    size_t bytes; // bytes allocated per clover full field 
+    size_t bytes; // bytes allocated per clover full field
     size_t norm_bytes; // sizeof each norm full field
     size_t length;
     size_t real_length;
+    size_t compressed_block; /** Length of compressed chiral block */
     int nColor;
     int nSpin;
 
@@ -150,7 +151,7 @@ namespace quda {
 
     double csw;
     double coeff;
-    bool twisted; 
+    bool twisted;
     double mu2;
     double rho;
 
@@ -212,7 +213,7 @@ namespace quda {
        @return Pointer to array storing trlog on each parity
     */
     std::array<double, 2>& TrLog() const { return trlog; }
-    
+
     /**
        @return The order of the field
      */
@@ -232,6 +233,11 @@ namespace quda {
        @return The total bytes of allocation
      */
     size_t TotalBytes() const { return total_bytes; }
+
+    /**
+       @return The storage length of the compressed chiral block
+     */
+    size_t compressed_block_size() const { return compressed_block; }
 
     /**
        @return Number of colors
@@ -404,7 +410,7 @@ namespace quda {
   */
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
 			 QudaFieldLocation location, void *Out=0, const void *In=0, void *outNorm=0, const void *inNorm=0);
-  
+
 
 
   /**
@@ -426,14 +432,14 @@ namespace quda {
 
   /**
      @brief Compute the force contribution from the solver solution fields
-   
+
      Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
 
       M = A_even - kappa^2 * Dslash * A_odd^{-1} * Dslash
       x(even) = M^{-1} b(even)
       x(odd)  = A_odd^{-1} * Dslash * x(even)
       p(even) = M * x(even)
-      p(odd)  = A_odd^{-1} * Dslash^dag * M * x(even). 
+      p(odd)  = A_odd^{-1} * Dslash^dag * M * x(even).
 
      @param force[out,in] The resulting force field
      @param U The input gauge field
@@ -477,7 +483,7 @@ namespace quda {
      @param gauge The input gauge field
      @param oprod The input outer-product field (tensor matrix field)
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
-     @param parity The field parity we are working on 
+     @param parity The field parity we are working on
    */
   void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
 
