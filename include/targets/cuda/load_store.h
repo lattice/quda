@@ -40,7 +40,7 @@ namespace quda {
       reinterpret_cast<T*>(ptr)[idx] = value;
     }
 
-    __device__ inline void operator()(void *ptr, int  idx, const double2 &value)
+    __device__ inline void operator()(void *ptr, int idx, const double2 &value)
     {
       store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
     }

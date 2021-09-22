@@ -40,9 +40,14 @@ namespace quda {
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
         if (order == QUDA_FLOAT2_CLOVER_ORDER) return true;
-      } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-                 || precision == QUDA_QUARTER_PRECISION) {
+      } else if (precision == QUDA_SINGLE_PRECISION) {
         if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
+      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+#ifdef FLOAT8
+        if (order == QUDA_FLOAT8_CLOVER_ORDER) return true;
+#else
+        if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
+#endif
       }
       return false;
     }
@@ -90,7 +95,17 @@ namespace quda {
       this->ghost_precision = precision;
 
       if (native) {
-        order = (precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
+        if (precision == QUDA_DOUBLE_PRECISION) {
+          order = QUDA_FLOAT2_CLOVER_ORDER;
+        } else if (precision == QUDA_SINGLE_PRECISION) {
+          order = QUDA_FLOAT4_CLOVER_ORDER;
+        } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+#ifdef FLOAT8
+          order = QUDA_FLOAT8_CLOVER_ORDER;
+#else
+          order = QUDA_FLOAT4_CLOVER_ORDER;
+#endif
+        }
       }
     }
 

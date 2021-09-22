@@ -109,9 +109,9 @@ namespace quda {
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                          void *Out, const void *In, void *outNorm, const void *inNorm)
   {
-    if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) 
+    if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 8)
       errorQuda("Fixed-point precision not supported for order %d", out.Order());
-    if (in.Precision() < QUDA_SINGLE_PRECISION && in.Order() > 4) 
+    if (in.Precision() < QUDA_SINGLE_PRECISION && in.Order() > 8)
       errorQuda("Fixed-point precision not supported for order %d", in.Order());
 
     // swizzle in/out since we first want to instantiate precision
