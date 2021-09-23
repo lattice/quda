@@ -69,7 +69,9 @@ namespace quda {
     public:
         T data[N*N];
 
-        __device__ __host__ constexpr int size() const { return N; }
+        constexpr int rows() const { return N; }
+        constexpr int cols() const { return N; }
+        constexpr int size() const { return N * N; }
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
@@ -310,6 +312,10 @@ namespace quda {
       public:
       T data[N*N]; // store in real-valued array
 
+      constexpr int rows() const { return N; }
+      constexpr int cols() const { return N; }
+      constexpr int size() const { return N * N; }
+
       __device__ __host__ inline HMatrix() {
 #pragma unroll
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
@@ -490,8 +496,8 @@ namespace quda {
   template<class T>
     __device__ __host__ inline T getDeterminant(const Matrix<T,2> &a)
     {
-      T result;    
-      result = a(0,0)*a(1,1) - a(1,0) * a(0,1);
+      T result;
+      result = a(0,0) * a(1,1) - a(0,1) * a(1,0);
       return result;
     }
 
@@ -555,7 +561,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator+=(Mat<T,N> & a, const Mat<T,N> & b)
     {
 #pragma unroll
-      for (int i=0; i<N*N; i++) a.data[i] += b.data[i];
+      for (int i=0; i<a.size(); i++) a.data[i] += b.data[i];
       return a;
     }
 
@@ -563,7 +569,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator+=(Mat<T,N> & a, const T & b)
     {
 #pragma unroll
-      for (int i=0; i<N; i++) a(i,i) += b;
+      for (int i=0; i<a.rows(); i++) a(i,i) += b;
       return a;
     }
 
@@ -571,7 +577,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator-=(Mat<T,N> & a, const Mat<T,N> & b)
     {
 #pragma unroll
-      for (int i=0; i<N*N; i++) a.data[i] -= b.data[i];
+      for (int i=0; i<a.size(); i++) a.data[i] -= b.data[i];
       return a;
     }
 
@@ -580,7 +586,7 @@ namespace quda {
     {
       Mat<T,N> result;
 #pragma unroll
-      for (int i=0; i<N*N; i++) result.data[i] = a.data[i] - b.data[i];
+      for (int i=0; i<a.size(); i++) result.data[i] = a.data[i] - b.data[i];
       return result;
     }
 
@@ -588,7 +594,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator*(const S & scalar, const Mat<T,N> & a){
       Mat<T,N> result;
 #pragma unroll
-      for (int i=0; i<N*N; ++i) result.data[i] = scalar*a.data[i];
+      for (int i=0; i<a.size(); ++i) result.data[i] = scalar*a.data[i];
       return result;
     }
 
@@ -607,7 +613,7 @@ namespace quda {
     __device__ __host__ inline Mat<T,N> operator-(const Mat<T,N> & a){
       Mat<T,N> result;
 #pragma unroll
-      for (int i=0; i<(N*N); ++i) result.data[i] = -a.data[i];
+      for (int i=0; i<a.size(); ++i) result.data[i] = -a.data[i];
       return result;
     }
 

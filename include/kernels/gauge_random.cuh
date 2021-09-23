@@ -31,12 +31,10 @@ namespace quda {
       sigma(sigma),
       geom(geom)
     {
-      int R = 0;
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = U.R()[dir];
         E[dir] = U.X()[dir];
         X[dir] = U.X()[dir] - border[dir] * 2;
-        R += border[dir];
       }
     }
   };

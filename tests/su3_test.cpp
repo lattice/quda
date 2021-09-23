@@ -16,6 +16,8 @@
 #include <quda.h>
 #include <qio_field.h>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");

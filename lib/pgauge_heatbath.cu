@@ -23,36 +23,28 @@ namespace quda {
     unsigned int minThreads() const { return U.LocalVolumeCB(); }
 
   public:
-    GaugeHB(GaugeField &U, double beta, RNG &rng) :
+    GaugeHB(GaugeField &U, double beta, RNG &rng, int mu, int parity, bool heatbath) :
       TunableKernel1D(U),
       U(U),
       beta(static_cast<Float>(beta)),
       rng(rng),
-      mu(0),
-      parity(0),
-      heatbath(false)
+      mu(mu),
+      parity(parity),
+      heatbath(heatbath)
     {
-      strcpy(aux2, aux);
-    }
-
-    void set_param(int _mu, int _parity, bool _heatbath)
-    {
-      mu = _mu;
-      parity = _parity;
-      heatbath = _heatbath;
-      strcpy(aux, aux2);
+      strcat(aux, mu == 0 ? ",mu=0" : mu == 1 ? ",mu=1" : mu == 2 ? ",mu=2" : ",mu=3");
+      strcat(aux, parity ? ",parity=1" : ",parity=0");
       strcat(aux, heatbath ? ",heatbath" : ",ovr");
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (heatbath) {
-        MonteArg<Float, nColor, recon, true> arg(U, beta, rng.State(), mu, parity);
-        launch<HB>(tp, stream, arg);
+        launch<HB>(tp, stream, MonteArg<Float, nColor, recon, true>(U, beta, rng.State(), mu, parity));
       } else {
-        MonteArg<Float, nColor, recon, false> arg(U, beta, rng.State(), mu, parity);
-        launch<HB>(tp, stream, arg);
+        launch<HB>(tp, stream, MonteArg<Float, nColor, recon, false>(U, beta, rng.State(), mu, parity));
       }
     }
 
@@ -111,46 +103,40 @@ namespace quda {
   struct MonteAlg {
     MonteAlg(GaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover)
     {
-      TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
+      host_timer_t timer;
+      double hb_time = 0.0, ovr_time = 0.0;
+      if (getVerbosity() >= QUDA_VERBOSE) timer.start();
 
-      if (getVerbosity() >= QUDA_SUMMARIZE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
-      GaugeHB<Float, nColor, recon> hb(data, Beta, rngstate);
-      for ( int step = 0; step < nhb; ++step ) {
-        for ( int parity = 0; parity < 2; ++parity ) {
-          for ( int mu = 0; mu < 4; ++mu ) {
-            hb.set_param(mu, parity, true);
-            hb.apply(device::get_default_stream());
+      for (int step = 0; step < nhb; step++) {
+        for (int parity = 0; parity < 2; parity++) {
+          for (int mu = 0; mu < 4; ++mu) {
+            GaugeHB<Float, nColor, recon>(data, Beta, rngstate, mu, parity, true);
             PGaugeExchange(data, mu, parity);
           }
         }
       }
+
       if (getVerbosity() >= QUDA_VERBOSE) {
         qudaDeviceSynchronize();
-        profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-        double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
-        double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
-        double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
-        printfQuda("HB:  Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+        timer.stop();
+        hb_time = timer.last();
+        timer.start();
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
-      GaugeHB<Float, nColor, recon> relax(data, Beta, rngstate);
-      for ( int step = 0; step < nover; ++step ) {
-        for ( int parity = 0; parity < 2; ++parity ) {
-          for ( int mu = 0; mu < 4; ++mu ) {
-            relax.set_param(mu, parity, false);
-            relax.apply(device::get_default_stream());
+      for (int step = 0; step < nover; step++) {
+        for (int parity = 0; parity < 2; parity++) {
+          for (int mu = 0; mu < 4; mu++) {
+            GaugeHB<Float, nColor, recon>(data, Beta, rngstate, mu, parity, false);
             PGaugeExchange(data, mu, parity);
           }
         }
       }
+
       if (getVerbosity() >= QUDA_VERBOSE) {
         qudaDeviceSynchronize();
-        profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-        double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
-        double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
-        double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);
-        printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+        timer.stop();
+        ovr_time = timer.last();
+        printfQuda("Heatbath time = %6.6f, Over-relaxation time = %6.6f\n", hb_time, ovr_time);
       }
     }
   };

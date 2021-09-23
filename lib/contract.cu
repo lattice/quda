@@ -110,7 +110,7 @@ namespace quda {
     
     if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
       errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
-    if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
+    if (x.Ncolor() != N_COLORS || y.Ncolor() != N_COLORS) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     
     instantiate<ContractionSummed>(x, y, result_global, cType, source_position, mom_mode, s1, b1);

@@ -232,6 +232,7 @@ int main(int argc, char **argv)
 	saveGaugeField(step, gaugeEx, gauge);
       }      
     }
+
     delete gauge;
     delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();

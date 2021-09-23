@@ -903,11 +903,10 @@ namespace quda {
   };
 
   /**
-     @brief Compute the inner product over color and spin
-     dot = \sum_s,c conj(a(s,c)) * b(s,c)
-     @param a Left-hand side ColorSpinor
-     @param b Right-hand side ColorSpinor
-     @return The inner product
+     @brief caxpy operation on ColorSpinor objects
+     @param[in] a complex scalar
+     @param[in] x Vector that is scaled
+     @param[in,out] y Accumulation vector
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
@@ -941,23 +940,6 @@ namespace quda {
   }
 
   /**
-     @brief Compute the inner product over color and spin
-     dot = \sum_s,c conj(a(s,c)) * b(s,c)
-     @param a Left-hand side ColorSpinor
-     @param b Right-hand side ColorSpinor
-     @return The inner product
-  */
-  template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
-                                                         const ColorSpinor<Float, Nc, Ns> &b)
-  {
-    complex<Float> dot = 0;
-#pragma unroll
-    for (int s = 0; s < Ns; s++) { dot += innerProduct(a, b, s, s); }
-    return dot;
-  }
-
-  /**
      @brief Compute the color contraction over color at spin s
      dot = \sum_s,c a(s,c) * b(s,c)
      @param a Left-hand side ColorSpinor
@@ -968,52 +950,31 @@ namespace quda {
   __device__ __host__ inline complex<Float> colorContract(const ColorSpinor<Float, Nc, Ns> &a,
                                                           const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
   {
-    complex<Float> dot = 0;
-    for (int c = 0; c < Nc; c++) {
-      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
-      dot.real(dot.real() - a(sa, c).imag() * b(sb, c).imag());
-      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
-      dot.imag(dot.imag() + a(sa, c).imag() * b(sb, c).real());
-    }
-
+    complex<Float> dot = cmul(a(sa, 0), b(sb, 0));
+#pragma unroll
+    for (int c = 1; c < Nc; c++) dot = cmac(a(sa, c), b(sb, c), dot);
     return dot;
   }
 
   /**
-     Compute the inner product over color at spin s between two ColorSpinor fields
-     dot = \sum_c conj(a(s,c)) * b(s,c)
+     @brief Compute the inner product over color and spin
+     dot = \sum_s,c conj(a(s,c)) * b(s,c)
      @param a Left-hand side ColorSpinor
      @param b Right-hand side ColorSpinor
-     @param s diagonal spin index
      @return The inner product
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
-                                                         const ColorSpinor<Float, Nc, Ns> &b, int s)
+                                                         const ColorSpinor<Float, Nc, Ns> &b)
   {
-    return innerProduct(a, b, s, s);
-  }
-
-  /**
-     Compute the inner product over color at spin sa and sb  between two ColorSpinor fields
-     dot = \sum_c conj(a(s1,c)) * b(s2,c)
-     @param a Left-hand side ColorSpinor
-     @param b Right-hand side ColorSpinor
-     @param sa Left-hand side spin index
-     @param sb Right-hand side spin index
-     @return The inner product
-  */
-  template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
-                                                         const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
-  {
-    complex<Float> dot = 0;
+    complex<Float> dot;
 #pragma unroll
-    for (int c = 0; c < Nc; c++) {
-      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
-      dot.real(dot.real() + a(sa, c).imag() * b(sb, c).imag());
-      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
-      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());
+    for (int s = 0; s < Ns; s++) {
+#pragma unroll
+      for (int c = 0; c < Nc; c++) {
+        if (s == 0 && c == 0) dot = cmul(conj(a(s, c)), b(s, c));
+        else dot = cmac(conj(a(s, c)), b(s, c), dot);
+      }
     }
     return dot;
   }
@@ -1030,15 +991,25 @@ namespace quda {
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
                                                          const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
   {
-    complex<Float> dot = 0;
+    complex<Float> dot = cmul(conj(a(sa, 0)), b(sb, 0));
 #pragma unroll
-    for (int c = 0; c < Nc; c++) {
-      dot.real(dot.real() + a(sa, c).real() * b(sb, c).real());
-      dot.real(dot.real() + a(sa, c).imag() * b(sb, c).imag());
-      dot.imag(dot.imag() + a(sa, c).real() * b(sb, c).imag());
-      dot.imag(dot.imag() - a(sa, c).imag() * b(sb, c).real());
-    }
+    for (int c = 1; c < Nc; c++) dot = cmac(conj(a(sa, c)), b(sb, c), dot);
     return dot;
+  }
+
+  /**
+     Compute the inner product over color at spin s between two ColorSpinor fields
+     dot = \sum_c conj(a(s,c)) * b(s,c)
+     @param a Left-hand side ColorSpinor
+     @param b Right-hand side ColorSpinor
+     @param s diagonal spin index
+     @return The inner product
+  */
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Ns> &a,
+                                                         const ColorSpinor<Float, Nc, Ns> &b, int s)
+  {
+    return innerProduct(a, b, s, s);
   }
 
   /**

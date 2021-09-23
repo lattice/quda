@@ -234,8 +234,7 @@ namespace quda
     {
       using real = typename Arg::real;
       using Complex = complex<real>;
-      typedef Matrix<Complex, N_COLORS> Link;
-
+      using Link =  Matrix<Complex, N_COLORS>;
       Link force;
 
       switch (mu) {

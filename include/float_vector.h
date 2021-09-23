@@ -110,8 +110,8 @@ namespace quda {
 
 #ifdef QUAD_SUM
   template<> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
-  template<> __device__ __host__ inline doubledouble zero() { return doubledouble2(); }
-  template<> __device__ __host__ inline doubledouble zero() { return doubledouble3(); }
+  template<> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
+  template<> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
 #endif
 
   /**
@@ -122,7 +122,7 @@ namespace quda {
     scalar data[n];
     __device__ __host__ inline scalar &operator[](int i) { return data[i]; }
     __device__ __host__ inline const scalar &operator[](int i) const { return data[i]; }
-    __device__ __host__ inline static constexpr int size() { return n; }
+    constexpr int size() const { return n; }
     __device__ __host__ inline void operator+=(const vector_type &a)
     {
 #pragma unroll

@@ -204,7 +204,7 @@ namespace quda {
        @return Clover coefficient (explicitly includes kappa)
     */
     double Coeff() const { return coeff; }
-    
+
     /**
        @return If the clover field is associated with twisted-clover fermions
     */
@@ -527,7 +527,7 @@ namespace quda {
 
   /**
      @brief Helper function that returns whether we have enabled
-     dyanmic clover inversion or not.
+     dynamic clover inversion or not.
    */
   constexpr bool dynamic_clover_inverse()
   {

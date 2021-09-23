@@ -257,7 +257,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_csw;                     /**< Csw coefficient of the clover term */
-    double clover_coeff;                   /**< Overall kappa * Csw coefficient of the clover term */
+    double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */

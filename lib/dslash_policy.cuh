@@ -34,6 +34,10 @@ namespace quda
     struct DslashCommsPattern {
       static constexpr int nDim = 4;
       static constexpr int nDir = 2;
+      // nStream here is not tied to the number underlying CUDA
+      // streams (although historically it was), rather it signifies
+      // the number of logical parallel streams we have when
+      // overlapping comms in 4 dimensions * 2 directions and compute
       static constexpr int nStream = nDim * nDir + 1;
 
       std::array<int, nStream> gatherCompleted;
@@ -1956,7 +1960,9 @@ namespace quda
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const qudaStream_t &) {
+  private:
+   void apply(const qudaStream_t &)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");

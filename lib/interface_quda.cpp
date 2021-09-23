@@ -69,6 +69,10 @@ static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
+// setting this to true indicates to the inverter that the gauge
+// field has already been smeared
+static bool inv_gauge_smeared = false;
+
 #include <blas_lapack.h>
 
 //for MAGMA lib:
@@ -919,6 +923,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     inv_param->clover_csw =  inv_param->clover_coeff / inv_param->kappa;
   }
   checkCloverParam(inv_param);
+  
   bool device_calc = false; // calculate clover and inverse on the device?
 
   pushVerbosity(inv_param->verbosity);
@@ -963,7 +968,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   bool twisted = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false;
-
+  
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   // If clover_coeff is not set manually, then it is the product Csw * kappa.
@@ -989,7 +994,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
   // FIXME do we need to make this more robust to changing other meta data (compare cloverPrecise against clover_param)
-  // IF either of the clover params have changed, trigger a recompute
+  // If either of the clover params have changed, trigger a recompute
   bool clover_update = false;
   // If either of the clover params have changed, trigger a recompute
   double csw_old = cloverPrecise ? cloverPrecise->Csw() : 0.0;
@@ -2632,10 +2637,33 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   QudaInvertParam *param = mg_param.invert_param;
   // set whether we are going use native or generic blas
   blas_lapack::set_native(param->native_blas_lapack);
-
   checkMultigridParam(&mg_param);
   cudaGaugeField *cudaGauge = checkGauge(param);
-
+  cudaGaugeField *gaugeTemp = nullptr;
+  
+  // Smear the gauge field
+  if (mg_param.invert_param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    if(!inv_gauge_smeared) {
+      switch(mg_param.invert_param->gauge_smear_type) {
+      case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(mg_param.invert_param->gauge_smear_steps, mg_param.invert_param->gauge_smear_coeff, 1); break;
+      case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(mg_param.invert_param->gauge_smear_steps, mg_param.invert_param->gauge_smear_coeff, 1); break;
+      default: errorQuda("Unsupported smear type %d", mg_param.invert_param->gauge_smear_type);
+      }
+      inv_gauge_smeared = true;
+    }
+  
+    // Copy the gauge field, restore after the MG construction
+    GaugeFieldParam gParam(*gaugeSmeared);
+    gaugeTemp = new cudaGaugeField(gParam);
+    gaugeTemp->copy(*gaugePrecise);
+    
+    gaugeSloppy->copy(*gaugeSmeared);
+    gaugePrecondition->copy(*gaugeSmeared);
+    gaugeRefinement->copy(*gaugeSmeared);
+    gaugeEigensolver->copy(*gaugeSmeared);
+    gaugePrecise->copy(*gaugeSmeared);
+  }
+  
   // check MG params (needs to go somewhere else)
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
     errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
@@ -2708,6 +2736,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
 
+  if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
+    gaugePrecise->copy(*gaugeTemp);
+    delete gaugeTemp;
+  }
+  
   // cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache();
   profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -2962,18 +2995,27 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   // Smear the gauge field
   if (param->gauge_smear == QUDA_BOOLEAN_TRUE) {
-    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);    
-    switch(param->gauge_smear_type) {
-    case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
-    default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
+    profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);   
+    if(!inv_gauge_smeared) {
+      switch(param->gauge_smear_type) {
+      case QUDA_GAUGE_SMEAR_TYPE_APE: performAPEnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+      case QUDA_GAUGE_SMEAR_TYPE_STOUT: performSTOUTnStep(param->gauge_smear_steps, param->gauge_smear_coeff, 1); break;
+      default: errorQuda("Unsupported smear type %d", param->gauge_smear_type);
+      }
+      inv_gauge_smeared = true;
     }
-
-    // Copy the gauge field, restore after the solve
+  
+    // Copy the gauge field, restore after the solve  
     GaugeFieldParam gParam(*gaugeSmeared);
     gaugeTemp = new cudaGaugeField(gParam);
     gaugeTemp->copy(*gaugePrecise);
     gaugePrecise->copy(*gaugeSmeared);
+    gaugeSloppy->copy(*gaugeSmeared);
+    gaugePrecondition->copy(*gaugeSmeared);
+    gaugeRefinement->copy(*gaugeSmeared);
+    gaugeEigensolver->copy(*gaugeSmeared);
+    gaugePrecise->copy(*gaugeSmeared);
+
     profileInvert.TPSTART(QUDA_PROFILE_TOTAL);    
   }
   
@@ -3559,7 +3601,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       gauge_param->ga_pad *= split_key[d];
     }
 
-    // Deal with clover field
+    // Deal with clover field. For Multi source computatons, clover field construction is done
+    // exclusively on the GPU.
+    if (param->clover_coeff == 0.0 && param->clover_csw == 0.0) errorQuda("called with neither clover term nor inverse and clover coefficient nor Csw not set");
+    if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
+
     quda::CloverField *input_clover = nullptr;
     quda::CloverField *collected_clover = nullptr;
     if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
@@ -3567,7 +3613,14 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
       if (h_clover || h_clovinv) {
         CloverFieldParam clover_param;
         clover_param.nDim = 4;
-        clover_param.csw = param->clover_coeff;
+	// If clover_coeff is not set manually, then it is the product Csw * kappa.
+	// If the user has set the clover_coeff manually, that value takes precedent.
+	clover_param.csw = param->clover_csw;
+	clover_param.coeff = param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff;
+	// We must also adjust param->clover_coeff here. If a user has set kappa and
+	// Csw, we must populate param->clover_coeff for them as the computeClover
+	// routines uses that value
+	param->clover_coeff = (param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff);
         clover_param.twisted = param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH;
         clover_param.mu2 = clover_param.twisted ? 4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
         clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;

@@ -69,8 +69,7 @@ namespace quda {
 
   void gaugeGauss(GaugeField &U, unsigned long long seed, double sigma)
   {
-    RNG *randstates = new RNG(U, seed);
-    quda::gaugeGauss(U, *randstates, sigma);
-    delete randstates;
+    RNG randstates(U, seed);
+    gaugeGauss(U, randstates, sigma);
   }
 }

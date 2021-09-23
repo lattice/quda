@@ -278,7 +278,7 @@ namespace quda
       }
     }
 
-    typedef cub::BlockReduce<float, block_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, 1> BlockReduce;
+    typedef cub::BlockReduce<float, block_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, 1, __COMPUTE_CAPABILITY__> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
     float aggregate = BlockReduce(temp_storage).Reduce(warp_max, cub::Max());
 

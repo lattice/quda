@@ -738,7 +738,7 @@ namespace quda {
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dagger,
-                   qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                    bool spin_project, double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     /**
@@ -748,7 +748,7 @@ namespace quda {
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
+    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -757,7 +757,7 @@ namespace quda {
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
+    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -830,7 +830,6 @@ namespace quda {
        @brief Wait on halo communication to complete
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side

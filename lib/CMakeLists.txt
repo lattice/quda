@@ -56,6 +56,7 @@ set (QUDA_OBJS
   dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
+  dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu blas_quda_3d.cu
   multi_reduce_quda.cu reduce_helper.cu
@@ -90,7 +91,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
-  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
+  dslash_mdw_fused.cu dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
@@ -260,6 +261,7 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")		
   add_subdirectory(targets/cuda)		
   target_include_directories(quda PRIVATE ../include/targets/cuda)
+  target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include/targets/cuda> $<INSTALL_INTERFACE:include/targets/cuda>)
   target_include_directories(quda SYSTEM PRIVATE ../include/targets/cuda/externals)
 endif()		
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")		
@@ -636,8 +638,8 @@ configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
 install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 if(QUDA_JITIFY)
-  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
-  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+  configure_file(../include/targets/cuda/jitify_options.hpp.in ../include/targets/cuda/jitify_options.hpp)
+  install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory

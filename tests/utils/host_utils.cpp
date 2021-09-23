@@ -1,3 +1,4 @@
+#include <limits>
 #include <complex>
 #include <stdlib.h>
 #include <stdio.h>
@@ -1415,7 +1416,7 @@ template <typename Float> void constructFundamentalGaugeField(Float **res)
   Float *resOut[4];
   for (int dir = 0; dir < 4; dir++) resOut[dir] = res[dir];
   
-  int Nc = 3;
+  int Nc = N_COLORS;
   
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static, 32)
@@ -1454,82 +1455,6 @@ template <typename Float> void constructFundamentalGaugeField(Float **res)
     }
   }
 }
-
-/*
-template <typename Float> void constructFundamentalGaugeField(Float **res)
-{
-  Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {
-    resEven[dir] = res[dir];
-    resOdd[dir] = res[dir] + Vh * gauge_site_size;
-  }
-
-  int Nc = 3;
-  
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static, 32)
-#endif
-  for (int dir = 0; dir < 4; dir++) {
-    for (int n = 0; n < Vh; n++) {
-      
-      // Populate unitary matrix
-      MatrixXcd U = MatrixXcd::Zero(Nc, Nc);
-      for (int i = 0; i < Nc; i++) {
-	for (int j = 0; j < Nc; j++) {
-	  U(i,j).real(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
-	  U(i,j).imag(resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
-	}
-      }
-      
-      // Eigensolve the link
-      Eigen::ComplexEigenSolver<MatrixXcd> eig;
-      eig.compute(U);
-      
-      // Get the eigendecomposion
-      MatrixXcd E = eig.eigenvectors();
-      // Get eigenvalues
-      MatrixXcd S = MatrixXcd::Identity(Nc, Nc);
-      for(int i=0; i<Nc; i++) S(i,i).real(std::atan2(eig.eigenvalues()[i].imag(), eig.eigenvalues()[i].real()));
-      // Construct H
-      MatrixXcd H = E * S * E.adjoint();
-      
-      // Populate array
-      for (int i = 0; i < Nc; i++) {
-	for (int j = 0; j < Nc; j++) {
-	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
-	  resEven[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
-	}
-      }
-
-      // Populate unitary matrix
-      for (int i = 0; i < Nc; i++) {
-	for (int j = 0; j < Nc; j++) {
-	  U(i,j).real(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0]);
-	  U(i,j).imag(resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1]);
-	}
-      }
-      
-      // Eigensolve the link
-      eig.compute(U);
-      
-      // Get the eigendecomposion
-      E = eig.eigenvectors();
-      // Get eigenvalues
-      for(int i=0; i<Nc; i++) S(i,i) = eig.eigenvalues()[i];
-      // Construct H
-      H = E * S * E.adjoint();
-
-      // Populate array
-      for (int i = 0; i < Nc; i++) {
-	for (int j = 0; j < Nc; j++) {
-	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 0] = H(i,j).real();
-	  resOdd[dir][n*(Nc*Nc*2) + i*(Nc*2) + j*(2) + 1] = H(i,j).imag();
-	}
-      }
-    }
-  }
-}
-*/
 
 template <typename Float> void constructCloverField(Float *res, double norm, double diag)
 {
@@ -1602,7 +1527,6 @@ template <typename Float> static void checkGauge(Float **oldG, Float **newG, dou
   
   printf("Component fails (X, Y, Z, T)\n");
   for (int i=0; i<2*N_COLORS*N_COLORS; i++) printf("%d fails = (%8d, %8d, %8d, %8d)\n", i, iter[0][i], iter[1][i], iter[2][i], iter[3][i]);
-  
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f = 0; f < fail_check; f++) {
     printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],

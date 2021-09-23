@@ -462,8 +462,9 @@ namespace quda {
 	 * @return L1 norm
 	 */
 	__host__ double norm1(int =-1, bool global=true) const {
+          commGlobalReductionPush(global);
           double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
-          if (global) comm_allreduce(&nrm1);
+          commGlobalReductionPop();
           return nrm1;
         }
 
@@ -473,8 +474,9 @@ namespace quda {
          * @return L1 norm
          */
         __host__ double norm2(int =-1, bool global=true) const {
+          commGlobalReductionPush(global);
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
-          if (global) comm_allreduce(&nrm2);
+          commGlobalReductionPop();
           return nrm2;
         }
 
@@ -484,8 +486,9 @@ namespace quda {
          * @return Linfinity norm
          */
         __host__ double abs_max(int =-1, bool global=true) const {
+          commGlobalReductionPush(global);
           double absmax = accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
-          if (global) comm_allreduce_max(&absmax);
+          commGlobalReductionPop();
           return absmax;
         }
 
@@ -495,10 +498,11 @@ namespace quda {
          * @return Minimum norm
          */
         __host__ double abs_min(int =-1, bool global=true) const {
-          double absmax = accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
+          commGlobalReductionPush(global);
+          double absmin = accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
-          if (global) comm_allreduce_min(&absmax);
-          return absmax;
+          commGlobalReductionPop();
+          return absmin;
         }
       };
 

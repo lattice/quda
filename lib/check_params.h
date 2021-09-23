@@ -321,11 +321,9 @@ void printQudaCloverParam(QudaInvertParam *param)
   P(clover_coeff, INVALID_DOUBLE);
   P(clover_csw, INVALID_DOUBLE);
 #endif
-    P(clover_order, QUDA_INVALID_CLOVER_ORDER);
-    P(cl_pad, INVALID_INT);
+  P(clover_order, QUDA_INVALID_CLOVER_ORDER);
+  P(cl_pad, INVALID_INT);
 
-    P(clover_coeff, INVALID_DOUBLE);
-    P(clover_csw, INVALID_DOUBLE);
 #ifndef INIT_PARAM
   }
 #endif
