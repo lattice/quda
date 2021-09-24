@@ -5549,6 +5549,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   diracParam.mass   = inv_param->mass;
   diracParam.m5     = inv_param->m5;
   diracParam.mu     = inv_param->mu;
+  diracParam.laplace3D = inv_param->laplace3D;
 
   for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
@@ -5569,7 +5570,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   const double ftmp    = -(width*width)/(4.0*n_steps*4.0);  /* Extra 4 to compensate for stride 2 */
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas::ax(ftmp, *in);  
   
   const double msq     = 1. / ftmp;  
   const double a       = 6.0 + msq;

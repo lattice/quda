@@ -733,7 +733,7 @@ namespace quda {
       __device__ __host__ void operator()(int x_cb, int parity, int)
       {
         int x[4];
-        int dx[4] = {0,0,0,0};
+        int dx[4][4] = { {1,0,0,0}, {0,1,0,0}, {0,0,1,0}, {0,0,0,1} };
 
         getCoords(x, x_cb, arg.X, parity);
 
@@ -756,9 +756,7 @@ namespace quda {
         for (int mu=0; mu<4; mu++) {
           int point_c = e_cb;
 
-          dx[mu]++;
-          int point_d = linkIndexShift(x,dx,arg.E);
-
+          int point_d = linkIndexShift(x,dx[mu],arg.E);
 
           Link Ucd = arg.link(mu, point_c, parity);
           Link Ude = arg.link(mu, point_d, 1-parity);
