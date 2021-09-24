@@ -64,8 +64,7 @@ namespace quda {
 
   struct CloverFieldParam : public LatticeFieldParam {
     bool reconstruct; /** Whether to create a compressed that requires reconstruction */
-    bool direct; // whether to create the direct clover
-    bool inverse; // whether to create the inverse clover
+    bool inverse; /** whether to create the inverse clover */
     void *clover;
     void *norm;
     void *cloverInv;
@@ -112,7 +111,6 @@ namespace quda {
     CloverFieldParam() :
       LatticeFieldParam(),
       reconstruct(clover::reconstruct()),
-      direct(true),
       inverse(true),
       clover(nullptr),
       norm(nullptr),
@@ -128,7 +126,6 @@ namespace quda {
     CloverFieldParam(const CloverFieldParam &param) :
       LatticeFieldParam(param),
       reconstruct(param.reconstruct),
-      direct(param.direct),
       inverse(param.inverse),
       clover(param.clover),
       norm(param.norm),
@@ -141,7 +138,29 @@ namespace quda {
     {
     }
 
-    CloverFieldParam(const CloverField &field);
+  CloverFieldParam(const QudaInvertParam &inv_param, const int *x) :
+      LatticeFieldParam(),
+      reconstruct(clover::reconstruct()),
+      inverse(true),
+      clover(nullptr),
+      norm(nullptr),
+      cloverInv(nullptr),
+      invNorm(nullptr),
+      csw(inv_param.clover_csw),
+      // If clover_coeff is not set manually, then it is the product Csw * kappa.
+      // If the user has set the clover_coeff manually, that value takes precedent.
+      coeff(inv_param.clover_coeff == 0.0 ? inv_param.kappa * inv_param.clover_csw : inv_param.clover_coeff),
+      twisted(inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false),
+      mu2(twisted ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
+      rho(inv_param.clover_rho),
+      location(QUDA_INVALID_FIELD_LOCATION)
+      {
+        siteSubset = QUDA_FULL_SITE_SUBSET;
+        pad = inv_param.cl_pad;
+        for (int i = 0; i < nDim; i++) this->x[i] = x[i];
+      }
+
+      CloverFieldParam(const CloverField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
@@ -436,14 +455,6 @@ namespace quda {
      @param computeTraceLog Whether to compute the trace logarithm of the clover term
   */
   void cloverInvert(CloverField &clover, bool computeTraceLog);
-
-  /**
-     @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)
-
-     @param clover The clover field
-     @param rho Real scalar to be added on
-  */
-  void cloverRho(CloverField &clover, double rho);
 
   /**
      @brief Compute the force contribution from the solver solution fields
