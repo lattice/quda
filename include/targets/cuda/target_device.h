@@ -22,7 +22,7 @@ namespace quda {
     {
       if target (nv::target::is_device) {
         return f<true>()(args...);
-      } else if target (nv::target::is_host) {
+      } else {
         return f<false>()(args...);
       }
     }

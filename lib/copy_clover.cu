@@ -21,7 +21,7 @@ namespace quda {
     CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                void *Out, void *In, float *outNorm, float *inNorm) :
       TunableKernel2D(in, 2, location),
-      arg(OutOrder(out, inverse, (FloatOut*)Out, outNorm), InOrder(in, inverse, (FloatIn*)In, inNorm), in),
+      arg(OutOrder(out, inverse, static_cast<FloatOut*>(Out), outNorm), InOrder(in, inverse, static_cast<FloatIn*>(In), inNorm), in),
       out(out),
       in(in)
     {

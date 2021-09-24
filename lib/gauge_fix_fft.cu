@@ -66,10 +66,9 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityFFT>(arg.result, tp, stream, arg);
-      if (!activeTuning()) {
-        arg.result[0] /= (double)(3 * Arg::gauge_dir * meta.Volume());
-        arg.result[1] /= (double)(3 * meta.Volume());
-      }
+
+      arg.result[0] /= static_cast<double>(3 * Arg::gauge_dir * meta.Volume());
+      arg.result[1] /= static_cast<double>(3 * meta.Volume());
     }
 
     long long flops() const { return (36 * Arg::gauge_dir + 65) * meta.Volume(); }

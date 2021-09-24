@@ -91,7 +91,8 @@ namespace quda
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
     */
-    ReduceArg(int n_reduce = 1, bool reset = false) :
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
+      kernel_param<use_kernel_arg>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
@@ -197,7 +198,7 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
@@ -266,7 +267,7 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 

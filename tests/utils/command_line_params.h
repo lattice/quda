@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <externals/CLI11.hpp>
+#include <CLI11.hpp>
 #include <quda.h>
 
 // for compatibility while porting - remove later
@@ -216,6 +216,7 @@ extern double anisotropy;
 extern double tadpole_factor;
 extern double eps_naik;
 extern int n_naiks;
+extern double clover_csw;
 extern double clover_coeff;
 extern bool compute_clover;
 extern bool compute_clover_trlog;
@@ -365,37 +366,6 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern double stout_smear_rho;
-extern double stout_smear_epsilon;
-extern double ape_smear_rho;
-extern int smear_steps;
-extern double wflow_epsilon;
-extern int wflow_steps;
-extern QudaWFlowType wflow_type;
-extern int measurement_interval;
-
-extern int gf_gauge_dir;
-extern int gf_maxiter;
-extern int gf_verbosity_interval;
-extern double gf_ovr_relaxation_boost;
-extern double gf_fft_alpha;
-extern int gf_reunit_interval;
-extern double gf_tolerance;
-extern bool gf_theta_condition;
-extern bool gf_fft_autotune;
-
 extern QudaContractType contract_type;
 
 extern std::array<int, 4> grid_partition;
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
-
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;

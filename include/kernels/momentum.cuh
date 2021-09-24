@@ -13,10 +13,8 @@ namespace quda {
     const typename gauge_mapper<Float, recon>::type mom;
 
     MomActionArg(const GaugeField &mom) :
-      mom(mom)
-    {
-      this->threads = dim3(mom.VolumeCB(), 2, 1);
-    }
+      ReduceArg<double>(dim3(mom.VolumeCB(), 2, 1)),
+      mom(mom) { }
 
     __device__ __host__ double init() const { return 0.0; }
   };
@@ -72,11 +70,11 @@ namespace quda {
     int border[4]; //
 
     UpdateMomArg(GaugeField &mom, const Float &coeff, const GaugeField &force) :
+      ReduceArg<reduce_t>(dim3(mom.VolumeCB(), 2, 1)),
       mom(mom),
       force(force),
       coeff(coeff)
     {
-      this->threads = dim3(mom.VolumeCB(), 2, 1);
       for (int dir=0; dir<4; ++dir) {
         X[dir] = mom.X()[dir];
         E[dir] = force.X()[dir];
