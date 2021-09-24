@@ -182,8 +182,9 @@ namespace quda {
 
   void CloverField::copy(const CloverField &src, bool is_inverse)
   {
+    // special case where we wish to make a copy of the inverse field when dynamic_inverse is enabled
     static bool dynamic_inverse_copy = false;
-    if (is_inverse && clover::dynamic_inverse() && !src.V(true) && !dynamic_inverse_copy) {
+    if (is_inverse && clover::dynamic_inverse() && V(true) && !src.V(true) && !dynamic_inverse_copy) {
       dynamic_inverse_copy = true;
       // create a copy of the clover field that we will invert in place and use as the source
       CloverFieldParam param(src);
@@ -198,20 +199,14 @@ namespace quda {
     }
 
     checkField(src);
-    if (!V(is_inverse)) errorQuda("Destination field's inverse=%d component does not exist", is_inverse);
-    if (!src.V(is_inverse) && !dynamic_inverse_copy) errorQuda("Source field's inverse=%d component does not exist", is_inverse);
+    if (!V(is_inverse)) errorQuda("Destination field's is_inverse=%d component does not exist", is_inverse);
+    if (!src.V(is_inverse) && !dynamic_inverse_copy) errorQuda("Source field's is_inverse=%d component does not exist", is_inverse);
 
-    auto src_v = src.V(is_inverse);
+    auto src_v = dynamic_inverse_copy ? src.V(false) : src.V(is_inverse);
 
-    // special case where we are copying the inverse field computed in QUDA with dynamic_inverse enabled
-    if (dynamic_inverse_copy) src_v = src.V(false);
-
+    // if the destination is fixed point, then we must set the global norm
     if (precision < QUDA_SINGLE_PRECISION) {
-      if (src.Precision() >= QUDA_SINGLE_PRECISION) {
-        max[is_inverse] = src.abs_max(is_inverse);
-      } else {
-        max[is_inverse] = src.max_element(is_inverse);
-      }
+      max[is_inverse] = src.Precision() >= QUDA_SINGLE_PRECISION ? src.abs_max(is_inverse) : src.max_element(is_inverse);
     }
 
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
