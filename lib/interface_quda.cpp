@@ -850,13 +850,13 @@ void freeSloppyCloverQuda();
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
+  pushVerbosity(inv_param->verbosity);
   profileClover.TPSTART(QUDA_PROFILE_TOTAL);
   profileClover.TPSTART(QUDA_PROFILE_INIT);
 
   checkCloverParam(inv_param);
   bool device_calc = false; // calculate clover and inverse on the device?
 
-  pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -874,15 +874,11 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     errorQuda("Wrong dslash_type %d in loadCloverQuda()", inv_param->dslash_type);
   }
 
-  // determines whether operator is preconditioned when calling invertQuda()
-  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMOP_PC_SOLVE ||
-      inv_param->solve_type == QUDA_NORMERR_PC_SOLVE );
-
   CloverFieldParam clover_param(*inv_param, gaugePrecise->X());
   clover_param.create = QUDA_NULL_FIELD_CREATE;
-  clover_param.setPrecision(inv_param->clover_cuda_prec, true);
-  clover_param.inverse = (h_clovinv || pc_solve) && !clover::dynamic_inverse() ? true : false;
+  // do initial creation and download in same precision as caller, and demote after if needed
+  clover_param.setPrecision(inv_param->clover_cpu_prec, true);
+  clover_param.inverse = !clover::dynamic_inverse();
   clover_param.location = QUDA_CUDA_FIELD_LOCATION;
 
   // Adjust inv_param->clover_coeff: if a user has set kappa and Csw,
@@ -935,7 +931,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (!device_calc) {
       profileClover.TPSTART(QUDA_PROFILE_H2D);
       cloverPrecise->copy(*in, false);
-      if ((h_clovinv && !inv_param->compute_clover_inverse) && pc_solve && !clover::dynamic_inverse()) cloverPrecise->copy(*in, true);
+      if ((h_clovinv && !inv_param->compute_clover_inverse) && !clover::dynamic_inverse()) cloverPrecise->copy(*in, true);
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
       profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -943,8 +939,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       profileClover.TPSTART(QUDA_PROFILE_TOTAL);
     }
 
-    // inverted clover term is required when applying preconditioned operator
-    if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve && !clover::dynamic_inverse()) {
+    if ((!h_clovinv || inv_param->compute_clover_inverse) && !clover::dynamic_inverse()) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
       cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
       if (inv_param->compute_clover_trlog) {
@@ -956,10 +951,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   } else {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gauge field unchanged - using cached clover field\n");
   }
-
-  QudaPrecision prec[] = {inv_param->clover_cuda_prec_sloppy, inv_param->clover_cuda_prec_precondition,
-                          inv_param->clover_cuda_prec_refinement_sloppy, inv_param->clover_cuda_prec_eigensolver};
-  loadSloppyCloverQuda(prec);
 
   // if requested, copy back the clover / inverse field
   if (inv_param->return_clover || inv_param->return_clover_inverse) {
@@ -978,11 +969,26 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     }
   }
 
+  if (cloverPrecise->Precision() != inv_param->clover_cuda_prec) {
+    // we created the clover field in caller precision, and now need to demote to the desired precision
+    CloverFieldParam param(*cloverPrecise);
+    param.create = QUDA_NULL_FIELD_CREATE;
+    param.setPrecision(inv_param->clover_cuda_prec, true);
+    CloverField *tmp = new CloverField(param);
+    tmp->copy(*cloverPrecise);
+    std::swap(tmp, cloverPrecise);
+    delete tmp;
+  }
+
   profileClover.TPSTART(QUDA_PROFILE_FREE);
   if (in) delete in; // delete object referencing input field
   profileClover.TPSTOP(QUDA_PROFILE_FREE);
-  profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 
+  QudaPrecision prec[] = {inv_param->clover_cuda_prec_sloppy, inv_param->clover_cuda_prec_precondition,
+                          inv_param->clover_cuda_prec_refinement_sloppy, inv_param->clover_cuda_prec_eigensolver};
+  loadSloppyCloverQuda(prec);
+
+  profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
   popVerbosity();
 }
 
@@ -4265,18 +4271,30 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cudaGaugeField *gauge = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profileClover, false, recon);
 
   profileClover.TPSTART(QUDA_PROFILE_INIT);
+
+  GaugeField *ex = gauge;
+  if (gauge->Precision() < cloverPrecise->Precision()) {
+    GaugeFieldParam param(*gauge);
+    param.setPrecision(cloverPrecise->Precision(), true);
+    param.create = QUDA_NULL_FIELD_CREATE;
+    ex = GaugeField::Create(param);
+    ex->copy(*gauge);
+  }
+
   // create the Fmunu field
-  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+  GaugeFieldParam tensorParam(gaugePrecise->X(), ex->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField Fmunu(tensorParam);
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
   profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
-  computeFmunu(Fmunu, *gauge);
+  computeFmunu(Fmunu, *ex);
   computeClover(*cloverPrecise, Fmunu, invertParam->clover_coeff);
   profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  if (ex != gauge) delete ex;
 
   // FIXME always preserve the extended gauge
   extendedGaugeResident = gauge;

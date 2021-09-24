@@ -264,9 +264,7 @@ namespace quda {
     // only create inverse if not doing dynamic clover and one already exists
     cf_param.inverse = !clover::dynamic_inverse() && clover && clover->V(true);
     cf_param.clover = nullptr;
-    cf_param.norm = 0;
     cf_param.cloverInv = nullptr;
-    cf_param.invNorm = 0;
     cf_param.create = QUDA_NULL_FIELD_CREATE;
     cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     cf_param.location = location;

@@ -37,6 +37,7 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
   void computeClover(CloverField &clover, const GaugeField& f, double coeff)
   {
+    if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
     instantiate<ComputeClover>(clover, f, coeff);
   }
 #else

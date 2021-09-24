@@ -16,11 +16,10 @@ namespace quda {
     Out out;
     const In in;
     CopyCloverArg(CloverField &out, const CloverField &in, bool inverse,
-                  store_out_t *out_p, float *out_norm,
-                  const store_in_t *in_p, const float *in_norm) :
+                  store_out_t *out_p, const store_in_t *in_p) :
       kernel_param(dim3(in.VolumeCB(), 2, 1)),
-      out(out, inverse, out_p, out_norm),
-      in(in, inverse, const_cast<store_in_t*>(in_p), const_cast<float*>(in_norm)) { }
+      out(out, inverse, out_p),
+      in(in, inverse, const_cast<store_in_t*>(in_p)) { }
   };
 
   /** 

@@ -50,6 +50,7 @@ namespace quda {
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
     if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
+    if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
     instantiate<CloverInvert>(clover, computeTraceLog);
   }
 #else

@@ -541,9 +541,11 @@ namespace quda {
       static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
       static constexpr int Nrem = compressed_block % N;
       Float *clover;
-      norm_type *norm;
+      norm_type nrm;
+      norm_type nrm_inv;
+
+      const bool is_inverse;
       const AllocInt offset; // offset can be 32-bit or 64-bit
-      const AllocInt norm_offset;
 	const int volumeCB;
 	const int stride;
 
@@ -552,30 +554,26 @@ namespace quda {
         const real rho;
 
         size_t bytes;
-	size_t norm_bytes;
 	void *backup_h; //! host memory for backing up the field when tuning
-	void *backup_norm_h; //! host memory for backing up norm when tuning
 
-        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr, norm_type *norm_ = nullptr) :
+        FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
+          nrm(clover.max_element(is_inverse) / 2), // factor of two in normalization
+          nrm_inv(fixedMaxValue<Float>::value / nrm),
+          is_inverse(is_inverse),
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
-          norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
           volumeCB(clover.VolumeCB()),
           stride(clover.Stride()),
           twisted(clover.Twisted()),
           mu2(clover.Mu2()),
           rho(clover.Rho()),
           bytes(clover.Bytes()),
-          norm_bytes(clover.NormBytes()),
-          backup_h(nullptr),
-          backup_norm_h(nullptr)
+          backup_h(nullptr)
         {
-          if (clover.Order() != N) {
-            errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
-          }
+          if (clover.Order() != N) errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           if (clover.Reconstruct() != enable_reconstruct)
             errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct, clover.Reconstruct());
+          if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value) errorQuda("Max element appears unset");
           this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
-          this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
 	}
 
 	bool Twisted() const { return twisted; }
@@ -608,7 +606,6 @@ namespace quda {
           constexpr int M = (compressed_block + N - 1)/ N; // number of short vectors per chiral block
           constexpr int M_offset = compressed_block / N; // number of short vectors per chiral block
 
-          norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, parity * norm_offset + chirality * stride + x) : 0;
           vector_type<real, M * N> tmp;
           vector_type<real, compressed_block> tmp2;
 
@@ -643,20 +640,8 @@ namespace quda {
 
           vector_type<real, block> tmp;
 
-          // find the norm of each chiral block
-          if (isFixed<Float>::value) {
-            norm_type scale = static_cast<norm_type>(1.0);
 #pragma unroll
-            for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
-            norm[parity*norm_offset + chirality*stride + x] = scale;
-
-            real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
-            for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
-          } else {
-#pragma unroll
-            for (int i = 0; i < block; i++) tmp[i] = v[i];
-          }
+          for (int i = 0; i < block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
 
           vector_type<real, compressed_block> tmp2;
           recon.pack(tmp2, tmp);
@@ -718,10 +703,6 @@ namespace quda {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
           qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
-          if (norm_bytes) {
-            backup_norm_h = safe_malloc(norm_bytes);
-            qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
-          }
         }
 
         /**
@@ -732,19 +713,9 @@ namespace quda {
           qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
           host_free(backup_h);
           backup_h = nullptr;
-          if (norm_bytes) {
-            qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
-            host_free(backup_norm_h);
-            backup_norm_h = nullptr;
-          }
         }
 
-      size_t Bytes() const
-      {
-        size_t bytes = 2 * decltype(recon)::compressed_block_size() * sizeof(Float);
-        if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
-        return bytes;
-      }
+      size_t Bytes() const { return 2 * decltype(recon)::compressed_block_size() * sizeof(Float); }
     };
 
     /**

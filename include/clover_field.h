@@ -66,9 +66,7 @@ namespace quda {
     bool reconstruct; /** Whether to create a compressed that requires reconstruction */
     bool inverse; /** whether to create the inverse clover */
     void *clover;
-    void *norm;
     void *cloverInv;
-    void *invNorm;
     double csw;  //! C_sw clover coefficient
     double coeff;  //! Overall clover coefficient
     bool twisted; // whether to create twisted mass clover
@@ -113,9 +111,7 @@ namespace quda {
       reconstruct(clover::reconstruct()),
       inverse(true),
       clover(nullptr),
-      norm(nullptr),
       cloverInv(nullptr),
-      invNorm(nullptr),
       twisted(false),
       mu2(0.0),
       rho(0.0),
@@ -128,9 +124,7 @@ namespace quda {
       reconstruct(param.reconstruct),
       inverse(param.inverse),
       clover(param.clover),
-      norm(param.norm),
       cloverInv(param.cloverInv),
-      invNorm(param.invNorm),
       twisted(param.twisted),
       mu2(param.mu2),
       rho(param.rho),
@@ -143,9 +137,7 @@ namespace quda {
       reconstruct(clover::reconstruct()),
       inverse(true),
       clover(nullptr),
-      norm(nullptr),
       cloverInv(nullptr),
-      invNorm(nullptr),
       csw(inv_param.clover_csw),
       // If clover_coeff is not set manually, then it is the product Csw * kappa.
       // If the user has set the clover_coeff manually, that value takes precedent.
@@ -171,7 +163,6 @@ namespace quda {
     const bool reconstruct; /** Whether this field is compressed and requires reconstruction */
 
     size_t bytes; // bytes allocated per clover full field
-    size_t norm_bytes; // sizeof each norm full field
     size_t length;
     size_t real_length;
     size_t compressed_block; /** Length of compressed chiral block */
@@ -179,9 +170,9 @@ namespace quda {
     int nSpin;
 
     void *clover;
-    void *norm;
     void *cloverInv;
-    void *invNorm;
+
+    float max[2];
 
     double csw;
     double coeff;
@@ -218,9 +209,10 @@ namespace quda {
     static CloverField *Create(const CloverFieldParam &param);
 
     void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
-    void* Norm(bool inverse=false) { return inverse ? invNorm : norm; }
     const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
-    const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
+
+    /** @return max element in the clover field for fixed-point scaling */
+    auto max_element(bool inverse) const { return max[inverse]; }
 
     /**
      * Define the parameter type for this field.
@@ -257,11 +249,6 @@ namespace quda {
        @return The size of the fieldallocation
      */
     size_t Bytes() const { return bytes; }
-
-    /**
-       @return The size of the norm allocation
-     */
-    size_t NormBytes() const { return norm_bytes; }
 
     /**
        @return The total bytes of allocation
@@ -364,18 +351,18 @@ namespace quda {
     void restore() const;
 
     /**
-      @brief If managed memory and prefetch is enabled, prefetch
-      the clover, the norm field (as appropriate), and the inverse
-      fields (as appropriate) to the CPU or the GPU.
+      @brief If managed memory and prefetch is enabled, prefetch the
+      clover and the inverse fields (as appropriate) to the CPU or the
+      GPU.
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
 
     /**
-      @brief If managed memory and prefetch is enabled, prefetch
-      the clover, norm field and/or the inverse
-      fields as specified to the CPU or the GPU.
+      @brief If managed memory and prefetch is enabled, prefetch the
+      clover, and/or the inverse fields as specified to the CPU or the
+      GPU.
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in
       @param[in] type Whether to grab the clover, inverse, or both
@@ -439,11 +426,9 @@ namespace quda {
      @param location The location of where we are doing the copying (CPU or CUDA)
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
-     @param outNorm The output norm buffer (optional)
-     @param inNorm The input norm buffer (optional)
   */
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
-			 QudaFieldLocation location, void *Out=0, const void *In=0, void *outNorm=0, const void *inNorm=0);
+			 QudaFieldLocation location, void *Out=0, const void *In=0);
 
 
 
