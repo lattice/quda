@@ -6381,29 +6381,15 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
   if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Pre  step %d: gauge action %.16e momentum action %.16e Q charge %+.16e plaq = %.16e\n",
 						 step, gauge_action, momentum_action, gauge_obs_param.qcharge, gauge_obs_param.plaquette[0]);
 
-
-  // Begin HMC with initial half step.
-  //----------------------------------
   double hmc_coeff = hmc_param->beta*epsilon/3.0;
 
-  // Initial half step
-  // P_{1/2} = P_0 - dtau/2 * (fU - fD) 
-  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  // Inside the gauge force calculation is a momentum update too.
-  gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff/2.0, path_coeff);
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-  
-  for(int k=1; k<hmc_param->traj_steps; k++) {
+  // Begin HMC
+  //----------------------------------
+  for(int k=0; k<hmc_param->traj_steps; k++) {
 
-    // Now we have the gauge field force accumulated in the momentum
-    // field, we apply the impulse to the gauge field, reunitarize,
-    // and start the next leapfrog step in the integration.
-    // U_{k} = exp(i dtau P_{k-1/2}) * U_{k-1}
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
     profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
-    updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
+    updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);
     copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
     gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
     profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -6421,29 +6407,15 @@ int performLeapfrogStep(void *host_solution_ptr, void *host_source_ptr, QudaHMCP
     gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff, path_coeff);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
-    
-  }
 
-  // Final half step
-  // U_{n} = exp(i dtau P_{n-1/2}) * U_{n-1}
-  profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
-  updateGaugeField(*gaugeTemp, epsilon, *gaugeEvolved, *device_mom, false, true);
-  copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
-  gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
-  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
-  
-  *num_failures_h = 0;
-  quda::unitarizeLinks(*gaugeEvolved, num_failures_d); // unitarize on the gpu
-  if (*num_failures_h>0) errorQuda("Error in reunitarization: %d failures\n", *num_failures_h);
-  
-  //P_{n} = P_{n-1/2} - dtau/2 * (fU - fD) 
-  profileGaugeForce.TPSTART(QUDA_PROFILE_TOTAL);
-  profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugeForceNew(*device_mom, *gaugeEvolved, gauge_action_type, hmc_coeff/2.0, path_coeff);
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+    profileGaugeUpdate.TPSTART(QUDA_PROFILE_TOTAL);
+    profileGaugeUpdate.TPSTART(QUDA_PROFILE_COMPUTE);
+    updateGaugeField(*gaugeTemp, 0.5*epsilon, *gaugeEvolved, *device_mom, false, true);
+    copyExtendedGauge(*gaugeEvolved, *gaugeTemp, QUDA_CUDA_FIELD_LOCATION);
+    gaugeEvolved->exchangeExtendedGhost(gaugeEvolved->R(), false);
+    profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
+  }
   
   // Measure gauge and Q charge
   gaugeObservablesQuda(&gauge_obs_param);

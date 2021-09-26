@@ -260,7 +260,6 @@ quda::file_array<char[256]> prop_source_outfile;
 quda::file_array<char[256]> prop_sink_infile;
 quda::file_array<char[256]> prop_sink_outfile;
 quda::source_array<std::array<int, 4>> prop_source_position = {0, 0, 0, 0};
-
 int prop_source_smear_steps = 0;
 int prop_sink_smear_steps = 0;
 double prop_source_smear_coeff = 2.0;
@@ -268,6 +267,16 @@ double prop_sink_smear_coeff = 2.0;
 bool prop_read_sources = false;
 int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
+
+// gauge smear options
+double stout_smear_rho = 0.1;
+double stout_smear_epsilon = -0.25;
+double ape_smear_rho = 0.6;
+int gauge_smear_steps = 50;
+double wflow_epsilon = 0.01;
+int wflow_steps = 100;
+QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
+int measurement_interval = 5;
 
 // contract options
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_DR_FT_T;
@@ -1028,6 +1037,36 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup->add_option("--prop-save-prec", prop_save_prec, "Precision with which to save propagators (default single)")
     ->transform(prec_transform);
+}
+
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
+
+  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
+
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
+
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
+
+  opgroup->add_option("--su3-wflow-steps", wflow_steps,
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
+
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  ;
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }
 
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app)
