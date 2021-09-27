@@ -45,7 +45,7 @@ namespace quda {
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
       out(out), in(in),
       clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
-      cloverInv(clover, inverse),
+      cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
       nParity(in.SiteSubset()), parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)

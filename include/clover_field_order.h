@@ -572,7 +572,7 @@ namespace quda {
           if (clover.Order() != N) errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
           if (clover.Reconstruct() != enable_reconstruct)
             errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct, clover.Reconstruct());
-          if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value) errorQuda("Max element appears unset");
+          if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value) errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
           this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
 	}
 
