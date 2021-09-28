@@ -5498,7 +5498,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     gParam.create = QUDA_NULL_FIELD_CREATE;
     cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
 
-    staggered_qsmear::computeTwoLink(*two_link_ptr, *gaugePrecise);
+    computeTwoLink(*two_link_ptr, *gaugePrecise);
     gaugeSmeared = two_link_ptr;
   }
 

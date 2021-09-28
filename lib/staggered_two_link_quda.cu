@@ -5,13 +5,11 @@
 #include <tune_quda.h>
 #include <instantiate.h>
 #include <tunable_nd.h>
-#include <kernels/hisq_paths_force.cuh>
+#include <kernels/staggered_two_link.cuh>
 
 namespace quda {
 
-using namespace fermion_force;
-
-  namespace staggered_qsmear {
+using namespace staggered_quark_smearing;
 
     template <typename Arg> class TwoLink_ : public TunableKernel3D {
       Arg &arg;
@@ -74,7 +72,4 @@ using namespace fermion_force;
       errorQuda("HISQ force not enabled");
     }
 #endif
-
-  } // namespace staggered_qsmear
-
 } // namespace quda
