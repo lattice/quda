@@ -172,7 +172,8 @@ namespace quda {
     void *clover;
     void *cloverInv;
 
-    float max[2];
+    double diagonal;
+    double max[2];
 
     double csw;
     double coeff;
@@ -211,7 +212,19 @@ namespace quda {
     void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
     const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
 
-    /** @return max element in the clover field for fixed-point scaling */
+    /**
+       @return diagonal scaling factor applied to the identity
+    */
+    double Diagonal() const { return diagonal; }
+
+    /**
+       @return set diagonal scaling factor applied to the identity
+    */
+    void Diagonal(double diagonal) { this->diagonal = diagonal; }
+
+    /**
+       @return max element in the clover field for fixed-point scaling
+    */
     auto max_element(bool inverse) const { return max[inverse]; }
 
     /**

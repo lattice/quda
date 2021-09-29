@@ -8,33 +8,62 @@ namespace quda {
 
   template <typename OutOrder, typename InOrder, typename FloatOut, typename FloatIn>
   class CopyClover : TunableKernel2D {
-    CopyCloverArg<FloatOut, FloatIn, OutOrder, InOrder> arg;
+    using Arg = CopyCloverArg<FloatOut, FloatIn, OutOrder, InOrder>;
+    using real = typename mapper<FloatOut>::type;
+    bool compute_diagonal;
+    real *diagonal_d;
+    real *diagonal_h;
     CloverField &out;
     const CloverField &in;
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0 ;}
-
-    unsigned int minThreads() const { return arg.threads.x; }
+    bool inverse;
+    FloatOut *Out;
+    const FloatIn *In;
+    unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
     CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                void *Out, const void *In) :
       TunableKernel2D(in, 2, location),
-      arg(out, in, inverse, static_cast<FloatOut*>(Out), static_cast<const FloatIn*>(In)),
+      compute_diagonal(out.Reconstruct() && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
+      diagonal_d(compute_diagonal ? static_cast<real*>(pool_device_malloc(sizeof(real))) : nullptr),
+      diagonal_h(compute_diagonal ? static_cast<real*>(pool_pinned_malloc(sizeof(real))) : nullptr),
       out(out),
-      in(in)
+      in(in),
+      inverse(inverse),
+      Out(static_cast<FloatOut*>(Out)),
+      In(static_cast<const FloatIn*>(In))
     {
+      if (compute_diagonal) {
+        char aux2[TuneKey::aux_n];
+        strcpy(aux2, aux);
+        strcat(aux,",compute_diagonal");
+        apply(device::get_default_stream());
+        strcpy(aux, aux2);
+        compute_diagonal = false;
+      }
+
       apply(device::get_default_stream());
+    }
+
+    virtual ~CopyClover()
+    {
+      if (diagonal_h) pool_pinned_free(diagonal_h);
+      if (diagonal_d) pool_device_free(diagonal_d);
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverCopy, true>(tp, stream, arg);
+
+      auto diagonal = location == QUDA_CUDA_FIELD_LOCATION ? diagonal_d :diagonal_h;
+      launch<CloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+
+      if (compute_diagonal) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy(diagonal_h, diagonal_d, sizeof(real), qudaMemcpyDeviceToHost);
+        out.Diagonal(*diagonal_h / 2);
+      }
     }
 
-    long long flops() const { return 0; } 
-    long long bytes() const { return out.Bytes() + in.Bytes(); }
+    long long bytes() const { return (out.Bytes() + in.Bytes()) / (compute_diagonal ? in.Volume() : 1); }
   };
 
   template <typename InOrder, typename FloatOut, typename FloatIn>
@@ -65,7 +94,7 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn> struct CloverCopyOut {
-    CloverCopyOut(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location, 
+    CloverCopyOut(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
                   void *Out, const void *In)
     {
       if (in.isNative()) {
@@ -97,7 +126,7 @@ namespace quda {
   };
 
   template <typename FloatIn> struct CloverCopyIn {
-    CloverCopyIn(const CloverField &in, CloverField &out, bool inverse, QudaFieldLocation location, 
+    CloverCopyIn(const CloverField &in, CloverField &out, bool inverse, QudaFieldLocation location,
                  void *Out, const void *In)
     {
       // swizzle in/out back to instantiate out precision

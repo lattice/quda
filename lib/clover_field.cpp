@@ -42,6 +42,7 @@ namespace quda {
     nSpin(4),
     clover(0),
     cloverInv(0),
+    diagonal(0),
     max{0, 0},
     csw(param.csw),
     coeff(param.coeff),
@@ -204,8 +205,14 @@ namespace quda {
 
     auto src_v = dynamic_inverse_copy ? src.V(false) : src.V(is_inverse);
 
-    // if the destination is fixed point, then we must set the global norm
+    // if we copying to a reconstruction field, we must find the overall scale factor to allow us to reconstruct
+    if (Reconstruct()) {
+      if (src.Reconstruct()) Diagonal(src.Diagonal());
+      else Diagonal(-1);
+    }
+
     if (precision < QUDA_SINGLE_PRECISION) {
+      // if the destination is fixed point, then we must set the global norm
       max[is_inverse] = src.Precision() >= QUDA_SINGLE_PRECISION ? src.abs_max(is_inverse) : src.max_element(is_inverse);
     }
 

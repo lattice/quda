@@ -74,6 +74,10 @@ namespace quda {
 
     template <typename real, int block, bool enable_reconstruct> struct reconstruct_t {
 
+      real diagonal;
+
+      constexpr reconstruct_t(real diagonal) : diagonal(diagonal) {}
+
       /** Length of compressed block */
       static constexpr int compressed_block_size() { return 28; }
 
@@ -118,14 +122,17 @@ namespace quda {
         return order[i];
       }
 
-      template <typename T>
-      __device__ __host__ inline T decompress(const T &in, int k) const
+      template <typename T> constexpr T decompress(const T &in, int k) const
       {
         switch (k) {
+        case 0:
+        case 1:
+        case 2:
+          return diagonal + in;
         case 3:
         case 4:
         case 5:
-          return static_cast<T>(1.0) - in;
+          return diagonal - in;
         case 30:
         case 31:
         case 32:
@@ -141,12 +148,13 @@ namespace quda {
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
 #pragma unroll
-        for (int i = 0; i < block; i++) out[i] = in[pack_idx(i)];
+        for (int i = 0; i < compressed_block_size(); i++) out[unpack_idx(i)] = in[i];
 
-        // reconstruct matrix entries from symmetry
-        //out[3] = static_cast<real>(1.0) - out[0];
-        out[4] = static_cast<real>(1.0) - out[1];
-        out[5] = static_cast<real>(1.0) - out[2];
+        // first reconstruct second set of diagonal elements before we reconstruct the first set
+#pragma unroll
+        for (int i = 0; i < 3; i++) out[i + 3] = diagonal - out[i];
+#pragma unroll
+        for (int i = 0; i < 3; i++) out[i + 0] = diagonal + out[i];
 
         out[30] = -out[6];
         out[31] = -out[7];
@@ -160,17 +168,23 @@ namespace quda {
       {
 #pragma unroll
         for (int i = 0; i < compressed_block_size(); i++) out[i] = in[unpack_idx(i)];
+        // remove diagonal constant
+#pragma unroll
+        for (int i = 0; i < 3; i++) out[i] -= diagonal;
+        out[3] = 0.0; // intentionally zero this so that it can't contribute to the max element
       }
     };
 
     template <typename real, int block> struct reconstruct_t<real, block, false> {
 
+      real diagonal;
+      constexpr reconstruct_t(real diagonal) : diagonal(diagonal) {}
       static constexpr auto compressed_block_size() { return block; }     /** Length of compressed block */
       constexpr auto pack_idx(int i) const { return i; }
       constexpr auto compress_idx(int i) const { return i; }
       constexpr auto pack_compress_idx(int i) const { return i; }
 
-      template <typename T> __device__ __host__ inline T decompress(const T &in, int k) const { return in; }
+      template <typename T> constexpr T decompress(const T &in, int k) const { return in; }
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
@@ -296,7 +310,8 @@ namespace quda {
         a(static_cast<Float*>(const_cast<void*>(A.V(inverse)))),
         stride(A.Stride()),
         offset_cb(A.Bytes()/(2*sizeof(Float))),
-        compressed_block_size(A.compressed_block_size()) { }
+        compressed_block_size(A.compressed_block_size()),
+        recon(A.Diagonal()) { }
 
       __device__ __host__ inline complex<Float> operator()(int parity, int x, int chirality, int s_row, int s_col, int c_row, int c_col) const
       {
@@ -557,6 +572,7 @@ namespace quda {
 	void *backup_h; //! host memory for backing up the field when tuning
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
+          recon(clover.Diagonal()),
           nrm(clover.max_element(is_inverse) / 2), // factor of two in normalization
           nrm_inv(fixedMaxValue<Float>::value / nrm),
           is_inverse(is_inverse),
@@ -573,6 +589,7 @@ namespace quda {
           if (clover.Reconstruct() != enable_reconstruct)
             errorQuda("Accessor reconstruct = %d does not match field reconstruct %d", enable_reconstruct, clover.Reconstruct());
           if (clover.max_element(is_inverse) == 0.0 && isFixed<Float>::value) errorQuda("%p max_element(%d) appears unset", &clover, is_inverse);
+          if (clover.Diagonal() == 0.0 && clover.Reconstruct()) errorQuda("%p diagonal appears unset", &clover);
           this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
 	}
 
@@ -638,20 +655,17 @@ namespace quda {
           constexpr int M = (compressed_block + N - 1)/ N; // number of short vectors per chiral block
           constexpr int M_offset = compressed_block / N; // number of short vectors per chiral block
 
-          vector_type<real, block> tmp;
-
+          vector_type<real, compressed_block> tmp;
+          recon.pack(tmp, v);
 #pragma unroll
-          for (int i = 0; i < block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
-
-          vector_type<real, compressed_block> tmp2;
-          recon.pack(tmp2, tmp);
+          for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? tmp[i] * nrm_inv : tmp[i];
 
 #pragma unroll
           for (int i = 0; i < M_offset; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp2[chirality * Nrem + i * N + j]);
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * Nrem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
@@ -660,9 +674,7 @@ namespace quda {
             typename VectorType<Float, std::max(Nrem, 1)>::type vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < Nrem; j++) {
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp2[(1 - chirality) * M_offset * N + j]);
-            }
+            for (int j = 0; j < Nrem; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
 
             char *ptr = reinterpret_cast<char*>(reinterpret_cast<Vector*>(clover) + parity * offset + x);
             ptr += (stride * (M_offset * N) + chirality * Nrem) * sizeof(Float);
