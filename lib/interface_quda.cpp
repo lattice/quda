@@ -1005,7 +1005,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
 
     if (clover_param.Precision() != cloverPrecise->Precision()) {
       cloverSloppy = new CloverField(clover_param);
-      cloverSloppy->copy(*cloverPrecise, clover_param.inverse);
+      cloverSloppy->copy(*cloverPrecise);
     } else {
       cloverSloppy = cloverPrecise;
     }
@@ -1020,7 +1020,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
       cloverPrecondition = cloverSloppy;
     } else {
       cloverPrecondition = new CloverField(clover_param);
-      cloverPrecondition->copy(*cloverPrecise, clover_param.inverse);
+      cloverPrecondition->copy(*cloverPrecise);
     }
 
     // switch the parameters for creating the mirror refinement clover field
@@ -1029,7 +1029,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
     // create the mirror refinement clover field
     if (clover_param.Precision() != cloverSloppy->Precision()) {
       cloverRefinement = new CloverField(clover_param);
-      cloverRefinement->copy(*cloverSloppy, clover_param.inverse);
+      cloverRefinement->copy(*cloverSloppy);
     } else {
       cloverRefinement = cloverSloppy;
     }
@@ -1045,7 +1045,7 @@ void loadSloppyCloverQuda(const QudaPrecision *prec)
       cloverEigensolver = cloverPrecondition;
     } else {
       cloverEigensolver = new CloverField(clover_param);
-      cloverEigensolver->copy(*cloverPrecise, clover_param.inverse);
+      cloverEigensolver->copy(*cloverPrecise);
     }
   }
 
