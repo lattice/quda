@@ -94,8 +94,8 @@ namespace quda {
         half_fermion chi = in.chiral_project(chirality);
 
         if (arg.dynamic_clover && arg.inverse) {
-          Cholesky<HMatrix, real, N> cholesky(A);
-          chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
+          Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+          chi = static_cast<real>(0.25) * cholesky.solve(chi);
         } else {
           chi = A * chi;
         }
@@ -144,8 +144,8 @@ namespace quda {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a*arg.a*static_cast<real>(0.25);
-            Cholesky<HMatrix, real, N> cholesky(A2);
-            out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
+            Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
+            out_chi = static_cast<real>(0.25)*cholesky.solve(out_chi);
           } else {
             Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
             out_chi = static_cast<real>(2.0)*(Ainv*out_chi);

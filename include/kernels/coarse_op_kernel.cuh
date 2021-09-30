@@ -499,8 +499,8 @@ namespace quda {
       auto AV = A * V;
 #else
       // solve for the matrix
-      linalg::Cholesky<HMatrix, real, N> cholesky(A);
-      auto AV = cholesky.backward(cholesky.forward(V));
+      linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+      auto AV = cholesky.solve(V);
 #endif
 
       if (!Arg::compute_max) {
@@ -662,8 +662,8 @@ namespace quda {
         A = A.square();
         A += arg.mu * arg.mu;
 
-        linalg::Cholesky<HMatrix, real, N> cholesky(A);
-        const auto AV = cholesky.backward(cholesky.forward(UV));
+        linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+        const auto AV = cholesky.solve(UV);
 
         if (!Arg::compute_max) {
 #pragma unroll

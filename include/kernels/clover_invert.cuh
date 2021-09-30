@@ -62,13 +62,13 @@ namespace quda
         }
 
         // compute the Cholesky decomposition
-        linalg::Cholesky<HMatrix, real, N> cholesky(A);
+        linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
 
         // Accumulate trlogA
         if (arg.compute_tr_log)
           for (int j = 0; j < N; j++) trLogA += 2.0 * log(cholesky.D(j));
 
-        Mat Ainv = static_cast<real>(0.5) * cholesky.invert(); // return full inverse
+        Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
         arg.inverse(x_cb, parity, ch) = Ainv;
       }
 

@@ -49,6 +49,7 @@ namespace quda
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
       typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
+      typedef ColorSpinor<double, Arg::nColor, 2> HalfVectorD;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -80,8 +81,8 @@ namespace quda
           HalfVector chi = out.chiral_project(chirality);
 
           if (arg.dynamic_clover) {
-            Cholesky<HMatrix, real, Arg::nColor * Arg::nSpin / 2> cholesky(A);
-            chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
+            Cholesky<HMatrix, clover::cholesky_t<real>, Arg::nColor * Arg::nSpin / 2> cholesky(A);
+            chi = static_cast<real>(0.25) * cholesky.solve(chi);
           } else {
             chi = A * chi;
           }
