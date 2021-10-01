@@ -81,7 +81,7 @@ namespace quda
           HalfVector chi = out.chiral_project(chirality);
 
           if (arg.dynamic_clover) {
-            Cholesky<HMatrix, clover::cholesky_t<real>, Arg::nColor * Arg::nSpin / 2> cholesky(A);
+            Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A);
             chi = static_cast<real>(0.25) * cholesky.solve(chi);
           } else {
             chi = A * chi;

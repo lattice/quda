@@ -27,7 +27,11 @@ namespace quda {
        @brief Precision mapper that is used for the Cholesky
        factorization when inverting the clover matrices
     */
-    template <typename T> using cholesky_t = double;
+    template <typename T> struct cholesky_mapper { using type = double; };
+    template <> struct cholesky_mapper<short> { using type = float; };
+    template <> struct cholesky_mapper<int8_t> { using type = float; };
+
+    template <typename T> using cholesky_t = typename cholesky_mapper<T>::type;
 
     /**
        @brief Helper function that returns whether we have enabled

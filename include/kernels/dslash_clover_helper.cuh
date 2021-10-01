@@ -17,6 +17,7 @@ namespace quda {
   */
   template <typename Float, int nColor_, bool inverse_ = true>
   struct CloverArg : kernel_param<> {
+    using store_t = Float;
     using real = typename mapper<Float>::type;
     static constexpr int nSpin = 4;
     static constexpr int nColor = nColor_;
@@ -71,6 +72,7 @@ namespace quda {
 
   template <typename Arg> struct CloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
+    using store_t = typename Arg::store_t;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
@@ -94,7 +96,7 @@ namespace quda {
         half_fermion chi = in.chiral_project(chirality);
 
         if (arg.dynamic_clover && arg.inverse) {
-          Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+          Cholesky<HMatrix, clover::cholesky_t<store_t>, N> cholesky(A);
           chi = static_cast<real>(0.25) * cholesky.solve(chi);
         } else {
           chi = A * chi;
@@ -112,6 +114,7 @@ namespace quda {
   // else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
   template <typename Arg> struct TwistCloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
+    using store_t = typename Arg::store_t;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
@@ -144,7 +147,7 @@ namespace quda {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a*arg.a*static_cast<real>(0.25);
-            Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
+            Cholesky<HMatrix, clover::cholesky_t<store_t>, N> cholesky(A2);
             out_chi = static_cast<real>(0.25)*cholesky.solve(out_chi);
           } else {
             Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);

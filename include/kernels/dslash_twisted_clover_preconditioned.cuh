@@ -89,7 +89,7 @@ namespace quda
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += b.imag() * b.imag();
-            Cholesky<HMatrix, clover::cholesky_t<real>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
+            Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
             chi = cholesky.solve(chi);
             tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
           } else {
