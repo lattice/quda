@@ -5,7 +5,8 @@
 #include <block_reduction_kernel.h>
 #include <block_reduction_kernel_host.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This derived tunable class is for block reduction kernels,
@@ -60,30 +61,34 @@ namespace quda {
     template <template <typename> class Functor, typename Block, typename Arg>
     void launch_device(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
-      const_cast<Arg&>(arg).grid_dim = tp.grid;
-      const_cast<Arg&>(arg).block_dim = tp.block;
+      const_cast<Arg &>(arg).grid_dim = tp.grid;
+      const_cast<Arg &>(arg).block_dim = tp.block;
       launch_device<Block::block.size() - 1, Block, Functor>(arg, tp, stream);
     }
 
     template <int idx, typename Block, template <typename> class Functor, typename Arg>
     std::enable_if_t<idx != 0, void> launch_host(const TuneParam &tp, const Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      else launch_host<idx - 1, Block, Functor>(tp, arg);
+      if (tp.block.x == Block::block[idx])
+        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
+      else
+        launch_host<idx - 1, Block, Functor>(tp, arg);
     }
 
     template <int idx, typename Block, template <typename> class Functor, typename Arg>
     std::enable_if_t<idx == 0, void> launch_host(const TuneParam &tp, const Arg &arg)
     {
-      if (tp.block.x == Block::block[idx]) BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
-      else errorQuda("Unexpected block size %d", tp.block.x);
+      if (tp.block.x == Block::block[idx])
+        BlockKernel2D_host<Functor>(BlockKernelArg<Block::block[idx], Arg>(arg));
+      else
+        errorQuda("Unexpected block size %d", tp.block.x);
     }
 
     template <template <typename> class Functor, typename Block, typename Arg>
     void launch_host(const TuneParam &tp, const qudaStream_t &, const Arg &arg)
     {
-      const_cast<Arg&>(arg).grid_dim = tp.grid;
-      const_cast<Arg&>(arg).block_dim = tp.block;
+      const_cast<Arg &>(arg).grid_dim = tp.grid;
+      const_cast<Arg &>(arg).block_dim = tp.block;
       launch_host<Block::block.size() - 1, Block, Functor>(tp, arg);
     }
 
@@ -104,7 +109,7 @@ namespace quda {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         launch_device<Functor, Block>(tp, stream, arg);
       } else {
-	errorQuda("CPU not supported yet");
+        errorQuda("CPU not supported yet");
       }
     }
 
@@ -119,8 +124,8 @@ namespace quda {
     }
 
   public:
-    TunableBlock2D(const LatticeField &field, unsigned int vector_length_y,
-                   unsigned int max_block_y = 0, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+    TunableBlock2D(const LatticeField &field, unsigned int vector_length_y, unsigned int max_block_y = 0,
+                   QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableKernel(location != QUDA_INVALID_FIELD_LOCATION ? location : field.Location()),
       field(field),
       vector_length_y(vector_length_y),
@@ -146,21 +151,21 @@ namespace quda {
       param.grid.y = grid.y;
 
       if (ret) {
-	return true;
+        return true;
       } else { // block.x (spacetime) was reset
 
-	// we can advance spin/block-color since this is valid
-	if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1) &&
-	    param.block.x*(param.block.y+step_y)*param.block.z <= device::max_threads_per_block() &&
-            ((param.block.y + step_y) <= max_block_y)) {
-	  param.block.y += step_y;
-	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return true;
-	} else { // we have run off the end so let's reset
-	  param.block.y = step_y;
-	  param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
-	  return false;
-	}
+        // we can advance spin/block-color since this is valid
+        if (param.block.y < vector_length_y && param.block.y < device::max_threads_per_block_dim(1)
+            && param.block.x * (param.block.y + step_y) * param.block.z <= device::max_threads_per_block()
+            && ((param.block.y + step_y) <= max_block_y)) {
+          param.block.y += step_y;
+          param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
+          return true;
+        } else { // we have run off the end so let's reset
+          param.block.y = step_y;
+          param.grid.y = (vector_length_y + param.block.y - 1) / param.block.y;
+          return false;
+        }
       }
     }
 
@@ -183,4 +188,4 @@ namespace quda {
     void resizeStep(int y) const { step_y = y; }
   };
 
-}
+} // namespace quda

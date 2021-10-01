@@ -3,7 +3,8 @@
 #include <target_device.h>
 #include <kernel_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Kernel1D_impl is the implementation of the generic 1-d
@@ -26,7 +27,10 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i);
-      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      if (grid_stride)
+        i += gridDim.x * blockDim.x;
+      else
+        break;
     }
   }
 
@@ -43,7 +47,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel1D(Arg arg) { Kernel1D_impl<Functor, Arg, grid_stride>(arg); }
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel1D(Arg arg)
+  {
+    Kernel1D_impl<Functor, Arg, grid_stride>(arg);
+  }
 
   /**
      @brief Kernel1D is the entry point of the generic 1-d kernel.
@@ -58,8 +65,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D() { Kernel1D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>()); }
-
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel1D()
+  {
+    Kernel1D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
 
   /**
      @brief Kernel2D_impl is the implementation of the generic 2-d
@@ -84,7 +93,10 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i, j);
-      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      if (grid_stride)
+        i += gridDim.x * blockDim.x;
+      else
+        break;
     }
   }
 
@@ -101,7 +113,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel2D(Arg arg) { Kernel2D_impl<Functor, Arg, grid_stride>(arg); }
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel2D(Arg arg)
+  {
+    Kernel2D_impl<Functor, Arg, grid_stride>(arg);
+  }
 
   /**
      @brief Kernel2D is the entry point of the generic 2-d kernel.
@@ -116,8 +131,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D() { Kernel2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>()); }
-
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel2D()
+  {
+    Kernel2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
 
   /**
      @brief Kernel3D_impl is the implementation of the generic 3-d
@@ -144,7 +161,10 @@ namespace quda {
 
     while (i < arg.threads.x) {
       f(i, j, k);
-      if (grid_stride) i += gridDim.x * blockDim.x; else break;
+      if (grid_stride)
+        i += gridDim.x * blockDim.x;
+      else
+        break;
     }
   }
 
@@ -161,7 +181,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg) { Kernel3D_impl<Functor, Arg, grid_stride>(arg); }
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Kernel3D(Arg arg)
+  {
+    Kernel3D_impl<Functor, Arg, grid_stride>(arg);
+  }
 
   /**
      @brief Kernel3D is the entry point of the generic 3-d kernel.
@@ -176,8 +199,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D() { Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>()); }
-
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Kernel3D()
+  {
+    Kernel3D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
+  }
 
   /**
      @brief raw_kernel is used for CUDA-specific kernels where we want
@@ -200,4 +225,4 @@ namespace quda {
     f();
   }
 
-}
+} // namespace quda
