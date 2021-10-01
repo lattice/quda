@@ -238,16 +238,12 @@ M. A. Clark, A. Strelchenko, A. Vaquero, M. Wagner, and E. Weinberg,
 Implementations of Block-Krylov Space Solvers on GPUs,"
 Comput. Phys. Commun. 233 (2018), 29-40 [arXiv:1710.09745 [hep-lat]].
 
-When taking advantage of the Möbius MSPC solver, please also cite:
+When taking advantage of the Möbius MSPCG solver, please also cite:
 
 Jiqun Tu, M. A. Clark, Chulwoo Jung, Robert Mawhinney, "Solving DWF
 Dirac Equation Using Multi-splitting Preconditioned Conjugate Gradient
-with Tensor Cores on NVIDIA GPUs,".  To be published in the Platform
-of Advanced Scientific Computing (PASC21) [arXiv:2104.05615
-[hep-lat]].
-
-Several other papers that might be of interest are listed at
-http://lattice.github.io/quda .
+with Tensor Cores on NVIDIA GPUs," published in the Platform of
+Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 
 
 ## Authors:
