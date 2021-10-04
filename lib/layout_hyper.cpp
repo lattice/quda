@@ -203,10 +203,7 @@ void quda_get_coords(int x[], int node, int index) { quda_get_coords_helper(x, n
 
 /* The number of sites on the specified node */
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-QIO_Index quda_num_sites_ext(int, void *)
-{
-  return sites_on_node;
-}
+QIO_Index quda_num_sites_ext(int, void *) { return sites_on_node; }
 #else
 int quda_num_sites(int)
 {

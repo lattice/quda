@@ -12,7 +12,8 @@ namespace quda {
   /**
      @brief Class declaration to initialize and hold RNG states
   */
-  class RNG {
+  class RNG
+  {
 
     size_t size;                     /*! @brief number of curand states */
     std::shared_ptr<RNGState> state; /*! array with current curand rng state */
@@ -39,5 +40,4 @@ namespace quda {
     /*! @brief Get pointer to RNGState */
     RNGState *State() { return state.get(); };
   };
-
 }
