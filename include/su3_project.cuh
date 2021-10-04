@@ -23,12 +23,11 @@ namespace quda {
   template <typename Matrix, typename Float>
   __host__ __device__ inline bool checkUnitary(const Matrix &inv, const Matrix &in, const Float tol)
   {
-
     // first check U - U^{-1} = 0
 #pragma unroll
-    for (int i=0; i<in.size(); i++) {
+    for (int i = 0; i < in.rows(); i++) {
 #pragma unroll
-      for (int j=0; j<in.size(); j++) {
+      for (int j = 0; j < in.rows(); j++) {
         if (fabs(in(i,j).real() - inv(j,i).real()) > tol ||
             fabs(in(i,j).imag() + inv(j,i).imag()) > tol) return false;
       }
@@ -38,12 +37,12 @@ namespace quda {
     // this check is more expensive so delay until we have passed first check
     const Matrix identity = conj(in)*in;
 #pragma unroll
-    for (int i=0; i<in.size(); i++) {
+    for (int i = 0; i < in.rows(); i++) {
       if (fabs(identity(i,i).real() - static_cast<Float>(1.0)) > tol ||
           fabs(identity(i,i).imag()) > tol)
         return false;
 #pragma unroll
-      for (int j=0; j<in.size(); j++) {
+      for (int j = 0; j < in.rows(); j++) {
         if (i>j) { // off-diagonal identity check
         if (fabs(identity(i,j).real()) > tol || fabs(identity(i,j).imag()) > tol ||
             fabs(identity(j,i).real()) > tol || fabs(identity(j,i).imag()) > tol )
@@ -65,8 +64,8 @@ namespace quda {
   template <typename Matrix>
   __host__ __device__ void checkUnitaryPrint(const Matrix &inv, const Matrix &in)
   {
-    for (int i=0; i<in.size(); i++) {
-      for (int j=0; j<in.size(); j++) {
+    for (int i = 0; i < in.rows(); i++) {
+      for (int j = 0; j < in.rows(); j++) {
         printf("TESTR: %+.13le %+.13le %+.13le\n",
                in(i,j).real(), inv(j,i).real(), fabs(in(i,j).real() - inv(j,i).real()));
 	printf("TESTI: %+.13le %+.13le %+.13le\n",
@@ -94,7 +93,7 @@ namespace quda {
     constexpr int max_iter = 100;
     int i = 0;
     do { // iterate until matrix is unitary
-      out = 0.5*(out + conj(inv));
+      out = static_cast<Float>(0.5)*(out + conj(inv));
       inv = inverse(out);
     } while (!checkUnitary(inv, out, tol) && ++i < max_iter);
 
@@ -104,7 +103,7 @@ namespace quda {
     Float angle = arg(det);
 
     complex<Float> cTemp;
-    sincos(negative_third * angle, &cTemp.y, &cTemp.x);
+    quda::sincos(negative_third * angle, &cTemp.y, &cTemp.x);
 
     in = (mod*cTemp)*out;
   }

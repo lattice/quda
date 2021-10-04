@@ -10,7 +10,6 @@
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
 #include <sys/time.h>
-#include <dslash_quda.h>
 #include <gtest/gtest.h>
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -241,7 +240,6 @@ void gauge_force_test(void)
 {
   int max_length = 6;
 
-  initQuda(device);
   setVerbosityQuda(QUDA_VERBOSE,"",stdout);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -273,13 +271,16 @@ void gauge_force_test(void)
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
       if (dir == 0)
         memcpy(input_path_buf[dir][i], path_dir_x[i], length[i] * sizeof(int));
-      else if (dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
-      else if (dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
-      else if (dir ==3) memcpy(input_path_buf[dir][i], path_dir_t[i], length[i]*sizeof(int));
+      else if (dir == 1)
+        memcpy(input_path_buf[dir][i], path_dir_y[i], length[i] * sizeof(int));
+      else if (dir == 2)
+        memcpy(input_path_buf[dir][i], path_dir_z[i], length[i] * sizeof(int));
+      else if (dir == 3)
+        memcpy(input_path_buf[dir][i], path_dir_t[i], length[i] * sizeof(int));
     }
   }
 
-  quda::GaugeFieldParam param(0, gauge_param);
+  quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   auto U_qdp = new quda::cpuGaugeField(param);
@@ -340,7 +341,8 @@ void gauge_force_test(void)
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths);
-    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec), gauge_param.cpu_prec);
+    force_check = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
+                                 gauge_param.cpu_prec);
     strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
@@ -351,7 +353,7 @@ void gauge_force_test(void)
   printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, deviation);
 
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
-  printfQuda("total time = %.2f ms\n", total_time*1e+3);
+  printfQuda("total time = %.2f ms\n", total_time * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
 
   for(int dir = 0; dir < 4; dir++){
@@ -364,25 +366,18 @@ void gauge_force_test(void)
   delete Mom_qdp;
   delete Mom_milc;
   delete Mom_ref_milc;
-
-  endQuda();
 }
 
-TEST(force, verify)
-{
-  ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree";
-}
+TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA implementations do not agree"; }
 
-TEST(action, verify)
-{
-  ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree";
-}
+TEST(action, verify) { ASSERT_LE(deviation, getTolerance(cuda_prec)) << "CPU and QUDA implementations do not agree"; }
 
 static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    niter\n");
+  printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        "
+             "Gauge_order    niter\n");
   printfQuda("%s                       %s                         %d/%d/%d                       %d                  "
              "%s           %d\n",
              get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order),
@@ -409,6 +404,8 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
+  initQuda(device_ordinal);
+
   display_test_info();
 
   gauge_force_test();
@@ -422,6 +419,7 @@ int main(int argc, char **argv)
     if (test_rc != 0) warningQuda("Tests failed");
   }
 
+  endQuda();
   finalizeComms();
   return test_rc;
 }

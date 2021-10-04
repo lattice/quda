@@ -1,7 +1,9 @@
-#include <color_spinor_field.h>
 #include <string.h>
 #include <iostream>
 #include <typeinfo>
+
+#include <color_spinor_field.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -16,6 +18,7 @@ namespace quda {
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
     : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
+      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
       bytes(0), norm_bytes(0), even(0), odd(0),
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
@@ -29,6 +32,7 @@ namespace quda {
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
     : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
+      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
       bytes(0), norm_bytes(0), even(0), odd(0),
      composite_descr(field.composite_descr), components(0)
   {
@@ -38,12 +42,13 @@ namespace quda {
   }
 
   ColorSpinorField::~ColorSpinorField() {
+    if (dslash_constant) host_free(dslash_constant);
     destroy();
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
   {
-    if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
+    if (ghost_precision_allocated == ghost_precision) return;
 
     bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
     int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
@@ -52,8 +57,9 @@ namespace quda {
     // calculate size of ghost zone required
     int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
-    int x5   = nDim == 5 ? x[4] : 1; ///includes DW and non-degenerate TM ghosts
-    const int ghost_align = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 32-byte boundaries
+    int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
+    const int ghost_align
+      = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 32-byte boundaries
     ghost_bytes = 0;
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
@@ -63,14 +69,14 @@ namespace quda {
 	  if (i==j) continue;
 	  ghostFace[i] *= x[j];
 	}
-	ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
-	if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-	ghost_volume += 2 * nFace * ghostFace[i];
+        ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
+        if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+        ghost_volume += 2 * nFace * ghostFace[i];
       }
 
       ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;
       ghost_face_bytes_aligned[i] = ((ghost_face_bytes[i] + ghost_align - 1) / ghost_align) * ghost_align;
-      ghost_offset[i][0] = i == 0 ? 0 : ghost_offset[i-1][0] + 2 * ghost_face_bytes_aligned[i-1];
+      ghost_offset[i][0] = i == 0 ? 0 : ghost_offset[i - 1][0] + 2 * ghost_face_bytes_aligned[i - 1];
       ghost_offset[i][1] = ghost_offset[i][0] + ghost_face_bytes_aligned[i];
       ghost_bytes += 2 * ghost_face_bytes_aligned[i];
 
@@ -80,65 +86,65 @@ namespace quda {
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
     { // compute temporaries needed by dslash and packing kernels
-      auto &X = dslash_constant.X;
+      auto &dc = *dslash_constant;
+      auto &X = dc.X;
       for (int dim=0; dim<nDim; dim++) X[dim] = x[dim];
       for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
 
-      for (int i=0; i<nDim; i++) dslash_constant.Xh[i] = X[i]/2;
+      for (int i=0; i<nDim; i++) dc.Xh[i] = X[i]/2;
 
-      dslash_constant.Ls = X[4];
-      dslash_constant.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
-      dslash_constant.volume_4d = 2 * dslash_constant.volume_4d_cb;
+      dc.Ls = X[4];
+      dc.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
+      dc.volume_4d = 2 * dc.volume_4d_cb;
 
       int face[4];
       for (int dim=0; dim<4; dim++) {
         for (int j=0; j<4; j++) face[j] = X[j];
         face[dim] = nFace;
-        dslash_constant.face_X[dim] = face[0];
-        dslash_constant.face_Y[dim] = face[1];
-        dslash_constant.face_Z[dim] = face[2];
-        dslash_constant.face_T[dim] = face[3];
-        dslash_constant.face_XY[dim] = dslash_constant.face_X[dim] * face[1];
-        dslash_constant.face_XYZ[dim] = dslash_constant.face_XY[dim] * face[2];
-        dslash_constant.face_XYZT[dim] = dslash_constant.face_XYZ[dim] * face[3];
+        dc.face_X[dim] = face[0];
+        dc.face_Y[dim] = face[1];
+        dc.face_Z[dim] = face[2];
+        dc.face_T[dim] = face[3];
+        dc.face_XY[dim] = dc.face_X[dim] * face[1];
+        dc.face_XYZ[dim] = dc.face_XY[dim] * face[2];
+        dc.face_XYZT[dim] = dc.face_XYZ[dim] * face[3];
       }
 
-      dslash_constant.Vh = (X[3]*X[2]*X[1]*X[0])/2;
-      dslash_constant.ghostFace[0] = X[1] * X[2] * X[3];
-      dslash_constant.ghostFace[1] = X[0] * X[2] * X[3];
-      dslash_constant.ghostFace[2] = X[0] * X[1] * X[3];
-      dslash_constant.ghostFace[3] = X[0] * X[1] * X[2];
-      for (int d = 0; d < 4; d++) dslash_constant.ghostFaceCB[d] = dslash_constant.ghostFace[d] / 2;
+      dc.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dc.ghostFace[0] = X[1] * X[2] * X[3];
+      dc.ghostFace[1] = X[0] * X[2] * X[3];
+      dc.ghostFace[2] = X[0] * X[1] * X[3];
+      dc.ghostFace[3] = X[0] * X[1] * X[2];
+      for (int d = 0; d < 4; d++) dc.ghostFaceCB[d] = dc.ghostFace[d] / 2;
 
-      dslash_constant.X2X1 = X[1]*X[0];
-      dslash_constant.X3X2X1 = X[2]*X[1]*X[0];
-      dslash_constant.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dslash_constant.X2X1mX1 = (X[1]-1)*X[0];
-      dslash_constant.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
-      dslash_constant.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
-      dslash_constant.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
-      dslash_constant.X4X3X2X1hmX3X2X1h = dslash_constant.X4X3X2X1mX3X2X1/2;
+      dc.X2X1 = X[1]*X[0];
+      dc.X3X2X1 = X[2]*X[1]*X[0];
+      dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
+      dc.X2X1mX1 = (X[1]-1)*X[0];
+      dc.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
+      dc.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
+      dc.X4X3X2X1hmX3X2X1h = dc.X4X3X2X1mX3X2X1/2;
 
       // used by indexFromFaceIndexStaggered
-      dslash_constant.dims[0][0]=X[1];
-      dslash_constant.dims[0][1]=X[2];
-      dslash_constant.dims[0][2]=X[3];
+      dc.dims[0][0]=X[1];
+      dc.dims[0][1]=X[2];
+      dc.dims[0][2]=X[3];
 
-      dslash_constant.dims[1][0]=X[0];
-      dslash_constant.dims[1][1]=X[2];
-      dslash_constant.dims[1][2]=X[3];
+      dc.dims[1][0]=X[0];
+      dc.dims[1][1]=X[2];
+      dc.dims[1][2]=X[3];
 
-      dslash_constant.dims[2][0]=X[0];
-      dslash_constant.dims[2][1]=X[1];
-      dslash_constant.dims[2][2]=X[3];
+      dc.dims[2][0]=X[0];
+      dc.dims[2][1]=X[1];
+      dc.dims[2][2]=X[3];
 
-      dslash_constant.dims[3][0]=X[0];
-      dslash_constant.dims[3][1]=X[1];
-      dslash_constant.dims[3][2]=X[2];
+      dc.dims[3][0]=X[0];
+      dc.dims[3][1]=X[1];
+      dc.dims[3][2]=X[2];
     }
     ghost_precision_allocated = ghost_precision;
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
@@ -160,6 +166,7 @@ namespace quda {
     nVec = Nvec;
     twistFlavor = Twistflavor;
 
+    if (pc_type != QUDA_5D_PC && pc_type != QUDA_4D_PC) errorQuda("Unexpected pc_type %d", pc_type);
     this->pc_type = pc_type;
     this->suggested_parity = suggested_parity;
 
@@ -248,7 +255,7 @@ namespace quda {
     }
 
     {
-      int aux_string_n = TuneKey::aux_n / 2;
+      constexpr int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
       int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
                            stride, precision, fieldOrder, nSpin, nColor);
@@ -430,7 +437,7 @@ namespace quda {
 
     // If this is set to false, then we are assuming that the send and
     // ghost buffers are in a single contiguous memory space.  Setting
-    // to false means we aggregate all cudaMemcpys which reduces
+    // to false means we aggregate all qudaMemcpys which reduces
     // latency.
     bool fine_grained_memcpy = false;
 
@@ -461,12 +468,12 @@ namespace quda {
 	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
 	  offset += bytes[i];
 	  if (fine_grained_memcpy) {
-	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
-	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], qudaMemcpyDeviceToHost);
+	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], qudaMemcpyDeviceToHost);
 	  }
 	} else if (no_comms_fill) {
-	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
-	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], qudaMemcpyDeviceToDevice);
+	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], qudaMemcpyDeviceToDevice);
 	}
       }
       if (!fine_grained_memcpy && total_bytes) {
@@ -478,7 +485,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(total_send, send_ptr, total_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
       }
     }
 
@@ -511,8 +518,8 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	if (fine_grained_memcpy) {
-	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
-	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
+	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
 	}
       }
 
@@ -525,7 +532,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(ghost_ptr, total_recv, total_bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
       }
 
       if (total_bytes) {
@@ -738,9 +745,10 @@ namespace quda {
     return field;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
+  ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
-    if (param_.Precision() > precision) errorQuda("Cannot create an alias to source with lower precision than the alias");
+    if (param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
     ColorSpinorParam param(param_);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = V();
@@ -751,8 +759,9 @@ namespace quda {
     // internal field
     if (param.Precision() < QUDA_SINGLE_PRECISION) {
       auto norm_offset = (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) ?
-        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(Bytes()/4) : ALIGNMENT_ADJUST(Bytes()/2) : 0;
-      param.norm = Norm() ? Norm() : static_cast<char*>(V()) + norm_offset;
+        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2 * ALIGNMENT_ADJUST(Bytes() / 4) : ALIGNMENT_ADJUST(Bytes() / 2) :
+        0;
+      param.norm = Norm() ? Norm() : static_cast<char *>(V()) + norm_offset;
     }
 
     auto alias = ColorSpinorField::Create(param);
@@ -760,10 +769,10 @@ namespace quda {
     if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
     if (alias->Precision() < QUDA_SINGLE_PRECISION) {
       // check that norm does not overlap with body
-      if (static_cast<char*>(alias->V()) + alias->Bytes() > alias->Norm())
+      if (static_cast<char *>(alias->V()) + alias->Bytes() > alias->Norm())
         errorQuda("Overlap between alias body and norm");
       // check that norm does fall off the end
-      if (static_cast<char*>(alias->Norm()) + alias->NormBytes() > static_cast<char*>(V()) + Bytes())
+      if (static_cast<char *>(alias->Norm()) + alias->NormBytes() > static_cast<char *>(V()) + Bytes())
         errorQuda("Norm is not contained in the srouce field");
     }
 
@@ -775,9 +784,20 @@ namespace quda {
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
 
-    coarseParam.nColor = Nvec;
+    int geoBlockVolume = 1;
+    for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
+
+    // Detect if the "coarse" op is the Kahler-Dirac op or something else
+    // that still acts on a fine staggered ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+      coarseParam.nSpin = nSpin;
+      coarseParam.nColor = nColor;
+    } else {
+      coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
+      coarseParam.nColor = Nvec;
+    }
+
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 

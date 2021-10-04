@@ -103,7 +103,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
   size_t size = 2*n*n*prec*batch;
   void *A_d = device_malloc(size);
   void *Ainv_d = device_malloc(size);
-  qudaMemcpy(A_d, A_h, size, cudaMemcpyHostToDevice);
+  qudaMemcpy(A_d, A_h, size, qudaMemcpyHostToDevice);
 
   magma_int_t **dipiv_array = static_cast<magma_int_t**>(device_malloc(batch*sizeof(magma_int_t*)));
   magma_int_t *dipiv_tmp = static_cast<magma_int_t*>(device_malloc(batch*n*sizeof(magma_int_t)));
@@ -116,7 +116,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
       no_piv_array[i*n + j] = j+1;
     }
   }
-  qudaMemcpy(dipiv_tmp, no_piv_array, batch*n*sizeof(magma_int_t), cudaMemcpyHostToDevice);
+  qudaMemcpy(dipiv_tmp, no_piv_array, batch*n*sizeof(magma_int_t), qudaMemcpyHostToDevice);
 
   host_free(no_piv_array);
 
@@ -141,7 +141,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
     if(err != 0) errorQuda("\nError in LU decomposition (magma_cgetrf), error code = %d\n", err);
 
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
+    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), qudaMemcpyDeviceToHost);
     for (int i=0; i<batch; i++) {
       if (info_array[i] < 0) {
 	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
@@ -158,7 +158,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
     if(err != 0) errorQuda("\nError in matrix inversion (magma_cgetri), error code = %d\n", err);
 
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
+    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), qudaMemcpyDeviceToHost);
 
     for (int i=0; i<batch; i++) {
       if (info_array[i] < 0) {
@@ -185,7 +185,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
     if(err != 0) errorQuda("\nError in LU decomposition (magma_zgetrf), error code = %d\n", err);
 
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
+    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), qudaMemcpyDeviceToHost);
     for (int i=0; i<batch; i++) {
       if (info_array[i] < 0) {
 	errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
@@ -202,7 +202,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
 
     if(err != 0) errorQuda("\nError in matrix inversion (magma_cgetri), error code = %d\n", err);
 
-    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), cudaMemcpyDeviceToHost);
+    qudaMemcpy(info_array, dinfo_array, batch*sizeof(magma_int_t), qudaMemcpyDeviceToHost);
 
     for (int i=0; i<batch; i++) {
       if (info_array[i] < 0) {
@@ -218,7 +218,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
     errorQuda("%s not implemented for precision=%d", __func__, prec);
   }
 
-  qudaMemcpy(Ainv_h, Ainv_d, size, cudaMemcpyDeviceToHost);
+  qudaMemcpy(Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
 
   device_free(dipiv_tmp);
   device_free(dipiv_array);

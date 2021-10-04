@@ -68,7 +68,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &U, Args &&... args)
+    instantiateApply(G &, Args &&...)
     {
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
     }
@@ -131,7 +131,11 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
+#if (QUDA_PRECISION & 8) || (QUDA_PRECISION & 4)
   constexpr void instantiate(G &U, Args &&... args)
+#else
+  constexpr void instantiate(G &U, Args &&...)
+#endif
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -187,17 +191,12 @@ namespace quda
     }
   }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
-#endif
-
   /**
      @brief This instantiate function is used to instantiate the colors
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int> class Apply, typename store_t, typename F,
-            typename... Args>
+  template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
   constexpr void instantiate(F &field, Args &&... args)
   {
     if (field.Ncolor() == 3) {
@@ -206,11 +205,6 @@ namespace quda
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }
   }
-
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
-#endif
 
   /**
      @brief This instantiate function is used to instantiate the

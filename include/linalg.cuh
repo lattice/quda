@@ -1,5 +1,6 @@
 #pragma once
 #include <color_spinor.h> // vector container
+#include <math_helper.cuh>
 
 /**
    @file linalg.cuh
@@ -70,7 +71,7 @@ namespace quda {
 	    if (!fast) { // traditional Cholesky with sqrt and division
 	      L_(i,j) = (i == j) ? sqrt((A(i,i)-s).real()) : (A(i,j) - s) / L(j,j).real();
 	    } else { // optimized - since fwd/back subsitition only need inverse diagonal elements, avoid division and use rsqrt
-	      L_(i,j) = (i == j) ? rsqrt((A(i,i)-s).real()) : (A(i,j)-s) * L(j,j).real();
+	      L_(i,j) = (i == j) ? quda::rsqrt((A(i,i)-s).real()) : (A(i,j)-s) * L(j,j).real();
 	    }
 	  }
 	}

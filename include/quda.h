@@ -29,7 +29,7 @@ extern "C" {
    * interpretation of the gauge field by various Dirac operators
    */
   typedef struct QudaGaugeParam_s {
-
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     QudaFieldLocation location; /**< The location of the gauge field */
 
     int X[4];             /**< The local space-time dimensions (without checkboarding) */
@@ -89,7 +89,6 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
-
   } QudaGaugeParam;
 
 
@@ -97,6 +96,9 @@ extern "C" {
    * Parameters relating to the solver and the choice of Dirac operator.
    */
   typedef struct QudaInvertParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaFieldLocation input_location; /**< The location of the input field */
     QudaFieldLocation output_location; /**< The location of the output field */
@@ -185,6 +187,13 @@ extern "C" {
 
     int num_src; /**< Number of sources in the multiple source solver */
 
+    int num_src_per_sub_partition; /**< Number of sources in the multiple source solver, but per sub-partition */
+
+    /**< The grid of sub-partition according to which the processor grid will be partitioned.
+    Should have:
+      split_grid[0] * split_grid[1] * split_grid[2] * split_grid[3] * num_src_per_sub_partition == num_src. **/
+    int split_grid[QUDA_MAX_DIM];
+
     int overlap; /**< Width of domain overlaps */
 
     /** Offsets for multi-shift solver */
@@ -247,6 +256,7 @@ extern "C" {
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
+    double clover_csw;                     /**< Csw coefficient of the clover term */
     double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
@@ -364,7 +374,7 @@ extern "C" {
     int n_ev;
     /** EeigCG  : Search space dimension
      *  gmresdr : Krylov subspace dimension
-    */
+     */
     int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
@@ -408,11 +418,12 @@ extern "C" {
 
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
-
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     // EIGENSOLVER PARAMS
     //-------------------------------------------------
@@ -456,8 +467,15 @@ extern "C" {
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
+    /** Use Eigen routines to eigensolve the upper Hessenberg via QR **/
+    QudaBoolean use_eigen_qr;
+
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
+
+    /** Performs the \gamma_5 OP solve by Post multipling the eignvectors with
+        \gamma_5 before computing the eigenvalues */
+    QudaBoolean compute_gamma5;
 
     /** If true, the solver will error out if the convergence criteria are not met **/
     QudaBoolean require_convergence;
@@ -477,6 +495,8 @@ extern "C" {
     int n_ev_deflate;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
+    /** Tolerance on the QR iteration **/
+    double qr_tol;
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
@@ -539,10 +559,12 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
-
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaInvertParam *invert_param;
 
@@ -565,6 +587,9 @@ extern "C" {
 
     /** Number of times to repeat Gram-Schmidt in block orthogonalization */
     int n_block_ortho[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to do passes at block orthogonalize in fixed point for improved accuracy */
+    QudaBoolean block_ortho_two_pass[QUDA_MAX_MG_LEVEL];
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
@@ -719,18 +744,18 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
-    /** Boolean for if this is a staggered solve or not */
-    QudaBoolean is_staggered;
+    /** Boolean for aggregation type, implies staggered or not */
+    QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
-
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
@@ -740,6 +765,33 @@ extern "C" {
     QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
+
+  typedef struct QudaBLASParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
+
+    QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
+    QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
+    int m;                     /**< number of rows of matrix op(A) and C. */
+    int n;                     /**< number of columns of matrix op(B) and C. */
+    int k;                     /**< number of columns of op(A) and rows of op(B). */
+    int lda;                   /**< leading dimension of two-dimensional array used to store the matrix A. */
+    int ldb;                   /**< leading dimension of two-dimensional array used to store matrix B. */
+    int ldc;                   /**< leading dimension of two-dimensional array used to store matrix C. */
+    int a_offset;              /**< position of the A array from which begin read/write. */
+    int b_offset;              /**< position of the B array from which begin read/write. */
+    int c_offset;              /**< position of the C array from which begin read/write. */
+    int a_stride;              /**< stride of the A array in strided(batched) mode */
+    int b_stride;              /**< stride of the B array in strided(batched) mode */
+    int c_stride;              /**< stride of the C array in strided(batched) mode */
+
+    double_complex alpha; /**< scalar used for multiplication. */
+    double_complex beta;  /**< scalar used for multiplication. If beta==0, C does not have to be a valid input. */
+
+    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+
+    QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
+    QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
+  } QudaBLASParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -909,6 +961,15 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
+   * A new QudaBLASParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaBLASParam blas_param = newQudaBLASParam();
+   */
+  QudaBLASParam newQudaBLASParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -937,6 +998,12 @@ extern "C" {
    * @param param The QudaGaugeObservableParam whose elements we are to print.
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
+
+  /**
+   * Print the members of QudaBLASParam.
+   * @param param The QudaBLASParam whose elements we are to print.
+   */
+  void printQudaBLASParam(QudaBLASParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1006,15 +1073,48 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
-   * Perform the solve like @invertQuda but for multiples right hand sides.
-   *
-   * @param _hp_x    Array of solution spinor fields
-   * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
+   * @brief Perform the solve like @invertQuda but for multiple rhs by spliting the comm grid into
+   * sub-partitions: each sub-partition invert one or more rhs'.
+   * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
+   * Unlike @invertQuda, the interface also takes the host side gauge as input. The gauge pointer and
+   * gauge_param are used if for inv_param split_grid[0] * split_grid[1] * split_grid[2] * split_grid[3]
+   * is larger than 1, in which case gauge field is not required to be loaded beforehand; otherwise
+   * this interface would just work as @invertQuda, which requires gauge field to be loaded beforehand,
+   * and the gauge field pointer and gauge_param are not used.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
    */
-  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
+  void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge, QudaGaugeParam *gauge_param);
+
+  /**
+   * @brief Really the same with @invertMultiSrcQuda but for staggered-style fermions, by accepting pointers
+   * to fat links and long links.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
+   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   */
+  void invertMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *milc_fatlinks,
+                                   void *milc_longlinks, QudaGaugeParam *gauge_param);
+
+  /**
+   * @brief Really the same with @invertMultiSrcQuda but for clover-style fermions, by accepting pointers
+   * to direct and inverse clover field pointers.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   * @param h_clover    Base pointer to the direct clover field
+   * @param h_clovinv   Base pointer to the inverse clover field
+   */
+  void invertMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, void *h_gauge,
+                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1071,6 +1171,51 @@ extern "C" {
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
+   * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
+   * sub-partitions: each sub-partition does one or more rhs'.
+   * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
+   * Unlike @invertQuda, the interface also takes the host side gauge as
+   * input - gauge field is not required to be loaded beforehand.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param parity      Parity to apply dslash on
+   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   */
+  void dslashMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
+                          QudaGaugeParam *gauge_param);
+  /**
+   * @brief Really the same with @dslashMultiSrcQuda but for staggered-style fermions, by accepting pointers
+   * to fat links and long links.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param parity      Parity to apply dslash on
+   * @param milc_fatlinks     Base pointer to host **fat** gauge field (regardless of dimensionality)
+   * @param milc_longlinks    Base pointer to host **long** gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   */
+
+  void dslashMultiSrcStaggeredQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity,
+                                   void *milc_fatlinks, void *milc_longlinks, QudaGaugeParam *gauge_param);
+
+  /**
+   * @brief Really the same with @dslashMultiSrcQuda but for clover-style fermions, by accepting pointers
+   * to direct and inverse clover field pointers.
+   * @param _hp_x       Array of solution spinor fields
+   * @param _hp_b       Array of source spinor fields
+   * @param param       Contains all metadata regarding host and device storage and solver parameters
+   * @param parity      Parity to apply dslash on
+   * @param h_gauge     Base pointer to host gauge field (regardless of dimensionality)
+   * @param gauge_param Contains all metadata regarding host and device storage for gauge field
+   * @param h_clover    Base pointer to the direct clover field
+   * @param h_clovinv   Base pointer to the inverse clover field
+   */
+  void dslashMultiSrcCloverQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, QudaParity parity, void *h_gauge,
+                                QudaGaugeParam *gauge_param, void *h_clover, void *h_clovinv);
+
+  /**
    * Apply the clover operator or its inverse.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1079,8 +1224,7 @@ extern "C" {
    * @param parity The source and destination parity of the field
    * @param inverse Whether to apply the inverse of the clover term
    */
-  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity *parity, int inverse);
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -1250,8 +1394,8 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void **x, void *gauge,
-				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
+  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+                                 QudaInvertParam *invert_param);
 
   /**
    * Compute the fermion force for the HISQ quark action and integrate the momentum.
@@ -1302,10 +1446,9 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externalGaugeResident cudaGaugeField
-   * @param Location of gauge field
+   * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  void copyExtendedResidentGaugeQuda(void* resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
@@ -1384,20 +1527,14 @@ extern "C" {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingOVRQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double relax_boost,
-                      const double tolerance,
-                      const unsigned int reunit_interval,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
+                                const unsigned int reunit_interval, const unsigned int stopWtheta,
+                                QudaGaugeParam *param, double *timeinfo);
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1406,28 +1543,32 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
-  int computeGaugeFixingFFTQuda(void* gauge,
-                      const unsigned int gauge_dir,
-                      const unsigned int Nsteps,
-                      const unsigned int verbose_interval,
-                      const double alpha,
-                      const unsigned int autotune,
-                      const double tolerance,
-                      const unsigned int stopWtheta,
-                      QudaGaugeParam* param,
-                      double* timeinfo);
+  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
+                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
+                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
+                                double *timeinfo);
+
+  /**
+   * @brief Strided Batched GEMM
+   * @param[in] arrayA The array containing the A matrix data
+   * @param[in] arrayB The array containing the A matrix data
+   * @param[in] arrayC The array containing the A matrix data
+   * @param[in] native boolean to use either the native or generic version
+   * @param[in] param The data defining the problem execution.
+   */
+  void blasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaBoolean native, QudaBLASParam *param);
 
   /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
   void flushChronoQuda(int index);
-
 
   /**
   * Open/Close MAGMA library

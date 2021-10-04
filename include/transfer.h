@@ -39,6 +39,9 @@ namespace quda {
     /** The number of times to Gram-Schmidt within block ortho */
     const int NblockOrtho;
 
+    /** Whether we are doing the two-pass Block Orthogonalize */
+    const bool blockOrthoTwoPass;
+
     /** Precision to use for the GPU null-space components */
     const QudaPrecision null_precision;
 
@@ -110,9 +113,9 @@ namespace quda {
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
 
-    /** Whether or not the fine level is a staggered operator, in which
+    /** Implies whether or not the fine level is a staggered operator, in which
     case we don't actually need to allocate any memory. */
-    mutable bool is_staggered;
+    mutable QudaTransferType transfer_type;
 
     /**
      * @brief Allocate V field
@@ -161,6 +164,7 @@ namespace quda {
        * @param B Array of null-space vectors
        * @param Nvec Number of null-space vectors
        * @param NblockOrtho Number of times to Gram-Schmidt within block ortho
+       * @param blockOrthoTwoPass Whether to do a two pass block orthogonalization
        * @param d The Dirac operator to which these null-space vectors correspond
        * @param geo_bs The geometric block sizes to use
        * @param spin_bs The spin block sizes to use
@@ -168,38 +172,38 @@ namespace quda {
        * @param null_precision The precision to store the null-space basis vectors in
        * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
        */
-      Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, int *geo_bs, int spin_bs,
-               QudaPrecision null_precision, TimeProfile &profile);
+    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs, int spin_bs,
+             QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
 
-      /** The destructor for Transfer */
-      virtual ~Transfer();
+    /** The destructor for Transfer */
+    virtual ~Transfer();
 
-      /**
-       @brief for resetting the Transfer when the null vectors have changed
-       */
-      void reset();
+    /**
+     @brief for resetting the Transfer when the null vectors have changed
+     */
+    void reset();
 
-      /**
-       * Apply the prolongator
-       * @param out The resulting field on the fine lattice
-       * @param in The input field on the coarse lattice
-       */
-      void P(ColorSpinorField &out, const ColorSpinorField &in) const;
+    /**
+     * Apply the prolongator
+     * @param out The resulting field on the fine lattice
+     * @param in The input field on the coarse lattice
+     */
+    void P(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-      /**
-       * Apply the restrictor
-       * @param out The resulting field on the coarse lattice
-       * @param in The input field on the fine lattice
-       */
-      void R(ColorSpinorField &out, const ColorSpinorField &in) const;
+    /**
+     * Apply the restrictor
+     * @param out The resulting field on the coarse lattice
+     * @param in The input field on the fine lattice
+     */
+    void R(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-      /**
-       * @brief The precision of the packed null-space vectors
-       */
-      QudaPrecision NullPrecision(QudaFieldLocation location) const
-      {
-        return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
-      }
+    /**
+     * @brief The precision of the packed null-space vectors
+     */
+    QudaPrecision NullPrecision(QudaFieldLocation location) const
+    {
+      return location == QUDA_CUDA_FIELD_LOCATION ? null_precision : std::max(B[0]->Precision(), QUDA_SINGLE_PRECISION);
+    }
 
     /**
      * Returns a const reference to the V field
@@ -232,7 +236,13 @@ namespace quda {
      * @return geo_bs
      */
     const int *Geo_bs() const {return geo_bs;}
-    
+
+    /**
+     * Returns the transfer type; used to inform staggered-type coarsenings
+     * @return transfer_type
+     */
+    QudaTransferType getTransferType() const { return transfer_type; }
+
     /**
        @return Pointer to the lookup table to the fine-to-coarse map
     */
@@ -280,9 +290,13 @@ namespace quda {
      @param[in] coarse_to_fine Coarse-to-fine lookup table (linear indices)
      @param[in] spin_bs Spin block size
      @param[in] n_block_ortho Number of times to Gram-Schmidt
+     @param[in] two_pass Whether we use a two-pass algorithm: first
+     pass is a dummy run to set the scale, second does the final
+     calculation.  This this provides better accuracy in fixed-point
+     precision.
    */
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
-                          const int *coarse_to_fine, const int *geo_bs, const int spin_bs, const int n_block_ortho);
+                          const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho, bool two_pass);
 
   /**
      @brief Apply the prolongation operator

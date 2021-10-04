@@ -4,227 +4,22 @@
 #include <index_helper.cuh>
 #include <inline_ptx.h>
 #include <math_helper.cuh>
-#include <shared_memory_cache_helper.cuh>
+#include <tunable_nd.h>
+#include <kernels/madwf_transfer.cuh>
+#include <kernels/madwf_tensor.cuh>
 
 #include <cub_helper.cuh>
-#include <thrust_helper.cuh>
+#define THRUST_IGNORE_CUB_VERSION_CHECK
+#include "thrust/inner_product.h"
 
 #include <madwf_transfer.h>
+#include <quda_cuda_api.h>
 
 namespace quda
 {
   namespace madwf_ml
   {
-
-    template <class real> using WilsonVector = ColorSpinor<real, 3, 4>;
-
-    template <class real, int dim> class Matrix
-    {
-
-      static constexpr int size = dim * dim;
-      complex<real> data[size];
-
-    public:
-      __device__ __host__ inline Matrix<real, dim>()
-      {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = 0; }
-      }
-
-      __device__ __host__ inline Matrix<real, dim>(const Matrix<real, dim> &a)
-      {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-      }
-
-      __device__ __host__ inline Matrix<real, dim> &operator=(const Matrix<real, dim> &a)
-      {
-        if (this != &a) {
-#pragma unroll
-          for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-        }
-        return *this;
-      }
-
-      __device__ __host__ inline complex<real> &operator()(int index) { return data[index]; }
-
-      __device__ __host__ inline const complex<real> &operator()(int index) const { return data[index]; }
-
-      // Wilson Matrix is row major
-      __device__ __host__ inline complex<real> &operator()(int row, int column) { return data[row * dim + column]; }
-
-      __device__ __host__ inline const complex<real> &operator()(int row, int column) const
-      {
-        return data[row * dim + column];
-      }
-    };
-
-    template <class real> using WilsonMatrix = Matrix<real, color_spin_dim>;
-
-    template <bool dagger, class real>
-    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const WilsonMatrix<real> &m,
-                                                                         const WilsonVector<real> &v)
-    {
-      WilsonVector<real> out; // out is initialized to zero
-#pragma unroll
-      for (int column = 0; column < color_spin_dim; column++) {
-        auto v_col = v(column);
-#pragma unroll
-        for (int row = 0; row < color_spin_dim; row++) {
-          if (dagger) {
-            out(row) += conj(m(column, row)) * v_col;
-          } else {
-            out(row) += m(row, column) * v_col;
-          }
-        }
-      }
-      return out;
-    }
-
-    template <class real> using SpinMatrix = Matrix<real, spin_dim>;
-
-    template <bool dagger, class real>
-    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const SpinMatrix<real> &m,
-                                                                         const WilsonVector<real> &v)
-    {
-      WilsonVector<real> out; // out is initialized to zero
-#pragma unroll
-      for (int color = 0; color < color_dim; color++) {
-#pragma unroll
-        for (int column = 0; column < spin_dim; column++) {
-          auto v_col = v(column, color);
-#pragma unroll
-          for (int row = 0; row < spin_dim; row++) {
-            if (dagger) {
-              out(row, color) += conj(m(column, row)) * v_col;
-            } else {
-              out(row, color) += m(row, column) * v_col;
-            }
-          }
-        }
-      }
-      return out;
-    }
-
-    template <class real> using ChiralProjector = complex<real>[2];
-
-    template <bool dagger, class real>
-    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const ChiralProjector<real> &m,
-                                                                         const WilsonVector<real> &v)
-    {
-      if (dagger) {
-        return conj(m[0]) * v.project(4, +1).reconstruct(4, +1) + conj(m[1]) * v.project(4, -1).reconstruct(4, -1);
-      } else {
-        return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
-      }
-    }
-
-    constexpr int warp_size = 32;
-
-    template <class T> __device__ inline void warp_reduce(T &f)
-    {
-#pragma unroll
-      for (int offset = 16; offset > 0; offset /= 2) {
-        T other_f = __shfl_down_sync(0xffffffffu, f, offset);
-        f += other_f;
-      }
-    }
-
-    template <class T> __device__ inline void block_reduce_x(T &f)
-    {
-
-      int lane_id_x = threadIdx.x % warp_size;
-      int warp_id_x = threadIdx.x / warp_size;
-      int block_dim_x = blockDim.x / warp_size;
-
-      __shared__ T smem[32];
-
-      warp_reduce(f);
-      // Now lane 0 of each warp holds the reduced value
-
-      if (block_dim_x > 1) {
-        int index = threadIdx.y * block_dim_x + warp_id_x;
-        if (lane_id_x == 0) { smem[index] = f; }
-        __syncthreads();
-        if (warp_id_x == 0) {
-          f = (lane_id_x < block_dim_x) ? smem[index] : 0;
-          warp_reduce(f);
-        }
-      }
-      // Now the first thread in the x direction holds the reduction result.
-    }
-
-    template <class real>
-    __device__ inline void vector_tensor_matrix(WilsonMatrix<real> *mp, const WilsonVector<real> &v,
-                                                const WilsonVector<real> &w)
-    {
-
-      real *real_p = reinterpret_cast<real *>(mp);
-
-#pragma unroll
-      for (int a = 0; a < color_spin_dim; a++) {
-#pragma unroll
-        for (int b = 0; b < color_spin_dim; b++) {
-          int cs = a * color_spin_dim + b;
-          complex<real> z = conj(conj(v(a)) * w(b));
-          // Perform a block reduction across the x direction
-          block_reduce_x(z);
-          if (threadIdx.x == 0) {
-            atomicAdd(&real_p[cs * 2 + 0], z.real());
-            atomicAdd(&real_p[cs * 2 + 1], z.imag());
-          }
-        }
-      }
-    }
-
-    template <class real>
-    __device__ inline void vector_tensor_matrix(SpinMatrix<real> *mp, int m_index, const WilsonVector<real> &v,
-                                                const WilsonVector<real> &w)
-    {
-
-      complex<real> *p = reinterpret_cast<complex<real> *>(mp);
-
-#pragma unroll
-      for (int a = 0; a < spin_dim; a++) {
-#pragma unroll
-        for (int b = 0; b < spin_dim; b++) {
-          int cs = a * spin_dim + b;
-          complex<real> z = 0;
-#pragma unroll
-          for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
-          // Perform a block reduction across the x direction
-          block_reduce_x(z);
-          if (threadIdx.x == 0) { p[(m_index * spin_dim * spin_dim + cs) * gridDim.x + blockIdx.x] = z; }
-        }
-      }
-    }
-
-    template <class real>
-    __device__ inline void vector_tensor_matrix(ChiralProjector<real> *mp, int m_index, const WilsonVector<real> &v,
-                                                const WilsonVector<real> &w)
-    {
-
-      complex<real> *p = reinterpret_cast<complex<real> *>(mp);
-
-#pragma unroll
-      for (int pm = 0; pm < 2; pm++) {
-        complex<real> z = 0;
-        WilsonVector<real> projected_w = w.project(4, 1 - 2 * pm).reconstruct(4, 1 - 2 * pm);
-#pragma unroll
-        for (int spin = 0; spin < spin_dim; spin++) {
-#pragma unroll
-          for (int color = 0; color < color_dim; color++) {
-            z += conj(conj(v(spin, color)) * projected_w(spin, color));
-          }
-        }
-        // Perform a block reduction across the x direction
-        block_reduce_x(z);
-        if (threadIdx.x == 0) { p[(m_index * 2 + pm) * gridDim.x + blockIdx.x] = z; }
-      }
-    }
-
-#ifdef GPU_DOMAIN_WALL_DIRAC
-
+#if 0
     template <class storage_type, class matrix_type> struct MadwfMlArg {
 
       typedef typename colorspinor_mapper<storage_type, 4, 3>::type F;
@@ -253,9 +48,9 @@ namespace quda
       MadwfMlArg(ColorSpinorField &out, const ColorSpinorField &in, const matrix_type *wm_p, bool dagger) :
         out(out),
         in(in),
-        volume_4d_cb(in.VolumeCB() / in.X(4)),
-        Ls_in(in.X(4)),
         Ls_out(out.X(4)),
+        Ls_in(in.X(4)),
+        volume_4d_cb(in.VolumeCB() / in.X(4)),
         wm_p(wm_p),
         dagger(dagger),
         transfer(true),
@@ -302,6 +97,7 @@ namespace quda
           errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
       }
     };
+#endif
 
     template <class T, int block_size> __global__ void tensor_reduce_kernel(T *out, T *in, int batch_size)
     {
@@ -321,6 +117,7 @@ namespace quda
       if (threadIdx.x == 0) { out[blockIdx.x] = aggregate; }
     }
 
+#if 0
     template <class storage_type, class Arg> __global__ void tensor_5d_kernel(Arg arg)
     {
 
@@ -340,7 +137,7 @@ namespace quda
       if (s >= Ls_out) return;
       if (parity >= arg.nParity) return;
 
-      VectorCache<real, Vector> cache;
+      VectorCache<Vector> cache;
 
       int ld = Ls_in * blockDim.x;
       int t = s;
@@ -360,152 +157,122 @@ namespace quda
       }
     }
 
-    template <class storage_type, bool dagger, class Arg> __global__ void transfer_5d_kernel(Arg arg)
+#endif
+
+    template <class storage_type, class matrix_type> class transfer_5D_wrapper: public TunableKernel3D
     {
-
-      typedef typename mapper<storage_type>::type real;
-      typedef ColorSpinor<real, 3, 4> Vector;
-      typedef typename Arg::MatrixType matrix_type;
-
-      const int Ls_in = arg.Ls_in;
-      const int Ls_out = arg.Ls_out;
-      const int volume_4d_cb = arg.volume_4d_cb;
-      const matrix_type *wm_p = arg.wm_p;
-
-      int index_4d_cb = blockIdx.x * blockDim.x + threadIdx.x;
-      int s = blockIdx.y * blockDim.y + threadIdx.y;
-      int parity = blockIdx.z * blockDim.z + threadIdx.z;
-
-      int tid = threadIdx.y * blockDim.x + threadIdx.x;
-      extern __shared__ real smem[];
-      while (tid < Ls_out * Ls_in * sizeof(matrix_type) / sizeof(real)) {
-        smem[tid] = reinterpret_cast<const real *>(wm_p)[tid];
-        tid += blockDim.y * blockDim.x;
-      }
-      __syncthreads();
-
-      if (index_4d_cb >= volume_4d_cb) return;
-      if (s >= Ls_out) return;
-      if (parity >= arg.nParity) return;
-
-      Vector out;
-      // t -> s_in, s-> s_out
-      for (int t = 0; t < Ls_in; t++) {
-        Vector in = arg.in(t * volume_4d_cb + index_4d_cb, parity);
-        int wm_index;
-        if (dagger) {
-          wm_index = t * Ls_out + s;
-        } else {
-          wm_index = s * Ls_in + t;
-        }
-        out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_type *>(smem)[wm_index], in);
-      }
-      arg.out(s * volume_4d_cb + index_4d_cb, parity) = out;
-    }
-
-    template <class storage_type, class Arg> class Transfer5d : public TunableVectorYZ
-    {
-
-      typedef typename mapper<storage_type>::type real;
-
-      Arg &arg;
-      const ColorSpinorField &meta; // this reference is for meta data only
+      ColorSpinorField &out;
+      const ColorSpinorField &in;
+      const matrix_type *wm_p;
+      bool dagger;
 
     private:
       unsigned int sharedBytesPerThread() const
       {
-        if (arg.transfer) {
-          return 0;
-        } else {
-          return (arg.Ls_in) * color_spin_dim * 2 * sizeof(typename mapper<storage_type>::type) / arg.Ls_out;
-        }
+        return 0;
       }
 
       unsigned int sharedBytesPerBlock(const TuneParam &param) const
       {
-        if (arg.transfer) {
-          return arg.Ls_in * arg.Ls_out * Arg::matrix_size;
+        return out.X(4) * in.X(4) * sizeof(matrix_type);
+      }
+
+      unsigned int minThreads() const { return out.VolumeCB() / out.X(4); }
+
+    public:
+      transfer_5D_wrapper(ColorSpinorField &out, const ColorSpinorField &in, const matrix_type *wm_p, bool dagger):
+        TunableKernel3D(out, out.X(4), out.SiteSubset()), out(out), in(in), wm_p(wm_p), dagger(dagger)
+      {
+        TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
+        // FIXME: the threadblock must only have one parity
+
+        strcpy(aux, out.AuxString());
+        char tmp[512];
+        sprintf(tmp, ",%02d->%02d", in.X(4), out.X(4));
+        strcat(aux, tmp);
+        strcat(aux, ",transfer_5D");
+        if (dagger) strcat(aux, ",Dagger");
+
+        apply(device::get_default_stream());
+      }
+
+      void apply(const qudaStream_t &stream)
+      {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        if (dagger) {
+          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_type, matrix_type, true>(out, in, wm_p));
         } else {
-          return 0;
+          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_type, matrix_type, false>(out, in, wm_p));
         }
+      }
+
+      long long flops() const { return 0; }
+      long long bytes() const { return in.Bytes() + out.Bytes(); }
+    };
+
+    template <class storage_type, class matrix_type> class tensor_5D_wrapper : public TunableKernel3D
+    {
+      const ColorSpinorField &out;
+      const ColorSpinorField &in;
+      matrix_type *wm_p;
+
+    private:
+      unsigned int sharedBytesPerThread() const
+      {
+        return in.X(4) * color_spin_dim * 2 * sizeof(typename mapper<storage_type>::type) / out.X(4);
+      }
+
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const
+      {
+        return 0;
       }
       // bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return arg.volume_4d_cb; }
+      unsigned int minThreads() const { return out.VolumeCB() / out.X(4); }
 
     public:
-      Transfer5d(const ColorSpinorField &meta, Arg &arg) :
-        TunableVectorYZ(arg.Ls_out, arg.nParity), arg(arg), meta(meta)
+      tensor_5D_wrapper(const ColorSpinorField &out, const ColorSpinorField &in, matrix_type *wm_p) :
+        TunableKernel3D(out, out.X(4), out.SiteSubset()), out(out), in(in), wm_p(wm_p)
       {
-        strcpy(aux, meta.AuxString());
+        TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
+        // FIXME: the threadblock must only have one parity
+
+        strcpy(aux, out.AuxString());
         char tmp[512];
-        sprintf(tmp, ",%02d->%02d", arg.Ls_in, arg.Ls_out);
+        sprintf(tmp, ",%02d->%02d", in.X(4), out.X(4));
         strcat(aux, tmp);
-        strcat(aux, arg.transfer ? ",transfer_5d" : ",tensor_5d");
-        if (arg.dagger) strcat(aux, ",Dagger");
+        strcat(aux, ",tensor_5D");
+
+        apply(device::get_default_stream());
       }
 
-      virtual ~Transfer5d() { ; }
-
-      template <class F> inline void launch(F *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-      {
-        qudaLaunchKernel(f, tp, stream, arg);
-      }
-
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        if (arg.transfer) {
-          auto f = arg.dagger ? transfer_5d_kernel<storage_type, true, Arg> : transfer_5d_kernel<storage_type, false, Arg>;
-          qudaLaunchKernel(f, tp, stream, arg);
-        } else {
-          using Complex = complex<real>;
-          using matrix_type = typename Arg::MatrixType;
+        tp.set_max_shared_bytes = true;
+        using Arg = Tensor5DArg<storage_type, matrix_type>;
+        using complex_type = complex<typename Arg::real>;
 
-          // Each block has a Wilson Matrix.
-          int num_x_blocks = tp.grid.x;
-          int alloc_size = num_x_blocks * Arg::matrix_size * arg.Ls_in * arg.Ls_out;
+        // Each block has a Wilson Matrix.
+        int num_x_blocks = tp.grid.x;
+        int alloc_size = num_x_blocks * sizeof(matrix_type) * in.X(4) * out.X(4);
 
-          Complex *tensor_out = reinterpret_cast<Complex *>(arg.tensor_out_p);
-          arg.tensor_out_p = (matrix_type *)device_malloc(alloc_size);
-          Complex *tensor_in = reinterpret_cast<Complex *>(arg.tensor_out_p);
+        Arg arg(out, in, reinterpret_cast<matrix_type *>(device_malloc(alloc_size)));
 
-          launch(tensor_5d_kernel<storage_type, Arg>, tp, arg, stream);
+        launch<Tensor5D>(tp, stream, arg);
+        // launch(tensor_5d_kernel<storage_type, Arg>, tp, arg, stream);
 
-          constexpr int block_size = 128;
-          tensor_reduce_kernel<Complex, block_size>
-            <<<arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(Complex), block_size, 0, stream>>>(
-              tensor_out, tensor_in, num_x_blocks);
+        constexpr int block_size = 128;
+        tensor_reduce_kernel<complex_type, block_size>
+          <<<arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type), block_size, 0, target::cuda::get_stream(stream)>>>(
+              reinterpret_cast<complex_type *>(wm_p), reinterpret_cast<complex_type *>(arg.reduce_buffer), num_x_blocks);
 
-          device_free(tensor_in);
-        }
+        device_free(arg.reduce_buffer);
       }
-
-      void initTuneParam(TuneParam &param) const
-      {
-        TunableVectorYZ::initTuneParam(param);
-        param.block.y = arg.Ls_out; // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes
-          = sharedBytesPerBlock(param) + sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
-
-      void defaultTuneParam(TuneParam &param) const
-      {
-        TunableVectorYZ::defaultTuneParam(param);
-        param.block.y = arg.Ls_out; // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes
-          = sharedBytesPerBlock(param) + sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
-
-      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
       long long flops() const { return 0; }
-      long long bytes() const { return arg.in.Bytes() + arg.out.Bytes(); }
+      long long bytes() const { return in.Bytes() + out.Bytes(); }
     };
-
-#endif
 
 // The following macro choose the structure of the transfer matrix.
 #if 1
@@ -524,16 +291,10 @@ namespace quda
       }
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-        using arg_type = MadwfMlArg<short, matrix_type>;
-        arg_type arg(out, in, (const matrix_type *)tp.data(), dagger);
-        Transfer5d<short, arg_type> dslash(in, arg);
-        dslash.apply(streams[Nstream - 1]);
+        transfer_5D_wrapper<short, matrix_type> w(out, in, reinterpret_cast<const matrix_type *>(tp.data()), dagger);
       } break;
       case QUDA_QUARTER_PRECISION: {
-        using arg_type = MadwfMlArg<int8_t, matrix_type>;
-        arg_type arg(out, in, (const matrix_type *)tp.data(), dagger);
-        Transfer5d<int8_t, arg_type> dslash(in, arg);
-        dslash.apply(streams[Nstream - 1]);
+        transfer_5D_wrapper<int8_t, matrix_type> w(out, in, reinterpret_cast<const matrix_type *>(tp.data()), dagger);
       } break;
 
       default: errorQuda("Unsupported precision %d\n", in.Precision());
@@ -553,18 +314,10 @@ namespace quda
       }
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-        using arg_type = MadwfMlArg<short, matrix_type>;
-        cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
-        arg_type arg(out, in, (matrix_type *)tp.data());
-        Transfer5d<short, arg_type> dslash(in, arg);
-        dslash.apply(streams[Nstream - 1]);
+        tensor_5D_wrapper<short, matrix_type> w(out, in, reinterpret_cast<matrix_type *>(tp.data()));
       } break;
       case QUDA_QUARTER_PRECISION: {
-        using arg_type = MadwfMlArg<int8_t, matrix_type>;
-        cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
-        arg_type arg(out, in, (matrix_type *)tp.data());
-        Transfer5d<int8_t, arg_type> dslash(in, arg);
-        dslash.apply(streams[Nstream - 1]);
+        tensor_5D_wrapper<int8_t, matrix_type> w(out, in, reinterpret_cast<matrix_type *>(tp.data()));
       } break;
       default: errorQuda("Unsupported precision %d\n", in.Precision());
       }
@@ -589,7 +342,7 @@ namespace quda
       int p_size = out.get_size() / 2; // complex
       constexpr int block_size = 256;
       int grid_size = (p_size + block_size - 1) / block_size;
-      axpby_kernel<<<grid_size, block_size, 0, streams[Nstream - 1]>>>(
+      axpby_kernel<<<grid_size, block_size>>>(
         (complex<float> *)out.data(), p_size, a, (complex<float> *)x.data(), b, (complex<float> *)y.data());
     }
 

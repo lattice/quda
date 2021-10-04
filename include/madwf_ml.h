@@ -9,6 +9,9 @@
 #include <madwf_transfer.h>
 #include <polynomial.h>
 
+#include <random_quda.h>
+#include <tune_quda.h>
+
 namespace quda
 {
 
@@ -171,14 +174,10 @@ namespace quda
       cudaColorSpinorField null_x(csParam);
       cudaColorSpinorField null_b(csParam);
 
-      auto rng = new RNG(null_b, 1234);
-      rng->Init();
+      RNG rng(null_b, 1234);
 
       printfQuda("Generating Null Space Vectors ... \n");
-      spinorNoise(null_b, *rng, QUDA_NOISE_GAUSS);
-
-      rng->Release();
-      delete rng;
+      spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
 
       std::vector<ColorSpinorField *> B(16);
       csParam.setPrecision(prec_precondition);
@@ -190,8 +189,7 @@ namespace quda
 
       saveTuneCache();
 
-      bool global_reduction = commGlobalReduction();
-      commGlobalReductionSet(false);
+      commGlobalReductionPush(false);
 
       cudaColorSpinorField chi(csParam);
       cudaColorSpinorField tmp(csParam);
@@ -378,7 +376,7 @@ namespace quda
 
       // Destroy all dynamically allocated stuff.
       for (auto &pB : B) { delete pB; }
-      commGlobalReductionSet(global_reduction);
+      commGlobalReductionPop();
     }
   };
 

@@ -16,7 +16,6 @@ namespace quda
     bool parity_inflate;
 #endif
   public:
-
     /**
        Constructor for VectorIO class
        @param[in] filename The filename associated with this IO object

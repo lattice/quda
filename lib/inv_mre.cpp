@@ -1,12 +1,16 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda {
 
-  MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile)
-    : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile){
-
+  MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile) :
+    mat(mat),
+    orthogonal(orthogonal),
+    apply_mat(apply_mat),
+    hermitian(hermitian),
+    profile(profile)
+  {
   }
 
   MinResExt::~MinResExt() {
@@ -18,7 +22,6 @@ namespace quda {
   void MinResExt::solve(Complex *psi_, std::vector<ColorSpinorField*> &p,
                         std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 

@@ -643,9 +643,6 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
-   * @param milc_link Ignored
-   * @param milc_clover Ignored
-   * @param milc_clover_inv Ignored
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
@@ -660,9 +657,6 @@ extern "C" {
       double clover_coeff,
       QudaInvertArgs_t inv_args,
       const double* target_residual,
-      const void* milc_link,
-      void* milc_clover,
-      void* milc_clover_inv,
       void* source,
       void** solutionArray,
       double* const final_residual,
@@ -754,6 +748,18 @@ extern "C" {
    * @param phase_in whether staggered phases are applied
    */
   void qudaUpdateUPhased(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param dt The integration step size step
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   * @param want_gaugepipe whether to enabled QUDA gaugepipe for HMC
+   */
+  void qudaUpdateUPhasedPipeline(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe);
 
   /**
    * Download the momentum from MILC and place into QUDA's resident
@@ -951,7 +957,7 @@ extern "C" {
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
   void qudaGaugeFixingOVR( const int precision,
@@ -975,7 +981,7 @@ extern "C" {
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
   void qudaGaugeFixingFFT( int precision,

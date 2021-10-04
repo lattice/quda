@@ -23,7 +23,7 @@ constexpr int NcontractType = 2;
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
 const char *names[] = {"OpenSpin", "DegrandRossi"};
-const char *prec_str[] = {"single", "double"};
+const char *prec_str[] = {"quarter", "half", "single", "double"};
 
 namespace quda
 {
@@ -47,6 +47,9 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  // Start Google Test Suite
+  //-----------------------------------------------------------------------------
+  ::testing::InitGoogleTest(&argc, argv);
 
   // QUDA initialise
   //-----------------------------------------------------------------------------
@@ -70,23 +73,19 @@ int main(int argc, char **argv)
   display_test_info();
 
   // initialize the QUDA library
-  initQuda(device);
+  initQuda(device_ordinal);
   int X[4] = {xdim, ydim, zdim, tdim};
   setDims(X);
-  setSpinorSiteSize(24);
   //-----------------------------------------------------------------------------
-
-  // Start Google Test Suite
-  //-----------------------------------------------------------------------------
-  ::testing::InitGoogleTest(&argc, argv);
 
   prec = QUDA_INVALID_PRECISION;
 
   // Check for correctness
+  int result = 0;
   if (verify_results) {
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
     if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    int result = RUN_ALL_TESTS();
+    result = RUN_ALL_TESTS();
     if (result) warningQuda("Google tests for QUDA contraction failed!");
   }
   //-----------------------------------------------------------------------------
@@ -97,23 +96,15 @@ int main(int argc, char **argv)
   // finalize the communications layer
   finalizeComms();
 
-  return 0;
+  return result;
 }
 
 // Functions used for Google testing
 //-----------------------------------------------------------------------------
 
 // Performs the CPU GPU comparison with the given parameters
-void test(int contractionType, int Prec)
+int test(int contractionType, QudaPrecision test_prec)
 {
-
-  QudaPrecision test_prec = QUDA_INVALID_PRECISION;
-  switch (Prec) {
-  case 0: test_prec = QUDA_SINGLE_PRECISION; break;
-  case 1: test_prec = QUDA_DOUBLE_PRECISION; break;
-  default: errorQuda("Undefined QUDA precision type %d\n", Prec);
-  }
-
   int X[4] = {xdim, ydim, zdim, tdim};
 
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -124,9 +115,9 @@ void test(int contractionType, int Prec)
   inv_param.cuda_prec_precondition = test_prec;
 
   size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V * spinor_site_size * data_size);
-  void *spinorY = malloc(V * spinor_site_size * data_size);
-  void *d_result = malloc(2 * V * 16 * data_size);
+  void *spinorX = safe_malloc(V * spinor_site_size * data_size);
+  void *spinorY = safe_malloc(V * spinor_site_size * data_size);
+  void *d_result = safe_malloc(2 * V * 16 * data_size);
 
   if (test_prec == QUDA_SINGLE_PRECISION) {
     for (int i = 0; i < V * spinor_site_size; i++) {
@@ -160,19 +151,19 @@ void test(int contractionType, int Prec)
   // It returns the number of faults it detects.
   int faults = 0;
   if (test_prec == QUDA_DOUBLE_PRECISION) {
-    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType, X);
+    faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType);
   } else {
-    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
+    faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType);
   }
 
   printfQuda("Contraction comparison for contraction type %s complete with %d/%d faults\n", get_contract_str(cType),
              faults, V * 16 * 2);
 
-  EXPECT_LE(faults, 0) << "CPU and GPU implementations do not agree";
+  host_free(spinorX);
+  host_free(spinorY);
+  host_free(d_result);
 
-  free(spinorX);
-  free(spinorY);
-  free(d_result);
+  return faults;
 }
 
 // The following tests gets each contraction type and precision using google testing framework
@@ -184,7 +175,6 @@ using ::testing::Values;
 
 class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, int>>
 {
-
   protected:
   ::testing::tuple<int, int> param;
 
@@ -196,9 +186,11 @@ class ContractionTest : public ::testing::TestWithParam<::testing::tuple<int, in
 // Sets up the Google test
 TEST_P(ContractionTest, verify)
 {
-  int prec = ::testing::get<0>(GetParam());
+  QudaPrecision prec = getPrecision(::testing::get<0>(GetParam()));
   int contractionType = ::testing::get<1>(GetParam());
-  test(contractionType, prec);
+  if ((QUDA_PRECISION & prec) == 0) GTEST_SKIP();
+  auto faults = test(contractionType, prec);
+  EXPECT_EQ(faults, 0) << "CPU and GPU implementations do not agree";
 }
 
 // Helper function to construct the test name
@@ -209,8 +201,8 @@ std::string getContractName(testing::TestParamInfo<::testing::tuple<int, int>> p
   std::string str(names[contractType]);
   str += std::string("_");
   str += std::string(prec_str[prec]);
-  return str; // names[contractType] + "_" + prec_str[prec];
+  return str;
 }
 
 // Instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(0, 2), Range(0, NcontractType)), getContractName);
+INSTANTIATE_TEST_SUITE_P(QUDA, ContractionTest, Combine(Range(2, 4), Range(0, NcontractType)), getContractName);

@@ -143,8 +143,8 @@ namespace quda {
     }
   }
 
-  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex** const beta, 
-		      double *gamma, int k, std::vector<ColorSpinorField*> p)
+  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex **const beta, double *gamma, int k,
+                      std::vector<ColorSpinorField *> p)
   {
     Complex *delta = new Complex[k];
 
@@ -292,15 +292,23 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matMdagM);
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        // double the size of the Krylov space
-        extendSVDDeflationSpace();
-        // populate extra memory with L/R singular vectors
-        eig_solve->computeSVD(matMdagM, evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
         profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
@@ -448,7 +456,7 @@ namespace quda {
         r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
-          // Deflate and accumulate to solution vector
+          // Deflate: Hardcoded to SVD.
           eig_solve->deflateSVD(x, r, evecs, evals, true);
 
           // Compute r_defl = RHS - A * LHS

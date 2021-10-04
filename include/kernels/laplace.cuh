@@ -31,6 +31,7 @@ namespace quda
 
     F out;        /** output vector field */
     const F in;   /** input vector field */
+    const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
@@ -43,11 +44,12 @@ namespace quda
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
-      U(U),
-      dir(dir),
+      in_pack(in),
       x(x),
+      U(U),
       a(a),
-      b(b)
+      b(b),
+      dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
@@ -73,7 +75,7 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
-                                               int idx, int thread_dim, bool &active)
+                                               int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -85,9 +87,9 @@ namespace quda
         {
           // Forward gather - compute fwd offset for vector fetch
           const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
-
+	  
           if (doHalo<kernel_type>(d) && ghost) {
-
+	    
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
             const Link U = arg.U(d, coord.x_cb, parity);
@@ -118,7 +120,7 @@ namespace quda
 
             const Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
-
+	    
             out += conj(U) * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
@@ -131,26 +133,27 @@ namespace quda
       }
     }
   }
-
+  
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
-    Arg &arg;
-    constexpr laplace(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr laplace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
+    template <KernelType mykernel_type = kernel_type>
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
-      bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
+      bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;
 
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -159,19 +162,17 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3:
-        applyLaplace<nParity, dagger, kernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active);
-        break;
+      case 3: applyLaplace<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
       case 4:
       default:
-        applyLaplace<nParity, dagger, kernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
+        applyLaplace<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       }
 
-      if (xpay && kernel_type == INTERIOR_KERNEL) {
+      if (xpay && mykernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * out + arg.b * x;
-      } else if (kernel_type != INTERIOR_KERNEL) {
+      } else if (mykernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }

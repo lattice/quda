@@ -1,5 +1,4 @@
-#ifndef _ENUM_QUDA_H
-#define _ENUM_QUDA_H
+#pragma once
 
 #include <limits.h>
 #define QUDA_INVALID_ENUM INT_MIN
@@ -111,7 +110,6 @@ typedef enum QudaInverterType_s {
   QUDA_MR_INVERTER,
   QUDA_MPBICGSTAB_INVERTER,
   QUDA_SD_INVERTER,
-  QUDA_XSD_INVERTER,
   QUDA_PCG_INVERTER,
   QUDA_MPCG_INVERTER,
   QUDA_EIGCG_INVERTER,
@@ -137,20 +135,20 @@ typedef enum QudaInverterType_s {
 typedef enum QudaEigType_s {
   QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
   QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
-  QUDA_EIG_IR_LANCZOS,     // Implicitly Restarted Lanczos solver (not implemented)
-  QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver (not implemented)
+  QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver
+  QUDA_EIG_BLK_IR_ARNOLDI, // Block Implicitly Restarted Arnoldi solver
   QUDA_EIG_INVALID = QUDA_INVALID_ENUM
 } QudaEigType;
 
 /** S=smallest L=largest
     R=real M=modulus I=imaniary **/
 typedef enum QudaEigSpectrumType_s {
-  QUDA_SPECTRUM_SR_EIG,
-  QUDA_SPECTRUM_LR_EIG,
-  QUDA_SPECTRUM_SM_EIG,
-  QUDA_SPECTRUM_LM_EIG,
-  QUDA_SPECTRUM_SI_EIG,
-  QUDA_SPECTRUM_LI_EIG,
+  QUDA_SPECTRUM_LM_EIG = 0,
+  QUDA_SPECTRUM_SM_EIG = 1,
+  QUDA_SPECTRUM_LR_EIG = 2,
+  QUDA_SPECTRUM_SR_EIG = 3,
+  QUDA_SPECTRUM_LI_EIG = 4,
+  QUDA_SPECTRUM_SI_EIG = 5,
   QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
 } QudaEigSpectrumType;
 
@@ -293,9 +291,9 @@ typedef enum QudaDiracType_s {
   QUDA_WILSON_DIRAC,
   QUDA_WILSONPC_DIRAC,
   QUDA_CLOVER_DIRAC,
+  QUDA_CLOVERPC_DIRAC,
   QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC,
   QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC,
-  QUDA_CLOVERPC_DIRAC,
   QUDA_DOMAIN_WALL_DIRAC,
   QUDA_DOMAIN_WALLPC_DIRAC,
   QUDA_DOMAIN_WALL_4D_DIRAC,
@@ -306,8 +304,10 @@ typedef enum QudaDiracType_s {
   QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC,
   QUDA_STAGGERED_DIRAC,
   QUDA_STAGGEREDPC_DIRAC,
+  QUDA_STAGGEREDKD_DIRAC,
   QUDA_ASQTAD_DIRAC,
   QUDA_ASQTADPC_DIRAC,
+  QUDA_ASQTADKD_DIRAC,
   QUDA_TWISTED_MASS_DIRAC,
   QUDA_TWISTED_MASSPC_DIRAC,
   QUDA_TWISTED_CLOVER_DIRAC,
@@ -449,6 +449,13 @@ typedef enum QudaSetupType_s {
   QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
 } QudaSetupType;
 
+typedef enum QudaTransferType_s {
+  QUDA_TRANSFER_AGGREGATE,
+  QUDA_TRANSFER_COARSE_KD,
+  QUDA_TRANSFER_OPTIMIZED_KD,
+  QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
+} QudaTransferType;
+
 typedef enum QudaBoolean_s {
   QUDA_BOOLEAN_FALSE = 0,
   QUDA_BOOLEAN_TRUE = 1,
@@ -459,83 +466,100 @@ typedef enum QudaBoolean_s {
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
-  typedef enum QudaDirection_s {
-    QUDA_BACKWARDS = -1,
-    QUDA_FORWARDS = +1,
-    QUDA_BOTH_DIRS = 2
-  } QudaDirection;
+typedef enum QudaBLASOperation_s {
+  QUDA_BLAS_OP_N = 0, // No transpose
+  QUDA_BLAS_OP_T = 1, // Transpose only
+  QUDA_BLAS_OP_C = 2, // Conjugate transpose
+  QUDA_BLAS_OP_INVALID = QUDA_INVALID_ENUM
+} QudaBLASOperation;
 
-  typedef enum QudaLinkDirection_s {
-    QUDA_LINK_BACKWARDS,
-    QUDA_LINK_FORWARDS,
-    QUDA_LINK_BIDIRECTIONAL
-  } QudaLinkDirection;
+typedef enum QudaBLASDataType_s {
+  QUDA_BLAS_DATATYPE_S = 0, // Single
+  QUDA_BLAS_DATATYPE_D = 1, // Double
+  QUDA_BLAS_DATATYPE_C = 2, // Complex(single)
+  QUDA_BLAS_DATATYPE_Z = 3, // Complex(double)
+  QUDA_BLAS_DATATYPE_INVALID = QUDA_INVALID_ENUM
+} QudaBLASDataType;
 
-  typedef enum QudaFieldGeometry_s {
-    QUDA_SCALAR_GEOMETRY = 1,
-    QUDA_VECTOR_GEOMETRY = 4,
-    QUDA_TENSOR_GEOMETRY = 6,
-    QUDA_COARSE_GEOMETRY = 8,
-    QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
-  } QudaFieldGeometry;
+typedef enum QudaBLASDataOrder_s {
+  QUDA_BLAS_DATAORDER_ROW = 0,
+  QUDA_BLAS_DATAORDER_COL = 1,
+  QUDA_BLAS_DATAORDER_INVALID = QUDA_INVALID_ENUM
+} QudaBLASDataOrder;
 
-  typedef enum QudaGhostExchange_s {
-    QUDA_GHOST_EXCHANGE_NO,
-    QUDA_GHOST_EXCHANGE_PAD,
-    QUDA_GHOST_EXCHANGE_EXTENDED,
-    QUDA_GHOST_EXCHANGE_INVALID = QUDA_INVALID_ENUM
-  } QudaGhostExchange;
+typedef enum QudaDirection_s {
+  QUDA_BACKWARDS = -1,
+  QUDA_IN_PLACE = 0,
+  QUDA_FORWARDS = +1,
+  QUDA_BOTH_DIRS = 2
+} QudaDirection;
 
-  typedef enum QudaStaggeredPhase_s {
-    QUDA_STAGGERED_PHASE_NO = 0,
-    QUDA_STAGGERED_PHASE_MILC = 1,
-    QUDA_STAGGERED_PHASE_CPS = 2,
-    QUDA_STAGGERED_PHASE_TIFR = 3,
-    QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
-  } QudaStaggeredPhase;
+typedef enum QudaLinkDirection_s { QUDA_LINK_BACKWARDS, QUDA_LINK_FORWARDS, QUDA_LINK_BIDIRECTIONAL } QudaLinkDirection;
 
-  typedef enum QudaContractType_s {
-    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
-    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
-    QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
-  } QudaContractType;
+typedef enum QudaFieldGeometry_s {
+  QUDA_SCALAR_GEOMETRY = 1,
+  QUDA_VECTOR_GEOMETRY = 4,
+  QUDA_TENSOR_GEOMETRY = 6,
+  QUDA_COARSE_GEOMETRY = 8,
+  QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
+} QudaFieldGeometry;
 
-  typedef enum QudaContractGamma_s {
-    QUDA_CONTRACT_GAMMA_I = 0,
-    QUDA_CONTRACT_GAMMA_G1 = 1,
-    QUDA_CONTRACT_GAMMA_G2 = 2,
-    QUDA_CONTRACT_GAMMA_G3 = 3,
-    QUDA_CONTRACT_GAMMA_G4 = 4,
-    QUDA_CONTRACT_GAMMA_G5 = 5,
-    QUDA_CONTRACT_GAMMA_G1G5 = 6,
-    QUDA_CONTRACT_GAMMA_G2G5 = 7,
-    QUDA_CONTRACT_GAMMA_G3G5 = 8,
-    QUDA_CONTRACT_GAMMA_G4G5 = 9,
-    QUDA_CONTRACT_GAMMA_S12 = 10,
-    QUDA_CONTRACT_GAMMA_S13 = 11,
-    QUDA_CONTRACT_GAMMA_S14 = 12,
-    QUDA_CONTRACT_GAMMA_S21 = 13,
-    QUDA_CONTRACT_GAMMA_S23 = 14,
-    QUDA_CONTRACT_GAMMA_S34 = 15,
-    QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
-  } QudaContractGamma;
+typedef enum QudaGhostExchange_s {
+  QUDA_GHOST_EXCHANGE_NO,
+  QUDA_GHOST_EXCHANGE_PAD,
+  QUDA_GHOST_EXCHANGE_EXTENDED,
+  QUDA_GHOST_EXCHANGE_INVALID = QUDA_INVALID_ENUM
+} QudaGhostExchange;
 
-  typedef enum QudaWFlowType_s {
-    QUDA_WFLOW_TYPE_WILSON,
-    QUDA_WFLOW_TYPE_SYMANZIK,
-    QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
-  } QudaWFlowType;
+typedef enum QudaStaggeredPhase_s {
+  QUDA_STAGGERED_PHASE_NO = 0,
+  QUDA_STAGGERED_PHASE_MILC = 1,
+  QUDA_STAGGERED_PHASE_CPS = 2,
+  QUDA_STAGGERED_PHASE_TIFR = 3,
+  QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
+} QudaStaggeredPhase;
 
-  // Allows to choose an appropriate external library
-  typedef enum QudaExtLibType_s {
-    QUDA_CUSOLVE_EXTLIB,
-    QUDA_EIGEN_EXTLIB,
-    QUDA_MAGMA_EXTLIB,
-    QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
-  } QudaExtLibType;
+typedef enum QudaContractType_s {
+  QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+  QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+  QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaContractType;
+
+typedef enum QudaContractGamma_s {
+  QUDA_CONTRACT_GAMMA_I = 0,
+  QUDA_CONTRACT_GAMMA_G1 = 1,
+  QUDA_CONTRACT_GAMMA_G2 = 2,
+  QUDA_CONTRACT_GAMMA_G3 = 3,
+  QUDA_CONTRACT_GAMMA_G4 = 4,
+  QUDA_CONTRACT_GAMMA_G5 = 5,
+  QUDA_CONTRACT_GAMMA_G1G5 = 6,
+  QUDA_CONTRACT_GAMMA_G2G5 = 7,
+  QUDA_CONTRACT_GAMMA_G3G5 = 8,
+  QUDA_CONTRACT_GAMMA_G4G5 = 9,
+  QUDA_CONTRACT_GAMMA_S12 = 10,
+  QUDA_CONTRACT_GAMMA_S13 = 11,
+  QUDA_CONTRACT_GAMMA_S14 = 12,
+  QUDA_CONTRACT_GAMMA_S21 = 13,
+  QUDA_CONTRACT_GAMMA_S23 = 14,
+  QUDA_CONTRACT_GAMMA_S34 = 15,
+  QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
+} QudaContractGamma;
+
+typedef enum QudaWFlowType_s {
+  QUDA_WFLOW_TYPE_WILSON,
+  QUDA_WFLOW_TYPE_SYMANZIK,
+  QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaWFlowType;
+
+// Allows to choose an appropriate external library
+typedef enum QudaExtLibType_s {
+  QUDA_CUSOLVE_EXTLIB,
+  QUDA_EIGEN_EXTLIB,
+  QUDA_MAGMA_EXTLIB,
+  QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
+} QudaExtLibType;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _ENUM_QUDA_H

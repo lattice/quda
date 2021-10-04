@@ -5,6 +5,8 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
+#include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -14,10 +16,11 @@
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 #endif
+
 namespace quda
 {
 
-  enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, SHMEM, N_ALLOC_TYPE };
 
   class MemAlloc
   {
@@ -42,37 +45,38 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
-  static long total_bytes[N_ALLOC_TYPE] = {0};
-  static long max_total_bytes[N_ALLOC_TYPE] = {0};
-  static long total_host_bytes, max_total_host_bytes;
-  static long total_pinned_bytes, max_total_pinned_bytes;
+  static size_t total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t max_total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t total_host_bytes, max_total_host_bytes;
+  static size_t total_pinned_bytes, max_total_pinned_bytes;
 
-  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+  size_t device_allocated() { return total_bytes[DEVICE]; }
 
-  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+  size_t pinned_allocated() { return total_bytes[PINNED]; }
 
-  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+  size_t mapped_allocated() { return total_bytes[MAPPED]; }
 
-  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+  size_t managed_allocated() { return total_bytes[MANAGED]; }
 
-  long host_allocated_peak() { return max_total_bytes[HOST]; }
+  size_t host_allocated() { return total_bytes[HOST]; }
+
+  size_t device_allocated_peak() { return max_total_bytes[DEVICE]; }
+
+  size_t pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+
+  size_t mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  size_t managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+
+  size_t host_allocated_peak() { return max_total_bytes[HOST]; }
 
   static void print_trace(void)
   {
@@ -94,12 +98,11 @@ namespace quda
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
-    std::map<void *, MemAlloc>::iterator entry;
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed", "Shmem "};
 
-    for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
-      void *ptr = entry->first;
-      MemAlloc a = entry->second;
+    for (auto entry : alloc[type]) {
+      void *ptr = entry.first;
+      MemAlloc a = entry.second;
       printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
                  a.file.c_str(), a.line);
 #ifdef QUDA_BACKWARDSCPP
@@ -115,7 +118,7 @@ namespace quda
   {
     total_bytes[type] += a.base_size;
     if (total_bytes[type] > max_total_bytes[type]) { max_total_bytes[type] = total_bytes[type]; }
-    if (type != DEVICE && type != DEVICE_PINNED) {
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) {
       total_host_bytes += a.base_size;
       if (total_host_bytes > max_total_host_bytes) { max_total_host_bytes = total_host_bytes; }
     }
@@ -130,7 +133,7 @@ namespace quda
   {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
-    if (type != DEVICE && type != DEVICE_PINNED) { total_host_bytes -= size; }
+    if (type != DEVICE && type != DEVICE_PINNED && type != SHMEM) { total_host_bytes -= size; }
     if (type == PINNED || type == MAPPED) { total_pinned_bytes -= size; }
     alloc[type].erase(ptr);
   }
@@ -147,12 +150,12 @@ namespace quda
 
     a.size = size;
 
-#if (CUDA_VERSION > 4000)                                                                                              \
-  && 0 // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
+#if 0
     a.base_size = size;
     ptr = malloc(size);
     if (!ptr) {
 #else
+    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
@@ -175,7 +178,8 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported())
+          warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
@@ -359,6 +363,42 @@ namespace quda
 #endif
     return ptr;
   }
+  /**
+   * Allocate shemm device memory. This function should only be called via
+   * device_comms_pinned_malloc_()
+   */
+#ifdef NVSHMEM_COMMS
+  void *shmem_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+
+    a.size = a.base_size = size;
+
+    auto ptr = nvshmem_malloc(size);
+    if (ptr == nullptr) {
+      printfQuda("ERROR: Failed to allocate shmem memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorQuda("Aborting");
+    }
+    track_malloc(SHMEM, a, ptr);
+#ifdef HOST_DEBUG
+    cudaMemset(ptr, 0xff, size);
+#endif
+    return ptr;
+  }
+#endif
+
+  /**
+   * Allocate pinned or symmetric (shmem) device memory for comms. Should only be called via the
+   * device_comms_pinned_malloc macro, defined in malloc_quda.h
+   */
+  void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+#ifdef NVSHMEM_COMMS
+    return shmem_malloc_(func, file, line, size);
+#else
+    return device_pinned_malloc_(func, file, line, size);
+#endif
+  }
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -457,13 +497,46 @@ namespace quda
     }
   }
 
+#ifdef NVSHMEM_COMMS
+  /**
+   * Free symmetric memory allocated with shmem_malloc_. Should only be called via the device_comms_* functions.
+   */
+  void shmem_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) {
+      printfQuda("ERROR: Attempt to free NULL shmem pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    if (!alloc[SHMEM].count(ptr)) {
+      printfQuda("ERROR: Attempt to free invalid shmem pointer (%s:%d in %s())\n", file, line, func);
+      errorQuda("Aborting");
+    }
+    nvshmem_free(ptr);
+    track_free(SHMEM, ptr);
+  }
+#endif
+
+  /**
+   * Free device comms memory allocated with device_comms_pinned_malloc(). This function should only be
+   * called via the device_comms_pinned_free() macro, defined in malloc_quda.h
+   */
+  void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
+  {
+#ifdef NVSHMEM_COMMS
+    shmem_free_(func, file, line, ptr);
+#else
+    device_pinned_free_(func, file, line, ptr);
+#endif
+  }
+
   void printPeakMemUsage()
   {
-    printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
-    printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
-    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
-    printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1 << 20));
-    printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1 << 20));
+    printfQuda("Device memory used = %.1f MiB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
+    printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
+    printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
+    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
+    printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
@@ -475,6 +548,7 @@ namespace quda
       print_alloc_header();
       print_alloc(DEVICE);
       print_alloc(DEVICE_PINNED);
+      print_alloc(SHMEM);
       print_alloc(HOST);
       print_alloc(PINNED);
       print_alloc(MAPPED);
@@ -484,7 +558,6 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
     void *data[] = {&mem_type};
@@ -511,12 +584,29 @@ namespace quda
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
 
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {
+    auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {
+    auto error = cudaHostUnregister(ptr);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
 
   namespace pool
   {
@@ -573,18 +663,23 @@ namespace quda
         }
         pool_init = true;
       }
+#if defined(NVSHMEM_COMMS)
+      MPI_Comm tmp = MPI_COMM_WORLD;
+      warningQuda("Init NVSHMEM");
+      nvshmemx_init_attr_t attr;
+      attr.mpi_comm = &tmp;
+      nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+#endif
     }
 
     void *pinned_malloc_(const char *func, const char *file, int line, size_t nbytes)
     {
       void *ptr = nullptr;
       if (pinned_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-
         if (pinnedCache.empty()) {
           ptr = quda::pinned_malloc_(func, file, line, nbytes);
         } else {
-          it = pinnedCache.lower_bound(nbytes);
+          auto it = pinnedCache.lower_bound(nbytes);
           if (it != pinnedCache.end()) { // sufficiently large allocation found
             nbytes = it->first;
             ptr = it->second;
@@ -619,12 +714,10 @@ namespace quda
     {
       void *ptr = nullptr;
       if (device_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-
         if (deviceCache.empty()) {
           ptr = quda::device_malloc_(func, file, line, nbytes);
         } else {
-          it = deviceCache.lower_bound(nbytes);
+          auto it = deviceCache.lower_bound(nbytes);
           if (it != deviceCache.end()) { // sufficiently large allocation found
             nbytes = it->first;
             ptr = it->second;
@@ -655,14 +748,22 @@ namespace quda
       }
     }
 
+#ifdef NVSHMEM_COMMS
+    void *shmem_malloc_(const char *func, const char *file, int line, size_t nbytes)
+    {
+      return quda::shmem_malloc_(func, file, line, nbytes);
+    }
+
+    void shmem_free_(const char *func, const char *file, int line, void *ptr)
+    {
+      quda::shmem_free_(func, file, line, ptr);
+    }
+#endif
+
     void flush_pinned()
     {
       if (pinned_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-        for (it = pinnedCache.begin(); it != pinnedCache.end(); it++) {
-          void *ptr = it->second;
-          host_free(ptr);
-        }
+        for (auto it : pinnedCache) { host_free(it.second); }
         pinnedCache.clear();
       }
     }
@@ -670,11 +771,7 @@ namespace quda
     void flush_device()
     {
       if (device_memory_pool) {
-        std::multimap<size_t, void *>::iterator it;
-        for (it = deviceCache.begin(); it != deviceCache.end(); it++) {
-          void *ptr = it->second;
-          device_free(ptr);
-        }
+        for (auto it : deviceCache) { device_free(it.second); }
         deviceCache.clear();
       }
     }

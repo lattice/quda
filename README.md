@@ -29,13 +29,17 @@ QUDA includes an implementations of adaptive multigrid for the Wilson,
 clover-improved, twisted-mass and twisted-clover fermion actions.  We
 note however that this is undergoing continued evolution and
 improvement and we highly recommend using adaptive multigrid use the
-latest develop branch.  More details can be found at
-https://github.com/lattice/quda/wiki/Multigrid-Solver.
+latest develop branch.  More details can be found [here]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver).
 
 Support for eigen-vector deflation solvers is also included through
-the Thick Restarted Lanczos Method (TRLM).  For more details we refer
-the user to the wiki
-(https://github.com/lattice/quda/wiki/Deflated-Solvers).
+the Thick Restarted Lanczos Method (TRLM), and we offer an Implicitly
+Restarted Arnoldi for observing non-hermitian operator spectra.
+For more details we refer the user to the wiki:
+[QUDA's eigensolvers]
+(https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers)
+[Deflating coarse grid solves in Multigrid]
+(https://github.com/lattice/quda/wiki/Multigrid-Solver#multigrid-inverter--lanczos)
 
 ## Software Compatibility:
 
@@ -191,7 +195,7 @@ used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
-Please visit http://lattice.github.com/quda for contact information. Bug
+Please visit http://lattice.github.io/quda for contact information. Bug
 reports are especially welcome.
 
 
@@ -212,7 +216,7 @@ Performance Computing, Networking, Storage and Analysis (SC), 2011
 
 When taking advantage of adaptive multigrid, please also cite:
 
-M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
 "Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
 Parallelization," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016
@@ -226,7 +230,7 @@ Implementations of Block-Krylov Space Solvers on GPUs,"
 To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
 
 Several other papers that might be of interest are listed at
-http://lattice.github.com/quda .
+http://lattice.github.io/quda .
 
 
 ## Authors:
@@ -240,20 +244,20 @@ http://lattice.github.com/quda .
 *  Kate Clark (NVIDIA)
 *  Michael Cheng (Boston University)
 *  Carleton DeTar (Utah University)
-*  Justin Foley (NIH) 
-*  Joel Giedt (Rensselaer Polytechnic Institute) 
+*  Justin Foley (NIH)
 *  Arjun Gambhir (William and Mary)
+*  Joel Giedt (Rensselaer Polytechnic Institute) 
 *  Steven Gottlieb (Indiana University) 
 *  Kyriakos Hadjiyiannakou (Cyprus)
-*  Dean Howarth (Boston University)
+*  Dean Howarth (Lawrence Livermore Lab, Lawrence Berkeley Lab)
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
-*  Eloy Romero (William and Mary)
 *  Claudio Rebbi (Boston University) 
-*  Guochun Shi (NCSA)
+*  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
+*  Guochun Shi (NCSA)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
 *  Jiqun Tu (NVIDIA)
 *  Alejandro Vaquero (Utah University)

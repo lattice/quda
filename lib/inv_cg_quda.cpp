@@ -5,10 +5,6 @@
 #include <memory>
 #include <iostream>
 
-#ifdef BLOCKSOLVER
-#include <Eigen/Dense>
-#endif
-
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -16,6 +12,7 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <eigensolve_quda.h>
+#include <eigen_helper.h>
 
 namespace quda {
 
@@ -225,8 +222,7 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
-    bool global_reduction = commGlobalReduction();
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -240,6 +236,9 @@ namespace quda {
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
+
+    // Detect whether this is a pure double solve or not; informs the necessity of some stability checks
+    bool is_pure_double = (param.precision == QUDA_DOUBLE_PRECISION && param.precision_sloppy == QUDA_DOUBLE_PRECISION);
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
@@ -332,13 +331,9 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = param.precision_sloppy == 8 ?
-      std::numeric_limits<double>::epsilon() / 2. :
-      param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
-    const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-                                                param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                                                       param.precision == 2 ? pow(2., -13) : pow(2., -6);
+    const double u = precisionEpsilon(param.precision_sloppy);
+    const double uhigh = precisionEpsilon(); // solver precision
+
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
     double d_new = 0;
@@ -357,6 +352,13 @@ namespace quda {
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
     }
+
+    // for detecting HQ residual stalls
+    // let |r2/b2| drop to epsilon tolerance * 1e-30, semi-arbitrarily, but
+    // with the intent of letting the solve grind as long as possible before
+    // triggering a `NaN`. Ignored for pure double solves because if
+    // pure double has stability issues, bigger problems are at hand.
+    const double hq_res_stall_check = is_pure_double ? 0. : uhigh * uhigh * 1e-60;
 
     // compute initial residual
     double r2 = 0.0;
@@ -424,7 +426,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha[Np];
+    auto alpha = std::make_unique<double[]>(Np);
     double pAp;
     int rUpdate = 0;
 
@@ -565,7 +567,7 @@ namespace quda {
             if ( (j+1)%Np == 0 ) {
               std::vector<ColorSpinorField*> x_;
               x_.push_back(&xSloppy);
-              blas::axpy(alpha, p, x_);
+              blas::axpy(alpha.get(), p, x_);
             }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
@@ -602,7 +604,7 @@ namespace quda {
           x_.push_back(&xSloppy);
           std::vector<ColorSpinorField*> p_;
           for (int i=0; i<=j; i++) p_.push_back(p[i]);
-          blas::axpy(alpha, p_, x_);
+          blas::axpy(alpha.get(), p_, x_);
         }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
@@ -741,7 +743,7 @@ namespace quda {
         x_.push_back(&xSloppy);
         std::vector<ColorSpinorField*> p_;
         for (int i=0; i<=j; i++) p_.push_back(p[i]);
-        blas::axpy(alpha, p_, x_);
+        blas::axpy(alpha.get(), p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
@@ -784,17 +786,21 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(global_reduction);
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
-  #ifndef BLOCKSOLVER
-  errorQuda("QUDA_BLOCKSOLVER not built.");
-  #else
 
+#ifndef BLOCKSOLVER
+
+void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+
+#else
+
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
+{
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
@@ -1158,8 +1164,8 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
 
   return;
 
-  #endif
 }
+#endif
 
 #else
 
@@ -1386,7 +1392,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     double n = blas::norm2(p.Component(i));
     blas::ax(1/sqrt(n),p.Component(i));
     for(int j=i+1; j < param.num_src; j++) {
-      std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+      auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
       blas::caxpy(-ri,p.Component(i),p.Component(j));
     }
   }
@@ -1537,7 +1543,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           double n = blas::norm2(p.Component(i));
           blas::ax(1/sqrt(n),p.Component(i));
           for(int j=i+1; j < param.num_src; j++) {
-            std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+            auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
             blas::caxpy(-ri,p.Component(i),p.Component(j));
 
           }

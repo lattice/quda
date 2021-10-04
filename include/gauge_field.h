@@ -1,9 +1,10 @@
-#ifndef _GAUGE_QUDA_H
-#define _GAUGE_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda.h>
 #include <lattice_field.h>
+
+#include <comm_key.h>
 
 namespace quda {
 
@@ -131,7 +132,7 @@ namespace quda {
     {
     }
 
-    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+    GaugeFieldParam(const QudaGaugeParam &param, void *h_gauge = nullptr, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
       location(QUDA_CPU_FIELD_LOCATION),
       nColor(3),
@@ -294,6 +295,11 @@ namespace quda {
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = GaugeFieldParam;
+
+    /**
        Apply the staggered phase factors to the gauge field.
        @param[in] phase The phase we will apply to the field.  If this
        is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply
@@ -346,6 +352,8 @@ namespace quda {
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 
+    size_t TotalBytes() const { return bytes; }
+
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}
@@ -353,6 +361,8 @@ namespace quda {
     virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual int full_dim(int d) const { return x[d]; }
 
     const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
@@ -502,7 +512,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, qudaStream_t *stream_p = nullptr);
+    void sendStart(int dim, int dir, const qudaStream_t &stream_p);
 
     /**
        @brief Wait for communication to complete
@@ -574,6 +584,18 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -597,7 +619,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -665,6 +687,18 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -722,6 +756,16 @@ namespace quda {
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
 
   /**
+    @brief This function is used for copying from a source gauge field to a destination gauge field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
+ */
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type);
+
+  /**
      This function is used for copying the gauge field into an
      extended gauge field.  Defined in copy_extended_gauge.cu.
      @param out The extended output field to which we are copying
@@ -770,10 +814,12 @@ namespace quda {
   void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true, int offset=0);
 
   /**
-     This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in extract_gauge_ghost.cu.
+     This function is used for extracting the extended gauge ghost
+     zone from a gauge field array.  Defined in
+     extract_gauge_ghost_extended.cu.
      @param u The gauge field from which we want to extract/pack the ghost zone
      @param dim The dimension in which we are packing/unpacking
+     @param R array holding the radius of the extended region
      @param ghost The array where we want to pack/unpack the ghost zone into/from
      @param extract Whether we are extracting into ghost or injecting from ghost
   */
@@ -831,5 +877,3 @@ namespace quda {
 #define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
-
-#endif // _GAUGE_QUDA_H

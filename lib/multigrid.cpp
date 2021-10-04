@@ -1,7 +1,12 @@
 #include <cstring>
 
 #include <multigrid.h>
+#include <tune_quda.h>
+#include <random_quda.h>
 #include <vector_io.h>
+
+// for building the KD inverse op
+#include <staggered_kd_build_xinv.h>
 
 namespace quda
 {
@@ -31,6 +36,7 @@ namespace quda
     x_coarse(nullptr),
     tmp_coarse(nullptr),
     tmp2_coarse(nullptr),
+    xInvKD(nullptr),
     diracResidual(param.matResidual->Expose()),
     diracSmoother(param.matSmooth->Expose()),
     diracSmootherSloppy(param.matSmoothSloppy->Expose()),
@@ -74,9 +80,8 @@ namespace quda
     }
 
     rng = new RNG(*param.B[0], 1234);
-    rng->Init();
 
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
         if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
           if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
@@ -112,7 +117,7 @@ namespace quda
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::reset(bool refresh) {
@@ -128,8 +133,9 @@ namespace quda
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
-    // Check if we're on the top level of a staggered MG build.
-    if (param.level != 0 || !param.is_staggered) {
+    // Only refresh if we needed to generate near-nulls, that is,
+    // if we aren't doing a staggered KD solve
+    if (param.level != 0 || param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       // Refresh the null-space vectors if we need to
       if (refresh && param.level < param.Nlevel - 1) {
         if (param.mg_global.setup_maxiter_refresh[param.level]) generateNullVectors(param.B, refresh);
@@ -149,8 +155,9 @@ namespace quda
       } else {
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], profile);
+        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize, param.spinBlockSize,
+                                param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level],
+                                profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -239,7 +246,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::pushLevel(int level) const
@@ -249,7 +256,7 @@ namespace quda
     pushOutputPrefix(prefix);
   }
 
-  void MG::popLevel(int level) const
+  void MG::popLevel() const
   {
     popVerbosity();
     popOutputPrefix();
@@ -280,7 +287,7 @@ namespace quda
       param_postsmooth = nullptr;
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createSmoother() {
@@ -341,7 +348,7 @@ namespace quda
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createCoarseDirac() {
@@ -353,69 +360,131 @@ namespace quda
     bool preconditioned_coarsen = (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE);
     QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
 
-    // create coarse grid operator
-    DiracParam diracParam;
-    diracParam.transfer = transfer;
-
-    // Parameters that matter for coarse construction and application
-    diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac*>(diracSmoother) : const_cast<Dirac*>(diracResidual);
-    diracParam.kappa = (param.B[0]->Nspin() == 1) ?
-      -1.0 :
-      diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
-    diracParam.mass = diracParam.dirac->Mass();
-    diracParam.mu = diracParam.dirac->Mu();
-    diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
-
-    // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
-    // preconditioned, we have to force bi-directional builds.
-    diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
-    for (int i = 0; i <= param.level; i++) {
-      if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
-          && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
-        diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
-      }
-    }
-
-    diracParam.dagger = QUDA_DAG_NO;
-    diracParam.matpcType = matpc_type;
-    diracParam.type = QUDA_COARSE_DIRAC;
-    diracParam.tmp1 = tmp_coarse;
-    diracParam.tmp2 = tmp2_coarse;
-    diracParam.halo_precision = param.mg_global.precision_null[param.level];
-    diracParam.use_mma = param.use_mma;
-
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
-    diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
-                                          param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
-
-    // create smoothing operators
-    diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
-    diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level+1];
-
     if (diracCoarseSmoother) delete diracCoarseSmoother;
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
-    if (param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE) {
-      diracParam.type = QUDA_COARSEPC_DIRAC;
-      diracParam.tmp1 = &(tmp_coarse->Even());
-      diracParam.tmp2 = &(tmp2_coarse->Even());
-      diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
-      {
-        bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
-        for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+    // custom setup for the staggered KD ops
+    if (param.level == 0 && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD) {
+      auto dirac_type = diracSmoother->getDiracType();
+
+      auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
+      if (smoother_solve_type != QUDA_DIRECT_SOLVE) {
+        errorQuda("Invalid solve type %d for optimized KD operator", smoother_solve_type);
       }
-      diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
+
+      // Allocate and build the KD inverse block (inverse coarse clover)
+      auto fine_dirac_type = diracSmoother->getDiracType();
+      if (fine_dirac_type != dirac_type)
+        errorQuda("Input dirac type %d does not match smoother type %d\n", dirac_type, fine_dirac_type);
+
+      cudaGaugeField *fine_gauge = nullptr;
+      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC)
+        fine_gauge
+          = const_cast<cudaGaugeField *>(reinterpret_cast<const DiracStaggered *>(diracSmoother)->getGaugeField());
+      if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
+        fine_gauge = const_cast<cudaGaugeField *>(
+          reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getFatLinkField());
+
+      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(),
+                                                           param.mg_global.invert_param->cuda_prec_precondition);
+
+      DiracParam diracParamKD;
+      diracParamKD.kappa
+        = -1.0; // Cancels automatic kappa in Y field application, which may be relevant if it propagates down
+      diracParamKD.mass = diracSmoother->Mass();
+      diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
+      diracParamKD.mu_factor = 1.0;          // doesn't matter
+      diracParamKD.dagger = QUDA_DAG_NO;
+      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+      diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
+      diracParamKD.xInvKD = xInvKD;
+
+      diracParamKD.tmp1 = tmp_coarse;
+      diracParamKD.tmp2 = tmp2_coarse;
+
+      if (dirac_type == QUDA_STAGGERED_DIRAC || dirac_type == QUDA_STAGGEREDPC_DIRAC) {
+        diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
+
+        diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
+        diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+        diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
+      } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
+        diracParamKD.type = QUDA_ASQTADKD_DIRAC;
+
+        diracParamKD.fatGauge = fine_gauge;
+        diracParamKD.longGauge = const_cast<cudaGaugeField *>(
+          reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
+
+        diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
+        diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
+        diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+      } else {
+        errorQuda("Invalid dirac_type %d", dirac_type);
+      }
+
     } else {
+
+      // create coarse grid operator
+      DiracParam diracParam;
+      diracParam.transfer = transfer;
+
+      // Parameters that matter for coarse construction and application
+      diracParam.dirac = preconditioned_coarsen ? const_cast<Dirac *>(diracSmoother) : const_cast<Dirac *>(diracResidual);
+      diracParam.kappa = (param.B[0]->Nspin() == 1) ?
+        -1.0 :
+        diracParam.dirac->Kappa(); // -1 cancels automatic kappa in application of Y fields
+      diracParam.mass = diracParam.dirac->Mass();
+      diracParam.mu = diracParam.dirac->Mu();
+      diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
+
+      // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
+      // preconditioned, we have to force bi-directional builds.
+      diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
+      for (int i = 0; i <= param.level; i++) {
+        if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+            && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+          diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
+        }
+      }
+
+      diracParam.dagger = QUDA_DAG_NO;
+      diracParam.matpcType = matpc_type;
       diracParam.type = QUDA_COARSE_DIRAC;
       diracParam.tmp1 = tmp_coarse;
       diracParam.tmp2 = tmp2_coarse;
-      diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseResidual), diracParam);
-      {
-        bool schwarz = param.mg_global.smoother_schwarz_type[param.level+1] != QUDA_INVALID_SCHWARZ;
-        for (int i=0; i<4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+      diracParam.halo_precision = param.mg_global.precision_null[param.level];
+      diracParam.use_mma = param.use_mma;
+
+      diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
+                                            param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
+
+      // create smoothing operators
+      diracParam.dirac = const_cast<Dirac *>(param.matSmooth->Expose());
+      diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level + 1];
+
+      if (param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE) {
+        diracParam.type = QUDA_COARSEPC_DIRAC;
+        diracParam.tmp1 = &(tmp_coarse->Even());
+        diracParam.tmp2 = &(tmp2_coarse->Even());
+        diracCoarseSmoother = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+        {
+          bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+          for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+        }
+        diracCoarseSmootherSloppy = new DiracCoarsePC(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
+      } else {
+        diracParam.type = QUDA_COARSE_DIRAC;
+        diracParam.tmp1 = tmp_coarse;
+        diracParam.tmp2 = tmp2_coarse;
+        diracCoarseSmoother = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseResidual), diracParam);
+        {
+          bool schwarz = param.mg_global.smoother_schwarz_type[param.level + 1] != QUDA_INVALID_SCHWARZ;
+          for (int i = 0; i < 4; i++) diracParam.commDim[i] = schwarz ? 0 : 1;
+        }
+        diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse &>(*diracCoarseSmoother), diracParam);
       }
-      diracCoarseSmootherSloppy = new DiracCoarse(static_cast<DiracCoarse&>(*diracCoarseSmoother),diracParam);
     }
 
     if (matCoarseResidual) delete matCoarseResidual;
@@ -427,7 +496,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::destroyCoarseSolver() {
@@ -456,7 +525,7 @@ namespace quda
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createCoarseSolver() {
@@ -598,7 +667,7 @@ namespace quda
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   MG::~MG()
@@ -630,7 +699,6 @@ namespace quda
     }
 
     if (rng) {
-      rng->Release();
       delete rng;
     }
 
@@ -644,11 +712,13 @@ namespace quda
     if (tmp_coarse) delete tmp_coarse;
     if (tmp2_coarse) delete tmp2_coarse;
 
+    if (xInvKD) delete xInvKD;
+
     if (param_coarse) delete param_coarse;
 
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
 
-    popLevel(param.level);
+    popLevel();
   }
 
   // FIXME need to make this more robust (implement Solver::flops() for all solvers)
@@ -699,10 +769,17 @@ namespace quda
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
-    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
+    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+    double tol;
+    switch (prec) {
+    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+    case QUDA_HALF_PRECISION:    tol = 5e-2; break;
+    case QUDA_SINGLE_PRECISION:  tol = 1e-3; break;
+    default: tol = 1e-8;
+    }
 
     // No need to check (projector) v_k for staggered case
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -717,8 +794,8 @@ namespace quda
 
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda(
-            "Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e, L2 relative deviation = %e\n", i,
-            norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2), deviation);
+            "Vector %d: norms v_k = %e P^\\dagger v_k = %e (1 - P P^\\dagger) v_k = %e, L2 relative deviation = %e\n",
+            i, norm2(*tmp1), norm2(*r_coarse), norm2(*tmp2), deviation);
         if (deviation > tol) errorQuda("L2 relative deviation for k=%d failed, %e > %e", i, deviation, tol);
       }
 
@@ -806,77 +883,86 @@ namespace quda
     if (deviation > tol ) errorQuda("L2 relative deviation = %e > %e failed", deviation, tol);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (D_c - P^\\dagger D P) (native coarse operator to emulated operator)\n");
 
-    ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, r->Precision(), param.mg_global.location[param.level+1]);
     zero(*tmp_coarse);
     zero(*r_coarse);
 
+#if 0 // debugging trick: point source matrix elements
+    tmp_coarse->Source(QUDA_POINT_SOURCE, 0, 0, 0);
+#else
     spinorNoise(*tmp_coarse, *rng, QUDA_NOISE_UNIFORM);
-    transfer->P(*tmp1, *tmp_coarse);
-
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
-      double kappa = diracResidual->Kappa();
-      double mass = diracResidual->Mass();
-      if (param.level==0) {
-        if (tmp1->Nspin() == 4) {
-          diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
-          diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
-        } else if (tmp1->Nspin() == 2) { // if the coarse op is on top
-          diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-          diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
-        } else { // staggered
-          diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(),
-                                    2.0 * mass); // stag convention
-          diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(),
-                                    2.0 * mass); // stag convention
-        }
-      } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
-        diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
-        diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
-      }
-    } else {
-      (*param.matResidual)(*tmp2,*tmp1);
-    }
-
-    transfer->R(*x_coarse, *tmp2);
-    static_cast<DiracCoarse *>(diracCoarseResidual)->M(*r_coarse, *tmp_coarse);
-
-#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
-    setOutputPrefix("");
-
-    for (int i=0; i<comm_rank(); i++) { // this ensures that we print each rank in order
-      if (i==comm_rank()) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
-        for (int x=0; x<x_coarse->Volume(); x++) tmp1->PrintVector(x);
-
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
-        for (int x=0; x<r_coarse->Volume(); x++) tmp2->PrintVector(x);
-      }
-      comm_barrier();
-    }
-    setOutputPrefix(prefix);
 #endif
 
-    double r_nrm = norm2(*r_coarse);
-    deviation = sqrt( xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse) );
+    // the three-hop terms break the verification b/c the coarse ops don't have the long links baked in
+    // need a more robust fix to this
+    if ((param.transfer_type == QUDA_TRANSFER_AGGREGATE || param.transfer_type == QUDA_TRANSFER_COARSE_KD)
+        && diracSmoother->getDiracType() != QUDA_ASQTAD_DIRAC && diracSmoother->getDiracType() != QUDA_ASQTADPC_DIRAC
+        && diracSmoother->getDiracType() != QUDA_ASQTADKD_DIRAC) {
 
-    if (diracResidual->Mu() != 0.0) {
-      // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
-      //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
-      double delta_factor = param.mg_global.mu_factor[param.level+1] - param.mg_global.mu_factor[param.level];
-      if(fabs(delta_factor) > tol ) {
-        double delta_a
-          = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu() * transfer->Vectors().TwistFlavor();
-        deviation -= fabs(delta_a) * sqrt(norm2(*tmp_coarse) / norm2(*x_coarse));
-        deviation = fabs(deviation);
+      transfer->P(*tmp1, *tmp_coarse);
+
+      if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+        double kappa = diracResidual->Kappa();
+        double mass = diracResidual->Mass();
+        if (param.level == 0) {
+          if (tmp1->Nspin() == 4) {
+            diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), -kappa);
+            diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), -kappa);
+          } else if (tmp1->Nspin() == 2) { // if the coarse op is on top
+            diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+            diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+          } else { // staggered
+            diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(),
+                                      2.0 * mass); // stag convention
+            diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(),
+                                      2.0 * mass); // stag convention
+          }
+        } else { // this is a hack since the coarse Dslash doesn't properly use the same xpay conventions yet
+          diracSmoother->DslashXpay(tmp2->Even(), tmp1->Odd(), QUDA_EVEN_PARITY, tmp1->Even(), 1.0);
+          diracSmoother->DslashXpay(tmp2->Odd(), tmp1->Even(), QUDA_ODD_PARITY, tmp1->Odd(), 1.0);
+        }
+      } else {
+        (*param.matResidual)(*tmp2, *tmp1);
       }
-    }
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(*x_coarse), r_nrm, deviation);
 
-    // FIXME: This check will fail for ASQTAD because we leave out the long links.
-    // Need to put in temporary zero links for long links
-    if (param.level != 0 || !param.is_staggered) {
+      transfer->R(*x_coarse, *tmp2);
+      static_cast<DiracCoarse *>(diracCoarseResidual)->M(*r_coarse, *tmp_coarse);
+
+#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
+      setOutputPrefix("");
+
+      for (unsigned int i=0; i<comm_size(); i++) { // this ensures that we print each rank in order
+        if (i==comm_rank()) {
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
+          for (int x=0; x<x_coarse->Volume(); x++) x_coarse->PrintVector(x);
+
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
+          for (int x=0; x<r_coarse->Volume(); x++) r_coarse->PrintVector(x);
+        }
+        comm_barrier();
+      }
+      setOutputPrefix(prefix);
+#endif
+
+      double r_nrm = norm2(*r_coarse);
+      deviation = sqrt(xmyNorm(*x_coarse, *r_coarse) / norm2(*x_coarse));
+
+      if (diracResidual->Mu() != 0.0) {
+        // When the mu is shifted on the coarse level; we can compute exactly the error we introduce in the check:
+        //  it is given by 2*kappa*delta_mu || tmp_coarse ||; where tmp_coarse is the random vector generated for the test
+        double delta_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
+        if (fabs(delta_factor) > tol) {
+          double delta_a
+            = delta_factor * 2.0 * diracResidual->Kappa() * diracResidual->Mu() * transfer->Vectors().TwistFlavor();
+          deviation -= fabs(delta_a) * sqrt(norm2(*tmp_coarse) / norm2(*x_coarse));
+          deviation = fabs(deviation);
+        }
+      }
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(*x_coarse), r_nrm, deviation);
+
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
+    } else {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("...skipping check due to long links\n"); // asqtad operator only
     }
 
     // check the preconditioned operator construction on the lower level if applicable
@@ -889,7 +975,7 @@ namespace quda
       static_cast<DiracCoarse *>(diracCoarseResidual)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Even(), r_coarse->Even(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarsePC *>(diracCoarseSmoother)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
-      r_nrm = norm2(r_coarse->Even());
+      double r_nrm = norm2(r_coarse->Even());
       deviation = sqrt(xmyNorm(x_coarse->Even(), r_coarse->Even()) / norm2(x_coarse->Even()));
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(x_coarse->Even()), r_nrm,
@@ -942,7 +1028,7 @@ namespace quda
     }
 
     // Not useful for staggered op since it's a unitary transform
-    if (param.level != 0 || !param.is_staggered) {
+    if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.mg_global.run_low_mode_check) {
 
         sprintf(prefix, "MG level %d (%s): eigenvector overlap : ", param.level + 1,
@@ -998,11 +1084,10 @@ namespace quda
 
     delete tmp1;
     delete tmp2;
-    delete tmp_coarse;
 
     if (recursively && param.level < param.Nlevel - 2) coarse->verify(true);
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
@@ -1143,7 +1228,7 @@ namespace quda
   // supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
     } else {
       bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
@@ -1157,7 +1242,7 @@ namespace quda
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_infile);
       io.load(B);
-      popLevel(param.level);
+      popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
@@ -1165,7 +1250,7 @@ namespace quda
 
   void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
     } else {
       bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
@@ -1179,7 +1264,7 @@ namespace quda
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_outfile);
       io.save(B);
-      popLevel(param.level);
+      popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
@@ -1187,7 +1272,7 @@ namespace quda
 
   void MG::dumpNullVectors() const
   {
-    if (param.level == 0 && param.is_staggered) {
+    if (param.transfer_type != QUDA_TRANSFER_AGGREGATE) {
       warningQuda("Cannot dump near-null vectors for top level of staggered MG solve.");
     } else {
       saveVectors(param.B);
@@ -1232,7 +1317,8 @@ namespace quda
     ColorSpinorParam csParam(*B[0]);                            // Create spinor field parameters:
     csParam.setPrecision(r->Precision(), r->Precision(), true); // ensure native ordering
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    csParam.gammaBasis = B[0]->Nspin() == 1 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS :
+                                              QUDA_UKQCD_GAMMA_BASIS; // degrand-rossi required for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     ColorSpinorField *b = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
     ColorSpinorField *x = static_cast<ColorSpinorField *>(new cudaColorSpinorField(csParam));
@@ -1382,7 +1468,7 @@ namespace quda
       saveVectors(B);
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   // generate a full span of free vectors.
@@ -1559,7 +1645,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done building free vectors\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::generateEigenVectors()
@@ -1583,7 +1669,7 @@ namespace quda
 
     for (int i = 0; i < n_conv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
-    // before entering the eigen solver, lets free the B vectors to save some memory
+    // before entering the eigen solver, let's free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
 
@@ -1626,7 +1712,7 @@ namespace quda
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
 
-    popLevel(param.level);
+    popLevel();
   }
 
 } // namespace quda

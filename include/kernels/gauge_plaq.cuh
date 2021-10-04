@@ -1,27 +1,28 @@
-#include <quda_matrix.h>
+#pragma once
+
 #include <gauge_field_order.h>
-#include <launch_kernel.cuh>
+#include <quda_matrix.h>
 #include <index_helper.cuh>
-#include <reduce_helper.h>
+#include <reduction_kernel.h>
 
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<double2> {
+  struct GaugePlaqArg : public ReduceArg<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
-    int threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
-    int border[4]; 
+    int border[4];
     Gauge U;
-    
+
     GaugePlaqArg(const GaugeField &U_) :
-      ReduceArg<double2>(),
+      ReduceArg<reduce_t>(dim3(U_.LocalVolumeCB(), 1, 1)),
       U(U_)
     {
       int R = 0;
@@ -31,12 +32,13 @@ namespace quda {
 	X[dir] = U_.X()[dir] - border[dir]*2;
 	R += border[dir];
       }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
+
+    __device__ __host__ reduce_t init() const { return reduce_t(); }
   };
 
   template<typename Arg>
-  __device__ inline double plaquette(Arg &arg, int x[], int parity, int mu, int nu)
+  __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
     using Link = Matrix<complex<typename Arg::Float>,3>;
 
@@ -53,35 +55,36 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template<int blockSize, typename Arg>
-  __global__ void computePlaq(Arg arg)
-  {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
+  template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
+    using reduce_t = vector_type<double, 2>;
+    using plus<reduce_t>::operator();
+    const Arg &arg;
+    constexpr Plaquette(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    double2 plaq = make_double2(0.0,0.0);
+    // return the plaquette at site (x_cb, parity)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
+    {
+      reduce_t plaq;
 
-    while (idx < arg.threads) {
       int x[4];
-      getCoords(x, idx, arg.X, parity);
+      getCoords(x, x_cb, arg.X, parity);
 #pragma unroll
       for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
 #pragma unroll
       for (int mu = 0; mu < 3; mu++) {
 #pragma unroll
-	for (int nu = 0; nu < 3; nu++) {
-	  if (nu >= mu + 1) plaq.x += plaquette(arg, x, parity, mu, nu);
-	}
+        for (int nu = 0; nu < 3; nu++) {
+          if (nu >= mu + 1) plaq[0] += plaquette(arg, x, parity, mu, nu);
+        }
 
-	plaq.y += plaquette(arg, x, parity, mu, 3);
+        plaq[1] += plaquette(arg, x, parity, mu, 3);
       }
 
-      idx += blockDim.x*gridDim.x;
+      return plus::operator()(plaq, value);
     }
 
-    // perform final inter-block reduction and write out result
-    arg.template reduce2d<blockSize, 2>(plaq);
-  }
+  };
 
 } // namespace quda
