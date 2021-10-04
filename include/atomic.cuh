@@ -52,17 +52,45 @@ static inline double atomicAdd(double *x, double v)
 }
 static inline unsigned int atomicCAS(unsigned int*x, unsigned int c, unsigned int v)
 {
+#if 0
+  unsigned int old = *x, assumed;
+  do{
+    assumed = old;
+    if(assumed==c){
+      #pragma omp atomic capture
+      {old=*x; *x=v;}
+    }else{
+      old=*x;
+    }
+  }while(assumed!=old);
+  return old;
+#else
   unsigned int z;
-#pragma omp atomic capture
-  {z=*x; *x=z==c?v:z;}
+  #pragma omp atomic capture compare
+  {z=*x; if(*x==c){*x=v;}}
   return z;
+#endif
 }
 static inline uint32_t atomicMax(uint32_t *x, uint32_t v)
 {
+#if 0
+  unsigned int old = *x, assumed;
+  do{
+    assumed = old;
+    if(assumed<v){
+      #pragma omp atomic capture
+      {old=*x; *x=v;}
+    }else{
+      old=*x;
+    }
+  }while(assumed!=old);
+  return old;
+#else
   uint32_t z;
-#pragma omp atomic capture
-  {z=*x; *x=z<v?v:z;}
+  #pragma omp atomic capture compare
+  {z=*x; if(*x<v){*x=v;}}
   return z;
+#endif
 }
 #endif
 
