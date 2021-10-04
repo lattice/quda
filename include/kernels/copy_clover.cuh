@@ -34,7 +34,7 @@ namespace quda {
       typename mapper<typename Arg::store_out_t>::type out[Arg::length];
       typename mapper<typename Arg::store_in_t>::type in[Arg::length];
       arg.in.load(in, x_cb, parity);
-#pragma unroll
+QUDA_UNROLL
       for (int i=0; i<Arg::length; i++) out[i] = in[i];
       arg.out.save(out, x_cb, parity);
     }

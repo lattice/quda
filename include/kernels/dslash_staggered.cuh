@@ -92,7 +92,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
-#pragma unroll
+QUDA_UNROLL
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction

@@ -166,7 +166,7 @@ namespace quda {
     __device__ inline bool is_halo_4d(const int coordinate[4], const int dim[4], const int halo_shift[4])
     {
       bool ret = false;
-#pragma unroll
+QUDA_UNROLL
       for (int d = 0; d < 4; d++) {
         ret = ret or (coordinate[d] >= dim[d] - halo_shift[d] or coordinate[d] < halo_shift[d]);
       }
@@ -179,14 +179,14 @@ namespace quda {
       int back_x[4];
       int back_dim[4];
 
-#pragma unroll
+QUDA_UNROLL
       for (int d = 0; d < 4; d++) {
         back_x[d] = comm[d] ? x[d] - pad : x[d];
         back_dim[d] = comm[d] ? dim[d] - pad * 2 : dim[d];
       }
 
       bool is_center = true;
-#pragma unroll
+QUDA_UNROLL
       for (int d = 0; d < 4; d++) { is_center = is_center && (back_x[d] >= 0 && back_x[d] < back_dim[d]); }
 
       if (is_center) {
@@ -210,7 +210,7 @@ namespace quda {
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-#pragma unroll
+QUDA_UNROLL
       for (int d = 0; d < 4; d++) // loop over dimension
       {
         int x[4] = {coordinate[0], coordinate[1], coordinate[2], coordinate[3]};
@@ -261,7 +261,7 @@ namespace quda {
       int aux[4];
       aux[0] = shrunk_index * 2;
 
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < 3; i++) { aux[i + 1] = aux[i] / shrunk_dim[i]; }
 
       coordinate[0] = aux[0] - aux[1] * shrunk_dim[0];
@@ -274,7 +274,7 @@ namespace quda {
         += (shift[0] + shift[1] + shift[2] + shift[3] + parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
 
 // Now go back to the extended volume.
-#pragma unroll
+QUDA_UNROLL
       for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
     }
 
@@ -355,7 +355,7 @@ namespace quda {
         mma::MmaOperandA op_a[Arg::reload ? 1 : tk_dim];
         mma::MmaOperandA op_a_aux[Arg::reload ? 1 : tk_dim];
         if (!Arg::reload) { // the data in registers can be resued.
-#pragma unroll
+QUDA_UNROLL
           for (int tile_k = 0; tile_k < tk_dim; tile_k++) { op_a[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm); }
         }
 
@@ -365,7 +365,7 @@ namespace quda {
             construct_matrix_a_m5inv<M_sm, true, Arg>(arg, sm_a); // dagger = true
             __syncthreads();
 
-#pragma unroll
+QUDA_UNROLL
             for (int tile_k = 0; tile_k < tk_dim; tile_k++) {
               op_a_aux[tile_k].template load<M_sm>(sm_a, tile_k, warp_m, wrm);
             }

@@ -72,7 +72,7 @@ namespace quda {
 
       // Load the field-strength tensor from global memory
       Link F[6];
-#pragma unroll
+QUDA_UNROLL
       for (int i=0; i<6; ++i) F[i] = arg.f(i, x_cb, parity);
 
       Complex I(0.0,1.0);
@@ -84,12 +84,12 @@ namespace quda {
       block2[1] = arg.coeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
 
       // This uses lots of unnecessary memory
-#pragma unroll
+QUDA_UNROLL
       for (int ch=0; ch<2; ++ch) {
         HMatrix<real,N> A;
         // c = 0(1) => positive(negative) chiral block
         // Compute real diagonal elements
-#pragma unroll
+QUDA_UNROLL
         for (int i=0; i<N/2; ++i) {
           A(i+0,i+0) = 1.0 - block1[ch](i,i).real();
           A(i+3,i+3) = 1.0 + block1[ch](i,i).real();

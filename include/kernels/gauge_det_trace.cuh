@@ -43,17 +43,17 @@ namespace quda {
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
       int X[4];
-#pragma unroll
+QUDA_UNROLL
       for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
       int x[4];
       getCoords(x, x_cb, X, parity);
-#pragma unroll
+QUDA_UNROLL
       for(int dr=0; dr<4; ++dr) {
         x[dr] += arg.border[dr];
         X[dr] += 2*arg.border[dr];
       }
-#pragma unroll
+QUDA_UNROLL
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);

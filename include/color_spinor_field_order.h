@@ -222,7 +222,7 @@ namespace quda {
         using vec_t = typename VectorType<Float, 2>::type;
         constexpr int N = nSpin * nColor * nVec;
         constexpr int M = nSpinBlock * nColor * nVec;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), x_cb * N + chi * M + i);
           memcpy(&out[i], &tmp, sizeof(vec_t));
@@ -278,7 +278,7 @@ namespace quda {
       {
         using vec_t = typename VectorType<Float, 2>::type;
         constexpr int M = nSpinBlock * nColor * nVec;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
                                          (chi * M + i) * stride + x_cb);
@@ -326,7 +326,7 @@ namespace quda {
       {
         using vec_t = typename VectorType<Float, 4>::type;
         constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
                                          (chi * M + i) * stride + x_cb);
@@ -379,13 +379,13 @@ namespace quda {
         constexpr int N = nSpin * nColor * nVec * 2; // real numbers in the loaded vector
         constexpr int M = N / 8;
         Float tmp[N];
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           vec_t ld_tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
           memcpy(&tmp[i * 8], &ld_tmp, sizeof(vec_t));
         }
         constexpr int N_chi = N / (nSpin / nSpinBlock);
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < N_chi; i++)
           out[i] = complex<Float>(tmp[chi * N_chi + 2 * i + 0], tmp[chi * N_chi + 2 * i + 1]);
       }
@@ -719,11 +719,11 @@ namespace quda {
           complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
           accessor.template load<nSpinBlock>(tmp, v, parity, x_cb, chi);
           Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
-#pragma unroll
+QUDA_UNROLL
           for (int s = 0; s < nSpinBlock; s++) {
-#pragma unroll
+QUDA_UNROLL
             for (int c = 0; c < nColor; c++) {
-#pragma unroll
+QUDA_UNROLL
               for (int v = 0; v < nVec; v++) {
                 int k = (s * nColor + c) * nVec + v;
                 out[k] = norm_ * complex<Float>(static_cast<Float>(tmp[k].real()), static_cast<Float>(tmp[k].imag()));
@@ -985,16 +985,16 @@ namespace quda {
     real v[length];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, x + parity * norm_offset) : 0.0;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<M; i++) {
       // first load from memory
       Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
       // now copy into output and scale
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < length / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
@@ -1002,7 +1002,7 @@ namespace quda {
   {
     real v[length];
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < length / 2; i++) {
       v[2 * i + 0] = in[i].real();
       v[2 * i + 1] = in[i].imag();
@@ -1011,23 +1011,23 @@ namespace quda {
     if (isFixed<Float>::value) {
       norm_type max_[length / 2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length / 2; i++) max_[i] = fmaxf(fabsf((norm_type)v[i]), fabsf((norm_type)v[i + length / 2]));
       norm_type scale = 0.0;
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length; i++) v[i] = v[i] * scale_inv;
     }
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<M; i++) {
       Vector vecTmp;
       // first do scalar copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
       // second do vectorized copy into memory
       vector_store(field, parity * offset + x + stride * i, vecTmp);
@@ -1053,15 +1053,15 @@ namespace quda {
     real v[length_ghost];
     norm_type nrm = isFixed<Float>::value ? vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x) : 0.0;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < M_ghost; i++) {
       GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir],
                                                     parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < length_ghost / 2; i++) out[i] = complex(v[2 * i + 0], v[2 * i + 1]);
   }
 
@@ -1069,7 +1069,7 @@ namespace quda {
                                             int parity = 0) const
   {
     real v[length_ghost];
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < length_ghost / 2; i++) {
       v[2 * i + 0] = in[i].real();
       v[2 * i + 1] = in[i].imag();
@@ -1078,25 +1078,25 @@ namespace quda {
     if (isFixed<Float>::value) {
       norm_type max_[length_ghost / 2];
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length_ghost / 2; i++)
         max_[i] = fmaxf( (norm_type)fabsf( (norm_type)v[i] ),
                          (norm_type)fabsf( (norm_type)v[i + length_ghost / 2] ) );
       norm_type scale = 0.0;
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < length_ghost; i++) v[i] = v[i] * scale_inv;
     }
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < M_ghost; i++) {
       GhostVector vecTmp;
       // first do scalar copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
       // second do vectorized copy into memory
       vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);

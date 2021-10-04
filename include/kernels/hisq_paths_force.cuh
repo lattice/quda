@@ -204,7 +204,7 @@ namespace quda {
       {
         int x[4];
         getCoords(x, x_cb, arg.X, parity);
-#pragma unroll
+QUDA_UNROLL
         for (int d=0; d<4; d++) x[d] += arg.border[d];
         int e_cb = linkIndex(x,arg.E);
 
@@ -611,7 +611,7 @@ namespace quda {
         for (int d=0; d<4; d++) x[d] += arg.border[d];
         int e_cb = linkIndex(x,arg.E);
 
-#pragma unroll
+QUDA_UNROLL
         for (int sig=0; sig<4; ++sig) {
           Link Uw = arg.link(sig, e_cb, parity);
           Link Ox = arg.oProd(sig, e_cb, parity);
@@ -672,7 +672,7 @@ namespace quda {
          */
 
         // compute the force for forward long links
-#pragma unroll
+QUDA_UNROLL
         for (int sig=0; sig<4; sig++) {
           int point_c = e_cb;
 

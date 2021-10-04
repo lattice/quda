@@ -591,12 +591,12 @@ namespace quda {
         {
           norm_type nrm = isFixed<Float>::value ? vector_load<float>(norm, parity * norm_offset + chirality * stride + x) : 0;
 
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<M; i++) {
             // first load from memory
             Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
             // second do scalar copy converting into register type
-#pragma unroll
+QUDA_UNROLL
             for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
           }
 
@@ -617,19 +617,19 @@ namespace quda {
           // find the norm of each chiral block
           if (isFixed<Float>::value) {
             norm_type scale = static_cast<norm_type>(1.0);
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;
 
             real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < block; i++) tmp[i] = v[i] * scale_inv;
           } else {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < block; i++) tmp[i] = v[i];
           }
 
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < M; i++) {
             Vector vecTmp;
             // first do scalar copy converting into storage type
@@ -647,7 +647,7 @@ namespace quda {
 	   @param[in] chirality Chiral block index
 	 */
 	__device__ __host__ inline void load(real v[length], int x, int parity) const {
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
         }
 
@@ -659,7 +659,7 @@ namespace quda {
 	   @param[in] chirality Chiral block index
 	 */
 	__device__ __host__ inline void save(const real v[length], int x, int parity) const {
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) save(&v[chirality * block], x, parity, chirality);
         }
 

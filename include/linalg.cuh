@@ -49,12 +49,12 @@ namespace quda {
       __device__ __host__ inline Cholesky(const Mat<T,N> &A) {
 	const Mat<T,N> &L = L_;
 
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<N; i++) {
-#pragma unroll
+QUDA_UNROLL
 	  for (int j=0; j<N; j++) if (j<i+1) {
 	    complex<T> s = 0;
-#pragma unroll
+QUDA_UNROLL
 	    for (int k=0; k<N; k++) {
 	      if (k==0) {
 		s.x  = L(i,k).real()*L(j,k).real();
@@ -98,10 +98,10 @@ namespace quda {
       __device__ __host__ inline Vector forward(const Vector &b) {
 	const Mat<T,N> &L = L_;
 	Vector x;
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<N; i++) {
 	  x(i) = b(i);
-#pragma unroll
+QUDA_UNROLL
 	  for (int j=0; j<N; j++) if (j<i) {
 	    x(i).x -= L(i,j).real()*x(j).real();
 	    x(i).x += L(i,j).imag()*x(j).imag();
@@ -124,10 +124,10 @@ namespace quda {
       __device__ __host__ inline Vector backward(const Vector &b) {
 	const Mat<T,N> &L = L_;
 	Vector x;
-#pragma unroll
+QUDA_UNROLL
 	for (int i=N-1; i>=0; i--) {
 	  x(i) = b(i);
-#pragma unroll
+QUDA_UNROLL
 	  for (int j=0; j<N; j++) if (j>=i+1) {
 	    x(i).x -= L(i,j).real()*x(j).real();
 	    x(i).x += L(i,j).imag()*x(j).imag();
@@ -149,17 +149,17 @@ namespace quda {
 	Mat<T,N> Ainv;
 	ColorSpinor<T,1,N> v;
 
-#pragma unroll
+QUDA_UNROLL
 	for (int k=0;k<N;k++) {
 
 	  // forward substitute
 	  if (!fast) v(k) = complex<T>(static_cast<T>(1.0)/L(k,k).real());
 	  else v(k) = L(k,k).real();
 
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<N; i++) if (i>k) {
 	    v(i) = complex<T>(0.0);
-#pragma unroll
+QUDA_UNROLL
 	    for (int j=0; j<N; j++) if (j>=k && j<i) {
 	      v(i).x -= L(i,j).real() * v(j).real();
 	      v(i).x += L(i,j).imag() * v(j).imag();
@@ -174,9 +174,9 @@ namespace quda {
 	  if (!fast) v(N-1) *= static_cast<T>(1.0) / L(N-1,N-1);
 	  else v(N-1) *= L(N-1,N-1);
 
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=N-2; i>=0; i--) if (i>=k) {
-#pragma unroll
+QUDA_UNROLL
 	    for (int j=0; j<N; j++) if (j>i) {
 	      v(i).x -= L(i,j).real() * v(j).real();
 	      v(i).x += L(i,j).imag() * v(j).imag();
@@ -190,7 +190,7 @@ namespace quda {
 	  // Overwrite column k
 	  Ainv(k,k) = v(k);
 
-#pragma unroll
+QUDA_UNROLL
 	  for(int i=0;i<N;i++) if (i>k) Ainv(i,k) = v(i);
 	}
 

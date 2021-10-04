@@ -908,13 +908,13 @@ namespace quda {
         __device__ __host__ inline void Pack(real out[N], const complex in[N / 2]) const
         {
           if (isFixed<Float>::value) {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < N / 2; i++) {
               out[2 * i + 0] = scale_inv * in[i].real();
               out[2 * i + 1] = scale_inv * in[i].imag();
             }
           } else {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < N / 2; i++) {
               out[2 * i + 0] = in[i].real();
               out[2 * i + 1] = in[i].imag();
@@ -927,10 +927,10 @@ namespace quda {
                                                const I *, const int *) const
         {
           if (isFixed<Float>::value) {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < N / 2; i++) { out[i] = scale * complex(in[2 * i + 0], in[2 * i + 1]); }
           } else {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < N / 2; i++) { out[i] = complex(in[2 * i + 0], in[2 * i + 1]); }
           }
         }
@@ -1024,7 +1024,7 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[12], const complex in[9]) const
         {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 6; i++) {
             out[2 * i + 0] = in[i].real();
             out[2 * i + 1] = in[i].imag();
@@ -1035,7 +1035,7 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real,
                                                const I *X, const int *R) const
         {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
 
           const real u0 = dir < 3 ?
@@ -1080,7 +1080,7 @@ namespace quda {
 
         __device__ __host__ inline void Pack(real out[10], const complex in[9]) const
         {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 2; i++) {
             out[2 * i + 0] = in[i + 1].real();
             out[2 * i + 1] = in[i + 1].imag();
@@ -1138,7 +1138,7 @@ namespace quda {
         __device__ __host__ inline void Unpack(complex out[9], const real in[12], int, int, real phase,
                                                const I *, const int *) const
         {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 6; i++) out[i] = complex(in[2 * i + 0], in[2 * i + 1]);
 
           out[6] = cmul(out[2], out[4]);
@@ -1182,7 +1182,7 @@ namespace quda {
           }
 #else // phase from determinant
           Matrix<complex, 3> a;
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
           return phase = arg(det) / 3;
@@ -1244,7 +1244,7 @@ namespace quda {
           real u0 = u.real();
           real u0_inv = u.imag();
 
-#pragma unroll
+QUDA_UNROLL
           for (int i = 1; i <= 3; i++)
             out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
@@ -1310,7 +1310,7 @@ namespace quda {
 
           // Rearrange {{b1,b2,b3},{a1,a2,a3},{-c1,-c2,-c3}} back
           // to {{a1,a2,a3},{b1,b2,b3},{c1,c2,c3}}
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 3; i++) {
             const auto tmp = out[i];
             out[i] = out[i + 3];
@@ -1366,7 +1366,7 @@ namespace quda {
           }
 #else // phase from determinant
           Matrix<complex, 3> a;
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 9; i++) a(i) = scale_inv * in[i];
           const complex det = getDeterminant(a);
           real phase = arg(det) / 3;
@@ -1385,10 +1385,10 @@ namespace quda {
             Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(-phase), &cos_sin[1], &cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale_inv;
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 9; i++) su3[i] = cmul(z, in[i]);
           } else {
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 9; i++) { su3[i] = phase * in[i]; }
           }
           reconstruct_8.Pack(out, su3);
@@ -1406,10 +1406,10 @@ namespace quda {
             Trig<isFixed<real>::value, real>::SinCos(static_cast<real>(phase), &cos_sin[1], &cos_sin[0]);
             complex z(cos_sin[0], cos_sin[1]);
             z *= scale;
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 9; i++) out[i] = cmul(z, out[i]);
           } else { // stagic phase
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 18; i++) { out[i] *= phase; }
           }
         }
@@ -1499,12 +1499,12 @@ namespace quda {
         const int M = reconLen / N;
         real tmp[reconLen];
 
-#pragma unroll
+QUDA_UNROLL
         for (int i=0; i<M; i++){
           // first load from memory
           Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
           // second do copy converting into register type
-#pragma unroll
+QUDA_UNROLL
           for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
         }
 
@@ -1527,11 +1527,11 @@ namespace quda {
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
-#pragma unroll
+QUDA_UNROLL
         for (int i=0; i<M; i++){
 	  Vector vecTmp;
 	  // first do copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
 	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
           vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
@@ -1566,13 +1566,13 @@ namespace quda {
           const int M = reconLen / N;
           real tmp[reconLen];
 
-#pragma unroll
+QUDA_UNROLL
           for (int i=0; i<M; i++) {
 	    // first do vectorized copy from memory into registers
             Vector vecTmp = vector_load<Vector>(
                 ghost[dir] + parity * faceVolumeCB[dir] * (M * N + hasPhase), i * faceVolumeCB[dir] + x);
             // second do copy converting into register type
-#pragma unroll
+QUDA_UNROLL
             for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j]);
           }
           real phase = 0.;
@@ -1599,11 +1599,11 @@ namespace quda {
           real tmp[reconLen];
           reconstruct.Pack(tmp, v);
 
-#pragma unroll
+QUDA_UNROLL
           for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy into memory
 	    vector_store(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), i*faceVolumeCB[dir]+x, vecTmp);
@@ -1655,13 +1655,13 @@ namespace quda {
         const int M = reconLen / N;
         real tmp[reconLen];
 
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<M; i++) {
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
 	  // second do copy converting into register type
-#pragma unroll
+QUDA_UNROLL
 	  for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
 	}
         real phase = 0.;
@@ -1681,11 +1681,11 @@ namespace quda {
         real tmp[reconLen];
         reconstruct.Pack(tmp, v);
 
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
 	    for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	    // second do vectorized copy to memory
 	    vector_store(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),

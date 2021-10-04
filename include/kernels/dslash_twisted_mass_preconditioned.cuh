@@ -55,7 +55,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
-#pragma unroll
+QUDA_UNROLL
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       {                              // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);

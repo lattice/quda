@@ -207,10 +207,10 @@ namespace quda
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < n; i++) max_[i] = fmaxf(fabsf((norm_t)v[i].real()), fabsf((norm_t)v[i].imag()));
         norm_t scale = 0.0;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
         data.norm[x + parity * data.cb_norm_offset] = scale;
 
@@ -235,12 +235,12 @@ namespace quda
         vector_type<real, len> v_;
 
         constexpr int M = len / N;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           // first load from memory
           Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
           // now copy into output and scale
-#pragma unroll
+QUDA_UNROLL
           for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
         }
 
@@ -263,13 +263,13 @@ namespace quda
 
         if (isFixed<store_t>::value) {
           real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();
             v_[2 * i + 1] = scale_inv * v[i].imag();
           }
         } else {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = v[i].real();
             v_[2 * i + 1] = v[i].imag();
@@ -277,11 +277,11 @@ namespace quda
         }
 
         constexpr int M = len / N;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < M; i++) {
           Vector vecTmp;
           // first do scalar copy converting into storage type
-#pragma unroll
+QUDA_UNROLL
           for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
           // second do vectorized copy into memory
           vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);

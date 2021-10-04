@@ -28,18 +28,18 @@ namespace quda {
 
     __device__ __host__ inline ColorSpinor<Float, Nc, Ns>()
     {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] = 0; }
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const ColorSpinor<Float, Nc, Ns> &a) {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
 	if (this != &a) {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
         }
 	return *this;
@@ -48,20 +48,20 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator-() const
       {
         ColorSpinor<Float, Nc, Ns> a;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { a.data[i] = -data[i]; }
         return a;
       }
 
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator+=(const ColorSpinor<Float, Nc, Ns> &a) {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { data[i] += a.data[i]; }
         return *this;
       }
 
       template <typename T> __device__ __host__ inline ColorSpinor<Float, Nc, Ns> &operator*=(const T &a)
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { data[i] *= a; }
         return *this;
       }
@@ -69,7 +69,7 @@ namespace quda {
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns> &operator-=(const ColorSpinor<Float, Nc, Ns> &a)
       {
         if (this != &a) {
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < Nc * Ns; i++) { data[i] -= a.data[i]; }
         }
         return *this;
@@ -141,32 +141,32 @@ namespace quda {
 
       __device__ __host__ inline ColorSpinor<Float, Nc, 4>()
       {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] = 0; }
       }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
       if (this != &a) {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
       }
       return *this;
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] += a.data[i]; }
       return *this;
     }
 
     template <typename T> __device__ __host__ inline ColorSpinor<Float, Nc, 4> &operator*=(const T &a)
     {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] *= a; }
       return *this;
     }
@@ -182,7 +182,7 @@ namespace quda {
 
       switch (dim) {
       case 0: // x dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(3, i));
           a(1, i) = i_(t(2, i));
@@ -191,7 +191,7 @@ namespace quda {
         }
         break;
       case 1: // y dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = t(3, i);
           a(1, i) = -t(2, i);
@@ -200,7 +200,7 @@ namespace quda {
         }
         break;
       case 2: // z dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(2, i));
           a(1, i) = -i_(t(3, i));
@@ -209,7 +209,7 @@ namespace quda {
         }
         break;
       case 3: // t dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = t(0, i);
           a(1, i) = t(1, i);
@@ -218,7 +218,7 @@ namespace quda {
         }
         break;
       case 4: // gamma_5
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = t(2, i);
           a(1, i) = t(3, i);
@@ -242,7 +242,7 @@ namespace quda {
 
       switch (dim) {
       case 0: // x dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = -t(3, i);
           a(1, i) = -t(2, i);
@@ -251,7 +251,7 @@ namespace quda {
         }
         break;
       case 1: // y dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(3, i));
           a(1, i) = -i_(t(2, i));
@@ -260,7 +260,7 @@ namespace quda {
         }
         break;
       case 2: // z dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = -t(2, i);
           a(1, i) = t(3, i);
@@ -269,7 +269,7 @@ namespace quda {
         }
         break;
       case 3: // t dimension
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(0, i));
           a(1, i) = i_(t(1, i));
@@ -278,7 +278,7 @@ namespace quda {
         }
         break;
       case 4: // gamma_5
-#pragma unroll
+QUDA_UNROLL
 	for (int i=0; i<Nc; i++) {
           a(0, i) = i_(t(2, i));
           a(1, i) = i_(t(3, i));
@@ -297,9 +297,9 @@ namespace quda {
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,2> chiral_project(int chirality) const {
       ColorSpinor<Float,Nc,2> proj;
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns/2; s++) {
-#pragma unroll
+QUDA_UNROLL
 	for (int c=0; c<Nc; c++) {
 	  proj(s,c) = (*this)(chirality*Ns/2+s,c);
 	}
@@ -321,14 +321,14 @@ namespace quda {
       case 0: // x dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + i_(t(3, i));
             proj(1, i) = t(1, i) + i_(t(2, i));
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(3, i));
             proj(1, i) = t(1, i) - i_(t(2, i));
@@ -339,14 +339,14 @@ namespace quda {
       case 1: // y dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + t(3, i);
             proj(1, i) = t(1, i) - t(2, i);
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - t(3, i);
             proj(1, i) = t(1, i) + t(2, i);
@@ -357,14 +357,14 @@ namespace quda {
       case 2: // z dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) + i_(t(2, i));
             proj(1, i) = t(1, i) - i_(t(3, i));
           }
           break;
         case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(2, i));
             proj(1, i) = t(1, i) + i_(t(3, i));
@@ -375,14 +375,14 @@ namespace quda {
       case 3: // t dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = static_cast<Float>(2.0) * t(0, i);
             proj(1, i) = static_cast<Float>(2.0) * t(1, i);
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = static_cast<Float>(2.0) * t(2, i);
             proj(1, i) = static_cast<Float>(2.0) * t(3, i);
@@ -393,14 +393,14 @@ namespace quda {
       case 4:
         switch (sign) {
         case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < Nc; i++) {
             proj(0, i) = t(0, i) + t(2, i);
             proj(1, i) = t(1, i) + t(3, i);
           }
           break;
         case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < Nc; i++) {
             proj(0, i) = t(0, i) - t(2, i);
             proj(1, i) = t(1, i) - t(3, i);
@@ -457,7 +457,7 @@ namespace quda {
       case 0:
 	switch(nu) {
 	case 1:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) =  j*b(0,i);
 	    a(1,i) = -j*b(1,i);
@@ -466,7 +466,7 @@ namespace quda {
 	  }
 	  break;
 	case 2:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -b(1,i);
 	    a(1,i) =  b(0,i);
@@ -475,7 +475,7 @@ namespace quda {
 	  }
 	  break;
 	case 3:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -j*b(3,i);
 	    a(1,i) = -j*b(2,i);
@@ -488,7 +488,7 @@ namespace quda {
       case 1:
 	switch(nu) {
 	case 0:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -j*b(0,i);
 	    a(1,i) =  j*b(1,i);
@@ -497,7 +497,7 @@ namespace quda {
 	  }
 	  break;
 	case 2:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = j*b(1,i);
 	    a(1,i) = j*b(0,i);
@@ -506,7 +506,7 @@ namespace quda {
 	  }
 	  break;
 	case 3:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -b(3,i);
 	    a(1,i) =  b(2,i);
@@ -519,7 +519,7 @@ namespace quda {
       case 2:
 	switch(nu) {
 	case 0:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) =  b(1,i);
 	    a(1,i) = -b(0,i);
@@ -528,7 +528,7 @@ namespace quda {
 	  }
 	  break;
 	case 1:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -j*b(1,i);
 	    a(1,i) = -j*b(0,i);
@@ -537,7 +537,7 @@ namespace quda {
 	  }
 	  break;
 	case 3:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = -j*b(2,i);
 	    a(1,i) =  j*b(3,i);
@@ -550,7 +550,7 @@ namespace quda {
       case 3:
 	switch(nu) {
 	case 0:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) = j*b(3,i);
 	    a(1,i) = j*b(2,i);
@@ -559,7 +559,7 @@ namespace quda {
 	  }
 	  break;
 	case 1:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) =  b(3,i);
 	    a(1,i) = -b(2,i);
@@ -568,7 +568,7 @@ namespace quda {
 	  }
 	  break;
 	case 2:
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    a(0,i) =  j*b(2,i);
 	    a(1,i) = -j*b(3,i);
@@ -631,7 +631,7 @@ namespace quda {
     */
     __device__ __host__ inline void toNonRel() {
       ColorSpinor<Float,Nc,Ns> a;
-#pragma unroll
+QUDA_UNROLL
       for (int c=0; c<Nc; c++) {
 	a(0,c) =  (*this)(1,c)+(*this)(3,c);
 	a(1,c) = -(*this)(2,c)-(*this)(0,c);
@@ -646,7 +646,7 @@ namespace quda {
     */
     __device__ __host__ inline void toRel() {
       ColorSpinor<Float,Nc,Ns> a;
-#pragma unroll
+QUDA_UNROLL
       for (int c=0; c<Nc; c++) {
 	a(0,c) = -(*this)(1,c)-(*this)(3,c);
 	a(1,c) =  (*this)(2,c)+(*this)(0,c);
@@ -677,33 +677,33 @@ namespace quda {
     complex<Float> data[size];
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] = 0; }
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
     }
 
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
       if (this != &a) {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
       }
       return *this;
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] += a.data[i]; }
       return *this;
     }
 
     template <typename T> __device__ __host__ inline ColorSpinor<Float, Nc, 2> &operator*=(const T &a)
     {
-#pragma unroll
+QUDA_UNROLL
       for (int i = 0; i < size; i++) { data[i] *= a; }
       return *this;
     }
@@ -714,9 +714,9 @@ namespace quda {
     */
     __device__ __host__ inline ColorSpinor<Float,Nc,4> chiral_reconstruct(int chirality) const {
       ColorSpinor<Float,Nc,4> recon;
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
-#pragma unroll
+QUDA_UNROLL
 	for (int c=0; c<Nc; c++) {
 	  recon(chirality*Ns+s,c) = (*this)(s,c);
 	}
@@ -739,7 +739,7 @@ namespace quda {
       case 0: // x dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -748,7 +748,7 @@ namespace quda {
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -761,7 +761,7 @@ namespace quda {
       case 1: // y dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -770,7 +770,7 @@ namespace quda {
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -783,7 +783,7 @@ namespace quda {
       case 2: // z dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -792,7 +792,7 @@ namespace quda {
           }
           break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -805,7 +805,7 @@ namespace quda {
       case 3: // t dimension
 	switch (sign) {
 	case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -814,7 +814,7 @@ namespace quda {
 	  }
 	  break;
 	case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
 	  for (int i=0; i<Nc; i++) {
 	    recon(0,i) = 0;
 	    recon(1,i) = 0;
@@ -827,7 +827,7 @@ namespace quda {
       case 4:
         switch (sign) {
         case 1: // positive projector
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -836,7 +836,7 @@ namespace quda {
           }
           break;
         case -1: // negative projector
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < Nc; i++) {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
@@ -912,7 +912,7 @@ namespace quda {
   __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
                                         ColorSpinor<Float, Nc, Ns> &y)
   {
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < Nc * Ns; i++) {
       y(i).real( a.real() * x(i).real() + y(i).real());
       y(i).real(-a.imag() * x(i).imag() + y(i).real());
@@ -931,7 +931,7 @@ namespace quda {
   __device__ __host__ inline Float norm2(const ColorSpinor<Float, Nc, Ns> &a)
   {
     Float nrm = 0.0;
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < Nc * Ns; i++) {
       nrm += a(i).real() * a(i).real();
       nrm += a(i).imag() * a(i).imag();
@@ -951,7 +951,7 @@ namespace quda {
                                                           const ColorSpinor<Float, Nc, Ns> &b, int sa, int sb)
   {
     complex<Float> dot = cmul(a(sa, 0), b(sb, 0));
-#pragma unroll
+QUDA_UNROLL
     for (int c = 1; c < Nc; c++) dot = cmac(a(sa, c), b(sb, c), dot);
     return dot;
   }
@@ -968,9 +968,9 @@ namespace quda {
                                                          const ColorSpinor<Float, Nc, Ns> &b)
   {
     complex<Float> dot;
-#pragma unroll
+QUDA_UNROLL
     for (int s = 0; s < Ns; s++) {
-#pragma unroll
+QUDA_UNROLL
       for (int c = 0; c < Nc; c++) {
         if (s == 0 && c == 0) dot = cmul(conj(a(s, c)), b(s, c));
         else dot = cmac(conj(a(s, c)), b(s, c), dot);
@@ -992,7 +992,7 @@ namespace quda {
                                                          const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
   {
     complex<Float> dot = cmul(conj(a(sa, 0)), b(sb, 0));
-#pragma unroll
+QUDA_UNROLL
     for (int c = 1; c < Nc; c++) dot = cmac(conj(a(sa, c)), b(sb, c), dot);
     return dot;
   }
@@ -1047,9 +1047,9 @@ namespace quda {
     Matrix<complex<Float>, Nc> out;
 
     // outer product over color
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < Nc; j++) {
         // trace over spin (manual unroll for perf)
         out(j, i).real(a(0, j).real() * b(0, i).real());
@@ -1058,7 +1058,7 @@ namespace quda {
         out(j, i).imag(out(j, i).imag() - a(0, j).real() * b(0, i).imag());
         // out(j,i) = a(0,j) * conj(b(0,i));
 
-#pragma unroll
+QUDA_UNROLL
 	for (int s=1; s<Ns; s++) {
 	  out(j,i).real( out(j,i).real() + a(s,j).real() * b(s,i).real() );
 	  out(j,i).real( out(j,i).real() + a(s,j).imag() * b(s,i).imag() );
@@ -1085,9 +1085,9 @@ namespace quda {
     Matrix<complex<Float>, Nc> out;
 
     // outer product over color
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int j = 0; j < Nc; j++) {
         // trace over spin (manual unroll for perf)
         out(j, i).real(a(0, j).real() * b(0, i).real());
@@ -1111,9 +1111,9 @@ namespace quda {
 
     ColorSpinor<Float,Nc,Ns> z;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
 	z.data[s*Nc + i] = x.data[s*Nc + i] + y.data[s*Nc + i];
       }
@@ -1133,9 +1133,9 @@ namespace quda {
 
     ColorSpinor<Float,Nc,Ns> z;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
 	z.data[s*Nc + i] = x.data[s*Nc + i] - y.data[s*Nc + i];
       }
@@ -1155,9 +1155,9 @@ namespace quda {
 
     ColorSpinor<Float,Nc,Ns> y;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
 	y.data[s*Nc + i] = a * x.data[s*Nc + i];
       }
@@ -1177,18 +1177,18 @@ namespace quda {
 
     ColorSpinor<Float,Nc,Ns> y;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
 	y.data[s*Nc + i].x  = A(i,0).real() * x.data[s*Nc + 0].real();
 	y.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
 	y.data[s*Nc + i].y  = A(i,0).real() * x.data[s*Nc + 0].imag();
 	y.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
       }
-#pragma unroll
+QUDA_UNROLL
       for (int j=1; j<Nc; j++) {
-#pragma unroll
+QUDA_UNROLL
 	for (int s=0; s<Ns; s++) {
 	  y.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
 	  y.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
@@ -1213,18 +1213,18 @@ namespace quda {
   {
     ColorSpinor<Float,Nc,Ns> z;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<Nc; i++) {
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Ns; s++) {
 	z.data[s*Nc + i].x  = y.data[s*Nc + i].real() + A(i,0).real() * x.data[s*Nc + 0].real();
 	z.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
 	z.data[s*Nc + i].y  = y.data[s*Nc + i].imag() + A(i,0).real() * x.data[s*Nc + 0].imag();
 	z.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
       }
-#pragma unroll
+QUDA_UNROLL
       for (int j=1; j<Nc; j++) {
-#pragma unroll
+QUDA_UNROLL
 	for (int s=0; s<Ns; s++) {
 	  z.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
 	  z.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
@@ -1249,7 +1249,7 @@ namespace quda {
     ColorSpinor<Float,Nc,Ns> y;
     constexpr int N = Ns * Nc;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i=0; i<N; i++) {
       if (i==0) {
 	y.data[i].x  = A(i,0).real() * x.data[0].real();
@@ -1260,7 +1260,7 @@ namespace quda {
 	y.data[i].y  = A(i,0).real() * x.data[0].imag();
 	y.data[i].y += A(i,0).imag() * x.data[0].real();
       }
-#pragma unroll
+QUDA_UNROLL
       for (int j=1; j<N; j++) {
 	if (i==j) {
 	  y.data[i].x += A(i,j).real() * x.data[j].real();

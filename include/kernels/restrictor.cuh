@@ -72,33 +72,33 @@ namespace quda {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
     const int v_parity = (arg.V.Nparity() == 2) ? parity : 0;
 
-#pragma unroll
+QUDA_UNROLL
     for (int s=0; s<Arg::fineSpin; s++)
-#pragma unroll
+QUDA_UNROLL
       for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
 	out[s*coarse_color_per_thread+coarse_color_local] = 0.0;
       }
 
-#pragma unroll
+QUDA_UNROLL
     for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
       int i = coarse_color_block + coarse_color_local;
-#pragma unroll
+QUDA_UNROLL
       for (int s=0; s<Arg::fineSpin; s++) {
 
 	constexpr int color_unroll = Arg::fineColor == 3 ? 3 : 2;
 
 	complex<typename Arg::real> partial[color_unroll];
-#pragma unroll
+QUDA_UNROLL
 	for (int k=0; k<color_unroll; k++) partial[k] = 0.0;
 
-#pragma unroll
+QUDA_UNROLL
 	for (int j=0; j<Arg::fineColor; j+=color_unroll) {
-#pragma unroll
+QUDA_UNROLL
 	  for (int k=0; k<color_unroll; k++)
 	    partial[k] = cmac(conj(arg.V(v_parity, x_cb, s, j+k, i)), arg.in(spinor_parity, x_cb, s, j+k), partial[k]);
 	}
 
-#pragma unroll
+QUDA_UNROLL
 	for (int k=0; k<color_unroll; k++) out[s*coarse_color_per_thread + coarse_color_local] += partial[k];
       }
     }
@@ -137,9 +137,9 @@ namespace quda {
         rotateCoarseColor(tmp, arg, parity, x_fine_cb, coarse_color_block);
 
         // perform any local spin coarsening
-#pragma unroll
+QUDA_UNROLL
         for (int s=0; s<Arg::fineSpin; s++) {
-#pragma unroll
+QUDA_UNROLL
           for (int v=0; v<coarse_color_per_thread; v++) {
             reduced[arg.spin_map(s,parity)*coarse_color_per_thread+v] += tmp[s*coarse_color_per_thread+v];
           }
@@ -152,9 +152,9 @@ namespace quda {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
         const int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 
-#pragma unroll
+QUDA_UNROLL
         for (int s = 0; s < Arg::coarseSpin; s++) {
-#pragma unroll
+QUDA_UNROLL
           for (int coarse_color_local=0; coarse_color_local<coarse_color_per_thread; coarse_color_local++) {
             int v = coarse_color_thread * coarse_color_per_thread + coarse_color_local;
             arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_color_per_thread+coarse_color_local];

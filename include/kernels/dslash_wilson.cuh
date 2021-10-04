@@ -77,7 +77,7 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (Arg::nDim == 5 ? (coord.x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-#pragma unroll
+QUDA_UNROLL
     for (int d = 0; d < 4; d++) { // loop over dimension - 4 and not nDim since this is used for DWF as well
       {                           // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);

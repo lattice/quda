@@ -59,7 +59,7 @@ namespace quda {
 
       auto yHat = make_tile_C<complex,true>(arg.tile);
 
-#pragma unroll
+QUDA_UNROLL
       for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, true>(arg.tile);
         Y.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
@@ -81,7 +81,7 @@ namespace quda {
 
       auto yHat = make_tile_C<complex,false>(arg.tile);
 
-#pragma unroll
+QUDA_UNROLL
       for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto Y = make_tile_A<complex, false>(arg.tile);
         Y.load(arg.Y, d, 1-parity, back_idx, i0, k);
@@ -101,7 +101,7 @@ namespace quda {
     { // now do the forwards links X^{-1} * Y^{-\mu}
       auto yHat = make_tile_C<complex, false>(arg.tile);
 
-#pragma unroll
+QUDA_UNROLL
       for (int k = 0; k < Arg::yhatTileType::k; k += Arg::yhatTileType::K) {
         auto X = make_tile_A<complex, false>(arg.tile);
         X.load(arg.Xinv, 0, parity, x_cb, i0, k);

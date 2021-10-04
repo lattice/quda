@@ -33,7 +33,7 @@ struct WarpReduce
   {}
   inline T Sum(T input, int valid_items = warp_threads)  // FIXME warp_num_valid < warp_threads
   {
-    #pragma unroll
+    QUDA_UNROLL
     for(int i=0;i<warp_steps;++i){
       temp_storage.reduce[lane_id] = input;
       const int offset = 1 << i;
@@ -78,7 +78,7 @@ struct BlockReduce
     if (lane_id == 0) temp_storage.warp_aggregates[warp_id] = warp_aggregate;
     #pragma omp barrier
     if (tid == 0) {
-#pragma unroll
+QUDA_UNROLL
       for(int i=1;i<warps;++i) warp_aggregate += temp_storage.warp_aggregates[i];
     }
     return warp_aggregate;

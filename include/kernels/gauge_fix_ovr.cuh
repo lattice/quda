@@ -56,12 +56,12 @@ namespace quda {
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];
-#pragma unroll
+QUDA_UNROLL
       for (int dr = 0; dr < 4; dr++) X[dr] = arg.X[dr];
 
       int x[4];
       getCoords(x, x_cb, X, parity);
-#pragma unroll
+QUDA_UNROLL
       for (int dr = 0; dr < 4; ++dr) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];
@@ -139,7 +139,7 @@ namespace quda {
       int parity = arg.parity;
 
       int X[4], x[4];
-#pragma unroll
+QUDA_UNROLL
       for (int dr = 0; dr < 4; dr++) X[dr] = arg.X[dr];
 
       if (!Arg::halo) {
@@ -154,7 +154,7 @@ namespace quda {
         x[0] = idx % X[0];
       }
 
-#pragma unroll
+QUDA_UNROLL
       for (int dr = 0; dr < 4; dr++) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];

@@ -241,7 +241,7 @@ namespace quda
             constexpr size_t n = sizeof(T) / sizeof(atomic_t);
             atomic_t sum_tmp[n];
             memcpy(sum_tmp, &sum, sizeof(sum));
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < n; i++) {
               // catch the case where the computed value is equal to the init_value
               sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];

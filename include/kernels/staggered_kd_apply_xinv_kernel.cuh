@@ -163,30 +163,30 @@ namespace quda {
       //////////////////////
 
       // Zero the shared memory buffer, which is 48 components
-#pragma unroll
+QUDA_UNROLL
       for (unsigned int coarse_row = 0; coarse_row < Arg::coarseDof; coarse_row += Arg::blockSizeKD) {
         out_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + fast_idx + coarse_row] = { 0, 0 };
       }
 
-#pragma unroll
+QUDA_UNROLL
       for (int tile_row = 0; tile_row < Arg::numTiles; tile_row++) {
-#pragma unroll
+QUDA_UNROLL
         for (int tile_col = 0; tile_col < Arg::numTiles; tile_col++) {
           // load Xinv
           if (Arg::dagger) {
-#pragma unroll
+QUDA_UNROLL
             for (int col = 0; col < Arg::xinvColTileSize; col++) {
               xinv_buffer[fast_idx * Arg::xinvPaddedColTileSize + col] = conj(arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvColTileSize * tile_col + col, Arg::xinvRowTileSize * tile_row + fast_idx));
             }
           } else {
-#pragma unroll
+QUDA_UNROLL
             for (int row = 0; row < Arg::xinvColTileSize; row++) {
               xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx] = arg.xInv(0, parity_coarse_xinv, x_coarse_xinv_cb, 0, 0, Arg::xinvRowTileSize * tile_row + row, Arg::xinvColTileSize * tile_col + fast_idx);
             }
           }
 
           // do the tile multiplication
-#pragma unroll
+QUDA_UNROLL
           for (int row = 0; row < Arg::xinvRowTileSize; row++) {
             const complex xinv_elem = xinv_buffer[row * Arg::xinvPaddedColTileSize + fast_idx];
             const complex cs_component = in_buffer[Arg::paddedSpinorSizeKD * Arg::fineColor * mid_idx + Arg::xinvColTileSize * tile_col + fast_idx];
@@ -208,7 +208,7 @@ namespace quda {
 
       Vector out;
 
-#pragma unroll
+QUDA_UNROLL
       for (int c_f = 0; c_f < Arg::fineColor; c_f++) {
         out(0,c_f) = static_cast<complex_spinor>(out_buffer[buffer_index + 8 * c_f]);
       }

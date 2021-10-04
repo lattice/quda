@@ -68,7 +68,7 @@ namespace quda
 
         Vector tmp;
 
-#pragma unroll
+QUDA_UNROLL
         for (int chirality = 0; chirality < 2; chirality++) {
           constexpr int n = Arg::nColor * Arg::nSpin / 2;
           HMatrix<real, n> A = arg.A(coord.x_cb, parity, chirality);

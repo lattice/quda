@@ -47,7 +47,7 @@ namespace quda
     using Link = Matrix<complex<typename Arg::real>, Arg::nColor>;
     Link result;
 
-#pragma unroll
+QUDA_UNROLL
     for (int i = 0; i < Arg::nvector; i++) {
       const Spinor A = arg.inA[i](x_cb, parity);
       const Spinor B = arg.inB[i](x_cb, parity);

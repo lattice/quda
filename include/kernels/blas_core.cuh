@@ -99,7 +99,7 @@ namespace quda
       axpbyz_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &v) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) v[i] = a * x[i] + b * y[i];
       }                                  // use v not z to ensure same precision as y
       constexpr int flops() const { return 3; }   //! flops per element
@@ -115,7 +115,7 @@ namespace quda
       ax_(const real &a, const real &, const real &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &, T &, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) x[i] *= a;
       }
       constexpr int flops() const { return 1; }   //! flops per element
@@ -131,7 +131,7 @@ namespace quda
       caxpy_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) y[i] = cmac(a, x[i], y[i]);
       }
       constexpr int flops() const { return 4; }   //! flops per element
@@ -164,7 +164,7 @@ namespace quda
       caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) _caxpby(a, x[i], b, y[i]);
       }
       constexpr int flops() const { return 7; }   //! flops per element
@@ -179,7 +179,7 @@ namespace quda
       caxpbypczw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           w[i] = y[i];
           _caxpby(a, x[i], b, w[i]);
@@ -201,7 +201,7 @@ namespace quda
       axpyBzpcx_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] += a * x[i];
           x[i] = b * z[i] + c * x[i];
@@ -221,7 +221,7 @@ namespace quda
       axpyZpbx_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] += a * x[i];
           x[i] = z[i] + b * x[i];
@@ -241,7 +241,7 @@ namespace quda
       caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           x[i] = cmac(b, z[i], x[i]);
@@ -261,7 +261,7 @@ namespace quda
       caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           z[i] = cmac(b, x[i], z[i]);
@@ -281,7 +281,7 @@ namespace quda
       caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           z[i] = cmac(a, x[i], z[i]);
           z[i] = cmac(b, y[i], z[i]);
@@ -302,7 +302,7 @@ namespace quda
       cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &) : a(a.real()), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           x[i] *= a;
           y[i] = cmac(b, x[i], y[i]);
@@ -323,7 +323,7 @@ namespace quda
       caxpyxmaz_(const complex<real> &a, const complex<real> &, const complex<real> &) : a(a) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           x[i] = cmac(-a, z[i], x[i]);
@@ -363,7 +363,7 @@ namespace quda
 
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] = cmac(a, x[i], y[i]);
           x[i] = cmac(-a, z[i], x[i]);
@@ -387,7 +387,7 @@ namespace quda
       tripleCGUpdate_(const real &a, const real &b, const real &) : a(a), b(b) { ; }
       template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < x.size(); i++) {
           y[i] += a * w[i];
           z[i] -= a * x[i];

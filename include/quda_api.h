@@ -1,6 +1,11 @@
 #pragma once
 
 #ifdef QUDA_BACKEND_OMPTARGET
+
+#ifndef QUDA_UNROLL
+#define QUDA_UNROLL
+#endif
+
 // OMPTARGET SPECIFIC workarounds
 #define __host__
 #define __device__
@@ -97,6 +102,10 @@ struct LaunchParam{
 extern LaunchParam launch_param;
 
 #endif // QUDA_BACKEND_OMPTARGET
+
+#ifndef QUDA_UNROLL
+#define QUDA_UNROLL _Pragma("unroll")
+#endif
 
 #include <quda_define.h>
 #include <string>

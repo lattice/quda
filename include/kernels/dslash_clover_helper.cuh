@@ -87,7 +87,7 @@ namespace quda {
 
       in.toRel(); // change to chiral basis here
 
-#pragma unroll
+QUDA_UNROLL
       for (int chirality=0; chirality<2; chirality++) {
         HMatrix<real, N> A = arg.clover(x_cb, clover_parity, chirality);
         half_fermion chi = in.chiral_project(chirality);
@@ -129,7 +129,7 @@ namespace quda {
 
       in.toRel(); // change to chiral basis here
 
-#pragma unroll
+QUDA_UNROLL
       for (int chirality=0; chirality<2; chirality++) {
         // factor of 2 comes from clover normalization we need to correct for
         const complex<real> j(0.0, chirality == 0 ? static_cast<real>(0.5) : -static_cast<real>(0.5));

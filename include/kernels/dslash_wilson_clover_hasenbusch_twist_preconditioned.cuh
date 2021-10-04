@@ -82,7 +82,7 @@ namespace quda
 
           Vector tmp;
 
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) {
 
             HMatrix<real, Arg::nColor * Arg::nSpin / 2> A_inv = arg.A_inv(coord.x_cb, parity, chirality);
@@ -110,7 +110,7 @@ namespace quda
           Vector x = arg.x(coord.x_cb, my_spinor_parity);
           x.toRel();
           Vector tmp;
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) {
 
             HMatrix<real, Arg::nColor *Arg::nSpin / 2> A = arg.A(coord.x_cb, parity, chirality);

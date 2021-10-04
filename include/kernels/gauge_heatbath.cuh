@@ -592,12 +592,12 @@ namespace quda {
       auto parity = arg.parity;
 
       int X[4];
-#pragma unroll
+QUDA_UNROLL
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
 
       int x[4];
       getCoords(x, x_cb, X, parity);
-#pragma unroll
+QUDA_UNROLL
       for ( int dr = 0; dr < 4; ++dr ) {
         x[dr] += arg.border[dr];
         X[dr] += 2 * arg.border[dr];

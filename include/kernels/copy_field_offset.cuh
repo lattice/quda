@@ -117,7 +117,7 @@ namespace quda
   copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
-#pragma unroll
+QUDA_UNROLL
     for (int d = 0; d < 4; d++) {
       Element element = arg.in(d, in, parity);
       arg.out(d, out, parity) = element;
@@ -159,14 +159,14 @@ namespace quda
           // we are collecting so x_cb is the index for the input.
           idx_in = x_cb + arg.volume_4d_cb_in * s;
           getCoords5CB(coordinate, idx_in, arg.dim_in, arg.X0h_in, parity, QUDA_5D_PC);
-#pragma unroll
+QUDA_UNROLL
           for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
           idx_out = linkIndex(coordinate, arg.dim_out) + arg.volume_4d_cb_out * coordinate[4];
         } else {
           // we are dispersing so x_cb is the index for the output.
           idx_out = x_cb + arg.volume_4d_cb_out * s;
           getCoords5CB(coordinate, idx_out, arg.dim_out, arg.X0h_out, parity, QUDA_5D_PC);
-#pragma unroll
+QUDA_UNROLL
           for (int d = 0; d < 4; d++) { coordinate[d] += arg.offset[d]; }
           idx_in = linkIndex(coordinate, arg.dim_in) + arg.volume_4d_cb_in * coordinate[4];
         }
