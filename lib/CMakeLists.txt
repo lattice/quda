@@ -54,7 +54,7 @@ set (QUDA_OBJS
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
-  madwf_transfer.cu
+  madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
@@ -82,6 +82,7 @@ set (QUDA_OBJS
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   blas_magma.cu tune.cpp
+  device_vector.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu

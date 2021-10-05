@@ -12,16 +12,20 @@
 #include <random_quda.h>
 #include <tune_quda.h>
 
+#include <device_vector.h>
+
 namespace quda
 {
 
   struct MADWFacc {
 
-    using TrainingFloat = float;
+    using transfer_float = float;
+
+    static constexpr madwf_ml::transfer_5D_type transfer_type = madwf_ml::transfer_5D_type::Spin;
 
     // The parameters to be trained.
-    using Tp = madwf_ml::TrainingParameter<TrainingFloat>;
-    Tp device_param;
+    using device_container = device_vector<transfer_float>;
+    device_container device_param;
 
     // The diagonal component to suppress/lift the zero modes.
     double mu;
@@ -46,7 +50,7 @@ namespace quda
 
     QudaPrecision prec_precondition;
 
-    static std::unordered_map<std::string, std::vector<TrainingFloat>> host_training_param_cache; // empty map
+    static std::unordered_map<std::string, std::vector<transfer_float>> host_training_param_cache; // empty map
 
     MADWFacc(const SolverParam &solve_param) :
       mu(solve_param.madwf_diagonal_suppressor),
@@ -75,7 +79,7 @@ namespace quda
       if (backward_tmp) { delete backward_tmp; }
     }
 
-    void fill_random(std::vector<TrainingFloat> &v)
+    void fill_random(std::vector<transfer_float> &v)
     {
       static std::random_device rd;
       // the good rng
@@ -88,9 +92,9 @@ namespace quda
 
     template <class Base> void apply(Base base, ColorSpinorField &out, const ColorSpinorField &in)
     {
-      madwf_ml::transfer_5d_hh(*forward_tmp, in, device_param, false);
+      madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, in, device_param, false);
       base(*backward_tmp, *forward_tmp);
-      madwf_ml::transfer_5d_hh(out, *backward_tmp, device_param, true);
+      madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(out, *backward_tmp, device_param, true);
 
       blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
     }
@@ -112,22 +116,15 @@ namespace quda
       return blas::xmyNorm(tmp2, out);
     }
 
-// Uncomment the following marco to enable tuning mu (suppressor).
-// #define TUNE_SUPPRESSOR
-
-    template <class Ref, class Base, class Null>
+    template <class Ref, class Base, class Null, bool tune_suppressor = false>
     void train(const Ref &ref, Base base, Null &null, const ColorSpinorField &in)
     {
 
-#if 1
-      constexpr int complex_matrix_size = 16; // spin by spin
-#else
-      constexpr int complex_matrix_size = 2; // chiral
-#endif
+      constexpr int complex_matrix_size = static_cast<int>(transfer_type); // spin by spin
 
       int Ls = in.X(4);
       int param_size = Ls * Ls_base * complex_matrix_size * 2;
-      std::vector<TrainingFloat> host_param(param_size);
+      std::vector<transfer_float> host_param(param_size);
 
       if (param_load) {
         char param_file_name[512];
@@ -223,56 +220,51 @@ namespace quda
       device_param.resize(param_size);
       device_param.from_host(host_param);
 
-      Tp d1(param_size);
-      Tp d2(param_size);
-      Tp P(param_size);
-      Tp D_old(param_size);
+      device_container d1(param_size);
+      device_container d2(param_size);
+      device_container P(param_size);
+      device_container D_old(param_size);
 
-#ifdef TUNE_SUPPRESSOR
       double pmu = 0.0;
-#endif
 
-      TrainingFloat alpha;
-      TrainingFloat b = 0.8;
+      transfer_float alpha;
+      transfer_float b = 0.8;
       printfQuda("beta          = %.3f\n", b);
       printfQuda("training mu   = %.3f\n", mu);
       for (int iteration = 0; iteration < train_maxiter; iteration++) {
 
-        Tp D(param_size);
-#ifdef TUNE_SUPPRESSOR
+        device_container D(param_size);
         double dmu = 0.0;
-#endif
         double chi2 = 0.0;
         std::array<double, 5> a = {};
 
         for (const auto &phi : B) {
           chi2 += cost(ref, base, chi, *phi);
           // ATx(ATphi, *phi, T);
-          madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, device_param, false);
           base(ATphi, *forward_tmp);
 
-          // inner_dslash(Mchi, chi);
           ref(Mchi, chi);
 
           // ATx(ATMchi, Mchi, T);
-          madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, Mchi, device_param, false);
           base(ATMchi, *forward_tmp);
 
           // d1 = A * T * phi -x- M * chi
-          madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
+          madwf_ml::tensor_5d_hh<transfer_float, transfer_type>(ATphi, Mchi, d1);
           // d2 = A * T * M * phi -x- phi
-          madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
+          madwf_ml::tensor_5d_hh<transfer_float, transfer_type>(ATMchi, *phi, d2);
 
-          madwf_ml::axpby(D, 2.0f, d1, 2.0f, d2);
-#ifdef TUNE_SUPPRESSOR
-          dmu += 2.0 * blas::reDotProduct(Mchi, *phi);
-#endif
+          axpby(D, 2.0f, d1, 2.0f, d2);
+          if (tune_suppressor) {
+            dmu += 2.0 * blas::reDotProduct(Mchi, *phi);
+          }
         }
 
-        madwf_ml::axpby(P, (b - 1), P, (1 - b), D);
-#ifdef TUNE_SUPPRESSOR
-        pmu = b * pmu + (1 - b) * dmu;
-#endif
+        axpby(P, (b - 1), P, (1 - b), D);
+        if (tune_suppressor) {
+          pmu = b * pmu + (1 - b) * dmu;
+        }
 
         chi2 = 0.0;
         // line search
@@ -282,31 +274,29 @@ namespace quda
           chi2 += ind_chi2;
 
           // ATx(ATphi, *phi, T);
-          madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, device_param, false);
           base(ATphi, *forward_tmp);
 
           // D' * A * T * phi
-          madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(theta, ATphi, P, true);
 
           // ATx(ADphi, *phi, P);
-          madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, P, false);
           base(ADphi, *forward_tmp);
 
           // T' * A * D * phi
-          madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(tmp, ADphi, device_param, true);
           // theta
           blas::axpy(1.0, theta, tmp);
-#ifdef TUNE_SUPPRESSOR
-          blas::axpy(pmu, *phi, tmp);
-#endif
+          if (tune_suppressor) {
+            blas::axpy(pmu, *phi, tmp);
+          }
 
-          // inner_dslash(theta, tmp);
           ref(theta, tmp);
 
           // lambda = D' * A * D * phi
-          madwf_ml::transfer_5d_hh(tmp, ADphi, P, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(tmp, ADphi, P, true);
 
-          // inner_dslash(lambda, tmp);
           ref(lambda, tmp);
 
           std::vector<ColorSpinorField *> lhs {&chi, &theta, &lambda};
@@ -334,12 +324,12 @@ namespace quda
           }
         }
 
-        madwf_ml::axpby(device_param, 0.0f, device_param, -alpha, P);
-#ifdef TUNE_SUPPRESSOR
-        mu -= alpha * pmu;
-#endif
+        axpby(device_param, 0.0f, device_param, -alpha, P);
+        if (tune_suppressor) {
+          mu -= alpha * pmu;
+        }
 
-        printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
+        printfQuda("grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                    iteration, chi2, chi2 / residual, alpha, mu);
 
       }
@@ -363,7 +353,7 @@ namespace quda
         sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
         save_param_path += std::string(cstring);
         FILE *fp = fopen(save_param_path.c_str(), "w");
-        size_t fwrite_count = fwrite(host_param.data(), sizeof(TrainingFloat), host_param.size(), fp);
+        size_t fwrite_count = fwrite(host_param.data(), sizeof(transfer_float), host_param.size(), fp);
         fclose(fp);
         if (fwrite_count != host_param.size()) {
           errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,

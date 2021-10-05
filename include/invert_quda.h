@@ -530,7 +530,7 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual void train_param(Solver &null, ColorSpinorField &in) { errorQuda("NOT implemented."); }
+    virtual void train_param(Solver &, ColorSpinorField &) { errorQuda("NOT implemented."); }
     void set_tol(double tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
 
