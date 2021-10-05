@@ -1,4 +1,4 @@
-Version 1.1.0 - July 2021
+Version 1.1.0 - October 2021
 
 - Add support for NVSHMEM communication for the Dslash operators, for
   significantly improved strong scaling.  See

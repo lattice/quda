@@ -44,7 +44,7 @@ For more details we refer the user to the wiki:
 ## Software Compatibility:
 
 The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
-using releases 10.1 through 11.3 of the CUDA toolkit.  Earlier versions
+using releases 10.1 through 11.4 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
 11.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
