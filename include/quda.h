@@ -341,7 +341,7 @@ extern "C" {
 
     int madwf_ls;
 
-    int madwf_null_maxiter;
+    int madwf_null_miniter;
 
     double madwf_null_tol;
 

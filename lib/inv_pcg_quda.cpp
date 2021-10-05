@@ -75,7 +75,7 @@ namespace quda
 
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
       if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-        K = new Acc<MADWFacc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+        K = new Acc<MadwfAcc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
       } else { // unknown preconditioner
         errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
       }
@@ -102,8 +102,8 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
-                            int collect_maxiter, double collect_tol)
+  void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
+                            int collect_miniter, double collect_tol)
   {
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
 
@@ -359,7 +359,7 @@ namespace quda
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
-      if (collect > 0 && k > collect_maxiter && r2 < collect_tol * collect_tol * b2) {
+      if (collect > 0 && k > collect_miniter && r2 < collect_tol * collect_tol * b2) {
         *v_r[v_r.size() - collect] = rSloppy;
         printfQuda("Collecting r %2d: r2 / b2 = %12.8e, k = %5d.\n", collect, sqrt(r2 / b2), k);
         collect--;
@@ -501,6 +501,8 @@ namespace quda
 
     if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
+    if (collect > 0) { warningQuda("%d r vectors still to be collected ...\n", collect); }
+
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("PCG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residual
@@ -541,6 +543,6 @@ namespace quda
     return;
   }
 
-  std::unordered_map<std::string, std::vector<float>> MADWFacc::host_training_param_cache; // empty map
+  std::unordered_map<std::string, std::vector<float>> MadwfAcc::host_training_param_cache; // empty map
 
 } // namespace quda

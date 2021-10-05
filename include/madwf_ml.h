@@ -17,7 +17,7 @@
 namespace quda
 {
 
-  struct MADWFacc {
+  struct MadwfAcc {
 
     using transfer_float = float;
 
@@ -27,11 +27,11 @@ namespace quda
     using device_container = device_vector<transfer_float>;
     device_container device_param;
 
-    // The diagonal component to suppress/lift the zero modes.
+    // The diagonal component to suppress the zero modes.
     double mu;
     int Ls_base;
 
-    int null_maxiter;
+    int null_miniter;
     double null_tol;
     int train_maxiter;
 
@@ -52,10 +52,10 @@ namespace quda
 
     static std::unordered_map<std::string, std::vector<transfer_float>> host_training_param_cache; // empty map
 
-    MADWFacc(const SolverParam &solve_param) :
+    MadwfAcc(const SolverParam &solve_param) :
       mu(solve_param.madwf_diagonal_suppressor),
       Ls_base(solve_param.madwf_ls),
-      null_maxiter(solve_param.madwf_null_maxiter),
+      null_miniter(solve_param.madwf_null_miniter),
       null_tol(solve_param.madwf_null_tol),
       train_maxiter(solve_param.madwf_train_maxiter),
       param_load(solve_param.madwf_param_load == QUDA_BOOLEAN_TRUE),
@@ -65,15 +65,15 @@ namespace quda
       strcpy(param_infile, solve_param.madwf_param_infile);
       strcpy(param_outfile, solve_param.madwf_param_outfile);
 
-      printfQuda("Launching MADWFacc ... \n");
-      printfQuda("madwf_mu            = %.4f\n", mu);
-      printfQuda("madwf_ls            = %d\n", Ls_base);
-      printfQuda("madwf_null_maxiter  = %d\n", null_maxiter);
-      printfQuda("madwf_null_tol      = %.2f\n", null_tol);
-      printfQuda("madwf_train_maxiter = %d\n", train_maxiter);
+      printfQuda("Launching MADWF accelerator ... \n");
+      printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", mu);
+      printfQuda("madwf_ls (cheap Ls)                               = %d\n", Ls_base);
+      printfQuda("madwf_null_miniter                                = %d\n", null_miniter);
+      printfQuda("madwf_null_tol                                    = %.2f\n", null_tol);
+      printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", train_maxiter);
     }
 
-    ~MADWFacc()
+    ~MadwfAcc()
     {
       if (forward_tmp) { delete forward_tmp; }
       if (backward_tmp) { delete backward_tmp; }
@@ -90,7 +90,7 @@ namespace quda
       for (auto &x : v) { x = 1e-1 * n(rng); }
     }
 
-    template <class Base> void apply(Base base, ColorSpinorField &out, const ColorSpinorField &in)
+    template <class Base> void apply(Base &base, ColorSpinorField &out, const ColorSpinorField &in)
     {
       madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, in, device_param, false);
       base(*backward_tmp, *forward_tmp);
@@ -100,7 +100,7 @@ namespace quda
     }
 
     template <class Ref, class Base>
-    double cost(const Ref &ref, Base base, ColorSpinorField &out, const ColorSpinorField &in)
+    double cost(const Ref &ref, Base &base, ColorSpinorField &out, const ColorSpinorField &in)
     {
 
       ColorSpinorParam csParam(in);
@@ -117,7 +117,7 @@ namespace quda
     }
 
     template <class Ref, class Base, class Null, bool tune_suppressor = false>
-    void train(const Ref &ref, Base base, Null &null, const ColorSpinorField &in)
+    void train(const Ref &ref, Base &base, Null &null, const ColorSpinorField &in)
     {
 
       constexpr int complex_matrix_size = static_cast<int>(transfer_type); // spin by spin
@@ -180,8 +180,7 @@ namespace quda
       csParam.setPrecision(prec_precondition);
       for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
 
-      // TODO: Currently this only work for PreconCG.
-      static_cast<PreconCG &>(null)(null_x, null_b, B, null_maxiter, null_tol);
+      null.solve_and_collect(null_x, null_b, B, null_miniter, null_tol);
       for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
       saveTuneCache();

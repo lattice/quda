@@ -203,7 +203,7 @@ extern QudaSchwarzType precon_schwarz_type;
 
 extern double madwf_diagonal_suppressor;
 extern int madwf_ls;
-extern int madwf_null_maxiter;
+extern int madwf_null_miniter;
 extern double madwf_null_tol;
 extern int madwf_train_maxiter;
 extern bool madwf_param_load;

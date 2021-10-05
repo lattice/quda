@@ -66,7 +66,7 @@ QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
 
 double madwf_diagonal_suppressor = 0.0;
 int madwf_ls = 4;
-int madwf_null_maxiter = niter;
+int madwf_null_miniter = niter;
 double madwf_null_tol = tol;
 int madwf_train_maxiter = niter;
 bool madwf_param_load = false;
@@ -493,7 +493,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Set the digonal suppressor for MADWF (default 0)");
   quda_app->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
 
-  quda_app->add_option("--madwf-null-maxiter", madwf_null_maxiter, "Max iteration for null vector generation for MADWF");
+  quda_app->add_option("--madwf-null-miniter", madwf_null_miniter, "Min iteration after which to generate null vectors for MADWF");
   quda_app->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
   quda_app->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
 

@@ -233,7 +233,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.madwf_diagonal_suppressor = madwf_diagonal_suppressor;
   inv_param.madwf_ls = madwf_ls;
 
-  inv_param.madwf_null_maxiter = madwf_null_maxiter;
+  inv_param.madwf_null_miniter = madwf_null_miniter;
   inv_param.madwf_null_tol = madwf_null_tol;
   inv_param.madwf_train_maxiter = madwf_train_maxiter;
 

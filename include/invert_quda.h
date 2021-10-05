@@ -250,7 +250,7 @@ namespace quda {
 
     int madwf_ls;
 
-    int madwf_null_maxiter;
+    int madwf_null_miniter;
 
     double madwf_null_tol;
 
@@ -351,7 +351,7 @@ namespace quda {
       mg_instance(false),
       madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
       madwf_ls(param.madwf_ls),
-      madwf_null_maxiter(param.madwf_null_maxiter),
+      madwf_null_miniter(param.madwf_null_miniter),
       madwf_null_tol(param.madwf_null_tol),
       madwf_train_maxiter(param.madwf_train_maxiter),
       madwf_param_load(param.madwf_param_load),
@@ -437,7 +437,7 @@ namespace quda {
       mg_instance(param.mg_instance),
       madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
       madwf_ls(param.madwf_ls),
-      madwf_null_maxiter(param.madwf_null_maxiter),
+      madwf_null_miniter(param.madwf_null_miniter),
       madwf_null_tol(param.madwf_null_tol),
       madwf_train_maxiter(param.madwf_train_maxiter),
       madwf_param_load(param.madwf_param_load),
@@ -531,6 +531,9 @@ namespace quda {
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual void train_param(Solver &, ColorSpinorField &) { errorQuda("NOT implemented."); }
+
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
+
     void set_tol(double tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
 
@@ -914,11 +917,11 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in)
       {
         std::vector<ColorSpinorField *> v_r(0);
-        (*this)(out, in, v_r, 0, 0);
+        this->solve_and_collect(out, in, v_r, 0, 0);
       }
 
-      void operator()(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
-                      int collect_maxiter, double collect_col);
+      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in,
+                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_col);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
