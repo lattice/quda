@@ -1,6 +1,7 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Load n-length block of memory of type T and return in local array
@@ -34,10 +35,7 @@ QUDA_UNROLL
      @param[out] out Output value
      @param[in] in Input memory pointer we are loading from
   */
-  template <typename T> __host__ __device__ void block_load(T &out, const T *in)
-  {
-    out = *in;
-  }
+  template <typename T> __host__ __device__ void block_load(T &out, const T *in) { out = *in; }
 
   /**
      @brief Store type T in contiguous memory
@@ -45,9 +43,6 @@ QUDA_UNROLL
      @param[out] out Output memory pointer we are storing to
      @param[in] in Input value
   */
-  template <typename T> __host__ __device__ void block_store(T *out, const T &in)
-  {
-    *out = in;
-  }
+  template <typename T> __host__ __device__ void block_store(T *out, const T &in) { *out = in; }
 
-}
+} // namespace quda

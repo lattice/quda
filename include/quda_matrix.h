@@ -66,7 +66,7 @@ namespace quda {
     private:
         __device__ __host__ inline int index(int i, int j) const { return i*N + j; }
 
-    public:
+      public:
         T data[N*N];
 
         constexpr int rows() const { return N; }
@@ -75,10 +75,10 @@ namespace quda {
 
         __device__ __host__ inline Matrix() { setZero(this); }
 
-        Matrix(const Matrix<T,N> &) = default;
-        Matrix(Matrix<T,N> &&) = default;
-        Matrix& operator=(const Matrix<T,N> &) = default;
-        Matrix& operator=(Matrix<T,N> &&) = default;
+        Matrix(const Matrix<T, N> &) = default;
+        Matrix(Matrix<T, N> &&) = default;
+        Matrix &operator=(const Matrix<T, N> &) = default;
+        Matrix &operator=(Matrix<T, N> &&) = default;
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -195,10 +195,10 @@ QUDA_UNROLL
 	__device__ __host__ inline uint64_t checksum() const {
           // ensure length is rounded up to 64-bit multiple
           constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
-          uint64_t base[length] = { };
+          uint64_t base[length] = {};
           memcpy(base, data, N * N * sizeof(T));
           uint64_t checksum_ = base[0];
-          for (int i=1; i<length; i++) checksum_ ^= base[i];
+          for (int i = 1; i < length; i++) checksum_ ^= base[i];
           return checksum_;
         }
 
@@ -226,8 +226,7 @@ QUDA_UNROLL
           for (int i=0; i<N; i++) {
 QUDA_UNROLL
             for (int j=0; j<N; j++) {
-              if (is_nan((*this)(i,j).real()) ||
-                  is_nan((*this)(i,j).imag())) return false;
+              if (is_nan((*this)(i, j).real()) || is_nan((*this)(i, j).imag())) return false;
             }
           }
 
@@ -309,10 +308,10 @@ QUDA_UNROLL
         for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
-      HMatrix(const HMatrix<T,N> &) = default;
-      HMatrix(HMatrix<T,N> &&) = default;
-      HMatrix& operator=(const HMatrix<T,N> &) = default;
-      HMatrix& operator=(HMatrix<T,N> &&) = default;
+      HMatrix(const HMatrix<T, N> &) = default;
+      HMatrix(HMatrix<T, N> &&) = default;
+      HMatrix &operator=(const HMatrix<T, N> &) = default;
+      HMatrix &operator=(HMatrix<T, N> &&) = default;
 
       __device__ __host__ inline HMatrix(const T data_[]) {
 QUDA_UNROLL
@@ -357,17 +356,17 @@ QUDA_UNROLL
 	for (int i=0; i<N; i++) {
 QUDA_UNROLL
 	  for (int k=0; k<N; k++) if (i<=k) { // else compiler can't handle triangular unroll
-            tmp.real(             (*this)(i,0).real() * (*this)(0,k).real());
-	    tmp.real(tmp.real() - (*this)(i,0).imag() * (*this)(0,k).imag());
-            tmp.imag(             (*this)(i,0).real() * (*this)(0,k).imag());
-	    tmp.imag(tmp.imag() + (*this)(i,0).imag() * (*this)(0,k).real());
+              tmp.real((*this)(i, 0).real() * (*this)(0, k).real());
+              tmp.real(tmp.real() - (*this)(i, 0).imag() * (*this)(0, k).imag());
+              tmp.imag((*this)(i, 0).real() * (*this)(0, k).imag());
+              tmp.imag(tmp.imag() + (*this)(i, 0).imag() * (*this)(0, k).real());
 QUDA_UNROLL
 	    for (int j=1; j<N; j++) {
-              tmp.real(tmp.real() + (*this)(i,j).real() * (*this)(j,k).real());
-              tmp.real(tmp.real() - (*this)(i,j).imag() * (*this)(j,k).imag());
-              tmp.imag(tmp.imag() + (*this)(i,j).real() * (*this)(j,k).imag());
-              tmp.imag(tmp.imag() + (*this)(i,j).imag() * (*this)(j,k).real());
-	    }
+              tmp.real(tmp.real() + (*this)(i, j).real() * (*this)(j, k).real());
+              tmp.real(tmp.real() - (*this)(i, j).imag() * (*this)(j, k).imag());
+              tmp.imag(tmp.imag() + (*this)(i, j).real() * (*this)(j, k).imag());
+              tmp.imag(tmp.imag() + (*this)(i, j).imag() * (*this)(j, k).real());
+            }
 	    result(i,k) = tmp;
 	  }
 	}
@@ -434,7 +433,7 @@ QUDA_UNROLL
     {
       Mat<T,N> result;
 QUDA_UNROLL
-      for (int i=0; i<a.size(); i++) result.data[i] = a.data[i] + b.data[i];
+      for (int i = 0; i < a.size(); i++) result.data[i] = a.data[i] + b.data[i];
       return result;
     }
 
@@ -443,7 +442,7 @@ QUDA_UNROLL
     __device__ __host__ inline Mat<T,N> operator+=(Mat<T,N> & a, const Mat<T,N> & b)
     {
 QUDA_UNROLL
-      for (int i=0; i<a.size(); i++) a.data[i] += b.data[i];
+      for (int i = 0; i < a.size(); i++) a.data[i] += b.data[i];
       return a;
     }
 
@@ -451,7 +450,7 @@ QUDA_UNROLL
     __device__ __host__ inline Mat<T,N> operator+=(Mat<T,N> & a, const T & b)
     {
 QUDA_UNROLL
-      for (int i=0; i<a.rows(); i++) a(i,i) += b;
+      for (int i = 0; i < a.rows(); i++) a(i, i) += b;
       return a;
     }
 
@@ -459,7 +458,7 @@ QUDA_UNROLL
     __device__ __host__ inline Mat<T,N> operator-=(Mat<T,N> & a, const Mat<T,N> & b)
     {
 QUDA_UNROLL
-      for (int i=0; i<a.size(); i++) a.data[i] -= b.data[i];
+      for (int i = 0; i < a.size(); i++) a.data[i] -= b.data[i];
       return a;
     }
 
@@ -468,7 +467,7 @@ QUDA_UNROLL
     {
       Mat<T,N> result;
 QUDA_UNROLL
-      for (int i=0; i<a.size(); i++) result.data[i] = a.data[i] - b.data[i];
+      for (int i = 0; i < a.size(); i++) result.data[i] = a.data[i] - b.data[i];
       return result;
     }
 
@@ -476,7 +475,7 @@ QUDA_UNROLL
     __device__ __host__ inline Mat<T,N> operator*(const S & scalar, const Mat<T,N> & a){
       Mat<T,N> result;
 QUDA_UNROLL
-      for (int i=0; i<a.size(); ++i) result.data[i] = scalar*a.data[i];
+      for (int i = 0; i < a.size(); ++i) result.data[i] = scalar * a.data[i];
       return result;
     }
 
@@ -495,7 +494,7 @@ QUDA_UNROLL
     __device__ __host__ inline Mat<T,N> operator-(const Mat<T,N> & a){
       Mat<T,N> result;
 QUDA_UNROLL
-      for (int i=0; i<a.size(); ++i) result.data[i] = -a.data[i];
+      for (int i = 0; i < a.size(); ++i) result.data[i] = -a.data[i];
       return result;
     }
 
@@ -532,17 +531,17 @@ QUDA_UNROLL
       for (int i=0; i<N; i++) {
 QUDA_UNROLL
 	for (int k=0; k<N; k++) {
-          result(i,k).real(                     a(i,0).real() * b(0,k).real());
-          result(i,k).real(result(i,k).real() - a(i,0).imag() * b(0,k).imag());
-          result(i,k).imag(                     a(i,0).real() * b(0,k).imag());
-          result(i,k).imag(result(i,k).imag() + a(i,0).imag() * b(0,k).real());
+          result(i, k).real(a(i, 0).real() * b(0, k).real());
+          result(i, k).real(result(i, k).real() - a(i, 0).imag() * b(0, k).imag());
+          result(i, k).imag(a(i, 0).real() * b(0, k).imag());
+          result(i, k).imag(result(i, k).imag() + a(i, 0).imag() * b(0, k).real());
 QUDA_UNROLL
 	  for (int j=1; j<N; j++) {
-	    result(i,k).real(result(i,k).real() + a(i,j).real() * b(j,k).real());
-	    result(i,k).real(result(i,k).real() - a(i,j).imag() * b(j,k).imag());
-	    result(i,k).imag(result(i,k).imag() + a(i,j).real() * b(j,k).imag());
-	    result(i,k).imag(result(i,k).imag() + a(i,j).imag() * b(j,k).real());
-	  }
+            result(i, k).real(result(i, k).real() + a(i, j).real() * b(j, k).real());
+            result(i, k).real(result(i, k).real() - a(i, j).imag() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).real() * b(j, k).imag());
+            result(i, k).imag(result(i, k).imag() + a(i, j).imag() * b(j, k).real());
+          }
 	}
       }
       return result;
@@ -749,7 +748,7 @@ QUDA_UNROLL
     for (int i=0; i<N; i++) {
       am(i,i).y -= imag_trace/N;
     }
-    m = static_cast<real>(0.5)*am;
+    m = static_cast<real>(0.5) * am;
   }
 
   template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
@@ -885,31 +884,31 @@ QUDA_UNROLL
 
   template<class T>
   __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0,0).real() * b(0,0).real()  + a(0,0).imag() * b(0,0).imag());
-    sum += (double)(a(0,1).real() * b(0,1).real()  + a(0,1).imag() * b(0,1).imag());
-    sum += (double)(a(0,2).real() * b(0,2).real()  + a(0,2).imag() * b(0,2).imag());
-    sum += (double)(a(1,0).real() * b(1,0).real()  + a(1,0).imag() * b(1,0).imag());
-    sum += (double)(a(1,1).real() * b(1,1).real()  + a(1,1).imag() * b(1,1).imag());
-    sum += (double)(a(1,2).real() * b(1,2).real()  + a(1,2).imag() * b(1,2).imag());
-    sum += (double)(a(2,0).real() * b(2,0).real()  + a(2,0).imag() * b(2,0).imag());
-    sum += (double)(a(2,1).real() * b(2,1).real()  + a(2,1).imag() * b(2,1).imag());
-    sum += (double)(a(2,2).real() * b(2,2).real()  + a(2,2).imag() * b(2,2).imag());
+    double sum = (double)(a(0, 0).real() * b(0, 0).real() + a(0, 0).imag() * b(0, 0).imag());
+    sum += (double)(a(0, 1).real() * b(0, 1).real() + a(0, 1).imag() * b(0, 1).imag());
+    sum += (double)(a(0, 2).real() * b(0, 2).real() + a(0, 2).imag() * b(0, 2).imag());
+    sum += (double)(a(1, 0).real() * b(1, 0).real() + a(1, 0).imag() * b(1, 0).imag());
+    sum += (double)(a(1, 1).real() * b(1, 1).real() + a(1, 1).imag() * b(1, 1).imag());
+    sum += (double)(a(1, 2).real() * b(1, 2).real() + a(1, 2).imag() * b(1, 2).imag());
+    sum += (double)(a(2, 0).real() * b(2, 0).real() + a(2, 0).imag() * b(2, 0).imag());
+    sum += (double)(a(2, 1).real() * b(2, 1).real() + a(2, 1).imag() * b(2, 1).imag());
+    sum += (double)(a(2, 2).real() * b(2, 2).real() + a(2, 2).imag() * b(2, 2).imag());
     return sum;
   }
 
   template<class Cmplx>
     __host__ __device__ inline
     void printLink(const Matrix<Cmplx,3>& link){
-      printf("(%lf, %lf)\t", link(0,0).real(), link(0,0).imag());
-      printf("(%lf, %lf)\t", link(0,1).real(), link(0,1).imag());
-      printf("(%lf, %lf)\n", link(0,2).real(), link(0,2).imag());
-      printf("(%lf, %lf)\t", link(1,0).real(), link(1,0).imag());
-      printf("(%lf, %lf)\t", link(1,1).real(), link(1,1).imag());
-      printf("(%lf, %lf)\n", link(1,2).real(), link(1,2).imag());
-      printf("(%lf, %lf)\t", link(2,0).real(), link(2,0).imag());
-      printf("(%lf, %lf)\t", link(2,1).real(), link(2,1).imag());
-      printf("(%lf, %lf)\n", link(2,2).real(), link(2,2).imag());
-      printf("\n");
+    printf("(%lf, %lf)\t", link(0, 0).real(), link(0, 0).imag());
+    printf("(%lf, %lf)\t", link(0, 1).real(), link(0, 1).imag());
+    printf("(%lf, %lf)\n", link(0, 2).real(), link(0, 2).imag());
+    printf("(%lf, %lf)\t", link(1, 0).real(), link(1, 0).imag());
+    printf("(%lf, %lf)\t", link(1, 1).real(), link(1, 1).imag());
+    printf("(%lf, %lf)\n", link(1, 2).real(), link(1, 2).imag());
+    printf("(%lf, %lf)\t", link(2, 0).real(), link(2, 0).imag());
+    printf("(%lf, %lf)\t", link(2, 1).real(), link(2, 1).imag());
+    printf("(%lf, %lf)\n", link(2, 2).real(), link(2, 2).imag());
+    printf("\n");
     }
 
   template<class Cmplx>
@@ -1008,25 +1007,27 @@ QUDA_UNROLL
 
       //Get all the numerators for fj,
       //[30] f0
-      real hj_re = (u_sq - w_sq)*exp_2iu_re + 8*u_sq*cos_w*exp_iu_re + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_im;
-      real hj_im = (u_sq - w_sq)*exp_2iu_im - 8*u_sq*cos_w*exp_iu_im + 2*u_p*(3*u_sq + w_sq)*sinc_w*exp_iu_re;
-      T f0{hj_re * denom_inv, hj_im * denom_inv};
+      real hj_re
+        = (u_sq - w_sq) * exp_2iu_re + 8 * u_sq * cos_w * exp_iu_re + 2 * u_p * (3 * u_sq + w_sq) * sinc_w * exp_iu_im;
+      real hj_im
+        = (u_sq - w_sq) * exp_2iu_im - 8 * u_sq * cos_w * exp_iu_im + 2 * u_p * (3 * u_sq + w_sq) * sinc_w * exp_iu_re;
+      T f0 {hj_re * denom_inv, hj_im * denom_inv};
 
       //[31] f1
       hj_re = 2*u_p*exp_2iu_re - 2*u_p*cos_w*exp_iu_re + (3*u_sq - w_sq)*sinc_w*exp_iu_im;
       hj_im = 2*u_p*exp_2iu_im + 2*u_p*cos_w*exp_iu_im + (3*u_sq - w_sq)*sinc_w*exp_iu_re;
-      T f1{hj_re * denom_inv, hj_im * denom_inv};
+      T f1 {hj_re * denom_inv, hj_im * denom_inv};
 
       //[32] f2
       hj_re = exp_2iu_re - cos_w*exp_iu_re - 3*u_p*sinc_w*exp_iu_im;
       hj_im = exp_2iu_im + cos_w*exp_iu_im - 3*u_p*sinc_w*exp_iu_re;
-      T f2{hj_re * denom_inv, hj_im * denom_inv};
+      T f2 {hj_re * denom_inv, hj_im * denom_inv};
 
       //[34] If c0 < 0, apply tranformation  fj(-c0,c1) = (-1)^j f^*j(c0,c1)
       if (parity == 1) {
-	f0.imag(-f0.imag());
-	f1.real(-f1.real());
-	f2.imag(-f2.imag());
+        f0.imag(-f0.imag());
+        f1.real(-f1.real());
+        f2.imag(-f2.imag());
       }
 
       //[19] Construct exp{iQ}

@@ -10,7 +10,7 @@ namespace quda {
   DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
 
   // hack (for DW and TM operators)
-  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { } 
+  DiracWilson::DiracWilson(const DiracParam &param, const int) : Dirac(param) { }
 
   DiracWilson::~DiracWilson() { }
 
@@ -81,8 +81,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double, double mu, double mu_factor) const
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
+                                   double mu_factor) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");

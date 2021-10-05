@@ -516,10 +516,10 @@ namespace quda
     return quda_event;
   }
 
-  double qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
                               const char *func, const char *file, const char *line)
   {
-    return reinterpret_cast<QudaEvent *>(stop.event)->time - reinterpret_cast<QudaEvent *>(start.event)->time;
+    return const_cast<float>(reinterpret_cast<QudaEvent *>(stop.event)->time - reinterpret_cast<QudaEvent *>(start.event)->time);
   }
 
   void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)

@@ -99,8 +99,8 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 
 inline void comm_destroy_topology(Topology *topo)
 {
-  delete [] topo->ranks;
-  delete [] topo->coords;
+  delete[] topo->ranks;
+  delete[] topo->coords;
   delete topo;
 }
 
@@ -515,7 +515,6 @@ struct Communicator {
     Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data, comm_rank());
     comm_set_default_topology(topo);
 
-    
     // determine which GPU this rank will use
     char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
     comm_gather_hostname(hostname_recv_buf);
@@ -603,10 +602,19 @@ struct Communicator {
   const char *comm_dim_partitioned_string(const int *comm_dim_override)
   {
     if (comm_dim_override) {
-      char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
-                      (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
-                      (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
-                      (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
+      char comm[5] = {(!comm_dim_partitioned(0) ? '0' :
+                         comm_dim_override[0]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(1) ? '0' :
+                         comm_dim_override[1]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(2) ? '0' :
+                         comm_dim_override[2]   ? '1' :
+                                                  '0'),
+                      (!comm_dim_partitioned(3) ? '0' :
+                         comm_dim_override[3]   ? '1' :
+                                                  '0'),
+                      '\0'};
       strcpy(partition_override_string, ",comm=");
       strcat(partition_override_string, comm);
       return partition_override_string;
@@ -638,11 +646,20 @@ struct Communicator {
 
   void commGlobalReductionPop() { globalReduce.pop(); }
 
-  void reduceMaxDouble(double &max) { if (commGlobalReduction()) comm_allreduce_max(&max); }
+  void reduceMaxDouble(double &max)
+  {
+    if (commGlobalReduction()) comm_allreduce_max(&max);
+  }
 
-  void reduceDouble(double &sum) { if (commGlobalReduction()) comm_allreduce(&sum); }
+  void reduceDouble(double &sum)
+  {
+    if (commGlobalReduction()) comm_allreduce(&sum);
+  }
 
-  void reduceDoubleArray(double *sum, const int len) { if (commGlobalReduction()) comm_allreduce_array(sum, len); }
+  void reduceDoubleArray(double *sum, const int len)
+  {
+    if (commGlobalReduction()) comm_allreduce_array(sum, len);
+  }
 
   bool commAsyncReduction() { return asyncReduce; }
 
@@ -665,7 +682,7 @@ struct Communicator {
   int rank = -1;
   int size = -1;
 
-  Communicator() {}
+  Communicator() { }
 
   Communicator(Communicator &other, const int *comm_split);
 
