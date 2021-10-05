@@ -542,8 +542,9 @@ namespace quda {
         // force a reliable update if we are within target tolerance (only if doing reliable updates)
         if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) updateX = 1;
 
-        // For heavy-quark inversion force a reliable update if we continue after
-        if ( use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol ) {
+        if (use_heavy_quark_res and L2breakdown
+            and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check)
+            and param.delta >= param.tol) {
           updateX = 1;
         }
       }
