@@ -27,7 +27,8 @@ namespace quda {
     return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
-  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y) {
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y)
+  {
     return make_float2(x.x + y.x, x.y + y.y);
   }
 
@@ -100,18 +101,18 @@ namespace quda {
 #endif
 
   template <typename T> __device__ __host__ inline T zero() { return static_cast<T>(0); }
-  template<> __device__ __host__ inline double2 zero() { return make_double2(0.0, 0.0); }
-  template<> __device__ __host__ inline double3 zero() { return make_double3(0.0, 0.0, 0.0); }
-  template<> __device__ __host__ inline double4 zero() { return make_double4(0.0, 0.0, 0.0, 0.0); }
+  template <> __device__ __host__ inline double2 zero() { return make_double2(0.0, 0.0); }
+  template <> __device__ __host__ inline double3 zero() { return make_double3(0.0, 0.0, 0.0); }
+  template <> __device__ __host__ inline double4 zero() { return make_double4(0.0, 0.0, 0.0, 0.0); }
 
-  template<> __device__ __host__ inline float2 zero() { return make_float2(0.0, 0.0); }
-  template<> __device__ __host__ inline float3 zero() { return make_float3(0.0, 0.0, 0.0); }
-  template<> __device__ __host__ inline float4 zero() { return make_float4(0.0, 0.0, 0.0, 0.0); }
+  template <> __device__ __host__ inline float2 zero() { return make_float2(0.0, 0.0); }
+  template <> __device__ __host__ inline float3 zero() { return make_float3(0.0, 0.0, 0.0); }
+  template <> __device__ __host__ inline float4 zero() { return make_float4(0.0, 0.0, 0.0, 0.0); }
 
 #ifdef QUAD_SUM
-  template<> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
-  template<> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
-  template<> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
+  template <> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
+  template <> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
+  template <> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
 #endif
 
   /**
@@ -137,14 +138,15 @@ namespace quda {
     vector_type(const vector_type<scalar, n> &) = default;
     vector_type(vector_type<scalar, n> &&) = default;
 
-    template <typename... T>
-    constexpr vector_type(scalar first, const T... data) : data{first, data...} {}
+    template <typename... T> constexpr vector_type(scalar first, const T... data) : data {first, data...} { }
 
-    template <typename... T>
-    constexpr vector_type(const scalar &a) { for (auto &e : data) e = a; }
+    template <typename... T> constexpr vector_type(const scalar &a)
+    {
+      for (auto &e : data) e = a;
+    }
 
-    vector_type<scalar, n>& operator=(const vector_type<scalar, n> &) = default;
-    vector_type<scalar, n>& operator=(vector_type<scalar, n> &&) = default;
+    vector_type<scalar, n> &operator=(const vector_type<scalar, n> &) = default;
+    vector_type<scalar, n> &operator=(vector_type<scalar, n> &&) = default;
   };
 
   template <typename T, int n> std::ostream &operator<<(std::ostream &output, const vector_type<T, n> &a)

@@ -173,11 +173,10 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
 
 #ifndef MULTI_GPU
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision, QudaGaugeParam &)
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &)
 #else
-void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision, QudaGaugeParam &gauge_param)
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+                QudaGaugeParam &gauge_param)
 #endif
 {
 #ifndef MULTI_GPU
@@ -209,7 +208,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.pc_type = QUDA_4D_PC;
-  
+
   cpuColorSpinorField inField(csParam);
 
   {  // Now do the exchange
@@ -233,7 +232,6 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   }
 
 #endif
-
 }
 
 // applies b*(1 + i*a*gamma_5)

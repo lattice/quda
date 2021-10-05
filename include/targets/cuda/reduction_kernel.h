@@ -3,7 +3,8 @@
 #include <target_device.h>
 #include <reduce_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This class is derived from the arg class that the functor
@@ -21,7 +22,6 @@ namespace quda {
     static constexpr int block_size_y = block_size_y_;
     ReduceKernelArg(const Arg &arg) : Arg(arg) { }
   };
-
 
   /**
      @brief Reduction2D_impl is the implementation of the generic 2-d
@@ -50,7 +50,10 @@ namespace quda {
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+      if (grid_stride)
+        idx += blockDim.x * gridDim.x;
+      else
+        break;
     }
 
     // perform final inter-block reduction and write out result
@@ -88,11 +91,10 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
-
 
   /**
      @brief MultiReduction_impl is the implementation of the generic
@@ -125,7 +127,10 @@ namespace quda {
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j, k);
-      if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+      if (grid_stride)
+        idx += blockDim.x * gridDim.x;
+      else
+        break;
     }
 
     // perform final inter-block reduction and write out result
@@ -163,9 +168,9 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
 
-}
+} // namespace quda
