@@ -356,9 +356,9 @@ QUDA_UNROLL
         arg.result_d[idx] = sum;
         arg.count[idx] = 0; // set to zero for next time
       }
+    }
 #endif
-    }
-    }
+  }
 #endif
 
 } // namespace quda
