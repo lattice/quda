@@ -98,17 +98,19 @@ void closeMagma(){
 
 }
 
-// QUDA pointers to fields on the host. These pointers refer to the 'Precise'
-// field which is the field with no smearing applied, go gauge fixing, no evolution,
-// and at the precision requested at run time by the user. Associated with this
-// field are several copies that may have lower precision than gaugePrecise.
+// QUDA pointers to fields. These pointers refer to the 'Precise'
+// field which is the field with no smearing applied, no gauge fixing, no evolution,
+// all at the precision requested at run time by the user. Associated with these
+// fields are several copies that may have lower precision than the user requested.
 // * Sloppy: We use this field for higher speed, lower precision BLAS operations
-//   in solvers.
-// * Precondition: If a solver has a preconditioner step, we use this field.
-// * Refinement: The multishift solver has a refinement step, it uses this field.
+//   in solvers (prec_sloppy).
+// * Precondition: If a solver has a preconditioner step, we use this field at
+//   its specified precision (prec_precondition)
+// * Refinement: The multishift solver has a refinement step, it uses this field
+//   at (prec_refinement)
 // * Eigensolver: The stand alone eigensolver uses gaugePrecise. However, if an
 //   inverter calls the eigensolver for deflation, it will use gaugeEigensolver
-//   to compute the deflation space. 
+//   to compute the deflation space at (prec_eigensolver) 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
 cudaGaugeField *gaugePrecondition = nullptr;
