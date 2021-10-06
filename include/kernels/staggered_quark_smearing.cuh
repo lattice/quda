@@ -82,13 +82,13 @@ namespace quda
           const bool ghost = (coord[d] + 2 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
 	  
           if (doHalo<kernel_type>(d) && ghost) {//?
-#if 1	    
+
             const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, parity);//?
 
             out += U * in;
-#endif            
+
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
             const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
             const Vector in_2hop       = arg.in(_2hop_fwd_idx, parity);
@@ -101,14 +101,14 @@ namespace quda
           const bool ghost = (coord[d] - 2 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);//1=>2
 
           if (doHalo<kernel_type>(d) && ghost) {
-#if 1
+
             // when updating replace arg.nFace with 1 here
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);//check nFace=2, but in fact we work with a single layer
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, parity);
 	    
             out += conj(U) * in;	    
-#endif            
+
           } else if (doBulk<kernel_type>() && !ghost) {//?
           
             const int _2hop_back_idx = linkIndexM2(coord, arg.dim, d);

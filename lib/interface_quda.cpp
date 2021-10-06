@@ -5483,20 +5483,27 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-  
+    
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if ( gaugeSmeared == nullptr || compute_2link != 0 ) {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
     
+    R[4] = {2,2,2,2};
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGauge); 
+    
     //compute 2link 
-    GaugeFieldParam gParam(*gaugePrecise);
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
+    //GaugeFieldParam gParam(*gaugePrecise);
+    //gParam.create = QUDA_NULL_FIELD_CREATE;
+    //cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
 
-    computeTwoLink(*two_link_ptr, *gaugePrecise);
-    gaugeSmeared = two_link_ptr;
+    //computeTwoLink(*two_link_ptr, *gaugePrecise);
+    //copyExtendedGauge(*gaugeSmeared, *two_link_ptr, QUDA_CUDA_FIELD_LOCATION);
+    //two_link_ptr->exchangeGhost();
+    //delete two_link_ptr;
+    //gaugeSmeared = two_link_ptr;
+    computeTwoLink(*gaugeSmeared, *gaugePrecise);    
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -5508,6 +5515,10 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
   const int *X = gaugeSmeared->X();
+  
+  inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
+  diracParam.type        = QUDA_ASQTAD_DIRAC;  
+  
   ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
   cpuParam.nSpin = 1;
   // QUDA style pointer for host data.
