@@ -489,9 +489,9 @@ QUDA_UNROLL
       }
 
       ColorSpinor<real, Arg::fineColor, Arg::fineSpin / 2> V;
-#pragma unroll
+QUDA_UNROLL
       for (int s = 0; s < Arg::fineSpin / 2; s++) {
-#pragma unroll
+QUDA_UNROLL
         for (int c = 0; c < Arg::fineColor; c++) { V(s, c) = arg.V(parity, x_cb, 2 * ch + s, c, ic_c); }
       }
 
