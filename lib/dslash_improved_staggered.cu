@@ -159,16 +159,14 @@ namespace quda
       dslash::DslashPolicyTune<decltype(staggered)> policy(
         staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
+#ifdef GPU_STAGGERED_DIRAC
   void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                               const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile)
   {
-
-#ifdef GPU_STAGGERED_DIRAC
     for (int i = 0; i < 4; i++) {
       if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
         errorQuda(
@@ -179,9 +177,13 @@ namespace quda
     // L must be first gauge field argument since we template on long reconstruct
     instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override,
                                                               profile);
-#else
-    errorQuda("Staggered dslash has not been built");
-#endif
   }
+#else
+  void ApplyImprovedStaggered(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                              const GaugeField &, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Staggered dslash has not been built");
+  }
+#endif
 
 } // namespace quda

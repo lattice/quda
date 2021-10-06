@@ -46,42 +46,36 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void GaugeCovDev::Dslash(ColorSpinorField &out, const ColorSpinorField &in,  const QudaParity parity) const
+  void GaugeCovDev::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::DslashXpay(ColorSpinorField &out, 
-			       const ColorSpinorField &in, 
-			       const QudaParity parity, 
-			       const ColorSpinorField &x,
-			       const double &k) const
+  void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity, const ColorSpinorField &,
+                               const double &) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void GaugeCovDev::M(ColorSpinorField &, const ColorSpinorField &) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    //do nothing
-  }
-  
-  void GaugeCovDev::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b, 
-			    const QudaSolutionType solType) const
+  void GaugeCovDev::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::reconstruct(ColorSpinorField &x, 
-				const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void GaugeCovDev::prepare(ColorSpinorField *&, ColorSpinorField *&, ColorSpinorField &, ColorSpinorField &,
+                            const QudaSolutionType) const
   {
     //do nothing
   }
-  
+
+  void GaugeCovDev::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  {
+    //do nothing
+  }
+
 } // namespace quda

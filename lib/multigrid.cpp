@@ -1,6 +1,8 @@
 #include <cstring>
 
 #include <multigrid.h>
+#include <tune_quda.h>
+#include <random_quda.h>
 #include <vector_io.h>
 
 // for building the KD inverse op
@@ -78,7 +80,6 @@ namespace quda
     }
 
     rng = new RNG(*param.B[0], 1234);
-    rng->Init();
 
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
       if (param.level < param.Nlevel - 1) {
@@ -116,7 +117,7 @@ namespace quda
     // in case of iterative setup with MG the coarse level may be already built
     if (!transfer) reset();
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::reset(bool refresh) {
@@ -154,9 +155,9 @@ namespace quda
       } else {
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level],
-                                profile);
+        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level],
+                                param.mg_global.transfer_type[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -245,7 +246,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::pushLevel(int level) const
@@ -255,7 +256,7 @@ namespace quda
     pushOutputPrefix(prefix);
   }
 
-  void MG::popLevel(int level) const
+  void MG::popLevel() const
   {
     popVerbosity();
     popOutputPrefix();
@@ -286,7 +287,7 @@ namespace quda
       param_postsmooth = nullptr;
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createSmoother() {
@@ -347,7 +348,7 @@ namespace quda
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createCoarseDirac() {
@@ -495,7 +496,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse Dirac operator done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::destroyCoarseSolver() {
@@ -524,7 +525,7 @@ namespace quda
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::createCoarseSolver() {
@@ -666,7 +667,7 @@ namespace quda
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   MG::~MG()
@@ -698,7 +699,6 @@ namespace quda
     }
 
     if (rng) {
-      rng->Release();
       delete rng;
     }
 
@@ -718,7 +718,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
 
-    popLevel(param.level);
+    popLevel();
   }
 
   // FIXME need to make this more robust (implement Solver::flops() for all solvers)
@@ -769,7 +769,14 @@ namespace quda
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
-    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
+    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+    double tol;
+    switch (prec) {
+    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+    case QUDA_HALF_PRECISION: tol = 5e-2; break;
+    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
+    default: tol = 1e-8;
+    }
 
     // No need to check (projector) v_k for staggered case
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {
@@ -1080,7 +1087,7 @@ namespace quda
 
     if (recursively && param.level < param.Nlevel - 2) coarse->verify(true);
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
@@ -1235,7 +1242,7 @@ namespace quda
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_infile);
       io.load(B);
-      popLevel(param.level);
+      popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
@@ -1257,7 +1264,7 @@ namespace quda
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
       VectorIO io(vec_outfile);
       io.save(B);
-      popLevel(param.level);
+      popLevel();
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
@@ -1461,7 +1468,7 @@ namespace quda
       saveVectors(B);
     }
 
-    popLevel(param.level);
+    popLevel();
   }
 
   // generate a full span of free vectors.
@@ -1638,7 +1645,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Done building free vectors\n");
 
-    popLevel(param.level);
+    popLevel();
   }
 
   void MG::generateEigenVectors()
@@ -1705,7 +1712,7 @@ namespace quda
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
 
-    popLevel(param.level);
+    popLevel();
   }
 
 } // namespace quda

@@ -1,8 +1,9 @@
 #pragma once
 
+#include <vector>
+#include <array>
 #include <quda.h>
 #include <random_quda.h>
-#include <vector>
 #include <color_spinor_field.h>
 
 #define gauge_site_size 18      // real numbers per link
@@ -47,8 +48,6 @@ void setQudaStaggeredInvTestParams();
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
-                                           void *milc_longlink, QudaGaugeParam &gauge_param);
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv, bool &gauge_loaded);
@@ -113,9 +112,10 @@ inline bool isPCSolution(QudaSolutionType solution_type)
 {
   return (solution_type == QUDA_MATPC_SOLUTION || solution_type == QUDA_MATPC_DAG_SOLUTION
           || solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-};
+}
 //------------------------------------------------------
 
+// Reports basic statistics of flops and solver iterations
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
@@ -213,11 +213,6 @@ void cpu_xpy(QudaPrecision prec, void *x, void *y, int size);
 #ifdef __cplusplus
 }
 #endif
-
-// Use for profiling
-void stopwatchStart();
-double stopwatchReadSeconds();
-void performanceStats(double *time, double *gflops);
 
 inline QudaPrecision getPrecision(int i)
 {

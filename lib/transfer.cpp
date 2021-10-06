@@ -5,12 +5,13 @@
 
 #include <transfer.h>
 #include <multigrid.h>
+#include <tune_quda.h>
 #include <malloc_quda.h>
 
 #include <iostream>
 #include <algorithm>
 #include <vector>
-
+#include <limits>
 
 namespace quda {
 
@@ -18,11 +19,13 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
-                     QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile) :
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type,
+                     TimeProfile &profile) :
     B(B),
     Nvec(Nvec),
     NblockOrtho(n_block_ortho),
+    blockOrthoTwoPass(block_ortho_two_pass),
     null_precision(null_precision),
     V_h(nullptr),
     V_d(nullptr),
@@ -89,6 +92,15 @@ namespace quda {
       // The number of coarse dof is technically fineColor for optimized KD
       if (Nvec != B[0]->Ncolor())
         errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
+
+    } else {
+      int aggregate_size = total_block_size * B[0]->Ncolor();
+      if (spin_bs == 0)
+        aggregate_size /= 2; // effective spin_bs of 0.5 (fine spin / coarse spin)
+      else
+        aggregate_size *= spin_bs;
+      if (Nvec > aggregate_size)
+        errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
     }
 
     std::string block_str = std::to_string(geo_bs[0]);
@@ -210,8 +222,8 @@ namespace quda {
       createTmp(location);
       fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
       break;
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
@@ -232,14 +244,14 @@ namespace quda {
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
-      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho);
+      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_cpu) {
         *V_h = *V_d;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
       }
     } else {
       if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
-      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho);
+      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_gpu) { // if the GPU fields has been initialized then we need to update
         *V_d = *V_h;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
@@ -324,8 +336,8 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
     }
 
   }

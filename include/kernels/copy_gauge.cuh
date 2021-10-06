@@ -1,5 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <kernel.h>
 
 namespace quda {
 
@@ -8,8 +9,12 @@ namespace quda {
   /**
      Kernel argument struct
    */
-  template <typename OutOrder, typename InOrder>
-  struct CopyGaugeArg {
+  template <typename store_out_t, typename store_in_t, int length_, typename OutOrder, typename InOrder>
+  struct CopyGaugeArg : kernel_param<> {
+    using real_out_t  = typename mapper<store_out_t>::type;
+    using real_in_t  = typename mapper<store_in_t>::type;
+    static constexpr int length = length_;
+    static constexpr int nColor = Ncolor(length);
     OutOrder out;
     const InOrder in;
     int volume;
@@ -18,69 +23,43 @@ namespace quda {
     int_fastdiv geometry;
     int out_offset;
     int in_offset;
-    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta)
-      : out(out), in(in), volume(meta.Volume()), nDim(meta.Ndim()),
-        geometry(meta.Geometry()), out_offset(0), in_offset(0) {
+    CopyGaugeArg(const OutOrder &out, const InOrder &in, const GaugeField &meta) :
+      kernel_param(dim3(1, 1, meta.Geometry() * 2)), // FIXME - need to set .x and .y components
+      out(out),
+      in(in),
+      volume(meta.Volume()),
+      nDim(meta.Ndim()),
+      geometry(meta.Geometry()),
+      out_offset(0),
+      in_offset(0)
+    {
       for (int d=0; d<nDim; d++) faceVolumeCB[d] = meta.SurfaceCB(d) * meta.Nface();
     }
   };
 
   /**
-     Generic CPU gauge reordering and packing
-  */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  void copyGauge(Arg &arg) {
-    typedef typename mapper<FloatIn>::type RegTypeIn;
-    typedef typename mapper<FloatOut>::type RegTypeOut;
-    constexpr int nColor = Ncolor(length);
-
-    for (int parity=0; parity<2; parity++) {
-
-      for (int d=0; d<arg.geometry; d++) {
-	for (int x=0; x<arg.volume/2; x++) {
-#ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<nColor; i++)
-	    for (int j=0; j<nColor; j++) {
-	      arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
-	    }
-#else
-	  Matrix<complex<RegTypeIn>, nColor> in;
-	  Matrix<complex<RegTypeOut>, nColor> out;
-          in = arg.in(d, x, parity);
-          out = in;
-	  arg.out(d, x, parity) = out;
-#endif
-	}
-      }
-
-    }
-  }
-
-  /**
      Check whether the field contains Nans
   */
-  template <typename Float, int length, typename Arg>
-  void checkNan(Arg &arg) {
-    typedef typename mapper<Float>::type RegType;
-    constexpr int nColor = Ncolor(length);
-
+  template <typename Arg>
+  void checkNan(const Arg &arg)
+  {
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<nColor; i++)
-	    for (int j=0; j<nColor; j++) {
-              complex<Float> u = arg.in(d, parity, x, i, j);
-	      if (isnan(u.real()))
-	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j));
-	      if (isnan(u.imag()))
-		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j+1));
+	  for (int i=0; i<Arg::nColor; i++)
+	    for (int j=0; j<Arg::nColor; j++) {
+              complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
+	      if (std::isnan(u.real()))
+	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
+	      if (std::isnan(u.imag()))
+		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
             }
 #else
-	  Matrix<complex<RegType>, nColor> u = arg.in(d, x, parity);
-	  for (int i=0; i<length/2; i++)
-	    if (isnan(u(i).real()) || isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);
+	  for (int i=0; i<Arg::length/2; i++)
+	    if (std::isnan(u(i).real()) || std::isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
 #endif
 	}
       }
@@ -89,97 +68,83 @@ namespace quda {
   }
 
   /**
-      Generic CUDA gauge reordering and packing.  Adopts a similar form as
-      the CPU version, using the same inlined functions.
+     @brief Generic gauge reordering and packing
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  __global__ void copyGaugeKernel(Arg arg) {
-    typedef typename mapper<FloatIn>::type RegTypeIn;
-    typedef typename mapper<FloatOut>::type RegTypeOut;
-    constexpr int nColor = Ncolor(length);
+  template <typename Arg>
+  struct CopyGauge_ {
+    const Arg &arg;
+    constexpr CopyGauge_(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*geometry + d
-    int parity = parity_d / arg.geometry;
-    int d = parity_d % arg.geometry;
-
-    if (x >= arg.volume/2) return;
-    if (parity_d >= 2 * arg.geometry) return;
-
-#ifdef FINE_GRAINED_ACCESS
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i >= nColor) return;
-    for (int j=0; j<nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
-#else
-    Matrix<complex<RegTypeIn>, nColor> in;
-    Matrix<complex<RegTypeOut>, nColor> out;
-    in = arg.in(d, x, parity);
-    out = in;
-    arg.out(d, x, parity) = out;
-#endif
-  }
+    __device__ __host__ inline void operator()(int x, int, int parity_d)
+    {
+      int parity = parity_d / arg.geometry;
+      int d = parity_d % arg.geometry;
+      Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in(d, x, parity);
+      Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+      arg.out(d, x, parity) = out;
+    }
+  };
 
   /**
-     Generic CPU gauge ghost reordering and packing
+     @brief Generic gauge reordering and packing using fine-grain accessors
   */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  void copyGhost(Arg &arg) {
-    typedef typename mapper<FloatIn>::type RegTypeIn;
-    typedef typename mapper<FloatOut>::type RegTypeOut;
-    constexpr int nColor = Ncolor(length);
+  template <typename Arg>
+  struct CopyGaugeFineGrained_ {
+    const Arg &arg;
+    constexpr CopyGaugeFineGrained_(const Arg &arg) :arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    for (int parity=0; parity<2; parity++) {
+    __device__ __host__ inline void operator()(int x, int i, int parity_d)
+    {
+      int parity = parity_d / arg.geometry;
+      int d = parity_d % arg.geometry;
+      for (int j=0; j<Arg::nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+    }
+  };
 
-      for (int d=0; d<arg.nDim; d++) {
-        for (int x=0; x<arg.faceVolumeCB[d]; x++) {
-#ifdef FINE_GRAINED_ACCESS
-          for (int i=0; i<nColor; i++)
-            for (int j=0; j<nColor; j++)
-              arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
-#else
-          Matrix<complex<RegTypeIn>, nColor> in;
-          Matrix<complex<RegTypeOut>, nColor> out;
-          in = arg.in.Ghost(d+arg.in_offset, x, parity);
-          out = in;
-          arg.out.Ghost(d+arg.out_offset, x, parity) = out;
-#endif
+  /**
+     @brief Generic gauge reordering and packing
+  */
+  template <typename Arg>
+  struct CopyGhost_ {
+    const Arg &arg;
+    constexpr CopyGhost_(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x, int, int parity_d)
+    {
+      int parity = parity_d / arg.nDim;
+      int d = parity_d % arg.nDim;
+
+      if (x < arg.faceVolumeCB[d]) {
+        Matrix<complex<typename Arg::real_in_t>, Arg::nColor> in = arg.in.Ghost(d + arg.in_offset, x, parity);
+        Matrix<complex<typename Arg::real_out_t>, Arg::nColor> out = in;
+        arg.out.Ghost(d + arg.out_offset, x, parity) = out;
+      }
+    }
+  };
+
+  /**
+     @brief Generic gauge reordering and packing using fine-grain accessors
+  */
+  template <typename Arg>
+  struct CopyGhostFineGrained_ {
+    const Arg &arg;
+    constexpr CopyGhostFineGrained_(const Arg &arg) :arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
+
+    __device__ __host__ inline void operator()(int x, int i, int parity_d)
+    {
+      int parity = parity_d / arg.nDim;
+      int d = parity_d % arg.nDim;
+
+      if (x < arg.faceVolumeCB[d]) {
+        for (int j=0; j<Arg::nColor; j++) {
+          arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
         }
       }
-
     }
-  }
-
-  /**
-     Generic CUDA kernel for copying the ghost zone.  Adopts a similar form as
-     the CPU version, using the same inlined functions.
-  */
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  __global__ void copyGhostKernel(Arg arg) {
-    typedef typename mapper<FloatIn>::type RegTypeIn;
-    typedef typename mapper<FloatOut>::type RegTypeOut;
-    constexpr int nColor = Ncolor(length);
-
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*nDim + d
-    int parity = parity_d / arg.nDim;
-    int d = parity_d % arg.nDim;
-    if (parity_d >= 2 * arg.nDim) return;
-
-    if (x < arg.faceVolumeCB[d]) {
-#ifdef FINE_GRAINED_ACCESS
-      int i = blockIdx.y * blockDim.y + threadIdx.y;
-      if (i >= nColor) return;
-      for (int j=0; j<nColor; j++)
-        arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
-#else
-      Matrix<complex<RegTypeIn>, nColor> in;
-      Matrix<complex<RegTypeOut>, nColor> out;
-      in = arg.in.Ghost(d+arg.in_offset, x, parity);
-      out = in;
-      arg.out.Ghost(d+arg.out_offset, x, parity) = out;
-#endif
-    }
-
-  }
+  };
 
 } // namespace quda

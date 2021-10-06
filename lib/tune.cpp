@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <comm_quda.h>
 #include <quda.h>     // for QUDA_VERSION_STRING
+#include <timer.h>
 #include <sys/stat.h> // for stat()
 #include <fcntl.h>
 #include <cfloat> // for FLT_MAX
@@ -11,6 +12,7 @@
 #include <list>
 #include <unistd.h>
 #include <uint_to_char.h>
+#include <target_device.h>
 
 #include <deque>
 #include <queue>
@@ -24,13 +26,9 @@ extern char *gitversion;
 namespace quda
 {
   static TuneKey last_key;
-}
 
-// intentionally leave this outside of the namespace for now
-quda::TuneKey getLastTuneKey() { return quda::last_key; }
+  TuneKey getLastTuneKey() { return quda::last_key; }
 
-namespace quda
-{
   typedef std::map<TuneKey, TuneParam> map;
 
   struct TraceKey {
@@ -55,28 +53,10 @@ namespace quda
     {
     }
 
-    TraceKey(const TraceKey &trace) :
-      key(trace.key),
-      time(trace.time),
-      device_bytes(trace.device_bytes),
-      pinned_bytes(trace.pinned_bytes),
-      mapped_bytes(trace.mapped_bytes),
-      host_bytes(trace.host_bytes)
-    {
-    }
-
-    TraceKey &operator=(const TraceKey &trace)
-    {
-      if (&trace != this) {
-        key = trace.key;
-        time = trace.time;
-        device_bytes = trace.device_bytes;
-        pinned_bytes = trace.pinned_bytes;
-        mapped_bytes = trace.mapped_bytes;
-        host_bytes = trace.host_bytes;
-      }
-      return *this;
-    }
+    TraceKey(const TraceKey &) = default;
+    TraceKey(TraceKey &&) = default;
+    TraceKey &operator=(const TraceKey &) = default;
+    TraceKey &operator=(TraceKey &&) = default;
   };
 
   // linked list that is augmented each time we call a kernel
@@ -668,6 +648,21 @@ namespace quda
 #endif
   }
 
+  TuneParam::TuneParam() :
+    block(device::warp_size(), 1, 1),
+    grid(1, 1, 1),
+    shared_bytes(0),
+    set_max_shared_bytes(false),
+    aux(),
+    time(FLT_MAX),
+    n_calls(0)
+  {
+    aux = make_int4(1, 1, 1, 1);
+  }
+
+  int Tunable::blockStep() const { return device::warp_size(); }
+  int Tunable::blockMin() const { return device::warp_size(); }
+
   static TimeProfile launchTimer("tuneLaunch");
 
   /**
@@ -740,6 +735,7 @@ namespace quda
 
     if (enabled == QUDA_TUNE_NO) {
       TuneParam param_default;
+      param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
@@ -755,9 +751,7 @@ namespace quda
          can't guarantee that all nodes are partaking */
       if (comm_rank_global() == 0 || !commGlobalReduction() || policyTuning() || uberTuning()) {
         TuneParam best_param;
-        cudaError_t error = cudaSuccess;
-        cudaEvent_t start, end;
-        float elapsed_time, best_time;
+        float best_time;
         time_t now;
 
         tuning = true;
@@ -767,70 +761,62 @@ namespace quda
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
         tunable.preTune();
 
-        cudaEventCreate(&start);
-        cudaEventCreate(&end);
-
         if (verbosity >= QUDA_DEBUG_VERBOSE) {
           printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
         }
 
-        Timer tune_timer;
-        tune_timer.Start(__func__, __FILE__, __LINE__);
+        const auto &stream = device::get_default_stream();
+        device_timer_t timer(stream);
 
+        host_timer_t tune_timer;
+        tune_timer.start(__func__, __FILE__, __LINE__);
+
+        param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
+
         while (tuning) {
-          cudaDeviceSynchronize();
-          cudaGetLastError(); // clear error counter
+          qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
                        param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
                        param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
           }
-          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 
-          cudaEventRecord(start, 0);
+          tunable.apply(stream); // do initial call in case we need to jit compile for these parameters or if policy tuning
+
+          timer.start();
           for (int i = 0; i < tunable.tuningIter(); i++) {
-            tunable.apply(0); // calls tuneLaunch() again, which simply returns the currently active param
+            tunable.apply(stream); // calls tuneLaunch() again, which simply returns the currently active param
           }
-          cudaEventRecord(end, 0);
-          cudaEventSynchronize(end);
-          cudaEventElapsedTime(&elapsed_time, start, end);
-          cudaDeviceSynchronize();
-          error = cudaGetLastError();
+          timer.stop();
+          qudaDeviceSynchronize();
+          auto error = qudaGetLastError();
 
-          { // check that error state is cleared
-            cudaDeviceSynchronize();
-            cudaError_t error = cudaGetLastError();
-            if (error != cudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
+          if (error != QUDA_SUCCESS) { // check we don't have a sticky error
+            qudaDeviceSynchronize();
+            if (qudaGetLastError() != QUDA_SUCCESS)
+              errorQuda("Failed to clear error state %s\n", qudaGetLastErrorString().c_str());
           }
 
-          elapsed_time /= (1e3 * tunable.tuningIter());
-          if ((elapsed_time < best_time) && (error == cudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS)) {
+          float elapsed_time = timer.last() / tunable.tuningIter();
+          if ((elapsed_time < best_time) && (error == QUDA_SUCCESS) && (tunable.launchError() == QUDA_SUCCESS)) {
             best_time = elapsed_time;
             best_param = param;
           }
           if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-            if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
+            if (error == QUDA_SUCCESS && tunable.launchError() == QUDA_SUCCESS) {
               printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
                          tunable.perfString(elapsed_time).c_str());
             } else {
-              if (tunable.jitifyError() == CUDA_SUCCESS) {
-                // if not jitify error must be regular error
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
-              } else {
-                // else is a jitify error
-                const char *str;
-                cuGetErrorString(tunable.jitifyError(), &str);
-                printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
-              }
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), qudaGetLastErrorString().c_str());
             }
           }
           tuning = tunable.advanceTuneParam(param);
-          tunable.jitifyError() = CUDA_SUCCESS;
+          tunable.launchError() = QUDA_SUCCESS;
         }
 
-        tune_timer.Stop(__func__, __FILE__, __LINE__);
+        tune_timer.stop(__func__, __FILE__, __LINE__);
 
         if (best_time == FLT_MAX) {
           errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
@@ -841,12 +827,9 @@ namespace quda
         }
         time(&now);
         best_param.comment = "# " + tunable.perfString(best_time);
-        best_param.comment += ", tuning took " + std::to_string(tune_timer.Last()) + " seconds at ";
+        best_param.comment += ", tuning took " + std::to_string(tune_timer.last()) + " seconds at ";
         best_param.comment += ctime(&now); // includes a newline
         best_param.time = best_time;
-
-        cudaEventDestroy(start);
-        cudaEventDestroy(end);
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
         tuning = true;
@@ -859,6 +842,11 @@ namespace quda
 
       // check this process is getting the key that is expected
       if (tunecache.find(key) == tunecache.end()) {
+
+        // if we can't find the key, and debugging, then print out the entire map
+        if (verbosity >= QUDA_DEBUG_VERBOSE)
+          for (auto elem : tunecache) std::cout << elem.first << ": " << elem.second << std::endl;
+
         errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
       }
       param = tunecache[key]; // read this now for all processes

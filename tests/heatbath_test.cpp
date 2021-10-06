@@ -80,13 +80,14 @@ int main(int argc, char **argv)
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
 
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
@@ -100,8 +101,7 @@ int main(int argc, char **argv)
 
   {
     using namespace quda;
-    GaugeFieldParam gParam(0, gauge_param);
-    gParam.pad = 0;
+    GaugeFieldParam gParam(gauge_param);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
@@ -125,7 +125,6 @@ int main(int argc, char **argv)
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
 
     int nsteps = heatbath_num_steps;
     int nwarm = heatbath_warmup_steps;
@@ -139,32 +138,24 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile, "")) { // Copy in loaded gauge field
-
-      printfQuda("Loading the gauge field in %s\n", latfile);
-
-      loadGaugeQuda(load_gauge, &gauge_param);
-      // Get pointer to internal resident gauge field
-      cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
-      copyExtendedResidentGaugeQuda((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      InitGaugeField(*gaugeEx);
-      copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      delete extendedGaugeResident;
-
-    } else if (link_recon != QUDA_RECONSTRUCT_8 && coldstart) {
-      InitGaugeField( *gaugeEx);
+    if (strcmp(latfile, "")) { // We loaded in a gauge field
+      // copy internal extended field to gaugeEx
+      copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
-      InitGaugeField( *gaugeEx, *randstates );
+      if (coldstart)
+        InitGaugeField(*gaugeEx);
+      else
+        InitGaugeField(*gaugeEx, *randstates);
+
+      // copy into regular field
+      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+
+      // load the gauge field from gauge
+      gauge_param.gauge_order = gauge->Order();
+      gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
+
+      loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     }
-
-    // copy into regular field
-    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
-    // load the gauge field from gauge
-    gauge_param.gauge_order = gauge->Order();
-    gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-
-    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
 
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
     param.compute_plaquette = QUDA_BOOLEAN_TRUE;
@@ -225,7 +216,7 @@ int main(int argc, char **argv)
       setWilsonGaugeParam(gauge_param);
 
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -234,7 +225,7 @@ int main(int argc, char **argv)
 
       write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
 
-      for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+      for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     } else {
       printfQuda("No output file specified.\n");
     }
@@ -244,7 +235,6 @@ int main(int argc, char **argv)
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 
@@ -260,13 +250,13 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
 
+  for (int dir = 0; dir < 4; dir++) host_free(load_gauge[dir]);
+
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
-
-  for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
 
   return 0;
 }

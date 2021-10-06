@@ -8,6 +8,7 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
+#include <device.h>
 
 static bool zeroCopy = false;
 
@@ -30,7 +31,7 @@ namespace quda {
     case QUDA_NULL_FIELD_CREATE:
     case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing;
     case QUDA_ZERO_FIELD_CREATE: zero(); break;
-    case QUDA_COPY_FIELD_CREATE: errorQuda("Copy field create not implemented for this constructor");
+    case QUDA_COPY_FIELD_CREATE: errorQuda("Copy field create not implemented for this constructor"); break;
     default: errorQuda("Unexpected create type %d", param.create);
     }
   }
@@ -160,10 +161,10 @@ namespace quda {
 	v_h = mapped_malloc(bytes);
         v = get_mapped_device_pointer(v_h);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-	  norm_h = mapped_malloc(norm_bytes);
+          norm_h = mapped_malloc(norm_bytes);
           norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
         }
-	break;
+        break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
       }
@@ -297,10 +298,10 @@ namespace quda {
   void cudaColorSpinorField::backup() const {
     if (backed_up) errorQuda("ColorSpinorField already backed up");
     backup_h = new char[bytes];
-    qudaMemcpy(backup_h, v, bytes, cudaMemcpyDefault);
+    qudaMemcpy(backup_h, v, bytes, qudaMemcpyDefault);
     if (norm_bytes) {
       backup_norm_h = new char[norm_bytes];
-      qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDefault);
     }
     backed_up = true;
   }
@@ -308,10 +309,10 @@ namespace quda {
   void cudaColorSpinorField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    qudaMemcpy(v, backup_h, bytes, cudaMemcpyDefault);
+    qudaMemcpy(v, backup_h, bytes, qudaMemcpyDefault);
     delete []backup_h;
     if (norm_bytes) {
-      qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyDefault);
       delete []backup_norm_h;
     }
     backed_up = false;
@@ -330,9 +331,9 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    qudaMemsetAsync(v, 0, bytes, 0);
+    qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
     if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-      qudaMemsetAsync(norm, 0, norm_bytes, 0);
+      qudaMemsetAsync(norm, 0, norm_bytes, device::get_default_stream());
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -350,7 +351,7 @@ namespace quda {
       char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          qudaMemset2DAsync(dst + subset * bytes / siteSubset, pitch, 0, pad_bytes, Npad, 0);
+          qudaMemset2DAsync(dst + subset * bytes / siteSubset, pitch, 0, pad_bytes, Npad, device::get_default_stream());
         }
     }
 
@@ -358,7 +359,8 @@ namespace quda {
       size_t pad_bytes = (stride - volumeCB) * sizeof(float);
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          qudaMemsetAsync((char *)norm + volumeCB * sizeof(float), 0, (stride - volumeCB) * sizeof(float), 0);
+          qudaMemsetAsync((char *)norm + volumeCB * sizeof(float), 0, (stride - volumeCB) * sizeof(float),
+                          device::get_default_stream());
         }
     }
 
@@ -368,7 +370,7 @@ namespace quda {
       size_t subset_length = length/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
         qudaMemsetAsync((char *)v + subset_length * precision + subset_bytes * subset, 0,
-                        subset_bytes - subset_length * precision, 0);
+                        subset_bytes - subset_length * precision, device::get_default_stream());
       }
     }
 
@@ -377,7 +379,7 @@ namespace quda {
       size_t subset_bytes = norm_bytes/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
         qudaMemsetAsync((char *)norm + (size_t)stride * sizeof(float) + subset_bytes * subset, 0,
-                        subset_bytes - (size_t)stride * sizeof(float), 0);
+                        subset_bytes - (size_t)stride * sizeof(float), device::get_default_stream());
       }
     }
   }
@@ -407,8 +409,8 @@ namespace quda {
 
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
 
-      qudaMemcpy(v, buffer, bytes, cudaMemcpyDefault);
-      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(v, buffer, bytes, qudaMemcpyDefault);
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyDefault);
 
       pool_pinned_free(buffer);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
@@ -425,8 +427,8 @@ namespace quda {
           buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
           Src = buffer;
           srcNorm = static_cast<char*>(Src) + src.Bytes();
-          qudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyDefault);
-          qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyDefault);
+          qudaMemcpy(Src, src.V(), src.Bytes(), qudaMemcpyDefault);
+          qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), qudaMemcpyDefault);
         } else {
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
@@ -435,7 +437,7 @@ namespace quda {
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
-        qudaMemsetAsync(v, 0, bytes, 0); // FIXME (temporary?) bug fix for padding
+        qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
         if (zeroCopy) pool_pinned_free(buffer);
@@ -451,8 +453,8 @@ namespace quda {
 
     if ( reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
-      qudaMemcpy(buffer, v, bytes, cudaMemcpyDefault);
-      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDefault);
+      qudaMemcpy(buffer, v, bytes, qudaMemcpyDefault);
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDefault);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
       pool_pinned_free(buffer);
@@ -479,8 +481,8 @@ namespace quda {
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, 0, dstNorm, 0);
 
         if (!zeroCopy) {
-          qudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDefault);
-          qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDefault);
+          qudaMemcpy(dest.V(), dst, dest.Bytes(), qudaMemcpyDefault);
+          qudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), qudaMemcpyDefault);
         } else {
           qudaDeviceSynchronize();
           memcpy(dest.V(), buffer, dest.Bytes());
@@ -502,12 +504,11 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir,
-                                       const int dagger, qudaStream_t *stream,
-                                       MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                                       bool spin_project, double a, double b, double c, int shmem)
+  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger,
+                                       const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                       MemoryLocation location_label, bool spin_project, double a, double b, double c,
+                                       int shmem)
   {
-#ifdef MULTI_GPU
     void *packBuffer[4 * QUDA_MAX_DIM] = {};
 
     for (int dim=0; dim<4; dim++) {
@@ -540,111 +541,31 @@ namespace quda {
         }
       }
     }
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, *stream);
-#else
-    errorQuda("packGhost not built on single-GPU build");
-#endif
+
+    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
   }
  
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-                                       const int dagger, qudaStream_t *stream)
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
+                                       const qudaStream_t &stream)
   {
-#ifdef MULTI_GPU
-    if (precision != ghost_precision) { pushKernelPackT(true); }
-    
-    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
-
-      void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
-      qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], cudaMemcpyDeviceToHost, *stream);
-
-    } else {
-
-      const int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-      const int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
-      const int Npad = Nint / Nvec;                                 // number Nvec buffers we have
-      const int nParity = siteSubset;
-      const int x4 = nDim==5 ? x[4] : 1;
-      const int Nt_minus1_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4; // N_t-1 = Vh-Vsh
-
-      int offset = 0;
-      if (nSpin == 1) {
-	offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
-      } else if (nSpin == 4) {
-	// !dagger: send lower components backwards, send upper components forwards
-	// dagger: send upper components backwards, send lower components forwards
-	bool upper = dagger ? true : false; // Fwd is !Back  
-	if (dir == QUDA_FORWARDS) upper = !upper;
-	int lower_spin_offset = Npad*stride;
-	if (upper) offset = (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
-	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
-      }
-
-      size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
-      size_t dpitch = x4*len;
-      size_t spitch = stride*Nvec*ghost_precision;
-
-      // QUDA Memcpy NPad's worth. 
-      //  -- Dest will point to the right beginning PAD. 
-      //  -- Each Pad has size Nvec*Vsh Floats. 
-      //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
-
-      for (int parity = 0; parity < nParity; parity++) {
-        for (int s = 0; s < x4; s++) { // loop over multiple 4-d volumes (if they exist)
-          void *dst = (char *)ghost_spinor + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
-          void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
-          qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
-
-          // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
-          if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-            size_t len = nFace * (ghostFaceCB[3] / x4) * sizeof(float);
-            int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset * sizeof(float);
-            void *dst = (char *)ghost_spinor + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
-                + parity * nFace * ghostFaceCB[3] * sizeof(float);
-            void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
-            qudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
-          }
-        } // fifth dimension
-      }   // parity
-    }
-
-    if (precision != ghost_precision) { popKernelPackT(); }
-
-#else
-    errorQuda("sendGhost not built on single-GPU build");
-#endif
+    void *gpu_buf
+      = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
+    qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
   }
 
-  void cudaColorSpinorField::unpackGhost(const void *ghost_spinor, const int nFace, const int dim,
-                                         const QudaDirection dir, const int dagger, qudaStream_t *stream)
+  void cudaColorSpinorField::unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir,
+                                         const qudaStream_t &stream)
   {
     const void *src = ghost_spinor;
     auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
     void *ghost_dst = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
 
-    qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], cudaMemcpyHostToDevice, *stream);
+    qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
   }
 
-  // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
-                                               const QudaDirection dir, const int dagger, qudaStream_t *stream,
-                                               bool zero_copy)
+  void cudaColorSpinorField::createComms(int nFace, bool spin_project)
   {
-    errorQuda("not implemented");
-  }
-
-  // copy data from host buffer into boundary region of device field
-  void cudaColorSpinorField::unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity,
-                                                 const int dim, const QudaDirection dir, const int dagger,
-                                                 qudaStream_t *stream, bool zero_copy)
-  {
-    errorQuda("not implemented");
-  }
-
-  qudaStream_t *stream;
-
-  void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
-
     allocateGhostBuffer(nFace,spin_project); // allocate the ghost buffer if not yet allocated
 
     // ascertain if this instance needs its comms buffers to be updated
@@ -678,53 +599,34 @@ namespace quda {
     createIPCComms();
   }
 
-  void cudaColorSpinorField::streamInit(qudaStream_t *stream_p) { stream = stream_p; }
-
-  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
+  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, const qudaStream_t &stream,
                                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                                   bool spin_project, double a, double b, double c, int shmem)
   {
     createComms(nFace, spin_project); // must call this first
 
-    const int dim=-1; // pack all partitioned dimensions
-
-    packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], location, location_label,
-              spin_project, a, b, c, shmem);
+    packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
   }
 
-  void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, const int dagger,
-                                          const int dim, qudaStream_t *stream_p, const bool zero_copy)
-  {
-    createComms(nFace); // must call this first
-
-    stream = stream_p;
- 
-    packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[zero_copy ? 0 : (Nstream-1)], zero_copy);
-  }
-
-  void cudaColorSpinorField::gather(int nFace, int dagger, int dir, qudaStream_t *stream_p)
+  void cudaColorSpinorField::gather(int dir, const qudaStream_t &stream)
   {
     int dim = dir/2;
-
-    // If stream_p != 0, use pack_stream, else use the stream array
-    qudaStream_t *pack_stream = (stream_p) ? stream_p : stream + dir;
 
     if (dir%2 == 0) {
       // backwards copy to host
       if (comm_peer2peer_enabled(0,dim)) return;
 
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][0], nFace, dim, QUDA_BACKWARDS, dagger, pack_stream);
+      sendGhost(my_face_dim_dir_h[bufferIndex][dim][0], dim, QUDA_BACKWARDS, stream);
     } else {
       // forwards copy to host
       if (comm_peer2peer_enabled(1,dim)) return;
 
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][1], nFace, dim, QUDA_FORWARDS, dagger, pack_stream);
+      sendGhost(my_face_dim_dir_h[bufferIndex][dim][1], dim, QUDA_FORWARDS, stream);
     }
   }
 
-  void cudaColorSpinorField::recvStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr)
+  void cudaColorSpinorField::recvStart(int d, const qudaStream_t &, bool gdr)
   {
-
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -754,7 +656,7 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr, bool remote_write)
+  void cudaColorSpinorField::sendStart(int d, const qudaStream_t &stream, bool gdr, bool remote_write)
   {
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -764,10 +666,6 @@ namespace quda {
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    int Nvec = (nSpin == 1 || ghost_precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
-    int Npad = Nint/Nvec;
-
     if (!comm_peer2peer_enabled(dir,dim)) {
       if (dir == 0)
 	if (gdr) comm_start(mh_send_rdma_back[bufferIndex][dim]);
@@ -776,7 +674,6 @@ namespace quda {
 	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
 	else comm_start(mh_send_fwd[bufferIndex][dim]);
     } else { // doing peer-to-peer
-      qudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
 
       // if not using copy engine then the packing kernel will remotely write the halos
       if (!remote_write) {
@@ -784,84 +681,26 @@ namespace quda {
         void *ghost_dst
           = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
 
-        if (ghost_precision != precision) pushKernelPackT(true);
-
-        if (dim != 3 || getKernelPackT()) {
-
-          void *ghost_dst
-            = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
-          cudaMemcpyAsync(ghost_dst,
-                          my_face_dim_dir_d[bufferIndex][dim][dir],
-                          ghost_face_bytes[dim],
-                          cudaMemcpyDeviceToDevice,
-                          *copy_stream); // copy to forward processor
-
-        } else {
-
-          const int nParity = siteSubset;
-          const int x4 = nDim==5 ? x[4] : 1;
-          const int Nt_minus_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4;
-
-          int offset = 0;
-          if (nSpin == 1) {
-            offset = (dir == 0) ? 0 : Nt_minus_offset;
-          } else if (nSpin == 4) {
-            // !dagger: send lower components backwards, send upper components forwards
-            // dagger: send upper components backwards, send lower components forwards
-            bool upper = dagger ? true : false;
-            if (dir == 1) upper = !upper;
-            int lower_spin_offset = Npad*stride;
-            if (upper)
-              offset = (dir == 0 ? 0 : Nt_minus_offset);
-            else
-              offset = lower_spin_offset + (dir == 0 ? 0 : Nt_minus_offset);
-          }
-
-          size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
-          size_t dpitch = x4*len;
-          size_t spitch = stride*Nvec*ghost_precision;
-
-          for (int parity = 0; parity < nParity; parity++) {
-            for (int s = 0; s < x4; s++) {
-              void *dst = (char *)ghost_dst + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
-              void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
-              // start the copy
-              cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
-
-              // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
-              if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-                size_t len = nFace * (ghostFaceCB[3] / x4) * sizeof(float);
-                int norm_offset = (dir == 0) ? 0 : Nt_minus_offset * sizeof(float);
-                void *dst = (char *)ghost_dst + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
-                  + parity * nFace * ghostFaceCB[3] * sizeof(float);
-                void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
-                cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
-              }
-            }
-          } // fifth dimension
-        }   // parity
+        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
-
-      if (ghost_precision != precision) popKernelPackT();
 
       if (dir == 0) {
 	// record the event
-	qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
-	// send to the processor in the -1 direction
+        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
+        // send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
-	qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
-	// send to the processor in the +1 direction
+        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
+        // send to the processor in the +1 direction
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
     }
   }
 
-  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, qudaStream_t *stream_p, bool gdr_send,
-                                        bool gdr_recv)
+  void cudaColorSpinorField::commsStart(int dir, const qudaStream_t &stream, bool gdr_send, bool gdr_recv)
   {
-    recvStart(nFace, dir, dagger, stream_p, gdr_recv);
-    sendStart(nFace, dir, dagger, stream_p, gdr_send);
+    recvStart(dir, stream, gdr_recv);
+    sendStart(dir, stream, gdr_send);
   }
 
   static bool complete_recv_fwd[QUDA_MAX_DIM] = { };
@@ -869,9 +708,8 @@ namespace quda {
   static bool complete_send_fwd[QUDA_MAX_DIM] = { };
   static bool complete_send_back[QUDA_MAX_DIM] = { };
 
-  int cudaColorSpinorField::commsQuery(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr_send, bool gdr_recv)
+  int cudaColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
   {
-
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -938,9 +776,8 @@ namespace quda {
     return 0;
   }
 
-  void cudaColorSpinorField::commsWait(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr_send, bool gdr_recv)
+  void cudaColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
   {
-
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -955,7 +792,7 @@ namespace quda {
       // first wait on send to backwards
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+        qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
       } else if (gdr_send) {
 	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
       } else {
@@ -965,7 +802,7 @@ namespace quda {
       // second wait on receive from forwards
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
       } else if (gdr_recv) {
 	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
@@ -977,7 +814,7 @@ namespace quda {
       // first wait on send to forwards
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+        qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (gdr_send) {
 	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
@@ -987,7 +824,7 @@ namespace quda {
       // second wait on receive from backwards
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
       } else if (gdr_recv) {
 	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
@@ -995,11 +832,9 @@ namespace quda {
       }
 
     }
-
-    return;
   }
 
-  void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir, qudaStream_t *stream_p)
+  void cudaColorSpinorField::scatter(int dim_dir, const qudaStream_t &stream)
   {
     // note this is scatter centric, so input expects dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards), so here we need flip to receive centric
@@ -1007,31 +842,9 @@ namespace quda {
     int dim = dim_dir/2;
     int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 recive from backwards
     if (!commDimPartitioned(dim)) return;
-
     if (comm_peer2peer_enabled(dir,dim)) return;
-    unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, stream_p);
-  }
 
-  void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir)
-  {
-    // note this is scatter centric, so dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards), so here we need flip to receive centric
-
-    int dim = dim_dir/2;
-    int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 receive from backwards
-    if (!commDimPartitioned(dim)) return;
-
-    if (comm_peer2peer_enabled(dir,dim)) return;
-    unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[dim_dir]);
-  }
-
-  void cudaColorSpinorField::scatterExtended(int nFace, int parity, int dagger, int dim_dir)
-  {
-    bool zero_copy = false;
-    int dim = dim_dir/2;
-    int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 receive from backwards
-    if (!commDimPartitioned(dim)) return;
-    unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
+    unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, stream);
   }
 
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
@@ -1052,8 +865,6 @@ namespace quda {
     }
 
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-    pushKernelPackT(true); // ensure kernel packing is enabled for all dimensions
-    const_cast<cudaColorSpinorField&>(*this).streamInit(streams); // ensures streams are set (needed for p2p)
     const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
 
     // first set default values to device if needed
@@ -1111,24 +922,26 @@ namespace quda {
 	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
               qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                              2 * ghost_face_bytes_aligned[i], cudaMemcpyDeviceToHost, 0);
+                              2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
             } else {
               if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                                ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
+                                ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
               if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
                 qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
-                                ghost_face_bytes[i], cudaMemcpyDeviceToHost, 0);
+                                ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
             }
           }
         }
       } else if (total_bytes && !pack_host) {
-        qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, cudaMemcpyDeviceToHost, 0);
+        qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, qudaMemcpyDeviceToHost,
+                        device::get_default_stream());
       }
     }
 
     // prepost receive
-    for (int i=0; i<2*nDimComms; i++) const_cast<cudaColorSpinorField*>(this)->recvStart(nFace, i, dagger, 0, gdr_recv);
+    for (int i = 0; i < 2 * nDimComms; i++)
+      const_cast<cudaColorSpinorField *>(this)->recvStart(i, device::get_default_stream(), gdr_recv);
 
     bool sync = pack_host ? true : false; // no p2p if pack_host so we need to synchronize
     // if not p2p in any direction then need to synchronize before MPI
@@ -1139,8 +952,9 @@ namespace quda {
       for (int dim=0; dim<nDimComms; dim++) {
 	for (int dir=0; dir<2; dir++) {
 	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 0 ) { // issue non-p2p transfers first
-	    const_cast<cudaColorSpinorField*>(this)->sendStart(nFace, 2*dim+dir, dagger, 0, gdr_send);
-	  }
+            const_cast<cudaColorSpinorField *>(this)->sendStart(2 * dim + dir, device::get_stream(2 * dim + dir),
+                                                                gdr_send);
+          }
 	}
       }
     }
@@ -1151,11 +965,13 @@ namespace quda {
       for (int dim=0; dim<nDimComms; dim++) {
 	for (int dir=0; dir<2; dir++) {
 	  if (!comms_complete[dim*2+dir]) {
-	    comms_complete[2*dim+dir] = const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send, gdr_recv);
-	    if (comms_complete[2*dim+dir]) {
+            comms_complete[2 * dim + dir] = const_cast<cudaColorSpinorField *>(this)->commsQuery(
+              2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
+            if (comms_complete[2*dim+dir]) {
 	      comms_done++;
-	      if (comm_peer2peer_enabled(1-dir,dim)) qudaStreamWaitEvent(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
-	    }
+              if (comm_peer2peer_enabled(1 - dir, dim))
+                qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
+            }
 	  }
 	}
       }
@@ -1168,20 +984,20 @@ namespace quda {
 	    if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
 		halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
               qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                              2 * ghost_face_bytes_aligned[i], cudaMemcpyHostToDevice, 0);
+                              2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
             } else {
               if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
+                                ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
               if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
                 qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
-                                ghost_face_bytes[i], cudaMemcpyHostToDevice, 0);
+                                ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
             }
           }
         }
       } else if (total_bytes && !halo_host) {
-        qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, cudaMemcpyHostToDevice,
-                        0);
+        qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, qudaMemcpyHostToDevice,
+                        device::get_default_stream());
       }
     }
 
@@ -1189,11 +1005,10 @@ namespace quda {
     for (int dim = 0; dim < nDimComms; dim++) {
       if (!comm_dim_partitioned(dim)) continue;
       for (int dir = 0; dir < 2; dir++) {
-        if (comm_peer2peer_enabled(dir, dim)) qudaStreamWaitEvent(0, ipcCopyEvent[bufferIndex][dir][dim], 0);
+        if (comm_peer2peer_enabled(dir, dim))
+          qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dir][dim], 0);
       }
     }
-
-    popKernelPackT(); // restore kernel packing
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
@@ -1220,8 +1035,9 @@ namespace quda {
     exit(-1);
   }
 
-//copyCuda currently cannot not work with set of spinor fields..
-  void cudaColorSpinorField::CopySubset(cudaColorSpinorField &dst, const int range, const int first_element) const{
+  // copyCuda currently cannot not work with set of spinor fields..
+  void cudaColorSpinorField::CopySubset(cudaColorSpinorField &, const int, const int) const
+  {
 #if 0
     if (first_element < 0) errorQuda("\nError: trying to set negative first element.\n");
     if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
@@ -1298,19 +1114,28 @@ namespace quda {
 
   void cudaColorSpinorField::PrintVector(unsigned int i) const { genericCudaPrintVector(*this, i); }
 
+  const void *cudaColorSpinorField::Ghost2() const
+  {
+    if (bufferIndex < 2) {
+      return ghost_recv_buffer_d[bufferIndex];
+    } else {
+      return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
+    }
+  }
+
   void cudaColorSpinorField::copy_to_buffer(void *buffer) const
   {
-    qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
+    qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
     if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
   }
 
   void cudaColorSpinorField::copy_from_buffer(void *buffer)
   {
-    qudaMemcpy(v, buffer, bytes, cudaMemcpyHostToDevice);
+    qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
     if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
     }
   }
 

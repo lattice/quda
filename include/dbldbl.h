@@ -43,8 +43,9 @@
  *     observed maximum relative error.
  */
 
-#if !defined(DBLDBL_H_)
-#define DBLDBL_H_
+#pragma once
+
+#include <math_helper.cuh>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -226,7 +227,7 @@ __device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
 {
     dbldbl t, z;
     double e, y, s, r;
-    r = rsqrt (a.y);
+    r = quda::rsqrt(a.y);
     if (a.y == 0.0) r = 0.0;
     y = __dmul_rn (a.y, r);
     s = __fma_rn (y, -y, a.y);
@@ -253,7 +254,7 @@ __device__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
 {
     dbldbl z;
     double r, s, e;
-    r = rsqrt (a.y);
+    r = quda::rsqrt(a.y);
     e = __dmul_rn (a.y, r);
     s = __fma_rn (e, -r, 1.0);
     e = __fma_rn (a.y, r, -e);
@@ -378,5 +379,3 @@ __device__ doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &
 
 __device__ doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
 { return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
-
-#endif /* DBLDBL_H_ */

@@ -1,311 +1,109 @@
-/*
-  Spinor reordering and copying routines.  These are implemented to
-  un on both CPU and GPU.  Here we are templating on the following:
-  - input precision
-  - output precision
-  - number of colors
-  - number of spins
-  - field ordering
-*/
-
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-#include <tune_quda.h>
-#include <utility> // for std::swap
-
-#define PRESERVE_SPINOR_NORM
-
-#ifdef PRESERVE_SPINOR_NORM // Preserve the norm regardless of basis
-#define kP (1.0/sqrt(2.0))
-#define kU (1.0/sqrt(2.0))
-#else // More numerically accurate not to preserve the norm between basis
-#define kP (0.5)
-#define kU (1.0)
-#endif
+#include <tunable_nd.h>
+#include <kernels/copy_color_spinor.cuh>
+#include <tuple>
 
 namespace quda {
 
-  using namespace colorspinor;
-
-  template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In>
-  struct CopyColorSpinorArg {
-    using realOut = typename mapper<FloatOut>::type;
-    using realIn = typename mapper<FloatIn>::type;
-    static constexpr int nSpin = nSpin_;
-    static constexpr int nColor = nColor_;
-    Out out;
-    const In in;
-    const int volumeCB;
-    const int nParity;
-    const int outParity;
-    const int inParity;
-    CopyColorSpinorArg(const Out &out, const In &in, const ColorSpinorField &out_, const ColorSpinorField &in_)
-      : out(out), in(in), volumeCB(in_.VolumeCB()), nParity(in_.SiteSubset()),
-	outParity(out_.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
-	inParity(in_.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0) { }
-  };
-
-  /** Straight copy with no basis change */
-  template <typename Arg>
-  struct PreserveBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
-    template <typename FloatOut, typename FloatIn>
-    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
-      for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = in[s*Nc+c];
-    }
-  };
-
-  /** Transform from relativistic into non-relavisitic basis */
-  template <typename Arg>
-  struct NonRelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
-    template <typename FloatOut, typename FloatIn>
-    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
-      int s1[4] = {1, 2, 3, 0};
-      int s2[4] = {3, 0, 1, 2};
-      FloatOut K1[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP)};
-      FloatOut K2[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
-      for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
-	}
-      }
-    }
-  };
-
-  /** Transform from non-relativistic into relavisitic basis */
-  template <typename Arg>
-  struct RelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
-    template <typename FloatOut, typename FloatIn>
-    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
-      int s1[4] = {1, 2, 3, 0};
-      int s2[4] = {3, 0, 1, 2};
-      FloatOut K1[4] = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU),  static_cast<FloatOut>(kU)};
-      FloatOut K2[4] = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(-kU), static_cast<FloatOut>(-kU)};
-      for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
-	}
-      }
-    }
-  };
-
-  /** Transform from chiral into non-relavisitic basis */
-  template <typename Arg>
-  struct ChiralToNonRelBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
-    template <typename FloatOut, typename FloatIn>
-    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
-      int s1[4] = {0, 1, 0, 1};
-      int s2[4] = {2, 3, 2, 3};
-      FloatOut K1[4] = {static_cast<FloatOut>(-kP), static_cast<FloatOut>(-kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
-      FloatOut K2[4] = {static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP), static_cast<FloatOut>(kP)};
-      for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
-	}
-      }
-    }
-  };
-
-  /** Transform from non-relativistic into chiral basis */
-  template <typename Arg>
-  struct NonRelToChiralBasis {
-    static constexpr int Ns = Arg::nSpin;
-    static constexpr int Nc = Arg::nColor;
-    template <typename FloatOut, typename FloatIn>
-    __device__ __host__ inline void operator()(complex<FloatOut> out[Ns*Nc], const complex<FloatIn> in[Ns*Nc]) const {
-      int s1[4] = {0, 1, 0, 1};
-      int s2[4] = {2, 3, 2, 3};
-      FloatOut K1[4] = {static_cast<FloatOut>(-kU), static_cast<FloatOut>(-kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU)};
-      FloatOut K2[4] = {static_cast<FloatOut>(kU),static_cast<FloatOut>(kU), static_cast<FloatOut>(kU), static_cast<FloatOut>(kU)};
-      for (int s=0; s<Ns; s++) {
-	for (int c=0; c<Nc; c++) {
-	  out[s*Nc+c] = K1[s]*static_cast<complex<FloatOut> >(in[s1[s]*Nc+c]) + K2[s]*static_cast<complex<FloatOut> >(in[s2[s]*Nc+c]);
-	}
-      }
-    }
-  };
-
-  /** CPU function to reorder spinor fields.  */
-  template <typename Arg, template <typename> class Basis> void copyColorSpinor(Arg &arg)
-  {
-    for (int parity = 0; parity<arg.nParity; parity++) {
-      for (int x=0; x<arg.volumeCB; x++) {
-        ColorSpinor<typename Arg::realIn, Arg::nColor, Arg::nSpin> in = arg.in(x, (parity+arg.inParity)&1);
-        ColorSpinor<typename Arg::realOut, Arg::nColor, Arg::nSpin> out;
-        Basis<Arg> basis;
-	basis(out.data, in.data);
-	arg.out(x, (parity+arg.outParity)&1) = out;
-      }
-    }
-  }
-
-  /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
-  template <typename Arg, template <typename> class Basis> __global__ void copyColorSpinorKernel(Arg arg)
-  {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x >= arg.volumeCB) return;
-    int parity = blockIdx.y * blockDim.y + threadIdx.y;
-
-    ColorSpinor<typename Arg::realIn, Arg::nColor, Arg::nSpin> in = arg.in(x, (parity+arg.inParity)&1);
-    ColorSpinor<typename Arg::realOut, Arg::nColor, Arg::nSpin> out;
-    Basis<Arg> basis;
-    basis(out.data, in.data);
-    arg.out(x, (parity+arg.outParity)&1) = out;
-  }
-
-  template <int Ns, typename Arg>
-    class CopyColorSpinor : TunableVectorY {
-    Arg &arg;
-    const ColorSpinorField &meta;
-    const QudaFieldLocation location;
-
-  private:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return meta.VolumeCB(); }
-
-  public:
-    CopyColorSpinor(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in,
-		    QudaFieldLocation location)
-      : TunableVectorY(arg.nParity), arg(arg), meta(in), location(location) {
-      if (out.GammaBasis()!=in.GammaBasis()) errorQuda("Cannot change gamma basis for nSpin=%d\n", Ns);
-      writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
-    }
-
-    void apply(const qudaStream_t &stream) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-	copyColorSpinor<Arg, PreserveBasis>(arg);
-      } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
-      }
-    }
-
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-    long long flops() const { return 0; }
-    long long bytes() const { return arg.in.Bytes() + arg.out.Bytes(); }
-  };
-
-  template <typename Arg>
-  class CopyColorSpinor<4,Arg> : TunableVectorY {
-    static constexpr int Ns = 4;
-    Arg &arg;
-    const ColorSpinorField &out;
+  template <int Ns, int Nc, typename Out, typename In, typename param_t>
+  class CopyColorSpinor : TunableKernel2D {
+    using FloatOut = typename std::remove_pointer<typename std::tuple_element<3, param_t>::type>::type;
+    using FloatIn = typename std::remove_pointer<typename std::tuple_element<4, param_t>::type>::type;
+    template <template <int, int> class Basis> using Arg = CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In, Basis>;
+    FloatOut *Out_;
+    FloatIn *In_;
+    float *outNorm;
+    float *inNorm;
+    ColorSpinorField &out;
     const ColorSpinorField &in;
-    const QudaFieldLocation location;
 
-  private:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool advanceSharedBytes(TuneParam &) const { return false; } // Don't tune shared mem
     unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
-    CopyColorSpinor(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in,
-		    QudaFieldLocation location)
-      : TunableVectorY(arg.nParity), arg(arg), out(out), in(in), location(location) {
+    CopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, const param_t &param) :
+      TunableKernel2D(in, in.SiteSubset(), std::get<2>(param)),
+      Out_(std::get<3>(param)),
+      In_(std::get<4>(param)),
+      outNorm(std::get<5>(param)),
+      inNorm(std::get<6>(param)),
+      out(out),
+      in(in)
+    {
+      strcat(aux, out.AuxString());
+      if (out.GammaBasis()==in.GammaBasis()) strcat(aux, ",PreserveBasis");
+      else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) strcat(aux, ",NonRelBasis");
+      else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",RelBasis");
+      else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) strcat(aux, ",ChiralToNonRelBasis");
+      else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) strcat(aux, ",NonRelToChiralBasis");
+      else errorQuda("Basis change from %d to %d not supported", in.GammaBasis(), out.GammaBasis());
 
+      apply(device::get_default_stream());
+    }
+
+    template <int nSpin> std::enable_if_t<nSpin != 4, void> Launch(TuneParam &tp, const qudaStream_t &stream)
+    {
+      constexpr bool enable_host = true;
       if (out.GammaBasis()==in.GammaBasis()) {
-	writeAuxString("out_stride=%d,in_stride=%d,PreserveBasis", arg.out.stride, arg.in.stride);
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, Out_, In_, outNorm, inNorm));
+      } else {
+        errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
+      }
+    }
+
+    template <int nSpin> std::enable_if_t<nSpin == 4, void> Launch(TuneParam &tp, const qudaStream_t &stream)
+    {
+      constexpr bool enable_host = true;
+      if (out.GammaBasis()==in.GammaBasis()) {
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<PreserveBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	writeAuxString("out_stride=%d,in_stride=%d,NonRelBasis", arg.out.stride, arg.in.stride);
-      } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	writeAuxString("out_stride=%d,in_stride=%d,RelBasis", arg.out.stride, arg.in.stride);
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelBasis>(out, in, Out_, In_, outNorm, inNorm));
+      } else if (out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<RelBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	writeAuxString("out_stride=%d,in_stride=%d,ChiralToNonRelBasis", arg.out.stride, arg.in.stride);
-      } else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	writeAuxString("out_stride=%d,in_stride=%d,NonRelToChiralBasis", arg.out.stride, arg.in.stride);
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<ChiralToNonRelBasis>(out, in, Out_, In_, outNorm, inNorm));
+      } else if (out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS && in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS) {
+        launch<CopyColorSpinor_, enable_host>(tp, stream, Arg<NonRelToChiralBasis>(out, in, Out_, In_, outNorm, inNorm));
       } else {
-	errorQuda("Basis change from %d to %d not supported", in.GammaBasis(), out.GammaBasis());
+        errorQuda("Unexpected basis change from %d to %d", in.GammaBasis(), out.GammaBasis());
       }
     }
 
-    void apply(const qudaStream_t &stream) {
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-	if (out.GammaBasis()==in.GammaBasis()) {
-          copyColorSpinor<Arg, PreserveBasis>(arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, NonRelBasis>(arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, RelBasis>(arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, ChiralToNonRelBasis>(arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinor<Arg, NonRelToChiralBasis>(arg);
-	}
-      } else {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	if (out.GammaBasis()==in.GammaBasis()) {
-	  qudaLaunchKernel(copyColorSpinorKernel<Arg, PreserveBasis>, tp, stream, arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-          qudaLaunchKernel(copyColorSpinorKernel<Arg, NonRelBasis>, tp, stream, arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-          qudaLaunchKernel(copyColorSpinorKernel<Arg, RelBasis>, tp, stream, arg);
-	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-          qudaLaunchKernel(copyColorSpinorKernel<Arg, ChiralToNonRelBasis>, tp, stream, arg);
-	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-          qudaLaunchKernel(copyColorSpinorKernel<Arg, NonRelToChiralBasis>, tp, stream, arg);
-	}
-      }
+    void apply(const qudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Launch<Ns>(tp, stream);
     }
 
-    TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 0; }
-    long long bytes() const { return arg.in.Bytes() + arg.out.Bytes(); }
+    long long bytes() const { return in.Bytes() + out.Bytes(); }
   };
 
-
-  /** Decide whether we are changing basis or not */
-  template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename Out, typename In>
-  void genericCopyColorSpinor(Out &outOrder, const In &inOrder, const ColorSpinorField &out,
-			      const ColorSpinorField &in, QudaFieldLocation location)
-  {
-    CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In> arg(outOrder, inOrder, out, in);
-    CopyColorSpinor<Ns, decltype(arg)> copy(arg, out, in, location);
-    copy.apply(0);
-  }
-
   /** Decide on the output order*/
-  template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename InOrder>
-    void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out,
-				const ColorSpinorField &in, QudaFieldLocation location,
-				FloatOut *Out, float *outNorm) {
-    const bool override = true;
+  template <int Ns, int Nc, typename I, typename param_t>
+  void genericCopyColorSpinor(const param_t &param)
+  {
+    auto &out = std::get<0>(param);
+    auto &in = std::get<1>(param);
+    using FloatOut = typename std::remove_pointer<typename std::tuple_element<3, param_t>::type>::type;
     if (out.isNative()) {
-      typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
-      ColorSpinor outOrder(out, 1, Out, outNorm, nullptr, override);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = typename colorspinor_mapper<FloatOut,Ns,Nc>::type;
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
       // this is needed for single-precision mg for changing basis in the transfer
-      typedef typename colorspinor::FloatNOrder<FloatOut, 4, Nc, 2> ColorSpinor;
-      ColorSpinor outOrder(out, 1, Out, outNorm, nullptr, override);
-      genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = typename colorspinor::FloatNOrder<FloatOut, 4, Nc, 2>;
+      CopyColorSpinor<4, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = SpaceSpinorColorOrder<FloatOut, Ns, Nc>;
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = SpaceColorSpinorOrder<FloatOut, Ns, Nc>;
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
     } else if (out.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = PaddedSpaceSpinorColorOrder<FloatOut, Ns, Nc>;
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -313,44 +111,40 @@ namespace quda {
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, 1, Out);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out, in, location);
+      using O = QDPJITDiracOrder<FloatOut, Ns, Nc>;
+      CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
     }
-
   }
 
   /** Decide on the input order*/
-  template <typename FloatOut, typename FloatIn, int Ns, int Nc>
-    void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in,
-				QudaFieldLocation location, FloatOut *Out, FloatIn *In,
-				float *outNorm, float *inNorm) {
-    const bool override = true;
+  template <int Ns, int Nc, typename param_t>
+  void genericCopyColorSpinor(const param_t &param)
+  {
+    auto &in = std::get<1>(param);
+    using FloatIn = typename std::remove_pointer<typename std::tuple_element<4, param_t>::type>::type;
     if (in.isNative()) {
-      typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
-      ColorSpinor inOrder(in, 1, In, inNorm, nullptr, override);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);
+      using I = typename colorspinor_mapper<FloatIn,Ns,Nc>::type;
+      genericCopyColorSpinor<Ns, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
       // this is needed for single-precision mg for changing basis in the transfer
-      typedef typename colorspinor::FloatNOrder<FloatIn, 4, Nc, 2> ColorSpinor;
-      ColorSpinor inOrder(in, 1, In, inNorm, nullptr, override);
-      genericCopyColorSpinor<FloatOut,FloatIn,4,Nc>(inOrder, out, in, location, Out, outNorm);
+      using I = typename colorspinor::FloatNOrder<FloatIn, 4, Nc, 2>;
+      genericCopyColorSpinor<4, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);
+      using I = SpaceSpinorColorOrder<FloatIn, Ns, Nc>;
+      genericCopyColorSpinor<Ns, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);
+      using I = SpaceColorSpinorOrder<FloatIn, Ns, Nc>;
+      genericCopyColorSpinor<Ns, Nc, I>(param);
     } else if (in.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);
+      using ColorSpinor = PaddedSpaceSpinorColorOrder<FloatIn, Ns, Nc>;
+      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -358,22 +152,21 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
-      QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, 1, In);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in, location, Out, outNorm);
+      using ColorSpinor = QDPJITDiracOrder<FloatIn, Ns, Nc>;
+      genericCopyColorSpinor<Ns, Nc, ColorSpinor>(param);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
-
   }
 
-
-  template <int Ns, int Nc, typename dstFloat, typename srcFloat>
-    void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-				QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
-				float *dstNorm, float *srcNorm) {
+  template <int Ns, int Nc, typename param_t>
+  void copyGenericColorSpinor(const param_t &param)
+  {
+    auto &dst = std::get<0>(param);
+    auto &src = std::get<1>(param);
 
     if (dst.Ndim() != src.Ndim())
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
@@ -400,33 +193,39 @@ namespace quda {
       errorQuda("QDPJIT field ordering not supported for full site fields");
     }
 
-    genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
-
+    genericCopyColorSpinor<Ns, Nc>(param);
   }
 
-  template <int Nc, typename dstFloat, typename srcFloat>
-  void CopyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
-			      float *dstNorm=0, float *srcNorm=0)
+  template <typename dst_t, typename src_t> using param_t =
+    std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, dst_t *, src_t *, float *, float *>;
+  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+
+  template <int Nc, typename dst_t, typename src_t>
+  void CopyGenericColorSpinor(const copy_pack_t &pack)
   {
-    if (dst.Nspin() != src.Nspin())
-      errorQuda("source and destination spins must match");
+    auto &dst = std::get<0>(pack);
+    auto &src = std::get<1>(pack);
+    param_t<dst_t, src_t> param(std::get<0>(pack), std::get<1>(pack), std::get<2>(pack),
+                                static_cast<dst_t*>(std::get<3>(pack)), static_cast<src_t*>(std::get<4>(pack)),
+                                static_cast<float*>(std::get<5>(pack)), static_cast<float*>(std::get<6>(pack)));
+
+    if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
 
     if (dst.Nspin() == 4) {
 #if defined(NSPIN4)
-      copyGenericColorSpinor<4,Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+      copyGenericColorSpinor<4,Nc>(param);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
     } else if (dst.Nspin() == 2) {
 #if defined(NSPIN2)
-      copyGenericColorSpinor<2,Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+      copyGenericColorSpinor<2,Nc>(param);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
     } else if (dst.Nspin() == 1) {
 #if defined(NSPIN1)
-      copyGenericColorSpinor<1,Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+      copyGenericColorSpinor<1,Nc>(param);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif

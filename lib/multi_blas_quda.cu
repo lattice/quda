@@ -1,22 +1,14 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <cstring> // needed for memset
-
-#include <tune_quda.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
-
-#include <jitify_helper.cuh>
 #include <kernels/multi_blas_core.cuh>
+#include <tunable_nd.h>
 
 namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
-
     template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
-    class MultiBlas : public TunableVectorY
+    class MultiBlas : public TunableGridStrideKernel3D
     {
       using real = typename mapper<y_store_t>::type;
       const int NXZ;
@@ -27,7 +19,6 @@ namespace quda {
       const int nParity;
       const T &a, &b, &c;
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
-      const QudaFieldLocation location;
 
       bool tuneSharedBytes() const { return false; }
 
@@ -35,10 +26,10 @@ namespace quda {
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
-      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &x_meta, const ColorSpinorField &y_meta,
+      MultiBlas(const T &a, const T &b, const T &c, const ColorSpinorField &, const ColorSpinorField &,
                 std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                 std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w) :
-        TunableVectorY(y.size()),
+        TunableGridStrideKernel3D(*x[0], y.size(), x[0]->SiteSubset()),
         NXZ(x.size()),
         NYW(y.size()),
         f(NXZ, NYW),
@@ -50,9 +41,9 @@ namespace quda {
         x(x),
         y(y),
         z(z),
-        w(w),
-        location(checkLocation(*x[0], *y[0], *z[0], *w[0]))
+        w(w)
       {
+        checkLocation(*x[0], *y[0], *z[0], *w[0]);
         checkLength(*x[0], *y[0], *z[0], *w[0]);
         auto x_prec = checkPrecision(*x[0], *z[0], *w[0]);
         auto y_prec = y[0]->Precision();
@@ -63,7 +54,7 @@ namespace quda {
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
         // heuristic for enabling if we need the warp-splitting optimization
-        const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
+        const int gpu_size = 2 * device::max_threads_per_block() * device::processor_count();
         switch (gpu_size / (x[0]->Length() * NYW)) {
         case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
         case 1: max_warp_split = 2; break; // double the thread count
@@ -72,69 +63,38 @@ namespace quda {
         }
         max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        Amatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(a.data));
-        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(b.data));
-        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<typename T::type *>(c.data));
-
-        strcpy(aux, x[0]->AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
+        char NXZ_str[16];
+        char NYW_str[16];
+        u32toa(NXZ_str, NXZ);
+        u32toa(NYW_str, NYW);
+        strcat(aux, ",Nxz=");
+        strcat(aux, NXZ_str);
+        strcat(aux, ",Nyw=");
+        strcat(aux, NYW_str);
 
-#ifdef JITIFY
-        ::quda::create_jitify_program("kernels/multi_blas_core.cuh");
+#ifdef QUDA_FAST_COMPILE_REDUCE
+        strcat(aux, ",fast_compile");
 #endif
 
-        apply(*getStream());
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
+
+      template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
-        char name[TuneKey::name_n];
-        char NXZ_str[8];
-        char NYW_str[8];
-        u32toa(NXZ_str, NXZ);
-        u32toa(NYW_str, NYW);
-        strcpy(name, NXZ_str);
-        strcat(name, NYW_str);
-        strcat(name, typeid(f).name());
-        return TuneKey(x[0]->VolString(), name, aux);
-      }
-
-      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<multi_1d, void>::type
-      set_param(device_buffer_t &&buf_d, Arg &arg, char select, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(arg.f)::coeff_t;
-        coeff_t *buf_arg = nullptr;
-        switch (select) {
-        case 'a': buf_arg = arg.f.a; break;
-        case 'b': buf_arg = arg.f.b; break;
-        case 'c': buf_arg = arg.f.c; break;
-        default: errorQuda("Unknown buffer %c", select);
-        }
-        const auto N = std::max(NXZ,NYW);
-        for (int i = 0; i < N; i++) buf_arg[i] = coeff_t(h.data[i]);
-      }
-
-      template <bool multi_1d, typename device_buffer_t, typename Arg> typename std::enable_if<!multi_1d, void>::type
-      set_param(device_buffer_t &&buf_d, Arg &arg, char dummy, const T &h, const qudaStream_t &stream)
-      {
-        using coeff_t = typename decltype(arg.f)::coeff_t;
-        constexpr size_t n_coeff = MAX_MATRIX_SIZE / sizeof(coeff_t);
-
-        coeff_t tmp[n_coeff];
-        for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) tmp[NYW * i + j] = coeff_t(h.data[NYW * i + j]);
-
-#ifdef JITIFY
-        cuMemcpyHtoDAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), stream);
-#else
-        cudaMemcpyToSymbolAsync(buf_d, tmp, NXZ * NYW * sizeof(coeff_t), 0, cudaMemcpyHostToDevice, stream);
-#endif
+        constexpr bool multi_1d = Arg::Functor::multi_1d;
+        if (a.data) { set_param<multi_1d>(arg, 'a', a); }
+        if (b.data) { set_param<multi_1d>(arg, 'b', b); }
+        if (c.data) { set_param<multi_1d>(arg, 'c', c); }
+        launch<MultiBlas_>(tp, stream, arg);
       }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
@@ -163,30 +123,23 @@ namespace quda {
 
           tp.block.x *= tp.aux.x; // include warp-split factor
 
-          MultiBlasArg<NXZ, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, f_, NYW, length);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          auto instance = program->kernel("quda::blas::multiBlasKernel")
-            .instantiate(Type<device_real_t>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
-
-          if (a.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Amatrix_d"), arg, 'a', a, stream);
-          if (b.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Bmatrix_d"), arg, 'b', b, stream);
-          if (c.data) set_param<decltype(f_)::multi_1d>(instance.get_constant_ptr("quda::blas::Cmatrix_d"), arg, 'c', c, stream);
-
-          jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-          if (a.data) { set_param<decltype(f_)::multi_1d>(Amatrix_d, arg, 'a', a, stream); }
-          if (b.data) { set_param<decltype(f_)::multi_1d>(Bmatrix_d, arg, 'b', b, stream); }
-          if (c.data) { set_param<decltype(f_)::multi_1d>(Cmatrix_d, arg, 'c', c, stream); }
           switch (tp.aux.x) {
-          case 1: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 1, decltype(arg)>, tp, stream, arg); break;
+          case 1:
+            Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
 #ifdef WARP_SPLIT
-          case 2: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 2, decltype(arg)>, tp, stream, arg); break;
-          case 4: qudaLaunchKernel(multiBlasKernel<device_real_t, M, NXZ, 4, decltype(arg)>, tp, stream, arg); break;
+          case 2:
+            Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
+          case 4:
+            Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
+                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+            break;
 #endif
           default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
           }
-#endif
 
           tp.block.x /= tp.aux.x; // restore block size
         } else {
@@ -194,30 +147,30 @@ namespace quda {
         }
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiateLinear(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiateLinear<n-1>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiateLinear(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiateLinear(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
-      template <int n> typename std::enable_if<n!=1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n!=1, void> instantiatePow2(const qudaStream_t &stream)
       {
         if (NXZ == n) compute<n>(stream);
         else instantiatePow2<n/2>(stream);
       }
 
-      template <int n> typename std::enable_if<n==1, void>::type instantiatePow2(const qudaStream_t &stream)
+      template <int n> std::enable_if_t<n==1, void> instantiatePow2(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
 
       // instantiate the loop unrolling template
-      template <int NXZ_max> typename std::enable_if<NXZ_max!=1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max!=1, void> instantiate(const qudaStream_t &stream)
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
         constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
@@ -229,7 +182,7 @@ namespace quda {
         else errorQuda("x.size %lu greater than maximum supported size (pow2 = %d, linear = %d)", x.size(), pow2_max, linear_max);
       }
 
-      template <int NXZ_max> typename std::enable_if<NXZ_max==1, void>::type instantiate(const qudaStream_t &stream)
+      template <int NXZ_max> std::enable_if_t<NXZ_max==1, void> instantiate(const qudaStream_t &stream)
       {
         compute<1>(stream);
       }
@@ -256,9 +209,9 @@ namespace quda {
         }
       }
 
+#ifdef WARP_SPLIT
       bool advanceAux(TuneParam &param) const
       {
-#ifdef WARP_SPLIT
         if (2 * param.aux.x <= max_warp_split) {
           param.aux.x *= 2;
           warp_split = param.aux.x;
@@ -270,26 +223,27 @@ namespace quda {
           resetBlockDim(param);
           return false;
         }
+      }
 #else
+      bool advanceAux(TuneParam &) const
+      {
         warp_split = 1;
         return false;
-#endif
       }
+#endif
 
-      int blockStep() const { return deviceProp.warpSize / warp_split; }
-      int blockMin() const { return deviceProp.warpSize / warp_split; }
+      int blockStep() const { return device::warp_size() / warp_split; }
+      int blockMin() const { return device::warp_size() / warp_split; }
 
       void initTuneParam(TuneParam &param) const
       {
-        TunableVectorY::initTuneParam(param);
-        param.grid.z = nParity;
+        TunableGridStrideKernel3D::initTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const
       {
-        TunableVectorY::defaultTuneParam(param);
-        param.grid.z = nParity;
+        TunableGridStrideKernel3D::defaultTuneParam(param);
         param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
@@ -318,7 +272,11 @@ namespace quda {
                       const range &range_x, const range &range_y, int upper, int coeff_width)
     {
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, false)) {
+      size_t max_yw_size = y[0]->Precision() == QUDA_DOUBLE_PRECISION ?
+        max_YW_size<Functor<double>>(x.size(), x[0]->Precision(), y[0]->Precision()) :
+        max_YW_size<Functor<float>>(x.size(), x[0]->Precision(), y[0]->Precision());
+
+      if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
         T *tmpmajor = new T[x.size() * y.size()];
         T *tmpmajor0 = &tmpmajor[0];
@@ -409,7 +367,11 @@ namespace quda {
                         int pass, int upper)
     {
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, 2, false)) {
+      size_t max_yw_size = y[0]->Precision() == QUDA_DOUBLE_PRECISION ?
+        max_YW_size<multicaxpyz_<double>>(x.size(), x[0]->Precision(), y[0]->Precision()) :
+        max_YW_size<multicaxpyz_<float>>(x.size(), x[0]->Precision(), y[0]->Precision());
+
+      if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];

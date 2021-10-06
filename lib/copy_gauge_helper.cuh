@@ -1,149 +1,102 @@
-#include <tune_quda.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <kernels/copy_gauge.cuh>
 
 namespace quda {
 
   using namespace gauge;
 
-  template <typename FloatOut, typename FloatIn, int length, typename Arg>
-  class CopyGauge : TunableVectorYZ {
-    Arg arg;
+#ifdef FINE_GRAINED_ACCESS
+  constexpr bool fine_grain() { return true; }
+#define GAUGE_FUNCTOR CopyGaugeFineGrained_
+#define GHOST_FUNCTOR CopyGhostFineGrained_
+#else
+  constexpr bool fine_grain() { return false; }
+#define GAUGE_FUNCTOR CopyGauge_
+#define GHOST_FUNCTOR CopyGhost_
+#endif
+
+  template <typename Arg>
+  class CopyGauge : TunableKernel3D {
+    Arg &arg;
     int size;
-    const GaugeField &meta;
     QudaFieldLocation location;
     bool is_ghost;
+    GaugeField &out;
+    const GaugeField &in;
 
-  private:
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
-
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return size; }
 
-    bool advanceTuneParam(TuneParam &param) const {
-      // only do autotuning if we are doing the copy on the GPU
-      return location == QUDA_CUDA_FIELD_LOCATION ? TunableVectorYZ::advanceTuneParam(param) : false;
-    }
-
-public:
-    CopyGauge(Arg &arg, const GaugeField &out, const GaugeField &in, QudaFieldLocation location)
-#ifndef FINE_GRAINED_ACCESS
-      : TunableVectorYZ(1, in.Geometry()* 2),
-#else
-      : TunableVectorYZ(Ncolor(length), in.Geometry() * 2),
-#endif
-        arg(arg), meta(in), location(location), is_ghost(false) {
-
+  public:
+    CopyGauge(Arg &arg, GaugeField &out, const GaugeField &in, QudaFieldLocation location) :
+      TunableKernel3D(in, fine_grain() ? in.Ncolor() : 1, in.Geometry() * 2, location),
+      arg(arg), location(location), is_ghost(false),
+      out(out),
+      in(in)
+    {
       set_ghost(is_ghost); // initial state is not ghost
-
-      strcpy(aux, compile_type_str(in,location));
-      strcat(aux, "out:");
+      strcat(aux, ",");
       strcat(aux, out.AuxString());
-      strcat(aux, ",in:");
-      strcat(aux, in.AuxString());
-
-#ifdef FINE_GRAINED_ACCESS
-      strcat(aux,",fine-grained");
-#endif
-
-#ifdef JITIFY
-#ifdef FINE_GRAINED_ACCESS
-      std::vector<std::string> macro = { "-DFINE_GRAINED_ACCESS" }; // need to pass macro to jitify
-      create_jitify_program("kernels/copy_gauge.cuh", macro);
-#else
-      create_jitify_program("kernels/copy_gauge.cuh");
-#endif
-#endif
+      if (fine_grain()) strcat(aux,",fine-grained");
     }
 
-    void set_ghost(int is_ghost_) {
+    void set_ghost(int is_ghost_)
+    {
       is_ghost = is_ghost_;
-      if (is_ghost_ == 2) arg.out_offset = meta.Ndim(); // forward links
+      if (is_ghost_ == 2) arg.out_offset = in.Ndim(); // forward links
 
-      int faceMax = 0;
-      for (int d=0; d<arg.nDim; d++) {
-        faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
-      }
-      size = is_ghost ? faceMax : arg.volume/2;
+      int face_max = 0;
+      for (int d=0; d<in.Ndim(); d++) face_max = std::max(in.SurfaceCB(d), face_max);
+      size = is_ghost ? in.Nface() * face_max : in.VolumeCB();
       if (size == 0 && is_ghost) {
 	errorQuda("Cannot copy zero-sized ghost zone.  Check nFace parameter is non-zero for both input and output gauge fields");
       }
-#ifndef FINE_GRAINED_ACCESS
-      resizeVector(1, (is_ghost ? arg.nDim : meta.Geometry()) * 2);
-#else
-      resizeVector(Ncolor(length), (is_ghost ? arg.nDim : meta.Geometry()) * 2);
-#endif
+
+      resizeVector(vector_length_y, (is_ghost ? in.Ndim() : in.Geometry()) * 2); // only resizing z component
     }
 
-    virtual ~CopyGauge() { ; }
-  
-    void apply(const qudaStream_t &stream) {
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if (location == QUDA_CPU_FIELD_LOCATION) {
-        if (!is_ghost) {
-          copyGauge<FloatOut, FloatIn, length>(arg);
-        } else {
-          copyGhost<FloatOut, FloatIn, length>(arg);
-        }
-      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel(!is_ghost ? "quda::copyGaugeKernel" : "quda::copyGhostKernel")
-          .instantiate(Type<FloatOut>(),Type<FloatIn>(),length,Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-        if (!is_ghost) {
-          qudaLaunchKernel(copyGaugeKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
-        } else {
-          qudaLaunchKernel(copyGhostKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
-        }
-#endif
-      } else {
-        errorQuda("Invalid field location %d\n", location);
-      }
+      arg.threads.x = size;
+      constexpr bool enable_host = true;
+      if (!is_ghost) launch<GAUGE_FUNCTOR, enable_host>(tp, stream, arg);
+      else           launch<GHOST_FUNCTOR, enable_host>(tp, stream, arg);
     }
 
-    TuneKey tuneKey() const {
+    TuneKey tuneKey() const
+    {
       char aux_[TuneKey::aux_n];
       strcpy(aux_,aux);
       if (is_ghost) strcat(aux_, ",ghost");
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux_);
+      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
     }
 
     long long flops() const { return 0; } 
     long long bytes() const {
-      int sites = 4*arg.volume/2;
+      auto sites = 4 * in.VolumeCB();
       if (is_ghost) {
 	sites = 0;
-	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
+	for (int d=0; d<4; d++) sites += in.SurfaceCB(d) * in.Nface();
       }
-#ifndef FINE_GRAINED_ACCESS
-      return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
-			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
-#else      
-      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
-#endif
+      return sites * (out.Bytes() + in.Bytes()) / (4 * in.VolumeCB());
     } 
   };
 
-
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, const GaugeField &out, const GaugeField &in,
-		   QudaFieldLocation location, int type) {
-
-    CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, in);
-    CopyGauge<FloatOut, FloatIn, length, CopyGaugeArg<OutOrder,InOrder> > gaugeCopier(arg, out, in, location);
+    void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, GaugeField &out, const GaugeField &in,
+		   QudaFieldLocation location, int type)
+  {
+    CopyGaugeArg<FloatOut, FloatIn, length, OutOrder, InOrder> arg(outOrder, inOrder, in);
+    CopyGauge<decltype(arg)> gaugeCopier(arg, out, in, location);
 
 #ifdef HOST_DEBUG
-    if (location == QUDA_CPU_FIELD_LOCATION) checkNan<FloatIn, length>(arg);
+    if (location == QUDA_CPU_FIELD_LOCATION) checkNan(arg);
 #endif
 
     // first copy body
     if (type == 0 || type == 2) {
       gaugeCopier.set_ghost(0);
-      gaugeCopier.apply(0);
+      gaugeCopier.apply(device::get_default_stream());
     }
 
 #ifdef MULTI_GPU
@@ -151,7 +104,7 @@ public:
       if (in.Geometry() == QUDA_VECTOR_GEOMETRY || in.Geometry() == QUDA_COARSE_GEOMETRY) {
         // now copy ghost
         gaugeCopier.set_ghost(1);
-        gaugeCopier.apply(0);
+        gaugeCopier.apply(device::get_default_stream());
       } else {
         warningQuda("Cannot copy for %d geometry gauge field", in.Geometry());
       }
@@ -165,7 +118,7 @@ public:
     if (type == 3) {
       if (in.Geometry() != QUDA_COARSE_GEOMETRY) errorQuda("Cannot request copy type %d on non-coarse link fields", in.Geometry());
       gaugeCopier.set_ghost(2);
-      gaugeCopier.apply(0);
+      gaugeCopier.apply(device::get_default_stream());
     }
 #endif
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <quda_internal.h>
+#include <timer.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
@@ -55,8 +56,8 @@ void setPrec(ColorSpinorParam &param, QudaPrecision precision) { param.setPrecis
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
-  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
+  printfQuda("S_dimension T_dimension Nspin Ncolor Msrc Nsrc\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d     %3d  %3d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor, Msrc, Nsrc);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -227,6 +228,7 @@ void initFields(prec_pair_t prec_pair)
   param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.pc_type = QUDA_4D_PC;
 
   vH = new cpuColorSpinorField(param);
   wH = new cpuColorSpinorField(param);
@@ -356,10 +358,8 @@ double benchmark(Kernel kernel, const int niter)
   quda::Complex *A2 = new quda::Complex[Nsrc * Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  device_timer_t timer;
+  timer.start();
 
   {
     switch (kernel) {
@@ -523,19 +523,15 @@ double benchmark(Kernel kernel, const int niter)
     }
   }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
-  float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  timer.stop();
+
   delete[] A;
   delete[] B;
   delete[] C;
   delete[] A2;
   delete[] Ar;
-  double secs = runTime / 1000;
-  return secs;
+
+  return timer.last();
 }
 
 #define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
@@ -964,7 +960,7 @@ double test(Kernel kernel)
     *yD = *yH;
     *zD = *zH;
 
-    commGlobalReductionSet(false); // switch off global reductions for this test
+    commGlobalReductionPush(false); // switch off global reductions for this test
 
     commAsyncReductionSet(true);
     blas::cDotProductNormA(*zD, *xD);
@@ -982,7 +978,7 @@ double test(Kernel kernel)
     *xH = *vD;
     *yH = *wD;
 
-    commGlobalReductionSet(true); // restore global reductions
+    commGlobalReductionPop(); // restore global reductions
 
     error = ERROR(x) + ERROR(y);
     break;

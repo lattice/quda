@@ -144,7 +144,7 @@ namespace quda {
    };
 
    //Rayleigh Ritz procedure:
-   template <libtype which_lib> void ComputeRitz(EigCGArgs &args) { errorQuda("\nUnknown library type."); }
+   template <libtype which_lib> void ComputeRitz(EigCGArgs &) { errorQuda("\nUnknown library type."); }
 
    //pure eigen version: 
    template <> void ComputeRitz<libtype::eigen_lib>(EigCGArgs &args)
@@ -173,52 +173,6 @@ namespace quda {
 
      return;
    }
-
-   //(supposed to be a pure) magma version: 
-   template <> void ComputeRitz<libtype::magma_lib>(EigCGArgs &args)
-   {
-#ifdef MAGMA_LIB
-     const int m = args.m;
-     const int k = args.k;
-     //Solve m dim eigenproblem:
-     args.ritzVecs = args.Tm;
-     Complex *evecm = static_cast<Complex*>( args.ritzVecs.data());
-     double  *evalm = static_cast<double *>( args.Tmvals.data());
-
-     cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  cudaHostRegisterDefault);
-     magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
-     //Solve m-1 dim eigenproblem:
-     DenseMatrix ritzVecsm1(args.Tm);
-     Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
-
-     cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  cudaHostRegisterDefault);
-     magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
-     // fill 0s in mth element of old evecs:
-     for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
-     // Attach the first n_ev old evecs at the end of the n_ev latest ones:
-     memcpy(&evecm[k*m], evecm1, k*m*sizeof(Complex));
-     //?
-     // Orthogonalize the 2*n_ev (new+old) vectors evecm=QR:
-
-     MatrixXcd Q2k(MatrixXcd::Identity(m, 2*k));
-     HouseholderQR<MatrixXcd> ritzVecs2k_qr( Map<MatrixXcd, Unaligned >(args.ritzVecs.data(), m, 2*k) );
-     Q2k.applyOnTheLeft( ritzVecs2k_qr.householderQ() );
-
-     //2. Construct H = QH*Tm*Q :
-     args.H2k = Q2k.adjoint()*args.Tm*Q2k;
-
-     /* solve the small evecm1 2n_ev x 2n_ev eigenproblem */
-     SelfAdjointEigenSolver<MatrixXcd> es_h2k(args.H2k);
-     Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
-     args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
-//?
-     cudaHostUnregister(evecm);
-     cudaHostUnregister(evecm1);
-#else
-     errorQuda("Magma library was not built.");
-#endif
-     return;
-  }
 
   // set the required parameters for the inner solver
   static void fillEigCGInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
@@ -493,9 +447,9 @@ namespace quda {
       ColorSpinorField &pPre = *p_pre;
 
       blas::copy(rPre, r);
-      commGlobalReductionSet(false);
+      commGlobalReductionPush(false);
       (*K)(pPre, rPre);
-      commGlobalReductionSet(true);
+      commGlobalReductionPop();
       blas::copy(*z, pPre);
     }
 
@@ -547,9 +501,9 @@ namespace quda {
         ColorSpinorField &pPre = *p_pre;
 
         blas::copy(rPre, r);
-        commGlobalReductionSet(false);
+        commGlobalReductionPush(false);
         (*K)(pPre, rPre);
-        commGlobalReductionSet(true);
+        commGlobalReductionPop();
         blas::copy(*z, pPre);
       }
       //

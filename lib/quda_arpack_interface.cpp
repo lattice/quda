@@ -504,8 +504,8 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
-                    QudaEigParam *eig_param, TimeProfile &profile)
+  void arpack_solve(std::vector<ColorSpinorField *> &, std::vector<Complex> &, const DiracMatrix &, QudaEigParam *,
+                    TimeProfile &)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");
   }

@@ -92,45 +92,7 @@ namespace quda {
     }
   };
 
-  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
-
-  template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &args)
-  {
-#ifdef MAGMA_LIB
-    DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
-    DenseMatrix Gk = args.H.block(0, 0, args.m, args.m);
-
-    VectorSet harVecs = MatrixXcd::Zero(args.m, args.m);
-    Vector harVals = VectorXcd::Zero(args.m);
-
-    Vector em = VectorXcd::Zero(args.m);
-
-    em(args.m - 1) = norm(args.H(args.m, args.m - 1));
-
-    cudaHostRegister(static_cast<void *>(cH.data()), args.m * args.m * sizeof(Complex), cudaHostRegisterDefault);
-    magma_Xgesv(static_cast<void *>(em.data()), args.m, args.m, static_cast<void *>(cH.data()), args.m, sizeof(Complex));
-    cudaHostUnregister(cH.data());
-
-    Gk.col(args.m - 1) += em;
-
-    cudaHostRegister(static_cast<void *>(Gk.data()), args.m * args.m * sizeof(Complex), cudaHostRegisterDefault);
-    magma_Xgeev(static_cast<void *>(Gk.data()), args.m, args.m, static_cast<void *>(harVecs.data()),
-                static_cast<void *>(harVals.data()), args.m, sizeof(Complex));
-    cudaHostUnregister(Gk.data());
-
-    std::vector<SortedEvals> sorted_evals;
-    sorted_evals.reserve(args.m);
-
-    for (int e = 0; e < args.m; e++) sorted_evals.push_back(SortedEvals(abs(harVals.data()[e]), e));
-    std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortedEvals::SelectSmall);
-
-    for (int e = 0; e < args.k; e++)
-      memcpy(args.ritzVecs.col(e).data(), harVecs.col(sorted_evals[e]._idx).data(), (args.m) * sizeof(Complex));
-#else
-    errorQuda("Magma library was not built.\n");
-#endif
-    return;
-  }
+  template <libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
   template <> void ComputeHarmonicRitz<libtype::eigen_lib>(GMResDRArgs &args)
   {
@@ -162,28 +124,7 @@ namespace quda {
     return;
   }
 
-  template <libtype which_lib> void ComputeEta(GMResDRArgs &args) { errorQuda("\nUnknown library type.\n"); }
-
-  template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args)
-  {
-#ifdef MAGMA_LIB
-    DenseMatrix Htemp(DenseMatrix::Zero(args.m + 1, args.m));
-    Htemp = args.H;
-
-    Complex *ctemp = static_cast<Complex *>(args.ritzVecs.col(0).data());
-    memcpy(ctemp, args.c, (args.m + 1) * sizeof(Complex));
-
-    cudaHostRegister(static_cast<void *>(Htemp.data()), (args.m + 1) * args.m * sizeof(Complex), cudaHostRegisterDefault);
-    magma_Xgels(static_cast<void *>(Htemp.data()), ctemp, args.m + 1, args.m, args.m + 1, sizeof(Complex));
-    cudaHostUnregister(Htemp.data());
-
-    memcpy(args.eta.data(), ctemp, args.m * sizeof(Complex));
-    memset(ctemp, 0, (args.m + 1) * sizeof(Complex));
-#else
-    errorQuda("MAGMA library was not built.\n");
-#endif
-    return;
-  }
+  template <libtype which_lib> void ComputeEta(GMResDRArgs &) { errorQuda("\nUnknown library type.\n"); }
 
   template <> void ComputeEta<libtype::eigen_lib>(GMResDRArgs &args)
   {

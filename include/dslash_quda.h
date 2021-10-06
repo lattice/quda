@@ -1,30 +1,55 @@
-#ifndef _DSLASH_QUDA_H
-#define _DSLASH_QUDA_H
+#pragma once
 
 #include <quda_internal.h>
-#include <tune_quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <worker.h>
+#include <domain_wall_helper.h>
+#include <fast_intdiv.h>
+
 #ifdef NVSHMEM_COMMS
 #include <cuda/atomic>
 #endif
 
-namespace quda {
+namespace quda
+{
 
   /**
-    @param pack Sets whether to use a kernel to pack the T dimension
-    */
-  void setKernelPackT(bool pack);
+     @brief Constants used by dslash and packing kernels
+  */
+  struct DslashConstant {
+    int Vh;
+    int_fastdiv X[QUDA_MAX_DIM];
+    int_fastdiv Xh[QUDA_MAX_DIM];
+    int Ls;
 
-  /**
-    @return Whether the T dimension is kernel packed or not
-    */
-  bool getKernelPackT();
+    int volume_4d;
+    int_fastdiv volume_4d_cb;
 
-  void pushKernelPackT(bool pack);
-  void popKernelPackT();
+    int_fastdiv face_X[4];
+    int_fastdiv face_Y[4];
+    int_fastdiv face_Z[4];
+    int_fastdiv face_T[4];
+    int_fastdiv face_XY[4];
+    int_fastdiv face_XYZ[4];
+    int_fastdiv face_XYZT[4];
+
+    int ghostFace[QUDA_MAX_DIM + 1];
+    int ghostFaceCB[QUDA_MAX_DIM + 1];
+
+    int X2X1;
+    int X3X2X1;
+    int X4X3X2X1;
+
+    int X2X1mX1;
+    int X3X2X1mX2X1;
+    int X4X3X2X1mX3X2X1;
+    int X5X4X3X2X1mX4X3X2X1;
+    int X4X3X2X1hmX3X2X1h;
+
+    int_fastdiv dims[4][3];
+  };
 
   /**
      @brief Helper function that sets which dimensions the packing
@@ -554,31 +579,6 @@ namespace quda {
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
-  enum Dslash5Type {
-    DSLASH5_DWF,
-    DSLASH5_MOBIUS_PRE,
-    DSLASH5_MOBIUS,
-    M5_INV_DWF,
-    M5_INV_MOBIUS,
-    M5_INV_ZMOBIUS,
-    M5_EOFA,
-    M5INV_EOFA
-  };
-
-  /**
-    Applying the following five kernels in the order of 4-0-1-2-3 is equivalent to applying
-    the full even-odd preconditioned symmetric MdagM operator:
-    op = (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)^dag
-        * (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)
-  */
-  enum class MdwfFusedDslashType {
-    D4_D5INV_D5PRE,
-    D4_D5INV_D5INVDAG,
-    D4DAG_D5PREDAG_D5INVDAG,
-    D4DAG_D5PREDAG,
-    D5PRE,
-  };
-
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
@@ -765,6 +765,4 @@ namespace quda {
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
-}
-
-#endif // _DSLASH_QUDA_H
+} // namespace quda

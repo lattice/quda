@@ -171,18 +171,22 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
 
 #endif
 
+#ifndef MULTI_GPU
 // this actually applies the preconditioned dslash, e.g., D_ee^{-1} D_eo or D_oo^{-1} D_oe
-void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
-		QudaPrecision precision, QudaGaugeParam &gauge_param) {
-  
-#ifndef MULTI_GPU  
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision, QudaGaugeParam &)
+#else
+void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, QudaPrecision precision,
+                QudaGaugeParam &gauge_param)
+#endif
+{
+#ifndef MULTI_GPU
   if (precision == QUDA_DOUBLE_PRECISION)
     dslashReference((double*)out, (double**)gauge, (double*)in, oddBit, daggerBit);
   else
     dslashReference((float*)out, (float**)gauge, (float*)in, oddBit, daggerBit);
 #else
 
-  GaugeFieldParam gauge_field_param(gauge, gauge_param);
+  GaugeFieldParam gauge_field_param(gauge_param, gauge);
   gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField cpu(gauge_field_param);
   void **ghostGauge = (void**)cpu.Ghost();
@@ -203,7 +207,8 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  
+  csParam.pc_type = QUDA_4D_PC;
+
   cpuColorSpinorField inField(csParam);
 
   {  // Now do the exchange
@@ -227,7 +232,6 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
   }
 
 #endif
-
 }
 
 // applies b*(1 + i*a*gamma_5)
@@ -314,7 +318,7 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu,
   void *inOdd = (char *)in + Vh * spinor_site_size * precision;
   void *outEven = out;
   void *outOdd = (char *)out + Vh * spinor_site_size * precision;
-  void *tmp = malloc(V * spinor_site_size * precision);
+  void *tmp = safe_malloc(V * spinor_site_size * precision);
 
   wil_dslash(outOdd, gauge, inEven, 1, dagger_bit, precision, gauge_param);
   wil_dslash(outEven, gauge, inOdd, 0, dagger_bit, precision, gauge_param);
@@ -325,7 +329,7 @@ void tm_mat(void *out, void **gauge, void *in, double kappa, double mu,
   // combine
   xpay(tmp, -kappa, (double *)out, V * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
@@ -333,7 +337,7 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa,
 	       QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision,
 	       QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   // FIXME: remove once reference clover is finished
   // full dslash operator
@@ -349,14 +353,14 @@ void wil_matpc(void *outEven, void **gauge, void *inEven, double kappa,
   double kappa2 = -kappa*kappa;
   xpay(inEven, kappa2, outEven, Vh * spinor_site_size, precision);
 
-  free(tmp);
+  host_free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
 void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, QudaTwistFlavorType flavor,
 	      QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp = malloc(Vh * spinor_site_size * precision);
+  void *tmp = safe_malloc(Vh * spinor_site_size * precision);
 
   if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     wil_dslash(tmp, gauge, inEven, 1, daggerBit, precision, gauge_param);
@@ -403,7 +407,7 @@ void tm_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu
     xpay(tmp, kappa2, outEven, Vh * spinor_site_size, precision);
   }
 
-  free(tmp);
+  host_free(tmp);
 }
 
 
@@ -484,8 +488,8 @@ void tm_ndeg_dslash(void *res1, void *res2, void **gauge, void *spinorField1, vo
 void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, void *inEven2, double kappa, double mu, double epsilon,
 	   QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) {
 
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   if (!daggerBit) {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
@@ -546,8 +550,8 @@ void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, 
   xpay(inEven1, kappa2, outEven1, Vh * spinor_site_size, precision);
   xpay(inEven2, kappa2, outEven2, Vh * spinor_site_size, precision);
 
-  free(tmp1);
-  free(tmp2);
+  host_free(tmp1);
+  host_free(tmp2);
 }
 
 
@@ -566,11 +570,11 @@ void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *
   void *outOdd1   = oddOut;
   void *outOdd2 = (char *)oddOut + precision * Vh * spinor_site_size;
 
-  void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpEven2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpEven1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpEven2 = safe_malloc(Vh * spinor_site_size * precision);
 
-  void *tmpOdd1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpOdd2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd2 = safe_malloc(Vh * spinor_site_size * precision);
 
   // full dslash operator:
   wil_dslash(outOdd1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
@@ -589,11 +593,11 @@ void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *
   xpay(tmpEven1, -kappa, outEven1, Vh * spinor_site_size, precision);
   xpay(tmpEven2, -kappa, outEven2, Vh * spinor_site_size, precision);
 
-  free(tmpOdd1);
-  free(tmpOdd2);
+  host_free(tmpOdd1);
+  host_free(tmpOdd2);
   //
-  free(tmpEven1);
-  free(tmpEven2);
+  host_free(tmpEven1);
+  host_free(tmpEven2);
 }
 
 //End of nondeg TM

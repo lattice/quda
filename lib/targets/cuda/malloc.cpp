@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 #include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
@@ -44,20 +45,11 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
@@ -158,12 +150,12 @@ namespace quda
 
     a.size = size;
 
-#if (CUDA_VERSION > 4000)                                                                                              \
-  && 0 // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
+#if 0
     a.base_size = size;
     ptr = malloc(size);
     if (!ptr) {
 #else
+    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
@@ -186,7 +178,7 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
@@ -236,7 +228,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -267,7 +259,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -366,7 +358,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -388,7 +380,7 @@ namespace quda
     }
     track_malloc(SHMEM, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -565,7 +557,6 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
     void *data[] = {&mem_type};
@@ -596,6 +587,22 @@ namespace quda
                 func);
     }
     return device;
+  }
+
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {
+    auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {
+    auto error = cudaHostUnregister(ptr);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
+    }
   }
 
   namespace pool

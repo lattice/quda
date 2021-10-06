@@ -9,13 +9,74 @@
  */
 
 #include <type_traits>
-#include <quda_internal.h> // for maximum short, char traits.
+#include <target_device.h>
 #include <register_traits.h>
 
 namespace quda
 {
 
-  template <typename T> __host__ __device__ inline float i2f(T a)
+  /**
+   * Traits for determining the maximum and inverse maximum
+   * value of a (signed) char and short. Relevant for
+   * fixed-precision types.
+   */
+  template <typename T> struct fixedMaxValue {
+    static constexpr float value = 0.0f;
+  };
+  template <> struct fixedMaxValue<short> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short2> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short4> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short8> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<int8_t> {
+    static constexpr float value = 127.0f;
+  };
+  template <> struct fixedMaxValue<char2> {
+    static constexpr float value = 127.0f;
+  };
+  template <> struct fixedMaxValue<char4> {
+    static constexpr float value = 127.0f;
+  };
+  template <> struct fixedMaxValue<char8> {
+    static constexpr float value = 127.0f;
+  };
+
+  template <typename T> struct fixedInvMaxValue {
+    static constexpr float value = 3.402823e+38f;
+  };
+  template <> struct fixedInvMaxValue<short> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short2> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short4> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<short8> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
+  template <> struct fixedInvMaxValue<int8_t> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char2> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char4> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char8> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+
+  template <typename T> constexpr float i2f(T a)
   {
 #if 1
     return static_cast<float>(a);
@@ -30,27 +91,41 @@ namespace quda
 #endif
   }
 
-  // Fast float to integer round
-  __device__ __host__ inline int f2i(float f)
-  {
-#ifdef __CUDA_ARCH__
-    f += 12582912.0f;
-    return reinterpret_cast<int &>(f);
-#else
-    return static_cast<int>(f);
-#endif
-  }
+  /**
+     @brief Regular float to integer round used on the host
+  */
+  template <bool is_device> struct f2i {
+    constexpr int operator()(float f) { return static_cast<int>(f); }
+  };
 
-  // Fast double to integer round
-  __device__ __host__ inline int d2i(double d)
-  {
-#ifdef __CUDA_ARCH__
-    d += 6755399441055744.0;
-    return reinterpret_cast<int &>(d);
-#else
-    return static_cast<int>(d);
-#endif
-  }
+  /**
+     @brief Fast float to integer round used on the device
+  */
+  template <> struct f2i<true> {
+    __device__ inline int operator()(float f)
+    {
+      f += 12582912.0f;
+      return reinterpret_cast<int &>(f);
+    }
+  };
+
+  /**
+     @brief Regular double to integer round used on the host
+  */
+  template <bool is_device> struct d2i {
+    constexpr int operator()(double d) { return static_cast<int>(d); }
+  };
+
+  /**
+     @brief Fast double to integer round used on the device
+  */
+  template <> struct d2i<true> {
+    __device__ inline int operator()(double d)
+    {
+      d += 6755399441055744.0;
+      return reinterpret_cast<int &>(d);
+    }
+  };
 
   /**
      @brief Copy function which is trival between floating point
@@ -60,24 +135,21 @@ namespace quda
      the output to be on the same range.
   */
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && !isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
     a = b;
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value && isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value && isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value;
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<isFixed<T1>::value && !isFixed<T2>::value, void>::type
-  copy(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<isFixed<T1>::value && !isFixed<T2>::value, void> copy(T1 &a, const T2 &b)
   {
-    a = f2i(b * fixedMaxValue<T1>::value);
+    a = target::dispatch<f2i>(b * fixedMaxValue<T1>::value);
   }
 
   /**
@@ -85,15 +157,15 @@ namespace quda
      scaling factor has already been done.
   */
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<!isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
   {
     copy(a, b);
   }
 
   template <typename T1, typename T2>
-  __host__ __device__ inline typename std::enable_if<isFixed<T1>::value, void>::type copy_scaled(T1 &a, const T2 &b)
+  constexpr std::enable_if_t<isFixed<T1>::value, void> copy_scaled(T1 &a, const T2 &b)
   {
-    a = f2i(b);
+    a = target::dispatch<f2i>(b);
   }
 
   /**
@@ -102,15 +174,13 @@ namespace quda
      the input type (b) is either a short or char vector.
   */
   template <typename T1, typename T2, typename T3>
-  __host__ __device__ inline typename std::enable_if<!isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
-                                                                                                     const T3 &c)
+  constexpr std::enable_if_t<!isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &)
   {
     copy(a, b);
   }
 
   template <typename T1, typename T2, typename T3>
-  __host__ __device__ inline typename std::enable_if<isFixed<T2>::value, void>::type copy_and_scale(T1 &a, const T2 &b,
-                                                                                                    const T3 &c)
+  constexpr std::enable_if_t<isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &c)
   {
     a = i2f(b) * fixedInvMaxValue<T2>::value * c;
   }

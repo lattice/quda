@@ -6,8 +6,8 @@
 
 /**
  * @def   __COMPUTE_CAPABILITY__
- * @brief This macro sets the target GPU architecture.  Unlike
- * __CUDA_ARCH__, this is defined on host and device.
+ * @brief This macro sets the target GPU architecture, which is
+ * defined on both host and device.
  */
 #define __COMPUTE_CAPABILITY__ @COMP_CAP@
 
@@ -49,4 +49,14 @@
  */
 #define FLOAT8
 #undef QUDA_FLOAT8
+#endif
+
+/**
+ * If we are building for a QUDA Device this will be set by CMAKE
+ */
+#cmakedefine QUDA_TARGET_CUDA
+#cmakedefine QUDA_TARGET_HIP
+
+#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
+#error "No QUDA_TARGET selected"
 #endif

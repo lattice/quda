@@ -1,9 +1,8 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <iostream>
 #include <multigrid.h>
-
-#define NEW_DSLASH
 
 namespace quda {
 
@@ -61,7 +60,7 @@ namespace quda {
     twistedCloverApply(out, in, QUDA_TWIST_GAMMA5_DIRECT, parity);
   }
 
-  void DiracTwistedClover::Dslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const
+  void DiracTwistedClover::Dslash(ColorSpinorField &, const ColorSpinorField &, QudaParity) const
   {
     // this would really just be a Wilson dslash (not actually instantiated at present)
     errorQuda("Not implemented");
@@ -118,8 +117,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracTwistedClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				       const QudaSolutionType solType) const
+  void DiracTwistedClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
@@ -130,8 +128,9 @@ namespace quda {
     clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
-  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					  double kappa, double mass, double mu, double mu_factor) const {
+  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                          double mu, double mu_factor) const
+  {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
@@ -337,8 +336,9 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					    double kappa, double mass, double mu, double mu_factor) const {
+  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                            double mu, double mu_factor) const
+  {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 

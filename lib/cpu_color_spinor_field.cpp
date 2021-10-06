@@ -257,6 +257,8 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
+    createGhostZone(nFace, false);
+
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 
@@ -297,19 +299,17 @@ namespace quda {
   void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
     genericPackGhost(ghost, *this, parity, nFace, dagger);
-    return;
   }
 
-  void cpuColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
-					const QudaDirection dir, const int dagger)
+  void cpuColorSpinorField::unpackGhost(void *, const int, const QudaDirection)
   {
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in unpackGhost for cpu");
     }
   }
 
-  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *dummy1,
-					  const MemoryLocation *dummy2, bool dummy3, bool dummy4, QudaPrecision dummy5) const
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *,
+                                          const MemoryLocation *, bool, bool, QudaPrecision) const
   {
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer(nFace);

@@ -7,7 +7,7 @@ namespace quda {
   public:
     Worker() { }
     virtual ~Worker() { }
-    virtual void apply(const qudaStream_t &stream) = 0;
+    virtual void apply(const qudaStream_t stream = device::get_default_stream()) = 0;
   };
 
-};
+} // namespace quda

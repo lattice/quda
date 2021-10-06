@@ -1,0 +1,6 @@
+#define JITIFY_OPTIONS -I${CMAKE_BINARY_DIR}/lib        \
+  -I${CMAKE_BINARY_DIR}/include                         \
+  -I${CMAKE_BINARY_DIR}/include/externals               \
+  -I${CMAKE_BINARY_DIR}/include/targets/cuda            \
+  -I${CMAKE_BINARY_DIR}/include/targets/cuda/externals  \
+  -I${CUDAToolkit_INCLUDE_DIRS}

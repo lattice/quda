@@ -1,97 +1,101 @@
+#include <tuple>
 #include <color_spinor_field.h>
 
-namespace quda {
+namespace quda
+{
 
-  void copyGenericColorSpinorDD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorDH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorDQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  using copy_pack
+    = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+  void copyGenericColorSpinorDD(const copy_pack &pack);
+  void copyGenericColorSpinorDS(const copy_pack &pack);
+  void copyGenericColorSpinorDH(const copy_pack &pack);
+  void copyGenericColorSpinorDQ(const copy_pack &pack);
 
-  void copyGenericColorSpinorSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorSQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorSD(const copy_pack &pack);
+  void copyGenericColorSpinorSS(const copy_pack &pack);
+  void copyGenericColorSpinorSH(const copy_pack &pack);
+  void copyGenericColorSpinorSQ(const copy_pack &pack);
 
-  void copyGenericColorSpinorHD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorHS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorHH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorHQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorHD(const copy_pack &pack);
+  void copyGenericColorSpinorHS(const copy_pack &pack);
+  void copyGenericColorSpinorHH(const copy_pack &pack);
+  void copyGenericColorSpinorHQ(const copy_pack &pack);
 
-  void copyGenericColorSpinorQD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorQS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorQH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorQD(const copy_pack &pack);
+  void copyGenericColorSpinorQS(const copy_pack &pack);
+  void copyGenericColorSpinorQH(const copy_pack &pack);
+  void copyGenericColorSpinorQQ(const copy_pack &pack);
 
   // multigrid copying routines
-  void copyGenericColorSpinorMGDD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGSQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGHS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGHH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGHQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGQS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGQH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-  void copyGenericColorSpinorMGQQ(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
+  void copyGenericColorSpinorMGDD(const copy_pack &pack);
+  void copyGenericColorSpinorMGDS(const copy_pack &pack);
+  void copyGenericColorSpinorMGSD(const copy_pack &pack);
+  void copyGenericColorSpinorMGSS(const copy_pack &pack);
+  void copyGenericColorSpinorMGSH(const copy_pack &pack);
+  void copyGenericColorSpinorMGSQ(const copy_pack &pack);
+  void copyGenericColorSpinorMGHS(const copy_pack &pack);
+  void copyGenericColorSpinorMGHH(const copy_pack &pack);
+  void copyGenericColorSpinorMGHQ(const copy_pack &pack);
+  void copyGenericColorSpinorMGQS(const copy_pack &pack);
+  void copyGenericColorSpinorMGQH(const copy_pack &pack);
+  void copyGenericColorSpinorMGQQ(const copy_pack &pack);
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location, void *Dst,
                               void *Src, void *dstNorm, void *srcNorm)
   {
-
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
 
     if (dst.Ncolor() != src.Ncolor())
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
+    copy_pack pack(dst, src, location, Dst, Src, dstNorm, srcNorm);
     if (dst.Ncolor() == 3) {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorDD(dst, src, location, (double*)Dst, (double*)Src);
+          copyGenericColorSpinorDD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorDS(dst, src, location, (double*)Dst, (float*)Src);
+          copyGenericColorSpinorDS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorDH(dst, src, location, (double*)Dst, (short*)Src, 0, (float*)srcNorm);
+          copyGenericColorSpinorDH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorDQ(dst, src, location, (double *)Dst, (int8_t *)Src, 0, (float *)srcNorm);
+          copyGenericColorSpinorDQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorSD(dst, src, location, (float*)Dst, (double*)Src);
+          copyGenericColorSpinorSD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorSS(dst, src, location, (float*)Dst, (float*)Src);
+          copyGenericColorSpinorSS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorSH(dst, src, location, (float*)Dst, (short*)Src, 0, (float*)srcNorm);
+          copyGenericColorSpinorSH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorSQ(dst, src, location, (float *)Dst, (int8_t *)Src, 0, (float *)srcNorm);
+          copyGenericColorSpinorSQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_HALF_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorHD(dst, src, location, (short*)Dst, (double*)Src, (float*)dstNorm, 0);
+          copyGenericColorSpinorHD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorHS(dst, src, location, (short*)Dst, (float*)Src, (float*)dstNorm, 0);
+          copyGenericColorSpinorHS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorHH(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
+          copyGenericColorSpinorHH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorHQ(dst, src, location, (short *)Dst, (int8_t *)Src, (float *)dstNorm, (float *)srcNorm);
+          copyGenericColorSpinorHQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorQD(dst, src, location, (int8_t *)Dst, (double *)Src, (float *)dstNorm, 0);
+          copyGenericColorSpinorQD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorQS(dst, src, location, (int8_t *)Dst, (float *)Src, (float *)dstNorm, 0);
+          copyGenericColorSpinorQS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorQH(dst, src, location, (int8_t *)Dst, (short *)Src, (float *)dstNorm, (float *)srcNorm);
+          copyGenericColorSpinorQH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorQQ(dst, src, location, (int8_t *)Dst, (int8_t *)Src, (float *)dstNorm, (float *)srcNorm);
+          copyGenericColorSpinorQQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
@@ -101,41 +105,41 @@ namespace quda {
     } else {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorMGDD(dst, src, location, Dst, Src);
+          copyGenericColorSpinorMGDD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGDS(dst, src, location, (double*)Dst, (float*)Src);
+          copyGenericColorSpinorMGDS(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
-          copyGenericColorSpinorMGSD(dst, src, location, (float*)Dst, (double*)Src);
+          copyGenericColorSpinorMGSD(pack);
         } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGSS(dst, src, location, (float*)Dst, (float*)Src);
+          copyGenericColorSpinorMGSS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGSH(dst, src, location, (float*)Dst, (short*)Src);
+          copyGenericColorSpinorMGSH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGSQ(dst, src, location, (float *)Dst, (int8_t *)Src);
+          copyGenericColorSpinorMGSQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_HALF_PRECISION) {
         if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGHS(dst, src, location, (short*)Dst, (float*)Src);
+          copyGenericColorSpinorMGHS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGHH(dst, src, location, (short*)Dst, (short*)Src);
+          copyGenericColorSpinorMGHH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGHQ(dst, src, location, (short *)Dst, (int8_t *)Src);
+          copyGenericColorSpinorMGHQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }
       } else if (dst.Precision() == QUDA_QUARTER_PRECISION) {
         if (src.Precision() == QUDA_SINGLE_PRECISION) {
-          copyGenericColorSpinorMGQS(dst, src, location, (int8_t *)Dst, (float *)Src);
+          copyGenericColorSpinorMGQS(pack);
         } else if (src.Precision() == QUDA_HALF_PRECISION) {
-          copyGenericColorSpinorMGQH(dst, src, location, (int8_t *)Dst, (short *)Src);
+          copyGenericColorSpinorMGQH(pack);
         } else if (src.Precision() == QUDA_QUARTER_PRECISION) {
-          copyGenericColorSpinorMGQQ(dst, src, location, (int8_t *)Dst, (int8_t *)Src);
+          copyGenericColorSpinorMGQQ(pack);
         } else {
           errorQuda("Unsupported Destination Precision %d with Source Precision %d", dst.Precision(), src.Precision());
         }

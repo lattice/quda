@@ -643,9 +643,6 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
-   * @param milc_link Ignored
-   * @param milc_clover Ignored
-   * @param milc_clover_inv Ignored
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
@@ -660,9 +657,6 @@ extern "C" {
       double clover_coeff,
       QudaInvertArgs_t inv_args,
       const double* target_residual,
-      const void* milc_link,
-      void* milc_clover,
-      void* milc_clover_inv,
       void* source,
       void** solutionArray,
       double* const final_residual,
@@ -953,7 +947,6 @@ extern "C" {
    */
   void qudaDestroyGaugeField(void* gauge);
 
-
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in] precision, 1 for single precision else for double precision
@@ -961,9 +954,10 @@ extern "C" {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
   void qudaGaugeFixingOVR( const int precision,
@@ -977,7 +971,6 @@ extern "C" {
     void* milc_sitelink
     );
 
-
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in] precision, 1 for single precision else for double precision
@@ -986,8 +979,9 @@ extern "C" {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in,out] milc_sitelink, MILC gauge field to be fixed
    */
   void qudaGaugeFixingFFT( int precision,

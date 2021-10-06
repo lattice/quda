@@ -9,13 +9,6 @@ bool gauge_loaded = false;
 const char *prec_str[] = {"quarter", "half", "single", "double"};
 const char *recon_str[] = {"r18", "r13", "r9"};
 
-void init(int precision, QudaReconstructType link_recon, int partition)
-{
-  dslash_test_wrapper.init_ctest(precision, link_recon, partition);
-}
-
-void end() { dslash_test_wrapper.end(); }
-
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
@@ -73,23 +66,20 @@ public:
 
     if (skip()) GTEST_SKIP();
 
-    int value = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
-        commDimPartitionedSet(j);
-      }
-
+    int partition = ::testing::get<2>(GetParam());
+    for (int j = 0; j < 4; j++) {
+      if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
     updateR();
 
-    init(prec, recon, value);
+    dslash_test_wrapper.init_ctest(prec, link_recon);
     display_test_info(prec, recon);
   }
 
   virtual void TearDown()
   {
     if (skip()) GTEST_SKIP();
-    end();
+    dslash_test_wrapper.end();
   }
 
   static void SetUpTestCase() { initQuda(device_ordinal); }
@@ -179,14 +169,6 @@ int main(int argc, char **argv)
 
   // return result of RUN_ALL_TESTS
   int test_rc = RUN_ALL_TESTS();
-
-  // Clean up loaded gauge field
-  for (int dir = 0; dir < 4; dir++) {
-    if (dslash_test_wrapper.qdp_inlink[dir] != nullptr) {
-      free(dslash_test_wrapper.qdp_inlink[dir]);
-      dslash_test_wrapper.qdp_inlink[dir] = nullptr;
-    }
-  }
 
   dslash_test_wrapper.end_ctest_once();
 

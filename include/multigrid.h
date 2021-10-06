@@ -46,6 +46,9 @@ namespace quda {
     /** Number of times to apply Gram-Schmidt within a block */
     int NblockOrtho;
 
+    /** Whether we are doing the two-pass Block Orthogonalize */
+    bool blockOrthoTwoPass;
+
     /** This is the next lower level */
     MG *coarse;
 
@@ -116,6 +119,7 @@ namespace quda {
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
       NblockOrtho(param.n_block_ortho[level]),
+      blockOrthoTwoPass(param.block_ortho_two_pass[level]),
       B(B),
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
@@ -149,6 +153,7 @@ namespace quda {
       spinBlockSize(param.mg_global.spin_block_size[level]),
       Nvec(param.mg_global.n_vec[level]),
       NblockOrtho(param.mg_global.n_block_ortho[level]),
+      blockOrthoTwoPass(param.mg_global.block_ortho_two_pass[level]),
       coarse(param.coarse),
       fine(param.fine),
       B(B),
@@ -286,11 +291,10 @@ namespace quda {
 
     /**
        @brief Helper function called on exit to each MG member function
-       @param[in] level The level we working on
     */
-    void popLevel(int level) const;
+    void popLevel() const;
 
-public:
+  public:
     /**
        Constructor for MG class
        @param param MGParam struct that defines all meta data

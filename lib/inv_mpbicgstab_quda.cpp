@@ -127,7 +127,7 @@ namespace quda {
   } 
 #endif
 
-  void MPBiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
+  void MPBiCGstab::operator()(ColorSpinorField &, ColorSpinorField &)
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");

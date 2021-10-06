@@ -42,7 +42,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
   qudaMemset(num_failures_dev, 0, sizeof(int));
   unitarizeLinks(*cudaInGauge, num_failures_dev);
 
-  qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+  qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
   if (num_failures > 0) errorQuda("Error in the unitarization\n");
   device_free(num_failures_dev);
 }
@@ -184,7 +184,7 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -195,8 +195,8 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
     // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
@@ -208,16 +208,15 @@ int main(int argc, char **argv)
     inv_param.solve_type = solve_type;
   }
 
-  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorIn = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorCheck = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorOut = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
   {
     using namespace quda;
-    GaugeFieldParam gParam(0, gauge_param);
-    gParam.pad = 0;
+    GaugeFieldParam gParam(gauge_param);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
@@ -246,7 +245,6 @@ int main(int argc, char **argv)
 
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
-    randstates->Init();
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
@@ -448,7 +446,6 @@ int main(int argc, char **argv)
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    randstates->Release();
     delete randstates;
   }
 
@@ -462,22 +459,22 @@ int main(int argc, char **argv)
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (clover) host_free(clover);
+    if (clover_inv) host_free(clover_inv);
+  }
+
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
+
+  host_free(spinorIn);
+  host_free(spinorCheck);
+  host_free(spinorOut);
+
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
-  }
-
-  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
-
-  free(spinorIn);
-  free(spinorCheck);
-  free(spinorOut);
 
   return 0;
 }

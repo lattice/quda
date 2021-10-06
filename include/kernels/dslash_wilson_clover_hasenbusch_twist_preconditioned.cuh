@@ -37,8 +37,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct cloverHasenbuschPreconditioned : dslash_default {
 
-    Arg &arg;
-    constexpr cloverHasenbuschPreconditioned(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr cloverHasenbuschPreconditioned(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -47,7 +47,7 @@ namespace quda
        - with xpay:  out(x) = M*in = (1 - a*A(x)^{-1}D) * in(x-mu)
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       using namespace linalg; // for Cholesky
       typedef typename mapper<typename Arg::Float>::type real;

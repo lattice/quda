@@ -196,7 +196,7 @@ namespace quda {
   }
 #endif // SSTEP
 
-  void MPCG::operator()(ColorSpinorField &x, ColorSpinorField &b) 
+  void MPCG::operator()(ColorSpinorField &, ColorSpinorField &)
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");

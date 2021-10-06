@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 #include <qio_field.h>
@@ -1239,10 +1240,7 @@ public:
 
   public:
     MultiShiftSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-      mat(mat),
-      matSloppy(matSloppy),
-      param(param),
-      profile(profile)
+      mat(mat), matSloppy(matSloppy), param(param), profile(profile)
     {
       ;
     }

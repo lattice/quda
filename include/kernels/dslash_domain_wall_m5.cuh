@@ -1,10 +1,23 @@
 #pragma once
 
+#include <color_spinor_field_order.h>
 #include <shared_memory_cache_helper.cuh>
 #include <math_helper.cuh>
+#include <index_helper.cuh>
+#include <kernel.h>
+#include <domain_wall_helper.h>
 
 namespace quda
 {
+
+  /** Whether to use a shared memory scratch pad to store the input
+     field acrosss the Ls dimension to minimize global memory
+     reads. */
+  constexpr bool shared() { return true; }
+
+  /** Whether to use variable or fixed coefficient algorithm.  Must be
+      true if using ZMOBIUS */
+  constexpr bool var_inverse() { return true; }
 
   /**
      @brief Structure containing zMobius / Zolotarev coefficients
@@ -14,9 +27,6 @@ namespace quda
     complex<real> b[QUDA_MAX_DWF_LS];
     complex<real> c[QUDA_MAX_DWF_LS];
   };
-
-  constexpr int size = 4096;
-  static __constant__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
 
   // helper trait for determining if we are using variable coefficients
   template <Dslash5Type type> struct is_variable {
@@ -36,48 +46,38 @@ namespace quda
      @brief Helper class for grabbing the constant struct, whether
      we are on the GPU or CPU.
   */
-  template <typename real, bool is_variable, typename Arg> class coeff_type
+  template <typename real, bool is_variable, typename Arg> struct coeff_type
   {
-public:
     const Arg &arg;
     __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
-    __device__ __host__ real a(int s) { return arg.a; }
-    __device__ __host__ real b(int s) { return arg.b; }
-    __device__ __host__ real c(int s) { return arg.c; }
+    __device__ __host__ real a(int) { return arg.a; }
+    __device__ __host__ real b(int) { return arg.b; }
+    __device__ __host__ real c(int) { return arg.c; }
   };
 
   /**
      @brief Specialization for variable complex coefficients
   */
-  template <typename real, typename Arg> class coeff_type<real, true, Arg>
+  template <typename real, typename Arg> struct coeff_type<real, true, Arg>
   {
-    /**
-       @brief Helper function for grabbing the constant struct, whether
-       we are on the GPU or CPU.
-    */
-    inline __device__ __host__ const coeff_5<real> *coeff() const
-    {
-#ifdef __CUDA_ARCH__
-      return reinterpret_cast<const coeff_5<real> *>(mobius_d);
-#else
-      return arg.mobius_h;
-#endif
-    }
-
-public:
     const Arg &arg;
     __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
-    __device__ __host__ complex<real> a(int s) { return coeff()->a[s]; }
-    __device__ __host__ complex<real> b(int s) { return coeff()->b[s]; }
-    __device__ __host__ complex<real> c(int s) { return coeff()->c[s]; }
+    __device__ __host__ complex<real> a(int s) { return arg.coeff.a[s]; }
+    __device__ __host__ complex<real> b(int s) { return arg.coeff.b[s]; }
+    __device__ __host__ complex<real> c(int s) { return arg.coeff.c[s]; }
   };
 
   /**
      @brief Parameter structure for applying the Dslash
    */
-  template <typename Float, int nColor> struct Dslash5Arg {
-    typedef typename colorspinor_mapper<Float, 4, nColor>::type F;
-    typedef typename mapper<Float>::type real;
+  template <typename Float, int nColor_, bool dagger_, bool xpay_, Dslash5Type type_>
+  struct Dslash5Arg : kernel_param<> {
+    using real = typename mapper<Float>::type;
+    static constexpr int nColor = nColor_;
+    static constexpr bool dagger = dagger_;
+    static constexpr bool xpay = xpay_;
+    static constexpr Dslash5Type type = type_;
+    using F = typename colorspinor_mapper<Float, 4, nColor>::type;
 
     F out;                  // output vector field
     const F in;             // input vector field
@@ -90,19 +90,15 @@ public:
     const real m_f; // fermion mass parameter
     const real m_5; // Wilson mass shift
 
-    const bool dagger; // dagger
-    const bool xpay;   // whether we are doing xpay or not
-
     real b; // real constant Mobius coefficient
     real c; // real constant Mobius coefficient
     real a; // real xpay coefficient
 
-    Dslash5Type type;
-
-    coeff_5<real> *mobius_h; // constant buffer used for Mobius coefficients for CPU kernel
+    coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
-        const Complex *b_5_, const Complex *c_5_, double a_, bool dagger, Dslash5Type type) :
+               const Complex *b_5_, const Complex *c_5_, double a_) :
+        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
         out(out),
         in(in),
         x(x),
@@ -112,20 +108,15 @@ public:
         Ls(in.X(4)),
         m_f(m_f),
         m_5(m_5),
-        a(a_),
-        dagger(dagger),
-        xpay(a_ == 0.0 ? false : true),
-        type(type)
+        a(a_)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
-      if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-      mobius_h = new coeff_5<real>;
-      auto *a_5 = mobius_h->a;
-      auto *b_5 = mobius_h->b;
-      auto *c_5 = mobius_h->c;
+      auto *a_5 = coeff.a;
+      auto *b_5 = coeff.b;
+      auto *c_5 = coeff.c;
 
       switch (type) {
       case DSLASH5_DWF: break;
@@ -156,7 +147,7 @@ public:
       case M5_INV_MOBIUS:
         b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
         c = 0.5 / (1.0 + std::pow(b, (int)Ls) * m_f);
-        a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
+        a *= std::pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
         break;
       case M5_INV_ZMOBIUS: {
         complex<double> k = 1.0;
@@ -173,108 +164,74 @@ public:
       } break;
       default: errorQuda("Unknown Dslash5Type %d", type);
       }
-
-      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
     }
-
-    virtual ~Dslash5Arg() { delete mobius_h; }
   };
 
-  /**
-     @brief Apply the D5 operator at given site
-     @param[in] arg Argument struct containing any meta data and accessors
-     @param[in] parity Parity we are on
-     @param[in] x_b Checkerboarded 4-d space-time index
-     @param[in] s Ls dimension coordinate
-  */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __device__ __host__ inline void dslash5(Arg &arg, int parity, int x_cb, int s)
-  {
-    typedef typename mapper<Float>::type real;
-    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
-    typedef ColorSpinor<real, nColor, 4> Vector;
+  template <typename Arg> struct dslash5 {
+    const Arg &arg;
+    constexpr dslash5(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    Vector out;
+    /**
+       @brief Apply the D5 operator at given site
+       @param[in] parity Parity we are on
+       @param[in] x_b Checkerboarded 4-d space-time index
+       @param[in] s Ls dimension coordinate
+    */
+    __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+    {
+      using real = typename Arg::real;
+      coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
+      typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
-    { // forwards direction
-      const int fwd_idx = ((s + 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-      const Vector in = arg.in(fwd_idx, parity);
-      constexpr int proj_dir = dagger ? +1 : -1;
-      if (s == arg.Ls - 1) {
-        out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-      } else {
-        out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+      Vector out;
+
+      { // forwards direction
+        const int fwd_idx = ((s + 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
+        const Vector in = arg.in(fwd_idx, parity);
+        constexpr int proj_dir = Arg::dagger ? +1 : -1;
+        if (s == arg.Ls - 1) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
       }
-    }
 
-    { // backwards direction
-      const int back_idx = ((s + arg.Ls - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
-      const Vector in = arg.in(back_idx, parity);
-      constexpr int proj_dir = dagger ? -1 : +1;
-      if (s == 0) {
-        out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
-      } else {
-        out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+      { // backwards direction
+        const int back_idx = ((s + arg.Ls - 1) % arg.Ls) * arg.volume_4d_cb + x_cb;
+        const Vector in = arg.in(back_idx, parity);
+        constexpr int proj_dir = Arg::dagger ? -1 : +1;
+        if (s == 0) {
+          out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
+        } else {
+          out += in.project(4, proj_dir).reconstruct(4, proj_dir);
+        }
       }
-    }
 
-    if (type == DSLASH5_DWF && xpay) {
-      Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-      out = x + arg.a * out;
-    } else if (type == DSLASH5_MOBIUS_PRE) {
-      Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      out = coeff.c(s) * out + coeff.b(s) * diagonal;
-
-      if (xpay) {
+      if (Arg::type == DSLASH5_DWF && Arg::xpay) {
         Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = x + coeff.a(s) * out;
-      }
-    } else if (type == DSLASH5_MOBIUS) {
-      Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      out = coeff.c(s) * out + diagonal;
+        out = x + arg.a * out;
+      } else if (Arg::type == DSLASH5_MOBIUS_PRE) {
+        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.c(s) * out + coeff.b(s) * diagonal;
 
-      if (xpay) { // really axpy
-        Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.a(s) * x + out;
+        if (Arg::xpay) {
+          Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+          out = x + coeff.a(s) * out;
+        }
+      } else if (Arg::type == DSLASH5_MOBIUS) {
+        Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        out = coeff.c(s) * out + diagonal;
+
+        if (Arg::xpay) { // really axpy
+          Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+          out = coeff.a(s) * x + out;
+        }
       }
+
+      arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
     }
-
-    arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
-  }
-
-  /**
-     @brief CPU kernel for applying the D5 operator
-     @param[in] arg Argument struct containing any meta data and accessors
-  */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  void dslash5CPU(Arg &arg)
-  {
-    for (int parity = 0; parity < arg.nParity; parity++) {
-      for (int s = 0; s < arg.Ls; s++) {
-        for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { // 4-d volume
-          dslash5<Float, nColor, dagger, xpay, type>(arg, parity, x_cb, s);
-        } // 4-d volumeCB
-      }   // ls
-    }     // parity
-  }
-
-  /**
-     @brief GPU kernel for applying the D5 operator
-     @param[in] arg Argument struct containing any meta data and accessors
-  */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, typename Arg>
-  __global__ void dslash5GPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    int s = blockIdx.y * blockDim.y + threadIdx.y;
-    int parity = blockIdx.z * blockDim.z + threadIdx.z;
-
-    if (x_cb >= arg.volume_4d_cb) return;
-    if (s >= arg.Ls) return;
-    if (parity >= arg.nParity) return;
-
-    dslash5<Float, nColor, dagger, xpay, type>(arg, parity, x_cb, s);
-  }
+  };
 
   /**
      @brief Apply the M5 inverse operator at a given site on the
@@ -291,15 +248,16 @@ public:
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
+  template <typename Vector, typename Arg>
+  __device__ __host__ inline Vector constantInv(const Arg &arg, int parity, int x_cb, int s_)
   {
+    using real = typename Arg::real;
     const auto k = arg.b;
     const auto inv = arg.c;
 
     // if using shared-memory caching then load spinor field for my site into cache
-    VectorCache<real, Vector> cache;
-    if (shared) {
+    SharedMemoryCache<Vector> cache(target::block_dim());
+    if (shared()) {
       cache.save(arg.in(s_ * arg.volume_4d_cb + x_cb, parity));
       cache.sync();
     }
@@ -308,19 +266,19 @@ public:
 
     for (int s = 0; s < arg.Ls; s++) {
 
-      Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      Vector in = shared() ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
 
       {
         int exp = s_ < s ? arg.Ls - s + s_ : s_ - s;
-        real factorR = inv * __fast_pow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = dagger ? -1 : +1;
+        real factorR = inv * fpow(k, exp) * (s_ < s ? -arg.m_f : static_cast<real>(1.0));
+        constexpr int proj_dir = Arg::dagger ? -1 : +1;
         out += factorR * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
 
       {
         int exp = s_ > s ? arg.Ls - s_ + s : s - s_;
-        real factorL = inv * __fast_pow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
-        constexpr int proj_dir = dagger ? +1 : -1;
+        real factorL = inv * fpow(k, exp) * (s_ > s ? -arg.m_f : static_cast<real>(1.0));
+        constexpr int proj_dir = Arg::dagger ? +1 : -1;
         out += factorL * (in.project(4, proj_dir)).reconstruct(4, proj_dir);
       }
     }
@@ -340,29 +298,27 @@ public:
      build up the scalar coefficients needed in a SIMD-friendly
      fashion.
 
-     @tparam shared Whether to use a shared memory scratch pad to
-     store the input field acroos the Ls dimension to minimize global
-     memory reads.
      @param[in] arg Argument struct containing any meta data and accessors
      @param[in] parity Parity we are on
      @param[in] x_b Checkerboarded 4-d space-time index
      @param[in] s_ Ls dimension coordinate
   */
-  template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
-  __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
+  template <typename Vector, typename Arg>
+  __device__ __host__ inline Vector variableInv(const Arg &arg, int parity, int x_cb, int s_)
   {
     constexpr int nSpin = 4;
-    typedef ColorSpinor<real, nColor, nSpin / 2> HalfVector;
-    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
+    using real = typename Arg::real;
+    typedef ColorSpinor<real, Arg::nColor, nSpin / 2> HalfVector;
+    coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
     Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
-    VectorCache<real, HalfVector> cache;
+    SharedMemoryCache<HalfVector> cache(target::block_dim());
 
     { // first do R
-      constexpr int proj_dir = dagger ? -1 : +1;
+      constexpr int proj_dir = Arg::dagger ? -1 : +1;
 
-      if (shared) {
+      if (shared()) {
         cache.save(in.project(4, proj_dir));
         cache.sync();
       }
@@ -373,7 +329,7 @@ public:
       for (int s_count = 0; s_count < arg.Ls; s_count++) {
         auto factorR = (s_ < s ? -arg.m_f * R : R);
 
-        if (shared) {
+        if (shared()) {
           r += factorR * cache.load(threadIdx.x, s, parity);
         } else {
           Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
@@ -388,8 +344,8 @@ public:
     }
 
     { // second do L
-      constexpr int proj_dir = dagger ? +1 : -1;
-      if (shared) {
+      constexpr int proj_dir = Arg::dagger ? +1 : -1;
+      if (shared()) {
         cache.sync(); // ensure we finish R before overwriting cache
         cache.save(in.project(4, proj_dir));
         cache.sync();
@@ -401,7 +357,7 @@ public:
       for (int s_count = 0; s_count < arg.Ls; s_count++) {
         auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-        if (shared) {
+        if (shared()) {
           l += factorL * cache.load(threadIdx.x, s, parity);
         } else {
           Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
@@ -419,58 +375,42 @@ public:
   }
 
   /**
-     @brief Apply the M5 inverse operator at a given site on the
-     lattice.
-     @tparam shared Whether to use a shared memory scratch pad to
-     store the input field across the Ls dimension to minimize global
-     memory reads.
-     @param[in] arg Argument struct containing any meta data and accessors
-     @param[in] parity Parity we are on
-     @param[in] x_b Checkerboarded 4-d space-time index
-     @param[in] s Ls dimension coordinate
-  */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, bool shared, bool var_inverse, typename Arg>
-  __device__ __host__ inline void dslash5inv(Arg &arg, int parity, int x_cb, int s)
-  {
-    constexpr int nSpin = 4;
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, nSpin> Vector;
-    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
-
-    Vector out;
-    if (var_inverse) { // zMobius, must call variableInv
-      out = variableInv<real, nColor, dagger, type, shared, Vector>(arg, parity, x_cb, s);
-    } else {
-      out = constantInv<real, nColor, dagger, type, shared, Vector>(arg, parity, x_cb, s);
-    }
-
-    if (xpay) {
-      Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-      out = x + coeff.a(s) * out;
-    }
-
-    arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
-  }
-
-  /**
-     @brief CPU kernel for applying the M5 inverse operator
-     @tparam shared Whether to use a shared memory scratch pad to
-     store the input field acroos the Ls dimension to minimize global
-     memory reads.
+     @brief Functor for applying the M5 inverse operator
      @param[in] arg Argument struct containing any meta data and accessors
   */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, bool shared, bool var_inverse, typename Arg>
-  __global__ void dslash5invGPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    int s = blockIdx.y * blockDim.y + threadIdx.y;
-    int parity = blockIdx.z * blockDim.z + threadIdx.z;
+  template <typename Arg> struct dslash5inv {
+    const Arg &arg;
+    constexpr dslash5inv(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    if (x_cb >= arg.volume_4d_cb) return;
-    if (s >= arg.Ls) return;
-    if (parity >= arg.nParity) return;
+    /**
+       @brief Apply the M5 inverse operator at a given site on the
+       lattice.
+       @param[in] parity Parity we are on
+       @param[in] x_b Checkerboarded 4-d space-time index
+       @param[in] s Ls dimension coordinate
+    */
+    __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+    {
+      constexpr int nSpin = 4;
+      using real = typename Arg::real;
+      typedef ColorSpinor<real, Arg::nColor, nSpin> Vector;
+      coeff_type<real, is_variable<Arg::type>::value, Arg> coeff(arg);
 
-    dslash5inv<Float, nColor, dagger, xpay, type, shared, var_inverse>(arg, parity, x_cb, s);
-  }
+      Vector out;
+      if (var_inverse()) { // zMobius, must call variableInv
+        out = variableInv<Vector>(arg, parity, x_cb, s);
+      } else {
+        out = constantInv<Vector>(arg, parity, x_cb, s);
+      }
+
+      if (Arg::xpay) {
+        Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
+        out = x + coeff.a(s) * out;
+      }
+
+      arg.out(s * arg.volume_4d_cb + x_cb, parity) = out;
+    }
+  };
 
 } // namespace quda

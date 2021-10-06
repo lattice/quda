@@ -12,8 +12,6 @@
 #include "misc.h"
 #include <blas_quda.h>
 
-extern void *memset(void *s, int c, size_t n);
-
 #include <dslash_reference.h>
 
 template <typename Float> void display_link_internal(Float *link)
@@ -35,9 +33,14 @@ template <typename Float> void display_link_internal(Float *link)
 // if daggerBit is zero: perform ordinary dslash operator
 // if daggerBit is one:  perform hermitian conjugate of dslash
 template <typename sFloat, typename gFloat>
+#ifdef MULTI_GPU
 void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink,
                               gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
                               sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
+#else
+void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **, gFloat **, sFloat *spinorField,
+                              sFloat **, sFloat **, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
+#endif
 {
   for (int i = 0; i < Vh * stag_spinor_site_size * nSrc; i++) res[i] = 0.0;
 
@@ -58,8 +61,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
 #ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    ghostLonglinkEven[dir] = ghostLonglink[dir];
-    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
+    ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
+    ghostLonglinkOdd[dir] = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
 #endif
   }
 

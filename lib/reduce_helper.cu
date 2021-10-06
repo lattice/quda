@@ -1,7 +1,8 @@
 #include <quda_internal.h>
 #include <malloc_quda.h>
 #include <reduce_helper.h>
-#include <tune_quda.h>
+#include <tunable_nd.h>
+#include <kernels/reduce_init.cuh>
 
 // These are used for reduction kernels
 static device_reduce_t *d_reduce = nullptr;
@@ -9,7 +10,7 @@ static device_reduce_t *h_reduce = nullptr;
 static device_reduce_t *hd_reduce = nullptr;
 
 static count_t *reduce_count = nullptr;
-static cudaEvent_t reduceEnd;
+static qudaEvent_t reduceEnd;
 
 namespace quda
 {
@@ -22,7 +23,7 @@ namespace quda
     void *get_mapped_buffer() { return hd_reduce; }
     void *get_host_buffer() { return h_reduce; }
     count_t *get_count() { return reduce_count; }
-    cudaEvent_t &get_event() { return reduceEnd; }
+    qudaEvent_t &get_event() { return reduceEnd; }
 
     size_t buffer_size()
     {
@@ -41,18 +42,30 @@ namespace quda
       int reduce_size = 4 * sizeof(device_reduce_t);
       int max_reduce = reduce_size;
       int max_multi_reduce = max_n_reduce() * reduce_size;
-      int max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
+      int max_reduce_blocks = 2 * device::processor_count();
 
       // reduction buffer size
       size_t bytes = max_reduce_blocks * std::max(max_reduce, max_multi_reduce);
       return bytes;
     }
 
-    // need to use placement new constructor to initialize the atomic counters
-    template <typename T> __global__ void init_count(T *counter)
-    {
-      for (int i = 0; i < max_n_reduce(); i++) new (counter + i) T {0};
-    }
+    template <typename T>
+    struct init_reduce : public TunableKernel1D {
+      T *reduce_count;
+      long long bytes() const { return max_n_reduce() * sizeof(T); }
+      unsigned int minThreads() const { return max_n_reduce(); }
+
+      init_reduce(T *reduce_count) :
+        TunableKernel1D(max_n_reduce()),
+        reduce_count(reduce_count)
+      { apply(device::get_default_stream()); }
+
+      void apply(const qudaStream_t &stream)
+      {
+        auto tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        launch_device<init_count>(tp, stream, init_arg<T>(reduce_count));
+      }
+    };
 
     void init()
     {
@@ -78,21 +91,15 @@ namespace quda
 
       if (!reduce_count) {
         reduce_count = static_cast<count_t *>(device_malloc(max_n_reduce() * sizeof(decltype(*reduce_count))));
-        TuneParam tp;
-        tp.grid = dim3(1, 1, 1);
-        tp.block = dim3(1, 1, 1);
-
-        qudaLaunchKernel(init_count<count_t>, tp, 0, reduce_count);
+        init_reduce<count_t> init(reduce_count);
       }
 
-      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
-
-      checkCudaError();
+      reduceEnd = qudaEventCreate();
     }
 
     void destroy()
     {
-      cudaEventDestroy(reduceEnd);
+      qudaEventDestroy(reduceEnd);
 
       if (reduce_count) {
         device_free(reduce_count);

@@ -10,8 +10,8 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include "momentum.h"
-#include <dslash_quda.h> 
 #include <sys/time.h>
+#include <gtest/gtest.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
@@ -165,8 +165,6 @@ static int R[4] = {0, 0, 0, 0};
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device_ordinal);
-
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
   qudaGaugeParam.X[2] = zdim;
@@ -181,14 +179,14 @@ static void hisq_force_init()
 
   memcpy(&qudaGaugeParam_ex, &qudaGaugeParam, sizeof(QudaGaugeParam));
 
-  gParam = GaugeFieldParam(0, qudaGaugeParam);
+  gParam = GaugeFieldParam(qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
 
   gParam.order = gauge_order;
   cpuGauge = new cpuGaugeField(gParam);
 
-  gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
+  gParam_ex = GaugeFieldParam(qudaGaugeParam_ex);
   gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
@@ -239,11 +237,7 @@ static void hisq_force_init()
 
   //createMomCPU(cpuMom->Gauge_p(), mom_prec);
 
-  hw = malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
-  if (hw == NULL){
-    fprintf(stderr, "ERROR: malloc failed for hw\n");
-    exit(1);
-  }
+  hw = safe_malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
 
   createHwCPU(hw, hw_prec);
 
@@ -293,15 +287,12 @@ static void hisq_force_end()
   delete cpuOprod_ex;  
   delete cpuLongLinkOprod_ex;
 
-  free(hw);
-
-  endQuda();
+  host_free(hw);
 }
 
 static int hisq_force_test(void)
 {
   setVerbosity(QUDA_VERBOSE);
-
   hisq_force_init();
 
   //float weight = 1.0;
@@ -377,11 +368,9 @@ static int hisq_force_test(void)
   cudaMom->saveCPUField(*cpuMom);
 
   int accuracy_level = 3;
-  if(verify_results){
-    int res;
-    res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
-                         qudaGaugeParam.cpu_prec);
-
+  if (verify_results) {
+    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+                             qudaGaugeParam.cpu_prec);
     accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), qudaGaugeParam.cpu_prec);
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
   }
@@ -400,7 +389,6 @@ static int hisq_force_test(void)
   return accuracy_level;
 }
 
-
 static void display_test_info()
 {
   printfQuda("running the following fermion force computation test:\n");
@@ -411,18 +399,21 @@ static void display_test_info()
       get_recon_str(link_recon), 
       xdim, ydim, zdim, tdim,
       get_gauge_order_str(gauge_order));
-  return ;
+}
 
+TEST(paths, verify)
+{
+  int level = hisq_force_test();
+  int tolerance = link_prec == QUDA_SINGLE_PRECISION ? 5 : 13;
+  ASSERT_GE(level, tolerance) << "CPU and GPU implementations do not agree";
 }
 
 int main(int argc, char **argv)
 {
-  auto app = make_app();
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
 
+  auto app = make_app();
   CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
                                                             {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
@@ -433,23 +424,23 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    errorQuda("Multi-gpu for milc order is not supported\n");
-  }
-
   initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device_ordinal);
 
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) errorQuda("Multi-gpu for milc order is not supported");
   setPrecision(prec);
 
   display_test_info();
 
-  int accuracy_level = hisq_force_test();
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
+  int test_rc = RUN_ALL_TESTS();
+  if (test_rc != 0) warningQuda("Tests failed");
+
+  endQuda();
   finalizeComms();
 
-  if(accuracy_level >=3 ){
-    return EXIT_SUCCESS;
-  }else{
-    return -1;
-  }
+  return test_rc;
 }

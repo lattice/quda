@@ -10,7 +10,7 @@
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
 #include <sys/time.h>
-#include <dslash_quda.h>
+#include <gtest/gtest.h>
 
 using namespace quda;
 
@@ -26,14 +26,6 @@ cpuGaugeField *cpuResult = NULL;
 cpuGaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
-
-// extern bool verify_results;
-double accuracy = 1e-5;
-int ODD_BIT = 1;
-
-QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
-
-void setPrecision(QudaPrecision precision) { link_prec = precision; }
 
 // Create a field of links that are not su3_matrices
 void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
@@ -58,8 +50,6 @@ void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device_ordinal);
-
   gaugeParam.X[0] = xdim;
   gaugeParam.X[1] = ydim;
   gaugeParam.X[2] = zdim;
@@ -68,10 +58,10 @@ static void hisq_force_init()
   setDims(gaugeParam.X);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = link_prec;
+  gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  GaugeFieldParam gParam(0, gaugeParam);
+  GaugeFieldParam gParam(gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -114,11 +104,9 @@ static void hisq_force_end()
   delete cudaResult;
 
   delete cpuReference;
-
-  endQuda();
 }
 
-static void hisq_force_test()
+TEST(hisq_force_unitarize, verify)
 {
   hisq_force_init();
 
@@ -148,17 +136,20 @@ static void hisq_force_test()
   cudaResult->saveCPUField(*cpuReference);
   
   printfQuda("Comparing CPU and GPU results\n");
-  for(int dir=0; dir<4; ++dir){
-    int res = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
-                             cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
-#ifdef MULTI_GPU
-    comm_allreduce_int(&res);
-    res /= comm_size();
-#endif
-    printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
+  int res[4];
+
+  double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
+  for (int dir = 0; dir < 4; ++dir) {
+    res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+                              cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
+
+    comm_allreduce_int(&res[dir]);
+    res[dir] /= comm_size();
   }
 
   hisq_force_end();
+
+  for (int dir = 0; dir < 4; ++dir) { ASSERT_EQ(res[dir], 1) << "Dir:" << dir; }
 }
 
 static void display_test_info()
@@ -166,19 +157,16 @@ static void display_test_info()
   printfQuda("running the following fermion force computation test:\n");
     
   printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
-  printfQuda("%s                       %s                         %d/%d/%d                  %d \n", 
-	 get_prec_str(link_prec),
-	 get_recon_str(link_recon), 
-	 xdim, ydim, zdim, tdim);
+  printfQuda("%s                       %s                         %d/%d/%d                  %d \n", get_prec_str(prec),
+             get_recon_str(link_recon), xdim, ydim, zdim, tdim);
 }
 
 int main(int argc, char **argv)
 {
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
+
   auto app = make_app();
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -186,15 +174,15 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
-
-  setPrecision(prec);
+  initQuda(device_ordinal);
 
   display_test_info();
-    
-  hisq_force_test();
 
+  int test_rc = RUN_ALL_TESTS();
+
+  endQuda();
   finalizeComms();
 
-  return EXIT_SUCCESS;
+  return test_rc;
 }
 

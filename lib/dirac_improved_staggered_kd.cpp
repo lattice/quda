@@ -1,4 +1,5 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 #include <staggered_kd_build_xinv.h>
@@ -7,18 +8,16 @@ namespace quda
 {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) :
-    DiracImprovedStaggered(param),
-    Xinv(param.xInvKD)
+    DiracImprovedStaggered(param), Xinv(param.xInvKD)
   {
   }
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac) :
-    DiracImprovedStaggered(dirac),
-    Xinv(dirac.Xinv)
+    DiracImprovedStaggered(dirac), Xinv(dirac.Xinv)
   {
   }
 
-  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() {}
+  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() { }
 
   DiracImprovedStaggeredKD &DiracImprovedStaggeredKD::operator=(const DiracImprovedStaggeredKD &dirac)
   {
@@ -46,13 +45,13 @@ namespace quda
     }
   }
 
-  void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracImprovedStaggeredKD::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
 
-  void DiracImprovedStaggeredKD::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                            const ColorSpinorField &x, const double &k) const
+  void DiracImprovedStaggeredKD::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
+                                            const ColorSpinorField &, const double &) const
   {
     errorQuda("The improved staggered Kahler-Dirac operator does not have a single parity form");
   }
@@ -195,8 +194,7 @@ namespace quda
     }
   }
 
-  void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-                                             const QudaSolutionType solType) const
+  void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
 
@@ -205,7 +203,7 @@ namespace quda
   }
 
   void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-                                                      const QudaSolutionType solType) const
+                                                      const QudaSolutionType) const
   {
     // do nothing
 
@@ -227,8 +225,8 @@ namespace quda
     // nothing required for left block preconditioning
   }
 
-  void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in,
-                                              cudaGaugeField *long_gauge_in, cudaCloverField *clover_in)
+  void DiracImprovedStaggeredKD::updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in,
+                                              cudaGaugeField *long_gauge_in, cudaCloverField *)
   {
     Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
     fatGauge = fat_gauge_in;
@@ -238,8 +236,8 @@ namespace quda
     BuildStaggeredKahlerDiracInverse(*Xinv, *fatGauge, mass);
   }
 
-  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                                double mass, double mu, double mu_factor) const
+  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double,
+                                                double) const
   {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 

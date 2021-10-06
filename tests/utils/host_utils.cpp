@@ -1,3 +1,4 @@
+#include <limits>
 #include <complex>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,7 +13,6 @@
 // QUDA headers
 #include <color_spinor_field.h>
 #include <unitarization_links.h>
-#include <dslash_quda.h>
 
 // External headers
 #include <llfat_utils.h>
@@ -23,9 +23,7 @@
 #include <misc.h>
 #include <qio_field.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-using namespace std;
+template <typename T> using complex = std::complex<T>;
 
 #define XUP 0
 #define YUP 1
@@ -110,6 +108,7 @@ void setQudaDefaultMgTestParams()
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
+    block_ortho_two_pass[i] = true;
 
     // Default eigensolver params
     mg_eig[i] = false;
@@ -166,13 +165,13 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-
   // 0 = unit gauge
   // 1 = random SU(3)
   // 2 = supplied field
   int construct_type = 0;
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Loading the gauge field in %s\n", latfile);
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
@@ -184,7 +183,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param)
+void constructHostCloverField(void *clover, void *, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
   double diag = 1.0;  // constant added to the diagonal
@@ -215,9 +214,15 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
+  } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
+                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+    cs_param->nDim = 5;
+    cs_param->x[4] = 2;
   } else {
     cs_param->nDim = 4;
   }
+  cs_param->pc_type = inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
@@ -244,6 +249,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.create = QUDA_REFERENCE_FIELD_CREATE;
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.nDim = 4;
+  param.pc_type = QUDA_4D_PC;
   param.siteSubset = isPCSolution(sol_type) ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
@@ -255,7 +261,11 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
 
+#if defined(QMP_COMMS) || defined(MPI_COMMS)
 void initComms(int argc, char **argv, int *const commDims)
+#else
+void initComms(int, char **, int *const commDims)
+#endif
 {
   if (getenv("QUDA_TEST_GRID_SIZE")) { get_size_from_env(commDims, "QUDA_TEST_GRID_SIZE"); }
   if (getenv("QUDA_TEST_GRID_PARTITION")) { get_size_from_env(grid_partition.data(), "QUDA_TEST_GRID_PARTITION"); }
@@ -633,10 +643,11 @@ int fullLatticeIndex(int i, int oddBit)
 extern "C" {
 /**
    @brief Set the default ASAN options.  This ensures that QUDA just
-   works when SANITIZE is enabled without requiring ASAN_OPTIONS to
-   be set.
+   works when SANITIZE is enabled without requiring ASAN_OPTIONS to be
+   set.  We default disable leak checking, otherwise this will cause
+   ctest to fail with MPI library leaks.
  */
-const char *__asan_default_options() { return "protect_shadow_gap=0"; }
+const char *__asan_default_options() { return "detect_leaks=0,protect_shadow_gap=0"; }
 }
 
 /**
@@ -660,14 +671,14 @@ void get_size_from_env(int *const dims, const char env[])
   }
 }
 
-int lex_rank_from_coords_t(const int *coords, void *fdata)
+int lex_rank_from_coords_t(const int *coords, void *)
 {
   int rank = coords[0];
   for (int i = 1; i < 4; i++) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
   return rank;
 }
 
-int lex_rank_from_coords_x(const int *coords, void *fdata)
+int lex_rank_from_coords_x(const int *coords, void *)
 {
   int rank = coords[3];
   for (int i = 2; i >= 0; i--) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
@@ -1450,14 +1461,8 @@ int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *
 
 void createMomCPU(void *mom, QudaPrecision precision)
 {
-  void *temp;
-
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4 * V * gauge_site_size * gSize);
-  if (temp == NULL) {
-    fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
-    exit(1);
-  }
+  void *temp = safe_malloc(4 * V * gauge_site_size * gSize);
 
   for (int i = 0; i < V; i++) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1479,7 +1484,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
     }
   }
 
-  free(temp);
+  host_free(temp);
   return;
 }
 
@@ -1609,20 +1614,6 @@ double mom_action(void *mom, QudaPrecision prec, int len)
   }
   comm_allreduce(&action);
   return action;
-}
-
-static struct timeval startTime;
-
-void stopwatchStart() { gettimeofday(&startTime, NULL); }
-
-double stopwatchReadSeconds()
-{
-  struct timeval endTime;
-  gettimeofday(&endTime, NULL);
-
-  long ds = endTime.tv_sec - startTime.tv_sec;
-  long dus = endTime.tv_usec - startTime.tv_usec;
-  return ds + 0.000001 * dus;
 }
 
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter)

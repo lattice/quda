@@ -88,6 +88,26 @@ typedef struct {
   double space;
 } danti_hermitmat;
 
+// convenience struct for passing around lattice meta data
+struct lattice_t {
+  int n_color;
+  size_t volume;
+  size_t volume_ex;
+  int x[4];
+  int r[4];
+  int e[4];
+
+  lattice_t(const GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
+  {
+    for (int d = 0; d < 4; d++) {
+      x[d] = lat.X()[d] - 2 * lat.R()[d];
+      r[d] = lat.R()[d];
+      e[d] = lat.X()[d];
+      volume *= x[d];
+    }
+  };
+};
+
 extern int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
 
 template <typename su3_matrix> void su3_adjoint(su3_matrix *a, su3_matrix *b)
@@ -213,68 +233,47 @@ template <typename su3_matrix> void print_su3_matrix(su3_matrix *a)
   }
 }
 
-int gf_neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
+int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 {
   int oddBit = 0;
-  int half_idx = i;
-  if (i >= Vh) {
+  int x[4];
+  auto half_idx = i;
+  if (i >= lat.volume / 2) {
     oddBit = 1;
-    half_idx = i - Vh;
+    half_idx = i - lat.volume / 2;
   }
-  int X1 = Z[0];
-  int X2 = Z[1];
-  int X3 = Z[2];
-  // int X4 = Z[3];
-  int X1h = X1 / 2;
 
-  int za = half_idx / X1h;
-  int x1h = half_idx - za * X1h;
-  int zb = za / X2;
-  int x2 = za - zb * X2;
-  int x4 = zb / X3;
-  int x3 = zb - x4 * X3;
-  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-  int x1 = 2 * x1h + x1odd;
+  auto za = half_idx / (lat.x[0] / 2);
+  auto x0h = half_idx - za * (lat.x[0] / 2);
+  auto zb = za / lat.x[1];
+  x[1] = za - zb * lat.x[1];
+  x[3] = zb / lat.x[2];
+  x[2] = zb - x[3] * lat.x[2];
+  auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  x[0] = 2 * x0h + x1odd;
 
-#ifdef MULTI_GPU
-  x4 = x4 + dx4;
-  x3 = x3 + dx3;
-  x2 = x2 + dx2;
-  x1 = x1 + dx1;
+  for (int d = 0; d < 4; d++) { x[d] = comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d]; }
+  size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
+                         + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
+    / 2;
 
-  int nbr_half_idx = ((x4 + 2) * (E[2] * E[1] * E[0]) + (x3 + 2) * (E[1] * E[0]) + (x2 + 2) * (E[0]) + (x1 + 2)) / 2;
-#else
-  x4 = (x4 + dx4 + Z[3]) % Z[3];
-  x3 = (x3 + dx3 + Z[2]) % Z[2];
-  x2 = (x2 + dx2 + Z[1]) % Z[1];
-  x1 = (x1 + dx1 + Z[0]) % Z[0];
-
-  int nbr_half_idx = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
-#endif
-
-  int oddBitChanged = (dx4 + dx3 + dx2 + dx1) % 2;
+  int oddBitChanged = (dx[3] + dx[2] + dx[1] + dx[0]) % 2;
   if (oddBitChanged) { oddBit = 1 - oddBit; }
   int ret = nbr_half_idx;
-  if (oddBit) {
-#ifdef MULTI_GPU
-    ret = Vh_ex + nbr_half_idx;
-#else
-    ret = Vh + nbr_half_idx;
-#endif
-  }
+  if (oddBit) ret += lat.volume_ex / 2;
 
   return ret;
 }
 
-// this functon compute one path for all lattice sites
+// this function compute one path for all lattice sites
 template <typename su3_matrix, typename Float>
-static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, su3_matrix **sitelink_ex_2d, int *path,
-                                 int len, Float loop_coeff, int dir)
+static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
+                                 int dir, const lattice_t &lat)
 {
   su3_matrix prev_matrix, curr_matrix, tmat;
   int dx[4];
 
-  for (int i = 0; i < V; i++) {
+  for (size_t i = 0; i < lat.volume; i++) {
     memset(dx, 0, sizeof(dx));
     memset(&curr_matrix, 0, sizeof(curr_matrix));
 
@@ -295,12 +294,9 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, su3_
         lnkdir = OPP_DIR(path[j]);
       }
 
-      int nbr_idx = gf_neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-#ifdef MULTI_GPU
-      su3_matrix *lnk = sitelink_ex_2d[lnkdir] + nbr_idx;
-#else
+      int nbr_idx = gf_neighborIndexFullLattice(i, dx, lat);
       su3_matrix *lnk = sitelink[lnkdir] + nbr_idx;
-#endif
+
       if (GOES_FORWARDS(path[j])) {
         mult_su3_nn(&prev_matrix, lnk, &curr_matrix);
       } else {
@@ -321,9 +317,10 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, su3_
 }
 
 template <typename su3_matrix, typename anti_hermitmat, typename Float>
-static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3)
+static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
+                       const lattice_t &lat)
 {
-  for (int i = 0; i < V; i++) {
+  for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat1;
     su3_matrix tmat2;
     su3_matrix tmat3;
@@ -343,56 +340,51 @@ static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink,
 /* This function only computes one direction @dir
  *
  */
-void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex_2d,
-                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths)
+void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex, QudaPrecision prec,
+                               int **path_dir, int *length, void *loop_coeff, int num_paths, const lattice_t &lat)
 {
-  void *staple;
-  int gSize = prec;
-
-  staple = malloc(V * gauge_site_size * gSize);
-  if (staple == NULL) {
-    fprintf(stderr, "ERROR: malloc failed for staple in functon %s\n", __FUNCTION__);
-    exit(1);
-  }
-
-  memset(staple, 0, V * gauge_site_size * gSize);
+  size_t size = V * 2 * lat.n_color * lat.n_color * prec;
+  void *staple = safe_malloc(size);
+  memset(staple, 0, size);
 
   for (int i = 0; i < num_paths; i++) {
     if (prec == QUDA_DOUBLE_PRECISION) {
       double *my_loop_coeff = (double *)loop_coeff;
-      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink, (dsu3_matrix **)sitelink_ex_2d, path_dir[i],
-                           length[i], my_loop_coeff[i], dir);
+      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
+                           dir, lat);
     } else {
       float *my_loop_coeff = (float *)loop_coeff;
-      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink, (fsu3_matrix **)sitelink_ex_2d, path_dir[i],
-                           length[i], my_loop_coeff[i], dir);
+      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
+                           dir, lat);
     }
   }
 
   if (prec == QUDA_DOUBLE_PRECISION) {
-    update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3);
+    update_mom((danti_hermitmat *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
   } else {
-    update_mom((fanti_hermitmat *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3);
+    update_mom((fanti_hermitmat *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
   }
 
-  free(staple);
+  host_free(staple);
 }
 
 void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecision prec, int ***path_dir, int *length,
                            void *loop_coeff, int num_paths)
 {
   // created extended field
-  int R[] = {2, 2, 2, 2};
+  int R[4];
+  for (int d = 0; d < 4; d++) R[d] = 2 * comm_dim_partitioned(d);
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   param.t_boundary = QUDA_PERIODIC_T;
 
   auto qdp_ex = quda::createExtendedGauge((void **)sitelink, param, R);
+  lattice_t lat(*qdp_ex);
 
   for (int dir = 0; dir < 4; dir++) {
     gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
-                              loop_coeff, num_paths);
+                              loop_coeff, num_paths, lat);
   }
 
   delete qdp_ex;

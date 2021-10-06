@@ -82,7 +82,7 @@ namespace quda {
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t = device::get_default_stream())
     {
       static int count = 0;
 
@@ -118,7 +118,7 @@ namespace quda {
   {
   }
 
-  MultiShiftCG::~MultiShiftCG() {}
+  MultiShiftCG::~MultiShiftCG() { }
 
   /**
      Compute the new values of alpha and zeta
@@ -468,9 +468,9 @@ namespace quda {
 	
 	// set worker to do all updates at once
 	shift_update.updateNupdate(1);
-	shift_update.apply(0);
+        shift_update.apply();
 
-	for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
+        for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
       }
       
       k++;

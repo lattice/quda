@@ -1,10 +1,10 @@
 #pragma once
 
 #include <quda_internal.h>
+#include <timer.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-#include <dslash_quda.h>
 #include <blas_quda.h>
 
 #include <typeinfo>
@@ -229,10 +229,7 @@ namespace quda {
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */
-    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
-    {
-      errorQuda("Not implemented!\n");
-    }
+    virtual void MdagMLocal(ColorSpinorField &, const ColorSpinorField &) const { errorQuda("Not implemented!\n"); }
 
     /**
        @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
@@ -240,7 +237,7 @@ namespace quda {
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */
-    virtual void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+    virtual void Dslash4(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
     {
       errorQuda("Not implemented!\n");
     }
@@ -357,8 +354,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
     {
       gauge = gauge_in;
     }
@@ -374,8 +370,7 @@ namespace quda {
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				double kappa, double mass=0., double mu=0., double mu_factor=0.) const
+    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double) const
     {errorQuda("Not implemented");}
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
@@ -388,7 +383,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full Wilson
@@ -503,8 +498,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -536,7 +530,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned clover
@@ -600,7 +594,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full clover with Hasenbusch Twist
@@ -759,19 +753,17 @@ public:
   class DiracDomainWall4D : public DiracDomainWall
   {
 
-private:
-public:
+  public:
     DiracDomainWall4D(const DiracParam &param);
     DiracDomainWall4D(const DiracDomainWall4D &dirac);
     virtual ~DiracDomainWall4D();
     DiracDomainWall4D &operator=(const DiracDomainWall4D &dirac);
 
     void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
     void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -787,17 +779,14 @@ public:
   class DiracDomainWall4DPC : public DiracDomainWall4D
   {
 
-private:
-public:
+  public:
     DiracDomainWall4DPC(const DiracParam &param);
     DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
     virtual ~DiracDomainWall4DPC();
     DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
-    void Dslash5inv(
-        ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const double &kappa5) const;
-    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			const QudaParity parity, const double &kappa5, const ColorSpinorField &x, const double &k) const;
+    void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -837,15 +826,15 @@ public:
       // DiracMobius& operator=(const DiracMobius &dirac);
 
       void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-      void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-      void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+      void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in) const;
+      void Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const;
 
       void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
                        const ColorSpinorField &x, const double &k) const;
-      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                          const ColorSpinorField &x, const double &k) const;
-      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                       const ColorSpinorField &x, const double &k) const;
+      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                          const double &k) const;
+      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                       const double &k) const;
 
       virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
       virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -870,9 +859,8 @@ public:
     virtual ~DiracMobiusPC();
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
-    void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -941,6 +929,8 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC; }
   };
+
+  void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
@@ -1085,8 +1075,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -1121,7 +1110,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -1178,7 +1167,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full staggered
@@ -1346,7 +1335,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Full staggered
@@ -1402,8 +1391,8 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *)
     {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
@@ -1441,7 +1430,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1549,7 +1538,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   /**
@@ -1696,8 +1685,7 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
 
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
     {
       Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
       warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
@@ -1735,7 +1723,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
   /**
@@ -1793,7 +1781,7 @@ public:
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
   };
 
 
@@ -1971,8 +1959,8 @@ public:
   {
 
   public:
-    DiracM(const Dirac &d) : DiracMatrix(d) {}
-    DiracM(const Dirac *d) : DiracMatrix(d) {}
+    DiracM(const Dirac &d) : DiracMatrix(d) { }
+    DiracM(const Dirac *d) : DiracMatrix(d) { }
 
     /**
        @brief apply operator and potentially a shift
@@ -2087,8 +2075,8 @@ public:
   {
 
   public:
-    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
-    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
 
@@ -2304,8 +2292,8 @@ public:
   {
 
   public:
-    DiracG5M(const Dirac &d) : DiracMatrix(d) {}
-    DiracG5M(const Dirac *d) : DiracMatrix(d) {}
+    DiracG5M(const Dirac &d) : DiracMatrix(d) { }
+    DiracG5M(const Dirac *d) : DiracMatrix(d) { }
 
     /**
       @brief Left-apply gamma5 as appropriate for the operator

@@ -29,7 +29,7 @@ static size_t sites_on_node;
 static int *mcoord = nullptr;
 static bool single_parity = false;
 
-int quda_setup_layout(int len[], int nd, int numnodes, int single_parity_)
+int quda_setup_layout(int len[], int nd, int, int single_parity_)
 {
   ndim = nd;
   single_parity = single_parity_;
@@ -203,15 +203,11 @@ void quda_get_coords(int x[], int node, int index) { quda_get_coords_helper(x, n
 
 /* The number of sites on the specified node */
 #ifdef QIO_HAS_EXTENDED_LAYOUT
-QIO_Index quda_num_sites_ext(int node, void *arg)
-{
-  (void)arg;
-  return sites_on_node;
-}
+QIO_Index quda_num_sites_ext(int, void *) { return sites_on_node; }
 #else
-int quda_num_sites(int node)
+int quda_num_sites(int)
 {
-  if (sites_on_node > static_cast<size_t>(std::numeric_limits<int>::max()) || sites_on_node < 0)
+  if (sites_on_node > static_cast<size_t>(std::numeric_limits<int>::max()))
     errorQuda("Invalid sites_on_node %lu", sites_on_node);
 
   return static_cast<int>(sites_on_node);

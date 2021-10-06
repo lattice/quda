@@ -88,7 +88,7 @@ int comm_rank(void) { return get_current_communicator().comm_rank(); }
 
 int comm_rank_global(void) { return Communicator::comm_rank_global(); }
 
-int comm_size(void) { return get_current_communicator().comm_size(); }
+size_t comm_size(void) { return get_current_communicator().comm_size(); }
 
 // XXX:
 // Note here we are always using the **default** communicator.
@@ -181,6 +181,11 @@ void comm_allreduce_max_array(double *data, size_t size)
   get_current_communicator().comm_allreduce_max_array(data, size);
 }
 
+void comm_allreduce_min_array(double *data, size_t size)
+{
+  get_current_communicator().comm_allreduce_min_array(data, size);
+}
+
 void comm_allreduce_int(int *data) { get_current_communicator().comm_allreduce_int(data); }
 
 void comm_allreduce_xor(uint64_t *data) { get_current_communicator().comm_allreduce_xor(data); }
@@ -211,7 +216,9 @@ void commDimPartitionedReset() { get_current_communicator().comm_dim_partitioned
 
 bool commGlobalReduction() { return get_current_communicator().commGlobalReduction(); }
 
-void commGlobalReductionSet(bool global_reduce) { get_current_communicator().commGlobalReductionSet(global_reduce); }
+void commGlobalReductionPush(bool global_reduce) { get_current_communicator().commGlobalReductionPush(global_reduce); }
+
+void commGlobalReductionPop() { get_current_communicator().commGlobalReductionPop(); }
 
 bool commAsyncReduction() { return get_current_communicator().commAsyncReduction(); }
 

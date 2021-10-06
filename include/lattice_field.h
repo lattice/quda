@@ -1,8 +1,7 @@
 #pragma once
 
-#include <map>
-#include <quda.h>
 #include <iostream>
+#include <quda_internal.h>
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
@@ -90,8 +89,8 @@ namespace quda {
       siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
-      for (int i=0; i<nDim; i++) {
-	x[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        x[i] = 0;
 	r[i] = 0;
       }
     }
@@ -111,9 +110,9 @@ namespace quda {
       ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = x[i];
-	this->r[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        this->x[i] = i < nDim ? x[i] : 0;
+        this->r[i] = 0;
       }
     }
     
@@ -128,9 +127,9 @@ namespace quda {
       siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = param.X[i];
-	this->r[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        this->x[i] = i < nDim ? param.X[i] : 0;
+        this->r[i] = 0;
       }
     }
 
@@ -168,11 +167,23 @@ namespace quda {
     /** Array storing the length of dimension */
     int x[QUDA_MAX_DIM];
 
-    int surface[QUDA_MAX_DIM];
-    int surfaceCB[QUDA_MAX_DIM];
-
     /** The extended lattice radius (if applicable) */
     int r[QUDA_MAX_DIM];
+
+    /** Array storing the local dimensions (x - 2 * r) */
+    int local_x[QUDA_MAX_DIM];
+
+    /** Array storing the surface size in each dimension */
+    int surface[QUDA_MAX_DIM];
+
+    /** Array storing the checkerboarded surface size in each dimension */
+    int surfaceCB[QUDA_MAX_DIM];
+
+    /** Array storing the local surface size in each dimension */
+    int local_surface[QUDA_MAX_DIM];
+
+    /** Array storing the local surface size in each dimension */
+    int local_surfaceCB[QUDA_MAX_DIM];
 
     /** Precision of the field */
     QudaPrecision precision;
@@ -370,10 +381,10 @@ namespace quda {
     static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Local copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote copy of event used for peer-to-peer synchronization */
-    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Whether we have initialized communication for this field */
     bool initComms;
@@ -443,11 +454,8 @@ namespace quda {
        Create the communication handlers (both host and device)
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
-       @param[in] bidir Whether to allocate communication buffers to
-       allow for simultaneous bi-directional exchange.  If false, then
-       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(bool no_comms_fill=false, bool bidir=true);
+    void createComms(bool no_comms_fill = false);
 
     /**
        Destroy the communication handlers
@@ -477,12 +485,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -505,7 +513,17 @@ namespace quda {
     const int* X() const { return x; }
 
     /**
-       @return The pointer to the **full** lattice-dimension array
+       @return Extended field radius
+    */
+    const int *R() const { return r; }
+
+    /**
+       @return Local checkboarded lattice dimensions
+    */
+    const int *LocalX() const { return local_x; }
+
+    /**
+      @return The pointer to the **full** lattice-dimension array
     */
     virtual int full_dim(int d) const = 0;
 
@@ -542,6 +560,18 @@ namespace quda {
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
 
     /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    const int *LocalSurfaceCB() const { return local_surfaceCB; }
+
+    /**
+       @param i The dimension of the requested local surface
+       @return The single-parity local surface of dimension i
+    */
+    int LocalSurfaceCB(const int i) const { return local_surfaceCB[i]; }
+
+    /**
        @return The single-parity stride of the field
     */
     size_t Stride() const { return stride; }
@@ -551,11 +581,6 @@ namespace quda {
     */
     int Pad() const { return pad; }
     
-    /**
-       @return Extended field radius
-    */
-    const int* R() const { return r; }
-
     /**
        @return Type of ghost exchange
      */
@@ -633,7 +658,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_h(int dir, int dim) const { return my_face_dim_dir_h[bufferIndex][dim][dir]; }
+    void *myFace_h(int dir, int dim) const;
 
     /**
        @brief Return pointer to the local mapped my_face buffer in a
@@ -642,7 +667,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_hd(int dir, int dim) const { return my_face_dim_dir_hd[bufferIndex][dim][dir]; }
+    void *myFace_hd(int dir, int dim) const;
 
     /**
        @brief Return pointer to the device send buffer in a given
@@ -651,7 +676,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to pinned memory buffer
     */
-    void *myFace_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+    void *myFace_d(int dir, int dim) const;
 
     /**
        @brief Return base pointer to a remote device buffer for direct
@@ -662,7 +687,7 @@ namespace quda {
        @param[in] dim Dimension we are requesting
        @return Pointer to remote memory buffer
     */
-    void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
+    void *remoteFace_d(int dir, int dim) const;
 
     /**
        @brief Return base pointer to the ghost recv buffer. Since this is a
@@ -670,24 +695,21 @@ namespace quda {
        correct point for each direction/dimension.
        @return Pointer to remote memory buffer
      */
-    void *remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
+    void *remoteFace_r() const;
 
-    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+    virtual void gather(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                            bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); return 0; }
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool)
+    {
+      errorQuda("Not implemented");
+      return 0;
+    }
 
-    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
-    { errorQuda("Not implemented"); }
+    virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual void scatter(int nFace, int dagger, int dir)
-    { errorQuda("Not implemented"); }
+    virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
@@ -706,9 +728,14 @@ namespace quda {
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
     */
-    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
+    virtual void prefetch(QudaFieldLocation, qudaStream_t = device::get_default_stream()) const { ; }
 
     virtual bool isNative() const = 0;
+
+    /**
+       @brief Return the number of bytes in the field allocation.
+     */
+    virtual size_t Bytes() const = 0;
 
     /**
       @brief Copy all contents of the field to a host buffer.
@@ -839,6 +866,19 @@ namespace quda {
   inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
   {
     QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
+
+  /**
+     @brief Helper function for setting auxilary string
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION)
+  {
 #ifdef JITIFY
     return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
 #else

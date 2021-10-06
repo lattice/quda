@@ -3,6 +3,7 @@
 #include <multigrid.h>
 #include <eigensolve_quda.h>
 #include <cmath>
+#include <limits>
 
 namespace quda {
 
@@ -92,14 +93,6 @@ namespace quda {
     case QUDA_SD_INVERTER:
       report("SD");
       solver = new SD(mat, param, profile);
-      break;
-    case QUDA_XSD_INVERTER:
-#ifdef MULTI_GPU
-      report("XSD");
-      solver = new XSD(mat, param, profile);
-#else
-      errorQuda("Extended Steepest Descent is multi-gpu only");
-#endif
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");
@@ -344,8 +337,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceHQ(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceHQ(double, double hq2, double, double hq_tol)
+  {
     // check the heavy quark residual norm if necessary
     if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
       if (std::isnan(hq2) || std::isinf(hq2))
@@ -357,8 +350,8 @@ namespace quda {
     return true;
   }
 
-  bool Solver::convergenceL2(double r2, double hq2, double r2_tol, double hq_tol) {
-
+  bool Solver::convergenceL2(double r2, double, double r2_tol, double)
+  {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       if (std::isnan(r2) || std::isinf(r2)) errorQuda("Solver appears to have diverged with residual %9.6e", r2);

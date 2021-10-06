@@ -10,7 +10,6 @@
 #include "gauge_force_reference.h"
 #include "gauge_force_quda.h"
 #include <sys/time.h>
-#include <dslash_quda.h>
 #include <gtest/gtest.h>
 
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -281,7 +280,7 @@ void gauge_force_test(void)
     }
   }
 
-  quda::GaugeFieldParam param(0, gauge_param);
+  quda::GaugeFieldParam param(gauge_param);
   param.create = QUDA_NULL_FIELD_CREATE;
   param.order = QUDA_QDP_GAUGE_ORDER;
   auto U_qdp = new quda::cpuGaugeField(param);
