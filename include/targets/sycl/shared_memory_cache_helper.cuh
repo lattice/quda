@@ -48,9 +48,11 @@ namespace quda
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
     static constexpr int n_element = sizeof(T) / sizeof(atom_t);
+    using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
 
     const dim3 block;
     const int stride;
+    sycl::multi_ptr<atype, sycl::access::address_space::local_space> mem;
     atom_t *cache_;
 
     __device__ __host__ inline void save_detail(const T &a, int x, int y, int z)
@@ -101,10 +103,9 @@ namespace quda
       block(block),
       stride(block.x * block.y * block.z)
     {
-	using atype = atom_t[n_element * block_size_x * block_size_y * block_size_z];
 	auto g = getGroup();
 	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
-	auto mem = sycl::group_local_memory<atype>(g);
+	mem = sycl::group_local_memory<atype>(g);
         //return reinterpret_cast<atom_t*>(cache_.get());
         cache_ = *mem.get();
     }

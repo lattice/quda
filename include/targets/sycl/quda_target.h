@@ -3,8 +3,6 @@
 #include <CL/sycl.hpp>
 #include <cstddef>
 
-// warningQuda("TRACE: %s %s %i", __FILE__, __func__, __LINE__);
-
 using cudaStream_t = int;
 
 //#include <error.h>
@@ -54,86 +52,48 @@ inline std::string str(std::vector<T> v)
 
 static inline auto getGroup()
 {
-  //return sycl::detail::Builder::getElement(static_cast<sycl::group<3>*>(nullptr));
-  return sycl::this_group<3>();
+  //return sycl::this_group<3>();
+  return sycl::ext::oneapi::experimental::this_group<3>();
 }
 static inline auto getNdItem()
 {
-  //return sycl::detail::Builder::getNDItem<3>();
-  return sycl::this_nd_item<3>();
+  //return sycl::this_nd_item<3>();
+  return sycl::ext::oneapi::experimental::this_nd_item<3>();
 }
-
-#if 0
-#ifdef __SYCL_DEVICE_ONLY__
-static inline auto getGroup()
-{
-  //return sycl::detail::Builder::getElement(static_cast<sycl::group<3>*>(nullptr));
-  return sycl::this_group<3>();
-}
-static inline auto getNdItem()
-{
-  //return sycl::detail::Builder::getNDItem<3>();
-  return sycl::this_nd_item<3>();
-}
-#else
-#include <util_quda.h>
-static inline sycl::group<3> getGroup()
-{
-  sycl::range<3> r{0,0,0};
-  sycl::id<3> i{0,0,0};
-  errorQuda("Can't use getGroup() in host code");
-  return sycl::detail::Builder::createGroup(r, r, i);
-}
-static inline sycl::nd_item<3> getNdItem()
-{
-  sycl::range<3> r{0,0,0};
-  sycl::id<3> i{0,0,0};
-  auto g = sycl::detail::Builder::createItem<3,true>(r, i, i);
-  auto l = sycl::detail::Builder::createItem<3,false>(r, i);
-  errorQuda("Can't use getNdItem() in host code");
-  return sycl::detail::Builder::createNDItem(g, l, getGroup());
-}
-#endif
-#endif
-
 
 inline dim3 getGridDim()
 {
   dim3 r;
-#ifdef __SYCL_DEVICE_ONLY__
-  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
-  //auto ndi = getNDItem<3>();
-  auto ndi = sycl::this_nd_item<3>();
+  //#ifdef __SYCL_DEVICE_ONLY__
+  auto ndi = getNdItem();
   r.x = ndi.get_group_range(0);
   r.y = ndi.get_group_range(1);
   r.z = ndi.get_group_range(2);
-#endif
+  //#endif
   return r;
 }
 
 inline dim3 getBlockIdx()
 {
   dim3 r;
-#ifdef __SYCL_DEVICE_ONLY__
-  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
-  auto ndi = sycl::this_nd_item<3>();
+  //#ifdef __SYCL_DEVICE_ONLY__
+  auto ndi = getNdItem();
   r.x = ndi.get_group(0);
   r.y = ndi.get_group(1);
   r.z = ndi.get_group(2);
-#endif
+  //#endif
   return r;
 }
 
 inline dim3 getBlockDim()
 {
   dim3 r;
-#ifdef __SYCL_DEVICE_ONLY__
-  //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
-  auto ndi = sycl::this_nd_item<3>();
+  //#ifdef __SYCL_DEVICE_ONLY__
+  auto ndi = getNdItem();
   r.x = ndi.get_local_range(0);
   r.y = ndi.get_local_range(1);
   r.z = ndi.get_local_range(2);
-#endif
+  //#endif
   return r;
 }
 
@@ -142,7 +102,7 @@ inline dim3 getThreadIdx()
   dim3 r;
 #ifdef __SYCL_DEVICE_ONLY__
   //auto ndi = cl::sycl::detail::Builder::getNDItem<3>();
-  auto ndi = sycl::this_nd_item<3>();
+  auto ndi = getNdItem();
   r.x = ndi.get_local_id(0);
   r.y = ndi.get_local_id(1);
   r.z = ndi.get_local_id(2);
@@ -155,12 +115,12 @@ inline uint getLocalLinearId()
   int id = 0;
 #ifdef __SYCL_DEVICE_ONLY__
   //auto ndi = getNdItem();
-  auto ndi = sycl::this_nd_item<3>();
+  //auto ndi = sycl::this_nd_item<3>();
+  auto ndi = getNdItem();
   id = ndi.get_local_linear_id();
 #endif
   return id;
 }
-
 
 inline void __syncthreads(void)
 {
@@ -180,11 +140,13 @@ namespace quda
     sycl::queue get_target_stream(const qudaStream_t &stream);
     sycl::queue defaultQueue(void);
   }
+  namespace target {
+    namespace sycl {
+      void set_error(std::string error_str, const char *api_func, const char *func,
+		     const char *file, const char *line, bool allow_error);
+    }
+  }
 }
-
-//#define qudaLaunchKernel(a,b,c,...)			\
-//  qudaLaunchKernel_(__FILE__,__LINE__,__func__,#a)
-
 
 ///// MATH
 

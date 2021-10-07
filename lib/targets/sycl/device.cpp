@@ -85,6 +85,7 @@ namespace quda
       printfQuda("  Max num sub groups: %u\n", myDevice.get_info<sycl::info::device::max_num_sub_groups>());
       printfQuda("  Sub group independent forward progress: %s\n", myDevice.get_info<sycl::info::device::sub_group_independent_forward_progress>()?"true":"false");
       printfQuda("  Sub group sizes: %s\n", str(myDevice.get_info<sycl::info::device::sub_group_sizes>()).c_str());
+      //printfQuda("  Primary sub group size: %lu\n", myDevice.get_info<sycl::info::device::primary_sub_group_size>());
       printfQuda("  Preferred vector width float: %u\n", myDevice.get_info<sycl::info::device::preferred_vector_width_float>());
       printfQuda("  Preferred vector width double: %u\n", myDevice.get_info<sycl::info::device::preferred_vector_width_double>());
       printfQuda("  Native vector width float: %u\n", myDevice.get_info<sycl::info::device::native_vector_width_float>());
@@ -97,10 +98,10 @@ namespace quda
       printfQuda("  Global mem cache line size: %u\n", myDevice.get_info<sycl::info::device::global_mem_cache_line_size>());
       printfQuda("  Global mem cache size: %lu\n", myDevice.get_info<sycl::info::device::global_mem_cache_size>());
       printfQuda("  Global mem size: %lu\n", myDevice.get_info<sycl::info::device::global_mem_size>());
-      printfQuda("  Max constant buffer size: %lu\n", myDevice.get_info<sycl::info::device::max_constant_buffer_size>());
-      printfQuda("  max_constant_args: %u\n", myDevice.get_info<sycl::info::device::max_constant_args>());
-      printfQuda("  local_mem_size: %lu\n", myDevice.get_info<sycl::info::device::local_mem_size>());
-      printfQuda("  error_correction_support: %s\n", myDevice.get_info<sycl::info::device::error_correction_support>()?"true":"false");
+      //printfQuda("  Max constant buffer size: %lu\n", myDevice.get_info<sycl::info::device::max_constant_buffer_size>());
+      //printfQuda("  max_constant_args: %u\n", myDevice.get_info<sycl::info::device::max_constant_args>());
+      printfQuda("  Local mem size: %lu\n", myDevice.get_info<sycl::info::device::local_mem_size>());
+      printfQuda("  Error correction support: %s\n", myDevice.get_info<sycl::info::device::error_correction_support>()?"true":"false");
 
       bool err = false;
       auto warps = myDevice.get_info<sycl::info::device::sub_group_sizes>();

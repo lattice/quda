@@ -11,18 +11,18 @@
  */
 
 //inline constexpr auto mo = sycl::memory_order::relaxed;
-inline constexpr auto mo = sycl::ONEAPI::memory_order::acq_rel;
+inline constexpr auto mo = sycl::ext::oneapi::memory_order::acq_rel;
 //inline constexpr auto mo = memory_order::seq_cst;
 //inline constexpr auto mo = sycl::memory_order::acq_rel;
 
-inline constexpr auto ms = sycl::ONEAPI::memory_scope::system;
+inline constexpr auto ms = sycl::ext::oneapi::memory_scope::system;
 //inline constexpr auto ms = sycl::memory_scope::system;
 
 //inline constexpr auto as = sycl::access::address_space::generic_space;
 inline constexpr auto as = sycl::access::address_space::global_space;
 
 template <typename T>
-using atomicRef = sycl::ONEAPI::atomic_ref<T,mo,ms,as>;
+using atomicRef = sycl::ext::oneapi::atomic_ref<T,mo,ms,as>;
 //using atomicRef = sycl::atomic_ref<T,mo,ms,as>;
 
 template <typename T>

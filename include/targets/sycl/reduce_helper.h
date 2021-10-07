@@ -95,7 +95,8 @@ namespace quda
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
     */
-    ReduceArg(int n_reduce = 1, bool reset = false) :
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
+      kernel_param<use_kernel_arg>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
@@ -146,7 +147,7 @@ namespace quda
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
-        result_h[i].wait(init_value<system_atomic_t>(), cuda::std::memory_order_relaxed);
+        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) {}
       }
 
       // copy back result element by element and convert if necessary to host reduce type
@@ -210,7 +211,7 @@ namespace quda
     template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
     __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
     {
-      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+      using BlockReduce = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
       __shared__ typename BlockReduce::TempStorage cub_tmp;
       __shared__ bool isLastBlockDone;
 
@@ -256,6 +257,9 @@ namespace quda
           } else { // write to device memory
             arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
           }
+          // TODO in principle we could remove this final atomic store
+          // if we use a sense reversal barrier, avoiding the need to
+          // reset the count at the end
           arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
         }
       }
@@ -364,7 +368,8 @@ namespace quda
   template <typename T, typename U>
   void blockReduceSum(sycl::group<3> &grp, T &agg, const U &in)
   {
-    auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
+    //auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
+    auto t = sycl::reduce_over_group(grp, in, sycl::plus<>());
     agg = fromGroupReduceType<T>(t);
   }
 
@@ -372,8 +377,10 @@ namespace quda
   void blockReduceSum(sycl::group<3> &grp, T &agg,
 		      const sycl::vec<double,16> *in)
   {
-    auto t0 = sycl::ONEAPI::reduce(grp, in[0], sycl::ONEAPI::plus<>());
-    auto t1 = sycl::ONEAPI::reduce(grp, in[1], sycl::ONEAPI::plus<>());
+    //auto t0 = sycl::ONEAPI::reduce(grp, in[0], sycl::ONEAPI::plus<>());
+    //auto t1 = sycl::ONEAPI::reduce(grp, in[1], sycl::ONEAPI::plus<>());
+    auto t0 = sycl::reduce_over_group(grp, in[0], sycl::plus<>());
+    auto t1 = sycl::reduce_over_group(grp, in[1], sycl::plus<>());
     sycl::vec<double,16> x[2] = {t0,t1};
     agg = *reinterpret_cast<T*>(x);
   }
@@ -385,7 +392,8 @@ namespace quda
     for(int i=0; i<in.size(); i++) {
       auto t = in[i];
       auto v = sycl::vec{t.real(),t.imag()};
-      auto r = sycl::ONEAPI::reduce(grp, v, sycl::ONEAPI::plus<>());
+      //auto r = sycl::ONEAPI::reduce(grp, v, sycl::ONEAPI::plus<>());
+      auto r = sycl::reduce_over_group(grp, v, sycl::plus<>());
       agg[i].real(r[0]);
       agg[i].imag(r[1]);
     }
@@ -404,7 +412,8 @@ namespace quda
   template <typename T, typename U>
   void blockReduceMax(sycl::group<3> &grp, T &agg, const U &in)
   {
-    auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::maximum<>());
+    //auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::maximum<>());
+    auto t = sycl::reduce_over_group(grp, in, sycl::maximum<>());
     agg = fromGroupReduceType<T>(t);
   }
 
@@ -469,6 +478,7 @@ namespace quda
       T aggregate;
       //T tin = in;
       blockReduce(grp, aggregate, in, r);
+      //blockReduce(grp, aggregate, in, r);
 
       auto llid = ndi.get_local_linear_id();
       auto grpRg = ndi.get_group_range(0);
@@ -477,24 +487,24 @@ namespace quda
       bool isLastBlockDone = false;
       if (llid==0) {
 	arg.partial[idx*grpRg + grpId] = aggregate;
-	//sycl::ONEAPI::atomic_fence(sycl::ONEAPI::memory_order::release,
-	//			   sycl::ONEAPI::memory_scope::device);
+	sycl::atomic_fence(sycl::memory_order::release,sycl::memory_scope::device);
 	// increment global block counter
 	unsigned int prev = atomicAdd(&arg.count[idx], 1);
 	// determine if last block
 	isLastBlockDone = (prev == (grpRg-1));
       }
       //isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
-      isLastBlockDone = sycl::ONEAPI::any_of(grp, isLastBlockDone);
-      //isLastBlockDone = group_broadcast(grp, isLastBlockDone);
+      //isLastBlockDone = sycl::ONEAPI::any_of(grp, isLastBlockDone);
+      isLastBlockDone = group_broadcast(grp, isLastBlockDone);
+      //ndi.barrier();
+      //isLastBlockDone = sycl::ONEAPI::broadcast(grp, isLastBlockDone);
 
       // finish the reduction if last block
       if (isLastBlockDone) {
 	auto nloc = ndi.get_local_range(0) * ndi.get_local_range(1);
 	uint i = llid;
         T sum = arg.init();
-	//sycl::ONEAPI::atomic_fence(sycl::ONEAPI::memory_order::acquire,
-	//			   sycl::ONEAPI::memory_scope::device);
+	sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
 	while (i<grpRg) {
 	  sum = r(sum, arg.partial[idx*grpRg + i]);
 	  //i += block_size_x*block_size_y;

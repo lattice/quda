@@ -50,7 +50,8 @@ namespace quda {
     */
     bool tuneGridDim() const final { return grid_stride; }
 
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    //virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    virtual unsigned int minGridSize() const { return 8; }
     virtual int gridStep() const { return minGridSize(); }
 
     /**
@@ -232,7 +233,8 @@ namespace quda {
        here which is catered for non-block / non-batch reductions, so
        inherit from the "grandfather"
     */
-    virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    //virtual unsigned int minGridSize() const { return Tunable::minGridSize(); }
+    virtual unsigned int minGridSize() const { return 8; }
 
     /**
        @brief we don't want to inherit TunableReduction2D behaviour

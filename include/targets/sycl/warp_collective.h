@@ -2,7 +2,8 @@ namespace quda {
 
   template <int warp_split, typename T> inline T warp_combine(T &x)
   {
-    auto sg = sycl::ONEAPI::this_sub_group();
+    //auto sg = sycl::ONEAPI::this_sub_group();
+    auto sg = sycl::ext::oneapi::experimental::this_sub_group();
     constexpr int warp_size = device::warp_size();
     if (warp_split > 1) {
 #pragma unroll

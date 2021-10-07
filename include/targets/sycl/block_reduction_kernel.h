@@ -26,7 +26,7 @@ namespace quda {
      this mapping.
    */
   template <typename Arg>
-  int virtual_block_idx(const Arg &arg, sycl::nd_item<3> ndi)
+  int virtual_block_idx(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     //int block_idx = blockIdx.x;
     int block_idx = ndi.get_group(0);
@@ -60,7 +60,7 @@ namespace quda {
      thread dimension is a trivial vectorizable dimension.
   */
   template <template <typename> class Transformer, typename Arg>
-  void BlockKernel2DImpl(Arg arg, sycl::nd_item<3> ndi)
+  void BlockKernel2DImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
     const dim3 block_idx(virtual_block_idx(arg,ndi), ndi.get_group(1), 0);
     const dim3 thread_idx(ndi.get_local_id(0), ndi.get_local_id(1), 0);

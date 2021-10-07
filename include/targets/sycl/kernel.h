@@ -61,9 +61,11 @@ namespace quda {
 	   });
       });
     } catch (sycl::exception const& e) {
+      auto what = e.what();
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
+	printfQuda("  Caught synchronous SYCL exception:\n  %s\n", what);
       }
+      target::sycl::set_error(what, "submit", __func__, __FILE__, __STRINGIFY__(__LINE__), activeTuning());
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -259,7 +261,7 @@ namespace quda {
 	//h.parallel_for<struct Kernel3Da>
 	h.parallel_for<>
 	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 #ifdef QUDA_THREADS_BLOCKED
 	     quda::Kernel3DImplB<Functor, Arg, grid_stride>(arg, ndi);
 #else
@@ -315,7 +317,7 @@ namespace quda {
 	//h.parallel_for<class Kernel3Dc>
 	h.parallel_for<>
 	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
 	     //Arg *arg2 = static_cast<Arg *>(p);
 	     //const Arg *arg2 = a.get_pointer();
 	     const char *p = a.get_pointer();

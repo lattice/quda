@@ -5,17 +5,13 @@
 #include <timer.h>
 #include <device.h>
 
-// if this macro is defined then we use the driver API, else use the
-// runtime API.  Typically the driver API has 10-20% less overhead
-//#define USE_DRIVER_API
-
 // if this macro is defined then we profile the CUDA API calls
 //#define API_PROFILE
 
 #ifdef API_PROFILE
-#define PROFILE(f, idx)                                                                                                \
-  apiTimer.TPSTART(idx);                                                                                               \
-  f;                                                                                                                   \
+#define PROFILE(f, idx)							\
+  apiTimer.TPSTART(idx);						\
+  f;									\
   apiTimer.TPSTOP(idx);
 #else
 #define PROFILE(f, idx) f;
@@ -41,12 +37,32 @@ namespace quda
     return rtn;
   }
 
+  namespace target {
+
+    namespace sycl {
+
+      void set_error(std::string error_str, const char *api_func, const char *func,
+		     const char *file, const char *line, bool allow_error)
+      {
+        last_error = QUDA_ERROR;
+        last_error_str = error_str;
+        if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, error_str.c_str(), file, line, func);
+      }
+
+    }
+
+  }
+
+  using namespace target::sycl;
+
+#if 0
   qudaError_t qudaLaunchKernel_(const char *file, const int line,
 				const char *func, const char *kern)
   {
     errorQuda("qudaLaunchKernel_ %s %i %s %s\n", file, line, func, kern);
     return QUDA_ERROR;
   }
+#endif
 
   class QudaMem : public Tunable
   {

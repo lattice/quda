@@ -125,7 +125,7 @@ namespace quda {
       }
       dim_threads = param.aux.y;
       resizeStep(step_y, 2 * dim_threads); // 2 is forwads/backwards
-      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / Mc));
+      resizeVector(vector_length_y, 2 * dim_threads * 2 * (Nc / colors_per_thread(Nc, dim_threads)));
 #else
       color_col_stride = 1;
       dim_threads = 1;

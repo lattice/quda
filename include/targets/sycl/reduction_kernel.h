@@ -100,8 +100,7 @@ namespace quda {
     //using da = double[nd];
     constexpr int nd = sizeof(*result_h)/sizeof(double);
     using da = sycl::vec<double,nd>;
-    auto red = sycl::ONEAPI::reduction((da*)result_d, *(da*)result_h,
-				       sycl::ONEAPI::plus<da>());
+    auto red = sycl::reduction((da*)result_d, *(da*)result_h, sycl::plus<da>());
     try {
       q.submit([&](sycl::handler& h) {
 	//h.parallel_for<class Reduction2Dn>
@@ -215,13 +214,21 @@ namespace quda {
       auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
       *result_h = arg.init();
       auto result = reinterpret_cast<reduce_t *>(quda::reducer::get_mapped_buffer());
-      auto red = sycl::ONEAPI::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+      auto red = sycl::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+      sycl::buffer<const char,1>
+	buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
       q.submit([&](sycl::handler& h) {
-	h.parallel_for<class MultiReduction1x>
+	auto a = buf.get_access<sycl::access::mode::read,
+				sycl::access::target::constant_buffer>(h);
+	//h.parallel_for<class MultiReduction1x>
+	h.parallel_for<>
 	  (ndRange, red,
 	   [=](sycl::nd_item<3> ndi, auto &sum) {
 	     using Sum = decltype(sum);
-	     MultiReductionImpl1<Transformer, Arg, Sum, grid_stride>(arg, ndi, sum);
+	     //MultiReductionImpl1<Transformer, Arg, Sum, grid_stride>(arg, ndi, sum);
+	     const char *p = a.get_pointer();
+	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	     MultiReductionImpl1<Transformer, Arg, Sum, grid_stride>(*arg2, ndi, sum);
 	   });
       });
     } else {
