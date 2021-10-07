@@ -1223,10 +1223,7 @@ public:
 
   public:
     MultiShiftSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-      mat(mat),
-      matSloppy(matSloppy),
-      param(param),
-      profile(profile)
+      mat(mat), matSloppy(matSloppy), param(param), profile(profile)
     {
       ;
     }

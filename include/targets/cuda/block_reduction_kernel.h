@@ -3,7 +3,8 @@
 #include <target_device.h>
 #include <reduce_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This helper function swizzles the block index through
@@ -69,7 +70,7 @@ namespace quda {
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    auto j = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y * blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Functor<Arg> t(arg);
@@ -91,8 +92,9 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     BlockKernel2D_impl<Functor, Arg>(arg);
@@ -113,11 +115,12 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
   }
 
-}
+} // namespace quda

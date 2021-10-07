@@ -15,13 +15,22 @@ namespace quda {
     field.fill(*this);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param)
-    : LatticeField(param), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ),
-      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
-      bytes(0), norm_bytes(0), even(0), odd(0),
-      composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
-      components(0)
+  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
+    LatticeField(param),
+    init(false),
+    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    v(0),
+    norm(0),
+    ghost(),
+    ghostNorm(),
+    ghostFace(),
+    dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
+    bytes(0),
+    norm_bytes(0),
+    even(0),
+    odd(0),
+    composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
+    components(0)
   {
     if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
@@ -29,12 +38,22 @@ namespace quda {
            param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
-    : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
-      ghost( ), ghostNorm( ), ghostFace( ),
-      dslash_constant(static_cast<DslashConstant*>(safe_malloc(sizeof(DslashConstant)))),
-      bytes(0), norm_bytes(0), even(0), odd(0),
-     composite_descr(field.composite_descr), components(0)
+  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) :
+    LatticeField(field),
+    init(false),
+    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    v(0),
+    norm(0),
+    ghost(),
+    ghostNorm(),
+    ghostFace(),
+    dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
+    bytes(0),
+    norm_bytes(0),
+    even(0),
+    odd(0),
+    composite_descr(field.composite_descr),
+    components(0)
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
@@ -92,7 +111,7 @@ namespace quda {
       for (int dim=nDim; dim<QUDA_MAX_DIM; dim++) X[dim] = 1;
       if (siteSubset == QUDA_PARITY_SITE_SUBSET) X[0] = 2*X[0];
 
-      for (int i=0; i<nDim; i++) dc.Xh[i] = X[i]/2;
+      for (int i = 0; i < nDim; i++) dc.Xh[i] = X[i] / 2;
 
       dc.Ls = X[4];
       dc.volume_4d_cb = volumeCB / (nDim == 5 ? x[4] : 1);
@@ -111,38 +130,38 @@ namespace quda {
         dc.face_XYZT[dim] = dc.face_XYZ[dim] * face[3];
       }
 
-      dc.Vh = (X[3]*X[2]*X[1]*X[0])/2;
+      dc.Vh = (X[3] * X[2] * X[1] * X[0]) / 2;
       dc.ghostFace[0] = X[1] * X[2] * X[3];
       dc.ghostFace[1] = X[0] * X[2] * X[3];
       dc.ghostFace[2] = X[0] * X[1] * X[3];
       dc.ghostFace[3] = X[0] * X[1] * X[2];
       for (int d = 0; d < 4; d++) dc.ghostFaceCB[d] = dc.ghostFace[d] / 2;
 
-      dc.X2X1 = X[1]*X[0];
-      dc.X3X2X1 = X[2]*X[1]*X[0];
+      dc.X2X1 = X[1] * X[0];
+      dc.X3X2X1 = X[2] * X[1] * X[0];
       dc.X4X3X2X1 = X[3] * X[2] * X[1] * X[0];
-      dc.X2X1mX1 = (X[1]-1)*X[0];
-      dc.X3X2X1mX2X1 = (X[2]-1)*X[1]*X[0];
-      dc.X4X3X2X1mX3X2X1 = (X[3]-1)*X[2]*X[1]*X[0];
+      dc.X2X1mX1 = (X[1] - 1) * X[0];
+      dc.X3X2X1mX2X1 = (X[2] - 1) * X[1] * X[0];
+      dc.X4X3X2X1mX3X2X1 = (X[3] - 1) * X[2] * X[1] * X[0];
       dc.X5X4X3X2X1mX4X3X2X1 = (X[4] - 1) * X[3] * X[2] * X[1] * X[0];
-      dc.X4X3X2X1hmX3X2X1h = dc.X4X3X2X1mX3X2X1/2;
+      dc.X4X3X2X1hmX3X2X1h = dc.X4X3X2X1mX3X2X1 / 2;
 
       // used by indexFromFaceIndexStaggered
-      dc.dims[0][0]=X[1];
-      dc.dims[0][1]=X[2];
-      dc.dims[0][2]=X[3];
+      dc.dims[0][0] = X[1];
+      dc.dims[0][1] = X[2];
+      dc.dims[0][2] = X[3];
 
-      dc.dims[1][0]=X[0];
-      dc.dims[1][1]=X[2];
-      dc.dims[1][2]=X[3];
+      dc.dims[1][0] = X[0];
+      dc.dims[1][1] = X[2];
+      dc.dims[1][2] = X[3];
 
-      dc.dims[2][0]=X[0];
-      dc.dims[2][1]=X[1];
-      dc.dims[2][2]=X[3];
+      dc.dims[2][0] = X[0];
+      dc.dims[2][1] = X[1];
+      dc.dims[2][2] = X[3];
 
-      dc.dims[3][0]=X[0];
-      dc.dims[3][1]=X[1];
-      dc.dims[3][2]=X[2];
+      dc.dims[3][0] = X[0];
+      dc.dims[3][1] = X[1];
+      dc.dims[3][2] = X[2];
     }
     ghost_precision_allocated = ghost_precision;
   } // createGhostZone
@@ -472,13 +491,13 @@ namespace quda {
 	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
 	  offset += bytes[i];
 	  if (fine_grained_memcpy) {
-	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], qudaMemcpyDeviceToHost);
-	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], qudaMemcpyDeviceToHost);
-	  }
+            qudaMemcpy(send_back[i], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToHost);
+            qudaMemcpy(send_fwd[i], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToHost);
+          }
 	} else if (no_comms_fill) {
-	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], qudaMemcpyDeviceToDevice);
-	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], qudaMemcpyDeviceToDevice);
-	}
+          qudaMemcpy(ghost[2 * i + 1], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToDevice);
+          qudaMemcpy(ghost[2 * i + 0], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToDevice);
+        }
       }
       if (!fine_grained_memcpy && total_bytes) {
 	// find first non-zero pointer
@@ -489,7 +508,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
       }
     }
 
@@ -522,9 +541,9 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	if (fine_grained_memcpy) {
-	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
-	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
-	}
+          qudaMemcpy(ghost[2 * i + 0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
+          qudaMemcpy(ghost[2 * i + 1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
+        }
       }
 
       if (!fine_grained_memcpy && total_bytes) {
@@ -536,7 +555,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
       }
 
       if (total_bytes) {

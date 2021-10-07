@@ -278,10 +278,9 @@ namespace quda {
 	if (!src.isNative()) errorQuda("Only native order is supported");
 	void *buffer = pool_pinned_malloc(src.Bytes());
 	// this copies over both even and odd
-	qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
-		   src.Bytes(), qudaMemcpyDeviceToHost);
+        qudaMemcpy(buffer, static_cast<const cudaGaugeField &>(src).Gauge_p(), src.Bytes(), qudaMemcpyDeviceToHost);
 
-	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
+        copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
 	pool_pinned_free(buffer);
 
       } else { // else on the GPU
@@ -301,17 +300,17 @@ namespace quda {
 
 	if (order == QUDA_QDP_GAUGE_ORDER) {
 	  for (int d=0; d<geometry; d++) {
-	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, qudaMemcpyDeviceToHost);
-	  }
+            qudaMemcpy(((void **)gauge)[d], ((void **)buffer)[d], bytes / geometry, qudaMemcpyDeviceToHost);
+          }
 	} else {
-	  qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
-	}
+          qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
+        }
 
 	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
 	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
+            qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
 
-	free_gauge_buffer(buffer, order, geometry);
+        free_gauge_buffer(buffer, order, geometry);
 	if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
       }
 

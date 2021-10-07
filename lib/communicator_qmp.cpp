@@ -65,8 +65,7 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split) :
-  globalReduce(other.globalReduce)
+Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
 {
   user_set_comm_handle = false;
 
