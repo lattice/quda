@@ -56,7 +56,8 @@ namespace quda {
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
 
-  void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const
+  void DiracDomainWall4D::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                      const double &k) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -139,7 +140,8 @@ namespace quda {
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
   }
 
-  void DiracDomainWall4DPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &b) const
+  void DiracDomainWall4DPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                      const double &b) const
   {
     checkDWF(out, in);
     checkParitySpinor(in, out);
@@ -148,7 +150,7 @@ namespace quda {
     ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, M5_INV_DWF);
 
     long long Ls = in.X(4);
-    flops += (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);
+    flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
   }
 
   // Apply the 4D even-odd preconditioned domain-wall Dirac operator
@@ -210,14 +212,14 @@ namespace quda {
         src = &(x.Odd());
         M5inv(*src, b.Odd());
         Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), kappa5);
-	M5inv(*src, *tmp1);
+        M5inv(*src, *tmp1);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
         // src = M5^-1 (b_o + k D4_oe*M5^-1 b_e)
         src = &(x.Even());
         M5inv(*src, b.Even());
         Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), kappa5);
-	M5inv(*src, *tmp1);
+        M5inv(*src, *tmp1);
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo*M5^-1 b_o

@@ -332,7 +332,7 @@ protected:
   int param;
 
 public:
-  virtual ~BLASTest() {}
+  virtual ~BLASTest() { }
   virtual void SetUp() { param = GetParam(); }
 };
 
@@ -374,19 +374,25 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
   CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   auto opgroup = quda_app->add_option_group("BLAS Interface", "Options controlling BLAS interface tests");
-  opgroup->add_option("--blas-data-type", blas_data_type,
-                      "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
+  opgroup
+    ->add_option("--blas-data-type", blas_data_type,
+                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
     ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
 
-  opgroup->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
+  opgroup
+    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
     ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
 
-  opgroup->add_option("--blas-trans-a", blas_trans_a,
-                      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+  opgroup
+    ->add_option(
+      "--blas-trans-a", blas_trans_a,
+      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
-  opgroup->add_option("--blas-trans-b", blas_trans_b,
-                      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
+  opgroup
+    ->add_option(
+      "--blas-trans-b", blas_trans_b,
+      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
     ->transform(CLI::QUDACheckedTransformer(blas_op_map));
 
   opgroup->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
@@ -395,11 +401,13 @@ void add_blas_interface_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
     ->expected(2);
 
-  opgroup->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
+  opgroup
+    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
     ->expected(3);
 
-  opgroup->add_option("--blas-leading-dims", blas_leading_dims,
-                      "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
+  opgroup
+    ->add_option("--blas-leading-dims", blas_leading_dims,
+                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
     ->expected(3);
 
   opgroup->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")

@@ -368,8 +368,9 @@ static int hisq_force_test(void)
   cudaMom->saveCPUField(*cpuMom);
 
   int accuracy_level = 3;
-  if(verify_results) {
-    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5, qudaGaugeParam.cpu_prec);
+  if (verify_results) {
+    int res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+                             qudaGaugeParam.cpu_prec);
     accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), qudaGaugeParam.cpu_prec);
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
   }

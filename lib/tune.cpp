@@ -656,9 +656,9 @@ namespace quda
     aux(),
     time(FLT_MAX),
     n_calls(0)
-    {
-      aux = make_int4(1,1,1,1);
-    }
+  {
+    aux = make_int4(1, 1, 1, 1);
+  }
 
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }

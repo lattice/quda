@@ -14,7 +14,8 @@
    specializations to handle the rescaling required in these cases.
 */
 
-namespace quda {
+namespace quda
+{
 
   /**
      plus reducer, used for conventional sum reductions
@@ -56,10 +57,12 @@ namespace quda {
   /**
      square transformer, return the L2 norm squared of the input
    */
-  template<typename ReduceType, typename Float> struct square_ {
+  template <typename ReduceType, typename Float> struct square_ {
     square_(ReduceType = 1.0) { }
     __host__ __device__ inline ReduceType operator()(const quda::complex<Float> &x) const
-    { return static_cast<ReduceType>(norm(x)); }
+    {
+      return static_cast<ReduceType>(norm(x));
+    }
   };
 
   /**
@@ -70,38 +73,43 @@ namespace quda {
     const ReduceType scale;
     square_(const ReduceType scale) : scale(scale) { }
     __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x) const
-    { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    {
+      return norm(scale * complex<ReduceType>(x.real(), x.imag()));
+    }
   };
 
   /**
      square transformer, return the L2 norm squared of the input
      (short specialization)
    */
-  template<typename ReduceType> struct square_<ReduceType,short> {
+  template <typename ReduceType> struct square_<ReduceType, short> {
     const ReduceType scale;
     square_(const ReduceType scale) : scale(scale) { }
     __host__ __device__ inline ReduceType operator()(const quda::complex<short> &x) const
-    { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    {
+      return norm(scale * complex<ReduceType>(x.real(), x.imag()));
+    }
   };
 
   /**
      square transformer, return the L2 norm squared of the input
      (int specialization)
    */
-  template<typename ReduceType> struct square_<ReduceType,int> {
+  template <typename ReduceType> struct square_<ReduceType, int> {
     const ReduceType scale;
     square_(const ReduceType scale) : scale(scale) { }
     __host__ __device__ inline ReduceType operator()(const quda::complex<int> &x) const
-    { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
+    {
+      return norm(scale * complex<ReduceType>(x.real(), x.imag()));
+    }
   };
 
   /**
      abs transformer, return the absolute value of the input
    */
-  template<typename Float, typename storeFloat> struct abs_ {
+  template <typename Float, typename storeFloat> struct abs_ {
     abs_(const Float = 1.0) { }
-    __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const
-    { return abs(x); }
+    __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const { return abs(x); }
   };
 
   /**
@@ -112,39 +120,47 @@ namespace quda {
     Float scale;
     abs_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int8_t> &x) const
-    { return abs(scale * complex<Float>(x.real(), x.imag())); }
+    {
+      return abs(scale * complex<Float>(x.real(), x.imag()));
+    }
   };
 
   /**
      abs transformer, return the absolute value of the input (short
      specialization)
    */
-  template<typename Float> struct abs_<Float,short> {
+  template <typename Float> struct abs_<Float, short> {
     Float scale;
     abs_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<short> &x) const
-    { return abs(scale * complex<Float>(x.real(), x.imag())); }
+    {
+      return abs(scale * complex<Float>(x.real(), x.imag()));
+    }
   };
 
   /**
      abs transformer, return the absolute value of the input (int
      specialization)
    */
-  template<typename Float> struct abs_<Float,int> {
+  template <typename Float> struct abs_<Float, int> {
     Float scale;
     abs_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int> &x) const
-    { return abs(scale * complex<Float>(x.real(), x.imag())); }
+    {
+      return abs(scale * complex<Float>(x.real(), x.imag()));
+    }
   };
 
   /**
      abs_max transformer, return the maximum of the absolute value of the real
      and imaginary components
    */
-  template<typename Float, typename storeFloat> struct abs_max_ {
+  template <typename Float, typename storeFloat> struct abs_max_ {
     abs_max_(const Float = 1.0) { }
     __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const
-    { return maximum<Float>()(abs(x.real()), abs(x.imag())); }
+    {
+      return maximum<Float>()(abs(x.real()), abs(x.imag()));
+    }
   };
 
   /**
@@ -155,39 +171,47 @@ namespace quda {
     Float scale;
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int8_t> &x) const
-    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
   /**
      abs_max transformer, return the maximum of the absolute value of the real
      and imaginary components (short specialziation)
    */
-  template<typename Float> struct abs_max_<Float,short> {
+  template <typename Float> struct abs_max_<Float, short> {
     Float scale;
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<short> &x) const
-    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
   /**
      abs_max transformer, return the maximum of the absolute value of the real
      and imaginary components (int specialziation)
    */
-  template<typename Float> struct abs_max_<Float,int> {
+  template <typename Float> struct abs_max_<Float, int> {
     Float scale;
     abs_max_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int> &x) const
-    { return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return maximum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
   /**
      abs_min transformer, return the minimum of the absolute value of the real
      and imaginary components
    */
-  template<typename Float, typename storeFloat> struct abs_min_ {
+  template <typename Float, typename storeFloat> struct abs_min_ {
     abs_min_(const Float = 1.0) { }
     __host__ __device__ Float operator()(const quda::complex<storeFloat> &x) const
-    { return minimum<Float>()(abs(x.real()), abs(x.imag())); }
+    {
+      return minimum<Float>()(abs(x.real()), abs(x.imag()));
+    }
   };
 
   /**
@@ -198,29 +222,35 @@ namespace quda {
     Float scale;
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int8_t> &x) const
-    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
   /**
      abs_min transformer, return the minimum of the absolute value of the real
      and imaginary components (short specialziation)
    */
-  template<typename Float> struct abs_min_<Float,short> {
+  template <typename Float> struct abs_min_<Float, short> {
     Float scale;
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<short> &x) const
-    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
   /**
      abs_min transformer, return the minimum of the absolute value of the real
      and imaginary components (int specialziation)
    */
-  template<typename Float> struct abs_min_<Float,int> {
+  template <typename Float> struct abs_min_<Float, int> {
     Float scale;
     abs_min_(const Float scale) : scale(scale) { }
     __host__ __device__ Float operator()(const quda::complex<int> &x) const
-    { return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag())); }
+    {
+      return minimum<Float>()(abs(scale * x.real()), abs(scale * x.imag()));
+    }
   };
 
-}
+} // namespace quda

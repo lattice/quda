@@ -46,13 +46,13 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void GaugeCovDev::Dslash(ColorSpinorField &, const ColorSpinorField &,  const QudaParity) const
+  void GaugeCovDev::Dslash(ColorSpinorField &, const ColorSpinorField &, const QudaParity) const
   {
     //do nothing
   }
 
-  void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity,
-			       const ColorSpinorField &, const double &) const
+  void GaugeCovDev::DslashXpay(ColorSpinorField &, const ColorSpinorField &, const QudaParity, const ColorSpinorField &,
+                               const double &) const
   {
     //do nothing
   }
@@ -67,8 +67,8 @@ namespace quda {
     //do nothing
   }
 
-  void GaugeCovDev::prepare(ColorSpinorField* &, ColorSpinorField* &, ColorSpinorField &, ColorSpinorField &,
-			    const QudaSolutionType) const
+  void GaugeCovDev::prepare(ColorSpinorField *&, ColorSpinorField *&, ColorSpinorField &, ColorSpinorField &,
+                            const QudaSolutionType) const
   {
     //do nothing
   }
