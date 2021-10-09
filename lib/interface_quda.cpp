@@ -5490,20 +5490,20 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
     
-    R[4] = {2,2,2,2};
-    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGauge); 
+    int R_[4] = {2,2,2,2};
+    gaugeSmeared = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R_, profileGauge);
     
     //compute 2link 
-    //GaugeFieldParam gParam(*gaugePrecise);
-    //gParam.create = QUDA_NULL_FIELD_CREATE;
-    //cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
 
-    //computeTwoLink(*two_link_ptr, *gaugePrecise);
-    //copyExtendedGauge(*gaugeSmeared, *two_link_ptr, QUDA_CUDA_FIELD_LOCATION);
-    //two_link_ptr->exchangeGhost();
-    //delete two_link_ptr;
-    //gaugeSmeared = two_link_ptr;
-    computeTwoLink(*gaugeSmeared, *gaugePrecise);    
+    computeTwoLink(*two_link_ptr, *gaugePrecise);
+
+    gaugeSmeared->copy(*two_link_ptr);
+    gaugeSmeared->exchangeExtendedGhost(R_, profileGauge, redundant_comms);
+
+    delete two_link_ptr;   
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -5517,7 +5517,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   const int *X = gaugeSmeared->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
-  diracParam.type        = QUDA_ASQTAD_DIRAC;  
   
   ColorSpinorParam cpuParam(h_in, *inv_param, X, QUDA_MAT_SOLUTION, QUDA_CPU_FIELD_LOCATION);
   cpuParam.nSpin = 1;
@@ -5541,12 +5540,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   Dirac *d       = nullptr;
   DiracParam diracParam;
   //
-  if ( inv_param->dslash_type == QUDA_STAGGERED_DSLASH )
-    diracParam.type = QUDA_STAGGERED_DIRAC;
-
-  else if ( inv_param->dslash_type == QUDA_ASQTAD_DSLASH )
-    diracParam.type = QUDA_ASQTAD_DIRAC;
-
+  diracParam.type      = QUDA_ASQTAD_DIRAC;
   diracParam.matpcType = inv_param->matpc_type;
   diracParam.dagger    = inv_param->dagger;
   diracParam.gauge     = gaugeSmeared;
