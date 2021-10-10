@@ -99,8 +99,8 @@ namespace quda {
           int point_c = e_cb;
 
           dx[mu] = 1;
-          int point_d = linkIndexShift(x,dx[mu],arg.E);
-	  dx[mu] = 0;
+          int point_d = linkIndexShift(x,dx,arg.E);
+          dx[mu] = 0;
 
           Link Ucd = arg.link(mu, point_c, parity);
           Link Ude = arg.link(mu, point_d, 1-parity);
