@@ -5487,23 +5487,26 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if ( gaugeSmeared == nullptr || compute_2link != 0 ) {
+  
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
     
-    int R_[4] = {2,2,2,2};
-    gaugeSmeared = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R_, profileGauge);
-    
-    //compute 2link 
+    //int R_[4] = {2,2,2,2};    
     GaugeFieldParam gParam(*gaugePrecise);
-    gParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaGaugeField *two_link_ptr = new cudaGaugeField(gParam);
+    //
+    gParam.create        = QUDA_NULL_FIELD_CREATE;
+    gParam.link_type     = QUDA_GENERAL_LINKS;
+    gParam.reconstruct   = QUDA_RECONSTRUCT_NO;
+    gParam.setPrecision(inv_param->cuda_prec, true);
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    //
+    gaugeSmeared = new cudaGaugeField(gParam);
+    
+    cudaGaugeField *two_link_ext = createExtendedGauge(*gaugePrecise, R, profileGauge);//aux field
 
-    computeTwoLink(*two_link_ptr, *gaugePrecise);
+    computeTwoLink(*gaugeSmeared, *two_link_ext);
 
-    gaugeSmeared->copy(*two_link_ptr);
-    gaugeSmeared->exchangeExtendedGhost(R_, profileGauge, redundant_comms);
-
-    delete two_link_ptr;   
+    delete two_link_ext;   
   }
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -5602,6 +5605,8 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_D2H);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+
+  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished 2link Gaussian smearing.\n");
 
   delete temp1;
   delete temp2;
