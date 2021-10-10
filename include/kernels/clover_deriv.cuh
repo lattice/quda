@@ -1,150 +1,57 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
-
-#if (CUDA_VERSION < 8000)
-#define DYNAMIC_MU_NU
-#endif
-
-// Use shared memory for the force accumulator matrix
-#define SHARED_ACCUMULATOR
-
-#ifdef DYNAMIC_MU_NU
-
-// When using dynamic mu/nu indexing, to avoid local spills use shared
-// memory for the per thread indexing arrays.
-// FIXME for reasons I don't understand, the shared array breaks in multi-GPU mode
-//#define SHARED_ARRAY
-
-#endif // DYNAMIC_MU_NU
+#include <kernel.h>
 
 namespace quda
 {
 
-#ifdef SHARED_ACCUMULATOR
-
-#define DECLARE_LINK(U)                                                                                                \
-  extern __shared__ int s[];                                                                                           \
-  real *U = (real *)s;                                                                                                 \
-  {                                                                                                                    \
-    const int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;                               \
-    const int block = blockDim.x * blockDim.y * blockDim.z;                                                            \
-    for (int i = 0; i < 18; i++) force[i * block + tid] = 0.0;                                                         \
-  }
-
-#define LINK real *
-
-  template <typename real, typename Link> __device__ inline void axpy(real a, const real *x, Link &y)
-  {
-    const int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
-    const int block = blockDim.x * blockDim.y * blockDim.z;
-#pragma unroll
-    for (int i = 0; i < 9; i++) {
-      y.data[i] += a * complex<real>(x[(2 * i + 0) * block + tid], x[(2 * i + 1) * block + tid]);
-    }
-  }
-
-  template <typename real, typename Link> __device__ inline void operator+=(real *y, const Link &x)
-  {
-    const int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
-    const int block = blockDim.x * blockDim.y * blockDim.z;
-#pragma unroll
-    for (int i = 0; i < 9; i++) {
-      y[(2 * i + 0) * block + tid] += x.data[i].real();
-      y[(2 * i + 1) * block + tid] += x.data[i].imag();
-    }
-  }
-
-  template <typename real, typename Link> __device__ inline void operator-=(real *y, const Link &x)
-  {
-    const int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
-    const int block = blockDim.x * blockDim.y * blockDim.z;
-#pragma unroll
-    for (int i = 0; i < 9; i++) {
-      y[(2 * i + 0) * block + tid] -= x.data[i].real();
-      y[(2 * i + 1) * block + tid] -= x.data[i].imag();
-    }
-  }
-
-#else
-
-#define DECLARE_LINK(U) Link U;
-
-#define LINK Link &
-
-  template <typename real, typename Link> __device__ inline void axpy(real a, const Link &x, Link &y) { y += a * x; }
-
-#endif
-
-#if defined(SHARED_ARRAY) && defined(SHARED_ACCUMULATOR)
-
-#define DECLARE_ARRAY(d, idx)                                                                                          \
-  unsigned char *d;                                                                                                    \
-  {                                                                                                                    \
-    extern __shared__ int s[];                                                                                         \
-    int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;                                     \
-    int block = blockDim.x * blockDim.y * blockDim.z;                                                                  \
-    int offset = 18 * block * sizeof(real) / sizeof(int) + idx * block + tid;                                          \
-    s[offset] = 0;                                                                                                     \
-    d = (unsigned char *)&s[offset];                                                                                   \
-  }
-#elif defined(SHARED_ARRAY)
-#error Cannot use SHARED_ARRAY with SHARED_ACCUMULATOR
-#else
-#define DECLARE_ARRAY(d, idx) int d[4] = {0, 0, 0, 0};
-#endif
-
-  template <class Float, typename Force, typename Gauge, typename Oprod> struct CloverDerivArg {
+  template <typename Float, QudaReconstructType recon> struct CloverDerivArg : kernel_param<> {
+    using Force = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
+    using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type;
+    using Gauge = typename gauge_mapper<Float, recon>::type;
+    using real = typename mapper<Float>::type;
     int X[4];
     int E[4];
     int border[4];
-    Float coeff;
+    real coeff;
     int parity;
-    int volumeCB;
 
     Force force;
     Gauge gauge;
     Oprod oprod;
 
-    CloverDerivArg(const Force &force, const Gauge &gauge, const Oprod &oprod, const int *X_, const int *E_,
-        double coeff, int parity) :
-        coeff(coeff),
-        parity(parity),
-        volumeCB(force.volumeCB),
-        force(force),
-        gauge(gauge),
-        oprod(oprod)
+    CloverDerivArg(const GaugeField &force, const GaugeField &gauge, const GaugeField &oprod, double coeff, int parity) :
+      kernel_param(dim3(force.VolumeCB(), 2, 4)),
+      coeff(coeff),
+      parity(parity),
+      force(force),
+      gauge(gauge),
+      oprod(oprod)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        this->X[dir] = X_[dir];
-        this->E[dir] = E_[dir];
-        this->border[dir] = (E_[dir] - X_[dir]) / 2;
+        X[dir] = force.X()[dir];
+        E[dir] = oprod.X()[dir];
+        border[dir] = (E[dir] - X[dir]) / 2;
       }
     }
   };
 
-#ifdef DYNAMIC_MU_NU
-  template <typename real, typename Arg, typename Link>
-  __device__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex, int mu, int nu)
+  template <typename Arg, int mu, int nu, typename Link>
+  __device__ __forceinline__ void computeForce(Link &force, const Arg &arg, int xIndex, int yIndex)
   {
-#else
-  template <typename real, typename Arg, int mu, int nu, typename Link>
-  __device__ __forceinline__ void computeForce(LINK force, Arg &arg, int xIndex, int yIndex)
-  {
-#endif
-
     int otherparity = (1 - arg.parity);
 
     const int tidx = mu > nu ? (mu - 1) * mu / 2 + nu : (nu - 1) * nu / 2 + mu;
 
     if (yIndex == 0) { // do "this" force
 
-      DECLARE_ARRAY(x, 1);
+      int x[4];
       getCoordsExtended(x, xIndex, arg.X, arg.parity, arg.border);
 
       // U[mu](x) U[nu](x+mu) U[*mu](x+nu) U[*nu](x) Oprod(x)
       {
-        DECLARE_ARRAY(d, 0);
+        int d[4] = { };
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(x, d, arg.E), arg.parity);
@@ -183,7 +90,7 @@ namespace quda
       }
 
       {
-        DECLARE_ARRAY(d, 0);
+        int d[4] = { };
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -226,11 +133,11 @@ namespace quda
 
     } else { // else do other force
 
-      DECLARE_ARRAY(y, 1);
+      int y[4] = { };
       getCoordsExtended(y, xIndex, arg.X, otherparity, arg.border);
 
       {
-        DECLARE_ARRAY(d, 0);
+        int d[4] = { };
 
         // load U(x)_(+mu)
         Link U1 = arg.gauge(mu, linkIndexShift(y, d, arg.E), otherparity);
@@ -272,7 +179,7 @@ namespace quda
       // Lower leaf
       // U[nu*](x-nu) U[mu](x-nu) U[nu](x+mu-nu) Oprod(x+mu) U[*mu](x)
       {
-        DECLARE_ARRAY(d, 0);
+        int d[4] = { };
 
         // load U(x-nu)(+nu)
         d[nu]--;
@@ -317,60 +224,48 @@ namespace quda
 
   } // namespace quda
 
-  template <typename real, typename Arg> __global__ void cloverDerivativeKernel(Arg arg)
+  template <typename Arg> struct CloverDerivative
   {
-    int index = threadIdx.x + blockIdx.x * blockDim.x;
-    if (index >= arg.volumeCB) return;
+    const Arg &arg;
+    constexpr CloverDerivative(const Arg &arg) : arg(arg) {}
+    static constexpr const char *filename() { return KERNEL_FILE; }
 
-    // y index determines whether we're updating arg.parity or (1-arg.parity)
-    int yIndex = threadIdx.y + blockIdx.y * blockDim.y;
-    if (yIndex >= 2) return;
+    __host__ __device__ void operator()(int x_cb, int parity, int mu)
+    {
+      using real = typename Arg::real;
+      using Complex = complex<real>;
+      using Link = Matrix<Complex, 3>;
 
-    // mu index is mapped from z thread index
-    int mu = threadIdx.z + blockIdx.z * blockDim.z;
-    if (mu >= 4) return;
+      Link force;
 
-    typedef complex<real> Complex;
-    typedef Matrix<Complex, 3> Link;
+      switch (mu) {
+      case 0:
+        computeForce<Arg, 0, 1, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 0, 2, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 0, 3, Link>(force, arg, x_cb, parity);
+        break;
+      case 1:
+        computeForce<Arg, 1, 0, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 1, 3, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 1, 2, Link>(force, arg, x_cb, parity);
+        break;
+      case 2:
+        computeForce<Arg, 2, 3, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 2, 0, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 2, 1, Link>(force, arg, x_cb, parity);
+        break;
+      case 3:
+        computeForce<Arg, 3, 2, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 3, 1, Link>(force, arg, x_cb, parity);
+        computeForce<Arg, 3, 0, Link>(force, arg, x_cb, parity);
+        break;
+      }
 
-    DECLARE_LINK(force);
-
-#ifdef DYNAMIC_MU_NU
-    for (int nu = 0; nu < 4; nu++) {
-      if (mu == nu) continue;
-      computeForce<real, Arg, Link>(force, arg, index, yIndex, mu, nu);
+      // Write to array
+      Link F = arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity);
+      F += arg.coeff * force;
+      arg.force(mu, x_cb, parity == 0 ? arg.parity : 1 - arg.parity) = F;
     }
-#else
-    switch (mu) {
-    case 0:
-      computeForce<real, Arg, 0, 1, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 0, 2, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 0, 3, Link>(force, arg, index, yIndex);
-      break;
-    case 1:
-      computeForce<real, Arg, 1, 0, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 1, 3, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 1, 2, Link>(force, arg, index, yIndex);
-      break;
-    case 2:
-      computeForce<real, Arg, 2, 3, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 2, 0, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 2, 1, Link>(force, arg, index, yIndex);
-      break;
-    case 3:
-      computeForce<real, Arg, 3, 2, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 3, 1, Link>(force, arg, index, yIndex);
-      computeForce<real, Arg, 3, 0, Link>(force, arg, index, yIndex);
-      break;
-    }
-#endif
-
-    // Write to array
-    Link F = arg.force(mu, index, yIndex == 0 ? arg.parity : 1 - arg.parity);
-    axpy(arg.coeff, force, F);
-    arg.force(mu, index, yIndex == 0 ? arg.parity : 1 - arg.parity) = F;
-
-    return;
-  } // cloverDerivativeKernel
+  };
 
 } // namespace quda

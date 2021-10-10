@@ -40,8 +40,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedMassPreconditioned : dslash_default {
 
-    Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr nDegTwistedMassPreconditioned(const Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
@@ -57,7 +57,6 @@ namespace quda
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
-      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
@@ -94,14 +93,16 @@ namespace quda
         Vector x = arg.out(my_flavor_idx, my_spinor_parity);
         out += x;
       }
-
-      if (isComplete<mykernel_type>(arg, coord) && active) {
-        if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
-          VectorCache<real, Vector> cache;
+      
+      if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
+        SharedMemoryCache<Vector> cache(target::block_dim());
+        if (isComplete<mykernel_type>(arg, coord) && active) {
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
-          cache.sync(); // safe to sync in here since other threads will exit
+        }
 
+        cache.sync(); // safe to sync in here since other threads will exit
+        if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
             out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load(threadIdx.x, 1, threadIdx.z));
           else

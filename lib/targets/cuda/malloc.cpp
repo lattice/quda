@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 #include <shmem_helper.cuh>
 
 #ifdef USE_QDPJIT
@@ -44,37 +45,38 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
-  static long total_bytes[N_ALLOC_TYPE] = {0};
-  static long max_total_bytes[N_ALLOC_TYPE] = {0};
-  static long total_host_bytes, max_total_host_bytes;
-  static long total_pinned_bytes, max_total_pinned_bytes;
+  static size_t total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t max_total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t total_host_bytes, max_total_host_bytes;
+  static size_t total_pinned_bytes, max_total_pinned_bytes;
 
-  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+  size_t device_allocated() { return total_bytes[DEVICE]; }
 
-  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+  size_t pinned_allocated() { return total_bytes[PINNED]; }
 
-  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+  size_t mapped_allocated() { return total_bytes[MAPPED]; }
 
-  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+  size_t managed_allocated() { return total_bytes[MANAGED]; }
 
-  long host_allocated_peak() { return max_total_bytes[HOST]; }
+  size_t host_allocated() { return total_bytes[HOST]; }
+
+  size_t device_allocated_peak() { return max_total_bytes[DEVICE]; }
+
+  size_t pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+
+  size_t mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  size_t managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+
+  size_t host_allocated_peak() { return max_total_bytes[HOST]; }
 
   static void print_trace(void)
   {
@@ -148,12 +150,12 @@ namespace quda
 
     a.size = size;
 
-#if (CUDA_VERSION > 4000)                                                                                              \
-  && 0 // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
+#if 0
     a.base_size = size;
     ptr = malloc(size);
     if (!ptr) {
 #else
+    // we need to manually align to page boundaries to allow us to bind a texture to mapped memory
     static int page_size = 2 * getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     int align = posix_memalign(&ptr, page_size, a.base_size);
@@ -176,7 +178,8 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported())
+          warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
@@ -226,7 +229,7 @@ namespace quda
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -257,7 +260,7 @@ namespace quda
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -356,7 +359,7 @@ namespace quda
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -378,7 +381,7 @@ namespace quda
     }
     track_malloc(SHMEM, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -528,12 +531,12 @@ namespace quda
 
   void printPeakMemUsage()
   {
-    printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
-    printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
-    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
-    printfQuda("Shmem memory used = %.1f MB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
-    printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1 << 20));
-    printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1 << 20));
+    printfQuda("Device memory used = %.1f MiB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
+    printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
+    printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
+    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
+    printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
@@ -555,7 +558,6 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
     void *data[] = {&mem_type};
@@ -582,12 +584,29 @@ namespace quda
     void *device;
     auto error = cudaHostGetDevicePointer(&device, const_cast<void *>(host), 0);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostGetDevicePointer failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line,
+                func);
     }
     return device;
   }
 
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {
+    auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {
+    auto error = cudaHostUnregister(ptr);
+    if (error != cudaSuccess) {
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
+                cudaGetErrorString(error), file, line, func);
+    }
+  }
 
   namespace pool
   {

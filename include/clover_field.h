@@ -1,9 +1,8 @@
-#ifndef _CLOVER_QUDA_H
-#define _CLOVER_QUDA_H
+#pragma once
 
+#include <array>
 #include <quda_internal.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -39,7 +38,8 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    double csw;  //! Clover coefficient
+    double csw;  //! C_sw clover coefficient
+    double coeff;  //! Overall clover coefficient
     bool twisted; // whether to create twisted mass clover
     double mu2;
     double rho;
@@ -118,6 +118,7 @@ namespace quda {
     void *invNorm;
 
     double csw;
+    double coeff;
     bool twisted; 
     double mu2;
     double rho;
@@ -125,7 +126,12 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable double trlog[2];
+    mutable std::array<double, 2> trlog;
+
+    /**
+       @brief Set the vol_string and aux_string for use in tuning
+    */
+    void setTuningString();
 
   public:
     CloverField(const CloverFieldParam &param);
@@ -152,7 +158,7 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    double* TrLog() const { return trlog; }
+    std::array<double, 2>& TrLog() const { return trlog; }
     
     /**
        @return The order of the field
@@ -190,9 +196,14 @@ namespace quda {
     int Nspin() const { return nSpin; }
 
     /**
-       @return Clover coefficient (usually includes kappa)
+       @return Csw coefficient (does not include kappa)
     */
     double Csw() const { return csw; }
+
+    /**
+       @return Clover coefficient (explicitly includes kappa)
+    */
+    double Coeff() const { return coeff; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
@@ -239,6 +250,16 @@ namespace quda {
        @return Absolute minimum value
      */
     double abs_min(bool inverse = false) const;
+
+    /**
+       @brief Backs up the CloverField
+    */
+    void backup() const;
+
+    /**
+       @brief Restores the CloverField
+    */
+    void restore() const;
 
     virtual int full_dim(int d) const { return x[d]; }
   };
@@ -288,7 +309,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -402,7 +423,6 @@ namespace quda {
   */
   void computeClover(CloverField &clover, const GaugeField &fmunu, double coeff);
 
-
   /**
      @brief This generic function is used for copying the clover field where
      in the input and output can be in any order and location.
@@ -493,7 +513,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
    */
-  void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field
@@ -507,7 +527,7 @@ namespace quda {
 
   /**
      @brief Helper function that returns whether we have enabled
-     dyanmic clover inversion or not.
+     dynamic clover inversion or not.
    */
   constexpr bool dynamic_clover_inverse()
   {
@@ -518,7 +538,4 @@ namespace quda {
 #endif
   }
 
-
 } // namespace quda
-
-#endif // _CLOVER_QUDA_H

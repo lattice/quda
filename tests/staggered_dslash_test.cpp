@@ -10,6 +10,7 @@ static int dslashTest()
   int test_rc = 0;
   dslash_test_wrapper.init_test();
 
+  dslash_test_wrapper.staggeredDslashRef();
   int attempts = 1;
   for (int i = 0; i < attempts; i++) {
     dslash_test_wrapper.run_test(niter, /**print_metrics =*/true);
@@ -62,9 +63,6 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  for (int d = 0; d < 4; d++) {
-    if (dim_partitioned[d]) { commDimPartitionedSet(d); }
-  }
   updateR();
 
   initQuda(device_ordinal);
@@ -104,7 +102,8 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n", get_string(dtest_type_map, dtest_type).c_str());
+      errorQuda("Test type %s is not supported for the Laplace operator.\n",
+                get_string(dtest_type_map, dtest_type).c_str());
     }
   }
 

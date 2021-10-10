@@ -11,7 +11,6 @@
 #include "util_quda.h"
 #include "malloc_quda.h"
 #include <unitarization_links.h>
-#include "dslash_quda.h"
 #include "ks_improved_force.h"
 
 #ifdef MULTI_GPU
@@ -90,8 +89,7 @@ static void hisq_test()
   qudaGaugeParam.ga_pad = 0;
 
   // Needed for unitarization, following "unitarize_link_test.cpp"
-  GaugeFieldParam gParam(0, qudaGaugeParam);
-  gParam.pad = 0;
+  GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = gauge_order;

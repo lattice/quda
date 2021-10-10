@@ -1,13 +1,6 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <cstring> // needed for memset
-
-#include <tune_quda.h>
-#include <quda_internal.h>
 #include <blas_quda.h>
 #include <color_spinor_field.h>
-
-#include <jitify_helper.cuh>
+#include <tunable_nd.h>
 #include <kernels/blas_core.cuh>
 
 namespace quda {
@@ -22,11 +15,9 @@ namespace quda {
     unsigned long long flops;
     unsigned long long bytes;
 
-    static qudaStream_t *blasStream;
-
     template <template <typename real> class Functor, typename store_t, typename y_store_t,
               int nSpin, typename coeff_t>
-    class Blas : public Tunable
+    class Blas : public TunableGridStrideKernel2D
     {
       using real = typename mapper<y_store_t>::type;
       Functor<real> f;
@@ -34,21 +25,17 @@ namespace quda {
 
       const coeff_t &a, &b, &c;
       ColorSpinorField &x, &y, &z, &w, &v;
-      const QudaFieldLocation location;
-
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       bool tuneSharedBytes() const { return false; }
-
       // for these streaming kernels, there is no need to tune the grid size, just use max
       unsigned int minGridSize() const { return maxGridSize(); }
 
     public:
       Blas(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x,
            ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) :
+        TunableGridStrideKernel2D(x, (x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()),
         f(a, b, c),
-        nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()),
+        nParity(vector_length_y),
         a(a),
         b(b),
         c(c),
@@ -56,9 +43,9 @@ namespace quda {
         y(y),
         z(z),
         w(w),
-        v(v),
-        location(checkLocation(x, y, z, w, v))
+        v(v)
       {
+        checkLocation(x, y, z, w, v);
         checkLength(x, y, z, w, v);
         auto x_prec = checkPrecision(x, z, w);
         auto y_prec = checkPrecision(y, v);
@@ -68,24 +55,18 @@ namespace quda {
         if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
-        strcpy(aux, x.AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
-        if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
 
-#ifdef JITIFY
-        ::quda::create_jitify_program("kernels/blas_core.cuh");
-#endif
-
-        apply(*blasStream);
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(f).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
 
       void apply(const qudaStream_t &stream)
       {
@@ -93,7 +74,6 @@ namespace quda {
         if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           if (site_unroll_check) checkNative(x, y, z, w, v); // require native order when using site_unroll
           using device_store_t = typename device_type_mapper<store_t>::type;
@@ -106,18 +86,11 @@ namespace quda {
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x.Length() / (nParity * M);
+          const int threads = x.Length() / (nParity * M);
 
-          BlasArg<device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, length, nParity);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::blas::blasKernel")
-            .instantiate(Type<device_real_t>(), M, Type<decltype(arg)>())
-            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-            .launch(arg);
-#else
-          qudaLaunchKernel(blasKernel<device_real_t, M, decltype(arg)>, tp, stream, arg);
-#endif
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          BlasArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
+          launch<Blas_>(tp, stream, arg);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER)
             errorQuda("CPU Blas functions expect AoS field order");
@@ -132,10 +105,12 @@ namespace quda {
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
-          const int length = x.Length() / (nParity * M);
+          const int threads = x.Length() / (nParity * M);
 
-          BlasArg<host_store_t, N, host_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, length, nParity);
-          blasCPU<host_real_t, M>(arg);
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          BlasArg<host_real_t, M, host_store_t, N, host_y_store_t, Ny, decltype(f_)> arg(x, y, z, w, v, f_, threads, nParity);
+
+          launch_host<Blas_>(tp, stream, arg);
         }
       }
 
@@ -162,18 +137,6 @@ namespace quda {
         return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
       }
 
-      void initTuneParam(TuneParam &param) const
-      {
-        Tunable::initTuneParam(param);
-        param.grid.y = nParity;
-      }
-
-      void defaultTuneParam(TuneParam &param) const
-      {
-        Tunable::initTuneParam(param);
-        param.grid.y = nParity;
-      }
-
       long long flops() const { return f.flops() * x.Length(); }
       long long bytes() const
       {
@@ -193,7 +156,6 @@ namespace quda {
 
     void init()
     {
-      blasStream = &streams[Nstream-1];
       reducer::init();
     }
 
@@ -201,8 +163,6 @@ namespace quda {
     {
       reducer::destroy();
     }
-
-    qudaStream_t* getStream() { return blasStream; }
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)
     {

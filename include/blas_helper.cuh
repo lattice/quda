@@ -1,6 +1,9 @@
 #pragma once
 
 #include <color_spinor_field.h>
+#include <reduce_helper.h>
+#include <load_store.h>
+#include <convert.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -89,43 +92,117 @@ namespace quda
   namespace blas
   {
 
-    template <typename store_t, bool is_fixed> struct SpinorNorm {
+    /**
+       Helper struct that contains the meta data required for
+       read and writing to a spinor field in the BLAS kernels.
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector
+    */
+    template <typename store_t, int N, bool is_fixed> struct data_t {
+      store_t *spinor;
+      int stride;
+      unsigned int cb_offset;
+      data_t() :
+        spinor(nullptr),
+        stride(0),
+        cb_offset(0)
+      {}
+
+      data_t(const ColorSpinorField &x) :
+        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
+        stride(x.Stride()),
+        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
+      {}
+    };
+
+    /**
+       Helper struct that contains the meta data required for read and
+       writing to a spinor field in the BLAS kernels.  This is a
+       specialized variant for fixed-point fields where need to store
+       the meta data for the norm field.
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector
+    */
+    template <typename store_t, int N> struct data_t<store_t, N, true> {
       using norm_t = float;
+      store_t *spinor;
       norm_t *norm;
+      int stride;
+      unsigned int cb_offset;
       unsigned int cb_norm_offset;
+      data_t() :
+        spinor(nullptr),
+        norm(nullptr),
+        stride(0),
+        cb_offset(0),
+        cb_norm_offset(0)
+      {}
 
-      SpinorNorm() : norm(nullptr), cb_norm_offset(0) {}
-
-      SpinorNorm(const ColorSpinorField &x) :
-        norm((norm_t *)x.Norm()),
+      data_t(const ColorSpinorField &x) :
+        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
+        norm(static_cast<norm_t *>(const_cast<ColorSpinorField &>(x).Norm())),
+        stride(x.Stride()),
+        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N)),
         cb_norm_offset(x.NormBytes() / (2 * sizeof(norm_t)))
+      {}
+    };
+
+    /**
+       Specialized accessor struct for the BLAS kernels.
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector
+    */
+    template <typename store_t, int N> struct Spinor {
+      using Vector = typename VectorType<store_t, N>::type;
+      using norm_t = float;
+      data_t<store_t, N, isFixed<store_t>::value> data;
+
+      Spinor() {}
+
+      Spinor(const ColorSpinorField &x) : data(x) {}
+
+      /**
+         @brief Dummy implementation of load_norm for non-fixed-point fields
+         @tparam is_fixed Whether fixed point
+      */
+      template <bool is_fixed>
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> load_norm(const int, const int = 0) const { return 1.0; }
+
+      /**
+         @brief Implementation of load_norm for fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @param[in] i checkerboard site index
+         @param[in] parity site parity
+      */
+      template <bool is_fixed>
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> load_norm(const int x, const int parity = 0) const
       {
+        return data.norm[data.cb_norm_offset * parity + x];
       }
 
-      SpinorNorm(const SpinorNorm &sn) : norm(sn.norm), cb_norm_offset(sn.cb_norm_offset) {}
-
-      SpinorNorm &operator=(const SpinorNorm &src)
+      /**
+         @brief Dummy implementation of store_norm for non fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+      */
+      template <bool is_fixed, typename real, int n>
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &, int, int) const
       {
-        if (&src != this) {
-          norm = src.norm;
-          cb_norm_offset = src.cb_norm_offset;
-        }
-        return *this;
+        return 1.0;
       }
 
-      void set(const ColorSpinorField &x)
-      {
-        norm = (norm_t *)x.Norm();
-        cb_norm_offset = x.NormBytes() / (2 * sizeof(norm_t));
-      }
-
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const
-      {
-        return norm[cb_norm_offset * parity + i];
-      }
-
-      template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
+      /**
+         @brief Implementation of store_norm for fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v elements we wish to find the max abs of for storing
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
+      template <bool is_fixed, typename real, int n>
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -134,85 +211,24 @@ namespace quda
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
-        norm[x + parity * cb_norm_offset] = scale;
+        data.norm[x + parity * data.cb_norm_offset] = scale;
 
-#ifdef __CUDA_ARCH__
-        return __fdividef(fixedMaxValue<store_t>::value, scale);
-#else
-        return fixedMaxValue<store_t>::value / scale;
-#endif
+        return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
-      norm_t *Norm() { return norm; }
-    };
-
-    template <typename store_type_t> struct SpinorNorm<store_type_t, false> {
-      using norm_t = float;
-      SpinorNorm() {}
-      SpinorNorm(const ColorSpinorField &x) {}
-      SpinorNorm(const SpinorNorm &sn) {}
-      SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
-      void set(const ColorSpinorField &x) {}
-      __device__ __host__ inline norm_t load_norm(const int i, const int parity = 0) const { return 1.0; }
-      template <typename real, int n>
-      __device__ __host__ inline norm_t store_norm(const vector_type<complex<real>, n> &v, int x, int parity)
-      {
-        return 1.0;
-      }
-      void backup(char **norm_h, size_t norm_bytes) {}
-      void restore(char **norm_h, size_t norm_bytes) {}
-      norm_t *Norm() { return nullptr; }
-    };
-
-    /**
-       @param RegType Register type used in kernel
-       @param InterType Intermediate format - RegType precision with StoreType ordering
-       @param StoreType Type used to store field in memory
-       @param N Length of vector of RegType elements that this Spinor represents
-    */
-    template <typename store_t, int N> struct Spinor : SpinorNorm<store_t, isFixed<store_t>::value> {
-      using SN = SpinorNorm<store_t, isFixed<store_t>::value>;
-      using Vector = typename VectorType<store_t, N>::type;
-      store_t *spinor;
-      int stride;
-      unsigned int cb_offset;
-
-      Spinor() : SN(), spinor(nullptr), stride(0), cb_offset(0) {}
-
-      Spinor(const ColorSpinorField &x) :
-        SN(x),
-        spinor(static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V())),
-        stride(x.Stride()),
-        cb_offset(x.Bytes() / (2 * sizeof(store_t) * N))
-      {
-      }
-
-      Spinor(const Spinor &st) : SN(st), spinor(st.spinor), stride(st.stride), cb_offset(st.cb_offset) {}
-
-      Spinor &operator=(const Spinor &src)
-      {
-        if (&src != this) {
-          SN::operator=(src);
-          spinor = src.spinor;
-          stride = src.stride;
-          cb_offset = src.cb_offset;
-        }
-        return *this;
-      }
-
-      void set(const ColorSpinorField &x)
-      {
-        SN::set(x);
-        spinor = static_cast<store_t *>(const_cast<ColorSpinorField &>(x).V());
-        stride = x.Stride();
-        cb_offset = x.Bytes() / (2 * sizeof(store_t) * N);
-      }
-
+      /**
+         @brief Load spinor function
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v output vector now loaded
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
       template <typename real, int n>
       __device__ __host__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        float nrm = isFixed<store_t>::value ? SN::load_norm(x, parity) : 0.0;
+        float nrm = load_norm<isFixed<store_t>::value>(x, parity);
 
         vector_type<real, len> v_;
 
@@ -220,7 +236,7 @@ namespace quda
 #pragma unroll
         for (int i = 0; i < M; i++) {
           // first load from memory
-          Vector vecTmp = vector_load<Vector>(spinor, parity * cb_offset + x + stride * i);
+          Vector vecTmp = vector_load<Vector>(data.spinor, parity * data.cb_offset + x + data.stride * i);
           // now copy into output and scale
 #pragma unroll
           for (int j = 0; j < N; j++) copy_and_scale(v_[i * N + j], reinterpret_cast<store_t *>(&vecTmp)[j], nrm);
@@ -229,14 +245,22 @@ namespace quda
         for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
       }
 
+      /**
+         @brief Save spinor function
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v input vector we wish to store
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
       template <typename real, int n>
-      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0)
+      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
         vector_type<real, len> v_;
 
         if (isFixed<store_t>::value) {
-          real scale_inv = SN::template store_norm<real, n>(v, x, parity);
+          real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
 #pragma unroll
           for (int i = 0; i < n; i++) {
             v_[2 * i + 0] = scale_inv * v[i].real();
@@ -258,13 +282,20 @@ namespace quda
 #pragma unroll
           for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<store_t *>(&vecTmp)[j], v_[i * N + j]);
           // second do vectorized copy into memory
-          vector_store(spinor, parity * cb_offset + x + stride * i, vecTmp);
+          vector_store(data.spinor, parity * data.cb_offset + x + data.stride * i, vecTmp);
         }
       }
     };
 
-    // n_vector defines the granularity of load/store, e.g., sets the
-    // size of vector we load from memory
+    /**
+       n_vector defines the granularity of load/store, e.g., sets the
+       size of vector we load from memory
+       @tparam store_t Field storage precision
+       @tparam GPU Whether this is GPU (or CPU)?
+       @tparam nSpin Number of spino components
+       @tparam site_unroll Whether we enforce all site components must
+       be unrolled onto the same thread (required for fixed-point precision)
+    */
     template <typename store_t, bool GPU, int nSpin, bool site_unroll> constexpr int n_vector() { return 0; }
 
     // native ordering
@@ -310,13 +341,10 @@ namespace quda
     template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
     template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
-#endif
-
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               typename T, typename store_t, typename y_store_t, typename V, typename... Args>
+#if defined(NSPIN1) || defined(NSPIN2) || defined(NSPIN4)
     constexpr void instantiate(const T &a, const T &b, const T &c, V &x, Args &&... args)
     {
       if (x.Nspin() == 4 || x.Nspin() == 2) {
@@ -334,10 +362,11 @@ namespace quda
 #endif
       }
     }
-
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
+#else
+    constexpr void instantiate(const T &, const T &, const T &, V &x, Args &&...)
+    {
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+    }
 #endif
 
     // The instantiate helpers are used to instantiate the precision
@@ -346,8 +375,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<!mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x,
-                                                                      Args &&... args)
+    constexpr std::enable_if_t<!mixed, void> instantiate(const T &a, const T &b, const T &c, V &x,
+                                                         Args &&... args)
     {
       return instantiate<Functor, Blas, T, store_t, store_t>(a, b, c, x, args...);
     }
@@ -355,8 +384,8 @@ namespace quda
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,
               bool mixed, typename T, typename x_store_t, typename V, typename... Args>
-    constexpr typename std::enable_if<mixed, void>::type instantiate(const T &a, const T &b, const T &c, V &x, V &y,
-                                                                     Args &&... args)
+    constexpr std::enable_if_t<mixed, void> instantiate(const T &a, const T &b, const T &c, V &x, V &y,
+                                                        Args &&... args)
     {
       if (y.Precision() < x.Precision()) errorQuda("Y precision %d not supported", y.Precision());
 

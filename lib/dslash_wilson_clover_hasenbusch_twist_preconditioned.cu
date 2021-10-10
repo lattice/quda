@@ -61,6 +61,7 @@ namespace quda
           += 2 * (clover_flops + 48) * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += (clover_flops + 48) * in.Volume();
 
@@ -94,6 +95,7 @@ namespace quda
         bytes += clover_bytes * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
 
         bytes += clover_bytes * in.Volume();
@@ -128,19 +130,18 @@ namespace quda
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
+#ifdef GPU_CLOVER_HASENBUSCH_TWIST
   void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
                                                    const GaugeField &U, const CloverField &A, double a, double b,
                                                    const ColorSpinorField &x, int parity, bool dagger,
                                                    const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_CLOVER_HASENBUSCH_TWIST
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -153,10 +154,15 @@ namespace quda
 
     instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                              profile);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif
   }
+#else
+  void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &, const ColorSpinorField &,
+                                                   const GaugeField &, const CloverField &, double, double,
+                                                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
+  }
+#endif
 
   /* ***************************
    * Clov Inv
@@ -209,6 +215,7 @@ namespace quda
           * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += (2 * clover_flops + 48) * in.Volume();
 
@@ -247,6 +254,7 @@ namespace quda
           * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
 
         bytes += dyn_factor * clover_bytes * in.Volume();
@@ -280,24 +288,28 @@ namespace quda
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
+#ifdef GPU_CLOVER_HASENBUSCH_TWIST
   void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                                  const CloverField &A, double a, double b, const ColorSpinorField &x,
                                                  int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_CLOVER_HASENBUSCH_TWIST
     instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                            profile);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif
   }
+#else
+  void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                                 const CloverField &, double, double, const ColorSpinorField &,
+                                                 int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Clover Hasenbusch Twist dslash has not been built");
+  }
+#endif
 
 } // namespace quda
 

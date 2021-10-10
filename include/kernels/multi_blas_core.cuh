@@ -1,14 +1,14 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
-
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
+#include <constant_kernel_arg.h>
+#include <kernel.h>
+#include <warp_collective.h>
 
-#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300) && !defined(QUDA_FAST_COMPILE_REDUCE)
+#ifndef QUDA_FAST_COMPILE_REDUCE
 #define WARP_SPLIT
-#include <generics/shfl.h>
 #endif
 
 namespace quda
@@ -19,108 +19,91 @@ namespace quda
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
-       @tparam NXZ is dimension of input vectors: X,Z
+       @tparam warp_split_ The degree of warp splitting over the NXZ dimension
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam NXZ_ is dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
        @tparam N Y-field vector i/o length
-       @tparam Functor Functor used to operate on data
+       @tparam Functor_ Functor used to operate on data
     */
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    struct MultiBlasArg :
-      SpinorXZ<NXZ_, store_t, N, Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor>(), store_t, N, y_store_t, Ny, Functor::use_w> {
+    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor_>
+    struct MultiBlasArg : kernel_param<>,
+      SpinorXZ<NXZ_, store_t, N, Functor_::use_z>,
+      SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Functor_>(), store_t, N, y_store_t, Ny, Functor_::use_w> {
+      using real = real_;
+      using Functor = Functor_;
+      static constexpr int warp_split = warp_split_;
+      static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW;
       Functor f;
-      const int length;
-
       MultiBlasArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                    Functor f, int NYW, int length) :
+        kernel_param(dim3(length * warp_split, NYW, x[0]->SiteSubset())),
         NYW(NYW),
-        f(f),
-        length(length)
+        f(f)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i].set(*x[i]);
-          if (Functor::use_z) this->Z[i].set(*z[i]);
+          this->X[i] = *x[i];
+          if (Functor::use_z) this->Z[i] = *z[i];
         }
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i].set(*y[i]);
-          if (Functor::use_w) this->W[i].set(*w[i]);
+          this->Y[i] = *y[i];
+          if (Functor::use_w) this->W[i] = *w[i];
         }
       }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<NXZ_, store_t, N, y_store_t, Ny, Functor>::NXZ;
+    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NXZ;
 
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
-    constexpr int MultiBlasArg<NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
-
-    template <int warp_split, typename T> __device__ __host__ void warp_combine(T &x)
-    {
-#ifdef WARP_SPLIT
-      constexpr int warp_size = 32;
-      if (warp_split > 1) {
-#pragma unroll
-        for (int i = 0; i < x.size(); i++) {
-          // reduce down to the first group of column-split threads
-#pragma unroll
-          for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-#define WARP_CONVERGED 0xffffffff // we know warp should be converged here
-            x[i] += __shfl_down_sync(WARP_CONVERGED, x[i], offset);
-          }
-        }
-      }
-
-#endif // WARP_SPLIT
-    }
+    template <int warp_split_, typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
+    constexpr int MultiBlasArg<warp_split_, real_, n_, NXZ_, store_t, N, y_store_t, Ny, Functor>::NYW_max;
 
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename real, int n, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-      // use i to loop over elements in kernel
-      const int k = blockIdx.y * blockDim.y + threadIdx.y;
-      const int parity = blockIdx.z;
+    template <typename Arg> struct MultiBlas_ {
+      const Arg &arg;
+      constexpr MultiBlas_(const Arg &arg) : arg(arg) {}
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-      // partition the warp between grid points and the NXZ update
-      constexpr int warp_size = 32;
-      constexpr int vector_site_width = warp_size / warp_split;
-      const int lane_id = threadIdx.x % warp_size;
-      const int warp_id = threadIdx.x / warp_size;
-      unsigned int idx
-        = blockIdx.x * (blockDim.x / warp_split) + warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
-      const int l_idx = lane_id / vector_site_width;
+      __device__ __host__ inline void operator()(int i, int k, int parity)
+      {
+        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
 
-      if (k >= arg.NYW) return;
-
-      while (idx < arg.length) {
+        // partition the warp between grid points and the NXZ update
+        constexpr int warp_size = device::warp_size();
+        constexpr int warp_split = Arg::warp_split;
+        constexpr int vector_site_width = warp_size / warp_split;
+        const int lane_id = i % warp_size;
+        const int warp_id = i / warp_size;
+        const int idx = warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
+        const int l_idx = lane_id / vector_site_width;
 
         vec x, y, z, w;
         if (l_idx == 0 || warp_split == 1) {
           if (arg.f.read.Y) arg.Y[k].load(y, idx, parity);
           if (arg.f.read.W) arg.W[k].load(w, idx, parity);
         } else {
-          zero(y);
-          zero(w);
+          y = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
+          w = ::quda::zero<complex<typename Arg::real>, Arg::n/2>();
         }
 
 #pragma unroll
-        for (int l_ = 0; l_ < NXZ; l_ += warp_split) {
+        for (int l_ = 0; l_ < Arg::NXZ; l_ += warp_split) {
           const int l = l_ + l_idx;
-          if (l < NXZ || warp_split == 1) {
+          if (l < Arg::NXZ || warp_split == 1) {
             if (arg.f.read.X) arg.X[l].load(x, idx, parity);
             if (arg.f.read.Z) arg.Z[l].load(z, idx, parity);
 
@@ -129,55 +112,24 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        if (arg.f.write.Y) warp_combine<warp_split>(y);
-        if (arg.f.write.W) warp_combine<warp_split>(w);
+        if (arg.f.write.Y) y = warp_combine<warp_split>(y);
+        if (arg.f.write.W) w = warp_combine<warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           if (arg.f.write.Y) arg.Y[k].save(y, idx, parity);
           if (arg.f.write.W) arg.W[k].save(w, idx, parity);
         }
-
-        idx += gridDim.x * blockDim.x / warp_split;
       }
-    }
+    };
 
     template <typename coeff_t_, bool multi_1d_ = false>
-    struct MultiBlasFunctor {
+    struct MultiBlasFunctor : MultiBlasParam<coeff_t_, false, multi_1d_> {
       using coeff_t = coeff_t_;
       static constexpr bool reducer = false;
       static constexpr bool coeff_mul = true;
       static constexpr bool multi_1d = multi_1d_;
 
-      const int NXZ;
-      const int NYW;
-      MultiBlasFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
-
-      __device__ __host__ inline coeff_t a(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-#endif
-      }
+      MultiBlasFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**
@@ -193,7 +145,7 @@ namespace quda
       using MultiBlasFunctor<real>::a;
       multiaxpy_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] += a(j, i) * x[k];
@@ -215,7 +167,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpy_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) y[k] = cmac(a(j, i), x[k], y[k]);
@@ -237,7 +189,7 @@ namespace quda
       using MultiBlasFunctor<complex<real>>::a;
       multicaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -267,7 +219,7 @@ namespace quda
       real c[N];
       multi_axpyBzpcx_(int NXZ, int NYW) : MultiBlasFunctor<real, true>(NXZ, NYW) {}
 
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {
@@ -293,10 +245,17 @@ namespace quda
       complex<real> a[N];
       complex<real> b[N];
       complex<real> c[N];
-      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW) {}
+      multi_caxpyBxpz_(int NXZ, int NYW) : MultiBlasFunctor<complex<real>, true>(NXZ, NYW)
+      {
+        for (int i = 0; i < N; i++) {
+          a[i] = 0.0;
+          b[i] = 0.0;
+          c[i] = 0.0;
+        }
+      }
 
       // i loops over NYW, j loops over NXZ
-      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &z, T &w, int i, int j)
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

@@ -1,18 +1,13 @@
-#include <tune_quda.h>
-#include <transfer.h>
 #include <gauge_field.h>
 #include <blas_quda.h>
 #include <blas_lapack.h>
-
-#include <staggered_kd_build_xinv.h>
-
-#include <jitify_helper.cuh>
-#include <kernels/staggered_kd_build_xinv_kernel.cuh>
+#include <tunable_nd.h>
+#include <kernels/staggered_coarse_op_kernel.cuh>
 
 namespace quda {
 
   template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  class CalculateStaggeredKDBlock : public TunableVectorYZ {
+  class CalculateStaggeredKDBlock : public TunableKernel3D {
 
     Arg &arg;
     const GaugeField &meta;
@@ -34,21 +29,14 @@ namespace quda {
 
     unsigned int minThreads() const { return arg.fineVolumeCB; }
     bool tuneSharedBytes() const { return false; } // FIXME don't tune the grid dimension
-    bool tuneGridDim() const { return false; } // FIXME don't tune the grid dimension
-    bool tuneAuxDim() const { return false; }
 
   public:
     CalculateStaggeredKDBlock(Arg &arg, const GaugeField &meta, GaugeField &X) :
-      TunableVectorYZ(fineColor*fineColor, 2),
+      TunableKernel3D(meta, fineColor*fineColor, 2),
       arg(arg),
       meta(meta),
       X(X)
     {
-#ifdef JITIFY
-      create_jitify_program("kernels/staggered_kd_build_xinv_kernel.cuh");
-#endif
-      strcpy(aux, compile_type_str(meta));
-      strcpy(aux, meta.AuxString());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux,",computeStaggeredKDBlock");
       strcat(aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && X.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
@@ -59,19 +47,12 @@ namespace quda {
 
     void apply(const qudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        ComputeStaggeredKDBlockCPU(arg);
+        launch_host<ComputeStaggeredVUV>(tp, stream, arg);
       } else {
-#ifdef JITIFY
-        using namespace jitify::reflection;
-        jitify_error = program->kernel("quda::ComputeStaggeredKDBlockGPU")
-          .instantiate(Type<Arg>())
-          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else // not jitify
-        qudaLaunchKernel(ComputeStaggeredKDBlockGPU<Arg>, tp, stream, arg);
-#endif // JITIFY
+        launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
     }
 
@@ -80,8 +61,6 @@ namespace quda {
       if (X.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
       else return false;
     }
-
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
 
   /**
@@ -119,8 +98,8 @@ namespace quda {
     x_size[4] = xc_size[4] = 1;
 
     // Calculate X (KD block), which is really just a permutation of the gauge fields w/in a KD block
-    using Arg = CalculateStaggeredKDBlockArg<Float,coarseSpin,fineColor,coarseColor,xGauge,fineGauge>;
-    Arg arg(X, G, mass, x_size, xc_size);
+    using Arg = CalculateStaggeredYArg<Float, coarseSpin, fineColor, coarseColor, xGauge, fineGauge, true>;
+    Arg arg(X, X, G, mass, x_size, xc_size);
     CalculateStaggeredKDBlock<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, X_);
 
     QudaFieldLocation location = checkLocation(X_, G_);
@@ -136,7 +115,7 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KD block\n");
-    y.apply(0);
+    y.apply(device::get_default_stream());
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
   }
@@ -204,10 +183,9 @@ namespace quda {
   }
 
   //Does the heavy lifting of building X
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-#if defined(GPU_STAGGERED_DIRAC)
-
     // FIXME remove when done
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing X for StaggeredKD...\n");
 
@@ -236,10 +214,13 @@ namespace quda {
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing X for StaggeredKD\n");
-#else
-    errorQuda("Staggered fermion support has not been built");
-#endif
   }
+#else
+  void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
+  {
+    errorQuda("Staggered fermion multigrid support has not been built");
+  }
+#endif
 
   // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated, in MILC data order
   void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)

@@ -62,6 +62,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = num_mv_multiply * mv_flops * sites; // SU(3) matrix-vector multiplies
@@ -101,6 +102,7 @@ namespace quda
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (gauge_bytes + 2 * spinor_bytes) * sites;
@@ -144,20 +146,23 @@ namespace quda
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
   // Apply the covariant derivative operator
   // out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
   // out(x) = U^\dagger_mu'(x-mu')in(x-mu') for mu = 4...7 and we set mu' = mu-4
+#ifdef GPU_COVDEV
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_COVDEV
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Covariant derivative kernels have not been built");
-#endif
   }
+#else
+  void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,
+                   bool, const int *, TimeProfile &)
+  {
+    errorQuda("Covariant derivative kernels have not been built");
+  }
+#endif
 } // namespace quda

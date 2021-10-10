@@ -1,10 +1,10 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
+#include <convert.h>
 #include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <fast_intdiv.h>
+#include <reduction_kernel.h>
 
 namespace quda
 {
@@ -13,100 +13,104 @@ namespace quda
   {
 
     /**
-       @brief Parameter struct for generic multi-blas kernel.
-       @tparam NXZ is dimension of input vectors: X,Z,V
-       @tparam NXZ is dimension of input vectors: X,Z
+       @brief Parameter struct for generic multi-reduce blas kernel.
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam NXZ_ the dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
-       @tparam N Y-field vector i/o length
-       @tparam Reducer Functor used to operate on data
+       @tparam Ny Y-field vector i/o length
+       @tparam Reducer_ Functor used to operate on data
     */
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
       public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
       SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
+      using real = real_;
       using Reducer = Reducer_;
+      using reduce_t = vector_type<typename Reducer_::reduce_t, NXZ_>;
+      static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
       const int NYW;
-      Reducer r;
-      const int length;
-      const int_fastdiv gridSize;
+      Reducer f;
+
+      const int length_cb;
+      const int nParity;
 
       MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-                     Reducer r, int NYW, int length, int nParity, TuneParam &tp) :
+                     Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ>>(NYW),
+        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
         NYW(NYW),
-        r(r),
-        length(length),
-        gridSize(tp.grid.x * tp.block.x / nParity)
+        f(f),
+        length_cb(length / nParity),
+        nParity(nParity)
       {
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i].set(*x[i]);
-          if (Reducer::use_z) this->Z[i].set(*z[i]);
+          this->X[i] = *x[i];
+          if (Reducer::use_z) this->Z[i] = *z[i];
         }
 
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i].set(*y[i]);
-          if (Reducer::use_w) this->W[i].set(*w[i]);
+          this->Y[i] = *y[i];
+          if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
+
+      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
-    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NXZ;
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<real_, n_, NXZ_, store_t, N, y_store_t, Ny, Reducer>::NXZ;
 
-    template <int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
-    constexpr int MultiReduceArg<NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
+    template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer>
+    constexpr int MultiReduceArg<real_, n_, NXZ_, store_t, N, y_store_t, Ny, Reducer>::NYW_max;
 
-    template <int block_size, typename real, int n, int NXZ, typename Arg>
-    __global__ void multiReduceKernel(Arg arg)
-    {
-      // n is real numbers per thread
-      using vec = vector_type<complex<real>, n/2>;
-      unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int idx = tid % arg.gridSize;
-      unsigned int parity = tid / arg.gridSize;
+    /**
+       Generic multi-reduction functor with up to four loads and saves
+    */
+    template <typename Arg> struct MultiReduce_ : plus<vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
+      using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+      using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+      using plus<reduce_t>::operator();
+      const Arg &arg;
+      constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-      const int k = blockIdx.y * blockDim.y + threadIdx.y;
-
-      if (k >= arg.NYW) return; // safe since k are different thread blocks
-
-      using block_reduce_t = vector_type<typename Arg::Reducer::reduce_t, NXZ>;
-      block_reduce_t sum;
-
-      while (idx < arg.length) {
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int) const
+      {
+        unsigned int parity = tid >= arg.length_cb ? 1 : 0;
+        unsigned int i = tid - parity * arg.length_cb;
 
         vec x, y, z, w;
-        if (arg.r.read.Y) arg.Y[k].load(y, idx, parity);
-        if (arg.r.read.W) arg.W[k].load(w, idx, parity);
+        if (arg.f.read.Y) arg.Y[k].load(y, i, parity);
+        if (arg.f.read.W) arg.W[k].load(w, i, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
 #pragma unroll
-        for (int l = 0; l < NXZ; l++) {
-          if (arg.r.read.X) arg.X[l].load(x, idx, parity);
-          if (arg.r.read.Z) arg.Z[l].load(z, idx, parity);
+        for (int l = 0; l < Arg::NXZ; l++) {
+          if (arg.f.read.X) arg.X[l].load(x, i, parity);
+          if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
 
-          arg.r(sum[l], x, y, z, w, k, l);
+          arg.f(sum[l], x, y, z, w, k, l);
+
         }
-        if (arg.r.write.Y) arg.Y[k].save(y, idx, parity);
-        if (arg.r.write.W) arg.W[k].save(w, idx, parity);
+        if (arg.f.write.Y) arg.Y[k].save(y, i, parity);
+        if (arg.f.write.W) arg.W[k].save(w, i, parity);
 
-        idx += arg.gridSize;
+        return sum;
       }
-
-      arg.template reduce<block_size>(sum, k);
-    } // multiReduceKernel
+    };
 
     /**
        Base class from which all reduction functors should derive.
@@ -115,43 +119,15 @@ namespace quda
        @tparam reduce_t The fundamental reduction type
        @tparam coeff_t The type of any coefficients we multiply by
     */
-    template <typename reduce_t_, typename coeff_t_> struct MultiReduceFunctor {
+    template <typename reduce_t_, typename coeff_t_>
+    struct MultiReduceFunctor : MultiBlasParam<coeff_t_, true, false> {
       using reduce_t = reduce_t_;
       using coeff_t = coeff_t_;
       static constexpr bool reducer = true;
       static constexpr bool coeff_mul  = false;
       static constexpr bool multi_1d = false;
-      const int NXZ;
-      const int NYW;
 
-      MultiReduceFunctor(int NXZ, int NYW) : NXZ(NXZ), NYW(NYW) {}
-
-      __device__ __host__ inline coeff_t a(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Amatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Amatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t b(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Bmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Bmatrix_h)[i * NYW + j];
-#endif
-      }
-
-      __device__ __host__ inline coeff_t c(int i, int j) const
-      {
-#ifdef __CUDA_ARCH__
-        return reinterpret_cast<coeff_t *>(Cmatrix_d)[i * NYW + j];
-#else
-        return reinterpret_cast<coeff_t *>(Cmatrix_h)[i * NYW + j];
-#endif
-      }
+      MultiReduceFunctor(int NXZ, int NYW) : MultiBlasParam<coeff_t, reducer, multi_1d>(NXZ, NYW) {}
     };
 
     /**
@@ -172,7 +148,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiDot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, real>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
@@ -203,7 +179,7 @@ namespace quda
       static constexpr bool use_w = false;
       multiCdot(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
 #pragma unroll
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
@@ -221,7 +197,7 @@ namespace quda
       static constexpr bool use_w = true;
       multiCdotCopy(int NXZ, int NYW) : MultiReduceFunctor<reduce_t, complex<real>>(NXZ, NYW) { }
 
-      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &z, T &w, const int i, const int j)
+      template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j) const
       {
 #pragma unroll
         for (int k = 0; k < x.size(); k++) {

@@ -59,6 +59,7 @@ namespace quda
         flops += clover_flops * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += clover_flops * in.Volume();
 
@@ -89,6 +90,7 @@ namespace quda
         bytes += clover_bytes * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
         break;
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         bytes += clover_bytes * in.Volume();
 
@@ -119,7 +121,6 @@ namespace quda
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
@@ -128,15 +129,20 @@ namespace quda
 
     out = x + a*A^{-1} D * in = x + a*(C + i*b*gamma_5)^{-1}*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   */
+#ifdef GPU_TWISTED_CLOVER_DIRAC
   void ApplyTwistedCloverPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       const CloverField &C, double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
       const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_TWISTED_CLOVER_DIRAC
     instantiate<TwistedCloverPreconditionedApply>(out, in, U, C, a, b, xpay, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Twisted-clover dslash has not been built");
-#endif // GPU_TWISTED_CLOVER_DIRAC
   }
+#else
+  void ApplyTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                        const CloverField &, double, double, bool, const ColorSpinorField &, int, bool,
+                                        const int *, TimeProfile &)
+  {
+    errorQuda("Twisted-clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_CLOVER_DIRAC
 
 } // namespace quda

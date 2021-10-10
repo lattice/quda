@@ -40,6 +40,7 @@ namespace quda
 
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
       default: break; // all clover flops are in the interior kernel
       }
@@ -73,7 +74,6 @@ namespace quda
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
@@ -90,21 +90,24 @@ namespace quda
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(0);
     }
   };
 
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.
+#ifdef GPU_CLOVER_DIRAC
   void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
       double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_CLOVER_DIRAC
     instantiate<WilsonCloverApply>(out, in, U, A, a, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif
   }
+#else
+  void ApplyWilsonClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
+                         double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Clover dslash has not been built");
+  }
+#endif
 
 } // namespace quda

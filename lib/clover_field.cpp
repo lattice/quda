@@ -21,6 +21,7 @@ namespace quda {
     cloverInv(nullptr),
     invNorm(nullptr),
     csw(a.Csw()),
+    coeff(a.Coeff()),
     twisted(a.Twisted()),
     mu2(a.Mu2()),
     rho(a.Rho()),
@@ -37,8 +38,8 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
-    order(param.order), create(param.create), trlog{0, 0}
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff), 
+    rho(param.rho), order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -57,13 +58,72 @@ namespace quda {
 //for twisted mass only:
     twisted = false;//param.twisted;
     mu2 = 0.0; //param.mu2;
+
+    setTuningString();
   }
 
   CloverField::~CloverField() { }
 
+  void CloverField::setTuningString()
+  {
+    LatticeField::setTuningString();
+    int aux_string_n = TuneKey::aux_n / 2;
+    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Nc=%d", volume, stride,
+                         precision, nColor);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+  }
+
+  void CloverField::backup() const
+  {
+    if (backup_h) errorQuda("Already allocated host backup");
+    backup_h = static_cast<char*>(safe_malloc(2 * bytes));
+    if (norm_bytes) backup_norm_h = static_cast<char*>(safe_malloc(2 * norm_bytes));
+
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpy(backup_h + bytes, cloverInv, bytes, qudaMemcpyDeviceToHost);
+      if (norm_bytes) {
+        qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
+      }
+    } else {
+      memcpy(backup_h, clover, bytes);
+      memcpy(backup_h + bytes, cloverInv, bytes);
+      if (norm_bytes) {
+        memcpy(backup_norm_h, norm, norm_bytes);
+        memcpy(backup_norm_h + norm_bytes, invNorm, norm_bytes);
+      }
+    }
+  }
+
+  void CloverField::restore() const
+  {
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
+      qudaMemcpy(cloverInv, backup_h + bytes, bytes, qudaMemcpyHostToDevice);
+      if (norm_bytes) {
+        qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes, qudaMemcpyHostToDevice);
+      }
+    } else {
+      memcpy(clover, backup_h, bytes);
+      memcpy(cloverInv, backup_h + bytes, bytes);
+      if (norm_bytes) {
+        memcpy(norm, backup_norm_h, norm_bytes);
+        memcpy(invNorm, backup_norm_h + norm_bytes, norm_bytes);
+      }
+    }
+
+    host_free(backup_h);
+    backup_h = nullptr;
+    if (norm_bytes) {
+      host_free(backup_norm_h);
+      backup_norm_h = nullptr;
+    }
+  }
+
   CloverField *CloverField::Create(const CloverFieldParam &param)
   {
-
     CloverField *field = nullptr;
     if (param.location == QUDA_CPU_FIELD_LOCATION) {
       field = new cpuCloverField(param);
@@ -185,16 +245,16 @@ namespace quda {
 
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	qudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(clover, packClover, bytes, qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(norm, packCloverNorm, norm_bytes, qudaMemcpyHostToDevice);
       }
 
       if (src.V(true) && inverse) {
 	copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	qudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(cloverInv, packClover, bytes, qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(invNorm, packCloverNorm, norm_bytes, qudaMemcpyHostToDevice);
       }
 
       pool_pinned_free(packClover);
@@ -205,17 +265,17 @@ namespace quda {
           0;
 
       if (src.V(false)) {
-	qudaMemcpy(packClover, src.V(false), src.Bytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(false), src.Bytes(), qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), qudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
 
       if (src.V(true) && inverse) {
-	qudaMemcpy(packClover, src.V(true), src.Bytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(true), src.Bytes(), qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), qudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
@@ -240,9 +300,9 @@ namespace quda {
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
-      qudaMemcpy(packClover, clover, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, clover, bytes, qudaMemcpyDeviceToHost);
       if (precision == QUDA_HALF_PRECISION)
-	qudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(packCloverNorm, norm, norm_bytes, qudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
       errorQuda("Mismatch between Clover field GPU V(false) and CPU.V(false)");
@@ -250,9 +310,9 @@ namespace quda {
 
     // now copy the inverse part (if it exists)
     if (V(true) && cpu.V(true)) {
-      qudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, cloverInv, bytes, qudaMemcpyDeviceToHost);
 	if (precision == QUDA_HALF_PRECISION)
-	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
@@ -268,17 +328,17 @@ namespace quda {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
-      qudaMemcpy(buffer, clover, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(buffer, clover, bytes, qudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
       }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
-      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, qudaMemcpyDeviceToHost);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       }
     }
   }
@@ -288,17 +348,17 @@ namespace quda {
 
     size_t buffer_offset = 0;
     if (V(false)) { // direct
-      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, qudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
       buffer_offset += bytes + norm_bytes;
     }
 
     if (V(true)) { // inverse
-      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, qudaMemcpyHostToDevice);
       if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, cudaMemcpyHostToDevice);
+        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, qudaMemcpyHostToDevice);
       }
     }
   }
@@ -359,10 +419,7 @@ namespace quda {
   /**
      Computes Fmunu given the gauge field U
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge)
-  {
-    computeClover(*this, gauge, 1.0);
-  }
+  void cudaCloverField::compute(const cudaGaugeField &gauge) { computeClover(*this, gauge, 1.0); }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 
@@ -450,6 +507,7 @@ namespace quda {
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
     output << "csw = "       << param.csw << std::endl;
+    output << "coeff = "     << param.coeff << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
     output << "rho = "       << param.rho << std::endl;

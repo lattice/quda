@@ -222,7 +222,7 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
 
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
@@ -425,7 +425,7 @@ namespace quda {
     }
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
-    double alpha[Np];
+    auto alpha = std::make_unique<double[]>(Np);
     double pAp;
     int rUpdate = 0;
 
@@ -569,7 +569,7 @@ namespace quda {
 	    if ( (j+1)%Np == 0 ) {
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-              blas::axpy(alpha, p, x_);
+              blas::axpy(alpha.get(), p, x_);
             }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
@@ -579,16 +579,16 @@ namespace quda {
 
         if (use_heavy_quark_res && k % heavy_quark_check == 0) {
           if (&x != &xSloppy) {
-	    blas::copy(tmp,y);
+            blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-	  } else {
-	    blas::copy(r, rSloppy);
+          } else {
+            blas::copy(r, rSloppy);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
-	  }
+          }
         }
 
         // alternative reliable updates
-	if (alternative_reliable) {
+        if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
@@ -605,7 +605,7 @@ namespace quda {
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-          blas::axpy(alpha, p_, x_);
+          blas::axpy(alpha.get(), p_, x_);
         }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
@@ -740,7 +740,7 @@ namespace quda {
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-        blas::axpy(alpha, p_, x_);
+        blas::axpy(alpha.get(), p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
@@ -783,17 +783,21 @@ namespace quda {
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
-    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
-  #ifndef BLOCKSOLVER
-  errorQuda("QUDA_BLOCKSOLVER not built.");
-  #else
 
+#ifndef BLOCKSOLVER
+
+void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+
+#else
+
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
+{
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
@@ -1157,8 +1161,8 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
 
   return;
 
-  #endif
 }
+#endif
 
 #else
 
@@ -1385,7 +1389,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     double n = blas::norm2(p.Component(i));
     blas::ax(1/sqrt(n),p.Component(i));
     for(int j=i+1; j < param.num_src; j++) {
-      std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+      auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
       blas::caxpy(-ri,p.Component(i),p.Component(j));
     }
   }
@@ -1536,7 +1540,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           double n = blas::norm2(p.Component(i));
           blas::ax(1/sqrt(n),p.Component(i));
           for(int j=i+1; j < param.num_src; j++) {
-            std::complex<double> ri=blas::cDotProduct(p.Component(i),p.Component(j));
+            auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
             blas::caxpy(-ri,p.Component(i),p.Component(j));
 
           }

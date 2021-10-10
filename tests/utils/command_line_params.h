@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <externals/CLI11.hpp>
+#include <CLI11.hpp>
 #include <quda.h>
 
 // for compatibility while porting - remove later
@@ -22,7 +22,7 @@ public:
 
   template <typename T>
   CLI::Option *add_mgoption(std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
-                            std::string option_description = "", bool defaulted = false)
+                            std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -56,7 +56,7 @@ public:
 
   template <typename T>
   CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<T, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+                            CLI::Validator trans, std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -90,8 +90,9 @@ public:
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
-                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
+                            std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
+                            std::string option_description = "", bool = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -215,8 +216,10 @@ extern double anisotropy;
 extern double tadpole_factor;
 extern double eps_naik;
 extern int n_naiks;
+extern double clover_csw;
 extern double clover_coeff;
 extern bool compute_clover;
+extern bool compute_clover_trlog;
 extern bool compute_fatlong;
 extern double tol;
 extern double tol_precondition;
@@ -238,6 +241,7 @@ extern quda::mgarray<QudaFieldLocation> setup_location;
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
+extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
@@ -362,37 +366,6 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern double stout_smear_rho;
-extern double stout_smear_epsilon;
-extern double ape_smear_rho;
-extern int smear_steps;
-extern double wflow_epsilon;
-extern int wflow_steps;
-extern QudaWFlowType wflow_type;
-extern int measurement_interval;
-
-extern int gf_gauge_dir;
-extern int gf_maxiter;
-extern int gf_verbosity_interval;
-extern double gf_ovr_relaxation_boost;
-extern double gf_fft_alpha;
-extern int gf_reunit_interval;
-extern double gf_tolerance;
-extern bool gf_theta_condition;
-extern bool gf_fft_autotune;
-
 extern QudaContractType contract_type;
 
 extern std::array<int, 4> grid_partition;
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
-
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;
