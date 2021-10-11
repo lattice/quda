@@ -69,7 +69,7 @@ double gf_fft_alpha = 0.8;
 int gf_reunit_interval = 10;
 double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
-bool gf_fft_autotune = false;
+bool gf_fft_autotune = true;
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
