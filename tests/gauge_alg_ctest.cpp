@@ -100,7 +100,7 @@ class GaugeAlgTest : public ::testing::Test {
 protected:
   QudaGaugeParam param;
   
-  Timer a0,a1;
+  Timer<false> a0,a1;
   double2 detu;
   double3 plaq;
   cudaGaugeField *U;
@@ -137,16 +137,14 @@ protected:
     a1 = std::abs(a.y - b.y);
     a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val)) return true;
-    return false;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
   bool CheckDeterminant(double2 detu){
     double prec_val = 5e-8;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
-    return false;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
   }
 
   virtual void SetUp()
@@ -182,73 +180,74 @@ protected:
 
         RNG randstates(*U, 1234);
 
-	nsteps = heatbath_num_steps;
-	nhbsteps = heatbath_num_heatbath_per_step;
-	novrsteps = heatbath_num_overrelax_per_step;
-	coldstart = heatbath_coldstart;
-	beta_value = heatbath_beta_value;
-	a1.start();
+        nsteps = heatbath_num_steps;
+        nhbsteps = heatbath_num_heatbath_per_step;
+        novrsteps = heatbath_num_overrelax_per_step;
+        coldstart = heatbath_coldstart;
+        beta_value = heatbath_beta_value;
+        a1.start();
 
-	if (coldstart)
-	  InitGaugeField(*U);
-	else
-	  InitGaugeField(*U, randstates);
+        if (coldstart)
+          InitGaugeField(*U);
+        else
+          InitGaugeField(*U, randstates);
 
-	for (int step = 1; step <= nsteps; ++step) {
-	  printfQuda("Step %d\n", step);
-	  Monte(*U, randstates, beta_value, nhbsteps, novrsteps);
+        for (int step = 1; step <= nsteps; ++step) {
+          printfQuda("Step %d\n", step);
+          Monte(*U, randstates, beta_value, nhbsteps, novrsteps);
 
-	  // Reunitarization
-	  *num_failures_h = 0;
-	  unitarizeLinks(*U, num_failures_d);
-	  qudaDeviceSynchronize();
-	  if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
-	  plaq = plaquette(*U);
-	  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-	}
+          // Reunitarization
+          *num_failures_h = 0;
+          unitarizeLinks(*U, num_failures_d);
+          qudaDeviceSynchronize();
+          if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
+          plaq = plaquette(*U);
+          printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+        }
 
-	a1.stop();
-	printfQuda("Time Monte -> %.6f s\n", a1.last());
+        a1.stop();
+        printfQuda("Time Monte -> %.6f s\n", a1.last());
       } else {
 
-	// If a field is loaded, create a device field and copy
-	printfQuda("Copying gauge field from host\n");
-	param.location = QUDA_CPU_FIELD_LOCATION;
-	GaugeFieldParam gauge_field_param(param, host_gauge);
-	gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-	GaugeField *host = GaugeField::Create(gauge_field_param);
+        // If a field is loaded, create a device field and copy
+        printfQuda("Copying gauge field from host\n");
+        param.location = QUDA_CPU_FIELD_LOCATION;
+        GaugeFieldParam gauge_field_param(param, host_gauge);
+        gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+        GaugeField *host = GaugeField::Create(gauge_field_param);
 
-	// switch the parameters for creating the mirror precise cuda gauge field
-	gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
-	gauge_field_param.reconstruct = param.reconstruct;
-	gauge_field_param.setPrecision(param.cuda_prec, true);
+        // switch the parameters for creating the mirror precise cuda gauge field
+        gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
+        gauge_field_param.reconstruct = param.reconstruct;
+        gauge_field_param.setPrecision(param.cuda_prec, true);
 
-	if (comm_partitioned()) {
-	  int R[4] = {0, 0, 0, 0};
-	  for (int d = 0; d < 4; d++) if (comm_dim_partitioned(d)) R[d] = 2;
-	  static TimeProfile GaugeFix("GaugeFix");
-	  cudaGaugeField *tmp = new cudaGaugeField(gauge_field_param);
-	  tmp->copy(*host);
-	  U = createExtendedGauge(*tmp, R, GaugeFix);
-	  delete tmp;
-	} else {
-	  U = new cudaGaugeField(gauge_field_param);
-	  U->copy(*host);
-	}
+        if (comm_partitioned()) {
+          int R[4] = {0, 0, 0, 0};
+          for (int d = 0; d < 4; d++)
+            if (comm_dim_partitioned(d)) R[d] = 2;
+          static TimeProfile GaugeFix("GaugeFix");
+          cudaGaugeField *tmp = new cudaGaugeField(gauge_field_param);
+          tmp->copy(*host);
+          U = createExtendedGauge(*tmp, R, GaugeFix);
+          delete tmp;
+        } else {
+          U = new cudaGaugeField(gauge_field_param);
+          U->copy(*host);
+        }
+	
+        delete host;
 
-	delete host;
+        // Reunitarization
+        *num_failures_h = 0;
+        unitarizeLinks(*U, num_failures_d);
+        qudaDeviceSynchronize();
+        if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
 
-	// Reunitarization
-	*num_failures_h = 0;
-	unitarizeLinks(*U, num_failures_d);
-	qudaDeviceSynchronize();
-	if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
-
-	plaq = plaquette(*U);
-	printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+        plaq = plaquette(*U);
+        printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       }
 
-      // If a specific test type is requested, perform it now and then
+      // If a specific test type is requested, perfrom it now and then
       // turn off all Google tests in the tear down.
       switch (test_type) {
       case 0:
@@ -258,6 +257,7 @@ protected:
       case 2: run_fft(); break;
       default: errorQuda("Invalid test type %d ", test_type);
       }
+      
       host_free(num_failures_h);
     }
   }
@@ -274,10 +274,8 @@ protected:
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
       PGaugeExchangeFree();
 
-      a0.Stop(__func__, __FILE__, __LINE__);
-      printfQuda("Time -> %.6f s\n", a0.Last());
-      randstates->Release();
-      delete randstates;
+      a0.stop(__func__, __FILE__, __LINE__);
+      printfQuda("Time -> %.6f s\n", a0.last());
     }
     // If we performed a specific instance, switch off the
     // Google testing.
@@ -307,10 +305,10 @@ protected:
                        gf_theta_condition);
 
         auto plaq_gf = plaquette(*U);
-	printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-	printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+        printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+        printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
         ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-	saveTuneCache();
+        saveTuneCache();
         // Save if output string is specified
         if (gauge_store) save_gauge();
       } else {
@@ -351,7 +349,6 @@ protected:
   }
 };
 
-
 TEST_F(GaugeAlgTest, Generation)
 {
   if (execute && !gauge_load) {
@@ -367,6 +364,56 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
     gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
                    gf_theta_condition);
     auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+    saveTuneCache();
+  }
+}
+
+TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
+{
+  if (execute) {
+    printfQuda("Coulomb gauge fixing with overrelaxation\n");
+    gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
+                   gf_theta_condition);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+    saveTuneCache();
+  }
+}
+
+TEST_F(GaugeAlgTest, Landau_FFT)
+{
+  if (execute) {
+    if (!comm_partitioned()) {
+      printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
+      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+                     gf_theta_condition);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+      saveTuneCache();
+    }
+  }
+}
+
+TEST_F(GaugeAlgTest, Coulomb_FFT)
+{
+  if (execute) {
+    if (!comm_partitioned()) {
+      printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
+      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+                     gf_theta_condition);
+      auto plaq_gf = plaquette(*U);
+      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
+      saveTuneCache();
+    }
   }
 }
 

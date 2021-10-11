@@ -19,12 +19,12 @@ namespace quda {
       strcpy(volume, v);
       strcpy(name, n);
       strcpy(aux, a);
-    } 
+    }
 
     TuneKey(const TuneKey &) = default;
     TuneKey(TuneKey &&) = default;
-    TuneKey& operator=(const TuneKey &) = default;
-    TuneKey& operator=(TuneKey &&) = default;
+    TuneKey &operator=(const TuneKey &) = default;
+    TuneKey &operator=(TuneKey &&) = default;
 
     bool operator<(const TuneKey &other) const {
       int vc = std::strcmp(volume, other.volume);
@@ -40,18 +40,17 @@ namespace quda {
       }
       return false;
     }
-  
-    friend std::ostream& operator<<(std::ostream& output, const TuneKey& key)
+
+    friend std::ostream &operator<<(std::ostream &output, const TuneKey &key)
     {
       output << "volume = " << key.volume << ", ";
       output << "name = " << key.name << ", ";
       output << "aux = " << key.aux;
       return output;
     }
-
   };
 
   /** Return the key of the last kernel that has been tuned / called.*/
   TuneKey getLastTuneKey();
 
-}
+} // namespace quda

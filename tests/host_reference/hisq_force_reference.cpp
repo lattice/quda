@@ -376,7 +376,7 @@ private:
   const int half_volume;
 
 public:
-  LoadStore(int vol) : volume(vol), half_volume(vol / 2) {}
+  LoadStore(int vol) : volume(vol), half_volume(vol / 2) { }
 
   void loadMatrixFromField(const Real *const field, int oddBit, int half_lattice_index,
                            Matrix<3, std::complex<Real>> *const mat) const;

@@ -1376,7 +1376,7 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+  void computeStaggeredForceQuda(void *mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
                                  QudaInvertParam *invert_param);
 
   /**
@@ -1430,7 +1430,7 @@ extern "C" {
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge);
+  void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
