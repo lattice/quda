@@ -12,23 +12,6 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class T, int block_size> __global__ void tensor_reduce_kernel(T *out, T *in, int batch_size)
-    {
-      int tid = threadIdx.x;
-
-      T z = 0;
-      while (tid < batch_size) {
-        z += in[blockIdx.x * batch_size + tid];
-        tid += blockDim.x;
-      }
-
-      typedef cub::BlockReduce<T, block_size> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-      T aggregate = BlockReduce(temp_storage).Sum(z);
-
-      if (threadIdx.x == 0) { out[blockIdx.x] = aggregate; }
-    }
-
     template <class storage_type, class matrix_type> class tensor_5D_wrapper : public TunableKernel3D
     {
       const ColorSpinorField &out;
@@ -81,19 +64,18 @@ namespace quda
         int num_x_blocks = tp.grid.x;
         int alloc_size = num_x_blocks * sizeof(matrix_type) * in.X(4) * out.X(4);
 
-        Arg arg(out, in, reinterpret_cast<matrix_type *>(device_malloc(alloc_size)), wm_p, num_x_blocks);
+        Arg arg(out, in, num_x_blocks, wm_p);
 
         launch<Tensor5D>(tp, stream, arg);
 
-        tensor_reduce_kernel<complex_type, block_size>
-          <<<arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type), block_size, 0, target::cuda::get_stream(stream)>>>(
-              reinterpret_cast<complex_type *>(wm_p), reinterpret_cast<complex_type *>(arg.reduce_buffer), num_x_blocks);
+        tp.grid = {arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type), 1, 1};
+        tp.block = {block_size, 1, 1};
+        arg.threads = {tp.grid.x * tp.block.x, 1, 1};
+        launch<Tensor5DReduce>(tp, stream, arg);
 
         qudaEventRecord(event, stream);
         while (!qudaEventQuery(event)) {}
-
         qudaEventDestroy(event);
-        device_free(arg.reduce_buffer);
       }
 
       long long flops() const { return 0; }

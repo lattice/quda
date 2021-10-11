@@ -16,66 +16,36 @@ namespace quda
 
     template <class T> __device__ inline void warp_reduce(T &f)
     {
-#pragma unroll
-      for (int offset = 16; offset > 0; offset /= 2) {
-        T other_f = __shfl_down_sync(0xffffffffu, f, offset);
-        f += other_f;
-      }
+      int index = target::thread_idx().y * (target::block_dim().x / warp_size) + (target::thread_idx().x / warp_size);
+      typedef cub::WarpReduce<T> WarpReduce;
+      // Allocate WarpReduce shared memory for 4 warps
+      __shared__ typename WarpReduce::TempStorage temp_storage[32];
+      // Return the warp-wide sums to each lane0 (threads 0, 32, 64, and 96)
+      f = WarpReduce(temp_storage[index]).Sum(f);
     }
 
     template <class T> __device__ inline void block_reduce_x(T &f)
     {
-#ifdef __CUDA_ARCH__
-      int lane_id_x = threadIdx.x % warp_size;
-      int warp_id_x = threadIdx.x / warp_size;
-      int block_dim_x = blockDim.x / warp_size;
+      int lane_id_x = target::thread_idx().x % warp_size;
+      int warp_id_x = target::thread_idx().x / warp_size;
+      int warp_ct_x = target::block_dim().x / warp_size;
 
       __shared__ T smem[32];
 
       warp_reduce(f);
       // Now lane 0 of each warp holds the reduced value
 
-      if (block_dim_x > 1) {
-        int index = threadIdx.y * block_dim_x + warp_id_x;
+      if (warp_ct_x > 1) {
+        int index = target::thread_idx().y * warp_ct_x + warp_id_x;
         if (lane_id_x == 0) { smem[index] = f; }
         __syncthreads();
         if (warp_id_x == 0) {
-          f = (lane_id_x < block_dim_x) ? smem[index] : 0;
+          f = (lane_id_x < warp_ct_x) ? smem[index] : 0;
           warp_reduce(f);
         }
       }
       // Now the first thread in the x direction holds the reduction result.
-#endif
     }
-
-    /**
-      @brief Form a 12-by-12 tensor from v and w
-      @param[in] mp The buffer to accumulate on
-      @param[in] v, w input vectors
-     */
-    template <class real>
-      __device__ __host__ inline void vector_tensor_matrix(WilsonMatrix<real> *mp, const WilsonVector<real> &v,
-          const WilsonVector<real> &w)
-      {
-#ifdef __CUDA_ARCH__
-        real *real_p = reinterpret_cast<real *>(mp);
-
-#pragma unroll
-        for (int a = 0; a < color_spin_dim; a++) {
-#pragma unroll
-          for (int b = 0; b < color_spin_dim; b++) {
-            int cs = a * color_spin_dim + b;
-            complex<real> z = conj(conj(v(a)) * w(b));
-            // Perform a block reduction across the x direction
-            block_reduce_x(z);
-            if (threadIdx.x == 0) {
-              atomicAdd(&real_p[cs * 2 + 0], z.real());
-              atomicAdd(&real_p[cs * 2 + 1], z.imag());
-            }
-          }
-        }
-#endif
-      }
 
     /**
       @brief Form a 4-by-4 tensor from v and w (color d.o.f. is contracted)
@@ -86,7 +56,6 @@ namespace quda
       __device__ __host__ inline void vector_tensor_matrix(SpinMatrix<real> *mp, int m_index, const WilsonVector<real> &v,
           const WilsonVector<real> &w)
       {
-
 #ifdef __CUDA_ARCH__
         complex<real> *p = reinterpret_cast<complex<real> *>(mp);
 
@@ -99,40 +68,10 @@ namespace quda
 #pragma unroll
             for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
             // Perform a block reduction across the x direction
+
             block_reduce_x(z);
-            if (threadIdx.x == 0) { p[(m_index * spin_dim * spin_dim + cs) * gridDim.x + blockIdx.x] = z; }
+            if (target::thread_idx().x == 0) { p[(m_index * spin_dim * spin_dim + cs) * target::grid_dim().x + target::block_idx().x] = z; }
           }
-        }
-#endif
-      }
-
-    /**
-      @brief Form a 2-componet chiral projector from v and w (spin and color d.o.f. are contracted)
-      @param[in] mp The buffer to accumulate on
-      @param[in] v, w input vectors
-     */
-    template <class real>
-      __device__ __host__ inline void vector_tensor_matrix(ChiralProjector<real> *mp, int m_index, const WilsonVector<real> &v,
-          const WilsonVector<real> &w)
-      {
-#ifdef __CUDA_ARCH__
-
-        complex<real> *p = reinterpret_cast<complex<real> *>(mp);
-
-#pragma unroll
-        for (int pm = 0; pm < 2; pm++) {
-          complex<real> z = 0;
-          WilsonVector<real> projected_w = w.project(4, 1 - 2 * pm).reconstruct(4, 1 - 2 * pm);
-#pragma unroll
-          for (int spin = 0; spin < spin_dim; spin++) {
-#pragma unroll
-            for (int color = 0; color < color_dim; color++) {
-              z += conj(conj(v(spin, color)) * projected_w(spin, color));
-            }
-          }
-          // Perform a block reduction across the x direction
-          block_reduce_x(z);
-          if (threadIdx.x == 0) { p[(m_index * 2 + pm) * gridDim.x + blockIdx.x] = z; }
         }
 #endif
       }
@@ -154,7 +93,7 @@ namespace quda
 
       const int volume_4d_cb;
 
-      matrix_type *reduce_buffer;
+      matrix_type *reduce_buffer = nullptr;
 
       const int nParity;
 
@@ -162,17 +101,16 @@ namespace quda
 
       int batch;
 
-      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, matrix_type *reduce_buffer, matrix_type *result_d, int batch):
+      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, int num_x_blocks, matrix_type *result_d):
         kernel_param(dim3(out.VolumeCB() / out.X(4), out.X(4), out.SiteSubset())),
         out(out),
         in(in),
         Ls_out(out.X(4)),
         Ls_in(in.X(4)),
         volume_4d_cb(in.VolumeCB() / in.X(4)),
-        reduce_buffer(reduce_buffer),
         nParity(in.SiteSubset()),
         result_d(result_d),
-        batch(batch)
+        batch(num_x_blocks)
       {
 
         if (volume_4d_cb != static_cast<int>(out.VolumeCB() / Ls_out)) {
@@ -187,6 +125,13 @@ namespace quda
 
         if (!in.isNative() || !out.isNative())
           errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+
+        size_t reduce_bytes = num_x_blocks * sizeof(matrix_type) * out.X(4) * in.X(4);
+        reduce_buffer = reinterpret_cast<matrix_type *>(device_malloc(reduce_bytes));
+      }
+
+      ~Tensor5DArg() {
+        if (reduce_buffer) { device_free(reduce_buffer); }
       }
 
     };
@@ -242,7 +187,6 @@ namespace quda
 
       };
 
-#if 0
       template <class Arg>
       struct Tensor5DReduce {
 
@@ -250,16 +194,17 @@ namespace quda
         constexpr Tensor5DReduce(const Arg &arg) : arg(arg) {}
         static constexpr const char *filename() { return KERNEL_FILE; }
 
-        __device__ __host__ inline void operator()(int)
+        __device__ __host__ inline void operator()(int, int, int)
         {
           using T = complex<typename Arg::real>;
 
           int thread_idx = target::thread_idx().x;
-          int batch_size = arg.batch_size;
+          int batch = arg.batch;
 
+          T *in = reinterpret_cast<T *>(arg.reduce_buffer);
           T z = 0;
           while (thread_idx < batch) {
-            z += arg.in[target::block_idx().x * batch + thread_idx];
+            z += in[target::block_idx().x * batch + thread_idx];
             thread_idx += target::block_dim().x;
           }
 
@@ -268,12 +213,12 @@ namespace quda
           __shared__ typename BlockReduce::TempStorage temp_storage;
           T aggregate = BlockReduce(temp_storage).Sum(z);
 
-          if (target::thread_idx().x == 0) { arg.out[target::block_idx().x] = aggregate; }
+          T *out = reinterpret_cast<T *>(arg.result_d);
+          if (target::thread_idx().x == 0) { out[target::block_idx().x] = aggregate; }
 #endif
         }
 
       };
-#endif
   }
 
 }
