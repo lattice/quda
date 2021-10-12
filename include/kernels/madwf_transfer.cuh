@@ -19,81 +19,14 @@ namespace quda
 
     template <class real> using WilsonVector = ColorSpinor<real, color_dim, spin_dim>;
 
-    template <class real, int dim> class Matrix
-    {
-
-      static constexpr int size = dim * dim;
-      complex<real> data[size];
-
-      public:
-      __device__ __host__ inline Matrix<real, dim>()
-      {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = 0; }
-      }
-
-      __device__ __host__ inline Matrix<real, dim>(const Matrix<real, dim> &a)
-      {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-      }
-
-      __device__ __host__ inline Matrix<real, dim> &operator=(const Matrix<real, dim> &a)
-      {
-        if (this != &a) {
-#pragma unroll
-          for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-        }
-        return *this;
-      }
-
-      __device__ __host__ inline complex<real> &operator()(int index) { return data[index]; }
-
-      __device__ __host__ inline const complex<real> &operator()(int index) const { return data[index]; }
-
-      // Wilson Matrix is row major
-      __device__ __host__ inline complex<real> &operator()(int row, int column) { return data[row * dim + column]; }
-
-      __device__ __host__ inline const complex<real> &operator()(int row, int column) const
-      {
-        return data[row * dim + column];
-      }
-    };
-
     template <class real>
-    using WilsonMatrix = Matrix<real, color_spin_dim>;
-
-    template <class real>
-    using SpinMatrix = Matrix<real, spin_dim>;
-
-    template <class real>
-    using ChiralProjector = complex<real>[2];
+    using SpinMatrix = Matrix<complex<real>, spin_dim>;
 
     template <class real, transfer_5D_type transfer_type>
     struct transfer_5D_mapper {};
 
     template <class real>
     struct transfer_5D_mapper<real, transfer_5D_type::Spin> { using type = SpinMatrix<real>; };
-
-    template <bool dagger, class real>
-      __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const WilsonMatrix<real> &m,
-          const WilsonVector<real> &v)
-      {
-        WilsonVector<real> out; // out is initialized to zero
-#pragma unroll
-        for (int column = 0; column < color_spin_dim; column++) {
-          auto v_col = v(column);
-#pragma unroll
-          for (int row = 0; row < color_spin_dim; row++) {
-            if (dagger) {
-              out(row) += conj(m(column, row)) * v_col;
-            } else {
-              out(row) += m(row, column) * v_col;
-            }
-          }
-        }
-        return out;
-      }
 
     template <bool dagger, class real>
       __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const SpinMatrix<real> &m,
@@ -116,17 +49,6 @@ namespace quda
           }
         }
         return out;
-      }
-
-    template <bool dagger, class real>
-      __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const ChiralProjector<real> &m,
-          const WilsonVector<real> &v)
-      {
-        if (dagger) {
-          return conj(m[0]) * v.project(4, +1).reconstruct(4, +1) + conj(m[1]) * v.project(4, -1).reconstruct(4, -1);
-        } else {
-          return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
-        }
       }
 
     template <class storage_type, class matrix_type_, bool dagger_> struct Transfer5DArg: kernel_param<> {
@@ -185,11 +107,10 @@ namespace quda
         static constexpr const char *filename() { return KERNEL_FILE; }
 
         /**
-          @brief Apply the M5 inverse operator at a given site on the
-          lattice.
+          @brief Apply the Ls_out-by-Ls_in matrix to the input vector
           @param[in] parity Parity we are on
           @param[in] x_b Checkerboarded 4-d space-time index
-          @param[in] s Ls dimension coordinate
+          @param[in] s The output Ls dimension coordinate
          */
         __device__ __host__ inline void operator()(int x_cb, int s, int parity)
         {

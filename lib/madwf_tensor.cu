@@ -68,7 +68,7 @@ namespace quda
 
         launch<Tensor5D>(tp, stream, arg);
 
-        tp.grid = {arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type), 1, 1};
+        tp.grid = {static_cast<unsigned>(arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type)), 1, 1};
         tp.block = {block_size, 1, 1};
         arg.threads = {tp.grid.x * tp.block.x, 1, 1};
         launch<Tensor5DReduce>(tp, stream, arg);
