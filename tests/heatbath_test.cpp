@@ -140,10 +140,12 @@ int main(int argc, char **argv)
 
     if (strcmp(latfile, "")) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
-      copyExtendedResidentGaugeQuda((void*)gaugeEx);
+      copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
-      if (coldstart) InitGaugeField(*gaugeEx);
-      else InitGaugeField(*gaugeEx, *randstates);
+      if (coldstart)
+        InitGaugeField(*gaugeEx);
+      else
+        InitGaugeField(*gaugeEx, *randstates);
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -223,7 +225,7 @@ int main(int argc, char **argv)
 
       write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
 
-      for (int dir = 0; dir<4; dir++) host_free(cpu_gauge[dir]);
+      for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     } else {
       printfQuda("No output file specified.\n");
     }
@@ -248,7 +250,7 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
 
-  for (int dir = 0; dir<4; dir++) host_free(load_gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(load_gauge[dir]);
 
   // finalize the QUDA library
   endQuda();

@@ -234,18 +234,18 @@ extern "C" {
   */
   int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
 
-   /**
-     @brief Symmetric exchange of local memory addresses between
-     logically neighboring processes on the lattice.  The remote
-     addresses that are returned are directly addressable by the local
-     process and can be read or written to by a kernel, or can be
-     copied to and from.  This exchange is only defined between
-     devices that are peer-to-peer enabled.
-     @param[out] remote Array of remote memory pointers to neighboring
-     pointers
-     @param[in] local The process-local memory pointer to be exchanged
-     from this process
-   */
+  /**
+    @brief Symmetric exchange of local memory addresses between
+    logically neighboring processes on the lattice.  The remote
+    addresses that are returned are directly addressable by the local
+    process and can be read or written to by a kernel, or can be
+    copied to and from.  This exchange is only defined between
+    devices that are peer-to-peer enabled.
+    @param[out] remote Array of remote memory pointers to neighboring
+    pointers
+    @param[in] local The process-local memory pointer to be exchanged
+    from this process
+  */
   void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local);
 
   /**
@@ -266,8 +266,7 @@ extern "C" {
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM],
-                                  qudaEvent_t local[2][QUDA_MAX_DIM]);
+  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
 
   /**
      @brief Destroy the coupled events
@@ -386,7 +385,7 @@ extern "C" {
   void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_max_array(double* data, size_t size);
-  void comm_allreduce_min_array(double* data, size_t size);
+  void comm_allreduce_min_array(double *data, size_t size);
   void comm_allreduce_int(int* data);
   void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
