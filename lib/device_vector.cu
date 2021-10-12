@@ -30,10 +30,14 @@ namespace quda
       }
     };
 
+
   template <class T>
     struct axpby_wrapper: TunableKernel1D {
 
-      const AxpbyArg<T> arg;
+      AxpbyArg<T> arg;
+
+      device_vector<T> _backup_vector;
+      T *_backup_ptr = nullptr;
 
       axpby_wrapper(T *out, T a, const T *x, T b, const T *y, int size): TunableKernel1D(size, QUDA_CUDA_FIELD_LOCATION), arg(out, a, x, b, y, size)
       { 
@@ -45,6 +49,19 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch<Axpby>(tp, stream, arg);
+      }
+
+      void preTune()
+      {
+        _backup_vector.resize(arg.threads.x);
+        _backup_vector.from_device(arg.out);
+        _backup_ptr = arg.out;
+        arg.out = _backup_vector.data();
+      }
+
+      void postTune()
+      {
+        arg.out = _backup_ptr;
       }
 
       unsigned int minThreads() const { return arg.threads.x; }

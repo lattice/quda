@@ -36,7 +36,7 @@ namespace quda
       _size = size_;
       size_t bytes = _size * sizeof(real);
       if (bytes > 0) {
-        _device_data = (real *)device_malloc(bytes);
+        _device_data = reinterpret_cast<real *>(device_malloc(bytes));
         if (!_device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", bytes); }
         qudaMemset(_device_data, 0, bytes);
       }
@@ -68,6 +68,13 @@ namespace quda
     {
       if (host_vector.size() != _size) { errorQuda("Size mismatch: %lu vs %lu.\n", host_vector.size(), _size); }
       qudaMemcpy(_device_data, host_vector.data(), _size * sizeof(real), qudaMemcpyHostToDevice);
+    }
+
+    void from_device(const real *device_ptr)
+    {
+      if (_size > 0) {
+        qudaMemcpy(_device_data, device_ptr, _size * sizeof(real), qudaMemcpyDeviceToDevice);
+      }
     }
 
     real *data() { return _device_data; }
