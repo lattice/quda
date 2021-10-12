@@ -5652,10 +5652,16 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
   // perform the update
   profileGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
+  // We hardcode the value of autotune to 1 in the kernel call (lib/gauge_fix_fft.cu)
+  // This ensures that the user can not override alpha autotuning. This is done because
+  // it is very easy for the FFT gauge fixing to fail with a poorly chosen value of
+  // alpha, but autotuning alpha ensures optimal behaviour.
+  // Users who wish to change this behaviour may read the comment in
+  // lib/gauge_fix_fft.cu to regain control.
   gaugeFixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-
+  
   profileGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
-
+  
   // copy the gauge field back to the host
   profileGaugeFixFFT.TPSTART(QUDA_PROFILE_D2H);
   cudaInGauge->saveCPUField(*cpuGauge);

@@ -185,12 +185,24 @@ namespace quda {
   void gaugeFixingFFT(GaugeField& data, int Nsteps, int verbose_interval,
                       double alpha0, int autotune, double tolerance, int stopWtheta)
   {
+    // We hardcode the value of autotune to 1 at this point as it is the last
+    // point before computation begins. This ensures that the the user cannot
+    // override alpha autotuning. This is done because it is very easy for the
+    // FFT gauge fixing to fail with a poorly chosen value of alpha, but
+    // autotuning ensures optimal behaviour.
+    // Users who wish to change this behaviour may remove the follwing line
+    // of code and recompile to regain control of alpha autotuning.
+    autotune = 1;
+    
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("\tAuto tune active: %s\n", autotune ? "true" : "false");      
+      if(autotune == 1) printfQuda("\tAuto tune active: alpha will be adjusted as the algorithm progresses\n");
+      else if(autotune == 0) printfQuda("\tAuto tune not active: alpha will remain constant as the algorithm progresses\n");
+      else errorQuda("Unknown value of autotune = %d", autotune);
+      
       printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha0);
       printfQuda("\tTolerance: %e\n", tolerance);
       printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
@@ -217,7 +229,7 @@ namespace quda {
     GaugeFixQuality<decltype(argQ)> gfixquality(argQ, data);
     gfixquality.apply(device::get_default_stream());
     double action0 = argQ.getAction();
-    if(getVerbosity() >= QUDA_SUMMARIZE) printf("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if(getVerbosity() >= QUDA_SUMMARIZE) printf("Step: %05d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     double diff = 0.0;
     int iter = 0;
@@ -285,11 +297,11 @@ namespace quda {
       double action = argQ.getAction();
       diff = abs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
-        printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+        printf("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if ( autotune && ((action - action0) < -1e-14) ) {
         if ( arg.alpha > 0.01 ) {
           arg.alpha = 0.95 * arg.alpha;
-          if(getVerbosity() >= QUDA_SUMMARIZE) printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", arg.alpha);
+          if(getVerbosity() >= QUDA_SUMMARIZE) printf("Changing alpha down -> %.4e\n", arg.alpha);
         }
       }
       //------------------------------------------------------------------------
@@ -301,7 +313,7 @@ namespace quda {
       action0 = action;
     }
     if ((iter % verbose_interval) != 0 && getVerbosity() >= QUDA_SUMMARIZE)
-      printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
+      printf("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
     
     // Reunitarize at end
     const double unitarize_eps = 1e-14;
@@ -382,7 +394,7 @@ namespace quda {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
+   * @param[in] autotune (legacy), 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value. We hardcode this to true.
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */

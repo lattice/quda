@@ -1525,7 +1525,7 @@ extern "C" {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
+   * @param[in] autotune (legacy), 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value. We hardocde this to 1 to ensure optimal behaviour. Instructions on how the user may regain control of this parameter are located in comments in lib/gauge_fix_fft.cu
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
    * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value

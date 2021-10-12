@@ -313,7 +313,7 @@ namespace quda {
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
@@ -413,7 +413,7 @@ namespace quda {
       double action = argQ.getAction();
       double diff = abs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+        printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
       if (stopWtheta) {
         if (argQ.getTheta() < tolerance) break;
       } else {
@@ -436,7 +436,7 @@ namespace quda {
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
