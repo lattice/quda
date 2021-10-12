@@ -62,7 +62,6 @@ namespace quda
 
         // Each block has a Wilson Matrix.
         int num_x_blocks = tp.grid.x;
-        int alloc_size = num_x_blocks * sizeof(matrix_type) * in.X(4) * out.X(4);
 
         Arg arg(out, in, num_x_blocks, wm_p);
 
