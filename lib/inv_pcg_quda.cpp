@@ -103,9 +103,9 @@ namespace quda
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
                             int collect_miniter, double collect_tol)
   {
-    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
-
     profile.TPSTART(QUDA_PROFILE_INIT);
+
+    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
