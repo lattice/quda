@@ -206,7 +206,7 @@ namespace quda
 
           int thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
           SharedMemoryCache<real> cache;
-          while (thread_idx < Ls_out * Ls_in * sizeof(matrix_type) / sizeof(real)) {
+          while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_type) / sizeof(real))) {
             cache.data()[thread_idx] = reinterpret_cast<const real *>(wm_p)[thread_idx];
             thread_idx += target::block_dim().y * target::block_dim().x;
           }

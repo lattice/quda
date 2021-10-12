@@ -152,8 +152,6 @@ namespace quda
          */
         __device__ __host__ inline void operator()(int x_cb, int s, int parity)
         {
-
-          using real = typename Arg::real;
           using Vector = typename Arg::Vector;
 
           const int Ls_in = arg.Ls_in;
