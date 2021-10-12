@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
+if(POLICY CMP0104)
+  cmake_policy(SET CMP0104 OLD)
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
@@ -177,6 +180,9 @@ set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 
+# QIO legacy support
+option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
+
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
@@ -209,6 +215,8 @@ mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
+mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
+
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
@@ -233,8 +241,8 @@ if(QUDA_DOWNLOAD_EIGEN)
   set(EIGEN_VERSION 3.3.7)
 
   set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_SHA 9f13cf90dedbe3e52a19f43000d71fdf72e986beb9a5436dddcd61ff9d77a3ce)
+  set(EIGEN_URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_SHA 685adf14bd8e9c015b78097c1dc22f2f01343756f196acdc76a678e1ae352e11)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
@@ -409,7 +417,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
@@ -468,15 +476,20 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
+     set(QIO_BRANCH
+        "extended")
+    if(QUDA_DOWNLOAD_QIO_LEGACY)
+      set(QIO_BRANCH
+          "qio2-5-0")
+    endif()
     ExternalProject_Add(QIO
                         GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-                        GIT_TAG qio2-5-0
+                        GIT_TAG "${QIO_BRANCH}"
                         GIT_SHALLOW YES
                         PREFIX usqcd
-                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
-                                          "INSTALL=${INSTALL_EXE} -C"
-                                          --with-qmp=${QUDA_QMPHOME}
-                                          --prefix=<INSTALL_DIR>
+                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
+                        "CFLAGS=-Wall -O3 -std=c99 -DHAVE_BGL " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
                         BUILD_COMMAND make
                         INSTALL_COMMAND make install
                         DEPENDS QMP
@@ -520,7 +533,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)

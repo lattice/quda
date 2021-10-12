@@ -295,8 +295,8 @@ namespace quda{
 
       Matrix<complex<Float>,3> qsq, tempq;
 
-      Float c[3];
-      Float g[3];
+      Float c[3] =  {static_cast<Float>(0)};
+      Float g[3] = {static_cast<Float>(0)};
 
       if(!arg.svd_only){
 	qsq = q*q;
