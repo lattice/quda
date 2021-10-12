@@ -64,7 +64,7 @@ namespace quda {
 
   double3 plaquette(const GaugeField &data)
   {
-    double2 plq;
+    double2 plq = make_double2(0.0, 0.0);
     QudaFieldLocation location = data.Location();
     INSTANTIATE_PRECISION(plaquette, data, plq, location);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
