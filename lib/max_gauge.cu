@@ -54,7 +54,7 @@ namespace quda {
 
     double norm_ = 0.0;
     switch(u.Ncolor()) {
-    case  3: norm_ = norm<reg_t, store_t, 3>(u, d, type); break;
+    case  N_COLORS: norm_ = norm<reg_t, store_t, N_COLORS>(u, d, type); break;
 #ifdef GPU_MULTIGRID
     case 48: norm_ = norm<reg_t, store_t, 48>(u, d, type); break;
 #ifdef NSPIN4

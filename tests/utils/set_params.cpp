@@ -283,6 +283,8 @@ void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
   smear_param.laplace3D = laplace3D; // Omit this dim
   smear_param.solution_type = QUDA_MAT_SOLUTION;
   smear_param.solve_type = QUDA_DIRECT_SOLVE;
+  smear_param.clover_coeff = 0.0;
+  smear_param.clover_csw = 0.0;
 }
 
 
@@ -610,6 +612,21 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+
+  // Use kappa * csw or supplied clover_coeff
+  inv_param.clover_csw = clover_csw;
+  if (clover_coeff == 0.0) {
+    inv_param.clover_coeff = clover_csw * inv_param.kappa;
+  } else {
+    inv_param.clover_coeff = clover_coeff;
+  }  
 }
 
 void setMultigridInvertParam(QudaInvertParam &inv_param)
@@ -715,6 +732,13 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
@@ -875,6 +899,13 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
 
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+  
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 }
@@ -1194,6 +1225,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+
+  
 }
 
 void setDeflatedInvertParam(QudaInvertParam &inv_param)

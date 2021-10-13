@@ -432,7 +432,8 @@ int main(int argc, char **argv)
   void *correlation_function_sum = malloc(corr_param.corr_size_in_bytes); // This is where the result will be stored
 
   //! calculate correlators
-  //construct_operator(kappa, inv_param, mg_param, mg_inv_param, mg_preconditioner);
+  // Now that the clover field is set, we may assign a
+  // new MG preconditioner
   if(inv_multigrid) {
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
