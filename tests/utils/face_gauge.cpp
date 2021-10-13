@@ -141,8 +141,8 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
           for (a = 0; a < A[dir]; a++) {
             for (b = 0; b < B[dir]; b++) {
               for (c = 0; c < C[dir]; c++) {
-                int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
-		int oddness = (a+b+c+d)%2;
+                int index = (a * f[dir][0] + b * f[dir][1] + c * f[dir][2] + d * f[dir][3]) >> 1;
+                int oddness = (a+b+c+d)%2;
 		if (oddness == 0){ //even
 		  for(int i=0;i < gauge_site_size;i++){
 		    even_dst[gauge_site_size*even_dst_index+i] = even_src[gauge_site_size*index + i];
@@ -494,10 +494,8 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 //this function is used for link fattening computation
 //@optflag: if this flag is set, we only communicate in directions that are partitioned
 //          if not set, then we communicate in all directions regradless of partitions
-void exchange_cpu_sitelink(int* X,
-			   void** sitelink, void** ghost_sitelink,
-			   void** ghost_sitelink_diag,
-			   QudaPrecision gPrecision, QudaGaugeParam*, int optflag)
+void exchange_cpu_sitelink(int *X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
+                           QudaPrecision gPrecision, QudaGaugeParam *, int optflag)
 {  
   setup_dims(X);
   static void*  sitelink_fwd_sendbuf[4];

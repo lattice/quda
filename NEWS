@@ -1,3 +1,93 @@
+Version 1.1.0 - October 2021
+
+- Add support for NVSHMEM communication for the Dslash operators, for
+  significantly improved strong scaling.  See
+  https://github.com/lattice/quda/wiki/Multi-GPU-with-NVSHMEM for more
+  details.
+
+- Addition of the MSPCG preconditioned CG solver for Möbius
+  fermions. See
+  https://github.com/lattice/quda/wiki/The-Multi-Splitting-Preconditioned-Conjugate-Gradient-(MSPCG),-an-application-of-the-additive-Schwarz-Method
+  for more details.
+
+- Addition of the Exact One Flavor Algorithm (EOFA) for Möbius
+  fermions.  See
+  https://github.com/lattice/quda/wiki/The-Exact-One-Flavor-Algorithm-(EOFA)
+  for more details.
+
+- Addition of a fully GPU native Implicitly Restarted Arnoldi
+  eigensolver (as opposed to partially relying on ARPACK).  See
+  https://github.com/lattice/quda/wiki/QUDA%27s-eigensolvers#implicitly-restarted-arnoldi-eigensolver
+  for more details.
+
+- Significantly reduced latency for reduction kernels through the use
+  of heterogeneous atomics.  Requires CUDA 11.0+.
+
+- Addition of support for a split-grid multi-RHS solver.  See
+  https://github.com/lattice/quda/wiki/Split-Grid for more details.
+
+- Continued work on enhancing and refining the staggered multigrid
+  algorithm.  The MILC interface can now drive the staggered multigrid
+  solver.
+
+- Multigrid setup can now use tensor cores on Volta, Turing and Ampere
+  GPUs to accelerate the calculation.  Enable with the
+  `QudaMultigridParam::use_mma` parameter.
+
+- Improved support of managed memory through the addition of a
+  prefetch API.  This can dramatically improve the performance of the
+  multigrid setup when oversubscribing the memory.
+
+- Improved the performance of using MILC RHMC with QUDA
+
+- Add support for a new internal data order FLOAT8.  This is the
+  default data order for nSpin=4 half and quarter precision fields,
+  though the prior FLOAT4 order can be enabled with the cmake option
+  QUDA_FLOAT8=OFF.
+
+- Remove of the singularity from the reconstruct-8 and reconstruct-9
+  compressed gauge field ordering.  This enables support for free
+  fields with these orderings.
+
+- The clover parameter convention has been codified: one can either
+  1.) pass in QudaInvertParam::kappa and QudaInvertParam::csw
+  separately, and QUDA will infer the necessary clover coefficient, or
+  2.) pass an explicit value of QudaInvertParam::clover_coeff
+  (e.g. CHROMA's use case) and that will override the above inference.
+
+- QUDA now includes fast-compilation options (QUDA_FAST_COMPILE_DSLASH
+  and QUDA_FAST_COMPILE_REUDCE) which enable much faster build times
+  for development at the expense of reduced performance.
+
+- Add support for compiling QUDA using clang for both the host and
+  device compiler.
+
+- While the bulk of the work associated with making QUDA portable to
+  different architectures will form the soul of QUDA 2.0, some of the
+  initial refactoring associated with this has been applied.
+
+- Significant cleanup of the tests directory to reduce boiler plate.
+
+- General improvements to the cmake build system using modern cmake
+  features.  We now require cmake 3.15.
+
+- Extended the ctest list to include some optional benchmarks.
+
+- Fix a long-standing issue with multi-node Kepler GPU and Intel dual
+  socket systems.
+
+- Improved ASAN integration: SANITIZE builds now work out of the box
+  with no need to set the ASAN_OPTIONS environment variable.
+
+- Add support for the extended QIO branch (now required for MILC).
+
+- Bump QMP version to 2.5.3.
+
+- Updated to Eigen 3.3.9.
+
+- Multiple bug fixes and clean up to the library.  Many of these are
+  listed here: https://github.com/lattice/quda/milestone/24?closed=1
+
 Version 1.0.0 - 10 January 2020
 
 - Add support for CUDA 10.2: QUDA 1.0.0 is supported on CUDA 7.5-10.2

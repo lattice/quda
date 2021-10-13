@@ -108,7 +108,7 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
   }
 
   topo->ranks = new int[nodes];
-  topo->coords = (int(*)[QUDA_MAX_DIM])new int[QUDA_MAX_DIM * nodes];
+  topo->coords = (int(*)[QUDA_MAX_DIM]) new int[QUDA_MAX_DIM * nodes];
 
   int x[QUDA_MAX_DIM];
   for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;

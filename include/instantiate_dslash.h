@@ -18,7 +18,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
             typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
 #if QUDA_RECONSTRUCT & 4
@@ -51,7 +51,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (in.Ncolor() == N_COLORS) {
       instantiate<Apply, Recon, Float, N_COLORS>(out, in, U, args...);
@@ -68,7 +68,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -112,7 +112,7 @@ namespace quda
 #if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                        Args &&... args)
+                                        Args &&...args)
   {
     if (U.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2

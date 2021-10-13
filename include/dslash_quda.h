@@ -12,7 +12,8 @@
 #include <cuda/atomic>
 #endif
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Constants used by dslash and packing kernels
@@ -34,7 +35,7 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM+1];
+    int ghostFace[QUDA_MAX_DIM + 1];
     int ghostFaceCB[QUDA_MAX_DIM + 1];
 
     int X2X1;
@@ -785,4 +786,4 @@ namespace quda {
      @param[in] in Input field
   */  
   void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in);
-}
+} // namespace quda
