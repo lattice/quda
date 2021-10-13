@@ -12,36 +12,27 @@ namespace quda
 
   namespace madwf_ml
   {
-    constexpr int warp_size = 32;
-
-    template <class T> __device__ inline void warp_reduce(T &f)
+    template <class T> __device__ __host__ inline void block_reduce_x(T &f)
     {
-      int index = target::thread_idx().y * (target::block_dim().x / warp_size) + (target::thread_idx().x / warp_size);
-      typedef cub::WarpReduce<T> WarpReduce;
-      // Allocate WarpReduce shared memory for 4 warps
-      __shared__ typename WarpReduce::TempStorage temp_storage[32];
-      // Return the warp-wide sums to each lane0 (threads 0, 32, 64, and 96)
-      f = WarpReduce(temp_storage[index]).Sum(f);
-    }
+      int lane_id_x = target::thread_idx().x % device::warp_size();
+      int warp_id_x = target::thread_idx().x / device::warp_size();
+      int warp_ct_x = target::block_dim().x / device::warp_size();
 
-    template <class T> __device__ inline void block_reduce_x(T &f)
-    {
-      int lane_id_x = target::thread_idx().x % warp_size;
-      int warp_id_x = target::thread_idx().x / warp_size;
-      int warp_ct_x = target::block_dim().x / warp_size;
+      // pad = false, dynamic = false, basically to get a __shared__ T smem[32];
+      SharedMemoryCache<T, 32, 1, false, false> cache;
+      T *smem = cache.data();
 
-      __shared__ T smem[32];
-
-      warp_reduce(f);
+      WarpReduce<T, device::warp_size()> warp_reduce;
+      f = warp_reduce.Sum(f);
       // Now lane 0 of each warp holds the reduced value
 
       if (warp_ct_x > 1) {
         int index = target::thread_idx().y * warp_ct_x + warp_id_x;
         if (lane_id_x == 0) { smem[index] = f; }
-        __syncthreads();
+        cache.sync();
         if (warp_id_x == 0) {
           f = (lane_id_x < warp_ct_x) ? smem[index] : 0;
-          warp_reduce(f);
+          f = warp_reduce.Sum(f);
         }
       }
       // Now the first thread in the x direction holds the reduction result.
@@ -67,9 +58,9 @@ namespace quda
 #pragma unroll
             for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
             // Perform a block reduction across the x direction
-#ifdef __CUDA_ARCH__
+
             block_reduce_x(z);
-#endif
+
             if (target::thread_idx().x == 0) { p[(m_index * spin_dim * spin_dim + cs) * target::grid_dim().x + target::block_idx().x] = z; }
           }
         }
@@ -205,11 +196,9 @@ namespace quda
             thread_idx += target::block_dim().x;
           }
 
-#ifdef __CUDA_ARCH__
-          typedef cub::BlockReduce<T, Arg::block_dim_x> BlockReduce;
-          __shared__ typename BlockReduce::TempStorage temp_storage;
-          z = BlockReduce(temp_storage).Sum(z);
-#endif
+          BlockReduce<T, Arg::block_dim_x> block_reduce;
+          z = block_reduce.Sum(z);
+
           T *out = reinterpret_cast<T *>(arg.result_d);
           if (target::thread_idx().x == 0) { out[target::block_idx().x] = z; }
         }

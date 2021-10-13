@@ -171,17 +171,8 @@ namespace quda
     ColorSpinorField &tmp2 = *tmp2p;
     ColorSpinorField &tmp3 = *tmp3p;
 
-    // alternative reliable updates
-    // alternative reliable updates - set precision - does not hurt performance here
-
-    const double u = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-      param.precision_sloppy == 4                ? std::numeric_limits<float>::epsilon() / 2. :
-      param.precision_sloppy == 2                ? pow(2., -13) :
-                                                   pow(2., -6);
-    const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
-      param.precision == 4                    ? std::numeric_limits<float>::epsilon() / 2. :
-      param.precision == 2                    ? pow(2., -13) :
-                                                pow(2., -6);
+    const double u = precisionEpsilon(param.precision_sloppy);
+    const double uhigh = precisionEpsilon(); // solver precision
 
     double Anorm = 0;
 
