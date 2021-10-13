@@ -69,7 +69,7 @@ namespace quda
       printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", mu);
       printfQuda("madwf_ls (cheap Ls)                               = %d\n", Ls_base);
       printfQuda("madwf_null_miniter                                = %d\n", null_miniter);
-      printfQuda("madwf_null_tol                                    = %.2f\n", null_tol);
+      printfQuda("madwf_null_tol                                    = %4.2e\n", null_tol);
       printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", train_maxiter);
     }
 

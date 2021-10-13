@@ -56,7 +56,6 @@ namespace quda
       __device__ __host__ inline void vector_tensor_matrix(SpinMatrix<real> *mp, int m_index, const WilsonVector<real> &v,
           const WilsonVector<real> &w)
       {
-#ifdef __CUDA_ARCH__
         complex<real> *p = reinterpret_cast<complex<real> *>(mp);
 
 #pragma unroll
@@ -68,12 +67,12 @@ namespace quda
 #pragma unroll
             for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
             // Perform a block reduction across the x direction
-
+#ifdef __CUDA_ARCH__
             block_reduce_x(z);
+#endif
             if (target::thread_idx().x == 0) { p[(m_index * spin_dim * spin_dim + cs) * target::grid_dim().x + target::block_idx().x] = z; }
           }
         }
-#endif
       }
 
     template <class storage_type, class matrix_type_, int block_dim_x_> struct Tensor5DArg: kernel_param<> {
@@ -209,11 +208,10 @@ namespace quda
 #ifdef __CUDA_ARCH__
           typedef cub::BlockReduce<T, Arg::block_dim_x> BlockReduce;
           __shared__ typename BlockReduce::TempStorage temp_storage;
-          T aggregate = BlockReduce(temp_storage).Sum(z);
-
-          T *out = reinterpret_cast<T *>(arg.result_d);
-          if (target::thread_idx().x == 0) { out[target::block_idx().x] = aggregate; }
+          z = BlockReduce(temp_storage).Sum(z);
 #endif
+          T *out = reinterpret_cast<T *>(arg.result_d);
+          if (target::thread_idx().x == 0) { out[target::block_idx().x] = z; }
         }
 
       };
