@@ -44,29 +44,31 @@ namespace quda
       @param[in] v, w input vectors
      */
     template <class real>
-      __device__ __host__ inline void vector_tensor_matrix(SpinMatrix<real> *mp, int m_index, const WilsonVector<real> &v,
-          const WilsonVector<real> &w)
-      {
-        complex<real> *p = reinterpret_cast<complex<real> *>(mp);
+    __device__ __host__ inline void vector_tensor_matrix(SpinMatrix<real> *mp, int m_index, const WilsonVector<real> &v,
+                                                         const WilsonVector<real> &w)
+    {
+      complex<real> *p = reinterpret_cast<complex<real> *>(mp);
 
 #pragma unroll
-        for (int a = 0; a < spin_dim; a++) {
+      for (int a = 0; a < spin_dim; a++) {
 #pragma unroll
-          for (int b = 0; b < spin_dim; b++) {
-            int cs = a * spin_dim + b;
-            complex<real> z = 0;
+        for (int b = 0; b < spin_dim; b++) {
+          int cs = a * spin_dim + b;
+          complex<real> z = 0;
 #pragma unroll
-            for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
-            // Perform a block reduction across the x direction
+          for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
+          // Perform a block reduction across the x direction
 
-            block_reduce_x(z);
+          block_reduce_x(z);
 
-            if (target::thread_idx().x == 0) { p[(m_index * spin_dim * spin_dim + cs) * target::grid_dim().x + target::block_idx().x] = z; }
+          if (target::thread_idx().x == 0) {
+            p[(m_index * spin_dim * spin_dim + cs) * target::grid_dim().x + target::block_idx().x] = z;
           }
         }
       }
+    }
 
-    template <class storage_type, class matrix_type_, int block_dim_x_> struct Tensor5DArg: kernel_param<> {
+    template <class storage_type, class matrix_type_, int block_dim_x_> struct Tensor5DArg : kernel_param<> {
 
       using F = typename colorspinor_mapper<storage_type, 4, 3>::type;
       using real = typename mapper<storage_type>::type;
@@ -78,7 +80,7 @@ namespace quda
       const F out; // output vector field
       const F in;  // input vector field
 
-      const int Ls_out; // length of 5th dimension of the out field 
+      const int Ls_out; // length of 5th dimension of the out field
       const int Ls_in;  // length of 5th dimension of the in field
 
       const int volume_4d_cb;
@@ -91,7 +93,7 @@ namespace quda
 
       int batch;
 
-      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, int num_x_blocks, matrix_type *result_d):
+      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, int num_x_blocks, matrix_type *result_d) :
         kernel_param(dim3(out.VolumeCB() / out.X(4), out.X(4), out.SiteSubset())),
         out(out),
         in(in),
@@ -105,7 +107,7 @@ namespace quda
 
         if (volume_4d_cb != static_cast<int>(out.VolumeCB() / Ls_out)) {
           errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", volume_4d_cb,
-              static_cast<int>(out.VolumeCB() / Ls_out));
+                    static_cast<int>(out.VolumeCB() / Ls_out));
         }
 
         if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
@@ -120,90 +122,86 @@ namespace quda
         reduce_buffer = reinterpret_cast<matrix_type *>(device_malloc(reduce_bytes));
       }
 
-      ~Tensor5DArg() {
+      ~Tensor5DArg()
+      {
         if (reduce_buffer) { device_free(reduce_buffer); }
       }
-
     };
 
-    template <class Arg>
-      struct Tensor5D {
+    template <class Arg> struct Tensor5D {
 
-        const Arg &arg;
-        constexpr Tensor5D(const Arg &arg) : arg(arg) {}
-        static constexpr const char *filename() { return KERNEL_FILE; }
+      const Arg &arg;
+      constexpr Tensor5D(const Arg &arg) : arg(arg) { }
+      static constexpr const char *filename() { return KERNEL_FILE; }
 
-        /**
-          @brief Form a Ls_in-by-Ls_out tensor product from the two input vectors. The type of reduce_buffer
-                  determines if the resulting tensor has spin and/or color d.o.f, or just two chiral d.o.f
-          @param[in] parity Parity we are on
-          @param[in] x_b Checkerboarded 4-d space-time index
-          @param[in] s Ls dimension coordinate
-         */
-        __device__ __host__ inline void operator()(int x_cb, int s, int parity)
-        {
-          using Vector = typename Arg::Vector;
+      /**
+        @brief Form a Ls_in-by-Ls_out tensor product from the two input vectors. The type of reduce_buffer
+                determines if the resulting tensor has spin and/or color d.o.f, or just two chiral d.o.f
+        @param[in] parity Parity we are on
+        @param[in] x_b Checkerboarded 4-d space-time index
+        @param[in] s Ls dimension coordinate
+       */
+      __device__ __host__ inline void operator()(int x_cb, int s, int parity)
+      {
+        using Vector = typename Arg::Vector;
 
-          const int Ls_in = arg.Ls_in;
-          const int Ls_out = arg.Ls_out;
-          const int volume_4d_cb = arg.volume_4d_cb;
-          auto reduce_buffer = arg.reduce_buffer;
+        const int Ls_in = arg.Ls_in;
+        const int Ls_out = arg.Ls_out;
+        const int volume_4d_cb = arg.volume_4d_cb;
+        auto reduce_buffer = arg.reduce_buffer;
 
-          if (x_cb >= volume_4d_cb) return;
-          if (s >= Ls_out) return;
-          if (parity >= arg.nParity) return;
+        if (x_cb >= volume_4d_cb) return;
+        if (s >= Ls_out) return;
+        if (parity >= arg.nParity) return;
 
-          SharedMemoryCache<Vector> cache;
+        SharedMemoryCache<Vector> cache;
 
-          int ld = Ls_in * target::block_dim().x;
-          int t = s;
-          while (t < Ls_in) {
-            int index = t * target::block_dim().x + target::thread_idx().x;
-            cache.save_idx(index, ld, arg.in(t * volume_4d_cb + x_cb, parity));
-            t += target::block_dim().y;
-          }
-          cache.sync();
+        int ld = Ls_in * target::block_dim().x;
+        int t = s;
+        while (t < Ls_in) {
+          int index = t * target::block_dim().x + target::thread_idx().x;
+          cache.save_idx(index, ld, arg.in(t * volume_4d_cb + x_cb, parity));
+          t += target::block_dim().y;
+        }
+        cache.sync();
 
-          // t -> s_in, s-> s_out
-          const Vector v = arg.out(s * volume_4d_cb + x_cb, parity);
-          for (t = 0; t < Ls_in; t++) {
-            const Vector w = cache.load_idx(t * target::block_dim().x + target::thread_idx().x, ld);
-            int wm_index = s * Ls_in + t;
-            vector_tensor_matrix(reduce_buffer, wm_index, v, w);
-          }
+        // t -> s_in, s-> s_out
+        const Vector v = arg.out(s * volume_4d_cb + x_cb, parity);
+        for (t = 0; t < Ls_in; t++) {
+          const Vector w = cache.load_idx(t * target::block_dim().x + target::thread_idx().x, ld);
+          int wm_index = s * Ls_in + t;
+          vector_tensor_matrix(reduce_buffer, wm_index, v, w);
+        }
+      }
+    };
+
+    template <class Arg> struct Tensor5DReduce {
+
+      const Arg &arg;
+      constexpr Tensor5DReduce(const Arg &arg) : arg(arg) { }
+      static constexpr const char *filename() { return KERNEL_FILE; }
+
+      __device__ __host__ inline void operator()(int, int, int)
+      {
+        using T = complex<typename Arg::real>;
+
+        int thread_idx = target::thread_idx().x;
+        int batch = arg.batch;
+
+        T *in = reinterpret_cast<T *>(arg.reduce_buffer);
+        T z = 0;
+        while (thread_idx < batch) {
+          z += in[target::block_idx().x * batch + thread_idx];
+          thread_idx += target::block_dim().x;
         }
 
-      };
+        BlockReduce<T, Arg::block_dim_x> block_reduce;
+        z = block_reduce.Sum(z);
 
-      template <class Arg>
-      struct Tensor5DReduce {
+        T *out = reinterpret_cast<T *>(arg.result_d);
+        if (target::thread_idx().x == 0) { out[target::block_idx().x] = z; }
+      }
+    };
+  } // namespace madwf_ml
 
-        const Arg &arg;
-        constexpr Tensor5DReduce(const Arg &arg) : arg(arg) {}
-        static constexpr const char *filename() { return KERNEL_FILE; }
-
-        __device__ __host__ inline void operator()(int, int, int)
-        {
-          using T = complex<typename Arg::real>;
-
-          int thread_idx = target::thread_idx().x;
-          int batch = arg.batch;
-
-          T *in = reinterpret_cast<T *>(arg.reduce_buffer);
-          T z = 0;
-          while (thread_idx < batch) {
-            z += in[target::block_idx().x * batch + thread_idx];
-            thread_idx += target::block_dim().x;
-          }
-
-          BlockReduce<T, Arg::block_dim_x> block_reduce;
-          z = block_reduce.Sum(z);
-
-          T *out = reinterpret_cast<T *>(arg.result_d);
-          if (target::thread_idx().x == 0) { out[target::block_idx().x] = z; }
-        }
-
-      };
-  }
-
-}
+} // namespace quda

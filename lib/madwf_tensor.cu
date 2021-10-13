@@ -24,10 +24,7 @@ namespace quda
         return in.X(4) * color_spin_dim * 2 * sizeof(typename mapper<storage_type>::type) / out.X(4);
       }
 
-      unsigned int sharedBytesPerBlock(const TuneParam &) const
-      {
-        return 0;
-      }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
 
@@ -52,7 +49,7 @@ namespace quda
       void apply(const qudaStream_t &stream)
       {
         constexpr int block_size = 128;
-        
+
         qudaEvent_t event = qudaEventCreate();
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -73,7 +70,7 @@ namespace quda
         launch<Tensor5DReduce>(tp, stream, arg);
 
         qudaEventRecord(event, stream);
-        while (!qudaEventQuery(event)) {}
+        while (!qudaEventQuery(event)) { }
         qudaEventDestroy(event);
       }
 
@@ -106,8 +103,8 @@ namespace quda
 #endif
     }
 
-    template
-    void tensor_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &out, const ColorSpinorField &in, device_vector<float> &tp);
+    template void tensor_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &out, const ColorSpinorField &in,
+                                                              device_vector<float> &tp);
 
   } // namespace madwf_ml
 } // namespace quda

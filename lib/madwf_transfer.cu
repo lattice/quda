@@ -9,7 +9,7 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class storage_type, class matrix_type> class transfer_5D_wrapper: public TunableKernel3D
+    template <class storage_type, class matrix_type> class transfer_5D_wrapper : public TunableKernel3D
     {
       ColorSpinorField &out;
       const ColorSpinorField &in;
@@ -17,20 +17,14 @@ namespace quda
       bool dagger;
 
     private:
-      unsigned int sharedBytesPerThread() const
-      {
-        return 0;
-      }
+      unsigned int sharedBytesPerThread() const { return 0; }
 
-      unsigned int sharedBytesPerBlock(const TuneParam &) const
-      {
-        return out.X(4) * in.X(4) * sizeof(matrix_type);
-      }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return out.X(4) * in.X(4) * sizeof(matrix_type); }
 
       unsigned int minThreads() const { return out.VolumeCB() / out.X(4); }
 
     public:
-      transfer_5D_wrapper(ColorSpinorField &out, const ColorSpinorField &in, const matrix_type *wm_p, bool dagger):
+      transfer_5D_wrapper(ColorSpinorField &out, const ColorSpinorField &in, const matrix_type *wm_p, bool dagger) :
         TunableKernel3D(out, out.X(4), out.SiteSubset()), out(out), in(in), wm_p(wm_p), dagger(dagger)
       {
         TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
@@ -86,8 +80,8 @@ namespace quda
 #endif
     }
 
-    template
-    void transfer_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &out, const ColorSpinorField &in, const device_vector<float> &tp, bool dagger);
+    template void transfer_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &out, const ColorSpinorField &in,
+                                                                const device_vector<float> &tp, bool dagger);
 
   } // namespace madwf_ml
 } // namespace quda
