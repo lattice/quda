@@ -239,10 +239,7 @@ namespace quda {
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */
-    virtual void MdagMLocal(ColorSpinorField &, const ColorSpinorField &) const
-    {
-      errorQuda("Not implemented!\n");
-    }
+    virtual void MdagMLocal(ColorSpinorField &, const ColorSpinorField &) const { errorQuda("Not implemented!\n"); }
 
     /**
        @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
@@ -799,8 +796,7 @@ public:
     DiracDomainWall4DPC &operator=(const DiracDomainWall4DPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
-                   const ColorSpinorField &x, const double &k) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -845,8 +841,10 @@ public:
 
       void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
                        const ColorSpinorField &x, const double &k) const;
-      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
-      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                          const double &k) const;
+      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                       const double &k) const;
 
       virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
       virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -872,8 +870,7 @@ public:
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
-                   const ColorSpinorField &x, const double &k) const;
+    void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1974,8 +1971,8 @@ public:
   {
 
   public:
-    DiracM(const Dirac &d) : DiracMatrix(d) {}
-    DiracM(const Dirac *d) : DiracMatrix(d) {}
+    DiracM(const Dirac &d) : DiracMatrix(d) { }
+    DiracM(const Dirac *d) : DiracMatrix(d) { }
 
     /**
        @brief apply operator and potentially a shift
@@ -2090,8 +2087,8 @@ public:
   {
 
   public:
-    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
-    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
 
@@ -2307,8 +2304,8 @@ public:
   {
 
   public:
-    DiracG5M(const Dirac &d) : DiracMatrix(d) {}
-    DiracG5M(const Dirac *d) : DiracMatrix(d) {}
+    DiracG5M(const Dirac &d) : DiracMatrix(d) { }
+    DiracG5M(const Dirac *d) : DiracMatrix(d) { }
 
     /**
       @brief Left-apply gamma5 as appropriate for the operator

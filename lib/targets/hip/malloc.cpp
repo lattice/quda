@@ -160,8 +160,7 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
-        if (!device::managed_memory_supported())
-          warningQuda("Target device does not report supporting managed memory");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;

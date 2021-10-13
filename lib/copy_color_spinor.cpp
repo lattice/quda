@@ -1,9 +1,11 @@
 #include <tuple>
 #include <color_spinor_field.h>
 
-namespace quda {
+namespace quda
+{
 
-  using copy_pack = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+  using copy_pack
+    = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
   void copyGenericColorSpinorDD(const copy_pack &pack);
   void copyGenericColorSpinorDS(const copy_pack &pack);
   void copyGenericColorSpinorDH(const copy_pack &pack);

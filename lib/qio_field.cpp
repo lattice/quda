@@ -124,8 +124,8 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
   return outfile;
 }
 
-int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset,
-               QudaParity, int nSpin, int nColor, int len)
+int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset, QudaParity,
+               int nSpin, int nColor, int len)
 {
   // Get the QIO record and string
   char dummy[100] = "";
@@ -176,19 +176,15 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   /* Read the field record and convert to cpu precision*/
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_read(infile, rec_info, xml_record_in, vput<double, double>, rec_size, QUDA_DOUBLE_PRECISION,
-                        field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, double>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
     } else {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
     } else {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
     }
   }
 
@@ -361,15 +357,19 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   size_t rec_size = file_prec*count*len;
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<double, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<double, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   }
 
@@ -384,7 +384,8 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
     QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
 {
-  return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3, 18, type);
+  return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3,
+                     18, type);
 }
 
 void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
@@ -430,7 +431,8 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
 
   /* Read the spinor field record */
   printfQuda("%s: writing %d vector fields\n", __func__, Nvec); fflush(stdout);
-  int status = write_field(outfile, Nvec, V, precision, precision, subset, parity, nSpin, nColor, 2 * nSpin * nColor, type);
+  int status
+    = write_field(outfile, Nvec, V, precision, precision, subset, parity, nSpin, nColor, 2 * nSpin * nColor, type);
   if (status) { errorQuda("write_spinor_fields failed %d\n", status); }
 
   /* Close the file */

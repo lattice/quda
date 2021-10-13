@@ -2,7 +2,8 @@
 
 #include <hiprand_kernel.h>
 
-namespace quda {
+namespace quda
+{
 
 #if defined(XORWOW)
   using rng_state_t = hiprandStateXORWOW;
@@ -23,24 +24,21 @@ namespace quda {
    * @param [in] offset -- the offset
    * @param [in,out] state - the RNG State
    */
-  __device__ inline void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset, RNGState &state)
+  __device__ inline void random_init(unsigned long long seed, unsigned long long sequence, unsigned long long offset,
+                                     RNGState &state)
   {
     hiprand_init(seed, sequence, offset, &state.state);
   }
 
-  template<class Real>
-    struct uniform { };
-  template<>
-    struct uniform<float> {
+  template <class Real> struct uniform {
+  };
+  template <> struct uniform<float> {
 
     /**
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    __device__ static inline float rand(RNGState &state)
-    {
-      return hiprand_uniform(&state.state);
-    }
+    __device__ static inline float rand(RNGState &state) { return hiprand_uniform(&state.state); }
 
     /**
      * \brief return a uniform deviate between a and b
@@ -52,19 +50,14 @@ namespace quda {
     {
       return a + (b - a) * hiprand_uniform(&state.state);
     }
-
   };
 
-  template<>
-    struct uniform<double> {
+  template <> struct uniform<double> {
     /**
      * \brief Return a uniform deviate between 0 and 1
      * @param [in,out] the RNG State
      */
-    __device__ static inline double rand(RNGState &state)
-    {
-      return hiprand_uniform_double(&state.state);
-    }
+    __device__ static inline double rand(RNGState &state) { return hiprand_uniform_double(&state.state); }
 
     /**
      * \brief Return a uniform deviate between a and b
@@ -78,31 +71,23 @@ namespace quda {
     }
   };
 
-  template<class Real>
-    struct normal { };
+  template <class Real> struct normal {
+  };
 
-  template<>
-    struct normal<float> {
+  template <> struct normal<float> {
     /**
      * \brief return a gaussian normal deviate with mean of 0
      * @param [in,out] state
      */
-    __device__ static inline float rand(RNGState &state)
-    {
-      return hiprand_normal(&state.state);
-    }
+    __device__ static inline float rand(RNGState &state) { return hiprand_normal(&state.state); }
   };
 
-  template<>
-    struct normal<double> {
-     /**
-      * \brief return a gaussian (normal) deviate with a mean of 0
-      * @param [in,out] state
-      */
-    __device__ static inline double rand(RNGState &state)
-    {
-      return hiprand_normal_double(&state.state);
-    }
+  template <> struct normal<double> {
+    /**
+     * \brief return a gaussian (normal) deviate with a mean of 0
+     * @param [in,out] state
+     */
+    __device__ static inline double rand(RNGState &state) { return hiprand_normal_double(&state.state); }
   };
 
-}
+} // namespace quda
