@@ -166,7 +166,12 @@ namespace quda {
   }
 
 #ifdef GPU_FATLINK
-  void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField& u, const double *coeff)
+  void longKSLink(GaugeField *lng, const GaugeField &u, const double *coeff)
+  {
+    computeLongLink(*lng, u, coeff[1]);
+  }
+
+  void fatKSLink(GaugeField *fat, const GaugeField& u, const double *coeff)
   {
     GaugeFieldParam gParam(u);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -182,9 +187,6 @@ namespace quda {
     }
 
     computeOneLink(*fat, u, coeff[0]-6.0*coeff[5]);
-
-    // if this pointer is not NULL, compute the long link
-    if (lng) computeLongLink(*lng, u, coeff[1]);
 
     // Check the coefficients. If all of the following are zero, return.
     if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF ||
@@ -216,7 +218,12 @@ namespace quda {
     delete staple1;
   }
 #else
-  void fatLongKSLink(GaugeField *, GaugeField *, const GaugeField&, const double *)
+  void longKSLink(GaugeField *, const GaugeField&, const double *)
+  {
+    errorQuda("Long-link computation not enabled");
+  }
+
+  void fatKSLink(GaugeField *, const GaugeField&, const double *)
   {
     errorQuda("Fat-link computation not enabled");
   }

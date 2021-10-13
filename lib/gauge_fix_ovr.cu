@@ -109,7 +109,7 @@ namespace quda {
         }
         this->threads /= 2;
 
-        if (threads == 0) errorQuda("Local volume is too small");
+        if (this->threads == 0) errorQuda("Local volume is too small");
       } else {
         this->threads = threads;
       }
@@ -185,10 +185,9 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       launch<FixQualityOVR>(arg.result, tp, stream, arg);
-      if (!activeTuning()) {
-        arg.result[0] /= (double)(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
-        arg.result[1] /= (double)(3 * 2 * arg.threads.x * comm_size());
-      }
+
+      arg.result[0] /= static_cast<double>(3 * Arg::gauge_dir * 2 * arg.threads.x * comm_size());
+      arg.result[1] /= static_cast<double>(3 * 2 * arg.threads.x * comm_size());
     }
 
     long long flops() const { return (36LL * Arg::gauge_dir + 65LL) * meta.Volume(); }

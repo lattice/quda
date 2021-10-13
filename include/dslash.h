@@ -109,8 +109,6 @@ namespace quda
 
     inline void setParam(TuneParam &tp)
     {
-      arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
-
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
       // Also, the accessor constructor calls Ghost(), which uses
@@ -148,7 +146,8 @@ namespace quda
           (uberTuning() && !policyTuning() ? dslash::inc_shmem_sync_counter() : dslash::get_shmem_sync_counter()) :
           dslash::get_shmem_sync_counter();
         arg.exterior_blocks = ((arg.shmem & 64) && arg.exterior_dims > 0) ?
-          (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) : 0;
+          (device::processor_count() / (2 * arg.exterior_dims)) * (2 * arg.exterior_dims * tp.aux.y) :
+          0;
         tp.grid.x += arg.exterior_blocks;
       }
     }
@@ -244,7 +243,8 @@ namespace quda
     inline void launch(TuneParam &tp, const qudaStream_t &stream)
     {
       tp.set_max_shared_bytes = true;
-      launch_device<dslash_functor>(tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
+      launch_device<dslash_functor>(
+        tp, stream, dslash_functor_arg<D, P, nParity, dagger, xpay, kernel_type, Arg>(arg, tp.block.x * tp.grid.x));
     }
 
   public:
@@ -328,12 +328,7 @@ namespace quda
     Arg &dslashParam; // temporary addition for policy compatibility
 
     Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      TunableKernel3D(in, 1, arg.nParity),
-      arg(arg),
-      out(out),
-      in(in),
-      nDimComms(4),
-      dslashParam(arg)
+      TunableKernel3D(in, 1, arg.nParity), arg(arg), out(out), in(in), nDimComms(4), dslashParam(arg)
     {
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");
@@ -355,8 +350,10 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+#ifdef NVSHMEM_COMMS
       strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
       strcat(aux_barrier, ",shmem");
+#endif
     }
 
 #ifdef NVSHMEM_COMMS
@@ -366,10 +363,7 @@ namespace quda
       setUberTuning(arg.shmem & 64);
     }
 #else
-    void setShmem(int)
-    {
-      setUberTuning(arg.shmem & 64);
-    }
+    void setShmem(int) { setUberTuning(arg.shmem & 64); }
 #endif
 
     void setPack(bool pack, MemoryLocation location)

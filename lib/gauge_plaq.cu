@@ -8,10 +8,10 @@ namespace quda {
   template<typename Float, int nColor, QudaReconstructType recon>
   class GaugePlaq : public TunableReduction2D<> {
     const GaugeField &u;
-    double2 &plq;
+    std::vector<double> &plq;
 
   public:
-    GaugePlaq(const GaugeField &u, double2 &plq) :
+    GaugePlaq(const GaugeField &u, std::vector<double> &plq) :
       TunableReduction2D(u),
       u(u),
       plq(plq)
@@ -24,11 +24,9 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugePlaqArg<Float, nColor, recon> arg(u);
       launch<Plaquette>(plq, tp, stream, arg);
-      if (!activeTuning()) {
-        for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= (nColor*3.0*2.0*arg.threads.x*comm_size());
-      }
+      for (int i = 0; i < 2; i++) plq[i] /= nColor*nColor*2*arg.threads.x*comm_size();
     }
-
+    
     long long flops() const
     {
       auto Nc = u.Ncolor();
@@ -39,9 +37,9 @@ namespace quda {
 
   double3 plaquette(const GaugeField &U)
   {
-    double2 plq = zero<double2>();
+    std::vector<double> plq{0.0, 0.0};
     instantiate<GaugePlaq>(U, plq);
-    double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
+    double3 plaq = make_double3(0.5*(plq[0] + plq[1]), plq[0], plq[1]);
     return plaq;
   }
 

@@ -193,7 +193,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
 
   int faults = 0;
   Float tol = (sizeof(Float) == sizeof(double) ? 1e-9 : 2e-5);
-  void *h_result = malloc(V * 2 * 16 * sizeof(Float));
+  void *h_result = safe_malloc(V * 2 * 16 * sizeof(Float));
 
   // compute spin elementals
   contractColor(spinorX, spinorY, (Float *)h_result);
@@ -228,6 +228,6 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
       printfQuda("Contraction %d failed\n", j);
   }
 
-  free(h_result);
+  host_free(h_result);
   return faults;
 };

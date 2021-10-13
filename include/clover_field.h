@@ -1,8 +1,8 @@
 #pragma once
 
+#include <array>
 #include <quda_internal.h>
 #include <lattice_field.h>
-
 #include <comm_key.h>
 
 namespace quda {
@@ -38,8 +38,8 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    double csw;  //! Csw clover coefficient
-    double coeff;  //! Overall clover coefficient
+    double csw;   //! C_sw clover coefficient
+    double coeff; //! Overall clover coefficient
     bool twisted; // whether to create twisted mass clover
     double mu2;
     double rho;
@@ -126,7 +126,7 @@ namespace quda {
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
-    mutable std::vector<double> trlog;
+    mutable std::array<double, 2> trlog;
 
     /**
        @brief Set the vol_string and aux_string for use in tuning
@@ -158,8 +158,8 @@ namespace quda {
     /**
        @return Pointer to array storing trlog on each parity
     */
-    std::vector<double>& TrLog() const { return trlog; }
-    
+    std::array<double, 2> &TrLog() const { return trlog; }
+
     /**
        @return The order of the field
      */
@@ -204,7 +204,7 @@ namespace quda {
        @return Clover coefficient (explicitly includes kappa)
     */
     double Coeff() const { return coeff; }
-    
+
     /**
        @return If the clover field is associated with twisted-clover fermions
     */
@@ -513,7 +513,7 @@ namespace quda {
      @param coeff Multiplicative coefficient (e.g., clover coefficient)
      @param parity The field parity we are working on 
    */
-  void cloverDerivative(GaugeField &force, GaugeField& gauge, GaugeField& oprod, double coeff, QudaParity parity);
+  void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity);
 
   /**
     @brief This function is used for copying from a source clover field to a destination clover field
@@ -527,7 +527,7 @@ namespace quda {
 
   /**
      @brief Helper function that returns whether we have enabled
-     dyanmic clover inversion or not.
+     dynamic clover inversion or not.
    */
   constexpr bool dynamic_clover_inverse()
   {

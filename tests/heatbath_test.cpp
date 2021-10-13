@@ -113,7 +113,7 @@ int main(int argc, char **argv)
   
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
@@ -166,10 +166,13 @@ int main(int argc, char **argv)
 
     if (strcmp(latfile, "") || !coldstart) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
-      copyExtendedResidentGaugeQuda((void*)gaugeEx);
+      copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
-      if (coldstart) InitGaugeField(*gaugeEx);
-      //else InitGaugeField(*gaugeEx, *randstates);
+      if (coldstart)
+        InitGaugeField(*gaugeEx);
+      else
+        InitGaugeField(*gaugeEx, *randstates);
+
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);	
       // load the gauge field from gauge
@@ -228,11 +231,10 @@ int main(int argc, char **argv)
       freeGaugeQuda();
       
       // Save if output string is specified
-      if (strcmp(gauge_outfile,"")) {
-	saveGaugeField(step, gaugeEx, gauge);
-      }      
+      if (strcmp(gauge_outfile,"")) saveGaugeField(step, gaugeEx, gauge);
+      else printfQuda("No output file specified.\n");
     }
-        
+    
     delete gauge;
     delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
@@ -252,13 +254,13 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
 
+  for (int dir = 0; dir < 4; dir++) host_free(load_gauge[dir]);
+
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
-
-  for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
 
   return 0;
 }

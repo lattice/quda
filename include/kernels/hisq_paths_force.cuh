@@ -189,6 +189,7 @@ namespace quda {
       using Arg = Arg_;
       Arg arg;
       FatLinkParam(Arg &arg) :
+        kernel_param<>(arg.threads),
         arg(arg) {}
     };
 

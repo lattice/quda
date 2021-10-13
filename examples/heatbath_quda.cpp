@@ -152,7 +152,7 @@ int main(int argc, char **argv)
   // Construct an extended device gauge field
   //--------------------------------------------------------------------------
   using namespace quda;
-  GaugeFieldParam gParam(gauge_param, 0);
+  GaugeFieldParam gParam(gauge_param);
   gParam.pad = 0;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.create      = QUDA_NULL_FIELD_CREATE;

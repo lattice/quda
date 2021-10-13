@@ -62,8 +62,6 @@ namespace quda {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
-        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
-        if (commAsyncReduction()) strcat(aux, ",async");
 
         apply(device::get_default_stream());
 

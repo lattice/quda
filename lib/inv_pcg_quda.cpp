@@ -61,9 +61,7 @@ namespace quda
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
-    K(0),
-    Kparam(param)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
     // Preconditioners do not need a deflation space,

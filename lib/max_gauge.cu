@@ -58,7 +58,7 @@ namespace quda {
 #ifdef GPU_MULTIGRID
     case 48: norm_ = norm<reg_t, store_t, 48>(u, d, type); break;
 #ifdef NSPIN4
-    case 12: norm_ = norm<reg_t, store_t, 12>(u, d, type); break;
+    case 4*N_COLORS: norm_ = norm<reg_t, store_t, 4*N_COLORS>(u, d, type); break;
     case 64: norm_ = norm<reg_t, store_t, 64>(u, d, type); break;
 #endif // NSPIN4
 #ifdef NSPIN1

@@ -112,10 +112,10 @@ namespace quda {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
     int check = (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) ?
-      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d",
-               volume, stride, precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
-      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d",
-               volume, stride, precision, geometry, nColor);
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d", volume, stride,
+               precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
+      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride, precision,
+               geometry, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
@@ -206,10 +206,10 @@ namespace quda {
 	if (comm_dim_partitioned(i)) {
 	  send[i] = pool_pinned_malloc(bytes[i]);
 	  receive[i] = pool_pinned_malloc(bytes[i]);
-	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToHost);
-	} else {
-	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToDevice);
-	}
+          qudaMemcpy(send[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToHost);
+        } else {
+          if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToDevice);
+        }
       }
     }
 
@@ -242,8 +242,8 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
-	qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
-	pool_pinned_free(send[i]);
+        qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
+        pool_pinned_free(send[i]);
 	pool_pinned_free(receive[i]);
       }
     }
@@ -309,6 +309,7 @@ namespace quda {
     spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
+    spinor_param.pc_type = QUDA_4D_PC;
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;

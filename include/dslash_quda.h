@@ -12,7 +12,8 @@
 #include <cuda/atomic>
 #endif
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Constants used by dslash and packing kernels
@@ -34,7 +35,7 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM+1];
+    int ghostFace[QUDA_MAX_DIM + 1];
     int ghostFaceCB[QUDA_MAX_DIM + 1];
 
     int X2X1;
@@ -49,19 +50,6 @@ namespace quda {
 
     int_fastdiv dims[4][3];
   };
-
-  /**
-    @param pack Sets whether to use a kernel to pack the T dimension
-    */
-  void setKernelPackT(bool pack);
-
-  /**
-    @return Whether the T dimension is kernel packed or not
-    */
-  bool getKernelPackT();
-
-  void pushKernelPackT(bool pack);
-  void popKernelPackT();
 
   /**
      @brief Helper function that sets which dimensions the packing
@@ -798,4 +786,4 @@ namespace quda {
      @param[in] in Input field
   */  
   void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in);
-}
+} // namespace quda

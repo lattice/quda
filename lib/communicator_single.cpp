@@ -7,13 +7,13 @@
 
 #include <communicator_quda.h>
 
-Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
-                           bool, void *)
+Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data, bool, void *)
 {
   comm_init(nDim, commDims, rank_from_coords, map_data);
+  globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split)
+Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
 {
   constexpr int nDim = 4;
 
@@ -57,51 +57,47 @@ MsgHandle *Communicator::comm_declare_send_rank(void *, int, int, size_t) { retu
 
 MsgHandle *Communicator::comm_declare_recv_rank(void *, int, int, size_t) { return nullptr; }
 
-MsgHandle *Communicator::comm_declare_send_displaced(void *, const int [], size_t)
+MsgHandle *Communicator::comm_declare_send_displaced(void *, const int[], size_t) { return nullptr; }
+
+MsgHandle *Communicator::comm_declare_receive_displaced(void *, const int[], size_t) { return nullptr; }
+
+MsgHandle *Communicator::comm_declare_strided_send_displaced(void *, const int[], size_t, int, size_t)
 {
   return nullptr;
 }
 
-MsgHandle *Communicator::comm_declare_receive_displaced(void *, const int [], size_t)
+MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *, const int[], size_t, int, size_t)
 {
   return nullptr;
 }
 
-MsgHandle *Communicator::comm_declare_strided_send_displaced(void *, const int [], size_t, int, size_t)
-{
-  return nullptr;
-}
+void Communicator::comm_free(MsgHandle *&) { }
 
-MsgHandle *Communicator::comm_declare_strided_receive_displaced(void *, const int [], size_t, int, size_t)
-{
-  return nullptr;
-}
+void Communicator::comm_start(MsgHandle *) { }
 
-void Communicator::comm_free(MsgHandle *&) {}
-
-void Communicator::comm_start(MsgHandle *) {}
-
-void Communicator::comm_wait(MsgHandle *) {}
+void Communicator::comm_wait(MsgHandle *) { }
 
 int Communicator::comm_query(MsgHandle *) { return 1; }
 
-void Communicator::comm_allreduce(double *) {}
+void Communicator::comm_allreduce(double *) { }
 
-void Communicator::comm_allreduce_max(double *) {}
+void Communicator::comm_allreduce_max(double *) { }
 
-void Communicator::comm_allreduce_min(double *) {}
+void Communicator::comm_allreduce_min(double *) { }
 
-void Communicator::comm_allreduce_array(double *, size_t) {}
+void Communicator::comm_allreduce_array(double *, size_t) { }
 
-void Communicator::comm_allreduce_max_array(double *, size_t) {}
+void Communicator::comm_allreduce_max_array(double *, size_t) { }
 
-void Communicator::comm_allreduce_int(int *) {}
+void Communicator::comm_allreduce_min_array(double *, size_t) { }
 
-void Communicator::comm_allreduce_xor(uint64_t *) {}
+void Communicator::comm_allreduce_int(int *) { }
 
-void Communicator::comm_broadcast(void *, size_t) {}
+void Communicator::comm_allreduce_xor(uint64_t *) { }
 
-void Communicator::comm_barrier(void) {}
+void Communicator::comm_broadcast(void *, size_t) { }
+
+void Communicator::comm_barrier(void) { }
 
 void Communicator::comm_abort_(int status) { exit(status); }
 
