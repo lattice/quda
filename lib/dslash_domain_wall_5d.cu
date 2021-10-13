@@ -37,6 +37,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         int Ls = in.X(4);
         long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -54,6 +55,7 @@ namespace quda
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
       default: break;
       }
@@ -82,9 +84,7 @@ namespace quda
   void ApplyDomainWall5D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    pushKernelPackT(true); // with 5-d checkerboarding we must use kernel packing
     instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    popKernelPackT();
   }
 #else
   void ApplyDomainWall5D(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double, double,

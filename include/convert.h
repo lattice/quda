@@ -20,17 +20,33 @@ namespace quda
    * value of a (signed) char and short. Relevant for
    * fixed-precision types.
    */
-  template< typename T > struct fixedMaxValue{ static constexpr float value = 0.0f; };
-  template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
-  template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
+  template <typename T> struct fixedMaxValue {
+    static constexpr float value = 0.0f;
+  };
+  template <> struct fixedMaxValue<short> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short2> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short4> {
+    static constexpr float value = 32767.0f;
+  };
+  template <> struct fixedMaxValue<short8> {
+    static constexpr float value = 32767.0f;
+  };
   template <> struct fixedMaxValue<int8_t> {
     static constexpr float value = 127.0f;
   };
-  template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
-  template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
-  template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };
+  template <> struct fixedMaxValue<char2> {
+    static constexpr float value = 127.0f;
+  };
+  template <> struct fixedMaxValue<char4> {
+    static constexpr float value = 127.0f;
+  };
+  template <> struct fixedMaxValue<char8> {
+    static constexpr float value = 127.0f;
+  };
 
   template <typename T> struct fixedInvMaxValue {
     static constexpr float value = 3.402823e+38f;
@@ -79,10 +95,7 @@ namespace quda
      @brief Regular float to integer round used on the host
   */
   template <bool is_device> struct f2i {
-    constexpr int operator()(float f)
-    {
-      return static_cast<int>(f);
-    }
+    constexpr int operator()(float f) { return static_cast<int>(f); }
   };
 
   /**
@@ -100,10 +113,7 @@ namespace quda
      @brief Regular double to integer round used on the host
   */
   template <bool is_device> struct d2i {
-    constexpr int operator()(double d)
-    {
-      return static_cast<int>(d);
-    }
+    constexpr int operator()(double d) { return static_cast<int>(d); }
   };
 
   /**

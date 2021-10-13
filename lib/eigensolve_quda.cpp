@@ -106,9 +106,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
-    case QUDA_EIG_BLK_IR_ARNOLDI:
-      errorQuda("Block IR Arnoldi not implemented");
-      break;
+    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);
@@ -184,8 +182,8 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);

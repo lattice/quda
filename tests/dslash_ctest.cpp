@@ -110,6 +110,7 @@ public:
 
 TEST_P(DslashTest, verify)
 {
+  dslash_test_wrapper.dslashRef();
   dslash_test_wrapper.run_test(2);
 
   double deviation = dslash_test_wrapper.verify();

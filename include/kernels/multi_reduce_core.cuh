@@ -13,13 +13,15 @@ namespace quda
   {
 
     /**
-       @brief Parameter struct for generic multi-blas kernel.
-       @tparam NXZ is dimension of input vectors: X,Z,V
+       @brief Parameter struct for generic multi-reduce blas kernel.
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam NXZ_ the dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
-       @tparam N Y-field vector i/o length
-       @tparam Reducer Functor used to operate on data
+       @tparam Ny Y-field vector i/o length
+       @tparam Reducer_ Functor used to operate on data
     */
     template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
@@ -43,23 +45,22 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(NYW),
+        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
         nParity(nParity)
       {
-        this->threads = dim3(length, NYW, 1);
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i].set(*x[i]);
-          if (Reducer::use_z) this->Z[i].set(*z[i]);
+          this->X[i] = *x[i];
+          if (Reducer::use_z) this->Z[i] = *z[i];
         }
 
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i].set(*y[i]);
-          if (Reducer::use_w) this->W[i].set(*w[i]);
+          this->Y[i] = *y[i];
+          if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
 

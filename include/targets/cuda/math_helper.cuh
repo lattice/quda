@@ -6,7 +6,7 @@
 namespace quda {
 
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
@@ -18,14 +18,12 @@ namespace quda {
     inline void operator()(const float& a, float * s, float *c) { ::sincosf(a, s, c); }
   };
 
-#ifndef _NVHPC_CUDA
   template <> struct sincosf_impl<true> {
     __device__ inline void operator()(const float& a, float * s, float *c) { __sincosf(a, s, c); }
   };
-#endif
 
   /**
-   * @brief Combined sin and cos colculation in QUDA NAMESPACE
+   * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
    * @param s pointer to the storage for the result of the sin
    * @param c pointer to the storage for the result of the cos
@@ -36,6 +34,14 @@ namespace quda {
   inline __host__ __device__ void sincos(const float& a, float * s, float *c) { target::dispatch<sincosf_impl>(a, s, c); }
 
 
+  template <bool is_device> struct rsqrt_impl {
+    template <typename T> inline T operator()(T a) { return static_cast<T>(1.0) / sqrt(a); }
+  };
+
+  template <> struct rsqrt_impl<true> {
+    template <typename T> __device__ inline T operator()(T a) { return ::rsqrt(a); }
+  };
+
   /**
    * @brief Reciprocal square root function (rsqrt)
    * @param a the argument  (In|out)
@@ -43,8 +49,7 @@ namespace quda {
    * some math libraries provide a fast inverse sqrt() function.
    * this implementation uses the CUDA builtins
    */
-  template<typename T> inline __host__ __device__ T rsqrt(T a) { return ::rsqrt(a); }
-
+  template<typename T> inline __host__ __device__ T rsqrt(T a) { return target::dispatch<rsqrt_impl>(a); }
 
   /**
      Generic wrapper for Trig functions -- used in gauge field order
@@ -79,7 +84,7 @@ namespace quda {
    */
   template <>
     struct Trig<true,float> {
-    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b)/M_PI; }
+    __device__ __host__ static float Atan2( const float &a, const float &b) { return ::atan2f(a,b) / static_cast<float>(M_PI); }
     __device__ __host__ static float Sin(const float &a) { return target::dispatch<sinf_impl>(a * static_cast<float>(M_PI)); }
     __device__ __host__ static float Cos(const float &a) { return target::dispatch<cosf_impl>(a * static_cast<float>(M_PI)); }
     __device__ __host__ static void SinCos(const float &a, float *s, float *c) { target::dispatch<sincosf_impl>(a * static_cast<float>(M_PI), s, c); }
@@ -88,15 +93,13 @@ namespace quda {
   template <bool is_device> struct fpow_impl { template <typename real> inline real operator()(real a, int b) { return std::pow(a, b); } };
 
   template <> struct fpow_impl<true> {
-    template <typename real> __device__ inline real operator()(real a, int b)
+    __device__ inline double operator()(double a, int b) { return ::pow(a, b); }
+
+    __device__ inline float operator()(float a, int b)
     {
-      if (sizeof(real) == sizeof(double)) {
-        return ::pow(a, b);
-      } else {
-        float sign = signbit(a) ? -1.0f : 1.0f;
-        float power = __powf(fabsf(a), b);
-        return b & 1 ? sign * power : power;
-      }
+      float sign = signbit(a) ? -1.0f : 1.0f;
+      float power = __powf(fabsf(a), b);
+      return b & 1 ? sign * power : power;
     }
   };
 

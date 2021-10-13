@@ -1,4 +1,4 @@
-# QUDA 1.0.0
+# QUDA 1.1.0
 
 ## Overview
 
@@ -44,12 +44,12 @@ For more details we refer the user to the wiki:
 ## Software Compatibility:
 
 The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
-using releases 7.5 through 10.2 of the CUDA toolkit.  Earlier versions
+using releases 10.1 through 11.4 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
-10.x.  QUDA has been tested in conjunction with x86-64, IBM
+11.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  Both GCC and Clang host compilers are
-supported, with the mininum version being 5.x and 3.6, respectively.
-CMake 3.14 or greater to required to build QUDA.
+supported, with the mininum recommended versions being 7.x and 6, respectively.
+CMake 3.15 or greater to required to build QUDA.
 
 See also Known Issues below.
 
@@ -65,10 +65,9 @@ capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
-QUDA 1.0.0, supports devices of compute capability 3.0 or greater.
-While QUDA is no longer supported on the older Fermi architecture, it
-may continue to work (assuming the user disables the use of textures
-(QUDA_TEX=OFF).
+QUDA 1.1.0, supports devices of compute capability 3.0 or greater.
+QUDA is no longer supported on the older Tesla (1.x) and Fermi (2.x)
+architectures.
 
 See also "Known Issues" below.
 
@@ -79,12 +78,12 @@ It is recommended to build QUDA in a separate directory from the
 source directory.  For instructions on how to build QUDA using cmake
 see this page
 https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note
-that this requires cmake version 3.14 or later. You can obtain cmake
+that this requires cmake version 3.15 or later. You can obtain cmake
 from https://cmake.org/download/. On Linux the binary tar.gz archives
 unpack into a cmake directory and usually run fine from that
 directory.
 
-The basic steps for building cmake are: 
+The basic steps for building with cmake are:
 
 1. Create a build dir, outside of the quda source directory. 
 2. In your build-dir run `cmake <path-to-quda-src>` 
@@ -101,15 +100,25 @@ or specify e.g. -DQUDA_GPU_ARCH=sm_60 for a Pascal GPU in step 2.
 
 ### Multi-GPU support
 
-QUDA supports using multiple GPUs through MPI and QMP.
-To enable multi-GPU support either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA through cmake. 
+QUDA supports using multiple GPUs through MPI and QMP, together with
+the optional use of NVSHMEM GPU-initiated communication for improved
+strong scaling of the Dirac operators.  To enable multi-GPU support
+either set `QUDA_MPI` or `QUDA_QMP` to ON when configuring QUDA
+through cmake.
 
-Note that in any case cmake will automatically try to detect your MPI installation. If you need to specify a particular MPI please set `MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake. 
-See also https://cmake.org/cmake/help/v3.9/module/FindMPI.html for more help.
+Note that in any case cmake will automatically try to detect your MPI
+installation. If you need to specify a particular MPI please set
+`MPI_C_COMPILER` and `MPI_CXX_COMPILER` in cmake.  See also
+https://cmake.org/cmake/help/v3.9/module/FindMPI.html for more help.
 
 For QMP please set `QUDA_QMP_HOME` to the installation directory of QMP.
 
 For more details see https://github.com/lattice/quda/wiki/Multi-GPU-Support
+
+To enable NVSHMEM support set `QUDA_NVSHMEM` to ON, and set the
+location of the local NVSHMEM installation with `QUDA_NVSHMEM_HOME`.
+For more details see
+https://github.com/lattice/quda/wiki/Multi-GPU-with-NVSHMEM
 
 ### External dependencies
 
@@ -120,7 +129,7 @@ details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 cmake option `QUDA_MAGMA=ON`.
 
-Version 1.0.0 of QUDA includes interface for the external (P)ARPACK
+Version 1.1.0 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
 CMake option `QUDA_ARPACK=ON`. Note that with a multi-GPU option, the
@@ -175,7 +184,7 @@ communication and exterior update).
 ## Using the Library:
 
 Include the header file include/quda.h in your application, link against
-lib/libquda.a, and study tests/invert_test.cpp (for Wilson, clover,
+lib/libquda.so, and study tests/invert_test.cpp (for Wilson, clover,
 twisted-mass, or domain wall fermions) or
 tests/staggered_invert_test.cpp (for asqtad/HISQ fermions) for examples
 of the solver interface.  The various solver options are enumerated in
@@ -195,7 +204,7 @@ used on all GPUs and binary reproducibility.
 
 ## Getting Help:
 
-Please visit http://lattice.github.com/quda for contact information. Bug
+Please visit http://lattice.github.io/quda for contact information. Bug
 reports are especially welcome.
 
 
@@ -216,7 +225,7 @@ Performance Computing, Networking, Storage and Analysis (SC), 2011
 
 When taking advantage of adaptive multigrid, please also cite:
 
-M. A. Clark, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
+M. A. Clark, B. Joo, A. Strelchenko, M. Cheng, A. Gambhir, and R. Brower,
 "Accelerating Lattice QCD Multigrid on GPUs Using Fine-Grained
 Parallelization," International Conference for High Performance
 Computing, Networking, Storage and Analysis (SC), 2016
@@ -227,10 +236,14 @@ When taking advantage of block CG, please also cite:
 M. A. Clark, A. Strelchenko, A. Vaquero, M. Wagner, and E. Weinberg,
 "Pushing Memory Bandwidth Limitations Through Efficient
 Implementations of Block-Krylov Space Solvers on GPUs,"
-To be published in Comput. Phys. Commun. (2018) [arXiv:1710.09745 [hep-lat]].
+Comput. Phys. Commun. 233 (2018), 29-40 [arXiv:1710.09745 [hep-lat]].
 
-Several other papers that might be of interest are listed at
-http://lattice.github.com/quda .
+When taking advantage of the Möbius MSPCG solver, please also cite:
+
+Jiqun Tu, M. A. Clark, Chulwoo Jung, Robert Mawhinney, "Solving DWF
+Dirac Equation Using Multi-splitting Preconditioned Conjugate Gradient
+with Tensor Cores on NVIDIA GPUs," published in the Platform of
+Advanced Scientific Computing (PASC21) [arXiv:2104.05615[hep-lat]].
 
 
 ## Authors:
@@ -253,6 +266,7 @@ http://lattice.github.com/quda .
 *  Balint Joo (OLCF, Oak Ridge National Laboratory, formerly Jefferson Lab)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
+*  James Osborn (Argonne National Laboratory)
 *  Claudio Rebbi (Boston University) 
 *  Eloy Romero (William and Mary)
 *  Hauke Sandmeyer (Bielefeld)

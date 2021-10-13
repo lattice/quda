@@ -95,7 +95,7 @@ namespace quda {
 	for (int j=0; j<Arg::fineColor; j+=color_unroll) {
 #pragma unroll
 	  for (int k=0; k<color_unroll; k++)
-	    partial[k] += conj(arg.V(v_parity, x_cb, s, j+k, i)) * arg.in(spinor_parity, x_cb, s, j+k);
+	    partial[k] = cmac(conj(arg.V(v_parity, x_cb, s, j+k, i)), arg.in(spinor_parity, x_cb, s, j+k), partial[k]);
 	}
 
 #pragma unroll
@@ -104,7 +104,8 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename Arg> struct Restrictor {
+  template <typename Arg> struct Restrictor {
+    static constexpr unsigned block_size = Arg::block_size;
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
     using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;

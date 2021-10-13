@@ -89,7 +89,8 @@ namespace quda {
     flops += 1320LL * (long long)in.Volume();
   }
 
-  void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const
+  void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                   const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -105,7 +106,8 @@ namespace quda {
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
-  void DiracMobius::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const
+  void DiracMobius::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -220,7 +222,8 @@ namespace quda {
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
-  void DiracMobiusPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const
+  void DiracMobiusPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -624,12 +627,7 @@ namespace quda {
 
   // Copy the EOFA specific parameters
   DiracMobiusEofa::DiracMobiusEofa(const DiracParam &param) :
-    DiracMobius(param),
-    eofa_shift(param.eofa_shift),
-    eofa_pm(param.eofa_pm),
-    mq1(param.mq1),
-    mq2(param.mq2),
-    mq3(param.mq3)
+    DiracMobius(param), eofa_shift(param.eofa_shift), eofa_pm(param.eofa_pm), mq1(param.mq1), mq2(param.mq2), mq3(param.mq3)
   {
     // Initiaize the EOFA parameters here: u, x, y
 
@@ -794,7 +792,7 @@ namespace quda {
     // do nothing
   }
 
-  DiracMobiusEofaPC::DiracMobiusEofaPC(const DiracParam &param) : DiracMobiusEofa(param) {}
+  DiracMobiusEofaPC::DiracMobiusEofaPC(const DiracParam &param) : DiracMobiusEofa(param) { }
 
   void DiracMobiusEofaPC::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
   {

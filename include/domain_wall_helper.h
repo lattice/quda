@@ -1,6 +1,7 @@
 #pragma once
 
-namespace quda {
+namespace quda
+{
 
   enum class Dslash5Type {
     DSLASH5_DWF,
@@ -31,4 +32,4 @@ namespace quda {
     D5PRE,
   };
 
-}
+} // namespace quda

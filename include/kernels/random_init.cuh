@@ -14,25 +14,24 @@ namespace quda {
     int X_global[QUDA_MAX_DIM];
     RNGState *state;
     unsigned long long seed;
-    dim3 threads;
     rngArg(RNGState *state, unsigned long long seed, const LatticeField &meta) :
-      kernel_param(dim3(meta.VolumeCB(), meta.SiteSubset(), 1)),
+      kernel_param(dim3(meta.LocalVolumeCB(), meta.SiteSubset(), 1)),
       state(state),
       seed(seed)
     {
       for (int i=0; i<4; i++) {
         commCoord[i] = comm_coord(i);
-        X[i] = meta.X()[i];
+        X[i] = meta.LocalX()[i];
         X_global[i] = X[i] * comm_dim(i);
       }
     }
   };
 
   /**
-     @brief CUDA kernel to initialize CURAND RNG states
-     @param state CURAND RNG state array
+     @brief functor to initialize the RNG states
+     @param state RNG state array
      @param seed initial seed for RNG
-     @param size size of the CURAND RNG state array
+     @param size size of the RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
   template <typename Arg>

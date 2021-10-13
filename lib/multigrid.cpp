@@ -155,9 +155,9 @@ namespace quda
       } else {
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level],
-                                profile);
+        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level],
+                                param.mg_global.transfer_type[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -769,7 +769,14 @@ namespace quda
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
-    double tol = (prec == QUDA_QUARTER_PRECISION || prec == QUDA_HALF_PRECISION) ? 5e-2 : prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-8;
+    // moreover, we can improve the precision of block ortho with a tighter max than 1.0
+    double tol;
+    switch (prec) {
+    case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
+    case QUDA_HALF_PRECISION: tol = 5e-2; break;
+    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
+    default: tol = 1e-8;
+    }
 
     // No need to check (projector) v_k for staggered case
     if (param.transfer_type == QUDA_TRANSFER_AGGREGATE) {

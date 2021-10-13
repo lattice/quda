@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <externals/CLI11.hpp>
+#include <CLI11.hpp>
 #include <quda.h>
 
 // for compatibility while porting - remove later
@@ -134,6 +134,8 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
@@ -214,6 +216,7 @@ extern double anisotropy;
 extern double tadpole_factor;
 extern double eps_naik;
 extern int n_naiks;
+extern double clover_csw;
 extern double clover_coeff;
 extern bool compute_clover;
 extern bool compute_clover_trlog;
@@ -238,6 +241,7 @@ extern quda::mgarray<QudaFieldLocation> setup_location;
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
+extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
@@ -364,27 +368,6 @@ extern double eofa_mq1;
 extern double eofa_mq2;
 extern double eofa_mq3;
 
-extern double stout_smear_rho;
-extern double stout_smear_epsilon;
-extern double ape_smear_rho;
-extern int smear_steps;
-extern double wflow_epsilon;
-extern int wflow_steps;
-extern QudaWFlowType wflow_type;
-extern int measurement_interval;
-
 extern QudaContractType contract_type;
 
 extern std::array<int, 4> grid_partition;
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
-
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;

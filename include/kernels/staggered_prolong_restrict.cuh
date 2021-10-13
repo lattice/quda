@@ -111,9 +111,9 @@ namespace quda {
      Performs the permutation from a coarse degree of freedom to a
      fine degree of freedom
   */
-  template <typename Arg> struct StaggeredProlongRestrict_ {
+  template <typename Arg> struct StaggeredProlongRestrict {
     const Arg &arg;
-    constexpr StaggeredProlongRestrict_(const Arg &arg) : arg(arg) {}
+    constexpr StaggeredProlongRestrict(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity, int c)

@@ -63,7 +63,7 @@ namespace quda {
     } // force / oprod order
   }
 
-#ifdef GPU_CLOVER_DIRAC
+#if defined(GPU_CLOVER_DIRAC) && (QUDA_PRECISION & 8)
   void cloverDerivative(GaugeField &force, GaugeField &gauge, GaugeField &oprod, double coeff, QudaParity parity)
   {
     assert(oprod.Geometry() == QUDA_TENSOR_GEOMETRY);
@@ -74,10 +74,8 @@ namespace quda {
         errorQuda("Incompatible extended dimensions d=%d gauge=%d oprod=%d", d, gauge.X()[d], oprod.X()[d]);
     }
 
-    int device_parity = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
-
     if (force.Precision() == QUDA_DOUBLE_PRECISION) {
-      cloverDerivative<double>(force, gauge, oprod, coeff, device_parity);
+      cloverDerivative<double>(force, gauge, oprod, coeff, (parity == QUDA_EVEN_PARITY) ? 0 : 1);
     } else {
       errorQuda("Precision %d not supported", force.Precision());
     }
@@ -85,7 +83,11 @@ namespace quda {
 #else
   void cloverDerivative(GaugeField &, GaugeField &, GaugeField &, double, QudaParity)
   {
+#ifdef GPU_CLOVER_DIRAC
+    errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#else
     errorQuda("Clover has not been built");
+#endif
   }
 #endif
 

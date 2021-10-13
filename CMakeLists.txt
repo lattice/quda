@@ -222,7 +222,7 @@ option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
 option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
-option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" OFF)
+option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
@@ -254,7 +254,7 @@ option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20%
 
 option(QUDA_OPENMP "enable OpenMP" OFF)
 set(QUDA_CXX_STANDARD
-    14
+    17
     CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
@@ -278,7 +278,7 @@ option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_AR
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
 option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
-set(QUDA_DOWNLOAD_NVSHMEM_TAR "" CACHE STRING "location of NVSHMEM tarball")
+
 set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 
 
@@ -346,7 +346,7 @@ endif()
 
 set(CPU_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if(${CPU_ARCH} STREQUAL "x86_64")
-  set(CXX_OPT "-march=native")
+  set(CXX_OPT "-mtune=native")
 elseif(${CPU_ARCH} STREQUAL "ppc64le")
   set(CXX_OPT "-Ofast -mcpu=native -mtune=native")
 endif()
@@ -575,12 +575,25 @@ endif()
 
 if(QUDA_NVSHMEM)
   if(QUDA_DOWNLOAD_NVSHMEM)
+  # workaround potential UCX interaction issue with CUDA 11.3+ and UCX in NVSHMEM 2.1.2
+  if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
+    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
+  else()
+    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.2.1/source/nvshmem_src_2.2.1-0.txz" CACHE STRING "location of NVSHMEM tarball")
+  endif()
+    get_filename_component(NVSHMEM_CUDA_HOME ${CUDAToolkit_INCLUDE_DIRS} DIRECTORY)
+    find_path(GDRCOPY_HOME NAME gdrapi.h PATHS "/usr/local/gdrcopy" ${QUDA_GDRCOPY_HOME} PATH_SUFFIXES "include")
+    mark_as_advanced(GDRCOPY_HOME)
+    if(NOT GDRCOPY_HOME)
+      message(SEND_ERROR "QUDA_DOWNLOAD_NVSHMEM requires gdrcopy to be installed. Please set QUDA_GDRCOPY_HOME to the location of your gdrcopy installation.")
+    endif()
+    get_filename_component(NVSHMEM_GDRCOPY_HOME ${GDRCOPY_HOME} DIRECTORY)
     ExternalProject_Add(NVSHMEM
                         URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
                         PREFIX nvshmem
                         CONFIGURE_COMMAND ""
                         BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${QUDA_GDRCOPY_HOME} install
+                        BUILD_COMMAND  make -j8 MPICC=${MPI_C_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
                         INSTALL_COMMAND ""
                         LOG_INSTALL ON
                         LOG_BUILD ON
@@ -612,9 +625,9 @@ if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
                   OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
+  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
                   OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
@@ -629,7 +642,7 @@ if(QUDA_QMP)
     ExternalProject_Add(
       QMP
       GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-      GIT_TAG qmp2-5-2
+      GIT_TAG qmp2-5-3
       GIT_SHALLOW YES
       PREFIX usqcd
       CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"

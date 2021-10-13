@@ -182,7 +182,7 @@ namespace quda {
     }
   };
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv, bool dagger)
   {
@@ -206,7 +206,7 @@ namespace quda {
   // Applies the staggered KD block inverse to a staggered ColorSpinor
   void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, bool)
   {
-    errorQuda("Staggered fermion support has not been built");
+    errorQuda("Staggered fermion multigrid support has not been built");
   }
 #endif
 

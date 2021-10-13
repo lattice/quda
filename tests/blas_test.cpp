@@ -56,8 +56,8 @@ void setPrec(ColorSpinorParam &param, QudaPrecision precision) { param.setPrecis
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
-  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
+  printfQuda("S_dimension T_dimension Nspin Ncolor Msrc Nsrc\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d     %3d  %3d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor, Msrc, Nsrc);
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -228,6 +228,7 @@ void initFields(prec_pair_t prec_pair)
   param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.pc_type = QUDA_4D_PC;
 
   vH = new cpuColorSpinorField(param);
   wH = new cpuColorSpinorField(param);
@@ -959,7 +960,7 @@ double test(Kernel kernel)
     *yD = *yH;
     *zD = *zH;
 
-    commGlobalReductionSet(false); // switch off global reductions for this test
+    commGlobalReductionPush(false); // switch off global reductions for this test
 
     commAsyncReductionSet(true);
     blas::cDotProductNormA(*zD, *xD);
@@ -977,7 +978,7 @@ double test(Kernel kernel)
     *xH = *vD;
     *yH = *wD;
 
-    commGlobalReductionSet(true); // restore global reductions
+    commGlobalReductionPop(); // restore global reductions
 
     error = ERROR(x) + ERROR(y);
     break;
@@ -1110,6 +1111,7 @@ TEST_P(BlasTest, verify)
   double tol = std::max(tol_x, tol_y);
   tol = is_copy(kernel) ? 5e-2 : tol; // use different tolerance for copy
   EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+  EXPECT_EQ(false, std::isnan(deviation)) << "Nan has propagated into the result";
 }
 
 TEST_P(BlasTest, benchmark)

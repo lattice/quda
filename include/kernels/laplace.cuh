@@ -137,8 +137,8 @@ namespace quda
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
-    Arg &arg;
-    constexpr laplace(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr laplace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
