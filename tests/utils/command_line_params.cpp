@@ -456,7 +456,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Compute the clover inverse trace log to check for singularity (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
-  
+
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "

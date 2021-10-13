@@ -241,7 +241,7 @@ namespace quda
   }
    
   template <typename Float, int nColor_, int reduction_dim_ = 3>
-  struct ContractionSummedArg :  public ReduceArg<spinor_array>
+  struct ContractionSummedArg : public ReduceArg<spinor_array>
   {
     // This the direction we are performing reduction on. default to 3.
     static constexpr int reduction_dim = reduction_dim_; 
@@ -269,14 +269,14 @@ namespace quda
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(x.X()[reduction_dim]),
+      ReduceArg<spinor_array>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1),
       Gamma(),
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
+      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])  
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
