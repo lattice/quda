@@ -11,6 +11,7 @@
 #include <util_quda.h>
 
 #include <madwf_ml.h>
+#include <reliable_updates.h>
 
 namespace quda
 {
@@ -123,7 +124,6 @@ namespace quda
     }
 
     int k = 0;
-    int rUpdate = 0;
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
@@ -183,15 +183,6 @@ namespace quda
       param.precision == 2                    ? pow(2., -13) :
                                                 pow(2., -6);
 
-    const double deps = sqrt(u);
-    constexpr double dfac = 1.1;
-    double d_new = 0;
-    double d = 0;
-    double dinit = 0;
-    double xNorm = 0;
-    double xnorm = 0;
-    double pnorm = 0;
-    double ppnorm = 0;
     double Anorm = 0;
 
     // for alternative reliable updates
@@ -282,13 +273,6 @@ namespace quda
     double r2_old = 0;
     r2 = norm2(r);
 
-    double rNorm = sqrt(r2);
-    double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
-    double maxr_deflate = rNorm; // The maximum residual since the last deflation
-    double delta = param.delta;
-
     if (K) rMinvr = reDotProduct(rSloppy, *minvrSloppy);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -298,21 +282,9 @@ namespace quda
 
     PrintStats("PCG", k, r2, b2, heavy_quark_res);
 
-    int steps_since_reliable = 1;
-
-    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
-    const int maxResIncreaseTotal = param.max_res_increase_total;
-
-    int resIncrease = 0;
-    int resIncreaseTotal = 0;
-
     int collect = v_r.size();
 
-    // alternative reliable updates
-    if (alternative_reliable) {
-      dinit = uhigh * (rNorm + Anorm * xNorm);
-      d = dinit;
-    }
+    reliable_updates ru(alternative_reliable, u, uhigh, Anorm, r2, param.delta, param.max_res_increase, param.max_res_increase_total, use_heavy_quark_res, param.max_hq_res_increase, param.max_hq_res_increase);
 
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
@@ -323,7 +295,7 @@ namespace quda
       if (alternative_reliable) {
         double3 pAppp = blas::cDotProductNormA(*p, Ap);
         pAp = pAppp.x;
-        ppnorm = pAppp.z;
+        ru.update_ppnorm(pAppp.z);
       } else {
         pAp = reDotProduct(*p, Ap);
       }
@@ -338,24 +310,12 @@ namespace quda
 
       if (K) rMinvr_old = rMinvr;
 
-      rNorm = sqrt(r2);
-      int updateX;
-      int updateR;
+      ru.update_rNorm(sqrt(r2));
 
-      if (alternative_reliable) { // alternative reliable updates
-        updateX = ((d <= deps * sqrt(r2_old)) or (dfac * dinit > deps * r0Norm)) and (d_new > deps * rNorm)
-          and (d_new > dfac * dinit);
-        updateR = 0;
-      } else {
-        if (rNorm > maxrx) maxrx = rNorm;
-        if (rNorm > maxrr) maxrr = rNorm;
-
-        updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-      }
+      ru.evaluate(r2_old);
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
+      if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) ru.set_updateX();
 
       if (collect > 0 && k > collect_miniter && r2 < collect_tol * collect_tol * b2) {
         *v_r[v_r.size() - collect] = rSloppy;
@@ -363,7 +323,7 @@ namespace quda
         collect--;
       }
 
-      if (!(updateR || updateX)) {
+      if (!ru.trigger()) {
 
         if (K) {
           // can fuse these two kernels
@@ -385,18 +345,7 @@ namespace quda
           axpyZpbx(alpha, *p, xSloppy, rSloppy, beta);
         }
 
-        // alternative reliable updates
-        if (alternative_reliable) {
-          d = d_new;
-          pnorm = pnorm + alpha * alpha * ppnorm;
-          xnorm = sqrt(pnorm);
-          d_new = d + u * rNorm + uhigh * Anorm * xnorm;
-          if (steps_since_reliable == 0 && getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("New dnew: %e (r %e , y %e)\n", d_new, u * rNorm, uhigh * Anorm * sqrt(blas::norm2(y)));
-          }
-        }
-
-        steps_since_reliable++;
+        ru.accumulate_norm(alpha);
 
       } else { // reliable update
 
@@ -406,7 +355,7 @@ namespace quda
         mat(r, y, x, tmp3); // x is just a temporary here
         r2 = xmyNorm(b, r);
 
-        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+        if (param.deflate && sqrt(r2) < ru.maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
           eig_solve->deflate(y, r, evecs, evals, true);
 
@@ -414,46 +363,19 @@ namespace quda
           mat(r, y, x, tmp3);
           r2 = blas::xmyNorm(b, r);
 
-          maxr_deflate = sqrt(r2);
+          ru.update_maxr_deflate(r2);
         }
 
         copy(rSloppy, r); // copy r to rSloppy
         zero(xSloppy);
 
-        // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX) {
-          resIncrease++;
-          resIncreaseTotal++;
-          // reuse r0Norm for this
-          warningQuda(
-            "PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-            sqrt(r2), r0Norm, resIncreaseTotal);
+        bool L2breakdown = false;
+        double L2breakdown_eps = 0;
+        if (ru.reliable_break(r2, stop, L2breakdown, L2breakdown_eps)) { break; }
 
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+        ru.update_norm(r2, y);
 
-        } else {
-          resIncrease = 0;
-        }
-
-        // alternative reliable updates
-        if (alternative_reliable) {
-          dinit = uhigh * (sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
-          d = d_new;
-          xnorm = 0; // sqrt(norm2(x));
-          pnorm = 0; // pnorm + alpha * sqrt(norm2(p));
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-            printfQuda("New dinit: %e (r %e , y %e)\n", dinit, uhigh * sqrt(r2), uhigh * Anorm * sqrt(blas::norm2(y)));
-          }
-          d_new = dinit;
-        } else {
-          rNorm = sqrt(r2);
-          maxrr = rNorm;
-          maxrx = rNorm;
-        }
-
-        steps_since_reliable = 0;
-        r0Norm = sqrt(r2);
-        ++rUpdate;
+        ru.reset(r2);
 
         if (K) {
           // can fuse these two kernels
@@ -501,7 +423,7 @@ namespace quda
 
     if (collect > 0) { warningQuda("%d r vectors still to be collected ...\n", collect); }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("PCG: Reliable updates = %d\n", rUpdate);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("PCG: Reliable updates = %d\n", ru.rUpdate);
 
     // compute the true residual
     mat(r, x, y, tmp3);
