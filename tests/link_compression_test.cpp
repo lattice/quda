@@ -35,6 +35,7 @@ void display_test_info()
   return;
 }
 
+/*
 void setGaugeParam(QudaGaugeParam &gauge_param) {
 
   gauge_param.X[0] = xdim;
@@ -70,6 +71,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.ga_pad = pad_size;    
 #endif
 }
+*/
 
 // compress and decompress contiguous blocks
 static double process4D(double* buffer, uint blocks, double tolerance, uint block_size)

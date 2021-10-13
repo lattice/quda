@@ -346,7 +346,7 @@ namespace quda
       Vector y = arg.y(idx_cb, parity);
       
       // loop over channels
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
+      for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
 	for (int s2 = 0; s2 < nSpin; s2++) {
 
 	  // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
