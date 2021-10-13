@@ -83,7 +83,7 @@ namespace quda
 	  
           if (doHalo<kernel_type>(d) && ghost) {//?
 
-            const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);//check nFace=2, but in fact we work with a single layer
+            const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 2);//check nFace=2, requires improved staggered fields
             const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, parity);//?
 
@@ -103,7 +103,7 @@ namespace quda
           if (doHalo<kernel_type>(d) && ghost) {
 
             // when updating replace arg.nFace with 1 here
-            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);//check nFace=2, but in fact we work with a single layer
+            const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 2);//check nFace=2, requires improved staggered field
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
             const Vector in = arg.in.Ghost(d, 0, ghost_idx, parity);
 	    
