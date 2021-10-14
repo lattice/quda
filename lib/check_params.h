@@ -558,18 +558,24 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
 #endif
 
-#if defined INIT_PARAM
-  if (schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+#ifndef INIT_PARAM
+  if (param->schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
 #endif
   P(madwf_diagonal_suppressor, INVALID_DOUBLE);
   P(madwf_ls, INVALID_INT);
   P(madwf_null_miniter, INVALID_INT);
   P(madwf_null_tol, INVALID_DOUBLE);
   P(madwf_train_maxiter, INVALID_INT);
-  P(madwf_param_load, INVALID_INT);
-  P(madwf_param_save, INVALID_INT);
-#if defined INIT_PARAM
+#ifndef INIT_PARAM
   }
+#endif
+
+#ifdef INIT_PARAM
+  P(madwf_param_load, QUDA_BOOLEAN_FALSE);
+  P(madwf_param_save, QUDA_BOOLEAN_FALSE);
+#else
+  P(madwf_param_load, QUDA_BOOLEAN_INVALID);
+  P(madwf_param_save, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined(INIT_PARAM)
