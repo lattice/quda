@@ -60,5 +60,4 @@ namespace quda {
 
   class TimeProfile;
 
-}
-
+} // namespace quda

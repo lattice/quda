@@ -62,7 +62,7 @@ namespace quda
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
 
     template <int, int, typename Reducer, typename Arg, typename I>
-    friend __device__  void reduce(Arg&, const Reducer &, const I &, const int);
+    friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; // only do complete if no launch error to avoid hang
 
   private:
@@ -91,7 +91,8 @@ namespace quda
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
     */
-    ReduceArg(int n_reduce = 1, bool reset = false) :
+    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
+      kernel_param<use_kernel_arg>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
       reset(reset),
@@ -142,7 +143,7 @@ namespace quda
       if (consumed) errorQuda("Cannot call complete more than once for each construction");
 
       for (int i = 0; i < n_reduce * n_item; i++) {
-        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) {}
+        while (result_h[i].load(cuda::std::memory_order_relaxed) == init_value<system_atomic_t>()) { }
       }
 
       // copy back result element by element and convert if necessary to host reduce type
@@ -170,7 +171,7 @@ namespace quda
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) {}
+      while (!qudaEventQuery(event)) { }
 
       // copy back result element by element and convert if necessary to host reduce type
       // unit size here may differ from system_atomic_t size, e.g., if doing double-double
@@ -194,59 +195,59 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-    __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
-    {
-      using BlockReduce = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
-      __shared__ typename BlockReduce::TempStorage cub_tmp;
-      __shared__ bool isLastBlockDone;
+  template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
+  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
+  {
+    using BlockReduce = QudaCub::BlockReduce<T, block_size_x, QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
 
-      T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+    T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
-      if (threadIdx.x == 0 && threadIdx.y == 0) {
-        // need to call placement new constructor since partial is not necessarily constructed
-        new (arg.partial + idx * gridDim.x + blockIdx.x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      // need to call placement new constructor since partial is not necessarily constructed
+      new (arg.partial + idx * gridDim.x + blockIdx.x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
 
-        // increment global block counter for this reduction
-        auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
+      // increment global block counter for this reduction
+      auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
 
-        // determine if last block
-        isLastBlockDone = (value == (gridDim.x - 1));
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x - 1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      auto i = threadIdx.y * block_size_x + threadIdx.x;
+      T sum = arg.init();
+      while (i < gridDim.x) {
+        sum = r(sum, arg.partial[idx * gridDim.x + i].load(cuda::std::memory_order_relaxed));
+        i += block_size_x * block_size_y;
       }
 
-      __syncthreads();
+      sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
-      // finish the reduction if last block
-      if (isLastBlockDone) {
-        auto i = threadIdx.y * block_size_x + threadIdx.x;
-        T sum = arg.init();
-        while (i < gridDim.x) {
-          sum = r(sum, arg.partial[idx * gridDim.x + i].load(cuda::std::memory_order_relaxed));
-          i += block_size_x * block_size_y;
-        }
-
-        sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
-
-        // write out the final reduced value
-        if (threadIdx.y * block_size_x + threadIdx.x == 0) {
-          if (arg.result_d) { // write to host mapped memory
-            using atomic_t = typename atomic_type<T>::type;
-            constexpr size_t n = sizeof(T) / sizeof(atomic_t);
-            atomic_t sum_tmp[n];
-            memcpy(sum_tmp, &sum, sizeof(sum));
+      // write out the final reduced value
+      if (threadIdx.y * block_size_x + threadIdx.x == 0) {
+        if (arg.result_d) { // write to host mapped memory
+          using atomic_t = typename atomic_type<T>::type;
+          constexpr size_t n = sizeof(T) / sizeof(atomic_t);
+          atomic_t sum_tmp[n];
+          memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
             for (int i = 0; i < n; i++) {
               // catch the case where the computed value is equal to the init_value
               sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
               arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
             }
-          } else { // write to device memory
-            arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
-          }
-          // TODO in principle we could remove this final atomic store
-          // if we use a sense reversal barrier, avoiding the need to
-          // reset the count at the end
-          arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
+        } else { // write to device memory
+          arg.partial[idx].store(sum, cuda::std::memory_order_relaxed);
+        }
+        // TODO in principle we could remove this final atomic store
+        // if we use a sense reversal barrier, avoiding the need to
+        // reset the count at the end
+        arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
         }
       }
     }
@@ -263,45 +264,45 @@ namespace quda
        which reduction this thread block corresponds to.  Typically idx
        will be constant along constant blockIdx.y and blockIdx.z.
     */
-    template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
-    __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
-    {
-      using BlockReduce = ::QudaCub::BlockReduce<T, block_size_x, ::QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
-      __shared__ typename BlockReduce::TempStorage cub_tmp;
-      __shared__ bool isLastBlockDone;
+  template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
+  __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
+  {
+    using BlockReduce = ::QudaCub::BlockReduce<T, block_size_x, ::QudaCub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y>;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    __shared__ bool isLastBlockDone;
 
-      T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+    T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
 
-      if (threadIdx.x == 0 && threadIdx.y == 0) {
-        arg.partial[idx * gridDim.x + blockIdx.x] = aggregate;
-        __threadfence(); // flush result
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      arg.partial[idx * gridDim.x + blockIdx.x] = aggregate;
+      __threadfence(); // flush result
 
-        // increment global block counter
-        auto value = atomicInc(&arg.count[idx], gridDim.x);
+      // increment global block counter
+      auto value = atomicInc(&arg.count[idx], gridDim.x);
 
-        // determine if last block
-        isLastBlockDone = (value == (gridDim.x - 1));
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x - 1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      auto i = threadIdx.y * block_size_x + threadIdx.x;
+      T sum = arg.init();
+      while (i < gridDim.x) {
+        sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * gridDim.x + i]));
+        i += block_size_x * block_size_y;
       }
 
-      __syncthreads();
+      sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
 
-      // finish the reduction if last block
-      if (isLastBlockDone) {
-        auto i = threadIdx.y * block_size_x + threadIdx.x;
-        T sum = arg.init();
-        while (i < gridDim.x) {
-          sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * gridDim.x + i]));
-          i += block_size_x * block_size_y;
-        }
-
-        sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
-
-        // write out the final reduced value
-        if (threadIdx.y * block_size_x + threadIdx.x == 0) {
-          arg.result_d[idx] = sum;
-          arg.count[idx] = 0; // set to zero for next time
-        }
+      // write out the final reduced value
+      if (threadIdx.y * block_size_x + threadIdx.x == 0) {
+        arg.result_d[idx] = sum;
+        arg.count[idx] = 0; // set to zero for next time
       }
+    }
     }
 #endif
 

@@ -22,8 +22,8 @@ namespace quda
 #ifdef QUDA_MMA_AVAILABLE
 
     template <int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg, typename Tunable>
-    typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(TuneParam &, const qudaStream_t &,
-                                                                              Arg &, Tunable &)
+    typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(TuneParam &, const qudaStream_t &, Arg &,
+                                                                               Tunable &)
     {
       errorQuda("MMA implementation is ONLY built for AoS order.");
     }
@@ -42,8 +42,8 @@ namespace quda
       tp.shared_bytes = shared_memory_bytes(bM, bN, bK);
       tp.set_max_shared_bytes = true;
 
-      tunable.template launch_cuda<CalculateYhatMMA>
-        (tp, stream, CalculateYhatMMAArg<Arg, bM, bN, bK, block_y, block_z, min_block_cta>(arg));
+      tunable.template launch_cuda<CalculateYhatMMA>(
+        tp, stream, CalculateYhatMMAArg<Arg, bM, bN, bK, block_y, block_z, min_block_cta>(arg));
     }
 
     /**
@@ -104,7 +104,7 @@ namespace quda
 
     template <bool query_max = false, class Arg, typename Tunable>
     typename std::enable_if<Arg::N == 128, int>::type launch_yhat_kernel(TuneParam &tp, const qudaStream_t &stream,
-                                                                             Arg &arg, Tunable &tunable)
+                                                                         Arg &arg, Tunable &tunable)
     {
       if (query_max) return 7;
       // clang-format off

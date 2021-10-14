@@ -24,8 +24,7 @@ namespace quda {
    * measurement will be done on the default stream unless specified
    * otherwise in the constructor.
    */
-  template <bool device = false>
-  struct Timer {
+  template <bool device = false> struct Timer {
     /**< The cumulative sum of time */
     double time;
 
@@ -54,11 +53,7 @@ namespace quda {
     int count;
 
     Timer(qudaStream_t stream = device::get_default_stream()) :
-      time(0.0),
-      last_interval(0.0),
-      stream(stream),
-      running(false),
-      count(0)
+      time(0.0), last_interval(0.0), stream(stream), running(false), count(0)
     {
       if (device) {
         device_start = qudaChronoEventCreate();
@@ -77,9 +72,9 @@ namespace quda {
     void start(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (running) {
-	printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())",
-                   file ? file : "", line, func ? func : "");
-	errorQuda("Aborting");
+        printfQuda("ERROR: Cannot start an already running timer (%s:%d in %s())", file ? file : "", line,
+                   func ? func : "");
+        errorQuda("Aborting");
       }
       if (!device) {
         gettimeofday(&host_start, NULL);
@@ -92,15 +87,14 @@ namespace quda {
     void stop(const char *func = nullptr, const char *file = nullptr, int line = 0)
     {
       if (!running) {
-	printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())",
-                   file ? file : "", line, func ? func : "");
-	errorQuda("Aborting");
+        printfQuda("ERROR: Cannot stop an unstarted timer (%s:%d in %s())", file ? file : "", line, func ? func : "");
+        errorQuda("Aborting");
       }
       if (!device) {
         gettimeofday(&host_stop, NULL);
         long ds = host_stop.tv_sec - host_start.tv_sec;
         long dus = host_stop.tv_usec - host_start.tv_usec;
-        last_interval = ds + 0.000001*dus;
+        last_interval = ds + 0.000001 * dus;
       } else {
         qudaEventRecord(device_stop, stream);
         qudaEventSynchronize(device_stop);
@@ -114,11 +108,11 @@ namespace quda {
 
     double last() { return last_interval; }
 
-    void reset(const char *func, const char *file, int line) {
+    void reset(const char *func, const char *file, int line)
+    {
       if (running) {
-	printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())",
-                   file ? file : "", line, func ? func : "");
-	errorQuda("Aborting");
+        printfQuda("ERROR: Cannot reset a started timer (%s:%d in %s())", file ? file : "", line, func ? func : "");
+        errorQuda("Aborting");
       }
       time = 0.0;
       last_interval = 0.0;
@@ -220,12 +214,12 @@ namespace quda {
     static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
 
       global_total_level[idx]--;
-      if (global_total_level[idx]==0) global_profile[idx].stop(func,file,line);
+      if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
 
       // switch off total timer if we need to
       if (global_switchOff[idx]) {
         global_total_level[idx]--;
-        if (global_total_level[idx]==0) global_profile[idx].stop(func,file,line);
+        if (global_total_level[idx] == 0) global_profile[idx].stop(func, file, line);
         global_switchOff[idx] = false;
       }
     }
@@ -233,12 +227,12 @@ namespace quda {
     static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
       // if total timer isn't running, then start it running
       if (!global_profile[idx].running) {
-        global_profile[idx].start(func,file,line);
+        global_profile[idx].start(func, file, line);
         global_total_level[idx]++;
         global_switchOff[idx] = true;
       }
 
-      if (global_total_level[idx]==0) global_profile[idx].start(func,file,line);
+      if (global_total_level[idx] == 0) global_profile[idx].start(func, file, line);
       global_total_level[idx]++;
     }
 
@@ -250,10 +244,11 @@ namespace quda {
     /**< Print out the profile information */
     void Print();
 
-    void Start_(const char *func, const char *file, int line, QudaProfileType idx) {
+    void Start_(const char *func, const char *file, int line, QudaProfileType idx)
+    {
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-	profile[QUDA_PROFILE_TOTAL].start(func,file,line);
+        profile[QUDA_PROFILE_TOTAL].start(func, file, line);
         switchOff = true;
       }
 
@@ -262,27 +257,23 @@ namespace quda {
 	if (use_global) StartGlobal(func,file,line,idx);
     }
 
-
     void Stop_(const char *func, const char *file, int line, QudaProfileType idx) {
       profile[idx].stop(func, file, line);
       POP_RANGE
 
       // switch off total timer if we need to
       if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].stop(func,file,line);
+        profile[QUDA_PROFILE_TOTAL].stop(func, file, line);
         switchOff = false;
       }
       if (use_global) StopGlobal(func,file,line,idx);
     }
 
     void Reset_(const char *func, const char *file, int line) {
-      for (int idx=0; idx<QUDA_PROFILE_COUNT; idx++)
-	profile[idx].reset(func, file, line);
+      for (int idx = 0; idx < QUDA_PROFILE_COUNT; idx++) profile[idx].reset(func, file, line);
     }
 
-    double Last(QudaProfileType idx) {
-      return profile[idx].last_interval;
-    }
+    double Last(QudaProfileType idx) { return profile[idx].last_interval; }
 
     static void PrintGlobal();
 

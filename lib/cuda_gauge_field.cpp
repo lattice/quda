@@ -161,8 +161,9 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(device::get_stream(2 * dim + dir));
-	sendStart(dim, dir, device::get_stream(2*dim+dir)); // start sending
+        if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
+          qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+        sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
       }
 
       // complete communication and issue host-to-device copies if needed
@@ -180,8 +181,8 @@ namespace quda {
       // fill in the halos for non-partitioned dimensions
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim) && no_comms_fill) {
-	  qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-	}
+          qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        }
       }
 
       if (isNative()) {
@@ -189,7 +190,7 @@ namespace quda {
       } else {
 	// copy from receive buffer into ghost array
 	for (int dim=0; dim<nDim; dim++)
-	  qudaMemcpy(ghost[dim+link_dir*nDim], recv_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+          qudaMemcpy(ghost[dim + link_dir * nDim], recv_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
       }
 
       bufferIndex = 1-bufferIndex;
@@ -235,7 +236,8 @@ namespace quda {
       if (isNative()) { // copy from padded region in gauge field into send buffer
 	copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, send_d, 0, 1 + 2*link_dir);
       } else { // copy from receive buffer into ghost array
-	for (int dim=0; dim<nDim; dim++) qudaMemcpy(send_d[dim], ghost[dim+link_dir*nDim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        for (int dim = 0; dim < nDim; dim++)
+          qudaMemcpy(send_d[dim], ghost[dim + link_dir * nDim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
       }
       qudaDeviceSynchronize(); // need to synchronize before issueing copies in different streams - could replace with event post and wait
 
@@ -255,8 +257,9 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(device::get_stream(2*dim+dir));
-	sendStart(dim, dir, device::get_stream(2*dim+dir)); // start sending
+        if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled())
+          qudaStreamSynchronize(device::get_stream(2 * dim + dir));
+        sendStart(dim, dir, device::get_stream(2 * dim + dir)); // start sending
       }
 
       // complete communication and issue host-to-device copies if needed
@@ -274,8 +277,8 @@ namespace quda {
       // fill in the halos for non-partitioned dimensions
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim) && no_comms_fill) {
-	  qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-	}
+          qudaMemcpy(recv_d[dim], send_d[dim], ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        }
       }
 
       // get the links into contiguous buffers
@@ -361,12 +364,12 @@ namespace quda {
 
       if (dir == 0) {
 	// record the event
-	qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
-	// send to the processor in the -1 direction
+        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
+        // send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
-	qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
-	// send to the processor in the +1 direction
+        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
+        // send to the processor in the +1 direction
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
     }
@@ -443,7 +446,7 @@ namespace quda {
       if (comm_dim_partitioned(dim)) {
         qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
 
-	for (int dir=0; dir<2; dir++) recvStart(dim, dir);
+        for (int dir=0; dir<2; dir++) recvStart(dim, dir);
 
 	for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
@@ -456,8 +459,8 @@ namespace quda {
         // if either direction is not peer-to-peer then we need to synchronize
         if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
 
-	for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, device::get_stream(dir));
-	for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
+        for (int dir = 0; dir < 2; dir++) sendStart(dim, dir, device::get_stream(dir));
+        for (int dir = 0; dir < 2; dir++) commsComplete(dim, dir);
 
         for (int dir = 0; dir < 2; dir++) {
           // issue host-to-device copies if needed
@@ -468,10 +471,10 @@ namespace quda {
         }
 
       } else { // if just doing a local exchange to fill halo then need to swap faces
-	qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0],
-		   ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
-	qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1],
-		   ghost_face_bytes[dim], qudaMemcpyDeviceToDevice);
+        qudaMemcpy(from_face_dim_dir_d[b][dim][1], my_face_dim_dir_d[b][dim][0], ghost_face_bytes[dim],
+                   qudaMemcpyDeviceToDevice);
+        qudaMemcpy(from_face_dim_dir_d[b][dim][0], my_face_dim_dir_d[b][dim][1], ghost_face_bytes[dim],
+                   qudaMemcpyDeviceToDevice);
       }
 
       // inject back into the gauge field
@@ -591,12 +594,12 @@ namespace quda {
           void *src_d = get_mapped_device_pointer(src.Gauge_p());
 
           if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
-	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
-	  } else {
-	    errorQuda("Ghost copy not supported here");
-	  }
+            copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
+          } else {
+            errorQuda("Ghost copy not supported here");
+          }
 
-	} else {
+        } else {
 	  void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
 	  size_t ghost_bytes[8];
 	  int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
@@ -665,10 +668,10 @@ namespace quda {
 	// special case where we use zero-copy memory to read/write directly from application's array
         void *cpu_d = get_mapped_device_pointer(cpu.Gauge_p());
         if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
-	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
-	} else {
-	  errorQuda("Ghost copy not supported here");
-	}
+          copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
+        } else {
+          errorQuda("Ghost copy not supported here");
+        }
       } else {
 	void *buffer = create_gauge_buffer(cpu.Bytes(), cpu.Order(), cpu.Geometry());
 

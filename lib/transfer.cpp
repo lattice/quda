@@ -11,7 +11,7 @@
 #include <iostream>
 #include <algorithm>
 #include <vector>
-#include <blas_quda.h>
+#include <limits>
 
 namespace quda {
 
@@ -19,8 +19,9 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass, int *geo_bs, int spin_bs,
-                     QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile) :
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type,
+                     TimeProfile &profile) :
     B(B),
     Nvec(Nvec),
     NblockOrtho(n_block_ortho),
@@ -101,7 +102,6 @@ namespace quda {
       if (Nvec > aggregate_size)
         errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
     }
-
 
     std::string block_str = std::to_string(geo_bs[0]);
     for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
@@ -222,8 +222,8 @@ namespace quda {
       createTmp(location);
       fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
       break;
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
@@ -336,8 +336,8 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
     }
 
   }

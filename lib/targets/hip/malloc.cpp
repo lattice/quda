@@ -154,9 +154,7 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
-	// Managed memory is nor really recommended on HIP. It is a compatibility feature
-	// presently
-	warningQuda("Managed memory in HIP is a currently inefficient compatibility feature");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
