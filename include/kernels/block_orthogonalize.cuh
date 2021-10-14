@@ -135,7 +135,6 @@ namespace quda {
       int x_offset_cb[n_sites_per_thread];
       int x_cb[n_sites_per_thread];
 
-#pragma unroll
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
         int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
@@ -157,7 +156,6 @@ namespace quda {
 
           ColorSpinor<real, nColor, spinBlock> v[mVec][n_sites_per_thread];
 
-#pragma unroll
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
             if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
@@ -178,7 +176,6 @@ namespace quda {
             ColorSpinor<real, nColor, spinBlock> vi[n_sites_per_thread];
 
             dot_t dot;
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               load(vi[tx], parity[tx], x_cb[tx], chirality, i);
@@ -190,7 +187,6 @@ namespace quda {
             dot = dot_reducer.AllSum(dot);
 
             // subtract the blocks to orthogonalise
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
@@ -203,7 +199,6 @@ namespace quda {
           for (int m = 0; m < mVec; m++) {
 
             dot_t dot;
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
@@ -213,7 +208,6 @@ namespace quda {
             dot = dot_reducer.AllSum(dot);
             
             sum_t nrm = 0.0;
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
@@ -224,14 +218,12 @@ namespace quda {
             nrm = norm_reducer.AllSum(nrm);
             auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               v[m][tx] *= nrm_inv;
             }
           }
 
-#pragma unroll
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
