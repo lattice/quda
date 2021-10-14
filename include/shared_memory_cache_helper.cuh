@@ -211,7 +211,9 @@ namespace quda
     }
 
     /**
-     TODO: doc
+       @brief Save a vector to the shared memory cache but with cutomized index and leading dimension
+       @param[in] index The customized index
+       @param[in] ld The leading dimension
      */
     __device__ inline void save_idx(int index, int ld, const T &a)
     {
@@ -222,7 +224,9 @@ namespace quda
     }
 
     /**
-     TODO: doc
+       @brief Load a vector from the shared memory cache but with cutomized index and leading dimension
+       @param[in] index The customized index
+       @param[in] ld The leading dimension
      */
     __device__ inline T load_idx(int index, int ld)
     {

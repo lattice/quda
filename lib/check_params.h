@@ -548,7 +548,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
   P(schwarz_type, QUDA_INVALID_SCHWARZ);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
-  P(madwf_diagonal_suppressor, INVALID_DOUBLE);
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
       || param->inv_type_precondition == QUDA_MR_INVERTER) {
@@ -556,7 +555,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(precondition_cycle, 0);
-    P(madwf_diagonal_suppressor, INVALID_DOUBLE);
+  }
+#endif
+
+#if defined INIT_PARAM
+  if (schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+#endif
+  P(madwf_diagonal_suppressor, INVALID_DOUBLE);
+  P(madwf_ls, INVALID_INT);
+  P(madwf_null_miniter, INVALID_INT);
+  P(madwf_null_tol, INVALID_DOUBLE);
+  P(madwf_train_maxiter, INVALID_INT);
+  P(madwf_param_load, INVALID_INT);
+  P(madwf_param_save, INVALID_INT);
+#if defined INIT_PARAM
   }
 #endif
 

@@ -171,7 +171,8 @@
 
 #define QudaSchwarzType integer(4)
 #define QUDA_ADDITIVE_SCHWARZ 0 
-#define QUDA_MULTIPLICATIVE_SCHWARZ 1
+#define QUDA_ADDITIVE_MADWF_SCHWARZ 1
+#define QUDA_MULTIPLICATIVE_SCHWARZ 2
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
 #define QudaResidualType integer(4)

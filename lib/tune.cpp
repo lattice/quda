@@ -710,7 +710,6 @@ namespace quda
 
       tunable.checkLaunchParam(param_tuned);
 
-
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param_tuned.n_calls++;
 
