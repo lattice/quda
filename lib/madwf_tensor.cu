@@ -24,6 +24,11 @@ namespace quda
         return in.X(4) * color_spin_dim * 2 * sizeof(typename mapper<storage_type>::type) / out.X(4);
       }
 
+      unsigned int maxSharedBytesPerBlock() const
+      {
+        return maxDynamicSharedBytesPerBlock();
+      }
+
       unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -66,6 +71,7 @@ namespace quda
 
         tp.grid = {static_cast<unsigned>(arg.Ls_in * arg.Ls_out * sizeof(matrix_type) / sizeof(complex_type)), 1, 1};
         tp.block = {block_size, 1, 1};
+        tp.shared_bytes = 0;
         arg.threads = {tp.grid.x * tp.block.x, 1, 1};
         launch<Tensor5DReduce>(tp, stream, arg);
 

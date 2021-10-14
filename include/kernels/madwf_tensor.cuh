@@ -27,11 +27,10 @@ namespace quda
       // Now lane 0 of each warp holds the reduced value
 
       if (warp_ct_x > 1) {
-        int index = target::thread_idx().y * warp_ct_x + warp_id_x;
-        if (lane_id_x == 0) { smem[index] = f; }
+        if (lane_id_x == 0) { smem[target::thread_idx().y * warp_ct_x + warp_id_x] = f; }
         cache.sync();
         if (warp_id_x == 0) {
-          f = (lane_id_x < warp_ct_x) ? smem[index] : 0;
+          f = (lane_id_x < warp_ct_x) ? smem[target::thread_idx().y * warp_ct_x + lane_id_x] : 0;
           f = warp_reduce.Sum(f);
         }
       }
