@@ -198,7 +198,7 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
   {
-    using BlockReduce = BlockReduce<T, block_size_x, 1, block_size_y>;
+    using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
     __shared__ bool isLastBlockDone;
 
     T aggregate = BlockReduce().Reduce<true>(in, r);
@@ -266,7 +266,7 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
   {
-    using BlockReduce = BlockReduce<T, block_size_x, 1, block_size_y>;
+    using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
     __shared__ bool isLastBlockDone;
 
     T aggregate = BlockReducer().Reduce<true>(in, r);

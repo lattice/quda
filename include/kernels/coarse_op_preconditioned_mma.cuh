@@ -116,7 +116,7 @@ namespace quda
         case 3: max = computeYhatMMA(arg, 3, x_cb, parity, m, n); break;
         }
         if (Arg::compute_max) {
-          unsigned aggregate = BlockReduce<unsigned, 1, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
+          unsigned aggregate = BlockReduce<unsigned, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
         }
       }
