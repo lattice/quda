@@ -198,12 +198,10 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
   {
-    using BlockReduce
-      = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
-    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    using BlockReduce = BlockReduce<T, block_size_x, 1, block_size_y>;
     __shared__ bool isLastBlockDone;
 
-    T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+    T aggregate = BlockReduce().Reduce<true>(in, r);
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
       // need to call placement new constructor since partial is not necessarily constructed
@@ -227,7 +225,7 @@ namespace quda
         i += block_size_x * block_size_y;
       }
 
-      sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      sum = BlockReduce().Reduce<true>(sum, r);
 
       // write out the final reduced value
       if (threadIdx.y * block_size_x + threadIdx.x == 0) {
@@ -268,12 +266,10 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0)
   {
-    using BlockReduce
-      = cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y, 1, __COMPUTE_CAPABILITY__>;
-    __shared__ typename BlockReduce::TempStorage cub_tmp;
+    using BlockReduce = BlockReduce<T, block_size_x, 1, block_size_y>;
     __shared__ bool isLastBlockDone;
 
-    T aggregate = Reducer::do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r);
+    T aggregate = BlockReducer().Reduce<true>(in, r);
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
       arg.partial[idx * gridDim.x + blockIdx.x] = aggregate;
@@ -297,7 +293,7 @@ namespace quda
         i += block_size_x * block_size_y;
       }
 
-      sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      sum = BlockReduce().Reduce<true>(sum, r));
 
       // write out the final reduced value
       if (threadIdx.y * block_size_x + threadIdx.x == 0) {
