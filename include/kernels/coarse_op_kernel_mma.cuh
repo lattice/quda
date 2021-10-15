@@ -138,9 +138,7 @@ namespace quda
           max = impl::computeUV(arg, arg.AV, parity, x_cb);
 
         if (Arg::compute_max) {
-          using BlockReduce = cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z, __COMPUTE_CAPABILITY__>;
-          __shared__ typename BlockReduce::TempStorage temp_storage;
-          unsigned aggregate = BlockReduce(temp_storage).Reduce(__float_as_uint(max), cub::Max());
+          unsigned aggregate = BlockReduce<unsigned, 1, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
           if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
         }
       }
