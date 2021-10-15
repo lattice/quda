@@ -15,14 +15,15 @@ namespace quda
     /**
        @brief Returns the maximum size of a coefficient array for 2-d multi-blas
     */
-    constexpr size_t max_array_size() { return 8192; }
+    constexpr int max_array_size() { return 8192; }
 
     /**
        @brief Returns the maximum size of the kernel argument
        @tparam Functor reducer and multi_1d blas kernels use kernel arg, others use constant
     */
     template <typename Functor>
-    constexpr size_t max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
+    //constexpr int max_arg_size() { return (Functor::multi_1d || Functor::reducer) ? device::max_kernel_arg_size() : device::max_constant_size(); }
+    constexpr int max_arg_size() { return device::max_constant_size(); }
 
     /**
        @brief set_param sets the matrix coefficient parameters for the
@@ -65,7 +66,7 @@ namespace quda
     {
       using coeff_t = typename decltype(arg.f)::coeff_t;
       if (arg.NXZ * arg.NYW * sizeof(coeff_t) > max_array_size())
-        printfQuda("Requested parameter size %lu larger than max %lu", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
+        printfQuda("Requested parameter size %lu larger than max %d", arg.NXZ * arg.NYW * sizeof(coeff_t), max_array_size());
 
       coeff_t *host = nullptr;
       switch (select) {
@@ -173,7 +174,7 @@ namespace quda
 
     /**
        @brief Helper function to compute the maximum YW size for the
-       multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
+       multi-blas functions.  Since the SpinorX and SpinorZ arrays are
        statically allocated with length NXZ, we can statically compute
        how the maximum size of YW is and allocate this amount of
        space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
@@ -195,27 +196,29 @@ namespace quda
       using SpinorW = SpinorX;
 
       // compute the size remaining for the Y and W accessors
-      constexpr auto arg_size = (max_arg_size<Functor>()
-                                 - sizeof(kernel_param<>)                                      // kernel_param parent
-                                 - sizeof(int)                                                 // NYW parameter
-                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
-                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                 - sizeof(Functor)                                             // functor
-                                 - sizeof(dim3)                                                // threads parameter
-                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
-                                 - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+      constexpr int arg_size = (max_arg_size<Functor>()
+                                 - (int)sizeof(kernel_param<>)                                      // kernel_param parent
+                                 - (int)sizeof(int)                                                 // NYW parameter
+                                 - (int)sizeof(SpinorX[NXZ])                                        // SpinorX array
+                                 - (int)(Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+                                 - (int)sizeof(Functor)                                             // functor
+                                 - (int)sizeof(dim3)                                                // threads parameter
+                                 - (int)(!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
+                                 - (int)(Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
                                  )
-        / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
+        / (int)(sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      constexpr auto coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      constexpr int coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+
+      static_assert(arg_size>0);
 
       return std::min(arg_size, coeff_size);
     }
 
     /**
        @brief Helper function to compute the maximum YW size for the
-       multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
+       multi-blas functions.  Since the SpinorX and SpinorZ arrays are
        statically allocated with length NXZ, we can statically compute
        how the maximum size of YW is and allocate this amount of
        space.  This allows for a much larger NXZ (NYW) when NYW (NXZ)
@@ -234,32 +237,32 @@ namespace quda
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
       NXZ = is_valid_NXZ(NXZ, Functor::reducer, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
-      size_t spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
-      size_t spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
-      size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
+      int spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
+      int spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
+      int spinor_z_size = spinor_x_size;
+      int spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
 
       // compute the size remaining for the Y and W accessors
       const auto arg_size = (max_arg_size<Functor>()
-                             - sizeof(kernel_param<>)                                      // kernel_param parent
-                             - sizeof(int)                                                 // NYW parameter
-                             - NXZ * spinor_x_size                                         // SpinorX array
-                             - (Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
-                             - sizeof(Functor)                                             // functor
-                             - sizeof(dim3)                                                // threads parameter
-                             - (!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
-                             - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+                             - (int)sizeof(kernel_param<>)                                      // kernel_param parent
+                             - (int)sizeof(int)                                                 // NYW parameter
+                             - (int)NXZ * spinor_x_size                                         // SpinorX array
+                             - (int)(Functor::use_z ? NXZ * spinor_z_size : sizeof(void *))     // SpinorZ array (else dummy pointer)
+                             - (int)sizeof(Functor)                                             // functor
+                             - (int)sizeof(dim3)                                                // threads parameter
+                             - (int)(!Functor::use_w ? sizeof(void *) : 0)                      // subtract dummy pointer if not using W
+                             - (int)(Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
                              )
-        / (spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
+        / (int)(spinor_y_size + (Functor::use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      const auto coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      const int coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
 
     /**
-       @brief Helper function that we use ensure that the instantiated
+       @brief Helper function we use to ensure that the instantiated
        sizes are valid, prior to launching the kernel.
      */
     template <int NXZ, typename store_t, typename y_store_t, typename Functor>
@@ -273,7 +276,7 @@ namespace quda
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
       if ( !(f.reducer || f.multi_1d) && NXZ * f.NYW * sizeof(typename Functor::coeff_t) > max_array_size())
-        errorQuda("Coefficient matrix exceeds max size (%lu > %lu)", NXZ * f.NYW * sizeof(typename Functor::coeff_t), max_array_size());
+        errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * f.NYW * sizeof(typename Functor::coeff_t), max_array_size());
       if (f.reducer && NXZ * f.NYW > max_n_reduce())
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
                   NXZ * f.NYW, NXZ, f.NYW, max_n_reduce());
@@ -284,17 +287,20 @@ namespace quda
     }
 
     template <int NXZ, typename store_t, int N, bool> struct SpinorXZ {
+      static_assert(NXZ>0);
       Spinor<store_t, N> X[NXZ];
       Spinor<store_t, N> *Z;
       SpinorXZ() : Z(X) {}
     };
 
     template <int NXZ, typename store_t, int N> struct SpinorXZ<NXZ, store_t, N, true> {
+      static_assert(NXZ>0);
       Spinor<store_t, N> X[NXZ];
       Spinor<store_t, N> Z[NXZ];
     };
 
     template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny, bool> struct SpinorYW {
+      static_assert(NYW>0);
       Spinor<y_store_t, Ny> Y[NYW];
       Spinor<y_store_t, Ny> *W;
       SpinorYW() : W(Y) {}
@@ -302,6 +308,7 @@ namespace quda
 
     template <int NYW, typename x_store_t, int Nx, typename y_store_t, int Ny>
     struct SpinorYW<NYW, x_store_t, Nx, y_store_t, Ny, true> {
+      static_assert(NYW>0);
       Spinor<y_store_t, Ny> Y[NYW];
       Spinor<x_store_t, Nx> W[NYW];
     };

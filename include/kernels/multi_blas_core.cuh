@@ -214,7 +214,6 @@ namespace quda
       // this is a multi-1d functor so the coefficients are stored in the struct
       // set max 1-d size equal to max power of two
       static constexpr int N = max_N_multi_1d();
-      //static constexpr int N = 24;
       real a[N];
       real b[N];
       real c[N];
@@ -242,9 +241,7 @@ namespace quda
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
       static constexpr int NXZ_max = 0;
-      //static constexpr int N = max_N_multi_1d();
-      static constexpr int N = max_N_multi_1d()+1;
-      //static const int N = 24;
+      static constexpr int N = max_N_multi_1d();
       complex<real> a[N];
       complex<real> b[N];
       complex<real> c[N];
