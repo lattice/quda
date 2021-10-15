@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <mma_tensor_op/gemm.cuh>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_preconditioned.cuh>
 

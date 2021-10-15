@@ -1,5 +1,5 @@
 #include <color_spinor_field_order.h>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 #include <block_reduction_kernel.h>

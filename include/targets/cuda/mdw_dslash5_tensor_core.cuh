@@ -10,7 +10,7 @@
 
 #include <quda_fp16.cuh>
 
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 
 #if (__COMPUTE_CAPABILITY__ < 750)
 

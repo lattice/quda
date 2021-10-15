@@ -4,22 +4,13 @@
 #include <reducer.h>
 
 /**
-   @file cub_helper.cuh
+   @file block_reduce_helper.h
 
-   @section Description
-   Include this file as opposed to cub headers directly to ensure
-   correct compilation with clang and nvrtc
+   @section This files contains the generic (dummy) implementations
+   for warp- and block-level reductions.
  */
 
-// ensures we use shfl_sync and not shfl when compiling with clang
-#if defined(__clang__) && defined(__CUDA__)
-#define CUB_USE_COOPERATIVE_GROUPS
-#endif
-
 using namespace quda;
-
-#include <cub/block/block_reduce.cuh>
-#include <cub/block/block_scan.cuh>
 
 namespace quda {
 
@@ -37,60 +28,25 @@ namespace quda {
     static constexpr int batch_size = !batched ? 1 : block_size_z;
   };
 
+  /**
+     @brief Dummy generic implementation of warp_reduce
+  */
   template <bool is_device> struct warp_reduce {
     template <typename T, typename reducer_t, typename param_t>
     T operator()(const T &value, bool, reducer_t, param_t) { return value; }
   };
 
-  template <> struct warp_reduce<true> {
-    template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
-    {
-      using warp_reduce_t = cub::WarpReduce<T, param_t::width, __COMPUTE_CAPABILITY__>;
-      typename warp_reduce_t::TempStorage dummy_storage;
-      warp_reduce_t warp_reduce(dummy_storage);
-      T value = reducer_t::do_sum ? warp_reduce.Sum(value_) : warp_reduce.Reduce(value_, r);
-
-      if (all) {
-        using warp_scan_t = cub::WarpScan<T, param_t::width, __COMPUTE_CAPABILITY__>;
-        typename warp_scan_t::TempStorage dummy_storage;
-        warp_scan_t warp_scan(dummy_storage);
-        value = warp_scan.Broadcast(value, 0);
-      }
-
-      return value;
-    }
-  };
-
+  /**
+     @brief Dummy generic implementation of block_reduce
+  */
   template <bool is_device> struct block_reduce {
     template <typename T, typename reducer_t, typename param_t>
     T operator()(const T &value, bool, int, bool, reducer_t, param_t) { return value; }
   };
 
-  template <> struct block_reduce<true> {
-    template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all, const reducer_t &r, const param_t &)
-    {
-      using block_reduce_t =
-        cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
-      static __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
-      block_reduce_t block_reduce(storage[batch]);
-      if (!pipeline) __syncthreads(); // only synchronize if we are not pipelining
-      T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
-
-      if (all) {
-        T &value_shared = reinterpret_cast<T&>(storage[batch]);
-        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
-        __syncthreads();
-        value = value_shared;
-      }
-      return value;
-    }
-  };
-
   /**
-     @brief This is a convenience wrapper that allows us to perform
-     reductions at the warp or sub-warp level
+     @brief This allows us to perform reductions at the warp or
+     sub-warp level
   */
   template <typename T, int width> class WarpReduce
   {
@@ -131,8 +87,7 @@ namespace quda {
   };
 
   /**
-     @brief This is a convenience wrapper that allows us to perform
-     reductions at the block level
+     @brief This allows us to perform reductions at the block level
   */
   template <typename T, int block_size_x, int block_size_y = 1, int block_size_z = 1, bool batched = false>
   class BlockReduce {

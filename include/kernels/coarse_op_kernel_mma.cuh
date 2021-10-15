@@ -8,7 +8,7 @@
 #include <linalg.cuh>
 #include <matrix_tile.cuh>
 #include <mma_tensor_op/gemm.cuh>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
 

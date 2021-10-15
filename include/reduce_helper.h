@@ -1,9 +1,8 @@
 #pragma once
 
 #include <float_vector.h>
-#include <cub_helper.cuh>
 #include <target_device.h>
-#include <reducer.h>
+#include <block_reduce_helper.h>
 #include <kernel_helper.h>
 
 #ifdef QUAD_SUM
@@ -293,7 +292,7 @@ namespace quda
         i += block_size_x * block_size_y;
       }
 
-      sum = BlockReduce().Reduce<true>(sum, r));
+      sum = BlockReduce().Reduce<true>(sum, r);
 
       // write out the final reduced value
       if (threadIdx.y * block_size_x + threadIdx.x == 0) {
@@ -301,7 +300,7 @@ namespace quda
         arg.count[idx] = 0; // set to zero for next time
       }
     }
-    }
+  }
 #endif
 
 } // namespace quda
