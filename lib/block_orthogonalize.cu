@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <utility>
 
+#include <power_of_two_array.h>
 #include <kernels/block_orthogonalize.cuh>
 #include <tunable_block_reduction.h>
 
@@ -15,27 +16,24 @@ namespace quda {
     // up to a whole power of two.  So for example, 2x2x2x2 and
     // 3x3x3x1 aggregation would both use the same block size 32
 #ifndef QUDA_FAST_COMPILE_REDUCE
-    static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+    using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
-    static constexpr std::array<unsigned int, 1> block = {1024};
+    using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
 #endif
+    static constexpr array_type block = array_type();
 
     /**
        @brief Return the first power of two block that is larger than the required size
     */
     static unsigned int block_mapper(unsigned int raw_block)
     {
-      for (auto block_ : block) if (raw_block <= block_) return block_;
+      for (unsigned int b = 0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
       errorQuda("Invalid raw block size %d\n", raw_block);
       return 0;
     }
   };
 
-#ifndef QUDA_FAST_COMPILE_REDUCE
-  constexpr std::array<unsigned int, 6> OrthoAggregates::block;
-#else
-  constexpr std::array<unsigned int, 1> OrthoAggregates::block;
-#endif
+  constexpr OrthoAggregates::array_type OrthoAggregates::block;
 
   using namespace quda::colorspinor;
 
