@@ -16,7 +16,21 @@ namespace quda
      which is the effective matrix dimension that we are tranposing in
      this mapping.
 
-     @taram Arg Kernel argument struct
+     Specifically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parameterized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param arg Kernel argument struct
+     @return Swizzled block index
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
@@ -25,7 +39,6 @@ namespace quda
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
-      block_idx = blockIdx.x;
       if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
