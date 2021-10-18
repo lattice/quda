@@ -1,6 +1,8 @@
 #pragma once
 
 #include "complex_quda.h"
+#include "quda_constants.h"
+#include "quda_api.h"
 
 /**
    @file reducer.h
@@ -16,6 +18,24 @@
 
 namespace quda
 {
+
+  namespace reducer
+  {
+    /** returns the reduce buffer size allocated */
+    size_t buffer_size();
+
+    void *get_device_buffer();
+
+    void *get_mapped_buffer();
+
+    void *get_host_buffer();
+
+    template <typename count_t> count_t* get_count();
+
+    qudaEvent_t &get_event();
+  } // namespace reducer
+
+  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
 
   /**
      plus reducer, used for conventional sum reductions

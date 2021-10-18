@@ -1,7 +1,8 @@
 #pragma once
 
 #include <target_device.h>
-#include <reduce_helper.h>
+#include <kernel_helper.h>
+#include <block_reduce_helper.h>
 
 namespace quda
 {

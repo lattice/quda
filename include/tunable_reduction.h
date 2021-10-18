@@ -2,6 +2,7 @@
 
 #include <tunable_kernel.h>
 #include <lattice_field.h>
+#include <register_traits.h>
 #include <reduction_kernel.h>
 #include <reduction_kernel_host.h>
 
