@@ -89,13 +89,20 @@ namespace quda {
       printfQuda("  Transformer: %s\n", typeid(Transformer<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
+    sycl::buffer<const char,1>
+      buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     try {
       q.submit([&](sycl::handler& h) {
+	auto a = buf.get_access<sycl::access::mode::read,
+				sycl::access::target::constant_buffer>(h);
 	//h.parallel_for<class BlockKernel2D>
 	h.parallel_for<>
 	  (ndRange,
-	   [=](sycl::nd_item<3> ndi) {
-	     quda::BlockKernel2DImpl<Transformer, Arg>(arg, ndi);
+	   [=](sycl::nd_item<3> ndi) [[intel::reqd_sub_group_size(QUDA_WARP_SIZE)]] {
+	     //quda::BlockKernel2DImpl<Transformer, Arg>(arg, ndi);
+	     const char *p = a.get_pointer();
+	     const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	     quda::BlockKernel2DImpl<Transformer, Arg>(*arg2, ndi);
 	   });
       });
     } catch (sycl::exception const& e) {
