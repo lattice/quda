@@ -117,9 +117,9 @@ namespace quda {
 	// for multiplicative Schwarz we alternate updates depending on node parity
       } else {
 
-	commGlobalReductionSet(param.global_reduction); // use local reductions for DD solver
+        commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
 
-	blas::zero(xSloppy);  // can get rid of this for a special first update kernel
+        blas::zero(xSloppy);  // can get rid of this for a special first update kernel
 	double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r);  // c2 holds the initial r2
 	scale = c2 > 0.0 ? sqrt(c2) : 1.0;
 
@@ -163,8 +163,7 @@ namespace quda {
 	// Scale and sum to accumulator
 	blas::axpy(scale,xSloppy,x);
 
-	commGlobalReductionSet(true); // renable global reductions for outer solver
-
+        commGlobalReductionPop(); // renable global reductions for outer solver
       }
       step++;
 

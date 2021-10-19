@@ -227,7 +227,7 @@ __device__ __forceinline__ dbldbl sqrt_dbldbl (dbldbl a)
 {
     dbldbl t, z;
     double e, y, s, r;
-    r = quda::rsqrt (a.y);
+    r = quda::rsqrt(a.y);
     if (a.y == 0.0) r = 0.0;
     y = __dmul_rn (a.y, r);
     s = __fma_rn (y, -y, a.y);
@@ -254,7 +254,7 @@ __device__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
 {
     dbldbl z;
     double r, s, e;
-    r = quda::rsqrt (a.y);
+    r = quda::rsqrt(a.y);
     e = __dmul_rn (a.y, r);
     s = __fma_rn (e, -r, 1.0);
     e = __fma_rn (a.y, r, -e);

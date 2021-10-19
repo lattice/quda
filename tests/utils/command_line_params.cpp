@@ -443,9 +443,6 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_TYPE_APE},
                                                                 {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
                                                                 {"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
@@ -475,10 +472,13 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-  
-  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0. Will be inferred from clover-csw and kappa. "
-		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
-  
+  quda_app->add_option("--clover-coeff", clover_coeff,
+                 "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default "
+                 "1.0) and kappa. "
+                 "If the user populates this value with anything other than 0.0, the passed value will override the "
+                 "inferred value)")
+    ->capture_default_str();
+
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
@@ -942,8 +942,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)");
   quda_app->add_mgoption(opgroup, "--mg-n-block-ortho", n_block_ortho, CLI::PositiveNumber,
                          "The number of times to run Gram-Schmidt during block orthonormalization (default 1)");
-  quda_app->add_mgoption(opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
-                         "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
+    "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
   quda_app->add_mgoption(opgroup, "--mg-nu-post", nu_post, CLI::PositiveNumber,
                          "The number of post-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nu-pre", nu_pre, CLI::PositiveNumber,
@@ -1037,6 +1038,36 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
 }
 
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
+
+  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
+
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
+
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
+
+  opgroup->add_option("--su3-wflow-steps", wflow_steps,
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
+
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  ;
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   // Option group for heatbath related options
@@ -1056,41 +1087,6 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
                        "Number of measurement steps in heatbath before checkpointing (default 5)");
-}
-
-void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::QUDACheckedTransformer gauge_smear_transform(gauge_smear_type_map);
-  CLI::QUDACheckedTransformer wflow_type_transform(wflow_type_map);
-
-  // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
-  
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
-
-  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
-
-  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
-
-  opgroup->add_option("--su3-wflow-steps", wflow_steps,
-                      "The number of steps in the Runge-Kutta integrator (default 100)");
-
-  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of gauge smearing to use (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-
-  opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

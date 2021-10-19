@@ -55,7 +55,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      int reduction_dim = cType == QUDA_CONTRACT_TYPE_DR_FT_Z ? 2 : 3;
+      int reduction_dim = cType == QUDA_CONTRACT_TYPE_DR_FT_Z ? 2 : 3; // only z-dir type is QUDA_CONTRACT_TYPE_DR_FT_Z
       
       const int nSpinSq = x.Nspin()*x.Nspin();
       

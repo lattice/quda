@@ -159,21 +159,21 @@ namespace quda {
     TimeProfile &profile;
 
   public:
-      /**
-       * The constructor for Transfer
-       * @param B Array of null-space vectors
-       * @param Nvec Number of null-space vectors
-       * @param NblockOrtho Number of times to Gram-Schmidt within block ortho
-       * @param blockOrthoTwoPass Whether to do a two pass block orthogonalization
-       * @param d The Dirac operator to which these null-space vectors correspond
-       * @param geo_bs The geometric block sizes to use
-       * @param spin_bs The spin block sizes to use
-       * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
-       * @param null_precision The precision to store the null-space basis vectors in
-       * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
-       */
-    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs, int spin_bs,
-             QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
+    /**
+     * The constructor for Transfer
+     * @param B Array of null-space vectors
+     * @param Nvec Number of null-space vectors
+     * @param NblockOrtho Number of times to Gram-Schmidt within block ortho
+     * @param blockOrthoTwoPass Whether to do a two pass block orthogonalization
+     * @param d The Dirac operator to which these null-space vectors correspond
+     * @param geo_bs The geometric block sizes to use
+     * @param spin_bs The spin block sizes to use
+     * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
+     * @param null_precision The precision to store the null-space basis vectors in
+     * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
+     */
+    Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int NblockOrtho, bool blockOrthoTwoPass, int *geo_bs,
+             int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();

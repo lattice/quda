@@ -656,9 +656,9 @@ namespace quda
     aux(),
     time(FLT_MAX),
     n_calls(0)
-    {
-      aux = make_int4(1,1,1,1);
-    }
+  {
+    aux = make_int4(1, 1, 1, 1);
+  }
 
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }
@@ -735,6 +735,7 @@ namespace quda
 
     if (enabled == QUDA_TUNE_NO) {
       TuneParam param_default;
+      param_default.aux = make_int4(-1, -1, -1, -1);
       tunable.defaultTuneParam(param_default);
       tunable.checkLaunchParam(param_default);
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
@@ -770,7 +771,9 @@ namespace quda
         host_timer_t tune_timer;
         tune_timer.start(__func__, __FILE__, __LINE__);
 
+        param.aux = make_int4(-1, -1, -1, -1);
         tunable.initTuneParam(param);
+
         while (tuning) {
           qudaDeviceSynchronize();
           tunable.checkLaunchParam(param);

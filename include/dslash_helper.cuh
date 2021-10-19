@@ -677,8 +677,8 @@ namespace quda
       } else if (arg.shmem > 0
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
-                         && target::block_idx.x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_typen, Parity>(dslash, arg, s);
+                         && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
+        shmem_exterior<kernel_type, nParity>(dslash, arg, s);
 #endif
       } else {
         const int dslash_block_offset

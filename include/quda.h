@@ -1381,7 +1381,7 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+  void computeStaggeredForceQuda(void *mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
                                  QudaInvertParam *invert_param);
 
   /**
@@ -1435,7 +1435,7 @@ extern "C" {
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge);
+  void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
    * Performs Gaussian smearing on a given spinor using the gauge field
@@ -1536,7 +1536,8 @@ extern "C" {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
