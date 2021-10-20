@@ -826,7 +826,7 @@ namespace quda
                      tunable.perfString(best_time).c_str(), key.name, key.aux);
         }
         time(&now);
-        best_param.comment = "# " + tunable.perfString(best_time);
+        best_param.comment = "# " + tunable.perfString(best_time) + tunable.miscString(best_param);
         best_param.comment += ", tuning took " + std::to_string(tune_timer.last()) + " seconds at ";
         best_param.comment += ctime(&now); // includes a newline
         best_param.time = best_time;
