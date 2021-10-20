@@ -55,6 +55,10 @@ namespace quda
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type != QUDA_DIRECT_PC_SOLVE)
       errorQuda("Cannot use preconditioned coarse grid solution without preconditioned smoother solve");
 
+    if (param.mg_global.location[param.level] == QUDA_CPU_FIELD_LOCATION
+        || param.mg_global.location[param.level + 1] == QUDA_CPU_FIELD_LOCATION)
+      errorQuda("CPU solver location for MG is disabled");
+
     // allocating vectors
     {
       // create residual vectors
@@ -123,6 +127,11 @@ namespace quda
     pushLevel(param.level);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+
+    if (param.mg_global.setup_location[param.level + 1] == QUDA_CPU_FIELD_LOCATION)
+      errorQuda("MG setup location %d disabled", param.mg_global.setup_location[param.level + 1]);
+    if (param.mg_global.location[param.level + 1] == QUDA_CPU_FIELD_LOCATION)
+      errorQuda("MG location %d disabled", param.mg_global.location[param.level + 1]);
 
     destroySmoother();
     destroyCoarseSolver();

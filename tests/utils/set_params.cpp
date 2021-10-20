@@ -537,8 +537,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
-    mg_param.location[i] = solver_location[i];
-    mg_param.setup_location[i] = setup_location[i];
+    // CPU setup disabled in release/1.1.x
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
@@ -1126,8 +1127,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.omega[i] = omega; // over/under relaxation factor
 
-    mg_param.location[i] = solver_location[i];
-    mg_param.setup_location[i] = setup_location[i];
+    // CPU setup disabled in release/1.1.x
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
+    mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
   }

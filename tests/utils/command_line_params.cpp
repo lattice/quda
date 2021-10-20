@@ -97,9 +97,6 @@ QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
-quda::mgarray<QudaFieldLocation> solver_location = {};
-quda::mgarray<QudaFieldLocation> setup_location = {};
-
 quda::mgarray<int> nu_pre = {};
 quda::mgarray<int> nu_post = {};
 quda::mgarray<int> n_block_ortho = {};
@@ -935,8 +932,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-setup-iters", num_setup_iter, CLI::PositiveNumber,
                          "The number of setup iterations to use for the multigrid (default 1)");
 
-  quda_app->add_mgoption(opgroup, "--mg-setup-location", setup_location, CLI::QUDACheckedTransformer(field_location_map),
-                         "The location where the multigrid setup will be computed (default cuda)");
   quda_app->add_mgoption(
     opgroup, "--mg-setup-maxiter", setup_maxiter, CLI::Validator(),
     "The maximum number of solver iterations to use when relaxing on a null space vector (default 500)");
@@ -968,8 +963,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The type of solve to do in smoother (direct, direct-pc (default) )");
   quda_app->add_mgoption(opgroup, "--mg-smoother-tol", smoother_tol, CLI::Validator(),
                          "The smoother tolerance to use for each multigrid (default 0.25)");
-  quda_app->add_mgoption(opgroup, "--mg-solve-location", solver_location, CLI::QUDACheckedTransformer(field_location_map),
-                         "The location where the multigrid solver will run (default cuda)");
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");

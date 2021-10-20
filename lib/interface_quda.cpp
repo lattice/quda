@@ -2571,6 +2571,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   dSmoothSloppy = Dirac::create(diracSmoothSloppyParam);
   mSmoothSloppy = new DiracM(*dSmoothSloppy);
 
+  if (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION)
+    errorQuda("MG setup location %d disabled", mg_param.setup_location[0]);
   ColorSpinorParam csParam(nullptr, *param, cudaGauge->X(), pc_solution, mg_param.setup_location[0]);
   csParam.create = QUDA_NULL_FIELD_CREATE;
   QudaPrecision Bprec = mg_param.precision_null[0];
