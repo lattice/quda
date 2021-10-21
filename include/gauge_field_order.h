@@ -17,7 +17,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
-#include <atomic.cuh>
+#include <atomic_helper.h>
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <load_store.h>

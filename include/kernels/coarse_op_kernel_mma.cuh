@@ -139,7 +139,7 @@ namespace quda
 
         if (Arg::compute_max) {
           unsigned aggregate = BlockReduce<unsigned, 1, Arg::block_y, Arg::block_z>().Max(__float_as_uint(max));
-          if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
+          if (threadIdx.y == 0 && threadIdx.z == 0) atomic_fetch_abs_max(arg.max_d, __uint_as_float(aggregate));
         }
       }
     };
