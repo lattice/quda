@@ -36,8 +36,12 @@ namespace quda
      This type should be lock-free to guarantee correct behaviour on
      platforms that are not coherent with respect to the host
    */
-  template <typename T> struct atomic_type { using type = device_reduce_t; };
-  template <> struct atomic_type<float> { using type = float; };
+  template <typename T> struct atomic_type {
+    using type = device_reduce_t;
+  };
+  template <> struct atomic_type<float> {
+    using type = float;
+  };
 
   // declaration of reduce function
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>

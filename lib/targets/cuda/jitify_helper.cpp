@@ -74,8 +74,8 @@ namespace quda
       int runtime_version;
       CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
       if (runtime_version >= 11020) {
-        options.push_back("-err-no"); // display error/warning numbers
-        options.push_back("-diag-suppress=64"); // declaration does not declare anything (anonymous structs in CUB)
+        options.push_back("-err-no");            // display error/warning numbers
+        options.push_back("-diag-suppress=64");  // declaration does not declare anything (anonymous structs in CUB)
         options.push_back("-diag-suppress=161"); // unknown pragmas, e.g., OpenMP
       }
 

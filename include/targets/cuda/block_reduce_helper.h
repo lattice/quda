@@ -20,7 +20,8 @@ using namespace quda;
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
 
-namespace quda {
+namespace quda
+{
 
   // pre-declaration of warp_reduce that we wish to specialize
   template <bool> struct warp_reduce;
@@ -56,17 +57,18 @@ namespace quda {
   */
   template <> struct block_reduce<true> {
     template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all, const reducer_t &r, const param_t &)
+    __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all, const reducer_t &r,
+                                   const param_t &)
     {
-      using block_reduce_t =
-        cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
+      using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
+                                              param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
       static __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
       block_reduce_t block_reduce(storage[batch]);
       if (!pipeline) __syncthreads(); // only synchronize if we are not pipelining
       T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
 
       if (all) {
-        T &value_shared = reinterpret_cast<T&>(storage[batch]);
+        T &value_shared = reinterpret_cast<T &>(storage[batch]);
         if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) value_shared = value;
         __syncthreads();
         value = value_shared;

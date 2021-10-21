@@ -8,7 +8,8 @@
    @section Provides definitions of atomic functions that are used in QUDA.
  */
 
-namespace quda {
+namespace quda
+{
 
   template <bool is_device> struct atomic_fetch_add_impl {
     template <typename T> inline void operator()(T *addr, T val)
@@ -35,8 +36,8 @@ namespace quda {
 
   template <typename T> __device__ __host__ inline void atomic_fetch_add(complex<T> *addr, complex<T> val)
   {
-    atomic_fetch_add(reinterpret_cast<T*>(addr) + 0, val.real());
-    atomic_fetch_add(reinterpret_cast<T*>(addr) + 1, val.imag());
+    atomic_fetch_add(reinterpret_cast<T *>(addr) + 0, val.real());
+    atomic_fetch_add(reinterpret_cast<T *>(addr) + 1, val.imag());
   }
 
   template <typename T, int n> __device__ __host__ inline void atomic_fetch_add(array<T, n> *addr, array<T, n> val)
@@ -62,9 +63,10 @@ namespace quda {
        @param addr Address that stores the atomic variable to be updated
        @param val Value to be added to the atomic
     */
-    __device__ inline void operator()(float *addr, float val) {
+    __device__ inline void operator()(float *addr, float val)
+    {
       uint32_t val_ = __float_as_uint(val);
-      uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
+      uint32_t *addr_ = reinterpret_cast<uint32_t *>(addr);
       atomicMax(addr_, val_);
     }
   };
@@ -81,4 +83,4 @@ namespace quda {
     target::dispatch<atomic_fetch_abs_max_impl>(addr, val);
   }
 
-}
+} // namespace quda

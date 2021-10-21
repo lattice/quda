@@ -30,7 +30,7 @@ namespace quda
 
     void *get_host_buffer();
 
-    template <typename count_t> count_t* get_count();
+    template <typename count_t> count_t *get_count();
 
     qudaEvent_t &get_event();
   } // namespace reducer

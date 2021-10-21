@@ -234,8 +234,7 @@ namespace quda {
           }
           break;
 #endif
-        default:
-          errorQuda("Invalid dimension thread splitting %d", static_cast<int>(tp.aux.y));
+        default: errorQuda("Invalid dimension thread splitting %d", static_cast<int>(tp.aux.y));
         }
       }
     }

@@ -1109,7 +1109,8 @@ struct DslashTestWrapper {
         double norm2_cpu = blas::norm2(*spinorRef);
         double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
         printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-        deviation = std::max(deviation, std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+        deviation
+          = std::max(deviation, std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
       }
     } else {
       double norm2_cpu = blas::norm2(*spinorRef);

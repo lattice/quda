@@ -19,13 +19,13 @@ namespace quda {
     Object() { }
     virtual ~Object() { }
 
-    void* operator new(std::size_t size) { return safe_malloc(size); }
+    void *operator new(std::size_t size) { return safe_malloc(size); }
 
-    void operator delete(void* p) { host_free(p); }
+    void operator delete(void *p) { host_free(p); }
 
-    void* operator new[](std::size_t size) { return safe_malloc(size); }
+    void *operator new[](std::size_t size) { return safe_malloc(size); }
 
-    void operator delete[](void* p) { host_free(p); }
+    void operator delete[](void *p) { host_free(p); }
   };
 
 } // namespace quda
