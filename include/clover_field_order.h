@@ -710,11 +710,6 @@ namespace quda {
        QDP ordering for clover fields
     */
       template <typename Float, int length = 72> struct QDPOrder {
-        typedef typename mapper<Float>::type RegType;
-	Float *clover;
-	const int volumeCB;
-	const int stride;
-	const int offset;
 
       typedef typename mapper<Float>::type RegType;
       Float *clover;
@@ -777,8 +772,11 @@ namespace quda {
 
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-          volumeCB(clover.VolumeCB()), stride(volumeCB), twist_flavor(clover.TwistFlavor()), mu2(clover.Mu2()),
-          epsilon2(clover.Epsilon2()) {
+          volumeCB(clover.VolumeCB()),
+          stride(volumeCB),
+          twist_flavor(clover.TwistFlavor()),
+          mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2())
         {
           if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
@@ -849,8 +847,11 @@ namespace quda {
   const Float epsilon2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
-          volumeCB(clover.Stride()), stride(volumeCB), twist_flavor(clover.TwistFlavor()), mu2(clover.Mu2()),
-          epsilon2(clover.Epsilon2()) {
+          volumeCB(clover.Stride()),
+          stride(volumeCB),
+          twist_flavor(clover.TwistFlavor()),
+          mu2(clover.Mu2()),
+          epsilon2(clover.Epsilon2())
         {
           if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
             errorQuda("Invalid clover order %d for this accessor", clover.Order());
