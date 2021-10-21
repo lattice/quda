@@ -154,8 +154,8 @@ namespace quda {
     clover->prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
-  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					  double kappa, double, double mu, double mu_factor) const
+  void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                          double mu, double mu_factor) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
@@ -359,8 +359,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					    double kappa, double, double mu, double mu_factor) const
+  void DiracTwistedCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                            double mu, double mu_factor) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");

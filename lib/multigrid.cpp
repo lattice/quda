@@ -155,9 +155,9 @@ namespace quda
       } else {
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize, param.spinBlockSize,
-                                param.mg_global.precision_null[param.level], param.mg_global.transfer_type[param.level],
-                                profile);
+        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.blockOrthoTwoPass, param.geoBlockSize,
+                                param.spinBlockSize, param.mg_global.precision_null[param.level],
+                                param.mg_global.transfer_type[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
         // create coarse temporary vector if not already created in verify()
@@ -773,8 +773,8 @@ namespace quda
     double tol;
     switch (prec) {
     case QUDA_QUARTER_PRECISION: tol = 5e-2; break;
-    case QUDA_HALF_PRECISION:    tol = 5e-2; break;
-    case QUDA_SINGLE_PRECISION:  tol = 1e-3; break;
+    case QUDA_HALF_PRECISION: tol = 5e-2; break;
+    case QUDA_SINGLE_PRECISION: tol = 1e-3; break;
     default: tol = 1e-8;
     }
 

@@ -327,14 +327,14 @@ namespace quda {
             proj(1, i) = t(1, i) + i_(t(2, i));
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - i_(t(3, i));
             proj(1, i) = t(1, i) - i_(t(2, i));
           }
           break;
-	}
+        }
 	break;
       case 1: // y dimension
 	switch (sign) {
@@ -345,14 +345,14 @@ namespace quda {
             proj(1, i) = t(1, i) - t(2, i);
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = t(0, i) - t(3, i);
             proj(1, i) = t(1, i) + t(2, i);
           }
           break;
-	}
+        }
       	break;
       case 2: // z dimension
 	switch (sign) {
@@ -370,7 +370,7 @@ namespace quda {
             proj(1, i) = t(1, i) + i_(t(3, i));
           }
           break;
-	}
+        }
 	break;
       case 3: // t dimension
 	switch (sign) {
@@ -381,14 +381,14 @@ namespace quda {
             proj(1, i) = static_cast<Float>(2.0) * t(1, i);
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             proj(0, i) = static_cast<Float>(2.0) * t(2, i);
             proj(1, i) = static_cast<Float>(2.0) * t(3, i);
           }
           break;
-	}
+        }
 	break;
       case 4:
         switch (sign) {
@@ -448,9 +448,10 @@ namespace quda {
 		    -i  0  0  0
 		     0  i  0  0
     */
-    __device__ __host__ inline ColorSpinor<Float,Nc,4> sigma(int mu, int nu) const {
+    __device__ __host__ inline ColorSpinor<Float, Nc, 4> sigma(int mu, int nu) const
+    {
       ColorSpinor<Float,Nc,4> a;
-      const ColorSpinor<Float,Nc,4> &b = *this;
+      const ColorSpinor<Float, Nc, 4> &b = *this;
       complex<Float> j(0.0,1.0);
 
       switch(mu) {
@@ -581,7 +582,6 @@ namespace quda {
       }
       return a;
     }
-
 
     /**
        @brief 2-d accessor functor
@@ -747,7 +747,7 @@ namespace quda {
             recon(3, i) = -i_(t(0, i));
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
@@ -756,7 +756,7 @@ namespace quda {
             recon(3, i) = i_(t(0, i));
           }
           break;
-	}
+        }
 	break;
       case 1: // y dimension
 	switch (sign) {
@@ -769,7 +769,7 @@ namespace quda {
             recon(3, i) = t(0, i);
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
@@ -791,7 +791,7 @@ namespace quda {
             recon(3, i) = i_(t(1, i));
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
             recon(0, i) = t(0, i);
@@ -800,7 +800,7 @@ namespace quda {
             recon(3, i) = -i_(t(1, i));
           }
           break;
-	}
+        }
 	break;
       case 3: // t dimension
 	switch (sign) {
@@ -810,8 +810,8 @@ namespace quda {
             recon(0, i) = t(0, i);
             recon(1, i) = t(1, i);
             recon(2, i) = 0;
-            recon(3,i) = 0;
-	  }
+            recon(3, i) = 0;
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
@@ -822,7 +822,7 @@ namespace quda {
             recon(3, i) = t(1, i);
           }
           break;
-	}
+        }
 	break;
       case 4:
         switch (sign) {
@@ -903,11 +903,10 @@ namespace quda {
   };
 
   /**
-     @brief Compute the inner product over color and spin
-     dot = \sum_s,c conj(a(s,c)) * b(s,c)
-     @param a Left-hand side ColorSpinor
-     @param b Right-hand side ColorSpinor
-     @return The inner product
+     @brief caxpy operation on ColorSpinor objects
+     @param[in] a complex scalar
+     @param[in] x Vector that is scaled
+     @param[in,out] y Accumulation vector
   */
   template <typename Float, int Nc, int Ns>
   __device__ __host__ inline void caxpy(const complex<Float> &a, const ColorSpinor<Float, Nc, Ns> &x,
@@ -915,10 +914,10 @@ namespace quda {
   {
 #pragma unroll
     for (int i = 0; i < Nc * Ns; i++) {
-      y(i).real( a.real() * x(i).real() + y(i).real());
+      y(i).real(a.real() * x(i).real() + y(i).real());
       y(i).real(-a.imag() * x(i).imag() + y(i).real());
-      y(i).imag( a.imag() * x(i).real() + y(i).imag());
-      y(i).imag( a.real() * x(i).imag() + y(i).imag());
+      y(i).imag(a.imag() * x(i).real() + y(i).imag());
+      y(i).imag(a.real() * x(i).imag() + y(i).imag());
     }
   }
 
@@ -928,8 +927,7 @@ namespace quda {
      @param a ColorSpinor we taking the norm
      @return The L2 norm squared
   */
-  template <typename Float, int Nc, int Ns>
-  __device__ __host__ inline Float norm2(const ColorSpinor<Float, Nc, Ns> &a)
+  template <typename Float, int Nc, int Ns> __device__ __host__ inline Float norm2(const ColorSpinor<Float, Nc, Ns> &a)
   {
     Float nrm = 0.0;
 #pragma unroll
@@ -973,8 +971,10 @@ namespace quda {
     for (int s = 0; s < Ns; s++) {
 #pragma unroll
       for (int c = 0; c < Nc; c++) {
-        if (s == 0 && c == 0) dot = cmul(conj(a(s, c)), b(s, c));
-        else dot = cmac(conj(a(s, c)), b(s, c), dot);
+        if (s == 0 && c == 0)
+          dot = cmul(conj(a(s, c)), b(s, c));
+        else
+          dot = cmac(conj(a(s, c)), b(s, c), dot);
       }
     }
     return dot;
@@ -1209,29 +1209,30 @@ namespace quda {
      @param[in] z Input vector
      @return The vector z = A * x + y
   */
-  template<typename Float, int Nc, int Ns> __device__ __host__ inline
-  ColorSpinor<Float,Nc,Ns> mv_add(const Matrix<complex<Float>,Nc> &A, const ColorSpinor<Float,Nc,Ns> &x, const ColorSpinor<Float,Nc,Ns> &y)
+  template <typename Float, int Nc, int Ns>
+  __device__ __host__ inline ColorSpinor<Float, Nc, Ns>
+  mv_add(const Matrix<complex<Float>, Nc> &A, const ColorSpinor<Float, Nc, Ns> &x, const ColorSpinor<Float, Nc, Ns> &y)
   {
-    ColorSpinor<Float,Nc,Ns> z;
+    ColorSpinor<Float, Nc, Ns> z;
 
 #pragma unroll
-    for (int i=0; i<Nc; i++) {
+    for (int i = 0; i < Nc; i++) {
 #pragma unroll
-      for (int s=0; s<Ns; s++) {
-	z.data[s*Nc + i].x  = y.data[s*Nc + i].real() + A(i,0).real() * x.data[s*Nc + 0].real();
-	z.data[s*Nc + i].x -= A(i,0).imag() * x.data[s*Nc + 0].imag();
-	z.data[s*Nc + i].y  = y.data[s*Nc + i].imag() + A(i,0).real() * x.data[s*Nc + 0].imag();
-	z.data[s*Nc + i].y += A(i,0).imag() * x.data[s*Nc + 0].real();
+      for (int s = 0; s < Ns; s++) {
+        z.data[s * Nc + i].x = y.data[s * Nc + i].real() + A(i, 0).real() * x.data[s * Nc + 0].real();
+        z.data[s * Nc + i].x -= A(i, 0).imag() * x.data[s * Nc + 0].imag();
+        z.data[s * Nc + i].y = y.data[s * Nc + i].imag() + A(i, 0).real() * x.data[s * Nc + 0].imag();
+        z.data[s * Nc + i].y += A(i, 0).imag() * x.data[s * Nc + 0].real();
       }
 #pragma unroll
-      for (int j=1; j<Nc; j++) {
+      for (int j = 1; j < Nc; j++) {
 #pragma unroll
-	for (int s=0; s<Ns; s++) {
-	  z.data[s*Nc + i].x += A(i,j).real() * x.data[s*Nc + j].real();
-	  z.data[s*Nc + i].x -= A(i,j).imag() * x.data[s*Nc + j].imag();
-	  z.data[s*Nc + i].y += A(i,j).real() * x.data[s*Nc + j].imag();
-	  z.data[s*Nc + i].y += A(i,j).imag() * x.data[s*Nc + j].real();
-	}
+        for (int s = 0; s < Ns; s++) {
+          z.data[s * Nc + i].x += A(i, j).real() * x.data[s * Nc + j].real();
+          z.data[s * Nc + i].x -= A(i, j).imag() * x.data[s * Nc + j].imag();
+          z.data[s * Nc + i].y += A(i, j).real() * x.data[s * Nc + j].imag();
+          z.data[s * Nc + i].y += A(i, j).imag() * x.data[s * Nc + j].real();
+        }
       }
     }
 

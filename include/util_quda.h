@@ -7,13 +7,14 @@
 #include <tune_key.h>
 #include <malloc_quda.h>
 
-namespace quda {
+namespace quda
+{
   // strip path from __FILE__
-  constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
+  constexpr const char *str_end(const char *str) { return *str ? str_end(str + 1) : str; }
   constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
-  constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
-  constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
-}
+  constexpr const char *r_slant(const char *str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
+  constexpr const char *file_name(const char *str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+} // namespace quda
 
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
@@ -69,11 +70,12 @@ char* getOmpThreadStr();
 
 void errorQuda_(const char *func, const char *file, int line, ...);
 
-#define errorQuda(...) do {                                             \
-    fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());           \
-    fprintf(getOutputFile(), __VA_ARGS__);                              \
-    errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__); \
-  } while(0)
+#define errorQuda(...)                                                                                                 \
+  do {                                                                                                                 \
+    fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \
+    fprintf(getOutputFile(), __VA_ARGS__);                                                                             \
+    errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__);                                            \
+  } while (0)
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
 		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\

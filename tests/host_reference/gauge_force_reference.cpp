@@ -97,10 +97,7 @@ struct lattice_t {
   int r[4];
   int e[4];
 
-  lattice_t(const GaugeField &lat) :
-    n_color(lat.Ncolor()),
-    volume(1),
-    volume_ex(lat.Volume())
+  lattice_t(const GaugeField &lat) : n_color(lat.Ncolor()), volume(1), volume_ex(lat.Volume())
   {
     for (int d = 0; d < 4; d++) {
       x[d] = lat.X()[d] - 2 * lat.R()[d];
@@ -109,7 +106,6 @@ struct lattice_t {
       volume *= x[d];
     }
   };
-
 };
 
 extern int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1);
@@ -252,12 +248,12 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
   int oddBit = 0;
   int x[4];
   auto half_idx = i;
-  if (i >= lat.volume/2) {
+  if (i >= lat.volume / 2) {
     oddBit = 1;
-    half_idx = i - lat.volume/2;
+    half_idx = i - lat.volume / 2;
   }
 
-  auto za = half_idx / (lat.x[0] / 2) ;
+  auto za = half_idx / (lat.x[0] / 2);
   auto x0h = half_idx - za * (lat.x[0] / 2);
   auto zb = za / lat.x[1];
   x[1] = za - zb * lat.x[1];
@@ -266,10 +262,10 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
   auto x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2 * x0h + x1odd;
 
-  for (int d = 0; d < 4; d++) {
-    x[d] = comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d];
-  }
-  size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0]) + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0])) / 2;
+  for (int d = 0; d < 4; d++) { x[d] = comm_dim_partitioned(d) ? x[d] + dx[d] : (x[d] + dx[d] + lat.x[d]) % lat.x[d]; }
+  size_t nbr_half_idx = ((x[3] + lat.r[3]) * (lat.e[2] * lat.e[1] * lat.e[0]) + (x[2] + lat.r[2]) * (lat.e[1] * lat.e[0])
+                         + (x[1] + lat.r[1]) * (lat.e[0]) + (x[0] + lat.r[0]))
+    / 2;
 
   int oddBitChanged = (dx[3] + dx[2] + dx[1] + dx[0]) % 2;
   if (oddBitChanged) { oddBit = 1 - oddBit; }
@@ -281,7 +277,8 @@ int gf_neighborIndexFullLattice(size_t i, int dx[], const lattice_t &lat)
 
 // this function compute one path for all lattice sites
 template <typename su3_matrix, typename Float>
-static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff, int dir, const lattice_t &lat)
+static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int *path, int len, Float loop_coeff,
+                                 int dir, const lattice_t &lat)
 {
   su3_matrix prev_matrix, curr_matrix, tmat;
   int dx[4];
@@ -330,7 +327,8 @@ static void compute_path_product(su3_matrix *staple, su3_matrix **sitelink, int 
 }
 
 template <typename su3_matrix, typename anti_hermitmat, typename Float>
-static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3, const lattice_t &lat)
+static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
+                       const lattice_t &lat)
 {
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat1;
@@ -378,10 +376,12 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
   for (int i = 0; i < num_paths; i++) {
     if (prec == QUDA_DOUBLE_PRECISION) {
       double *my_loop_coeff = (double *)loop_coeff;
-      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i], dir, lat);
+      compute_path_product((dsu3_matrix *)staple, (dsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
+                           dir, lat);
     } else {
       float *my_loop_coeff = (float *)loop_coeff;
-      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i], dir, lat);
+      compute_path_product((fsu3_matrix *)staple, (fsu3_matrix **)sitelink_ex, path_dir[i], length[i], my_loop_coeff[i],
+                           dir, lat);
     }
   }
 
@@ -416,7 +416,8 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   lattice_t lat(*qdp_ex);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff, num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff,
+                              num_paths, lat, compute_force);
   }
 
   delete qdp_ex;

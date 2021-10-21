@@ -22,14 +22,13 @@ namespace quda
     real epsilon2;
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
-      ReduceArg<reduce_t>(),
+      ReduceArg<reduce_t>(dim3(field.VolumeCB(), 2, 1)),
       inverse(field, true),
       clover(field, false),
       compute_tr_log(compute_tr_log),
       mu2(field.Mu2()),
       epsilon2(field.Epsilon2())
     {
-      this->threads = dim3(field.VolumeCB(), 2, 1);
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
 

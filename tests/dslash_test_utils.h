@@ -43,7 +43,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
 };
 
 struct DslashTestWrapper {
@@ -1012,7 +1012,7 @@ struct DslashTestWrapper {
 
         dslash_time.cpu_time += host_timer.last();
         // skip first and last iterations since they may skew these metrics if comms are not synchronous
-        if (i>0 && i<niter) {
+        if (i > 0 && i < niter) {
           dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
           dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
         }

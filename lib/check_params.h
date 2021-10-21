@@ -310,7 +310,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(return_clover_inverse, 0);
     P(clover_rho, 0.0);
     P(clover_coeff, 0.0);
-    P(clover_csw, 0.0);    
+    P(clover_csw, 0.0);
 #else
   P(compute_clover_trlog, QUDA_INVALID_PRECISION);
   P(compute_clover, QUDA_INVALID_PRECISION);
@@ -699,10 +699,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #if defined CHECK_PARAM
-  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
-    errorQuda("Unexpected QudaMultigridParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+     errorQuda("Unexpected QudaMultigridParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
 #else
-  P(struct_size, (size_t)INVALID_INT);
+     P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
