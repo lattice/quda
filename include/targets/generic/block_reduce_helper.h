@@ -25,7 +25,7 @@ namespace quda {
     static constexpr int block_size_x = block_size_x_;
     static constexpr int block_size_y = block_size_y_;
     static constexpr int block_size_z = !batched ? block_size_z_ : 1;
-    static constexpr int batch_size = !batched ? 1 : block_size_z;
+    static constexpr int batch_size = !batched ? 1 : block_size_z_;
   };
 
   /**
