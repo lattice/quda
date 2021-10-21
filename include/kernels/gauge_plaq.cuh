@@ -3,13 +3,14 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
-  struct GaugePlaqArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugePlaqArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -55,8 +56,8 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template <typename Arg> struct Plaquette : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct Plaquette : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr Plaquette(const Arg &arg) : arg(arg) {}

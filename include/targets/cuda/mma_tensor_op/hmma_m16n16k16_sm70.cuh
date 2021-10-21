@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <quda_fp16.cuh>
+#include <array.h>
 #include <trove/ptr.h>
 
 // This macro determines whether or not we are using the fp16 accumulation of the MMA instruction.
@@ -322,8 +323,8 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
 
-      using vector_type = vector_type<store_type, 2>;
-      auto ptr = reinterpret_cast<vector_type *>(cc.data());
+      using array = array<store_type, 2>;
+      auto ptr = reinterpret_cast<array *>(cc.data());
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
@@ -336,7 +337,7 @@ namespace quda
         int m_index = row;
         int n_index = col + 2 * i;
 
-        vector_type value;
+        array value;
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
             value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
@@ -373,8 +374,8 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
 
-      using vector_type = vector_type<store_type, 2>;
-      auto ptr = reinterpret_cast<vector_type *>(cc.data());
+      using array = array<store_type, 2>;
+      auto ptr = reinterpret_cast<array *>(cc.data());
 
       constexpr bool check_bounds = !((M % MMA_M == 0) && (N % MMA_N == 0));
 
@@ -383,7 +384,7 @@ namespace quda
         int m_index = row + (i % 2) * 2;
         int n_index = col + (i / 2) * 4;
 
-        vector_type value;
+        array value;
 
         auto scale = fixed ? cc.scale : 1.0f;
         if (dagger) {

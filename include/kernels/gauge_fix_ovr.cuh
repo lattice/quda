@@ -3,6 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <kernel.h>
 #include <reduction_kernel.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
@@ -13,8 +14,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityOVRArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugeFixQualityOVRArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -40,8 +41,8 @@ namespace quda {
     double getTheta(){ return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityOVR : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct FixQualityOVR : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }

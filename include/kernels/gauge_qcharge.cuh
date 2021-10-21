@@ -1,14 +1,15 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
 {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
-    public ReduceArg<vector_type<double, 3>>
+    public ReduceArg<array<double, 3>>
   {
-    using reduce_t = vector_type<double, 3>;
+    using reduce_t = array<double, 3>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -28,8 +29,8 @@ namespace quda
   };
 
   // Core routine for computing the topological charge from the field strength
-  template <typename Arg> struct qCharge : plus<vector_type<double, 3>> {
-    using reduce_t = vector_type<double, 3>;
+  template <typename Arg> struct qCharge : plus<array<double, 3>> {
+    using reduce_t = array<double, 3>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr qCharge(const Arg &arg) : arg(arg) {}

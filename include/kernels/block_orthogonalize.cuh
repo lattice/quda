@@ -7,8 +7,9 @@
 #include <color_spinor_field_order.h>
 #include <constant_kernel_arg.h> // allow for large parameter structs
 #include <block_reduce_helper.h>
-#include <block_reduction_kernel.h>
 #include <fast_intdiv.h>
+#include <array.h>
+#include <block_reduction_kernel.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE
@@ -104,7 +105,7 @@ namespace quda {
     static_assert(Arg::nVec % mVec == 0, "mVec must be a factor of nVec");
 
     using sum_t = typename Arg::sum_t;
-    using dot_t = vector_type<complex<sum_t>, mVec>;
+    using dot_t = array<complex<sum_t>, mVec>;
     using real = typename Arg::real;
 
     constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}

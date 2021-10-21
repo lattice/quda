@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array.h>
+
 /**
    @file atomic.cuh
 
@@ -160,7 +162,7 @@ template <typename T> __device__ __host__ inline void atomic_fetch_add(T *addr, 
   target::dispatch<atomic_fetch_add_impl>(addr, val);
 }
 
-template <typename T, int n> __device__ __host__ void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
+template <typename T, int n> __device__ __host__ inline void atomic_fetch_add(array<T, n> *addr, array<T, n> val)
 {
   for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
 }

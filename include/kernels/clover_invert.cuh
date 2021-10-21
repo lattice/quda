@@ -1,13 +1,14 @@
 #include <clover_field_order.h>
 #include <quda_matrix.h>
 #include <linalg.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
 {
 
-  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
@@ -33,8 +34,8 @@ namespace quda
     __device__ __host__ auto init() const { return reduce_t(); }
   };
 
-  template <typename Arg> struct InvertClover : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct InvertClover : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr InvertClover(const Arg &arg) : arg(arg) {}

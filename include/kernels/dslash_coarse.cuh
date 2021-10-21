@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
-#include <float_vector.h>
+#include <array.h>
 #include <shared_memory_cache_helper.cuh>
 #include <kernel.h>
 #include <warp_collective.h>
@@ -329,7 +329,7 @@ namespace quda {
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
       constexpr int src_idx = 0;
-      vector_type<complex <typename Arg::real>, Mc> out;
+      array<complex <typename Arg::real>, Mc> out;
 
       if (Arg::dslash) {
         if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);
