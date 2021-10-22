@@ -204,14 +204,8 @@ namespace quda
             out = variableInv<sync_m5inv, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity,
                                                                                             0, s);
             // Apply the m5pre.
-#if 0
-            // For Mobius, M5inv + M5pre is equivalent to apply a single (b - c / kappa) * M5inv + c / kappa,
-            // But obviously this does not work when kappa ~ 0, so here we do not use this strategy
-            out = arg.alpha * out + arg.beta * stencil_out;
-#else
             constexpr bool sync_m5pre = true;
             out = d5<sync_m5pre, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, out, my_spinor_parity, 0, s);
-#endif
           }
 
           /******

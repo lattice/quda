@@ -1,4 +1,4 @@
-#include <dslash_domain_wall_4d_fused_m5.h>
+#include <dslash_domain_wall_4d_fused_m5.hpp>
 
 /**
    This is the gauged domain-wall 4-d preconditioned operator, fused with immediately followed fifth dimension operators.
