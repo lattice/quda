@@ -1115,7 +1115,6 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
 void qudaShift(int external_precision, int quda_precision, const void *const links,
                void* src, void* dst, int dir, int sym)
 {
-printf("Calling qudaShift\n"); fflush(stdout);
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1143,7 +1142,7 @@ printf("Calling qudaShift\n"); fflush(stdout);
   invertParam.dslash_type = QUDA_COVDEV_DSLASH;
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (!canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  if (!canReuseResidentGauge(&invertParam)) {invalidateGaugeQuda(); printf("Um, no persistence here\n"); }
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
     loadGaugeQuda(const_cast<void *>(links), &gparam);

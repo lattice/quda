@@ -643,7 +643,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       errorQuda("Invalid gauge type %d", param->type);
   }
 
-printf("Here we are, and param->type is %s\n", param->type == QUDA_SMEARED_LINKS ? "Ok" : "Wrong"); fflush(stdout);
   // if not preserving then copy the gauge field passed in
   cudaGaugeField *precise = nullptr;
 
@@ -667,7 +666,6 @@ printf("Here we are, and param->type is %s\n", param->type == QUDA_SMEARED_LINKS
   } else {
     profileGauge.TPSTOP(QUDA_PROFILE_INIT);
     profileGauge.TPSTART(QUDA_PROFILE_H2D);
-printf("Copying the gauge field\n"); fflush(stdout);
     precise->copy(*in);
     profileGauge.TPSTOP(QUDA_PROFILE_H2D);
   }
@@ -675,7 +673,6 @@ printf("Copying the gauge field\n"); fflush(stdout);
   // for gaugeSmeared we are interested only in the precise version
   if (param->type == QUDA_SMEARED_LINKS) {
     gaugeSmeared = createExtendedGauge(*precise, R, profileGauge);
-printf("Is gaugeSmeared nullptr? %s\n", gaugeSmeared == nullptr ? "Yes" : "No!"); fflush(stdout);
 
     profileGauge.TPSTART(QUDA_PROFILE_FREE);
     delete precise;
