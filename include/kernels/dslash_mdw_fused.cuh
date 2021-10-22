@@ -3,6 +3,7 @@
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
 #include <kernel.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda {
 
@@ -295,7 +296,7 @@ namespace quda {
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-        TensorCoreSharedMemory<float> shared_memory_data;
+        SharedMemoryCache<half2> cache;
 
         static_assert(Arg::block_dim_x * Ls / 32 < 32, "Number of threads in a threadblock should be less than 1024.");
 
@@ -305,7 +306,7 @@ namespace quda {
         constexpr int N_sm = N + sm_n_pad_size(N);
         constexpr int M_sm = M + sm_m_pad_size(M);
 
-        half2 *sm_b = reinterpret_cast<half2 *>(shared_memory_data + 32);
+        half2 *sm_b = cache.data();
         half *sm_c = reinterpret_cast<half *>(sm_b);
 
         half *sm_a = Arg::reload ? sm_c + M * N_sm : sm_c;

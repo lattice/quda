@@ -99,12 +99,12 @@ namespace quda
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
-            return (a_size * 2 + b_size) * sizeof(half) + 128;
+            return (a_size * 2 + b_size) * sizeof(half);
           } else {
-            return (a_size + b_size) * sizeof(half) + 128;
+            return (a_size + b_size) * sizeof(half);
           }
         } else {
-          return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
+          return (a_size > b_size ? a_size : b_size) * sizeof(half);
         }
       }
 

@@ -25,20 +25,6 @@
 namespace quda
 {
 
-  template <class T> struct TensorCoreSharedMemory {
-    __device__ inline operator T *()
-    {
-      extern __shared__ int __smem[];
-      return (T *)__smem;
-    }
-
-    __device__ inline operator const T *() const
-    {
-      extern __shared__ int __smem[];
-      return (T *)__smem;
-    }
-  };
-
   // matrix a for a generic matrix: column major, M/M_sm(size/padded size) by k
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
   // one(spin).
