@@ -1115,6 +1115,7 @@ void qudaDslash(int external_precision, int quda_precision, QudaInvertArgs_t inv
 void qudaShift(int external_precision, int quda_precision, const void *const links,
                void* src, void* dst, int dir, int sym)
 {
+printf("Calling qudaShift\n"); fflush(stdout);
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
