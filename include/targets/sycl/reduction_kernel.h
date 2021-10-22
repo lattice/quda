@@ -193,15 +193,22 @@ namespace quda {
       printfQuda("  reduce_t: %s\n", typeid(reduce_t).name());
     }
 #if 1
+    sycl::buffer<const char,1>
+      buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
     try {
       q.submit([&](sycl::handler& h) {
+	auto a = buf.get_access<sycl::access::mode::read,
+				sycl::access::target::constant_buffer>(h);
 	//h.parallel_for<class MultiReductionx>
 	h.parallel_for<>
 	  (ndRange,
 	   [=](sycl::nd_item<3> ndi) {
-	     MultiReductionImpl<Transformer,Arg,grid_stride>(arg,ndi);
-	   });
-      });
+	    //MultiReductionImpl<Transformer,Arg,grid_stride>(arg,ndi);
+	    const char *p = a.get_pointer();
+	    const Arg *arg2 = reinterpret_cast<const Arg*>(p);
+	    MultiReductionImpl<Transformer,Arg,grid_stride>(*arg2,ndi);
+	  });
+	});
     } catch (sycl::exception const& e) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	printfQuda("  Caught synchronous SYCL exception:\n  %s\n",e.what());
