@@ -24,6 +24,7 @@
 #include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
+#include <spin_taste.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
 #include <random_quda.h>
@@ -2085,6 +2086,296 @@ void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam inv_pa
   if (sym == 3)
     quda::blas::ax(0.5, out);
 
+  profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_D2H);
+  *out_h = out;
+  profileCovDev.TPSTOP(QUDA_PROFILE_D2H);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  profileCovDev.TPSTART(QUDA_PROFILE_FREE);
+  delete myCovDev; // clean up
+
+  delete out_h;
+  delete in_h;
+  profileCovDev.TPSTOP(QUDA_PROFILE_FREE);
+
+  popVerbosity();
+  profileCovDev.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam inv_param)
+{
+  profileCovDev.TPSTART(QUDA_PROFILE_TOTAL);
+  profileCovDev.TPSTART(QUDA_PROFILE_INIT);
+
+  const auto &gauge = *gaugePrecise; //(inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (!gaugePrecise)
+    errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param.verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&inv_param);
+
+  ColorSpinorParam cpuParam(h_in, inv_param, gauge.X(), false, inv_param.input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorParam cudaParam(cpuParam, inv_param);
+
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param.output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField in(*in_h, cudaParam);
+  cudaColorSpinorField out(in, cudaParam);
+
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaColorSpinorField tmp(in, cudaParam);
+
+  profileCovDev.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_H2D);
+  in = *in_h;
+  profileCovDev.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileCovDev.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  inv_param.dslash_type = QUDA_COVDEV_DSLASH; // ensure we use the correct dslash
+  DiracParam diracParam;
+  setDiracParam(diracParam, &inv_param, false);
+
+  GaugeCovDev *myCovDev = new GaugeCovDev(diracParam); // create the Dirac operator
+
+  int offset = spin_ ^ taste;
+  QudaSpinTasteGamma spin = (QudaSpinTasteGamma) spin_;
+
+  constexpr QudaSpinTasteGamma gDirs[4] = { QUDA_SPIN_TASTE_GX, QUDA_SPIN_TASTE_GY, QUDA_SPIN_TASTE_GZ, QUDA_SPIN_TASTE_GT };
+
+  switch (offset) {
+
+    case 0: // local
+    {
+      applySpinTaste(tmp, in,  spin);
+      applySpinTaste(out, tmp, QUDA_SPIN_TASTE_G5);  // antiquark
+      break;
+    }
+
+    case 1: // one-link X
+    case 2: // one-link Y
+    case 4: // one-link Z
+    case 8: // one-link T
+    {
+      int cDir = 0;
+
+      if (offset == 1) { cDir = 0; } else if (offset == 2) { cDir = 1; } else if (offset == 4) { cDir = 2; } else if (offset == 8) { cDir = 3; }
+
+      cudaColorSpinorField pr1(in, cudaParam);
+      applySpinTaste(out, in,  spin);
+      myCovDev->MCD (tmp, out, cDir);
+      myCovDev->MCD (pr1, out, cDir+4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[cDir]);
+      applySpinTaste(out, pr1, QUDA_SPIN_TASTE_G5);
+      quda::blas::ax(0.5, out);
+      break;
+    }
+
+    case 3:  // two-link XY
+    case 6:  // two-link YZ
+    case 5:  // two-link ZX
+    case 9:  // two-link XT
+    case 10: // two-link YT
+    case 12: // two-link ZT
+    {
+      int dirs[2];
+
+      {
+        if (offset == 3)  { dirs[0] = 0; dirs[1] = 1; }
+        if (offset == 6)  { dirs[0] = 1; dirs[1] = 2; }
+        if (offset == 5)  { dirs[0] = 2; dirs[1] = 0; }
+        if (offset == 9)  { dirs[0] = 0; dirs[1] = 3; }
+        if (offset == 10) { dirs[0] = 1; dirs[1] = 3; }
+        if (offset == 12) { dirs[0] = 2; dirs[1] = 3; }
+      }
+
+      cudaColorSpinorField pr1(in, cudaParam);
+      cudaColorSpinorField acc(in, cudaParam);
+
+      applySpinTaste(out, in,  spin);
+      // YX result in acc
+      myCovDev->MCD (tmp, out, dirs[1]);
+      myCovDev->MCD (pr1, out, dirs[1]+4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[dirs[1]]);
+      myCovDev->MCD (tmp, pr1, dirs[0]);
+      myCovDev->MCD (acc, pr1, dirs[0]+4);
+      quda::blas::xpy(acc, tmp);
+      applySpinTaste(acc, tmp, gDirs[dirs[0]]);
+      // XY result in tmp
+      myCovDev->MCD (tmp, out, dirs[0]);
+      myCovDev->MCD (pr1, out, dirs[0]+4);
+      quda::blas::xpy(pr1, tmp);
+      applySpinTaste(pr1, tmp, gDirs[dirs[0]]);
+      myCovDev->MCD (tmp, pr1, dirs[1]);
+      myCovDev->MCD (out, pr1, dirs[1]+4);
+      quda::blas::xpy(tmp, out);
+      applySpinTaste(tmp, out, gDirs[dirs[1]]);
+
+      quda::blas::mxpy(tmp, acc);
+      applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+      quda::blas::ax(0.125, out);
+      break;
+    }
+
+    case 14: // three-link 5X
+    case 13: // three-link 5Y
+    case 11: // three-link 5Z
+    case 7:  // three-link 5T
+    {
+      cudaColorSpinorField pr1(in, cudaParam);
+      cudaColorSpinorField pr2(in, cudaParam);
+      cudaColorSpinorField acc(in, cudaParam);
+
+      applySpinTaste(out, in,  spin);
+
+      int noDir = 0;
+      int dirs[3];
+
+      //quda::blas::ax(0.0, acc);
+      if (offset == 14) { noDir = 0; } else if (offset == 13) { noDir = 1; } else if (offset == 11) { noDir = 2; } else if (offset == 7) { noDir = 3; }
+      { int j=0; for (int i=0; i<4; i++) { if (i == noDir) continue; dirs[j++] = i; } }
+
+      for (int i=0; i<3; i++) {
+
+        const int d1 = dirs[(i+0)%3];
+        const int d2 = dirs[(i+1)%3];
+        const int d3 = dirs[(i+2)%3];
+
+        // Accumulate result in acc
+        myCovDev->MCD (tmp, out, d1);
+        myCovDev->MCD (pr1, out, d1+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d1]);
+        myCovDev->MCD (tmp, pr1, d2);
+        myCovDev->MCD (pr2, pr1, d2+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[d2]);
+        myCovDev->MCD (tmp, pr2, d3);
+        myCovDev->MCD (pr1, pr2, d3+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d3]);
+        quda::blas::xpy(pr1, acc);
+
+        // Accumulate result in acc
+        myCovDev->MCD (tmp, out, d3);
+        myCovDev->MCD (pr1, out, d3+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d3]);
+        myCovDev->MCD (tmp, pr1, d2);
+        myCovDev->MCD (pr2, pr1, d2+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[d2]);
+        myCovDev->MCD (tmp, pr2, d1);
+        myCovDev->MCD (pr1, pr2, d1+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d1]);
+        quda::blas::mxpy(pr1, acc);
+      }
+
+      applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+      quda::blas::ax(0.125/6., out);
+      break;
+    }
+
+    case 15: // four-link 5
+    {
+      const int dPlus[12][4] = { { 0, 1, 2, 3}, { 1, 2, 0, 3}, { 2, 0, 1, 3},
+                                 { 0, 3, 1, 2}, { 1, 3, 2, 0}, { 2, 3, 0, 1},
+                                 { 3, 2, 1, 0}, { 3, 0, 2, 1}, { 3, 1, 0, 2},
+                                 { 2, 1, 3, 0}, { 0, 2, 3, 1}, { 1, 0, 3, 2} };
+      const int dMnus[12][4] = { { 0, 2, 1, 3}, { 1, 0, 2, 3}, { 2, 1, 0, 3},
+                                 { 0, 3, 2, 1}, { 1, 3, 0, 2}, { 2, 3, 1, 0},
+                                 { 3, 1, 2, 0}, { 3, 2, 0, 1}, { 3, 0, 1, 2},
+                                 { 1, 2, 3, 0}, { 2, 0, 3, 1}, { 0, 1, 3, 2} };
+
+      cudaColorSpinorField pr1(in, cudaParam);
+      cudaColorSpinorField pr2(in, cudaParam);
+      cudaColorSpinorField acc(in, cudaParam);
+
+      applySpinTaste(out, in,  spin);
+
+      for (int i=0; i<12; i++) {
+
+        const int d1 = dPlus[i][0];
+        const int d2 = dPlus[i][1];
+        const int d3 = dPlus[i][2];
+        const int d4 = dPlus[i][3];
+
+        // Accumulate result in acc
+        myCovDev->MCD (tmp, out, d1);
+        myCovDev->MCD (pr1, out, d1+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d1]);
+        myCovDev->MCD (tmp, pr1, d2);
+        myCovDev->MCD (pr2, pr1, d2+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[d2]);
+        myCovDev->MCD (tmp, pr2, d3);
+        myCovDev->MCD (pr1, pr2, d3+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[d3]);
+        myCovDev->MCD (tmp, pr1, d4);
+        myCovDev->MCD (pr2, pr1, d4+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[d4]);
+        quda::blas::xpy(pr2, acc);
+
+        const int m1 = dMnus[i][0];
+        const int m2 = dMnus[i][1];
+        const int m3 = dMnus[i][2];
+        const int m4 = dMnus[i][3];
+
+        // Accumulate result in acc
+        myCovDev->MCD (tmp, out, m1);
+        myCovDev->MCD (pr1, out, m1+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[m1]);
+        myCovDev->MCD (tmp, pr1, m2);
+        myCovDev->MCD (pr2, pr1, m2+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[m2]);
+        myCovDev->MCD (tmp, pr2, m3);
+        myCovDev->MCD (pr1, pr2, m3+4);
+        quda::blas::xpy(pr1, tmp);
+        applySpinTaste(pr1, tmp, gDirs[m3]);
+        myCovDev->MCD (tmp, pr1, m4);
+        myCovDev->MCD (pr2, pr1, m4+4);
+        quda::blas::xpy(pr2, tmp);
+        applySpinTaste(pr2, tmp, gDirs[m4]);
+        quda::blas::mxpy(pr2, acc);
+      }
+
+      applySpinTaste(out, acc, QUDA_SPIN_TASTE_G5);
+      quda::blas::ax(0.0625/24., out);
+      break;
+    }
+  }
+
+  // FIXME: This is not exactly all covDev
   profileCovDev.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileCovDev.TPSTART(QUDA_PROFILE_D2H);
