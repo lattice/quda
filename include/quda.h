@@ -1172,6 +1172,16 @@ extern "C" {
   void shiftQuda(void *h_out, void *h_in, int dir, int sym, QudaInvertParam param);
 
   /**
+   * Apply the spin-taste operator.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param spin   Spin gamma structure
+   * @param taste  Taste gamma structure
+   * @param param  Metadata for host and device storage
+   */
+  void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertParam inv_param);
+
+  /**
    * @brief Perform the solve like @dslashQuda but for multiple rhs by spliting the comm grid into
    * sub-partitions: each sub-partition does one or more rhs'.
    * The QudaInvertParam object specifies how the solve should be performed on each sub-partition.
