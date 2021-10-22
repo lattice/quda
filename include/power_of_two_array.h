@@ -1,6 +1,6 @@
 #pragma once
 
-#include <array>
+#include <array.h>
 
 namespace quda
 {
@@ -25,7 +25,7 @@ namespace quda
    */
   template <unsigned int Min, unsigned int Max> struct PowerOfTwoArray {
 
-    std::array<unsigned int, numElements<Min, Max>()> data_;
+    array<unsigned int, numElements<Min, Max>()> data_;
 
     constexpr PowerOfTwoArray() : data_()
     {
