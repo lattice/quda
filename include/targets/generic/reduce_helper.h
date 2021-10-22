@@ -106,17 +106,17 @@ namespace quda
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
     __shared__ bool isLastBlockDone;
 
-    T aggregate = BlockReduce().Reduce<true>(in, r);
+    T aggregate = BlockReduce().template Reduce<true>(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
-      arg.partial[idx * gridDim.x + target::block_idx().x] = aggregate;
+      arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;
       __threadfence(); // flush result
 
       // increment global block counter
-      auto value = atomicInc(&arg.count[idx], gridDim.x);
+      auto value = atomicInc(&arg.count[idx], target::grid_dim().x);
 
       // determine if last block
-      isLastBlockDone = (value == (gridDim.x - 1));
+      isLastBlockDone = (value == (target::grid_dim().x - 1));
     }
 
     __syncthreads();
@@ -125,12 +125,12 @@ namespace quda
     if (isLastBlockDone) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
       T sum = arg.init();
-      while (i < gridDim.x) {
-        sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * gridDim.x + i]));
+      while (i < target::grid_dim().x) {
+        sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));
         i += block_size_x * block_size_y;
       }
 
-      sum = BlockReduce().Reduce<true>(sum, r);
+      sum = BlockReduce().template Reduce<true>(sum, r);
 
       // write out the final reduced value
       if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {

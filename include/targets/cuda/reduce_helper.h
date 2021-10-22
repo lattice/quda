@@ -157,17 +157,17 @@ namespace quda
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
     __shared__ bool isLastBlockDone;
 
-    T aggregate = BlockReduce().Reduce<true>(in, r);
+    T aggregate = BlockReduce().template Reduce<true>(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       // need to call placement new constructor since partial is not necessarily constructed
-      new (arg.partial + idx * gridDim.x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
+      new (arg.partial + idx * target::grid_dim().x + target::block_idx().x) cuda::atomic<T, cuda::thread_scope_device> {aggregate};
 
       // increment global block counter for this reduction
       auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
 
       // determine if last block
-      isLastBlockDone = (value == (gridDim.x - 1));
+      isLastBlockDone = (value == (target::grid_dim().x - 1));
     }
 
     __syncthreads();
@@ -176,12 +176,12 @@ namespace quda
     if (isLastBlockDone) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
       T sum = arg.init();
-      while (i < gridDim.x) {
-        sum = r(sum, arg.partial[idx * gridDim.x + i].load(cuda::std::memory_order_relaxed));
+      while (i < target::grid_dim().x) {
+        sum = r(sum, arg.partial[idx * target::grid_dim().x + i].load(cuda::std::memory_order_relaxed));
         i += block_size_x * block_size_y;
       }
 
-      sum = BlockReduce().Reduce<true>(sum, r);
+      sum = BlockReduce().template Reduce<true>(sum, r);
 
       // write out the final reduced value
       if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
