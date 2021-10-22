@@ -24,7 +24,7 @@ namespace quda
     /** Whether to use half vector, i.e. utilizing spin projection properties.
       Half vector uses less shared memory but results in more shared memory stores/loads. */
     constexpr bool use_half_vector() { return true; }
-  }
+  } // namespace mobius_m5
 
   /**
      @brief Structure containing zMobius / Zolotarev coefficients
@@ -110,7 +110,8 @@ namespace quda
 
     coeff_5<real> coeff; // constant buffer used for Mobius coefficients for CPU kernel
 
-    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5) {
+    void compute_coeff_mobius_pre(const Complex *b_5, const Complex *c_5)
+    {
       // out = (b + c * D5) * in
       for (int s = 0; s < Ls; s++) {
         coeff.beta[s] = b_5[s];
@@ -121,7 +122,8 @@ namespace quda
       }
     }
 
-    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5) {
+    void compute_coeff_mobius(const Complex *b_5, const Complex *c_5)
+    {
       // out = (1 + kappa * D5) * in
       for (int s = 0; s < Ls; s++) {
         coeff.kappa[s] = 0.5 * (c_5[s] * (m_5 + 4.0) - 1.0) / (b_5[s] * (m_5 + 4.0) + 1.0); // 0.5 from gamma matrices
@@ -131,20 +133,22 @@ namespace quda
       }
     }
 
-    void compute_coeff_m5inv_dwf() {
+    void compute_coeff_m5inv_dwf()
+    {
       kappa = 2.0 * (0.5 / (5.0 + m_5)); // 2  * kappa_5
       inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);
     }
 
-    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5) {
+    void compute_coeff_m5inv_mobius(const Complex *b_5, const Complex *c_5)
+    {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
-      kappa
-        = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
-      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                             // 0.5 from gamma matrices
-      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                         // kappa_b * kappa_b * a
+      kappa = -(c_5[0].real() * (4.0 + m_5) - 1.0) / (b_5[0].real() * (4.0 + m_5) + 1.0); // kappa = kappa_b / kappa_c
+      inv = 0.5 / (1.0 + std::pow(kappa, (int)Ls) * m_f);                                 // 0.5 from gamma matrices
+      a *= pow(0.5 / (b_5[0].real() * (m_5 + 4.0) + 1.0), 2);                             // kappa_b * kappa_b * a
     }
 
-    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5) {
+    void compute_coeff_m5inv_zmobius(const Complex *b_5, const Complex *c_5)
+    {
       // out = (1 + kappa * D5)^-1 * in = M5inv * in
       // Similar to mobius convention, but variadic across 5th dim
       complex<real> k = 1.0;
@@ -162,17 +166,17 @@ namespace quda
 
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
                const Complex *b_5, const Complex *c_5, double a_) :
-        kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
-        out(out),
-        in(in),
-        x(x),
-        nParity(in.SiteSubset()),
-        volume_cb(in.VolumeCB()),
-        volume_4d_cb(volume_cb / in.X(4)),
-        Ls(in.X(4)),
-        m_f(m_f),
-        m_5(m_5),
-        a(a_)
+      kernel_param(dim3(in.VolumeCB() / in.X(4), in.X(4), in.SiteSubset())),
+      out(out),
+      in(in),
+      x(x),
+      nParity(in.SiteSubset()),
+      volume_cb(in.VolumeCB()),
+      volume_4d_cb(volume_cb / in.X(4)),
+      Ls(in.X(4)),
+      m_f(m_f),
+      m_5(m_5),
+      a(a_)
     {
       if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
       if (!in.isNative() || !out.isNative())
@@ -180,19 +184,13 @@ namespace quda
 
       switch (type) {
       case Dslash5Type::DSLASH5_DWF: break;
-      case Dslash5Type::DSLASH5_MOBIUS_PRE:
-        compute_coeff_mobius_pre(b_5, c_5);
-        break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: compute_coeff_mobius_pre(b_5, c_5); break;
       case Dslash5Type::DSLASH5_MOBIUS_PRE_M5_MOB:
         compute_coeff_mobius_pre(b_5, c_5);
         compute_coeff_mobius(b_5, c_5);
         break;
-      case Dslash5Type::DSLASH5_MOBIUS:
-        compute_coeff_mobius(b_5, c_5);
-        break;
-      case Dslash5Type::M5_INV_DWF:
-        compute_coeff_m5inv_dwf();
-        break;
+      case Dslash5Type::DSLASH5_MOBIUS: compute_coeff_mobius(b_5, c_5); break;
+      case Dslash5Type::M5_INV_DWF: compute_coeff_m5inv_dwf(); break;
       case Dslash5Type::M5_INV_MOBIUS_M5_PRE:
       case Dslash5Type::M5_PRE_MOBIUS_M5_INV:
         compute_coeff_mobius_pre(b_5, c_5);
@@ -203,24 +201,23 @@ namespace quda
         compute_coeff_mobius(b_5, c_5);
         compute_coeff_m5inv_mobius(b_5, c_5);
         break;
-      case Dslash5Type::M5_INV_ZMOBIUS:
-        compute_coeff_m5inv_zmobius(b_5, c_5);
-        break;
+      case Dslash5Type::M5_INV_ZMOBIUS: compute_coeff_m5inv_zmobius(b_5, c_5); break;
       default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
       }
     }
   };
 
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
-    __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s) {
+  __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s)
+  {
 
-      using real = typename Arg::real;
-      constexpr bool is_variable = true;
-      coeff_type<real, is_variable, Arg> coeff(arg);
+    using real = typename Arg::real;
+    constexpr bool is_variable = true;
+    coeff_type<real, is_variable, Arg> coeff(arg);
 
-      Vector out;
+    Vector out;
 
-      if (mobius_m5::use_half_vector()) {
+    if (mobius_m5::use_half_vector()) {
       // if using shared-memory caching then load spinor field for my site into cache
       typedef ColorSpinor<real, Arg::nColor, 4 / 2> HalfVector;
       SharedMemoryCache<HalfVector> cache(target::block_dim());
@@ -271,7 +268,7 @@ namespace quda
         }
       }
 
-      } else { // use_half_vector
+    } else { // use_half_vector
 
       // if using shared-memory caching then load spinor field for my site into cache
       SharedMemoryCache<Vector> cache(target::block_dim());
@@ -304,18 +301,19 @@ namespace quda
           out += in.project(4, proj_dir).reconstruct(4, proj_dir);
         }
       }
-      } // use_half_vector
+    } // use_half_vector
 
-      if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
-        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
-      } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
-        Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        out = coeff.kappa(s) * out + diagonal;
-      }
-
-      return out;
+    if (type == Dslash5Type::DSLASH5_MOBIUS_PRE || type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
+        || type == Dslash5Type::M5_PRE_MOBIUS_M5_INV) {
+      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      out = coeff.alpha(s) * out + coeff.beta(s) * diagonal;
+    } else if (type == Dslash5Type::DSLASH5_MOBIUS) {
+      Vector diagonal = shared ? in : arg.in(s * arg.volume_4d_cb + x_cb, parity);
+      out = coeff.kappa(s) * out + diagonal;
     }
+
+    return out;
+  }
 
   template <typename Arg> struct dslash5 {
     const Arg &arg;
@@ -438,109 +436,109 @@ namespace quda
     Vector out;
 
     if (mobius_m5::use_half_vector()) {
-    SharedMemoryCache<HalfVector> cache(target::block_dim());
+      SharedMemoryCache<HalfVector> cache(target::block_dim());
 
-    { // first do R
-      constexpr int proj_dir = dagger ? -1 : +1;
+      { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
+        if (shared) {
+          if (sync) { cache.sync(); }
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+
+        int s = s_;
+        auto R = coeff.inv();
+        HalfVector r;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+          if (shared) {
+            r += factorR * cache.load(threadIdx.x, s, parity);
+          } else {
+            Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            r += factorR * in.project(4, proj_dir);
+          }
+
+          R *= coeff.kappa(s);
+          s = (s + arg.Ls - 1) % arg.Ls;
+        }
+
+        out += r.reconstruct(4, proj_dir);
+      }
+
+      { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
+        if (shared) {
+          cache.sync(); // ensure we finish R before overwriting cache
+          cache.save(in.project(4, proj_dir));
+          cache.sync();
+        }
+
+        int s = s_;
+        auto L = coeff.inv();
+        HalfVector l;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorL = (s_ > s ? -arg.m_f * L : L);
+
+          if (shared) {
+            l += factorL * cache.load(threadIdx.x, s, parity);
+          } else {
+            Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+            l += factorL * in.project(4, proj_dir);
+          }
+
+          L *= coeff.kappa(s);
+          s = (s + 1) % arg.Ls;
+        }
+
+        out += l.reconstruct(4, proj_dir);
+      }
+    } else { // use_half_vector
+      SharedMemoryCache<Vector> cache(target::block_dim());
       if (shared) {
         if (sync) { cache.sync(); }
-        cache.save(in.project(4, proj_dir));
+        cache.save(in);
         cache.sync();
       }
 
-      int s = s_;
-      auto R = coeff.inv();
-      HalfVector r;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorR = (s_ < s ? -arg.m_f * R : R);
+      { // first do R
+        constexpr int proj_dir = dagger ? -1 : +1;
 
-        if (shared) {
-          r += factorR * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+        int s = s_;
+        auto R = coeff.inv();
+        HalfVector r;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorR = (s_ < s ? -arg.m_f * R : R);
+
+          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
           r += factorR * in.project(4, proj_dir);
+
+          R *= coeff.kappa(s);
+          s = (s + arg.Ls - 1) % arg.Ls;
         }
 
-        R *= coeff.kappa(s);
-        s = (s + arg.Ls - 1) % arg.Ls;
+        out += r.reconstruct(4, proj_dir);
       }
 
-      out += r.reconstruct(4, proj_dir);
-    }
+      { // second do L
+        constexpr int proj_dir = dagger ? +1 : -1;
 
-    { // second do L
-      constexpr int proj_dir = dagger ? +1 : -1;
-      if (shared) {
-        cache.sync(); // ensure we finish R before overwriting cache
-        cache.save(in.project(4, proj_dir));
-        cache.sync();
-      }
+        int s = s_;
+        auto L = coeff.inv();
+        HalfVector l;
+        for (int s_count = 0; s_count < arg.Ls; s_count++) {
+          auto factorL = (s_ > s ? -arg.m_f * L : L);
 
-      int s = s_;
-      auto L = coeff.inv();
-      HalfVector l;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorL = (s_ > s ? -arg.m_f * L : L);
-
-        if (shared) {
-          l += factorL * cache.load(threadIdx.x, s, parity);
-        } else {
-          Vector in = arg.in(s * arg.volume_4d_cb + x_cb, parity);
+          Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
           l += factorL * in.project(4, proj_dir);
+
+          L *= coeff.kappa(s);
+          s = (s + 1) % arg.Ls;
         }
 
-        L *= coeff.kappa(s);
-        s = (s + 1) % arg.Ls;
+        out += l.reconstruct(4, proj_dir);
       }
-
-      out += l.reconstruct(4, proj_dir);
-    }
-    } else { // use_half_vector
-    SharedMemoryCache<Vector> cache(target::block_dim());
-    if (shared) {
-      if (sync) { cache.sync(); }
-      cache.save(in);
-      cache.sync();
-    }
-
-    { // first do R
-      constexpr int proj_dir = dagger ? -1 : +1;
-
-      int s = s_;
-      auto R = coeff.inv();
-      HalfVector r;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorR = (s_ < s ? -arg.m_f * R : R);
-
-        Vector in =  shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        r += factorR * in.project(4, proj_dir);
-
-        R *= coeff.kappa(s);
-        s = (s + arg.Ls - 1) % arg.Ls;
-      }
-
-      out += r.reconstruct(4, proj_dir);
-    }
-
-    { // second do L
-      constexpr int proj_dir = dagger ? +1 : -1;
-
-      int s = s_;
-      auto L = coeff.inv();
-      HalfVector l;
-      for (int s_count = 0; s_count < arg.Ls; s_count++) {
-        auto factorL = (s_ > s ? -arg.m_f * L : L);
-
-        Vector in = shared ? cache.load(threadIdx.x, s, parity) : arg.in(s * arg.volume_4d_cb + x_cb, parity);
-        l += factorL * in.project(4, proj_dir);
-
-        L *= coeff.kappa(s);
-        s = (s + 1) % arg.Ls;
-      }
-
-      out += l.reconstruct(4, proj_dir);
-    }
     } // use_half_vector
 
     return out;

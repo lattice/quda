@@ -801,9 +801,8 @@ public:
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-        ColorSpinorField &x, ColorSpinorField &b,
-		 const QudaSolutionType) const;
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
@@ -874,11 +873,16 @@ public:
 
     void Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const;
-    void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const;
-    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
+    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 

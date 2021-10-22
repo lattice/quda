@@ -160,7 +160,7 @@ namespace quda
         }
 
         switch (type) {
-        case Dslash5Type::M5_EOFA:    Launch<Dslash5Type::M5_EOFA, eofa_dslash5>(tp, stream); break;
+        case Dslash5Type::M5_EOFA: Launch<Dslash5Type::M5_EOFA, eofa_dslash5>(tp, stream); break;
         case Dslash5Type::M5INV_EOFA: Launch<Dslash5Type::M5INV_EOFA, eofa_dslash5inv>(tp, stream); break;
         default: errorQuda("Unknown Dslash5Type %d", static_cast<int>(type));
         }

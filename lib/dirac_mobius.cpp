@@ -215,7 +215,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger,
+                 zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
@@ -229,7 +230,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger,
+                 zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
@@ -273,7 +275,8 @@ namespace quda {
     flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
-  void DiracMobiusPC::Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  void DiracMobiusPC::Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -290,7 +293,8 @@ namespace quda {
     flops += 48LL * (long long)in.Volume();
   }
 
-  void DiracMobiusPC::Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  void DiracMobiusPC::Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -309,7 +313,8 @@ namespace quda {
     flops += 48LL * (long long)in.Volume();
   }
 
-  void DiracMobiusPC::Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  void DiracMobiusPC::Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -328,7 +333,8 @@ namespace quda {
     flops += 48LL * (long long)in.Volume();
   }
 
-  void DiracMobiusPC::Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a) const
+  void DiracMobiusPC::Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                            const ColorSpinorField &x, const double &a) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
@@ -349,7 +355,8 @@ namespace quda {
     flops += 48LL * (long long)in.Volume();
   }
 
-  void DiracMobiusPC::Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &a, ColorSpinorField &y) const
+  void DiracMobiusPC::Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                            const ColorSpinorField &x, const double &a, ColorSpinorField &y) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
