@@ -4,15 +4,17 @@
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <matrix_field.h>
-#include <kernel.h>
 #include <fast_intdiv.h>
+#include <kernel.h>
 
 namespace quda
 {
 
   using spinor_array = vector_type<double2, 16>;
   
-  template <typename real> class DRGammaMatrix {
+  template <typename real> class DRGammaMatrix
+  {
+
   public:
     // Stores gamma matrix column index for non-zero complex value.
     // This is shared by g5gm, gmg5.
@@ -24,7 +26,8 @@ namespace quda
     // use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
     //the possible minus sign will be taken care of in the main function
     //! Constructor
-    DRGammaMatrix() {
+    DRGammaMatrix()
+    {
       const complex<real> i(0., 1.);
       // VECTORS
       // G_idx = 1: \gamma_1
@@ -70,7 +73,6 @@ namespace quda
       g5gm_z[3][1] = 1.;
       g5gm_z[3][2] = -1.;
       g5gm_z[3][3] = -1.;
-
 
       // PSEUDO-VECTORS
       // G_idx = 6: \gamma_5\gamma_1
@@ -186,6 +188,7 @@ namespace quda
       g5gm_z[13][1] = 1.;
       g5gm_z[13][2] = -1.;
       g5gm_z[13][3] = -1.;
+
       // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
       gm_i[14][0] = 1;
       gm_i[14][1] = 0;
@@ -209,6 +212,7 @@ namespace quda
       g5gm_z[15][3] = 1.;
     };
   };
+
   
   template <int reduction_dim, class T> __device__ int* sink_from_t_xyz(int t, int xyz, T X[4])
   {
@@ -262,21 +266,19 @@ namespace quda
     DRGammaMatrix<real> Gamma;
     int t_offset;
     int offsets[4];
-    
-    dim3 threads;     // number of active threads required
+
     int_fastdiv X[4]; // grid dimensions
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
+      // Launch xyz threads per t, t times.
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim], 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1),
-      Gamma(),
-      // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])  
+      Gamma()
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -288,6 +290,7 @@ namespace quda
     }
     __device__ __host__ spinor_array init() const { return spinor_array(); }
   };
+
   
   template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
     using reduce_t = spinor_array;
@@ -344,11 +347,11 @@ namespace quda
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
-      
+
       // loop over channels
       for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
 	for (int s2 = 0; s2 < nSpin; s2++) {
-
+	  
 	  // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
 	  int b2 = arg.Gamma.gm_i[G_idx][s2];	  
 	  // get non-zero column index for current s1
@@ -357,11 +360,15 @@ namespace quda
 	  // only contributes if we're at the correct b1 from the outer loop FIXME
 	  if (b1_tmp == b1) {
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+	    
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
+
+	    // Sum the result
 	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
 	    result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
+	  //printf("Loop %d %d %d\n", G_idx, s2, t);
 	}
       }
 

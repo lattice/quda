@@ -238,10 +238,10 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
       //TODO convert back to 4D
       //TODO what is the difference between inv_param4d and inv_param5d?
-//      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-//        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
-//      }
-
+      //      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      //        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
+      //      }
+      
       //! Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
