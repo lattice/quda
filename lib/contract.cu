@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <contract_quda.h>
+
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
@@ -53,17 +54,32 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      // Pass the integer value of the redection dim as a template arg
+      int reduction_dim = 3;
+      const int nSpinSq = x.Nspin()*x.Nspin();
+      
+      if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) reduction_dim = 2;      
+      std::vector<double> result_local(2*nSpinSq * x.X()[reduction_dim], 0.0);      
+      
+      // Pass the integer value of the reduction dim as a template arg
       if (cType == QUDA_CONTRACT_TYPE_DR_FT_T) {
 	ContractionSummedArg<Float, nColor, 3> arg(x, y, source_position, mom_mode, s1, b1);
-	launch<DegrandRossiContractFT>(result_global, tp, stream, arg);
+	launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
       } else if(cType == QUDA_CONTRACT_TYPE_DR_FT_Z) {
 	ContractionSummedArg<Float, nColor, 2> arg(x, y, source_position, mom_mode, s1, b1);
-	launch<DegrandRossiContractFT>(result_global, tp, stream, arg);
+	launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
       } else {
 	errorQuda("Unexpected contraction type %d", cType);
       }
 
+      // Copy results back to host array
+      if(!activeTuning()) {
+	for(int i=0; i<nSpinSq * x.X()[reduction_dim]; i++) {
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].real(result_local[2*i]);
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].imag(result_local[2*i+1]);
+	}
+      }
+
+      
     }
     
     long long flops() const
