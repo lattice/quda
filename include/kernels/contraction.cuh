@@ -4,6 +4,7 @@
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <matrix_field.h>
+#include <fast_intdiv.h>
 #include <kernel.h>
 
 namespace quda
@@ -72,7 +73,6 @@ namespace quda
       g5gm_z[3][1] = 1.;
       g5gm_z[3][2] = -1.;
       g5gm_z[3][3] = -1.;
-
 
       // PSEUDO-VECTORS
       // G_idx = 6: \gamma_5\gamma_1
@@ -188,6 +188,7 @@ namespace quda
       g5gm_z[13][1] = 1.;
       g5gm_z[13][2] = -1.;
       g5gm_z[13][3] = -1.;
+
       // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
       gm_i[14][0] = 1;
       gm_i[14][1] = 0;
@@ -265,21 +266,19 @@ namespace quda
     DRGammaMatrix<real> Gamma;
     int t_offset;
     int offsets[4];
-    
-    dim3 threads;     // number of active threads required
+
     int_fastdiv X[4]; // grid dimensions
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_array>(x.X()[reduction_dim]),
+      // Launch xyz threads per t, t times.
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim], 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1),
-      Gamma(),
-      // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
+      Gamma()
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -296,8 +295,8 @@ namespace quda
   template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
     using reduce_t = spinor_array;
     using plus<reduce_t>::operator();    
-    Arg &arg;
-    constexpr DegrandRossiContractFT(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
     
     // Final param is unused in the MultiReduce functor in this use case.
@@ -348,11 +347,11 @@ namespace quda
       int idx_cb = getParityCBFromFull(parity, arg.X, idx);
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
-      
-      // loop over channels
-      for (int G_idx = 0; G_idx < 16; G_idx++) {
-	for (int s2 = 0; s2 < nSpin; s2++) {
 
+      // loop over channels
+      for (int G_idx = 0; G_idx < nSpin*nSpin; G_idx++) {
+	for (int s2 = 0; s2 < nSpin; s2++) {
+	  
 	  // We compute the contribution from s1,b1 and s2,b2 from props x and y respectively.
 	  int b2 = arg.Gamma.gm_i[G_idx][s2];	  
 	  // get non-zero column index for current s1
@@ -361,11 +360,15 @@ namespace quda
 	  // only contributes if we're at the correct b1 from the outer loop FIXME
 	  if (b1_tmp == b1) {
 	    // use tr[ Gamma * Prop * Gamma * g5 * conj(Prop) * g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+	    
 	    // gamma_5 * gamma_i <phi | phi > gamma_5 * gamma_idx 
 	    propagator_product = arg.Gamma.g5gm_z[G_idx][b2] * innerProduct(x, y, b2, s2) * arg.Gamma.g5gm_z[G_idx][b1];
+
+	    // Sum the result
 	    result_all_channels[G_idx].x += propagator_product.real()*phase_real-propagator_product.imag()*phase_imag;
 	    result_all_channels[G_idx].y += propagator_product.imag()*phase_real+propagator_product.real()*phase_imag;
 	  }
+	  //printf("Loop %d %d %d\n", G_idx, s2, t);
 	}
       }
 
@@ -379,7 +382,7 @@ namespace quda
     }
   };
   
-  template <typename Float, int nColor_> struct ContractionArg {
+  template <typename Float, int nColor_> struct ContractionArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     int X[4];    // grid dimensions
 
@@ -394,21 +397,20 @@ namespace quda
     F x;
     F y;
     matrix_field<complex<Float>, nSpin> s;
-    dim3 threads;
 
     ContractionArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<Float> *s) :
+      kernel_param(dim3(x.VolumeCB(), 2, 1)),
       x(x),
       y(y),
-      s(s, x.VolumeCB()),
-      threads(x.VolumeCB(), 2)
+      s(s, x.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
 
   template <typename Arg> struct ColorContract {
-    Arg &arg;
-    constexpr ColorContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr ColorContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)
@@ -436,8 +438,8 @@ namespace quda
   };
 
   template <typename Arg> struct DegrandRossiContract {
-    Arg &arg;
-    constexpr DegrandRossiContract(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     __device__ __host__ inline void operator()(int x_cb, int parity)

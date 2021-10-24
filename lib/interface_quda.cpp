@@ -5929,13 +5929,13 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
   }
 
   // temporal or spatial correlator?
-  size_t corr_dim = 0, local_decay_dim_slices = 0;
+  size_t corr_dim = 0;
   if (cType == QUDA_CONTRACT_TYPE_DR_FT_Z) corr_dim = 2;
   else if (cType == QUDA_CONTRACT_TYPE_DR_FT_T) corr_dim = 3;
   else errorQuda("Unsupported contraction type %d given", cType);
 
   // The number of slices in the decay dimension on this MPI rank.
-  local_decay_dim_slices = X[corr_dim];
+  size_t local_decay_dim_slices = X[corr_dim];
 
   // The number of slices in the decay dimension globally.
   size_t global_decay_dim_slices = local_decay_dim_slices * comm_dim(corr_dim);
@@ -5969,25 +5969,27 @@ void contractFTQuda(void **prop_array_flavor_1, void **prop_array_flavor_2, void
 	    for (size_t s1 = 0; s1 < nSpin; s1++) {
 	      for (size_t c1 = 0; c1 < nColor; c1++) {
 		for (size_t b1 = 0; b1 < nSpin; b1++) {
-		profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);
-	  
+		  
+		profileContractFT.TPSTART(QUDA_PROFILE_COMPUTE);	  
 		std::fill(result_global.begin(), result_global.end(), 0.0);
 		contractSummedQuda(*d_prop1[s1 * nColor + c1],
 				   *d_prop2[b1 * nColor + c1],
 				   result_global, cType, source_position, mom_mode, s1, b1);
-		
+		profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+		profileContractFT.TPSTART(QUDA_PROFILE_COMMS);
 		comm_allreduce_array((double *)&result_global[0], 2*elems_per_slice * global_decay_dim_slices);
 		for (size_t G_idx = 0; G_idx < nSpin * nSpin; G_idx++) {
 		  for (size_t t = 0; t < global_decay_dim_slices; t++) {
-		    int index = ((mom_idx) * 2*elems_per_slice * global_decay_dim_slices + 2*elems_per_slice * t + 2*G_idx);
+		    int index = 2*(mom_idx * elems_per_slice * global_decay_dim_slices + elems_per_slice * t + G_idx);
 		    
 		    ((double *)*result)[index]
-		      += result_global[(2*elems_per_slice * t) / 2 + G_idx].real();
+		      += result_global[(elems_per_slice * t) + G_idx].real();
 		    ((double *)*result)[index+1]
-		      += result_global[(2*elems_per_slice * t) / 2 + G_idx].imag();
+		      += result_global[(elems_per_slice * t) + G_idx].imag();		    
 		  }
 		}
-		profileContractFT.TPSTOP(QUDA_PROFILE_COMPUTE);
+		profileContractFT.TPSTOP(QUDA_PROFILE_COMMS);
 	      }
 	    }
 	  }
