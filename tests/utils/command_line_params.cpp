@@ -983,7 +983,12 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
                       "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
 
+  opgroup->add_option("--su3-smear", gauge_smear, "Apply gauge smearing prior to propagator/inversion computation (default false)");
+
   opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
+
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to perform (default Stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
 
   opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
 
@@ -992,8 +997,8 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
-
+  
+  
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
 
