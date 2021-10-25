@@ -23,9 +23,10 @@ namespace quda
     // Stores gamma matrix non-zero complex value for the corresponding g5gm_i
     complex<real> g5gm_z[16][4];
     
-    // use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
-    //the possible minus sign will be taken care of in the main function
-    //! Constructor
+    // Use tr[Gamma*Prop*Gamma*g5*conj(Prop)*g5] = tr[g5*Gamma*Prop*g5*Gamma*(-1)^{?}*conj(Prop)].
+    // The possible minus sign will be taken care of in the main function.
+    // These definitions follow thw QDPXX conventions defined in qdpxx/include/qdp_primspinvec.h
+    
     DRGammaMatrix()
     {
       const complex<real> i(0., 1.);
@@ -62,7 +63,7 @@ namespace quda
       g5gm_z[2][1] = -i;
       g5gm_z[2][2] = i;
       g5gm_z[2][3] = -i;
-
+      
       // G_idx = 4: \gamma_4
       gm_i[3][0] = 2;
       gm_i[3][1] = 3;
@@ -73,9 +74,9 @@ namespace quda
       g5gm_z[3][1] = 1.;
       g5gm_z[3][2] = -1.;
       g5gm_z[3][3] = -1.;
-
+      
       // PSEUDO-VECTORS
-      // G_idx = 6: \gamma_5\gamma_1
+      // G_idx = 6: \gamma_5 * \gamma_1
       gm_i[4][0] = 3;
       gm_i[4][1] = 2;
       gm_i[4][2] = 1;
@@ -86,7 +87,7 @@ namespace quda
       g5gm_z[4][2] = -i;
       g5gm_z[4][3] = -i;
 
-      // G_idx = 7: \gamma_5\gamma_2
+      // G_idx = 7: \gamma_5 * \gamma_2
       gm_i[5][0] = 3;
       gm_i[5][1] = 2;
       gm_i[5][2] = 1;
@@ -97,7 +98,7 @@ namespace quda
       g5gm_z[5][2] = 1.;
       g5gm_z[5][3] = -1.;
 
-      // G_idx = 8: \gamma_5\gamma_3
+      // G_idx = 8: \gamma_5 * \gamma_3
       gm_i[6][0] = 2;
       gm_i[6][1] = 3;
       gm_i[6][2] = 0;
@@ -108,7 +109,7 @@ namespace quda
       g5gm_z[6][2] = -i;
       g5gm_z[6][3] = i;
 
-      // G_idx = 9: \gamma_5\gamma_4
+      // G_idx = 9: \gamma_5 * \gamma_4
       gm_i[7][0] = 2;
       gm_i[7][1] = 3;
       gm_i[7][2] = 0;
@@ -131,7 +132,6 @@ namespace quda
       g5gm_z[8][2] = -1.;
       g5gm_z[8][3] = -1.;
 
-
       // PSEUDO-SCALAR
       // G_idx = 5: \gamma_5
       gm_i[9][0] = 0;
@@ -145,7 +145,75 @@ namespace quda
       g5gm_z[9][3] = 1.;
 
       // TENSORS
-      // G_idx = 10: (i/2) * [\gamma_1, \gamma_2]
+      // G_idx = 10: \gamma_1 * \gamma_2
+      gm_i[10][0] = 0;
+      gm_i[10][1] = 1;
+      gm_i[10][2] = 2;
+      gm_i[10][3] = 3;
+
+      g5gm_z[10][0] = -i;
+      g5gm_z[10][1] = i;
+      g5gm_z[10][2] = i;
+      g5gm_z[10][3] = -i;
+      
+      // G_idx = 11: \gamma_1 * \gamma_3
+      gm_i[11][0] = 1;
+      gm_i[11][1] = 0;
+      gm_i[11][2] = 3;
+      gm_i[11][3] = 2;
+
+      g5gm_z[11][0] = -1.0;
+      g5gm_z[11][1] =  1.0;
+      g5gm_z[11][2] =  1.0;
+      g5gm_z[11][3] = -1.0;
+      
+      // G_idx = 12: \gamma_1 * \gamma_4
+      gm_i[12][0] = 1;
+      gm_i[12][1] = 0;
+      gm_i[12][2] = 3;
+      gm_i[12][3] = 2;
+
+      g5gm_z[12][0] = i;
+      g5gm_z[12][1] = i;
+      g5gm_z[12][2] = i;
+      g5gm_z[12][3] = i;
+
+      // G_idx = 13: \gamma_2 * \gamma_3
+      gm_i[13][0] = 1;
+      gm_i[13][1] = 0;
+      gm_i[13][2] = 3;
+      gm_i[13][3] = 2;
+
+      g5gm_z[13][0] = i;
+      g5gm_z[13][1] = i;
+      g5gm_z[13][2] = -i;
+      g5gm_z[13][3] = -i;
+
+      // G_idx = 14: \gamma_2 * \gamma_4
+      gm_i[14][0] = 1;
+      gm_i[14][1] = 0;
+      gm_i[14][2] = 3;
+      gm_i[14][3] = 2;
+
+      g5gm_z[14][0] = -1.0;
+      g5gm_z[14][1] =  1.0;
+      g5gm_z[14][2] = -1.0;
+      g5gm_z[14][3] =  1.0;
+      
+      // G_idx = 15: \gamma_3 * \gamma_4
+      gm_i[15][0] = 0;
+      gm_i[15][1] = 1;
+      gm_i[15][2] = 2;
+      gm_i[15][3] = 3;
+
+      g5gm_z[15][0] = i;
+      g5gm_z[15][1] = -i;
+      g5gm_z[15][2] = i;
+      g5gm_z[15][3] = -i;
+      
+#if 0
+      // TENSORS
+      // G_idx = 10: \gamma_1 * \gamma_2
       gm_i[10][0] = 0;
       gm_i[10][1] = 1;
       gm_i[10][2] = 2;
@@ -156,7 +224,7 @@ namespace quda
       g5gm_z[10][2] = -1.;
       g5gm_z[10][3] = 1.;
       
-      // G_idx = 11: (i/2) * [\gamma_1, \gamma_3]. this matrix was corrected
+      // G_idx = 11: \gamma_1 * \gamma_3
       gm_i[11][0] = 1;
       gm_i[11][1] = 0;
       gm_i[11][2] = 3;
@@ -167,7 +235,7 @@ namespace quda
       g5gm_z[11][2] = i;
       g5gm_z[11][3] = -i;
       
-      // G_idx = 12: (i/2) * [\gamma_1, \gamma_4]
+      // G_idx = 12: \gamma_1 * \gamma_4
       gm_i[12][0] = 1;
       gm_i[12][1] = 0;
       gm_i[12][2] = 3;
@@ -178,7 +246,7 @@ namespace quda
       g5gm_z[12][2] = -1.;
       g5gm_z[12][3] = -1.;
 
-      // G_idx = 13: (i/2) * [\gamma_2, \gamma_3]
+      // G_idx = 13: \gamma_2 * \gamma_3
       gm_i[13][0] = 1;
       gm_i[13][1] = 0;
       gm_i[13][2] = 3;
@@ -189,7 +257,7 @@ namespace quda
       g5gm_z[13][2] = -1.;
       g5gm_z[13][3] = -1.;
 
-      // G_idx = 14: (i/2) * [\gamma_2, \gamma_4]
+      // G_idx = 14: \gamma_2 * \gamma_4
       gm_i[14][0] = 1;
       gm_i[14][1] = 0;
       gm_i[14][2] = 3;
@@ -200,7 +268,7 @@ namespace quda
       g5gm_z[14][2] = -i;
       g5gm_z[14][3] = i;
       
-      // G_idx = 15: (i/2) * [\gamma_3, \gamma_4]. this matrix was corrected
+      // G_idx = 15: \gamma_3 * \gamma_4
       gm_i[15][0] = 0;
       gm_i[15][1] = 1;
       gm_i[15][2] = 2;
@@ -210,9 +278,10 @@ namespace quda
       g5gm_z[15][1] = 1.;
       g5gm_z[15][2] = -1.;
       g5gm_z[15][3] = 1.;
+#endif
     };
   };
-
+  
   
   template <int reduction_dim, class T> __device__ int* sink_from_t_xyz(int t, int xyz, T X[4])
   {
@@ -247,7 +316,7 @@ namespace quda
   template <typename Float, int nColor_, int reduction_dim_ = 3>
   struct ContractionSummedArg : public ReduceArg<spinor_array>
   {
-    // This the direction we are performing reduction on. default to 3.
+    // This the direction we are performing reduction on, defaulted to 3.
     static constexpr int reduction_dim = reduction_dim_; 
 
     using real = typename mapper<Float>::type;
