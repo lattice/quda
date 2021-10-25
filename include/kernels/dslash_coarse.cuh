@@ -15,7 +15,7 @@ namespace quda {
   };
 
   // we use two colors per thread unless we have large dim_stride, when we're aiming for maximum parallelism
-  constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && dim_stride <= 2) ? 2 : 1; }
+  constexpr int colors_per_thread(int nColor, int dim_stride) { return (nColor % 2 == 0 && nColor <= 32 && dim_stride <= 2) ? 2 : 1; }
 
   template <bool dslash_, bool clover_, bool dagger_, DslashType type_, int color_stride_, int dim_stride_, typename Float,
             typename yFloat, typename ghostFloat, int nSpin_, int nColor_, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
