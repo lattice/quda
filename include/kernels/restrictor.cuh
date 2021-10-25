@@ -119,7 +119,7 @@ namespace quda {
       int x_fine_offset = thread.x;
       int coarse_color_thread = block.y * arg.block_dim.y + thread.y;
 
-      vector reduced;
+      vector reduced{0};
       if (x_fine_offset < arg.aggregate_size) {
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
@@ -134,7 +134,7 @@ namespace quda {
 
         const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
-        array<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp;
+        array<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp{0};
         rotateCoarseColor(tmp, arg, parity, x_fine_cb, coarse_color_block);
 
         // perform any local spin coarsening

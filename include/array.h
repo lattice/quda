@@ -29,18 +29,9 @@ namespace quda
     constexpr const T &operator[](int i) const { return data[i]; }
     constexpr int size() const { return n; }
 
+    array() = default;
     array(const array<T, n> &) = default;
     array(array<T, n> &&) = default;
-
-    __device__ __host__ constexpr array()
-    {
-      for (int i = 0; i < n; i++) data[i] = zero<T>();
-    }
-    template <typename... U> __device__ __host__ constexpr array(T first, const U... data) : data {first, data...} { }
-    __device__ __host__ constexpr array(T a)
-    {
-      for (auto &e : data) e = a;
-    }
 
     array<T, n> &operator=(const array<T, n> &) = default;
     array<T, n> &operator=(array<T, n> &&) = default;

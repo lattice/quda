@@ -337,7 +337,7 @@ namespace quda
         int m_index = row;
         int n_index = col + 2 * i;
 
-        array value;
+        array value{0};
         if (dagger) {
           if (!check_bounds || (n_index < M && m_index < N)) {
             value[0] = +static_cast<store_type>(__half2float(r2.x) * scale);
@@ -384,7 +384,7 @@ namespace quda
         int m_index = row + (i % 2) * 2;
         int n_index = col + (i / 2) * 4;
 
-        array value;
+        array value{0};
 
         auto scale = fixed ? cc.scale : 1.0f;
         if (dagger) {

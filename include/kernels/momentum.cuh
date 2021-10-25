@@ -83,7 +83,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ reduce_t init() const{ return reduce_t(); }
+    __device__ __host__ reduce_t init() const{ return reduce_t{0.0, 0.0}; }
   };
 
   template <typename Arg> struct MomUpdate {
@@ -125,7 +125,7 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = operator()(reduce_t(f.L1(), f.L2()), norm);
+        norm = operator()(reduce_t{f.L1(), f.L2()}, norm);
 
         m = m + arg.coeff * f;
 

@@ -31,7 +31,7 @@ namespace quda
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
 
-    __device__ __host__ auto init() const { return reduce_t(); }
+    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
   template <typename Arg> struct InvertClover : plus<array<double, 2>> {
@@ -71,7 +71,7 @@ namespace quda
         arg.inverse(x_cb, parity, ch) = Ainv;
       }
 
-      reduce_t result;
+      reduce_t result{0, 0};
       parity ? result[1] = trLogA : result[0] = trLogA;
       return operator()(result, value);
     }

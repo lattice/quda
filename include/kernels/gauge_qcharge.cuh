@@ -25,7 +25,7 @@ namespace quda
       f(Fmunu),
       qDensity(qDensity) { }
 
-    __device__ __host__ auto init() const { return reduce_t(); }
+    __device__ __host__ auto init() const { return reduce_t{0, 0, 0}; }
   };
 
   // Core routine for computing the topological charge from the field strength
@@ -44,7 +44,7 @@ namespace quda
       constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
       constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
 
-      reduce_t E_local;
+      reduce_t E_local{0, 0, 0};
       double &Q = E_local[2];
 
       // Load the field-strength tensor from global memory

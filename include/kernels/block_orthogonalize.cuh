@@ -149,8 +149,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer;
-      BlockReduce<sum_t, block_size> norm_reducer;
+      BlockReduce<dot_t, block_size> dot_reducer{0};
+      BlockReduce<sum_t, block_size> norm_reducer{0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -177,7 +177,7 @@ namespace quda {
           for (int i = 0; i < j; i++) { // compute (j,i) block inner products
             ColorSpinor<real, nColor, spinBlock> vi[n_sites_per_thread];
 
-            dot_t dot;
+            dot_t dot{0};
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               load(vi[tx], parity[tx], x_cb[tx], chirality, i);
@@ -200,7 +200,7 @@ namespace quda {
 #pragma unroll
           for (int m = 0; m < mVec; m++) {
 
-            dot_t dot;
+            dot_t dot{0};
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll

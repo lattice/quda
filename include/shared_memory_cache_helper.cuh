@@ -230,6 +230,13 @@ namespace quda
       array_ = array<T, n>(); // call default constructor
     }
 
+    __device__ __host__ constexpr thread_array(T a) :
+      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
+      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
+    {
+      for (int i = 0; i < n; i++) array_[i] = a;
+    }
+
     __device__ __host__ T& operator[](int i) { return array_[i]; }
     __device__ __host__ const T& operator[](int i) const { return array_[i]; }
   };

@@ -329,7 +329,7 @@ namespace quda {
       int color_block = (sM % (Arg::nColor/Mc)) * Mc;
 
       constexpr int src_idx = 0;
-      array<complex <typename Arg::real>, Mc> out;
+      array<complex <typename Arg::real>, Mc> out{ };
 
       if (Arg::dslash) {
         if (dim == 0)      applyDslash<Mc, 0>(out, dir, x_cb, src_idx, parity, s, color_block, color_offset, arg);

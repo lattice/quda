@@ -28,7 +28,8 @@ namespace quda {
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
       ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true
-      data(data)
+      data(data),
+      result{0, 0}
     {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -36,7 +37,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction(){ return result[0]; }
     double getTheta(){ return result[1]; }
   };
@@ -53,7 +54,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data{0, 0};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];

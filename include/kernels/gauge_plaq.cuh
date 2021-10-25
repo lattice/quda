@@ -35,7 +35,7 @@ namespace quda {
       }
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
   };
 
   template<typename Arg>
@@ -66,7 +66,7 @@ namespace quda {
     // return the plaquette at site (x_cb, parity)
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t plaq;
+      reduce_t plaq{0, 0};
 
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

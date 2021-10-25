@@ -167,12 +167,13 @@ namespace quda {
       ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
+      result{0, 0},
       volume(data.Volume())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction() { return result[0]; }
     double getTheta() { return result[1]; }
   };
@@ -189,7 +190,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data{0, 0};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
