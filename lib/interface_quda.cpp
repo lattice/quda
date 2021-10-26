@@ -2135,9 +2135,8 @@ void spinTasteQuda(void *h_out, void *h_in, int spin_, int taste, QudaInvertPara
 
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
   cudaColorSpinorField in(*in_h, cudaParam);
-  cudaColorSpinorField out(in, cudaParam);
-
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
   cudaColorSpinorField tmp(in, cudaParam);
 
   profileCovDev.TPSTOP(QUDA_PROFILE_INIT);

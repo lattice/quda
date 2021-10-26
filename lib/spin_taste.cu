@@ -14,7 +14,7 @@ namespace quda {
 
   public:
     SpinTastePhase_(ColorSpinorField &out, const ColorSpinorField &in, QudaSpinTasteGamma gamma) :
-      TunableKernel2D(in, 2),
+      TunableKernel2D(in, in.SiteSubset()),
       in(in),
       out(out),
       gamma(gamma)
