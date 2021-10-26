@@ -21,17 +21,39 @@ namespace quda
 
   namespace reducer
   {
-    /** returns the reduce buffer size allocated */
+    /**
+       @return the reduce buffer size allocated
+    */
     size_t buffer_size();
 
+    /**
+       @return pointer to device reduction buffer
+    */
     void *get_device_buffer();
 
+    /**
+       @return pointer to device-mapped host reduction buffer
+    */
     void *get_mapped_buffer();
 
+    /**
+       @return pointer to host reduction buffer
+    */
     void *get_host_buffer();
 
+    /**
+       @brief get_count returns the pointer to the counter array used
+       for tracking the number of completed thread blocks.  We
+       template this function, since the return type is target
+       dependent.
+       @return pointer to the reduction count array.
+     */
     template <typename count_t> count_t *get_count();
 
+    /**
+       @return reference to the event used for synchronizing
+       reductions with the host
+     */
     qudaEvent_t &get_event();
   } // namespace reducer
 

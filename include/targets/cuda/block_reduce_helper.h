@@ -27,9 +27,19 @@ namespace quda
   template <bool> struct warp_reduce;
 
   /**
-     @brief CUDA specialization of warp_reduce
+     @brief CUDA specialization of warp_reduce, utilizing cub::WarpReduce
   */
   template <> struct warp_reduce<true> {
+
+    /**
+       @brief Perform a warp-wide reduction
+       @param[in] value_ thread-local value to be reduced
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       warp (all = false)
+       @param[in] r The reduction operation we which to apply
+       @return The warp-wide reduced value
+     */
     template <typename T, typename reducer_t, typename param_t>
     __device__ inline T operator()(const T &value_, bool all, const reducer_t &r, const param_t &)
     {
@@ -53,18 +63,31 @@ namespace quda
   template <bool> struct block_reduce;
 
   /**
-     @brief CUDA specialization of block_reduce
+     @brief CUDA specialization of block_reduce, utilizing cub::BlockReduce
   */
   template <> struct block_reduce<true> {
+
+    /**
+       @brief Perform a block-wide reduction
+       @param[in] value_ thread-local value to be reduced
+       @param[in] async Whether this reduction will be performed
+       asynchronously with respect to the calling threads
+       @param[in] batch The batch index of the reduction
+       @param[in] all Whether we want all threads to have visibility
+       to the result (all = true) or just the first thread in the
+       block (all = false)
+       @param[in] r The reduction operation we which to apply
+       @return The block-wide reduced value
+     */
     template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool pipeline, int batch, bool all, const reducer_t &r,
+    __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
                                    const param_t &)
     {
       using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                               param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
       static __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
       block_reduce_t block_reduce(storage[batch]);
-      if (!pipeline) __syncthreads(); // only synchronize if we are not pipelining
+      if (!async) __syncthreads(); // only synchronize if we are not pipelining
       T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
 
       if (all) {

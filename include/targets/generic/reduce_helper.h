@@ -20,39 +20,41 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
+  /**
+     @brief ReduceArg is the argument type that all kernel arguments
+     shoud inherit from if the kernel is to utilize global reductions.
+     @tparam T the type that will be reduced
+     @tparam use_kernel_arg Whether the kernel will source the
+     parameter struct as an explicit kernel argument or from constant
+     memory
+   */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
-    qudaError_t launch_error; // only do complete if no launch error to avoid hang
+    qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
 
   private:
-    const int n_reduce; // number of reductions of length n_item
-    bool reset = false; // reset the counter post completion (required for multiple calls with the same arg instance
-    T *partial;
-    T *result_d;
-    T *result_h;
-    count_t *count;
-    bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
+    const int n_reduce; /** number of reductions of length n_item */
+    T *partial; /** device buffer */
+    T *result_d; /** device-mapped host buffer */
+    T *result_h; /** host buffer */
+    count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
 
   public:
     /**
        @brief Constructor for ReduceArg
-       @param[in] n_reduce The number of reductions of length n_item
-       @param[in] reset Whether to reset the atomics after the
-       reduction has completed; required if the same ReduceArg
-       instance will be used for multiple reductions.
+       @param[in] threads The number threads partaking in the kernel
+       @param[in] n_reduce The number of reductions
     */
-    ReduceArg(dim3 threads, int n_reduce = 1, bool reset = false) :
+    ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
       kernel_param<use_kernel_arg>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
       n_reduce(n_reduce),
-      reset(reset),
       partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
       result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
       result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
-      count {reducer::get_count<count_t>()},
-      consumed(false)
+      count {reducer::get_count<count_t>()}
     {
       // check reduction buffers are large enough if requested
       auto max_reduce_blocks = 2 * device::processor_count();
@@ -95,6 +97,8 @@ namespace quda
      variant which require explicit host-device synchronization to
      signal the completion of the reduction to the host.
 
+     @param arg The kernel argument, this must derive from ReduceArg
+     @param r Instance of the reducer to be used in this reduction
      @param in The input per-thread data to be reduced
      @param idx In the case of multiple reductions, idx identifies
      which reduction this thread block corresponds to.  Typically idx

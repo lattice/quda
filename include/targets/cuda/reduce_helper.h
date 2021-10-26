@@ -47,28 +47,36 @@ namespace quda
   template <int block_size_x, int block_size_y = 1, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx = 0);
 
+  /**
+     @brief ReduceArg is the argument type that all kernel arguments
+     shoud inherit from if the kernel is to utilize global reductions.
+     @tparam T the type that will be reduced
+     @tparam use_kernel_arg Whether the kernel will source the
+     parameter struct as an explicit kernel argument or from constant
+     memory
+   */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
-    qudaError_t launch_error; // only do complete if no launch error to avoid hang
+    qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
 
   private:
-    const int n_reduce; // number of reductions of length n_item
-    bool reset = false; // reset the counter post completion (required for multiple calls with the same arg instance
-    using system_atomic_t = typename atomic_type<T>::type;
-    static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t);
-    cuda::atomic<T, cuda::thread_scope_device> *partial;
-    // for heterogeneous atomics we need to use lock-free atomics -> operate on scalars
-    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d;
-    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h;
-    count_t *count;
+    const int n_reduce; /** number of reductions of length n_item */
+    bool reset = false; /** reset the counter post completion (required for multiple calls with the same arg instance */
+    using system_atomic_t = typename atomic_type<T>::type; /** heterogeneous atomics must use lock-free atomics -> operate on scalars */
+    static constexpr int n_item = sizeof(T) / sizeof(system_atomic_t); /** number of words per reduction variable */
+    cuda::atomic<T, cuda::thread_scope_device> *partial; /** device atomic buffer */
+    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_d; /** device-mapped host atomic buffer */
+    cuda::atomic<system_atomic_t, cuda::thread_scope_system> *result_h; /** host atomic buffer */
+    count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
     bool consumed; // check to ensure that we don't complete more than once unless we explicitly reset
 
   public:
     /**
        @brief Constructor for ReduceArg
-       @param[in] n_reduce The number of reductions of length n_item
+       @param[in] threads The number threads partaking in the kernel
+       @param[in] n_reduce The number of reductions
        @param[in] reset Whether to reset the atomics after the
        reduction has completed; required if the same ReduceArg
        instance will be used for multiple reductions.
@@ -146,6 +154,8 @@ namespace quda
      heterogeneous-atomic version which uses std::atomic to signal the
      completion of the reduction to the host.
 
+     @param arg The kernel argument, this must derive from ReduceArg
+     @param r Instance of the reducer to be used in this reduction
      @param in The input per-thread data to be reduced
      @param idx In the case of multiple reductions, idx identifies
      which reduction this thread block corresponds to.  Typically idx
