@@ -401,12 +401,12 @@ namespace quda {
         M5invXpay(out, *tmp1, in, -1.0);
       }
     } else if (symmetric && dagger) {
-      M5inv(*tmp1, in);
       if (this->use_mobius_fused_kernel) {
-        Dslash4M5preM5inv(out, *tmp1, parity[0]);
-        Dslash4M5preXpay(*tmp1, out, parity[1], in, -1.0);
-        out = *tmp1;
+        M5inv(out, in);
+        Dslash4M5preM5inv(*tmp1, out, parity[0]);
+        Dslash4M5preXpay(out, *tmp1, parity[1], in, -1.0);
       } else {
+        M5inv(*tmp1, in);
         Dslash4(out, *tmp1, parity[0]);
         Dslash4pre(*tmp1, out);
         M5inv(out, *tmp1);
@@ -414,12 +414,12 @@ namespace quda {
         Dslash4preXpay(out, *tmp1, in, -1.0);
       }
     } else if (!symmetric && !dagger) {
-      Dslash4pre(*tmp1, in);
       if (this->use_mobius_fused_kernel) {
-        Dslash4M5invM5pre(out, *tmp1, parity[0]);
-        Dslash4XpayM5mob(*tmp1, out, parity[1], in, -1.0);
-        out = *tmp1;
+        Dslash4pre(out, in);
+        Dslash4M5invM5pre(*tmp1, out, parity[0]);
+        Dslash4XpayM5mob(out, *tmp1, parity[1], in, -1.0);
       } else {
+        Dslash4pre(*tmp1, in);
         Dslash4(out, *tmp1, parity[0]);
         M5inv(*tmp1, out);
         Dslash4pre(out, *tmp1);

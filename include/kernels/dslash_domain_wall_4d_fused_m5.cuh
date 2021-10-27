@@ -168,10 +168,17 @@ namespace quda
 
       } else {
 
-        if ((Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS || Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
+        if ((Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS_M5_PRE
              || Arg::dslash5_type == Dslash5Type::M5_PRE_MOBIUS_M5_INV)
             && active) {
           out = stencil_out;
+        }
+
+        if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
+          // Apply the m5inv.
+          constexpr bool sync = false;
+          out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out, my_spinor_parity,
+                                                                                    0, s);
         }
 
         if (xpay && mykernel_type == INTERIOR_KERNEL) {
@@ -182,18 +189,8 @@ namespace quda
           out = x + (xpay ? arg.a_5[s] * out : out);
         }
 
-        /******
-         *  Apply M5inv
-         */
         bool complete = isComplete<mykernel_type>(arg, coord);
         if (complete && active) {
-
-          if (Arg::dslash5_type == Dslash5Type::M5_INV_MOBIUS) {
-            // Apply the m5inv.
-            constexpr bool sync = false;
-            out = variableInv<sync, dagger, shared, Vector, typename Arg::Dslash5Arg>(arg, stencil_out,
-                                                                                      my_spinor_parity, 0, s);
-          }
 
           /******
            *  First apply M5inv, and then M5pre
