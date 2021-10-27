@@ -4,8 +4,7 @@
 #include <color_spinor_field_order.h>
 #include <shared_memory_cache_helper.cuh>
 #include <kernels/madwf_transfer.cuh>
-
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 
 namespace quda
 {

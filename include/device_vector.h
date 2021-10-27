@@ -87,8 +87,4 @@ namespace quda
   void axpby(device_vector<float> &out, float a, const device_vector<float> &x, float b,
       const device_vector<float> &y);
 
-#if 0
-  float inner_product(const device_vector<float> &a, const device_vector<float> &b);
-#endif
-
 }

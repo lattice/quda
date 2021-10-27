@@ -51,7 +51,7 @@ namespace quda {
     rho(param.rho),
     order(param.order),
     create(param.create),
-    trlog {0, 0}
+    trlog {0.0, 0.0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 

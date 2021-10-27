@@ -4,9 +4,6 @@
 #include <madwf_transfer.h>
 #include <kernels/madwf_tensor.cuh>
 
-#include <cub_helper.cuh>
-#include <targets/cuda/quda_cuda_api.h>
-
 namespace quda
 {
   namespace madwf_ml
