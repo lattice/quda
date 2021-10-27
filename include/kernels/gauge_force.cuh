@@ -101,7 +101,7 @@ namespace quda {
     //linkA: current matrix
     //linkB: the loaded matrix in this round
     Link linkA, linkB, staple;
-    thread_array<int, 4> dx(0);
+    thread_array<int, 4> dx{0};
 
     for (int i=0; i<arg.p.num_paths; i++) {
       real coeff = arg.p.path_coeff[i];
