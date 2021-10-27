@@ -225,7 +225,7 @@ namespace quda
     /**
        @brief Perform a block-wide custom reduction
        @param[in] value Thread-local value to be reduced
-       @param[in] r The reduction operation we which to apply
+       @param[in] r The reduction operation we want to apply
        @return Reduced value (defined in logical thread 0 only)
      */
     template <bool async = false, typename reducer_t>
@@ -237,7 +237,7 @@ namespace quda
     /**
        @brief Perform a block-wide custom reduction
        @param[in] value Thread-local value to be reduced
-       @param[in] r The reduction operation we which to apply
+       @param[in] r The reduction operation we want to apply
        @return Reduced value (defined in all threads in the block)
      */
     template <bool async = false, typename reducer_t>
