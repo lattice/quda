@@ -136,9 +136,7 @@ namespace quda {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
 
-    // nullptr == no Kahler-Dirac Xinv
-    const cudaGaugeField *XinvKD = nullptr;
-    StaggeredCoarseOp(Y, X, T, *fatGauge, XinvKD, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

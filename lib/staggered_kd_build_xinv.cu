@@ -2,6 +2,8 @@
 #include <blas_quda.h>
 #include <blas_lapack.h>
 #include <tunable_nd.h>
+
+#include <staggered_kd_build_xinv.h>
 #include <kernels/staggered_coarse_op_kernel.cuh>
 
 namespace quda {
@@ -222,149 +224,163 @@ namespace quda {
   }
 #endif
 
-  // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated, in MILC data order
+  // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated
   void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
 
-    // Xinv should have a MILC gauge order independent of being
-    // on the CPU or GPU
-    if (Xinv.FieldOrder() != QUDA_MILC_GAUGE_ORDER)
-      errorQuda("Unsupported field order %d", Xinv.FieldOrder());
+    QudaFieldLocation location = checkLocation(Xinv, gauge);
+    QudaPrecision precision = checkPrecision(Xinv, gauge);
 
-    QudaPrecision precision = Xinv.Precision();
-    QudaFieldLocation location = Xinv.Location();
+    if (Xinv.Geometry() != QUDA_KDINVERSE_GEOMETRY)
+      errorQuda("Unsupported gauge geometry %d , expected %d for Xinv", Xinv.Geometry(), QUDA_KDINVERSE_GEOMETRY);
 
-    // Logic copied from `staggered_coarse_op.cu`
-    GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
+    // Note: the BatchInvertMatrix abstraction only supports single precision for now,
+    // so we copy a lot of intermediates to single precision early on.
 
-    if (location == QUDA_CPU_FIELD_LOCATION) {
+    // Step 1: build temporary Xinv field in QUDA_MILC_GAUGE_ORDER,
+    // independent of field location. Xinv is always single precision
+    // because it's an intermediate field.
+    std::unique_ptr<GaugeField> xInvMilcOrder(nullptr);
+    {
+      const int ndim = 4;
+      int xc[QUDA_MAX_DIM];
+      for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
+      const int Nc_c = gauge.Ncolor() * 8; // 24
+      const int Ns_c = 2; // staggered parity
+      GaugeFieldParam gParam;
+      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+      gParam.nColor = Nc_c*Ns_c;
+      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+      gParam.order = QUDA_MILC_GAUGE_ORDER;
+      gParam.link_type = QUDA_COARSE_LINKS;
+      gParam.t_boundary = QUDA_PERIODIC_T;
+      gParam.create = QUDA_ZERO_FIELD_CREATE;
+      gParam.setPrecision( QUDA_SINGLE_PRECISION );
+      gParam.nDim = ndim;
+      gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gParam.nFace = 0;
+      gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      gParam.pad = 0;
 
-      //First make a cpu gauge field from the cuda gauge field
-      int pad = 0;
-      GaugeFieldParam gf_param(gauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
-      gf_param.order = QUDA_QDP_GAUGE_ORDER;
-      gf_param.fixed = gauge.GaugeFixed();
-      gf_param.link_type = gauge.LinkType();
-      gf_param.t_boundary = gauge.TBoundary();
-      gf_param.anisotropy = gauge.Anisotropy();
-      gf_param.gauge = NULL;
-      gf_param.create = QUDA_NULL_FIELD_CREATE;
-      gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gf_param.nFace = 1;
-      gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+      if (location == QUDA_CUDA_FIELD_LOCATION)
+        xInvMilcOrder = std::make_unique<cudaGaugeField>(gParam);
+      else if (location == QUDA_CPU_FIELD_LOCATION)
+        xInvMilcOrder = std::make_unique<cpuGaugeField>(gParam);
+      else
+        errorQuda("Invalid field location %d", location);
 
-      U = new cpuGaugeField(gf_param);
+    }
 
-      //Copy the cuda gauge field to the cpu
-      gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
+    // Step 2: build a host or device gauge field as appropriate, but
+    // in any case change to reconstruct 18 so we can use fine-grained
+    // accessors for constructing X. Logic copied from `staggered_coarse_op.cu`
+    bool need_new_U = true;
+    if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO && gauge.Precision() == QUDA_SINGLE_PRECISION)
+      need_new_U = false;
 
-    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+    std::unique_ptr<GaugeField> tmp_U(nullptr);
 
-      // no reconstruct not strictly necessary, for now we do this for simplicity so
-      // we can take advantage of fine-grained access like in "staggered_coarse_op.cu"
-      // technically don't need to require the precision check, but it should
-      // generally be equal anyway
+    if (need_new_U) {
+      if (location == QUDA_CPU_FIELD_LOCATION) {
 
-      // FIXME: make this work for any gauge precision
-      if (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != precision || gauge.Precision() < QUDA_SINGLE_PRECISION) {
+        //First make a cpu gauge field from the cuda gauge field
+        int pad = 0;
+        GaugeFieldParam gf_param(gauge.X(), QUDA_SINGLE_PRECISION, QUDA_RECONSTRUCT_NO, pad, gauge.Geometry());
+        gf_param.order = QUDA_QDP_GAUGE_ORDER;
+        gf_param.fixed = gauge.GaugeFixed();
+        gf_param.link_type = gauge.LinkType();
+        gf_param.t_boundary = gauge.TBoundary();
+        gf_param.anisotropy = gauge.Anisotropy();
+        gf_param.gauge = NULL;
+        gf_param.create = QUDA_NULL_FIELD_CREATE;
+        gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+        gf_param.nFace = 1;
+        gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+
+        tmp_U = std::make_unique<cpuGaugeField>(gf_param);
+
+        //Copy the cuda gauge field to the cpu
+        gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
+
+      } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+
+        // We can assume: gauge.Reconstruct() != QUDA_RECONSTRUCT_NO || gauge.Precision() != QUDA_SINGLE_PRECISION)
         GaugeFieldParam gf_param(gauge);
         gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER; // guaranteed for no recon
-        gf_param.setPrecision( precision == QUDA_DOUBLE_PRECISION ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION );
-        U = new cudaGaugeField(gf_param);
+        gf_param.setPrecision( QUDA_SINGLE_PRECISION );
+        tmp_U = std::make_unique<cudaGaugeField>(gf_param);
 
-        U->copy(gauge);
+        tmp_U->copy(gauge);
       }
     }
 
-    // Create X based on Xinv, but switch to a native ordering
-    // for a GPU setup.
-    GaugeField *X = nullptr;
-    GaugeFieldParam x_param(Xinv);
+    const GaugeField& U = need_new_U ? *tmp_U : reinterpret_cast<const GaugeField&>(gauge);
+
+    // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
+    std::unique_ptr<GaugeField> X(nullptr);
+    GaugeFieldParam x_param(*xInvMilcOrder);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
-      X = static_cast<GaugeField*>(new cudaGaugeField(x_param));
+      X = std::make_unique<cudaGaugeField>(x_param);
     } else {
-      X = static_cast<GaugeField*>(new cpuGaugeField(x_param));
+      X = std::make_unique<cpuGaugeField>(x_param);
     }
 
-    // Calculate X
-    calculateStaggeredKDBlock(*X, *U, mass);
+    // Step 4: Calculate X from U
+    calculateStaggeredKDBlock(*X, U, mass);
 
-    // Invert X
     // Logic copied from `coarse_op_preconditioned.cu`
-    const int n = Xinv.Ncolor();
+    const int n = xInvMilcOrder->Ncolor();
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       // FIXME: add support for double precision inverse
       // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
-      GaugeFieldParam param(Xinv);
+      GaugeFieldParam param(*xInvMilcOrder);
       param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
-      param.setPrecision(QUDA_SINGLE_PRECISION); // FIXME until double prec support is added
+      param.setPrecision(QUDA_SINGLE_PRECISION);
       cudaGaugeField X_(param);
-      cudaGaugeField* Xinv_ = ( Xinv.Precision() == QUDA_SINGLE_PRECISION) ? static_cast<cudaGaugeField*>(&Xinv) : new cudaGaugeField(param);
-
+      
       X_.copy(*X);
 
-      blas::flops += invert((void*)Xinv_->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X->Location());
-      
-      if ( Xinv_ != &Xinv) {
-        if (Xinv.Precision() < QUDA_SINGLE_PRECISION) Xinv.Scale( Xinv_->abs_max() );
-        Xinv.copy(*Xinv_);
-        delete Xinv_;
-      }
+      blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X->Location());
 
     } else if (location == QUDA_CPU_FIELD_LOCATION) {
 
-      if (Xinv.Precision() == QUDA_DOUBLE_PRECISION)
-        errorQuda("Unsupported precision %d", Xinv.Precision());
-
-      const cpuGaugeField *X_h = static_cast<const cpuGaugeField*>(X);
-      cpuGaugeField *Xinv_h = static_cast<cpuGaugeField*>(&Xinv);
-      blas::flops += invert((void*)Xinv_h->Gauge_p(), (void*)X_h->Gauge_p(), n, X_h->Volume(), X->Precision(), X->Location());
-
+      blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X->Gauge_p(), n, X->Volume(), X->Precision(), X->Location());
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
 
-    // Clean up
-    delete X;
-    if (U != &gauge) delete U;
+    // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
+    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder);
 
   }
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  cudaGaugeField* AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const QudaPrecision override_prec)
+  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass)
   {
-    const int ndim = 4;
-    int xc[QUDA_MAX_DIM];
-    for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
-    const int Nc_c = gauge.Ncolor() * 8; // 24
-    const int Ns_c = 2; // staggered parity
-    GaugeFieldParam gParam;
-    memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
+    GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_MILC_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.setPrecision( override_prec );
-    gParam.nDim = ndim;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.geometry = QUDA_KDINVERSE_GEOMETRY;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.nFace = 0;
-    gParam.geometry = QUDA_SCALAR_GEOMETRY;
     gParam.pad = 0;
 
-    cudaGaugeField* Xinv = new cudaGaugeField(gParam);
+    // latter true is to force FLOAT2
+    gParam.setPrecision(gauge.Precision(), true);
+
+    std::unique_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
 
     BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass);
 
     return Xinv;
- }
+  }
 
 } //namespace quda

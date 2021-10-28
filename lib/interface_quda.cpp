@@ -2668,6 +2668,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.
 
+    // If we're doing a staggered or asqtad KD op, a thin update needs to update the
+    // fields for the KD op as well.
+    if (mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
+      if (param->overlap)
+        errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
+
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, param->mass);
+    }
+
   } else {
 
     bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);

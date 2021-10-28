@@ -454,6 +454,7 @@
 #define QUDA_VECTOR_GEOMETRY 4
 #define QUDA_TENSOR_GEOMETRY 6
 #define QUDA_COARSE_GEOMETRY 8
+#define QUDA_KDINVERSE_GEOMETRY 16 // Decomposition of the Kahler-Dirac block
 #define QUDA_INVALID_GEOMETRY QUDA_INVALID_ENUM
 
 #define QudaGhostExchange integer(4)

@@ -167,8 +167,6 @@ namespace quda
   void DiracImprovedStaggeredKD::prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
                                                   ColorSpinorField &b, const QudaSolutionType solType) const
   {
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
@@ -205,11 +203,6 @@ namespace quda
   void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
                                                       const QudaSolutionType) const
   {
-    // do nothing
-
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
-
     checkFullSpinor(x, b);
 
     bool right_block_precond = false;
@@ -231,19 +224,16 @@ namespace quda
     Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
     fatGauge = fat_gauge_in;
     longGauge = long_gauge_in;
-
-    // Recompute Xinv (I guess we should do that here?)
-    BuildStaggeredKahlerDiracInverse(*Xinv, *fatGauge, mass);
   }
 
-  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double,
+  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
                                                 double) const
   {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 
-    // if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
-    //  errorQuda("Staggered KD operators only support aggregation coarsening");
-    // StaggeredCoarseOp(Y, X, T, *fatGauge, Xinv, mass, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Staggered KD operators only support aggregation coarsening");
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *Xinv, mass, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

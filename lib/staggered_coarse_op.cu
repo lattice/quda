@@ -1,3 +1,5 @@
+#include <memory>
+
 #include <transfer.h>
 #include <gauge_field.h>
 #include <tunable_nd.h>
@@ -388,7 +390,8 @@ namespace quda {
 
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
+  // FIXME: the empty GaugeField& is a placeholder for the long links for now
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     checkPrecision(T.Vectors(X.Location()), X, Y);
@@ -430,23 +433,38 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
 #else
-  void calculateStaggeredY(GaugeField &, GaugeField &, const Transfer &, const GaugeField &,
+  void calculateStaggeredY(GaugeField &, GaugeField &, const Transfer &, const GaugeField &, const GaugeField&,
                            const GaugeField &, double, QudaDiracType, QudaMatPCType)
   {
     errorQuda("Staggered multigrid has not been built");
   }
 #endif
 
-//Calculates the coarse color matrix and puts the result in Y.
-  //N.B. Assumes Y, X have been allocated.
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField* XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+  //Calculates the coarse color matrix and puts the result in Y.
+  // N.B. Assumes Y, X have been allocated.
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField &longGauge,
+                         const GaugeField& XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
-    GaugeField *U = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(&gauge) : nullptr;
-    GaugeField *Xinv = location == QUDA_CUDA_FIELD_LOCATION ? const_cast<cudaGaugeField*>(XinvKD) : nullptr;
+    // sanity check long link coarsening
+    if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && &gauge == &longGauge)
+      errorQuda("Dirac type is %d but fat and long gauge links alias", dirac);
+
+    // sanity check KD op coarsening
+    if ((dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && &gauge == &XinvKD)
+      errorQuda("Dirac type is %d but fat links and KD inverse fields alias", dirac);
+
+    if (dirac == QUDA_ASQTADKD_DIRAC && &longGauge == &XinvKD)
+      errorQuda("Dirac type is %d but long links and KD inverse fields alias", dirac);
+
+    if ((dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && XinvKD.Reconstruct() != QUDA_RECONSTRUCT_NO)
+      errorQuda("Invalid reconstruct %d for KD inverse field", XinvKD.Reconstruct());
+
+    std::unique_ptr<GaugeField> tmp_U(nullptr);
+    std::unique_ptr<GaugeField> tmp_L(nullptr);
+    std::unique_ptr<GaugeField> tmp_Xinv(nullptr);
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
       //First make a cpu gauge field from the cuda gauge field
@@ -457,68 +475,117 @@ namespace quda {
       gf_param.link_type = gauge.LinkType();
       gf_param.t_boundary = gauge.TBoundary();
       gf_param.anisotropy = gauge.Anisotropy();
-      gf_param.gauge = NULL;
+      gf_param.gauge = nullptr;
       gf_param.create = QUDA_NULL_FIELD_CREATE;
       gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
       gf_param.nFace = 1;
       gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
-      U = new cpuGaugeField(gf_param);
+      tmp_U = std::make_unique<cpuGaugeField>(gf_param);
 
       //Copy the cuda gauge field to the cpu
-      gauge.saveCPUField(*static_cast<cpuGaugeField*>(U));
-    } else if (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
-      //Create a copy of the gauge field with no reconstruction, required for fine-grained access
-      GaugeFieldParam gf_param(gauge);
-      gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
-      gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gf_param.setPrecision(gf_param.Precision());
-      U = new cudaGaugeField(gf_param);
+      gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
 
-      U->copy(gauge);
+            // Create either a real or a dummy L field
+      GaugeFieldParam lgf_param(longGauge.X(), precision, QUDA_RECONSTRUCT_NO, pad, longGauge.Geometry());
+      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
+        for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
+      lgf_param.order = QUDA_QDP_GAUGE_ORDER;
+      lgf_param.fixed = longGauge.GaugeFixed();
+      lgf_param.link_type = longGauge.LinkType();
+      lgf_param.t_boundary = longGauge.TBoundary();
+      lgf_param.anisotropy = longGauge.Anisotropy();
+      lgf_param.gauge = nullptr;
+      lgf_param.create = QUDA_NULL_FIELD_CREATE;
+      lgf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      lgf_param.nFace = 3;
+      lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+
+      tmp_L = std::make_unique<cpuGaugeField>(lgf_param);
+
+      //Copy the cuda gauge field to the cpu
+      if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
+        longGauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_L));
+
+      // Create either a real or a dummy Xinv field
+      GaugeFieldParam xgf_param(XinvKD.X(), precision, QUDA_RECONSTRUCT_NO, pad, XinvKD.Geometry());
+      if (!(dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC))
+        for (int i = 0; i < xgf_param.nDim; i++) xgf_param.x[i] = 0;
+      xgf_param.order = QUDA_QDP_GAUGE_ORDER;
+      xgf_param.fixed = XinvKD.GaugeFixed();
+      xgf_param.link_type = XinvKD.LinkType();
+      xgf_param.t_boundary = XinvKD.TBoundary();
+      xgf_param.anisotropy = XinvKD.Anisotropy();
+      if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
+        xgf_param.create = QUDA_COPY_FIELD_CREATE;
+      } else {
+        xgf_param.gauge = nullptr;
+        xgf_param.create = QUDA_NULL_FIELD_CREATE;
+      }
+      xgf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+      xgf_param.nFace = 0;
+      xgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+      tmp_Xinv = std::make_unique<cpuGaugeField>(xgf_param);
+
+      //Copy the cuda gauge field to the cpu
+      //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
+      //  XinvKD.saveCPUField(*static_cast<cpuGaugeField*>(Xinv));
+    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+
+      int pad = 0;
+
+      // create some dummy fields if need be
+      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
+        // create a dummy field
+        GaugeFieldParam lgf_param(longGauge);
+        for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
+        lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+        lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+        lgf_param.setPrecision(lgf_param.Precision());
+        lgf_param.create = QUDA_NULL_FIELD_CREATE;
+        tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
+      } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
+        // create a copy of the gauge field with no reconstruction
+        GaugeFieldParam lgf_param(longGauge);
+        lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+        lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+        lgf_param.setPrecision(lgf_param.Precision());
+        tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
+
+        tmp_L->copy(longGauge);
+      }
+
+      if (!(dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
+        // Create a dummy field
+        GaugeFieldParam xgf_param(XinvKD.X(), precision, QUDA_RECONSTRUCT_NO, pad, XinvKD.Geometry());
+        for (int i = 0; i < xgf_param.nDim; i++) xgf_param.x[i] = 0;
+        xgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+        xgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+        xgf_param.setPrecision(xgf_param.Precision());
+        xgf_param.create = QUDA_NULL_FIELD_CREATE;
+        tmp_Xinv = std::make_unique<cudaGaugeField>(xgf_param);
+      }
+      // no need to worry about XinvKD's reconstruct
+
+      if (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
+        //Create a copy of the gauge field with no reconstruction, required for fine-grained access
+        GaugeFieldParam gf_param(gauge);
+        gf_param.reconstruct = QUDA_RECONSTRUCT_NO;
+        gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
+        gf_param.setPrecision(gf_param.Precision());
+        tmp_U = std::make_unique<cudaGaugeField>(gf_param);
+
+        tmp_U->copy(gauge);
+      }
     }
 
-    // Create an Xinv in the spirit of what's done in coarse_op.cu
-    
-    GaugeFieldParam xinvParam;
-    xinvParam.nDim = 4;
-    auto precision_xinv = XinvKD ? XinvKD->Precision() : QUDA_SINGLE_PRECISION;
-    if (precision_xinv < QUDA_HALF_PRECISION) { 
-      precision_xinv = QUDA_HALF_PRECISION;
-    } else if (precision_xinv > QUDA_SINGLE_PRECISION) {
-      precision_xinv = QUDA_SINGLE_PRECISION;
-    }
-    xinvParam.setPrecision( precision_xinv );
-    for (int i = 0; i < xinvParam.nDim; i++) xinvParam.x[i] = XinvKD ? XinvKD->X()[i] : 0;
-    xinvParam.nColor = XinvKD ? XinvKD->Ncolor() : 16 * U->Ncolor();
-    xinvParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    xinvParam.order = QUDA_MILC_GAUGE_ORDER;
-    xinvParam.link_type = QUDA_COARSE_LINKS;
-    xinvParam.t_boundary = QUDA_PERIODIC_T;
-    xinvParam.create = QUDA_NULL_FIELD_CREATE;
-    xinvParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    xinvParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    xinvParam.nFace = 0;
-    xinvParam.geometry = QUDA_SCALAR_GEOMETRY;
-    xinvParam.pad = 0;
+    const GaugeField& U = (location == QUDA_CUDA_FIELD_LOCATION ? reinterpret_cast<const GaugeField&>(gauge) : *tmp_U);
+    const GaugeField& L = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(longGauge) : *tmp_L);
+    const GaugeField& Xinv = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(XinvKD) : *tmp_Xinv);
 
-    if (location == QUDA_CUDA_FIELD_LOCATION && !XinvKD) {
-      // create a dummy GaugeField if one is not defined
-      xinvParam.order = QUDA_INVALID_GAUGE_ORDER;
-      Xinv = new cudaGaugeField(xinvParam);
-      
-      
-    } else if (location == QUDA_CPU_FIELD_LOCATION) {
-      // Create a cpuGaugeField from the cudaGaugeField
-      Xinv = new cpuGaugeField(xinvParam);
-      
-      if (XinvKD) XinvKD->saveCPUField(*static_cast<cpuGaugeField*>(Xinv));
-    }
+    calculateStaggeredY(Y, X, T, U, L, Xinv, mass, dirac, matpc);
 
-    calculateStaggeredY(Y, X, T, *U, *Xinv, mass, dirac, matpc);
-
-    if (U != &gauge) delete U;
-    if (Xinv != XinvKD) delete Xinv;
   }
 
 } //namespace quda

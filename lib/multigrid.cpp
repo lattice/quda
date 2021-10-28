@@ -249,6 +249,23 @@ namespace quda
     popLevel();
   }
 
+  void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, double mass)
+  {
+    if (param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD)
+      errorQuda("Attempting to update fine gauge fields of a \"coarse\" but non-KD operator");
+
+    // last nullptr is for the clover field
+    diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+    diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+    diracCoarseSmootherSloppy->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+
+    diracCoarseResidual->setMass(mass);
+    diracCoarseSmoother->setMass(mass);
+    diracCoarseSmootherSloppy->setMass(mass);
+
+    // to-do: think about updating Xinv
+  }
+
   void MG::pushLevel(int level) const
   {
     postTrace();
@@ -387,8 +404,7 @@ namespace quda
         fine_gauge = const_cast<cudaGaugeField *>(
           reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getFatLinkField());
 
-      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(),
-                                                           param.mg_global.invert_param->cuda_prec_precondition);
+      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass());
 
       DiracParam diracParamKD;
       diracParamKD.kappa
@@ -399,7 +415,7 @@ namespace quda
       diracParamKD.dagger = QUDA_DAG_NO;
       diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
       diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
-      diracParamKD.xInvKD = xInvKD;
+      diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
 
       diracParamKD.tmp1 = tmp_coarse;
       diracParamKD.tmp2 = tmp2_coarse;
@@ -440,11 +456,12 @@ namespace quda
       diracParam.mu_factor = param.mg_global.mu_factor[param.level + 1] - param.mg_global.mu_factor[param.level];
 
       // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
-      // preconditioned, we have to force bi-directional builds.
+      // preconditioned, or a KD op, we have to force bi-directional builds.
       diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
       for (int i = 0; i <= param.level; i++) {
-        if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
-            && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+            && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) ||
+            (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD)) {
           diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
         }
       }
@@ -712,8 +729,6 @@ namespace quda
     if (tmp_coarse) delete tmp_coarse;
     if (tmp2_coarse) delete tmp2_coarse;
 
-    if (xInvKD) delete xInvKD;
-
     if (param_coarse) delete param_coarse;
 
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
@@ -892,13 +907,36 @@ namespace quda
     spinorNoise(*tmp_coarse, *rng, QUDA_NOISE_UNIFORM);
 #endif
 
-    // the three-hop terms break the verification b/c the coarse ops don't have the long links baked in
-    // need a more robust fix to this
-    if ((param.transfer_type == QUDA_TRANSFER_AGGREGATE || param.transfer_type == QUDA_TRANSFER_COARSE_KD)
-        && diracSmoother->getDiracType() != QUDA_ASQTAD_DIRAC && diracSmoother->getDiracType() != QUDA_ASQTADPC_DIRAC
-        && diracSmoother->getDiracType() != QUDA_ASQTADKD_DIRAC) {
+    // put a non-trivial vector on the fine level as well
+    transfer->P(*tmp1, *tmp_coarse);
 
-      transfer->P(*tmp1, *tmp_coarse);
+    // the three-hop terms in ASQTAD can break the verification depending on how we're coarsening the operator
+    // and if the aggregate size is too small in a direction
+    bool can_verify = true;
+
+    if (param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC || 
+                                                              diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC)) {
+      // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0
+      can_verify = false;
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
+    } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
+      // If we're doing anything with the asqtad operator, the long links can make verification difficult
+
+      if (param.transfer_type == QUDA_TRANSFER_COARSE_KD) {
+        can_verify = false;
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using the naively coarsened KD operator with asqtad long links, skipping verify...\n");
+      } else if (param.transfer_type == QUDA_TRANSFER_AGGREGATE || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+        // need to see if the aggregate is smaller than 3 in any direction
+        for (int d = 0; d < 4; d++) {
+          if (param.mg_global.geo_block_size[param.level][d] < 3) {
+            can_verify = false;
+            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Aggregation geo_block_size[%d] = %d is less than 3, skipping verify for asqtad coarsen...\n", d, param.mg_global.geo_block_size[param.level][d]);
+          }
+        }
+      }
+    }
+
+    if (can_verify) {
 
       if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
         double kappa = diracResidual->Kappa();
@@ -961,8 +999,6 @@ namespace quda
         printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(*x_coarse), r_nrm, deviation);
 
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
-    } else {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("...skipping check due to long links\n"); // asqtad operator only
     }
 
     // check the preconditioned operator construction on the lower level if applicable

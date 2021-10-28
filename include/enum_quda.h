@@ -500,6 +500,7 @@ typedef enum QudaFieldGeometry_s {
   QUDA_VECTOR_GEOMETRY = 4,
   QUDA_TENSOR_GEOMETRY = 6,
   QUDA_COARSE_GEOMETRY = 8,
+  QUDA_KDINVERSE_GEOMETRY = 16, // Decomposition of Kahler-Dirac block
   QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
 } QudaFieldGeometry;
 

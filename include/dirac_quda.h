@@ -43,7 +43,7 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     cudaCloverField *clover;
-    cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
+    GaugeField* xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -1259,7 +1259,7 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField* Xinv; /** inverse Kahler-Dirac matrix */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1463,7 +1463,7 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField* Xinv; /** inverse Kahler-Dirac matrix */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);

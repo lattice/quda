@@ -31,6 +31,7 @@ namespace quda {
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else if (geometry == QUDA_KDINVERSE_GEOMETRY) siteDim = 1 << nDim;
     else errorQuda("Unknown geometry type %d", geometry);
 
     // compute the correct bytes size for these padded field orders
@@ -107,6 +108,7 @@ namespace quda {
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else if (geometry == QUDA_KDINVERSE_GEOMETRY) siteDim = 1 << nDim;
     else errorQuda("Unknown geometry type %d", geometry);
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {

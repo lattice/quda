@@ -153,8 +153,6 @@ namespace quda
   void DiracStaggeredKD::prepareSpecialMG(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
                                           ColorSpinorField &b, const QudaSolutionType solType) const
   {
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
       errorQuda("Preconditioned solution requires a preconditioned solve_type");
     }
@@ -190,11 +188,6 @@ namespace quda
 
   void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const
   {
-    // do nothing
-
-    // TODO: technically KD is a different type of preconditioning.
-    // Should we support "preparing" and "reconstructing"?
-
     checkFullSpinor(x, b);
 
     bool right_block_precond = false;
@@ -213,18 +206,15 @@ namespace quda
   void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
-
-    // Recompute Xinv (I guess we should do that here?)
-    BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
   }
 
-  void DiracStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double) const
+  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double, double) const
   {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 
-    // if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
-    //  errorQuda("Staggered KD operators only support aggregation coarsening");
-    // StaggeredCoarseOp(Y, X, T, *gauge, Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
+      errorQuda("Staggered KD operators only support aggregation coarsening");
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
