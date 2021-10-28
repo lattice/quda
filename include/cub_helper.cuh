@@ -20,4 +20,8 @@ using namespace quda;
 struct __half { };
 #endif
 
+#if CUDA_VERSION >= 11000
 #include <cub/block/block_reduce.cuh>
+#else
+#include <cub_legacy/block/block_reduce.cuh>
+#endif
