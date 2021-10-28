@@ -8,16 +8,21 @@
 
 namespace quda {
 
-  template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineColor, int coarseSpin, int coarseColor, bool dagger_approximation, typename Arg>
   class CalculateStaggeredGeometryReorder : public TunableKernel3D {
 
     Arg &arg;
     const GaugeField &xInvCoarse;
     GaugeField &meta;
 
-    long long flops() const { 
-      // just a permutation
-      return 0ll;
+    long long flops() const {
+      if (dagger_approximation) {
+        // rescale of all values
+        return meta.Volume() * Arg::kdBlockSize * fineColor * fineColor * 2ll;
+      } else {
+        // just a permutation
+        return 0ll;
+      }
     }
 
     long long bytes() const
@@ -41,8 +46,7 @@ namespace quda {
       strcat(aux,",computeStaggeredGeometryReorder");
       strcat(aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && xInvCoarse.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
              meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
-      strcat(aux,"coarse_vol=");
-      strcat(aux,xInvCoarse.VolString());
+      if (dagger_approximation) strcat(aux, "dagger_approximation");
     }
 
     void apply(const qudaStream_t &stream)
@@ -70,9 +74,10 @@ namespace quda {
      @param xInvCoarse[in] KD inverse coarse lattice field accessor
      @param xInvFine_[out] KD inverse fine gauge in KD geometry
      @param xInvCoarse_[in] KD inverse coarse lattice field
+     @param scale[in] Scaling factor for the reorder
    */
-  template<typename Float, int fineColor, int coarseSpin, int coarseColor, typename fineXinv, typename coarseXinv>
-  void calculateStaggeredGeometryReorder(fineXinv &xInvFine, coarseXinv &xInvCoarse, GaugeField &xInvFine_, const GaugeField &xInvCoarse_)
+  template<typename Float, int fineColor, int coarseSpin, int coarseColor, bool dagger_approximation, typename fineXinv, typename coarseXinv>
+  void calculateStaggeredGeometryReorder(fineXinv &xInvFine, coarseXinv &xInvCoarse, GaugeField &xInvFine_, const GaugeField &xInvCoarse_, const Float scale)
   {
     // sanity checks
     if (fineColor != 3)
@@ -97,15 +102,16 @@ namespace quda {
     x_size[4] = xc_size[4] = 1;
 
     // Calculate X (KD block), which is really just a permutation of the gauge fields w/in a KD block
-    using Arg = CalculateStaggeredGeometryReorderArg<Float,coarseSpin,fineColor,coarseColor,fineXinv,coarseXinv>;
-    Arg arg(xInvFine, xInvCoarse, x_size, xc_size);
-    CalculateStaggeredGeometryReorder<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, xInvFine_, xInvCoarse_);
+    using Arg = CalculateStaggeredGeometryReorderArg<Float,coarseSpin,fineColor,coarseColor,dagger_approximation,fineXinv,coarseXinv>;
+    Arg arg(xInvFine, xInvCoarse, x_size, xc_size, scale);
+    CalculateStaggeredGeometryReorder<Float, fineColor, coarseSpin, coarseColor, dagger_approximation, Arg> y(arg, xInvFine_, xInvCoarse_);
 
     QudaFieldLocation location = checkLocation(xInvFine_, xInvCoarse_);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Permuting KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // We know exactly what the scale should be: the max of the input inverse clover
     double max_scale = xInvCoarse_.abs_max();
+    if (dagger_approximation) max_scale *= (1.01 * abs(scale));
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global xInv_max = %e\n", max_scale);
 
     if (fineXinv::fixedPoint()) {
@@ -119,8 +125,8 @@ namespace quda {
 
   }
 
-  template <typename Float, typename vFloat, int fineColor>
-  void calculateStaggeredGeometryReorder(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout)
+  template <typename Float, typename vFloat, int fineColor, bool dagger_approximation>
+  void calculateStaggeredGeometryReorder(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout, const Float scale)
   {
     constexpr int coarseSpin = 2;
     constexpr int coarseColor = 8 * fineColor;
@@ -140,7 +146,7 @@ namespace quda {
       xInvFine xInvFineAccessor(xInvFineLayout);
       xInvCoarse xInvCoarseAccessor(const_cast<GaugeField&>(xInvCoarseLayout));
 
-      calculateStaggeredGeometryReorder<Float,fineColor,coarseSpin,coarseColor>(xInvFineAccessor, xInvCoarseAccessor, xInvFineLayout, xInvCoarseLayout);
+      calculateStaggeredGeometryReorder<Float,fineColor,coarseSpin,coarseColor,dagger_approximation>(xInvFineAccessor, xInvCoarseAccessor, xInvFineLayout, xInvCoarseLayout, scale);
 
     } else {
 
@@ -156,14 +162,29 @@ namespace quda {
       xInvFine xInvFineAccessor(const_cast<GaugeField&>(xInvFineLayout));
       xInvCoarse xInvCoarseAccessor(const_cast<GaugeField&>(xInvCoarseLayout));
 
-      calculateStaggeredGeometryReorder<Float,fineColor,coarseSpin,coarseColor>(xInvFineAccessor, xInvCoarseAccessor, xInvFineLayout, xInvCoarseLayout);
+      calculateStaggeredGeometryReorder<Float,fineColor,coarseSpin,coarseColor,dagger_approximation>(xInvFineAccessor, xInvCoarseAccessor, xInvFineLayout, xInvCoarseLayout, scale);
     }
 
   }
 
+  // template on dagger approximation
+  template <typename Float, typename vFloat, int fineColor>
+  void calculateStaggeredGeometryReorder(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout, const bool dagger_approximation, const double mass)
+  {
+    if (dagger_approximation) {
+      // approximate the inverse with the dagger: the free field for staggered, 
+      // B^-1 = 1 / (4 * (d + mass^2)), where the 4 is due to the factor of 2 convention
+      Float scale = static_cast<Float>(1. / (4. * (xInvFineLayout.Ndim() + mass * mass)));
+      calculateStaggeredGeometryReorder<Float,vFloat,fineColor,true>(xInvFineLayout, xInvCoarseLayout, scale);
+    } else {
+      Float scale = static_cast<Float>(1);
+      calculateStaggeredGeometryReorder<Float,vFloat,fineColor,false>(xInvFineLayout, xInvCoarseLayout, scale);
+    }
+  }
+
   // template on "fine", consistent coarse colors
   template <typename Float, typename vFloat>
-  void calculateStaggeredGeometryReorder(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout)
+  void calculateStaggeredGeometryReorder(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout, const bool dagger_approximation, const double mass)
   {
     const int fineColor = xInvFineLayout.Ncolor();
     constexpr int coarseSpin = 2;
@@ -173,14 +194,14 @@ namespace quda {
       errorQuda("Inconsistent fine color %d and coarse color %d", fineColor, coarseColor);
 
     if (xInvFineLayout.Ncolor() == 3) {
-      calculateStaggeredGeometryReorder<Float,vFloat,3>(xInvFineLayout, xInvCoarseLayout);
+      calculateStaggeredGeometryReorder<Float,vFloat,3>(xInvFineLayout, xInvCoarseLayout, dagger_approximation, mass);
     } else {
       errorQuda("Unsupported number of colors %d\n", xInvFineLayout.Ncolor());
     }
   }
 
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout, const bool dagger_approximation, const double mass) {
 
     QudaFieldLocation location = checkLocation(xInvFineLayout, xInvCoarseLayout);
     QudaPrecision precision = checkPrecision(xInvFineLayout, xInvCoarseLayout);
@@ -193,12 +214,12 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
     if (xInvFineLayout.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateStaggeredGeometryReorder<float,float>(xInvFineLayout, xInvCoarseLayout);
+      calculateStaggeredGeometryReorder<float,float>(xInvFineLayout, xInvCoarseLayout, dagger_approximation, mass);
     } else
 #endif
 #if QUDA_PRECISION & 2
     if (xInvFineLayout.Precision() == QUDA_HALF_PRECISION) {
-      calculateStaggeredGeometryReorder<float, short>(xInvFineLayout, xInvCoarseLayout);
+      calculateStaggeredGeometryReorder<float, short>(xInvFineLayout, xInvCoarseLayout, dagger_approximation, mass);
     } else
 #endif
     {
@@ -206,7 +227,7 @@ namespace quda {
     }
   }
 #else
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &) {
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &, const GaugeField &, const bool, const double) {
     errorQuda("Staggered fermion support has not been built");
   }
 #endif

@@ -5,7 +5,7 @@
 
 namespace quda {
 
-  template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_,
+  template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_, bool dagger_approximation_,
             typename fineGauge, typename coarseGauge>
   struct CalculateStaggeredGeometryReorderArg : kernel_param<> {
 
@@ -15,6 +15,8 @@ namespace quda {
     static constexpr int fineColor = fineColor_;
     static constexpr int coarseColor = coarseColor_;
     static_assert(8 * fineColor == coarseColor, "requires 8 * fineColor == coarseColor");
+
+    static constexpr bool dagger_approximation = dagger_approximation_;
 
     static constexpr int kdBlockSize = 16;
     static_assert(kdBlockSize == QUDA_KDINVERSE_GEOMETRY, "KD block size must match geometry");
@@ -32,15 +34,18 @@ namespace quda {
     const int fineVolumeCB;     /** Fine grid volume */
     const int coarseVolumeCB;   /** Coarse grid volume */
 
+    const real scale; /** Dagger approximation scale value */
+
     static constexpr int coarse_color = coarseColor;
 
-    CalculateStaggeredGeometryReorderArg(fineGauge &fineXinv, const coarseGauge &coarseXinv,  const int *x_size_, const int *xc_size_) :
+    CalculateStaggeredGeometryReorderArg(fineGauge &fineXinv, const coarseGauge &coarseXinv,  const int *x_size_, const int *xc_size_, const real scale) :
       kernel_param(dim3(fineXinv.VolumeCB(), kdBlockSize, 2)),
       fineXinv(fineXinv),
       coarseXinv(coarseXinv),
       spin_map(),
       fineVolumeCB(fineXinv.VolumeCB()),
-      coarseVolumeCB(coarseXinv.VolumeCB())
+      coarseVolumeCB(coarseXinv.VolumeCB()),
+      scale(scale)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
@@ -95,7 +100,11 @@ namespace quda {
       for (int ic_f = 0; ic_f < Arg::fineColor; ic_f++) {
 #pragma unroll
         for (int jc_f = 0; jc_f < Arg::fineColor; jc_f++) {
-          arg.fineXinv(g_f,parity,x_cb,ic_f,jc_f) = arg.coarseXinv(0,coarse_parity,coarse_x_cb,is_c,js_c,ic_c_base + Arg::kdBlockSizeCB * ic_f,jc_c_base + Arg::kdBlockSizeCB * jc_f);
+          if (Arg::dagger_approximation) {
+            arg.fineXinv(g_f,parity,x_cb,ic_f,jc_f) = arg.scale * conj(arg.coarseXinv(0,coarse_parity,coarse_x_cb,js_c,is_c,jc_c_base + Arg::kdBlockSizeCB * jc_f,ic_c_base + Arg::kdBlockSizeCB * ic_f));
+          } else {
+            arg.fineXinv(g_f,parity,x_cb,ic_f,jc_f) = arg.coarseXinv(0,coarse_parity,coarse_x_cb,is_c,js_c,ic_c_base + Arg::kdBlockSizeCB * ic_f,jc_c_base + Arg::kdBlockSizeCB * jc_f);
+          }
         }
       }
     }

@@ -19,8 +19,10 @@ namespace quda
      @brief Perform the reordering of the Kahler-Dirac inverse block from a coarse scalar field to a KD geometry gauge field
      @param[out] out Kahler-Dirac inverse in KD geometry gauge field
      @param[in] in Kahler-Dirac inverse in coarse geometry MILC layout
+     @param[in] dagger_approximation whether or not we're doing the dagger approximation, where you pass in X instead
+     @param[in] mass mass of the original staggered operator w/out factor of 2 convention, needed for dagger approx
   */
-  void ReorderStaggeredKahlerDiracInverse(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout);
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout, const bool dagger_approximation, const double mass);
 
   /**
      @brief Allocate and build the Kahler-Dirac inverse block for KD operators

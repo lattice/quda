@@ -15,7 +15,7 @@ namespace quda {
     const GaugeField &meta;
     GaugeField &X;
 
-    long long flops() const { 
+    long long flops() const {
       // only real work is multiplying the mass by two
       return arg.coarseVolumeCB*coarseSpin*coarseColor;
     }
@@ -321,42 +321,55 @@ namespace quda {
     const GaugeField& U = need_new_U ? *tmp_U : reinterpret_cast<const GaugeField&>(gauge);
 
     // Step 3: Create the X field based on Xinv, but switch to a native ordering for a GPU setup.
-    std::unique_ptr<GaugeField> X(nullptr);
+    std::unique_ptr<GaugeField> tmp_X(nullptr);
     GaugeFieldParam x_param(*xInvMilcOrder);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       x_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       x_param.setPrecision(x_param.Precision());
-      X = std::make_unique<cudaGaugeField>(x_param);
+      tmp_X = std::make_unique<cudaGaugeField>(x_param);
     } else {
-      X = std::make_unique<cpuGaugeField>(x_param);
+      tmp_X = std::make_unique<cpuGaugeField>(x_param);
     }
+    GaugeField& X = *tmp_X;
 
     // Step 4: Calculate X from U
-    calculateStaggeredKDBlock(*X, U, mass);
+    calculateStaggeredKDBlock(X, U, mass);
 
-    // Logic copied from `coarse_op_preconditioned.cu`
-    const int n = xInvMilcOrder->Ncolor();
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      // FIXME: add support for double precision inverse
-      // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
-      GaugeFieldParam param(*xInvMilcOrder);
-      param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
-      param.setPrecision(QUDA_SINGLE_PRECISION);
-      cudaGaugeField X_(param);
-      
-      X_.copy(*X);
+    // FIXME: expose on command line, though empirically we've seen
+    // this leads to poorer conditioned operator. Might be worth it because
+    // we could apply the dagger approx. operator directly without
+    // building the KD block, though
+    constexpr bool dagger_approximation = false;
 
-      blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X->Location());
+    if (dagger_approximation) {
+      xInvMilcOrder->copy(X);
+    } else {
+      // Logic copied from `coarse_op_preconditioned.cu`
+      const int n = xInvMilcOrder->Ncolor();
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        // FIXME: add support for double precision inverse
+        // Reorder to MILC order for inversion, based on "coarse_op_preconditioned.cu"
+        GaugeFieldParam param(*xInvMilcOrder);
+        param.order = QUDA_MILC_GAUGE_ORDER; // MILC order == QDP order for Xinv
+        param.setPrecision(QUDA_SINGLE_PRECISION);
+        cudaGaugeField X_(param);
+        
+        X_.copy(X);
 
-    } else if (location == QUDA_CPU_FIELD_LOCATION) {
+        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X_.Gauge_p(), n, X_.Volume(), X_.Precision(), X.Location());
 
-      blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X->Gauge_p(), n, X->Volume(), X->Precision(), X->Location());
+      } else if (location == QUDA_CPU_FIELD_LOCATION) {
+
+        blas::flops += invert((void*)xInvMilcOrder->Gauge_p(), (void*)X.Gauge_p(), n, X.Volume(), X.Precision(), X.Location());
+      }
+
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
+
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvMilcOrder = %e\n", xInvMilcOrder->norm2(0));
-
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
-    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder);
+    // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
+    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);    
 
   }
 
