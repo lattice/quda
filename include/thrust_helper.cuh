@@ -13,9 +13,6 @@
 #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
-// needed for newer versions of thrust/cub
-#define CUB_NS_QUALIFIER cub
-
 // hack required to silence a thrust complaint with clang-11
 #if defined(__clang__) && defined(__CUDA__)
 #define _CubLog(...)
