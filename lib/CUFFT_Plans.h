@@ -1,10 +1,14 @@
-
-#ifndef CUFFT_PLANS_H
-#define CUFFT_PLANS_H
+#pragma once
 
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <cufft.h>
+
+#ifndef GPU_GAUGE_ALG
+
+#define CUFFT_SAFE_CALL(call)
+
+#else
 
 /*-------------------------------------------------------------------------------*/
 #define CUFFT_SAFE_CALL( call) {                                      \
@@ -16,11 +20,10 @@
     } }
 /*-------------------------------------------------------------------------------*/
 
-
-
 /**
- * @brief Call CUFFT to perform a single-precision complex-to-complex transform plan in the transform direction 
-as specified by direction parameter
+ * @brief Call CUFFT to perform a single-precision complex-to-complex
+ * transform plan in the transform direction as specified by direction
+ * parameter
  * @param[in] CUFFT plan
  * @param[in] data_in, pointer to the complex input data (in GPU memory) to transform
  * @param[out] data_out, pointer to the complex output data (in GPU memory)
@@ -30,8 +33,8 @@ inline void ApplyFFT(cufftHandle &plan, float2 *data_in, float2 *data_out, int d
   CUFFT_SAFE_CALL(cufftExecC2C(plan, (cufftComplex *)data_in, (cufftComplex *)data_out, direction));
 }
 
-/*
- * @brief Call CUFFT to perform a double-precision complex-to-complex transform plan in the transform direction 
+/**
+ * @brief Call CUFFT to perform a double-precision complex-to-complex transform plan in the transform direction
 as specified by direction parameter
  * @param[in] CUFFT plan
  * @param[in] data_in, pointer to the complex input data (in GPU memory) to transform
@@ -128,6 +131,4 @@ inline void SetPlanFFT2DMany( cufftHandle &plan, int4 size, int dim, double2 *da
   //printf("Created 2D FFT Plan in Double Precision\n");
 }
 
-
 #endif
-

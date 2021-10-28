@@ -13,19 +13,21 @@
 namespace quda {
 
   CloverFieldParam::CloverFieldParam(const CloverField &a) :
-      LatticeFieldParam(a),
-      direct(false),
-      inverse(false),
-      clover(NULL),
-      norm(NULL),
-      cloverInv(NULL),
-      invNorm(NULL),
-      csw(a.Csw()),
-      twisted(a.Twisted()),
-      mu2(a.Mu2()),
-      rho(a.Rho()),
-      order(a.Order()),
-      create(QUDA_NULL_FIELD_CREATE)
+    LatticeFieldParam(a),
+    direct(a.V(false)),
+    inverse(a.V(true)),
+    clover(nullptr),
+    norm(nullptr),
+    cloverInv(nullptr),
+    invNorm(nullptr),
+    csw(a.Csw()),
+    coeff(a.Coeff()),
+    twisted(a.Twisted()),
+    mu2(a.Mu2()),
+    rho(a.Rho()),
+    order(a.Order()),
+    create(QUDA_NULL_FIELD_CREATE),
+    location(a.Location())
   {
     precision = a.Precision();
     nDim = a.Ndim();
@@ -36,8 +38,8 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), rho(param.rho),
-    order(param.order), create(param.create), trlog{0, 0}
+    clover(0), norm(0), cloverInv(0), invNorm(0), csw(param.csw), coeff(param.coeff), 
+    rho(param.rho), order(param.order), create(param.create), trlog{0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -57,17 +59,22 @@ namespace quda {
     twisted = false;//param.twisted;
     mu2 = 0.0; //param.mu2;
   }
-  
+
   CloverField::~CloverField() { }
 
-  bool CloverField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
+  CloverField *CloverField::Create(const CloverFieldParam &param)
+  {
+
+    CloverField *field = nullptr;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuCloverField(param);
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaCloverField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
     }
-    return false;
+
+    return field;
   }
 
   void CloverField::setRho(double rho_)
@@ -76,7 +83,7 @@ namespace quda {
   }
 
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
-    
+
     if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) 
       errorQuda("Create type %d not supported", create);
 
@@ -92,7 +99,7 @@ namespace quda {
 
       even = clover;
       odd = static_cast<char*>(clover) + bytes/2;
-    
+
       evenNorm = norm;
       oddNorm = static_cast<char*>(norm) + norm_bytes/2;
 
@@ -107,7 +114,7 @@ namespace quda {
 	evenInvNorm = evenNorm;
 	oddInvNorm = oddNorm;
       }
-    } 
+    }
 
     if (param.inverse) {
       if (create != QUDA_REFERENCE_FIELD_CREATE) {
@@ -121,7 +128,7 @@ namespace quda {
 
       evenInv = cloverInv;
       oddInv = static_cast<char*>(cloverInv) + bytes/2;
-    
+
       evenInvNorm = invNorm;
       oddInvNorm = static_cast<char*>(invNorm) + norm_bytes/2;
 
@@ -148,124 +155,12 @@ namespace quda {
       oddInvNorm = oddNorm;
     }
 
-#ifdef USE_TEXTURE_OBJECTS
-    createTexObject(tex, normTex, clover, norm, true);
-    createTexObject(invTex, invNormTex, cloverInv, invNorm, true);
-
-    createTexObject(evenTex, evenNormTex, even, evenNorm, false);
-    createTexObject(oddTex, oddNormTex, odd, oddNorm, false);
-
-    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm, false);
-    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm, false);
-#endif
     twisted = param.twisted;
     mu2 = param.mu2;
-
   }
-
-#ifdef USE_TEXTURE_OBJECTS
-  void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
-					void *field, void *norm, bool full) {
-    if (isNative()) {
-      // create the texture for the field components
-      
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
-      
-      // always four components regardless of precision
-      desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
-      int texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
-
-      cudaResourceDesc resDesc;
-      memset(&resDesc, 0, sizeof(resDesc));
-      resDesc.resType = cudaResourceTypeLinear;
-      resDesc.res.linear.devPtr = field;
-      resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
-
-      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
-          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
-        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-                  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
-      }
-
-      unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
-      if (texels > (unsigned)deviceProp.maxTexture1DLinear) {
-	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
-      }
-
-      cudaTextureDesc texDesc;
-      memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-        texDesc.readMode = cudaReadModeNormalizedFloat;
-      else
-        texDesc.readMode = cudaReadModeElementType;
-
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-      checkCudaError();
-      
-      // create the texture for the norm components
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	desc.f = cudaChannelFormatKindFloat;
-	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
-	
-	cudaResourceDesc resDesc;
-	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeLinear;
-	resDesc.res.linear.devPtr = norm;
-	resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
-
-        if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
-          errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
-        }
-
-        cudaTextureDesc texDesc;
-        memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.readMode = cudaReadModeElementType;
-
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
-	checkCudaError();
-      }
-    }
-
-  }
-
-  void cudaCloverField::destroyTexObject() {
-    if (isNative()) {
-      cudaDestroyTextureObject(tex);
-      cudaDestroyTextureObject(invTex);
-      cudaDestroyTextureObject(evenTex);
-      cudaDestroyTextureObject(oddTex);
-      cudaDestroyTextureObject(evenInvTex);
-      cudaDestroyTextureObject(oddInvTex);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaDestroyTextureObject(normTex);
-	cudaDestroyTextureObject(invNormTex);
-	cudaDestroyTextureObject(evenNormTex);
-	cudaDestroyTextureObject(oddNormTex);
-	cudaDestroyTextureObject(evenInvNormTex);
-	cudaDestroyTextureObject(oddInvNormTex);
-      }
-      checkCudaError();
-    }
-  }
-#endif
 
   cudaCloverField::~cudaCloverField()
   {
-#ifdef USE_TEXTURE_OBJECTS
-    destroyTexObject();
-#endif
-
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover != cloverInv) {
 	if (clover) pool_device_free(clover);
@@ -274,14 +169,12 @@ namespace quda {
       if (cloverInv) pool_device_free(cloverInv);
       if (invNorm) pool_device_free(invNorm);
     }
-    
-    checkCudaError();
   }
 
   void cudaCloverField::copy(const CloverField &src, bool inverse) {
 
     checkField(src);
-    
+
     if (typeid(src) == typeid(cudaCloverField)) {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
@@ -297,7 +190,7 @@ namespace quda {
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
           qudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
-      
+
       if (src.V(true) && inverse) {
 	copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
 	qudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
@@ -334,7 +227,6 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    checkCudaError();
   }
 
   void cudaCloverField::loadCPUField(const cpuCloverField &cpu) { copy(cpu); }
@@ -365,25 +257,110 @@ namespace quda {
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");
-    } 
+    }
 
     pool_pinned_free(packClover);
 
     qudaDeviceSynchronize();
-    checkCudaError();
+  }
+
+  void cudaCloverField::copy_to_buffer(void *buffer) const
+  {
+
+    size_t buffer_offset = 0;
+    if (V(false)) { // direct
+      qudaMemcpy(buffer, clover, bytes, cudaMemcpyDeviceToHost);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+      buffer_offset += bytes + norm_bytes;
+    }
+
+    if (V(true)) { // inverse
+      qudaMemcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        qudaMemcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+      }
+    }
+  }
+
+  void cudaCloverField::copy_from_buffer(void *buffer)
+  {
+
+    size_t buffer_offset = 0;
+    if (V(false)) { // direct
+      qudaMemcpy(clover, static_cast<char *>(buffer), bytes, cudaMemcpyHostToDevice);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, cudaMemcpyHostToDevice);
+      }
+      buffer_offset += bytes + norm_bytes;
+    }
+
+    if (V(true)) { // inverse
+      qudaMemcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes, cudaMemcpyHostToDevice);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        qudaMemcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes, cudaMemcpyHostToDevice);
+      }
+    }
+  }
+
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
+  }
+
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
+                                 QudaParity parity) const
+  {
+    if (is_prefetch_enabled()) {
+      auto clover_parity = clover;
+      auto norm_parity = norm;
+      auto cloverInv_parity = cloverInv;
+      auto invNorm_parity = invNorm;
+      auto bytes_parity = bytes;
+      auto norm_bytes_parity = norm_bytes;
+      if (parity != QUDA_INVALID_PARITY) {
+        bytes_parity /= 2;
+        norm_bytes_parity /= 2;
+        if (parity == QUDA_EVEN_PARITY) {
+          clover_parity = even;
+          norm_parity = evenNorm;
+          cloverInv_parity = evenInv;
+          invNorm_parity = evenInvNorm;
+        } else { // odd
+          clover_parity = odd;
+          norm_parity = oddNorm;
+          cloverInv_parity = oddInv;
+          invNorm_parity = oddInvNorm;
+        }
+      }
+
+      switch (type) {
+      case CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE:
+        if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
+        if (norm_parity) qudaMemPrefetchAsync(norm_parity, norm_bytes_parity, mem_space, stream);
+        if (clover_parity != cloverInv_parity) {
+          if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+          if (invNorm_parity) qudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, mem_space, stream);
+        }
+        break;
+      case CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE:
+        if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
+        if (norm_parity) qudaMemPrefetchAsync(norm_parity, norm_bytes_parity, mem_space, stream);
+        break;
+      case CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE:
+        if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+        if (invNorm_parity) qudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, mem_space, stream);
+        break;
+      default: errorQuda("Invalid CloverPrefetchType.");
+      }
+    }
   }
 
   /**
      Computes Fmunu given the gauge field U
   */
-  void cudaCloverField::compute(const cudaGaugeField &gauge) {
-
-    if (gauge.Precision() != precision) 
-      errorQuda("Gauge and clover precisions must match");
-
-    computeClover(*this, gauge, 1.0, QUDA_CUDA_FIELD_LOCATION);
-
-  }
+  void cudaCloverField::compute(const cudaGaugeField &gauge) { computeClover(*this, gauge, 1.0); }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
 
@@ -414,12 +391,49 @@ namespace quda {
     if (param.pad != 0) errorQuda("%s pad must be zero", __func__);
   }
 
-  cpuCloverField::~cpuCloverField() { 
+  cpuCloverField::~cpuCloverField()
+  {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (clover) host_free(clover);
       if (norm) host_free(norm);
       if (cloverInv) host_free(cloverInv);
-      if (invNorm) host_free(invNorm);      
+      if (invNorm) host_free(invNorm);
+    }
+  }
+
+  void cpuCloverField::copy_to_buffer(void *buffer) const
+  {
+
+    size_t buffer_offset = 0;
+    if (V(false)) { // direct
+      std::memcpy(static_cast<char *>(buffer), clover, bytes);
+      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes); }
+      buffer_offset += bytes + norm_bytes;
+    }
+
+    if (V(true)) { // inverse
+      std::memcpy(static_cast<char *>(buffer) + buffer_offset, cloverInv, bytes);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        std::memcpy(static_cast<char *>(buffer) + buffer_offset + bytes, invNorm, norm_bytes);
+      }
+    }
+  }
+
+  void cpuCloverField::copy_from_buffer(void *buffer)
+  {
+
+    size_t buffer_offset = 0;
+    if (V(false)) { // direct
+      std::memcpy(clover, static_cast<char *>(buffer), bytes);
+      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes); }
+      buffer_offset += bytes + norm_bytes;
+    }
+
+    if (V(true)) { // inverse
+      std::memcpy(cloverInv, static_cast<char *>(buffer) + buffer_offset, bytes);
+      if (precision < QUDA_SINGLE_PRECISION) {
+        std::memcpy(invNorm, static_cast<char *>(buffer) + buffer_offset + bytes, norm_bytes);
+      }
     }
   }
 
@@ -434,6 +448,7 @@ namespace quda {
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "invNorm = "   << param.invNorm << std::endl;
     output << "csw = "       << param.csw << std::endl;
+    output << "coeff = "     << param.coeff << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
     output << "rho = "       << param.rho << std::endl;

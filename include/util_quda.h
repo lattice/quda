@@ -73,7 +73,6 @@ namespace quda {
     if (zeroThread) printf(__VA_ARGS__);				\
   } while (0)
 
-
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
@@ -85,18 +84,18 @@ namespace quda {
   }                                                    \
 } while (0)
 
-#define errorQuda(...) do {                                                  \
-  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                  \
-  fprintf(getOutputFile(), __VA_ARGS__);                                     \
-  fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", \
-          comm_rank(), comm_hostname(), __LINE__, __func__);                 \
-  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
-	  getOutputPrefix(), getLastTuneKey().name,			     \
-	  getLastTuneKey().volume, getLastTuneKey().aux);	             \
-  fflush(getOutputFile());                                                   \
-  quda::saveTuneCache(true);						\
-  comm_abort(1);                                                             \
-} while (0)
+#define errorQuda(...)                                                                                                 \
+  do {                                                                                                                 \
+    fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \
+    fprintf(getOutputFile(), __VA_ARGS__);                                                                             \
+    fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", comm_rank_global(), comm_hostname(),    \
+            __LINE__, __func__);                                                                                       \
+    fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", getOutputPrefix(),        \
+            getLastTuneKey().name, getLastTuneKey().volume, getLastTuneKey().aux);                                     \
+    fflush(getOutputFile());                                                                                           \
+    quda::saveTuneCache(true);                                                                                         \
+    comm_abort(1);                                                                                                     \
+  } while (0)
 
 #define warningQuda(...) do {                                   \
   if (getVerbosity() > QUDA_SILENT) {				\
@@ -141,13 +140,11 @@ namespace quda {
 
 #endif // MULTI_GPU
 
-
-#define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error)); \
-} while (0)
-
+#define checkCudaErrorNoSync()                                                                                         \
+  do {                                                                                                                 \
+    cudaError_t error = cudaGetLastError();                                                                            \
+    if (error != cudaSuccess) errorQuda("(CUDA) %s", cudaGetErrorString(error));                                       \
+  } while (0)
 
 #ifdef HOST_DEBUG
 
@@ -162,5 +159,11 @@ namespace quda {
 
 #endif // HOST_DEBUG
 
+#ifdef __CUDA_ARCH__
+// hide from device code
+#undef errorQuda
+#define errorQuda(...)
+
+#endif
 
 #endif // _UTIL_QUDA_H

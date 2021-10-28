@@ -7,14 +7,14 @@
 #include <numa_affinity.h>
 #include <quda_internal.h>
 
-#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+#ifdef NUMA_NVML
 #include <nvml.h>
 #endif
 
 
 int setNumaAffinityNVML(int devid)
 {
-#if ((CUDA_VERSION >= 6000) && defined NUMA_NVML)
+#ifdef NUMA_NVML
   nvmlReturn_t result;
 
   result = nvmlInit();

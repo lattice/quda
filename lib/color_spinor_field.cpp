@@ -20,9 +20,10 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
+    if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
-        param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type);
+           param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -33,25 +34,28 @@ namespace quda {
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
-        field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type);
+           field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type, field.suggested_parity);
   }
 
   ColorSpinorField::~ColorSpinorField() {
     destroy();
   }
 
-  void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const {
-
+  void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
+  {
     if ( typeid(*this) == typeid(cpuColorSpinorField) || ghost_precision_allocated == ghost_precision ) return;
 
-    // For Wilson we half the number of effective faces if the fields are spin projected.
-    int num_faces = ((nSpin == 4 && spin_project) ? 1 : 2) * nFace;
-    int num_norm_faces = 2*nFace;
+    bool is_fixed = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION);
+    int nSpinGhost = (nSpin == 4 && spin_project) ? 2 : nSpin;
+    size_t site_size = nSpinGhost * nColor * 2 * ghost_precision + (is_fixed ? sizeof(float) : 0);
 
     // calculate size of ghost zone required
-    int ghostVolume = 0;
+    int ghost_volume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
-    int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
+    int x5 = nDim == 5 ? x[4] : 1; /// includes DW and non-degenerate TM ghosts
+    const int ghost_align
+      = 1; // TODO perhaps in the future we should align each ghost dim/dir, e.g., along 32-byte boundaries
+    ghost_bytes = 0;
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
       if (comm_dim_partitioned(i)) {
@@ -60,50 +64,20 @@ namespace quda {
 	  if (i==j) continue;
 	  ghostFace[i] *= x[j];
 	}
-	ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
-	if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
-	ghostVolume += ghostFace[i];
-      }
-      if (i==0) {
-	ghostOffset[i][0] = 0;
-      } else {
-        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-          ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/ghost_precision;
-          // Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
-          ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
-        } else {
-	  ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
-        }
+        ghostFace[i] *= x5; // temporary hack : extra dimension for DW ghosts
+        if (i == 0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
+        ghost_volume += 2 * nFace * ghostFace[i];
       }
 
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-        ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
-        ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/ghost_precision;
-	// Ensure that start of ghostOffset is aligned on four word boundaries (check if this is needed)
-        ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
-        ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*ghost_precision/sizeof(float);
-      } else {
-        ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
-      }
-
-      int Nint = nColor * nSpin * 2 / (nSpin == 4 && spin_project ? 2 : 1); // number of internal degrees of freedom
-      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*ghost_precision;
-      if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
-
-      if(GhostOffset(i,0)%FieldOrder()) errorQuda("ghostOffset(%d,0) %d is not a multiple of FloatN\n", i, GhostOffset(i,0));
-      if(GhostOffset(i,1)%FieldOrder()) errorQuda("ghostOffset(%d,1) %d is not a multiple of FloatN\n", i, GhostOffset(i,1));
+      ghost_face_bytes[i] = nFace * ghostFace[i] * site_size;
+      ghost_face_bytes_aligned[i] = ((ghost_face_bytes[i] + ghost_align - 1) / ghost_align) * ghost_align;
+      ghost_offset[i][0] = i == 0 ? 0 : ghost_offset[i - 1][0] + 2 * ghost_face_bytes_aligned[i - 1];
+      ghost_offset[i][1] = ghost_offset[i][0] + ghost_face_bytes_aligned[i];
+      ghost_bytes += 2 * ghost_face_bytes_aligned[i];
 
       ghostFaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET ? ghostFace[i] / 2 : ghostFace[i]);
     } // dim
 
-    int ghostNormVolume = num_norm_faces * ghostVolume;
-    ghostVolume *= num_faces;
-
-    size_t ghost_length = ghostVolume*nColor*nSpin*2;
-    size_t ghost_norm_length = (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ? ghostNormVolume : 0;
-
-    ghost_bytes = (size_t)ghost_length*ghost_precision;
-    if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
     if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
 
     { // compute temporaries needed by dslash and packing kernels
@@ -169,8 +143,9 @@ namespace quda {
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-      QudaGammaBasis gammaBasis, QudaPCType pc_type)
+                                QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder,
+                                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type,
+                                QudaParity suggested_parity)
   {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
@@ -187,11 +162,13 @@ namespace quda {
     twistFlavor = Twistflavor;
 
     this->pc_type = pc_type;
+    this->suggested_parity = suggested_parity;
 
     precision = Prec;
+    // Copy all data in X
+    for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = X[d];
     volume = 1;
     for (int d=0; d<nDim; d++) {
-      x[d] = X[d];
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
@@ -274,8 +251,8 @@ namespace quda {
     {
       int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
-                           volume, stride, precision, nSpin, nColor);
+      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
+                           stride, precision, fieldOrder, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
         strcpy(aux_tmp, aux_string);
@@ -305,7 +282,7 @@ namespace quda {
       }
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor, src.precision, src.pad, src.siteSubset,
-          src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
+             src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type, src.suggested_parity);
     }
     return *this;
   }
@@ -319,6 +296,7 @@ namespace quda {
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
     if (param.pc_type != QUDA_PC_INVALID) pc_type = param.pc_type;
+    if (param.suggested_parity != QUDA_INVALID_PARITY) suggested_parity = param.suggested_parity;
 
     if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
     if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
@@ -421,7 +399,8 @@ namespace quda {
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
     param.pc_type = pc_type;
-    param.create = QUDA_INVALID_FIELD_CREATE;
+    param.suggested_parity = suggested_parity;
+    param.create = QUDA_NULL_FIELD_CREATE;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const {
@@ -563,23 +542,6 @@ namespace quda {
       comm_free(mh_from_back[i]);
       comm_free(mh_from_fwd[i]);
     }
-  }
-
-  bool ColorSpinorField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION ||
-	       (precision == QUDA_HALF_PRECISION && nColor == 3) ||
-         (precision == QUDA_QUARTER_PRECISION && nColor == 3)) {
-      if (nSpin == 4) {
-	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
-      } else if (nSpin == 2) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      } else if (nSpin == 1) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      }
-    }
-    return false;
   }
 
   // For kernels with precision conversion built in
@@ -777,14 +739,59 @@ namespace quda {
     return field;
   }
 
+  ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
+  {
+    if (param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
+    ColorSpinorParam param(param_);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.v = V();
+
+    // if norm field in the source exists, use it, else use the second
+    // half of main field for norm storage, ensuring that the start of
+    // the norm field is on an alignment boundary if we're using an
+    // internal field
+    if (param.Precision() < QUDA_SINGLE_PRECISION) {
+      auto norm_offset = (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) ?
+        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2 * ALIGNMENT_ADJUST(Bytes() / 4) : ALIGNMENT_ADJUST(Bytes() / 2) :
+        0;
+      param.norm = Norm() ? Norm() : static_cast<char *>(V()) + norm_offset;
+    }
+
+    auto alias = ColorSpinorField::Create(param);
+
+    if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
+    if (alias->Precision() < QUDA_SINGLE_PRECISION) {
+      // check that norm does not overlap with body
+      if (static_cast<char *>(alias->V()) + alias->Bytes() > alias->Norm())
+        errorQuda("Overlap between alias body and norm");
+      // check that norm does fall off the end
+      if (static_cast<char *>(alias->Norm()) + alias->NormBytes() > static_cast<char *>(V()) + Bytes())
+        errorQuda("Norm is not contained in the srouce field");
+    }
+
+    return alias;
+  }
+
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin
 
-    coarseParam.nColor = Nvec;
+    int geoBlockVolume = 1;
+    for (int d = 0; d < nDim; d++) { geoBlockVolume *= geoBlockSize[d]; }
+
+    // Detect if the "coarse" op is the Kahler-Dirac op or something else
+    // that still acts on a fine staggered ColorSpinorField
+    if (geoBlockVolume == 1 && Nvec == nColor && nSpin == 1) {
+      coarseParam.nSpin = nSpin;
+      coarseParam.nColor = nColor;
+    } else {
+      coarseParam.nSpin = (nSpin == 1) ? 2 : (nSpin / spinBlockSize); // coarsening staggered check
+      coarseParam.nColor = Nvec;
+    }
+
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -834,13 +841,11 @@ namespace quda {
 
     // for GPU fields, always use native ordering to ensure coalescing
     if (new_location == QUDA_CUDA_FIELD_LOCATION) {
-      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.Precision()!= QUDA_DOUBLE_PRECISION) ?
-	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+      fineParam.setPrecision(new_precision, new_precision, true);
     } else {
       fineParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      fineParam.setPrecision(new_precision);
     }
-
-    fineParam.setPrecision(new_precision);
 
     // set where we allocate the field
     fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
@@ -865,6 +870,8 @@ namespace quda {
     out << "nDim = " << a.nDim << std::endl;
     for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;
+    out << "pc_type = " << a.pc_type << std::endl;
+    out << "suggested_parity = " << a.suggested_parity << std::endl;
     out << "precision = " << a.precision << std::endl;
     out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "pad = " << a.pad << std::endl;

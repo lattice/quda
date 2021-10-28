@@ -56,10 +56,8 @@ namespace quda {
        @param[in] gauge Gauge field
        @param[out] unitarization_failed Whether the unitarization failed (number of failures)
     */
-    void unitarizeForce(cudaGaugeField &newForce,
-                        const cudaGaugeField &oldForce,
-                        const cudaGaugeField &gauge,
-                        int* unitarization_failed);
+    void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &gauge,
+                        int *unitarization_failed);
 
     /**
        @brief Unitarize the fermion force on CPU
@@ -67,9 +65,7 @@ namespace quda {
        @param[in] oldForce Input force
        @param[in] gauge Gauge field
     */
-    void unitarizeForceCPU(cpuGaugeField &newForce,
-                           const cpuGaugeField &oldForce,
-                           const cpuGaugeField &gauge);
+    void unitarizeForceCPU(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &gauge);
 
  } // namespace fermion_force
 }  // namespace quda

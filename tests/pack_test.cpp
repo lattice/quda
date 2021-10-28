@@ -6,8 +6,9 @@
 #include <gauge_field.h>
 #include <util_quda.h>
 
-#include <test_util.h>
-#include <dslash_util.h>
+#include <host_utils.h>
+#include <command_line_params.h>
+#include <dslash_reference.h>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -25,16 +26,6 @@ ColorSpinorParam csParam;
 
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern char latfile[];
-extern int gridsize_from_cmdline[];
     
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
@@ -62,10 +53,8 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) {
-    qdpCpuGauge_p[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
-  }
-  cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = malloc(V * gauge_site_size * param.cpu_prec); }
+  cpsCpuGauge_p = malloc(4 * V * gauge_site_size * param.cpu_prec);
 
   csParam.nColor = 3;
   csParam.nSpin = 4;
@@ -84,7 +73,7 @@ void init() {
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  initQuda(device);
+  initQuda(device_ordinal);
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
@@ -109,8 +98,8 @@ void end() {
 
 void packTest() {
 
-  printf("Sending fields to GPU...\n"); fflush(stdout);
-  
+  printfQuda("Sending fields to GPU...\n");
+
 #ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
@@ -118,23 +107,20 @@ void packTest() {
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
-    cpsParam.setPrecision(param.cuda_prec);
     cpsParam.reconstruct = param.reconstruct;
+    cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cpsParam.order = (cpsParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      cpsParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
     cudaCpsGauge.loadCPUField(cpsCpuGauge);
     double cpsGtime = stopwatchReadSeconds();
-    printf("CPS Gauge send time = %e seconds\n", cpsGtime);
+    printfQuda("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
     cudaCpsGauge.saveCPUField(cpsCpuGauge);
     double cpsGRtime = stopwatchReadSeconds();
-    printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+    printfQuda("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
 #endif
 
@@ -145,23 +131,20 @@ void packTest() {
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
-    qdpParam.setPrecision(param.cuda_prec);
     qdpParam.reconstruct = param.reconstruct;
+    qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    qdpParam.order = (qdpParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      qdpParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
     cudaQdpGauge.loadCPUField(qdpCpuGauge);
     double qdpGtime = stopwatchReadSeconds();
-    printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+    printfQuda("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
     cudaQdpGauge.saveCPUField(qdpCpuGauge);
     double qdpGRtime = stopwatchReadSeconds();
-    printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+    printfQuda("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
 #endif
 
@@ -169,34 +152,29 @@ void packTest() {
 
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
+  printfQuda("Spinor send time = %e seconds\n", sSendTime);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
-  printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
-  
+  printfQuda("Spinor receive time = %e seconds\n", sRecTime);
+
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);
   double spinor2_norm = blas::norm2(*spinor2);
 
-  printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
-	 spinor_norm, cuda_spinor_norm, spinor2_norm);
+  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
 
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
-
 }
 
-extern void usage(char**);
-
 int main(int argc, char **argv) {
-  for (int i=1; i<argc; i++){    
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

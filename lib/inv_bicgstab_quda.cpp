@@ -14,9 +14,11 @@ namespace quda {
   // set the required parameters for the inner solver
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer);
 
-  BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
-
+  BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    init(false)
+  {
   }
 
   BiCGstab::~BiCGstab() {

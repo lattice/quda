@@ -8,9 +8,8 @@
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
-
+#include <instantiate.h>
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -21,22 +20,24 @@
 
 namespace quda {
 
-#ifdef GPU_GAUGE_ALG
-
-  template <typename Gauge>
+  template <typename Float, int nColor_, QudaReconstructType recon_>
   struct InitGaugeColdArg {
+    static constexpr int nColor = nColor_;
+    static constexpr QudaReconstructType recon = recon_;
+    using real = typename mapper<Float>::type;
+    using Gauge = typename gauge_mapper<real, recon>::type;
     int threads; // number of active threads required
     int X[4]; // grid dimensions
     Gauge dataOr;
-    InitGaugeColdArg(const Gauge &dataOr, const cudaGaugeField &data)
-      : dataOr(dataOr) {
+    InitGaugeColdArg(const GaugeField &data)
+      : dataOr(data) {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
     }
   };
 
-  template<typename Float, typename Gauge, int NCOLORS>
-  __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
+  template <typename Arg> __global__ void compute_InitGauge_ColdStart(Arg arg)
+  {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if ( idx >= arg.threads ) return;
     int parity = 0;
@@ -44,148 +45,68 @@ namespace quda {
       parity = 1;
       idx -= arg.threads / 2;
     }
-    Matrix<complex<Float>,NCOLORS> U;
+    Matrix<complex<typename Arg::real>, Arg::nColor> U;
     setIdentity(&U);
     for ( int d = 0; d < 4; d++ ) arg.dataOr(d, idx, parity) = U;
   }
 
-
-  template<typename Float, typename Gauge, int NCOLORS>
+  template <typename Float, int nColor, QudaReconstructType recon>
   class InitGaugeCold : Tunable {
-    InitGaugeColdArg<Gauge> arg;
-    mutable char aux_string[128]; // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; }  // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
+    InitGaugeColdArg<Float, nColor, recon> arg;
+    const GaugeField &meta;
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false;}
+    unsigned int minThreads() const { return arg.threads; }
+
+  public:
+    InitGaugeCold(GaugeField &data) :
+      arg(data),
+      meta(data)
+    {
+      apply(0);
     }
 
-    public:
-    InitGaugeCold(InitGaugeColdArg<Gauge> &arg)
-      : arg(arg) {
-    }
-    ~InitGaugeCold () {
-    }
-
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
-      //cudaDeviceSynchronize();
+      qudaLaunchKernel(compute_InitGauge_ColdStart<decltype(arg)>, tp, stream, arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
-
-    long long flops() const {
-      return 0;
-    }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
-    long long bytes() const {
-      return 0;
-    }                                  //no accounting the reduction!!!!
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    long long flops() const { return 0; }
+    long long bytes() const { return meta.Bytes(); }
   };
 
-  template<typename Float, int NCOLORS, typename Gauge>
-  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data) {
-    InitGaugeColdArg<Gauge> initarg(dataOr, data);
-    InitGaugeCold<Float, Gauge, NCOLORS> init(initarg);
-    init.apply(0);
-    checkCudaError();
-  }
-
-
-
-  template<typename Float>
-  void InitGaugeField( cudaGaugeField& data) {
-
-    if ( data.isNative() ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data);
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else {
-      errorQuda("Invalid Gauge Order\n");
-    }
-
-  }
-
-/** @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
- *
- * @param[in,out] data Gauge field
- */
-  void InitGaugeField( cudaGaugeField& data) {
-
-    if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
-      InitGaugeField<float> (data);
-    } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
-      InitGaugeField<double>(data);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
-    
-  }
-
-
-
-
-
-
-
-
-  template <typename Gauge>
+  template <typename Float, int nColor_, QudaReconstructType recon_>
   struct InitGaugeHotArg {
+    static constexpr int nColor = nColor_;
+    static constexpr QudaReconstructType recon = recon_;
+    using real = typename mapper<Float>::type;
+    using Gauge = typename gauge_mapper<real, recon>::type;
     int threads; // number of active threads required
     int X[4]; // grid dimensions
     RNG rngstate;
-#ifdef MULTI_GPU
     int border[4];
-#endif
     Gauge dataOr;
-    InitGaugeHotArg(const Gauge &dataOr, const cudaGaugeField &data, RNG &rngstate)
-      : dataOr(dataOr), rngstate(rngstate) {
-#ifdef MULTI_GPU
+    InitGaugeHotArg(const GaugeField &data, RNG &rngstate) :
+      dataOr(data),
+      rngstate(rngstate)
+    {
       for ( int dir = 0; dir < 4; ++dir ) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;
       } 
-#else
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-#endif
+
       //the optimal number of RNG states in rngstate array must be equal to half the lattice volume
       //this number is the same used in heatbath...
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
     }
   };
 
-
   template <typename Float>
-  __host__ __device__ static inline void reunit_link( Matrix<complex<Float>,3> &U ){
-
+  __host__ __device__ static inline void reunit_link( Matrix<complex<Float>,3> &U )
+  {
     complex<Float> t2((Float)0.0, (Float)0.0);
     Float t1 = 0.0;
     //first normalize first row
@@ -223,16 +144,11 @@ namespace quda {
     //T=130
   }
 
-
-
-
-
-
-/**
-    @brief Generate the four random real elements of the SU(2) matrix
-    @param localstate CURAND rng state
-    @return four real numbers of the SU(2) matrix
- */
+  /**
+     @brief Generate the four random real elements of the SU(2) matrix
+     @param localstate CURAND rng state
+     @return four real numbers of the SU(2) matrix
+  */
   template <class T>
   __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
     Matrix<T,2> a;
@@ -248,13 +164,12 @@ namespace quda {
     return a;
   }
 
-
-/**
-    @brief Update the SU(Nc) link with the new SU(2) matrix, link <- u * link
-    @param u SU(2) matrix represented by four real numbers
-    @param link SU(Nc) matrix
-    @param id indices
- */
+  /**
+     @brief Update the SU(Nc) link with the new SU(2) matrix, link <- u * link
+     @param u SU(2) matrix represented by four real numbers
+     @param link SU(Nc) matrix
+     @param id indices
+  */
   template <class T, int NCOLORS>
   __host__ __device__ static inline void mul_block_sun( Matrix<T,2> u, Matrix<complex<T>,NCOLORS> &link, int2 id ){
     for ( int j = 0; j < NCOLORS; j++ ) {
@@ -264,12 +179,11 @@ namespace quda {
     }
   }
 
-
-/**
-    @brief Calculate the SU(2) index block in the SU(Nc) matrix
-    @param block number to calculate the index's, the total number of blocks is NCOLORS * ( NCOLORS - 1) / 2.
-    @return Returns two index's in int2 type, accessed by .x and .y.
- */
+  /**
+     @brief Calculate the SU(2) index block in the SU(Nc) matrix
+     @param block number to calculate the index's, the total number of blocks is NCOLORS * ( NCOLORS - 1) / 2.
+     @return Returns two index's in int2 type, accessed by .x and .y.
+  */
   template<int NCOLORS>
   __host__ __device__ static inline int2 IndexBlock(int block){
     int2 id;
@@ -292,13 +206,14 @@ namespace quda {
     return id;
   }
 
-/**
-    @brief Generate a SU(Nc) random matrix
-    @param localstate CURAND rng state
-    @return SU(Nc) matrix
- */
+  /**
+     @brief Generate a SU(Nc) random matrix
+     @param localstate CURAND rng state
+     @return SU(Nc) matrix
+  */
   template <class Float, int NCOLORS>
-  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState ){
+  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState )
+  {
     Matrix<complex<Float>,NCOLORS> U;
 
     for ( int i = 0; i < NCOLORS; i++ )
@@ -317,147 +232,85 @@ namespace quda {
        return U;*/
   }
 
-  template<typename Float, typename Gauge, int NCOLORS>
-  __global__ void compute_InitGauge_HotStart(InitGaugeHotArg<Gauge> arg){
+  template<typename Arg> __global__ void compute_InitGauge_HotStart(Arg arg)
+  {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if ( idx >= arg.threads ) return;
-  #ifdef MULTI_GPU
     int X[4], x[4];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
     int id = idx;
     cuRNGState localState = arg.rngstate.State()[ id ];
-  #else
-    cuRNGState localState = arg.rngstate.State()[ idx ];
-  #endif
-    for ( int parity = 0; parity < 2; parity++ ) {
-    #ifdef MULTI_GPU
+    for (int parity = 0; parity < 2; parity++) {
       getCoords(x, id, arg.X, parity);
-      for ( int dr = 0; dr < 4; ++dr ) x[dr] += arg.border[dr];
+      for (int dr = 0; dr < 4; dr++) x[dr] += arg.border[dr];
       idx = linkIndex(x,X);
-    #endif
-      for ( int d = 0; d < 4; d++ ) {
-        Matrix<complex<Float>,NCOLORS> U;
-        U = randomize<Float, NCOLORS>(localState);
+      for (int d = 0; d < 4; d++) {
+        Matrix<complex<typename Arg::real>, Arg::nColor> U;
+        U = randomize<typename Arg::real, Arg::nColor>(localState);
         arg.dataOr(d, idx, parity) = U;
       }
     }
-  #ifdef MULTI_GPU
     arg.rngstate.State()[ id ] = localState;
-  #else
-    arg.rngstate.State()[ idx ] = localState;
-  #endif
   }
 
-
-
-
-  template<typename Float, typename Gauge, int NCOLORS>
+  template<typename Float, int nColors, QudaReconstructType recon>
   class InitGaugeHot : Tunable {
-    InitGaugeHotArg<Gauge> arg;
-    mutable char aux_string[128]; // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
+    InitGaugeHotArg<Float, nColors, recon> arg;
+    const GaugeField &meta;
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
+
+  public:
+    InitGaugeHot(GaugeField &data, RNG &rngstate) :
+      arg(data, rngstate),
+      meta(data)
+    {
+      apply(0);
+      qudaDeviceSynchronize();
+      data.exchangeExtendedGhost(data.R(),false);
     }
 
-    public:
-    InitGaugeHot(InitGaugeHotArg<Gauge> &arg)
-      : arg(arg) {
-    }
-    ~InitGaugeHot () {
-    }
-
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
-      //cudaDeviceSynchronize();
+      qudaLaunchKernel(compute_InitGauge_HotStart<decltype(arg)>, tp, stream, arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lud", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     void preTune(){ arg.rngstate.backup(); }
     void postTune(){ arg.rngstate.restore(); }
-    long long flops() const {
-      return 0;
-    }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
-    long long bytes() const {
-      return 0;
-    }                                  //no accounting the reduction!!!!
-
+    long long flops() const { return 0; }
+    long long bytes() const { return meta.Bytes(); }
   };
 
-
-  template<typename Float, int NCOLORS, typename Gauge>
-  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate) {
-    InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
-    InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
-    init.apply(0);
-    checkCudaError();
-    qudaDeviceSynchronize();
-
-    data.exchangeExtendedGhost(data.R(),false);
-  }
-
-  template<typename Float>
-  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
-
-    if ( data.isNative() ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else {
-      errorQuda("Invalid Gauge Order\n");
-    }
-  }
-#endif // GPU_GAUGE_ALG
-
-/** @brief Perform a hot start to the gauge field, random SU(3) matrix, followed by reunitarization, also exchange borders links in multi-GPU case.
- *
- * @param[in,out] data Gauge field
- * @param[in,out] rngstate state of the CURAND random number generator
- */
-  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
+  /**
+   * @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
+   *
+   * @param[in,out] data Gauge field
+   */
+  void InitGaugeField(GaugeField& data) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
-      InitGaugeField<float> (data, rngstate);
-    } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
-      InitGaugeField<double>(data, rngstate);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
+    instantiate<InitGaugeCold>(data);
 #else
     errorQuda("Pure gauge code has not been built");
 #endif
   }
+
+  /** @brief Perform a hot start to the gauge field, random SU(3) matrix, followed by reunitarization, also exchange borders links in multi-GPU case.
+   *
+   * @param[in,out] data Gauge field
+   * @param[in,out] rngstate state of the CURAND random number generator
+   */
+  void InitGaugeField(GaugeField& data, RNG &rngstate) {
+#ifdef GPU_GAUGE_ALG
+    instantiate<InitGaugeHot>(data, rngstate);
+#else
+    errorQuda("Pure gauge code has not been built");
+#endif
+  }
+
 }

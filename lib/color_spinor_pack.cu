@@ -32,7 +32,7 @@
    smaller tuning increments of the thread block dimension in x to
    ensure that we can always fit within a single thread block.  It is
    this constraint that gives rise for the need to cap the limit for
-   block-float support, e.g., MAX_BLOCK_FLOAT_NC.
+   block-float support, e.g., max_block_float_nc.
 
    At present we launch a volume of threads (actually multiples
    thereof for direction / dimension) and thus we have coalesced reads
@@ -62,6 +62,13 @@ namespace quda {
 
       strcpy(aux,compile_type_str(meta));
       strcat(aux,meta.AuxString());
+      switch(meta.GhostPrecision()) {
+      case QUDA_DOUBLE_PRECISION:  strcat(aux,",halo_prec=8"); break;
+      case QUDA_SINGLE_PRECISION:  strcat(aux,",halo_prec=4"); break;
+      case QUDA_HALF_PRECISION:    strcat(aux,",halo_prec=2"); break;
+      case QUDA_QUARTER_PRECISION: strcat(aux,",halo_prec=1"); break;
+      default: errorQuda("Unexpected precision = %d", meta.GhostPrecision());
+      }
       strcat(aux,comm_dim_partitioned_string());
       strcat(aux,comm_dim_topology_string());
 
@@ -80,14 +87,12 @@ namespace quda {
       strcat(aux,label);
     }
 
-    virtual ~GenericPackGhostLauncher() { }
-
-    inline void apply(const cudaStream_t &stream) {
+    inline void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.nDim == 5) GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,5,Arg>(arg);
 	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);
       } else {
-	const TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	const TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	arg.nParity2dim_threads = arg.nParity*2*tp.aux.x;
 #ifdef JITIFY
         using namespace jitify::reflection;
@@ -97,16 +102,16 @@ namespace quda {
 #else
         switch(tp.aux.x) {
         case 1:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,1,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,1,Arg>, tp, stream, arg);
+	  else qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,1,Arg>, tp, stream, arg);
 	  break;
 	case 2:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,2,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,2,Arg>, tp, stream, arg);
+	  else qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,2,Arg>, tp, stream, arg);
 	  break;
 	case 4:
-	  if (arg.nDim == 5) GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-	  else GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,4,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	  if (arg.nDim == 5) qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,5,4,Arg>, tp, stream, arg);
+	  else qudaLaunchKernel(GenericPackGhostKernel<Float,block_float,Ns,Ms,Nc,Mc,4,4,Arg>, tp, stream, arg);
 	  break;
         }
 #endif
@@ -178,8 +183,8 @@ namespace quda {
 
   template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns, int Nc>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
-			       int nFace, int dagger, MemoryLocation *destination) {
-
+			       int nFace, int dagger, MemoryLocation *destination)
+  {
     typedef typename mapper<Float>::type RegFloat;
     typedef typename colorspinor::FieldOrderCB<RegFloat,Ns,Nc,1,order,Float,ghostFloat> Q;
     Q field(a, nFace, 0, ghost);
@@ -188,18 +193,16 @@ namespace quda {
     constexpr int colors_per_thread = Nc%2 == 0 ? 2 : 1;
     PackGhostArg<Q> arg(field, a, parity, nFace, dagger);
 
+    constexpr bool block_float_requested = sizeof(Float) == QUDA_SINGLE_PRECISION &&
+      (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION);
+
     // if we only have short precision for the ghost then this means we have block-float
-    constexpr bool block_float = (sizeof(Float) == QUDA_SINGLE_PRECISION &&
-				  (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION)
-                                  && Nc <= MAX_BLOCK_FLOAT_NC) ? true : false;
+    constexpr bool block_float = block_float_requested && Nc <= max_block_float_nc;
 
     // ensure we only compile supported block-float kernels
-    constexpr int Nc_ = (sizeof(Float) == QUDA_SINGLE_PRECISION &&
-                         (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION) &&
-                         Nc > MAX_BLOCK_FLOAT_NC) ? MAX_BLOCK_FLOAT_NC : Nc;
+    constexpr int Nc_ = (block_float_requested &&  Nc > max_block_float_nc) ? max_block_float_nc : Nc;
 
-    if (sizeof(Float) == QUDA_SINGLE_PRECISION &&
-        (sizeof(ghostFloat) == QUDA_HALF_PRECISION || sizeof(ghostFloat) == QUDA_QUARTER_PRECISION) && Nc > MAX_BLOCK_FLOAT_NC)
+    if (block_float_requested && Nc > max_block_float_nc)
       errorQuda("Block-float format not supported for Nc = %d", Nc);
 
     GenericPackGhostLauncher<RegFloat,block_float,Ns,spins_per_thread,Nc_,colors_per_thread,PackGhostArg<Q> >
@@ -210,24 +213,42 @@ namespace quda {
 
   // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise
   template<typename T, typename G, int nSpin, int nColor_> struct precision_spin_color_mapper { static constexpr int nColor = nColor_; };
+#ifndef NSPIN1
   template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = 3; };
+#endif
 
+#ifdef NSPIN4
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
-  template<int nColor_> struct precision_spin_color_mapper<float,char,4,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,4,nColor_> { static constexpr int nColor = 3; };
+#endif
+
+#ifdef NSPIN1
+  // never need block-float format with nSpin=4 fields for arbitrary colors
+  template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,1,nColor_> { static constexpr int nColor = 3; };
+#endif
 
 #ifndef GPU_MULTIGRID_DOUBLE
+#ifdef NSPIN1
   template<int nColor_> struct precision_spin_color_mapper<double,double,1,nColor_> { static constexpr int nColor = 3; };
+#endif
+#ifdef NSPIN2
   template<int nColor_> struct precision_spin_color_mapper<double,double,2,nColor_> { static constexpr int nColor = 3; };
+#endif
+#ifdef NSPIN4
   template<int nColor_> struct precision_spin_color_mapper<double,double,4,nColor_> { static constexpr int nColor = 3; };
+#endif
 #endif
 
   template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
-    
+
+#ifndef NSPIN1
     if (a.Ncolor() != 3 && a.Nspin() == 1)
       errorQuda("Ncolor = %d not supported for Nspin = %d fields", a.Ncolor(), a.Nspin());
+#endif
     if (a.Ncolor() != 3 && a.Nspin() == 4 && a.Precision() == QUDA_SINGLE_PRECISION &&
         (a.GhostPrecision() == QUDA_HALF_PRECISION || a.GhostPrecision() == QUDA_QUARTER_PRECISION) )
       errorQuda("Ncolor = %d not supported for Nspin = %d fields with precision = %d and ghost_precision = %d",
@@ -237,47 +258,55 @@ namespace quda {
       errorQuda("Ncolor = %d not supported for double precision fields", a.Ncolor());
 #endif
 
-    if (a.Ncolor() == 2) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 3) {
+    if (a.Ncolor() == 3) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_MULTIGRID
-    } else if (a.Ncolor() == 4) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 6) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 8) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,8>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 12) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,12>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 16) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,16>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 20) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,20>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 24) {
+    } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 28) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,28>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 32) {
+#ifdef NSPIN4
+    } else if (a.Ncolor() == 32) { // Needed for Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 48) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,48>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 72) {
+#endif // NSPIN4
+#ifdef NSPIN1
+    } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#endif // NSPIN1
+    } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 96) {
+    } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 256) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,256>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 576) {
+#ifdef NSPIN1
+    } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 288) { // staggered 3 -> 96 Nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,288>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#endif // NSPIN1
+    } else if (a.Ncolor() == 576) { // staggered KD free-field or wilson 24 -> 24 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,576>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 768) {
+#ifdef NSPIN4
+    } else if (a.Ncolor() == 768) { // wilson 24 -> 32 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,768>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 1024) {
+    } else if (a.Ncolor() == 1024) { // wilson 32 -> 32 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#endif // NSPIN4
+#ifdef NSPIN1
+    } else if (a.Ncolor() == 1536) { // staggered KD 24 -> 64 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2304>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 4096) { // staggered 64 -> 64
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4096>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 6144) { // staggered 64 -> 96 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6144>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 9216) { // staggered 96 -> 96 nvec
+      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,9216>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#endif // NSPIN1
 #endif // GPU_MULTIGRID
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
@@ -295,14 +324,24 @@ namespace quda {
 			       int nFace, int dagger, MemoryLocation *destination) {
 
     if (a.Nspin() == 4) {
+#ifdef NSPIN4
       genericPackGhost<Float,ghostFloat,order,4>(ghost, a, parity, nFace, dagger, destination);
+#else
+      errorQuda("nSpin=4 not enabled for this build");
+#endif
     } else if (a.Nspin() == 2) {
+#ifdef NSPIN2
       if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
       genericPackGhost<Float,ghostFloat,spin_order_mapper<2,order>::order,2>(ghost, a, parity, nFace, dagger, destination);
-#ifdef GPU_STAGGERED_DIRAC
+#else
+      errorQuda("nSpin=2 not enabled for this build");
+#endif
     } else if (a.Nspin() == 1) {
+#ifdef NSPIN1
       if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
       genericPackGhost<Float,ghostFloat,spin_order_mapper<1,order>::order,1>(ghost, a, parity, nFace, dagger, destination);
+#else
+      errorQuda("nSpin=1 not enabled for this build");
 #endif
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());
@@ -315,13 +354,13 @@ namespace quda {
   template<> struct non_native_precision_mapper<double> { typedef double type; };
   template<> struct non_native_precision_mapper<float> { typedef float type; };
   template<> struct non_native_precision_mapper<short> { typedef float type; };
-  template<> struct non_native_precision_mapper<char> { typedef float type; };
+  template<> struct non_native_precision_mapper<int8_t> { typedef float type; };
 
   // traits used to ensure we only instantiate float and lower precision for float4 fields
   template<typename T> struct float4_precision_mapper { typedef T type; };
   template<> struct float4_precision_mapper<double> { typedef float type; };
   template<> struct float4_precision_mapper<short> { typedef float type; };
-  template<> struct float4_precision_mapper<char> { typedef float type; };
+  template<> struct float4_precision_mapper<int8_t> { typedef float type; };
 
   template <typename Float, typename ghostFloat>
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
@@ -344,6 +383,7 @@ namespace quda {
                        QUDA_FLOAT4_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
 
     } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+#ifndef GPU_MULTIGRID // with MG mma we need half-precision AoS exchange support
       if (typeid(Float) != typeid(typename non_native_precision_mapper<Float>::type))
         errorQuda("Precision %d not supported for field type %d", a.Precision(), a.FieldOrder());
       if (typeid(ghostFloat) != typeid(typename non_native_precision_mapper<ghostFloat>::type))
@@ -351,6 +391,10 @@ namespace quda {
       genericPackGhost<typename non_native_precision_mapper<Float>::type,
                        typename non_native_precision_mapper<ghostFloat>::type,
                        QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger, destination);
+#else
+      genericPackGhost<Float, ghostFloat, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(ghost, a, parity, nFace, dagger,
+                                                                             destination);
+#endif
     } else {
       errorQuda("Unsupported field order = %d", a.FieldOrder());
     }
@@ -393,7 +437,7 @@ namespace quda {
 #endif
       } else if (a.GhostPrecision() == QUDA_QUARTER_PRECISION) {
 #if QUDA_PRECISION & 1
-        genericPackGhost<float,char>(ghost, a, parity, nFace, dagger, destination);
+        genericPackGhost<float,int8_t>(ghost, a, parity, nFace, dagger, destination);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif

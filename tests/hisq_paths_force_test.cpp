@@ -3,7 +3,8 @@
 #include <cstring>
 
 #include <quda.h>
-#include "test_util.h"
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -16,8 +17,6 @@
 
 using namespace quda;
 
-extern void usage(char** argv);
-extern int device;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
 
@@ -39,13 +38,8 @@ cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
 cudaGaugeField *cudaLongLinkOprod = NULL;
 
-extern bool verify_results;
 int ODD_BIT = 1;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
 
-extern QudaPrecision prec;
-extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision hw_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_DOUBLE_PRECISION;
@@ -171,7 +165,7 @@ static int R[4] = {0, 0, 0, 0};
 // set the layout, etc.
 static void hisq_force_init()
 {
-  initQuda(device);
+  initQuda(device_ordinal);
 
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
@@ -245,7 +239,7 @@ static void hisq_force_init()
 
   //createMomCPU(cpuMom->Gauge_p(), mom_prec);
 
-  hw = malloc(4*cpuGauge->Volume()*hwSiteSize*qudaGaugeParam.cpu_prec);
+  hw = malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
   if (hw == NULL){
     fprintf(stderr, "ERROR: malloc failed for hw\n");
     exit(1);
@@ -350,7 +344,7 @@ static int hisq_force_test(void)
   gettimeofday(&t0, NULL);
 
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  cudaDeviceSynchronize(); 
+  qudaDeviceSynchronize();
   gettimeofday(&t1, NULL);
 
   delete cudaOprod_ex; //doing this to lower the peak memory usage
@@ -360,7 +354,7 @@ static int hisq_force_test(void)
   cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
   fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  cudaDeviceSynchronize(); 
+  qudaDeviceSynchronize();
 
   gettimeofday(&t2, NULL);
 
@@ -377,17 +371,16 @@ static int hisq_force_test(void)
   fermion_force::hisqCompleteForce(*cudaForce_ex, *cudaGauge_ex);
   updateMomentum(*cudaMom, 1.0, *cudaForce_ex, __func__);
 
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   gettimeofday(&t3, NULL);
-
-  checkCudaError();
 
   cudaMom->saveCPUField(*cpuMom);
 
   int accuracy_level = 3;
   if(verify_results){
     int res;
-    res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, qudaGaugeParam.cpu_prec);
+    res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+                         qudaGaugeParam.cpu_prec);
 
     accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), qudaGaugeParam.cpu_prec);
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
@@ -424,32 +417,20 @@ static void display_test_info()
 
 int main(int argc, char **argv)
 {
-  int i;
-  for (i =1;i < argc; i++){
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
 
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }    
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
+  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
 
-    if( strcmp(argv[i], "--gauge-order") == 0){
-      if(i+1 >= argc){
-        usage(argv);
-      }
-
-      if(strcmp(argv[i+1], "milc") == 0){
-        gauge_order = QUDA_MILC_GAUGE_ORDER;
-      }else if(strcmp(argv[i+1], "qdp") == 0){
-        gauge_order = QUDA_QDP_GAUGE_ORDER;
-      }else{
-        fprintf(stderr, "Error: unsupported gauge-field order\n");
-        exit(1);
-      }
-      i++;
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
@@ -471,7 +452,4 @@ int main(int argc, char **argv)
   }else{
     return -1;
   }
-
 }
-
-

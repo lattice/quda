@@ -34,8 +34,6 @@ namespace quda {
       return make_double2(0.,0.);
     }
 
-
-
   template<class T>
     struct Identity
     {
@@ -58,7 +56,7 @@ namespace quda {
   template<typename Float, typename T> struct gauge_wrapper;
   template<typename Float, typename T> struct gauge_ghost_wrapper;
   template<typename Float, typename T> struct clover_wrapper;
-  template<typename T, int N> struct HMatrix;
+  template <typename T, int N> class HMatrix;
 
   template<class T, int N>
     class Matrix
@@ -73,15 +71,13 @@ namespace quda {
 
         __device__ __host__ constexpr int size() const { return N; }
 
-        __device__ __host__ inline Matrix() {
-#pragma unroll
-	  for (int i=0; i<N*N; i++) zero(data[i]);
-	}
+        __device__ __host__ inline Matrix() { setZero(this); }
 
-	__device__ __host__ inline Matrix(const Matrix<T,N> &a) {
+        __device__ __host__ inline Matrix(const Matrix<T, N> &a)
+        {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
-	}
+        }
 
         template <class U> __device__ __host__ inline Matrix(const Matrix<U, N> &a)
         {
@@ -198,11 +194,10 @@ namespace quda {
 	__device__ __host__ inline uint64_t checksum() const {
           // ensure length is rounded up to 64-bit multiple
           constexpr int length = (N*N*sizeof(T) + sizeof(uint64_t) - 1)/ sizeof(uint64_t);
-          uint64_t base_[length] = { };
-          T *data_ = reinterpret_cast<T*>( static_cast<void*>(base_) );
-          for (int i=0; i<N*N; i++) data_[i] = data[i];
-          uint64_t checksum_ = base_[0];
-          for (int i=1; i<length; i++) checksum_ ^= base_[i];
+          uint64_t base[length] = { };
+          memcpy(base, data, N * N * sizeof(T));
+          uint64_t checksum_ = base[0];
+          for (int i=1; i<length; i++) checksum_ ^= base[i];
           return checksum_;
         }
 
@@ -306,7 +301,7 @@ namespace quda {
 
       __device__ __host__ inline HMatrix() {
 #pragma unroll
-	for (int i=0; i<N*N; i++) zero(data[i]);
+        for (int i = 0; i < N * N; i++) data[i] = (T)0.0;
       }
 
       __device__ __host__ inline HMatrix(const HMatrix<T,N> &a) {
@@ -376,7 +371,7 @@ namespace quda {
 
       /**
          @brief Compute the absolute max element of the Hermitian matrix
-         @return Abosolue Max element
+         @return Absolute Max element
       */
       __device__ __host__ inline T max() const
       {
@@ -558,11 +553,11 @@ namespace quda {
 
 
   // This is so that I can multiply real and complex matrice
-  template<class T, class U, int N>
-    __device__ __host__ inline
-    Matrix<typename PromoteTypeId<T,U>::Type,N> operator*(const Matrix<T,N> &a, const Matrix<U,N> &b)
-    {
-      Matrix<typename PromoteTypeId<T,U>::Type,N> result;
+  template <class T, class U, int N>
+  __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
+                                                                                     const Matrix<U, N> &b)
+  {
+    Matrix<typename PromoteTypeId<T, U>::type, N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll
@@ -575,8 +570,7 @@ namespace quda {
 	}
       }
       return result;
-    }
-
+  }
 
   template<class T>
     __device__ __host__ inline
@@ -660,7 +654,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = 0;
         }
       }
-      return;
     }
 
 
@@ -676,7 +669,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = make_float2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -692,7 +684,6 @@ namespace quda {
           (*m)(i,j) = (*m)(j,i) = make_double2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -708,7 +699,6 @@ namespace quda {
           (*m)(i,j) = 0;
         }
       }
-      return;
     }
 
 
@@ -723,7 +713,6 @@ namespace quda {
           (*m)(i,j) = make_float2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -738,7 +727,6 @@ namespace quda {
           (*m)(i,j) = make_double2(0.,0.);
         }
       }
-      return;
     }
 
 
@@ -759,7 +747,22 @@ namespace quda {
     m = 0.5*am;
   }
 
+  template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
+  {
+    typedef typename Complex::value_type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex, N> am = conj(m) - m;
 
+    // second make it traceless
+    real imag_trace = 0.0;
+#pragma unroll
+    for (int i = 0; i < N; i++) imag_trace += am(i, i).y;
+#pragma unroll
+    for (int i = 0; i < N; i++) { am(i, i).y -= imag_trace / N; }
+    // third scale out anti hermitian part
+    Complex i_2(0.0, 0.5);
+    m = i_2 * am;
+  }
 
   // Matrix and array are very similar
   // Maybe I should factor out the similar
@@ -796,35 +799,6 @@ namespace quda {
       for (int i=0; i<N; ++i){
         (*a)[i] = m(i,c); // c is the column index
       }
-      return;
-    }
-
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void outerProd(const Array<T,N>& a, const Array<T,N> & b, Matrix<T,N>* m){
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        const T conjb_i = conj(b[i]);
-        for (int j=0; j<N; ++j){
-          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
-        }
-      }
-      return;
-    }
-
-  template<class T, int N>
-    __device__ __host__ inline
-    void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
-#pragma unroll
-      for (int i=0; i<N; ++i){
-        const T conjb_i = conj(b[i]);
-#pragma unroll
-        for (int j=0; j<N; ++j){
-          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
-        }
-      }
-      return;
     }
 
 
@@ -851,178 +825,10 @@ namespace quda {
       return os;
     }
 
-
-  template<class T, class U>
-    __device__ inline
-    void loadLinkVariableFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<U,3> *link)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        link->data[i] = array[idx + (dir*9 + i)*stride];
-      }
-      return;
-    }
-
-
-  template<class T, class U, int N>
-    __device__ inline
-    void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<U,N> *mat)
-    {
-#pragma unroll
-      for (int i=0; i<(N*N); ++i){
-        mat->data[i] = array[idx + i*stride];
-      }
-    }
-
-
-  __device__ inline
-    void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<complex<double>,3> *link)
-    {
-      float2 single_temp;
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        single_temp = array[idx + (dir*9 + i)*stride];
-        link->data[i].x = single_temp.x;
-        link->data[i].y = single_temp.y;
-      }
-      return;
-    }
-
-
-
-  template<class T, int N, class U>
-    __device__ inline
-    void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, U* const array)
-    {
-#pragma unroll
-      for (int i=0; i<(N*N); ++i){
-        array[idx + i*stride] = mat.data[i];
-      }
-    }
-
-  __device__ inline
-    void appendMatrixToArray(const Matrix<complex<double>,3>& mat, const int idx, const int stride, double2* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + i*stride].x += mat.data[i].x;
-        array[idx + i*stride].y += mat.data[i].y;
-      }
-    }
-
-  __device__ inline
-    void appendMatrixToArray(const Matrix<complex<float>,3>& mat, const int idx, const int stride, float2* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + i*stride].x += mat.data[i].x;
-        array[idx + i*stride].y += mat.data[i].y;
-      }
-    }
-
-
-  template<class T, class U>
-    __device__ inline
-    void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, U* const array)
-    {
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        array[idx + (dir*9 + i)*stride] = link.data[i];
-      }
-      return;
-    }
-
-
-
-
-  __device__ inline
-    void writeLinkVariableToArray(const Matrix<complex<double>,3> & link, const int dir, const int idx, const int stride, float2* const array)
-    {
-      float2 single_temp;
-
-#pragma unroll
-      for (int i=0; i<9; ++i){
-        single_temp.x = link.data[i].x;
-        single_temp.y = link.data[i].y;
-        array[idx + (dir*9 + i)*stride] = single_temp;
-      }
-      return;
-    }
-
-
-  template<class T>
-    __device__ inline
-    void loadMomentumFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<T,3> *mom)
-    {
-      T temp2[5];
-      temp2[0] = array[idx + dir*stride*5];
-      temp2[1] = array[idx + dir*stride*5 + stride];
-      temp2[2] = array[idx + dir*stride*5 + 2*stride];
-      temp2[3] = array[idx + dir*stride*5 + 3*stride];
-      temp2[4] = array[idx + dir*stride*5 + 4*stride];
-
-      mom->data[0].x = 0.;
-      mom->data[0].y = temp2[3].x;
-      mom->data[1] = temp2[0];
-      mom->data[2] = temp2[1];
-
-      mom->data[3].x = -mom->data[1].x;
-      mom->data[3].y =  mom->data[1].y;
-      mom->data[4].x = 0.;
-      mom->data[4].y = temp2[3].y;
-      mom->data[5]   = temp2[2];
-
-      mom->data[6].x = -mom->data[2].x;
-      mom->data[6].y =  mom->data[2].y;
-
-      mom->data[7].x = -mom->data[5].x;
-      mom->data[7].y =  mom->data[5].y;
-
-      mom->data[8].x = 0.;
-      mom->data[8].y = temp2[4].x;
-
-      return;
-    }
-
-
-
-  template<class T, class U>
-    __device__  inline
-    void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
-    {
-      typedef typename T::value_type real;
-      T temp2;
-      temp2.x = (mom.data[1].x - mom.data[3].x)*0.5*coeff;
-      temp2.y = (mom.data[1].y + mom.data[3].y)*0.5*coeff;
-      array[idx + dir*stride*5] = temp2;
-
-      temp2.x = (mom.data[2].x - mom.data[6].x)*0.5*coeff;
-      temp2.y = (mom.data[2].y + mom.data[6].y)*0.5*coeff;
-      array[idx + dir*stride*5 + stride] = temp2;
-
-      temp2.x = (mom.data[5].x - mom.data[7].x)*0.5*coeff;
-      temp2.y = (mom.data[5].y + mom.data[7].y)*0.5*coeff;
-      array[idx + dir*stride*5 + stride*2] = temp2;
-
-      const real temp = (mom.data[0].y + mom.data[4].y + mom.data[8].y)*0.3333333333333333333333333;
-      temp2.x =  (mom.data[0].y-temp)*coeff;
-      temp2.y =  (mom.data[4].y-temp)*coeff;
-      array[idx + dir*stride*5 + stride*3] = temp2;
-
-      temp2.x = (mom.data[8].y - temp)*coeff;
-      temp2.y = 0.0;
-      array[idx + dir*stride*5 + stride*4] = temp2;
-
-      return;
-    }
-
-
-
   template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
     {
-
       const Cmplx & det = getDeterminant(u);
       const Cmplx & det_inv = static_cast<typename Cmplx::value_type>(1.0)/det;
 
@@ -1054,8 +860,6 @@ namespace quda {
 
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
       (*uinv)(2,2) = (temp*det_inv);
-
-      return;
     }
   // template this!
   inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
@@ -1067,7 +871,6 @@ namespace quda {
         (*link)(i,j).y = array[(i*3+j)*2 + 1];
       }
     }
-    return;
   }
 
   template<class Cmplx, class Real>
@@ -1080,7 +883,6 @@ namespace quda {
           (*link)(i,j).y = array[(i*3+j)*2 + 1];
         }
       }
-      return;
     }
 
 
@@ -1094,7 +896,6 @@ namespace quda {
         array[(i*3+j)*2 + 1] = link(i,j).y;
       }
     }
-    return;
   }
 
   // and this!
@@ -1108,7 +909,6 @@ namespace quda {
           array[(i*3+j)*2 + 1] = link(i,j).y;
         }
       }
-      return;
     }
 
   template<class T>
@@ -1140,8 +940,6 @@ namespace quda {
     sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
     return sum;
   }
-
-
 
   // and this!
   template<class Cmplx>
@@ -1186,9 +984,7 @@ namespace quda {
       return error;
     }
 
-  template<class T>
-    __device__  __host__ inline
-    void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
+    template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -1196,13 +992,13 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      typedef decltype(Q(0,0).x) undMatType;
+      typedef decltype(Q(0, 0).x) matType;
 
-      undMatType inv3 = 1.0/3.0;
-      undMatType c0, c1, c0_max, Tr_re;
-      undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-      undMatType theta;
-      undMatType u_p, w_p;  //u, w parameters.
+      matType inv3 = 1.0 / 3.0;
+      matType c0, c1, c0_max, Tr_re;
+      matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      matType theta;
+      matType u_p, w_p; // u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -1220,28 +1016,31 @@ namespace quda {
       //      where       fj = fj(c0,c1), j=0,1,2.
 
       //[17]
-      c0_max = 2*pow(c1*inv3,1.5);
+      auto sqrt_c1_inv3 = sqrt(c1 * inv3);
+      c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
       //[25]
       theta  = acos(c0/c0_max);
+
+      sincos(theta * inv3, &w_p, &u_p);
       //[23]
-      u_p = sqrt(c1*inv3)*cos(theta*inv3);
+      u_p *= sqrt_c1_inv3;
 
       //[24]
-      w_p = sqrt(c1)*sin(theta*inv3);
+      w_p *= sqrt(c1);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      undMatType u_sq = u_p*u_p;
-      undMatType w_sq = w_p*w_p;
-      undMatType denom_inv = 1.0/(9*u_sq - w_sq);
-      undMatType exp_iu_re = cos(u_p);
-      undMatType exp_iu_im = sin(u_p);
-      undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      undMatType cos_w = cos(w_p);
-      undMatType sinc_w;
-      undMatType hj_re = 0.0;
-      undMatType hj_im = 0.0;
+      matType u_sq = u_p * u_p;
+      matType w_sq = w_p * w_p;
+      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
+      matType exp_iu_re, exp_iu_im;
+      sincos(u_p, &exp_iu_im, &exp_iu_re);
+      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      matType cos_w = cos(w_p);
+      matType sinc_w;
+      matType hj_re = 0.0;
+      matType hj_im = 0.0;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
@@ -1249,7 +1048,6 @@ namespace quda {
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-
 
       //[34] Test for c0 < 0.
       int parity = 0;
@@ -1299,24 +1097,25 @@ namespace quda {
       f2_c.y = f2_im;
 
       //[19] Construct exp{iQ}
-      setZero(exp_iQ);
+      Matrix<T, 3> exp_iQ;
+      setZero(&exp_iQ);
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I
       temp1 = f0_c * UnitM;
-      *exp_iQ = temp1;
+      exp_iQ = temp1;
 
       // +f1*Q
       temp1 = f1_c * Q;
-      *exp_iQ += temp1;
+      exp_iQ += temp1;
 
       // +f2*Q^2
       temp1 = Q * Q;
       temp2 = f2_c * temp1;
-      *exp_iQ += temp2;
+      exp_iQ += temp2;
 
       //exp(iQ) is now defined.
-      return;
+      return exp_iQ;
     }
 
     /**

@@ -14,109 +14,81 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct NdegTwistedMassPreconditionedLaunch {
-    static constexpr const char *kernel = "quda::ndegTwistedMassPreconditionedGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(nParity == 1, "Non-degenerate twisted-mass operator only defined for nParity=1");
-      dslash.launch(ndegTwistedMassPreconditionedGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp,
-          arg, stream);
-    }
-  };
+  // trait to ensure we don't instantiate asymmetric & xpay
+  template <bool symmetric> constexpr bool xpay_() { return true; }
+  template <> constexpr bool xpay_<true>() { return false; }
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class NdegTwistedMassPreconditioned : public Dslash<Float>
+  // trait to ensure we don't instantiate asymmetric & !dagger
+  template <bool symmetric> constexpr bool not_dagger_() { return false; }
+  template <> constexpr bool not_dagger_<true>() { return true; }
+
+  template <typename Arg> class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned, Arg>
   {
+    using Dslash = Dslash<nDegTwistedMassPreconditioned, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+  protected:
     bool shared;
     unsigned int sharedBytesPerThread() const
     {
-      return shared ? 2 * nColor * 4 * sizeof(typename mapper<Float>::type) : 0;
+      return shared ? 2 * in.Ncolor() * 4 * sizeof(typename mapper<typename Arg::Float>::type) : 0;
     }
 
-public:
+  public:
     NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass_preconditioned.cuh"),
-        arg(arg),
-        in(in),
-        shared(arg.asymmetric || !arg.dagger)
+      Dslash(arg, out, in),
+      shared(arg.asymmetric || !arg.dagger)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
-      if (arg.asymmetric)
-        for (int i = 0; i < 8; i++)
-          if (i != 4) { strcat(Dslash<Float>::aux[i], ",asym"); }
+      if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
     }
 
-    virtual ~NdegTwistedMassPreconditioned() {}
-
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
+      if (arg.nParity != 1) errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
 
-      if (arg.nParity == 1) {
+      if (arg.dagger) {
         if (arg.xpay)
-          Dslash<Float>::template instantiate<NdegTwistedMassPreconditionedLaunch, nDim, nColor, 1, true>(
-              tp, arg, stream);
+          Dslash::template instantiate<packShmem, 1, true, xpay_<Arg::asymmetric>()>(tp, stream);
         else
-          Dslash<Float>::template instantiate<NdegTwistedMassPreconditionedLaunch, nDim, nColor, 1, false>(
-              tp, arg, stream);
+          Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
       } else {
-        errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
+        if (arg.xpay)
+          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), xpay_<Arg::asymmetric>()>(tp, stream);
+        else
+          Dslash::template instantiate<packShmem, 1, not_dagger_<Arg::asymmetric>(), false>(tp, stream);
       }
     }
 
     void initTuneParam(TuneParam &param) const
     {
-      TunableVectorYZ::initTuneParam(param);
-      if (shared) {
-        param.block.y = 2; // flavor must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
+      Dslash::initTuneParam(param);
+      if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
-      TunableVectorYZ::defaultTuneParam(param);
-      if (shared) {
-        param.block.y = 2; // flavor must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
+      Dslash::defaultTuneParam(param);
+      if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     long long flops() const
     {
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // twisted-mass flops are in the interior kernel
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
+      default: break; // twisted-mass flops are in the interior kernel
       }
       return flops;
-    }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
     }
   };
 
@@ -127,16 +99,23 @@ public:
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedMassArg<Float, nColor, recon> arg(
-          out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
-      NdegTwistedMassPreconditioned<Float, nDim, nColor, NdegTwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
+      if (asymmetric) {
+        NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-      policy.apply(0);
+        policy.apply(0);
+      } else {
+        NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
+        NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-      checkCudaError();
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+        policy.apply(0);
+      }
     }
   };
 
@@ -148,16 +127,6 @@ public:
       const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, x, U);
-
-    // check all locations match
-    checkLocation(out, in, x, U);
-
     // with symmetric dagger operator we must use kernel packing
     if (dagger && !asymmetric) pushKernelPackT(true);
 

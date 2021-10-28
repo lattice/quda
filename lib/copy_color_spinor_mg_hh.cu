@@ -6,13 +6,13 @@ namespace quda {
 				  QudaFieldLocation location, void *Dst, void *Src, 
 				  void *dstNorm, void *srcNorm) {
 
-#if defined(GPU_MULTIGRID)
-    short *dst_ptr = static_cast<short*>(Dst);
-    short *src_ptr = static_cast<short*>(Src);
+#if defined(GPU_MULTIGRID) && (QUDA_PRECISION & 2)
+    auto *dst_ptr = static_cast<short*>(Dst);
+    auto *src_ptr = static_cast<short*>(Src);
 
     INSTANTIATE_COLOR;
 #else
-    errorQuda("Double precision multigrid has not been enabled");
+    errorQuda("Half precision has not been enabled");
 #endif
 
   }

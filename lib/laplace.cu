@@ -19,45 +19,32 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct LaplaceLaunch {
-
-    // kernel name for jit compilation
-    static constexpr const char *kernel = "quda::laplaceGPU";
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(laplaceGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<Float>
+  template <typename Arg> class Laplace : public Dslash<laplace, Arg>
   {
+    using Dslash = Dslash<laplace, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+  public:
+    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/laplace.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~Laplace() {}
-
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
-      Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::setParam(tp);
+
+      // operator is Hermitian so do not instantiate dagger
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+      } else if (arg.nParity == 2) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+      }
     }
 
     long long flops() const
@@ -69,9 +56,6 @@ public:
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);      // 3D or 4D operator
 
       long long flops_ = 0;
-
-      // FIXME - should we count the xpay flops in the derived kernels
-      // since some kernels require the xpay in the exterior (preconditiond clover)
 
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
@@ -86,6 +70,7 @@ public:
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -111,8 +96,7 @@ public:
     virtual long long bytes() const
     {
       int gauge_bytes = arg.reconstruct * in.Precision();
-      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
+      int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed<typename Arg::Float>::value ? sizeof(float) : 0);
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
       int num_dir = (arg.dir == 4 ? 2 * 4 : 2 * 3);                           // 3D or 4D operator
@@ -130,6 +114,7 @@ public:
         break;
       }
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
@@ -152,7 +137,9 @@ public:
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
+                                                                           Dslash::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
       char laplace[32];
       u32toa(laplace, arg.dir);
@@ -163,42 +150,50 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
-                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
+                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
+      if (in.Nspin() == 1) {
+#if defined(GPU_STAGGERED_DIRAC) && defined(GPU_LAPLACE)
+        constexpr int nDim = 4;
+        constexpr int nSpin = 1;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
 
-      constexpr int nDim = 4;
-      LaplaceArg<Float, nColor, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<Float, nDim, nColor, LaplaceArg<Float, nColor, recon>> laplace(arg, out, in);
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("nSpin=1 Laplace operator required staggered dslash and laplace to be enabled");
+#endif
+      } else if (in.Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) && defined(GPU_LAPLACE)
+        constexpr int nDim = 4;
+        constexpr int nSpin = 4;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(laplace)> policy(
-        laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
-      policy.apply(0);
-
-      checkCudaError();
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("nSpin=4 Laplace operator required wilson dslash and laplace to be enabled");
+#endif
+      } else {
+        errorQuda("Unsupported nSpin= %d", in.Nspin());
+      }
     }
   };
 
   // Apply the Laplace operator
-  // out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  // Uses the kappa normalization for the Wilson operator.
+  // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
-    instantiate<LaplaceApply>(out, in, U, dir, kappa, x, parity, dagger, comm_override, profile);
+    instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda

@@ -2,71 +2,63 @@
 #include <gauge_field.h>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_plaq.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
-  template<typename Float, typename Gauge>
-  class GaugePlaq : TunableLocalParity {
-
-    GaugePlaqArg<Gauge> arg;
-    const GaugeField &meta;
-
-  private:
-    bool tuneGridDim() const { return true; }
+  template<typename Float, int nColor, QudaReconstructType recon>
+  class GaugePlaq : TunableLocalParityReduction {
+    const GaugeField &u;
+    double2 &plq;
 
   public:
-    GaugePlaq(GaugePlaqArg<Gauge> &arg, const GaugeField &meta)
-      : TunableLocalParity(), arg(arg), meta(meta) {
+    GaugePlaq(const GaugeField &u, double2 &plq) :
+      u(u),
+      plq(plq)
+    {
 #ifdef JITIFY
       create_jitify_program("kernels/gauge_plaq.cuh");
 #endif
-      strcpy(aux,compile_type_str(meta));
+      strcpy(aux, compile_type_str(u));
+      apply(0);
     }
 
-    ~GaugePlaq () { }
-
-    void apply(const cudaStream_t &stream){
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION){
-	for (int i=0; i<2; i++) ((double*)arg.result_h)[i] = 0.0;
+    void apply(const qudaStream_t &stream){
+      if (u.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        GaugePlaqArg<Float, nColor, recon> arg(u);
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::computePlaq")
-          .instantiate((int)tp.block.x,Type<Float>(),Type<Gauge>())
+          .instantiate((int)tp.block.x,type_of(arg))
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+        arg.launch_error = jitify_error == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
 #else
-	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, tp, stream, arg, Float, Gauge);
+	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, (*this), tp, stream, arg, decltype(arg));
 #endif
+        arg.complete(plq);
+        if (!activeTuning()) {
+          comm_allreduce_array((double*)&plq, 2);
+          for (int i = 0; i < 2; i++) ((double*)&plq)[i] /= 9.*2*arg.threads*comm_size();
+        }
       } else {
 	errorQuda("CPU not supported yet\n");
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-    long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
-    long long bytes() const { return 6ll*2*arg.threads*4*arg.dataOr.Bytes(); }
+    TuneKey tuneKey() const { return TuneKey(u.VolString(), typeid(*this).name(), aux); }
+    long long flops() const
+    {
+      auto Nc = u.Ncolor();
+      return 6ll*u.Volume()*(3 * (8 * Nc * Nc * Nc - 2 * Nc * Nc) + Nc);
+    }
+    long long bytes() const { return u.Bytes(); }
   };
 
-  template<typename Float, typename Gauge>
-  void plaquette(const Gauge dataOr, const GaugeField& data, double2 &plq, QudaFieldLocation location) {
-    GaugePlaqArg<Gauge> arg(dataOr, data);
-    GaugePlaq<Float,Gauge> gaugePlaq(arg, data);
-    gaugePlaq.apply(0);
-    qudaDeviceSynchronize();
-    comm_allreduce_array((double*)arg.result_h, 2);
-    for (int i=0; i<2; i++) ((double*)&plq)[i] = ((double*)arg.result_h)[i] / (9.*2*arg.threads*comm_size());
-  }
-
-  template<typename Float>
-  void plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
-    INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
-  }
-
-  double3 plaquette(const GaugeField &data)
+  double3 plaquette(const GaugeField &U)
   {
     double2 plq;
-    QudaFieldLocation location = data.Location();
-    INSTANTIATE_PRECISION(plaquette, data, plq, location);
+    instantiate<GaugePlaq>(U, plq);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
     return plaq;
   }

@@ -6,18 +6,14 @@
 #include <launch_kernel.cuh>
 #include <unitarization_links.h>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
 
 #include <cufft.h>
-
-#ifdef GPU_GAUGE_ALG
 #include <CUFFT_Plans.h>
-#endif
+#include <instantiate.h>
 
 namespace quda {
-
-#ifdef GPU_GAUGE_ALG
 
 //UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
@@ -33,7 +29,6 @@ namespace quda {
 #endif
 #endif
 
-
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
@@ -44,7 +39,7 @@ namespace quda {
     int X[4];     // grid dimensions
     complex<Float> *tmp0;
     complex<Float> *tmp1;
-    GaugeFixFFTRotateArg(const cudaGaugeField &data){
+    GaugeFixFFTRotateArg(const GaugeField &data){
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
       tmp0 = 0;
@@ -52,8 +47,8 @@ namespace quda {
     }
   };
 
-  template <int direction, typename Float>
-  __global__ void fft_rotate_kernel_2D2D(GaugeFixFFTRotateArg<Float> arg){ //Cmplx *data_in, Cmplx *data_out){
+  template <int direction, typename Arg>
+  __global__ void fft_rotate_kernel_2D2D(Arg arg){ //Cmplx *data_in, Cmplx *data_out){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if ( id >= arg.threads ) return;
     if ( direction == 0 ) {
@@ -81,73 +76,41 @@ namespace quda {
     }
   }
 
-
-
-
-
-
-  template<typename Float>
+  template <typename Float, typename Arg>
   class GaugeFixFFTRotate : Tunable {
-    GaugeFixFFTRotateArg<Float> arg;
+    Arg &arg;
+    const GaugeField &meta;
     int direction;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
     public:
-    GaugeFixFFTRotate(GaugeFixFFTRotateArg<Float> &arg) : arg(arg) {
+    GaugeFixFFTRotate(Arg &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta)
+    {
       direction = 0;
     }
-    ~GaugeFixFFTRotate () {
-    }
+
     void setDirection(int dir, complex<Float> *data_in, complex<Float> *data_out){
       direction = dir;
       arg.tmp0 = data_in;
       arg.tmp1 = data_out;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      if ( direction == 0 )
-        fft_rotate_kernel_2D2D<0, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
-      else if ( direction == 1 )
-        fft_rotate_kernel_2D2D<1, Float > <<< tp.grid, tp.block, 0, stream >>> (arg);
-      else
-        errorQuda("Error in GaugeFixFFTRotate option.\n");
+      if ( direction == 0 )      qudaLaunchKernel(fft_rotate_kernel_2D2D<0, Arg>, tp, stream, arg);
+      else if ( direction == 1 ) qudaLaunchKernel(fft_rotate_kernel_2D2D<1, Arg>, tp, stream, arg);
+      else                       errorQuda("Error in GaugeFixFFTRotate option.\n");
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
-
-    long long flops() const {
-      return 0;
-    }
-    long long bytes() const {
-      return 4LL * sizeof(Float) * arg.threads;
-    }
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    long long flops() const { return 0; }
+    long long bytes() const { return 4LL * sizeof(Float) * arg.threads; }
   };
-
 
   template <typename Float, typename Gauge>
   struct GaugeFixQualityArg : public ReduceArg<double2> {
@@ -155,18 +118,21 @@ namespace quda {
     int X[4];     // grid dimensions
     Gauge dataOr;
     complex<Float> *delta;
+    double2 result;
 
-    GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, complex<Float> * delta)
-      : ReduceArg<double2>(), dataOr(dataOr), delta(delta) {
+    GaugeFixQualityArg(const Gauge &dataOr, const GaugeField &data, complex<Float> * delta)
+      : ReduceArg<double2>(), dataOr(dataOr), delta(delta)
+    {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = data.VolumeCB();
     }
-    double getAction(){ return result_h[0].x; }
-    double getTheta(){ return result_h[0].y; }
+    double getAction() { return result.x; }
+    double getTheta() { return result.y; }
   };
 
-  template<int blockSize, int Elems, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix_quality(GaugeFixQualityArg<Float, Gauge> argQ){
+  template <int blockSize, int Elems, typename Float, typename Gauge, int gauge_dir>
+  __global__ void computeFix_quality(GaugeFixQualityArg<Float, Gauge> argQ)
+  {
     int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
@@ -211,62 +177,46 @@ namespace quda {
       idx_cb += blockDim.x * gridDim.x;
     }
 
-    reduce2d<blockSize,2>(argQ, data);
+    argQ.template reduce2d<blockSize,2>(data);
   }
 
-
-
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParity {
-    GaugeFixQualityArg<Float, Gauge> argQ;
-    mutable char aux_string[128];     // used as a label in the autotuner
-
-  private:
-    bool tuneGridDim() const { return true; }
+  class GaugeFixQuality : TunableLocalParityReduction {
+    GaugeFixQualityArg<Float, Gauge> &arg;
+    const GaugeField &meta;
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &argQ)
-      : argQ(argQ) {
-    }
-    ~GaugeFixQuality () { }
+    GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta) { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.result_h[0] = make_double2(0.0,0.0);
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-      qudaDeviceSynchronize();
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads);
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Elems, Float, Gauge, gauge_dir);
+      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
+      arg.complete(arg.result, stream, reset);
+      if (!activeTuning()) {
+        arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads);
+        arg.result.y /= (double)(3 * 2 * arg.threads);
+      }
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << argQ.X[0] << "x" << argQ.X[1] << "x" << argQ.X[2] << "x" << argQ.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d", argQ.threads, sizeof(Float), gauge_dir);
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-    }
-
-    long long flops() const {
-      return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
-    }                                                                         // Only correct if there is no link reconstruction, no cub reduction accounted also
-    long long bytes() const {
-      return (2LL * gauge_dir + 2LL) * Elems * 2 * argQ.threads * sizeof(Float);
-    }                                                                                                    //Not accounting the reduction!!!
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    long long flops() const { return (36LL * gauge_dir + 65LL) * 2 * arg.threads; }
+    long long bytes() const { return (2LL * gauge_dir + 2LL) * Elems * 2 * arg.threads * sizeof(Float); }
   };
-
-
 
   template <typename Float>
   struct GaugeFixArg {
     int threads;     // number of active threads required
     int X[4];     // grid dimensions
-    cudaGaugeField &data;
+    GaugeField &data;
     Float *invpsq;
     complex<Float> *delta;
     complex<Float> *gx;
 
-    GaugeFixArg( cudaGaugeField & data, const int Elems) : data(data){
+    GaugeFixArg(GaugeField & data, const int Elems) : data(data){
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
       invpsq = (Float*)device_malloc(sizeof(Float) * threads);
@@ -283,9 +233,6 @@ namespace quda {
       device_free(gx);
     }
   };
-
-
-
 
   template <typename Float>
   __global__ void kernel_gauge_set_invpsq(GaugeFixArg<Float> arg){
@@ -307,126 +254,71 @@ namespace quda {
     arg.invpsq[id] = prcfact;
   }
 
-
   template<typename Float>
   class GaugeFixSETINVPSP : Tunable {
     GaugeFixArg<Float> arg;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    const GaugeField &meta;
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
-    public:
-    GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) { }
-    ~GaugeFixSETINVPSP () { }
+  public:
+    GaugeFixSETINVPSP(GaugeFixArg<Float> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta) { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_set_invpsq<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
+      qudaLaunchKernel(kernel_gauge_set_invpsq<Float>, tp, stream, arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
-
-    long long flops() const {
-      return 21 * arg.threads;
-    }
-    long long bytes() const {
-      return sizeof(Float) * arg.threads;
-    }
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    long long flops() const { return 21 * arg.threads; }
+    long long bytes() const { return sizeof(Float) * arg.threads; }
   };
 
   template<typename Float>
-  __global__ void kernel_gauge_mult_norm_2D(GaugeFixArg<Float> arg){
+  __global__ void kernel_gauge_mult_norm_2D(GaugeFixArg<Float> arg) {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if ( id < arg.threads ) arg.gx[id] = arg.gx[id] * arg.invpsq[id];
   }
 
-
   template<typename Float>
   class GaugeFixINVPSP : Tunable {
     GaugeFixArg<Float> arg;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    const GaugeField &meta;
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
-    public:
-    GaugeFixINVPSP(GaugeFixArg<Float> &arg)
-      : arg(arg){
-      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   cudaFuncCachePreferL1);
-    }
-    ~GaugeFixINVPSP () {
-    }
+  public:
+    GaugeFixINVPSP(GaugeFixArg<Float> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta)
+    { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_mult_norm_2D<Float> <<< tp.grid, tp.block, 0, stream >>> (arg);
+      qudaLaunchKernel(kernel_gauge_mult_norm_2D<Float>, tp, stream, arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
-    }
-
-    void preTune(){
+    void preTune() {
       //since delta contents are irrelevant at this point, we can swap gx with delta
       complex<Float> *tmp = arg.gx;
       arg.gx = arg.delta;
       arg.delta = tmp;
     }
-    void postTune(){
+    void postTune() {
       arg.gx = arg.delta;
     }
-    long long flops() const {
-      return 2LL * arg.threads;
-    }
-    long long bytes() const {
-      return 5LL * sizeof(Float) * arg.threads;
-    }
-
+    long long flops() const { return 2LL * arg.threads; }
+    long long bytes() const { return 5LL * sizeof(Float) * arg.threads; }
   };
-
-
 
   template <typename Float>
   __host__ __device__ inline void reunit_link( Matrix<complex<Float>,3> &U ){
@@ -471,18 +363,19 @@ namespace quda {
 #ifdef GAUGEFIXING_DONT_USE_GX
 
   template <typename Float, typename Gauge>
-  __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){
+  __global__ void kernel_gauge_fix_U_EO_NEW(GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha)
+  {
     int id = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
+    if (id >= arg.threads/2) return;
 
-    if ( id >= arg.threads/2 ) return;
-
-    typedef complex<Float> Cmplx;
+    using complex = complex<Float>;
+    using matrix = Matrix<complex, 3>;
 
     int x[4];
     getCoords(x, id, arg.X, parity);
     int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
-    Matrix<Cmplx,3> de;
+    matrix de;
     //Read Delta
     de(0,0) = arg.delta[idx + 0 * arg.threads];
     de(0,1) = arg.delta[idx + 1 * arg.threads];
@@ -491,20 +384,19 @@ namespace quda {
     de(1,2) = arg.delta[idx + 4 * arg.threads];
     de(2,2) = arg.delta[idx + 5 * arg.threads];
 
-    de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
-    de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
-    de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
-    Matrix<Cmplx,3> g;
+    de(1,0) = complex(-de(0,1).real(), de(0,1).imag());
+    de(2,0) = complex(-de(0,2).real(), de(0,2).imag());
+    de(2,1) = complex(-de(1,2).real(), de(1,2).imag());
+    matrix g;
     setIdentity(&g);
     g += de * half_alpha;
     //36
     reunit_link<Float>( g );
     //130
 
-
     for ( int mu = 0; mu < 4; mu++ ) {
-      Matrix<Cmplx,3> U = dataOr(mu, id, parity);
-      Matrix<Cmplx,3> g0;
+      matrix U = dataOr(mu, id, parity);
+      matrix g0;
       U = g * U;
       //198
       idx = linkNormalIndexP1(x,arg.X,mu);
@@ -516,9 +408,9 @@ namespace quda {
       de(1,2) = arg.delta[idx + 4 * arg.threads];
       de(2,2) = arg.delta[idx + 5 * arg.threads];
 
-      de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
-      de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
-      de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
+      de(1,0) = complex(-de(0,1).real(), de(0,1).imag());
+      de(2,0) = complex(-de(0,2).real(), de(0,2).imag());
+      de(2,1) = complex(-de(1,2).real(), de(1,2).imag());
 
       setIdentity(&g0);
       g0 += de * half_alpha;
@@ -532,73 +424,54 @@ namespace quda {
     }
   }
 
-
   template<typename Float, typename Gauge>
-  class GaugeFixNEW : TunableLocalParity {
+  class GaugeFixNEW : TunableVectorY {
     GaugeFixArg<Float> arg;
+    const GaugeField &meta;
     Float half_alpha;
     Gauge dataOr;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
 
-    // since GaugeFixArg is used by other kernels that don't use
-    // tunableLocalParity, arg.threads stores Volume and not VolumeCB
-    // so we need to divide by two
+    bool tuneGridDim() const { return false; }
+    // since GaugeFixArg is used by other kernels that don't keep
+    // parity separate, arg.threads stores Volume and not VolumeCB so
+    // we need to divide by two
     unsigned int minThreads() const { return arg.threads/2; }
 
-    public:
-    GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
-      : dataOr(dataOr), arg(arg) {
+  public:
+    GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha, const GaugeField &meta) :
+      TunableVectorY(2),
+      dataOr(dataOr),
+      arg(arg),
+      meta(meta)
+    {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
     }
-    ~GaugeFixNEW () { }
 
     void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO_NEW<Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr, half_alpha);
+      qudaLaunchKernel(kernel_gauge_fix_U_EO_NEW<Float, Gauge>, tp, stream, arg, dataOr, half_alpha);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
-
-    //need this
-    void preTune() {
-      arg.data.backup();
-    }
-    void postTune() {
-      arg.data.restore();
-    }
-    long long flops() const {
-      return 2414LL * arg.threads;
-      //Not accounting here the reconstruction of the gauge if 12 or 8!!!!!!
-    }
-    long long bytes() const {
-      return ( dataOr.Bytes() * 4LL + 5 * 12LL * sizeof(Float)) * arg.threads;
-    }
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    void preTune() { arg.data.backup(); }
+    void postTune() { arg.data.restore(); }
+    long long flops() const { return 2414LL * arg.threads; }
+    long long bytes() const { return ( dataOr.Bytes() * 4LL + 5 * 12LL * sizeof(Float)) * arg.threads; }
   };
 
-
-
 #else
+
   template <int Elems, typename Float>
-  __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha){
-
+  __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha)
+  {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= arg.threads) return;
 
-    if ( id >= arg.threads ) return;
+    using complex = complex<Float>;
 
-    typedef complex<Float> Cmplx;
-
-    Matrix<Cmplx,3> de;
+    Matrix<complex,3> de;
     //Read Delta
     de(0,0) = arg.delta[id];
     de(0,1) = arg.delta[id + arg.threads];
@@ -607,12 +480,11 @@ namespace quda {
     de(1,2) = arg.delta[id + 4 * arg.threads];
     de(2,2) = arg.delta[id + 5 * arg.threads];
 
-    de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
-    de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
-    de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+    de(1,0) = complex(-de(0,1).x, de(0,1).y);
+    de(2,0) = complex(-de(0,2).x, de(0,2).y);
+    de(2,1) = complex(-de(1,2).x, de(1,2).y);
 
-
-    Matrix<Cmplx,3> g;
+    Matrix<complex, 3> g;
     setIdentity(&g);
     g += de * half_alpha;
     //36
@@ -632,74 +504,44 @@ namespace quda {
     //T=208 for Elems 6
   }
 
-
-
-
   template<int Elems, typename Float>
   class GaugeFix_GX : Tunable {
     GaugeFixArg<Float> arg;
+    const GaugeField &meta;
     Float half_alpha;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
     public:
-    GaugeFix_GX(GaugeFixArg<Float> &arg, Float alpha)
-      : arg(arg) {
-      half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   cudaFuncCachePreferL1);
-    }
-    ~GaugeFix_GX () {
-    }
-
-    void setAlpha(Float alpha){
+    GaugeFix_GX(GaugeFixArg<Float> &arg, Float alpha, const GaugeField &meta) :
+      arg(arg),
+      meta(meta)
+    {
       half_alpha = alpha * 0.5;
     }
 
+    void setAlpha(Float alpha) { half_alpha = alpha * 0.5; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_GX<Elems, Float> <<< tp.grid, tp.block, 0, stream >>> (arg, half_alpha);
+      qudaLaunchKernel(kernel_gauge_GX<Elems, Float>, tp, stream, arg, half_alpha);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     long long flops() const {
       if ( Elems == 6 ) return 208LL * arg.threads;
       else return 166LL * arg.threads;
     }
-    long long bytes() const {
-      return 4LL * Elems * sizeof(Float) * arg.threads;
-    }
-
+    long long bytes() const { return 4LL * Elems * sizeof(Float) * arg.threads; }
   };
 
-
   template <int Elems, typename Float, typename Gauge>
-  __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
+  __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr)
+  {
     int idd = threadIdx.x + blockIdx.x * blockDim.x;
-
     if ( idd >= arg.threads ) return;
 
     int parity = 0;
@@ -742,85 +584,52 @@ namespace quda {
       }
       U = U * conj(g0);
       //198
-      dataOr.save(mu, id, parity) = U;
+      dataOr(mu, id, parity) = U;
     }
     //T=42+4*(198*2+42) Elems=6
     //T=4*(198*2) Elems=9
     //Not accounting here the reconstruction of the gauge if 12 or 8!!!!!!
   }
 
-
   template<int Elems, typename Float, typename Gauge>
   class GaugeFix : Tunable {
     GaugeFixArg<Float> arg;
+    const GaugeField &meta;
     Gauge dataOr;
-    mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
-    public:
-    GaugeFix(Gauge & dataOr, GaugeFixArg<Float> &arg)
-      : dataOr(dataOr), arg(arg) {
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   cudaFuncCachePreferL1);
-    }
-    ~GaugeFix () { }
+  public:
+    GaugeFix(Gauge & dataOr, GaugeFixArg<Float> &arg, const GaugeField &meta) :
+      dataOr(dataOr),
+      arg(arg),
+      meta(meta)
+    { }
 
-
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_gauge_fix_U_EO<Elems, Float, Gauge> <<< tp.grid, tp.block, 0, stream >>> (arg, dataOr);
+      qudaLaunchKernel(kernel_gauge_fix_U_EO<Elems, Float, Gauge>, tp, stream, arg, dataOr);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
-    }
-
-    //need this
-    void preTune() {
-      arg.data.backup();
-    }
-    void postTune() {
-      arg.data.restore();
-    }
+    void preTune() { arg.data.backup(); }
+    void postTune() { arg.data.restore(); }
     long long flops() const {
       if ( Elems == 6 ) return 1794LL * arg.threads;
       else return 1536LL * arg.threads;
-      //Not accounting here the reconstruction of the gauge if 12 or 8!!!!!!
     }
-    long long bytes() const {
-      return 26LL * Elems * sizeof(Float) * arg.threads;
-    }
-
+    long long bytes() const { return 26LL * Elems * sizeof(Float) * arg.threads; }
   };
 #endif
 //GAUGEFIXING_DONT_USE_GX
 
-
   template<int Elems, typename Float, typename Gauge, int gauge_dir>
-  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
-                       const int Nsteps, const int verbose_interval, \
-                       const Float alpha0, const int autotune, const double tolerance, \
-                       const int stopWtheta) {
-
+  void gaugefixingFFT(Gauge dataOr, GaugeField& data, const int Nsteps, const int verbose_interval,
+                      const Float alpha0, const int autotune, const double tolerance, const int stopWtheta)
+  {
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -845,26 +654,24 @@ namespace quda {
     SetPlanFFT2DMany( plan_zt, size, 0, arg.delta);     //for space and time ZT
     SetPlanFFT2DMany( plan_xy, size, 1, arg.delta);    //with space only XY
 
-
     GaugeFixFFTRotateArg<Float> arg_rotate(data);
-    GaugeFixFFTRotate<Float> GFRotate(arg_rotate);
+    GaugeFixFFTRotate<Float, decltype(arg_rotate)> GFRotate(arg_rotate, data);
 
-    GaugeFixSETINVPSP<Float> setinvpsp(arg);
+    GaugeFixSETINVPSP<Float> setinvpsp(arg, data);
     setinvpsp.apply(0);
-    GaugeFixINVPSP<Float> invpsp(arg);
-
+    GaugeFixINVPSP<Float> invpsp(arg, data);
 
 #ifdef GAUGEFIXING_DONT_USE_GX
     //without using GX, gx will be created only for plane rotation but with less size
-    GaugeFixNEW<Float, Gauge> gfixNew(dataOr, arg, alpha);
+    GaugeFixNEW<Float, Gauge> gfixNew(dataOr, arg, alpha, data);
 #else
     //using GX
-    GaugeFix_GX<Elems, Float> calcGX(arg, alpha);
-    GaugeFix<Elems, Float, Gauge> gfix(dataOr, arg);
+    GaugeFix_GX<Elems, Float> calcGX(arg, alpha, data);
+    GaugeFix<Elems, Float, Gauge> gfix(dataOr, arg, data);
 #endif
 
     GaugeFixQualityArg<Float, Gauge> argQ(dataOr, data, arg.delta);
-    GaugeFixQuality<Elems, Float, Gauge, gauge_dir> gfixquality(argQ);
+    GaugeFixQuality<Elems, Float, Gauge, gauge_dir> gfixquality(argQ, data);
 
     gfixquality.apply(0);
     double action0 = argQ.getAction();
@@ -969,7 +776,7 @@ namespace quda {
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -980,11 +787,9 @@ namespace quda {
     }
     // end reunitarize
 
-
     arg.free();
     CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
-    checkCudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 
@@ -1020,54 +825,21 @@ namespace quda {
     }
   }
 
-  template<int Elems, typename Float, typename Gauge>
-  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, const int gauge_dir, \
-                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
-                       const double tolerance, const int stopWtheta) {
-    if ( gauge_dir != 3 ) {
-      printf("Starting Landau gauge fixing with FFTs...\n");
-      gaugefixingFFT<Elems, Float, Gauge, 4>(dataOr, data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-    }
-    else {
-      printf("Starting Coulomb gauge fixing with FFTs...\n");
-      gaugefixingFFT<Elems, Float, Gauge, 3>(dataOr, data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-    }
-  }
-
-
-
-  template<typename Float>
-  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
-                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
-                       const double tolerance, const int stopWtheta) {
-
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    //9 and 6 means the number of complex elements used to store g(x) and Delta(x)
-    if ( data.isNative() ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-        gaugefixingFFT<9, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-        gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-        gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-
+  template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
+    GaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const Float alpha,
+                   const int autotune, const double tolerance, const int stopWtheta)
+    {
+      using Gauge = typename gauge_mapper<Float, recon>::type;
+      constexpr int n_element = recon / 2; // number of complex elements used to store g(x) and Delta(x)
+      if ( gauge_dir != 3 ) {
+        printfQuda("Starting Landau gauge fixing with FFTs...\n");
+        gaugefixingFFT<n_element, Float, Gauge, 4>(Gauge(data), data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
+        printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
+        gaugefixingFFT<n_element, Float, Gauge, 3>(Gauge(data), data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       }
-    } else {
-      errorQuda("Invalid Gauge Order\n");
     }
-  }
-
-#endif // GPU_GAUGE_ALG
-
+  };
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -1080,30 +852,18 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
-                       const int Nsteps, const int verbose_interval, const double alpha, const int autotune, \
-                       const double tolerance, const int stopWtheta) {
-
+  void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
+                      const int autotune, const double tolerance, const int stopWtheta)
+  {
 #ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU
-    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
+    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
       errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!\n");
 #endif
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
-    if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
-      gaugefixingFFT<float> (data, gauge_dir, Nsteps, verbose_interval, (float)alpha, autotune, tolerance, stopWtheta);
-    } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
-      gaugefixingFFT<double>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
+    instantiate<GaugeFixingFFT>(data, gauge_dir, Nsteps, verbose_interval, (float)alpha, autotune, tolerance, stopWtheta);
 #else
     errorQuda("Gauge fixing has bot been built");
 #endif
   }
-
-
 
 }

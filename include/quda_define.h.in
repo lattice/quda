@@ -18,15 +18,15 @@
  */
 #define MAX_MULTI_BLAS_N @QUDA_MAX_MULTI_BLAS_N@
 
-#cmakedefine QUDA_TEX
-#ifdef QUDA_TEX
+#cmakedefine QUDA_HETEROGENEOUS_ATOMIC
+#ifdef QUDA_HETEROGENEOUS_ATOMIC
 /**
- * @def   USE_TEXTURE_OBJECTS
- * @brief This macro sets whether we are compiling QUDA with texture
+ * @def   HETEROGENEOUS_ATOMIC
+ * @brief This macro sets whether we are compiling QUDA with heterogeneous atomic
  * support enabled or not
  */
-#define USE_TEXTURE_OBJECTS
-#undef QUDA_TEX
+#define HETEROGENEOUS_ATOMIC
+#undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
 #cmakedefine QUDA_DYNAMIC_CLOVER
@@ -38,4 +38,15 @@
  */
 #define DYNAMIC_CLOVER
 #undef QUDA_DYNAMIC_CLOVER
+#endif
+
+#cmakedefine QUDA_FLOAT8
+#ifdef QUDA_FLOAT8
+/**
+ * @def FLOAT8
+ * @brief This macro set whether float8-ordered fields are enabled or
+ * not
+ */
+#define FLOAT8
+#undef QUDA_FLOAT8
 #endif

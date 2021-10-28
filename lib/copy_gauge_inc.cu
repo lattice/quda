@@ -1,5 +1,6 @@
 #include <gauge_field_order.h>
 #include <copy_gauge_helper.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
@@ -280,41 +281,54 @@ namespace quda {
     momCopier.apply(0);
   }
 
-  template <typename FloatOut, typename FloatIn>
-  void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In,
-      FloatOut **outGhost, FloatIn **inGhost, int type)
-  {
+  template <typename FloatOut, typename FloatIn> struct GaugeCopy {
+    GaugeCopy(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out_, void *In_,
+              void **outGhost_, void **inGhost_, int type)
+    {
+      FloatOut *Out = reinterpret_cast<FloatOut*>(Out_);
+      FloatIn *In = reinterpret_cast<FloatIn*>(In_);
+      FloatOut **outGhost = reinterpret_cast<FloatOut**>(outGhost_);
+      FloatIn **inGhost = reinterpret_cast<FloatIn**>(inGhost_);
 
-    if (in.Ncolor() != 3 && out.Ncolor() != 3) {
-      errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
-    }
+      if (in.Ncolor() != 3 && out.Ncolor() != 3) {
+        errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
+      }
 
-    if (out.Geometry() != in.Geometry()) {
-      errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
-    }
+      if (out.Geometry() != in.Geometry()) {
+        errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
+      }
 
-    if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
-      // we are doing gauge field packing
-      copyGauge<FloatOut,FloatIn,18>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else {
-      if (out.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", out.Geometry());
+      if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
+        // we are doing gauge field packing
+        copyGauge<FloatOut,FloatIn,18>(out, in, location, Out, In, outGhost, inGhost, type);
+      } else {
+        if (out.Geometry() != QUDA_VECTOR_GEOMETRY) errorQuda("Unsupported geometry %d", out.Geometry());
 
-      checkMomOrder(in);
-      checkMomOrder(out);
+        checkMomOrder(in);
+        checkMomOrder(out);
 
-      // this overrides the check that the texture maps to the gauge
-      // pointer - this is safe here since it only occurs when running
-      // the copier on the host when we will not be using texture
-      // reads
-      const bool override = true;
+        // this overrides the check that the texture maps to the gauge
+        // pointer - this is safe here since it only occurs when running
+        // the copier on the host when we will not be using texture
+        // reads
+        const bool override = true;
 
-      // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
+        // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
 	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In, 0, override), in);
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+#ifdef BUILD_QDP_INTERFACE
+	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
+	    typedef QDPOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out, 0, override), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+#else
+	    errorQuda("QDP interface has not been built\n");
+#endif
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
 	    typedef FloatNOrder<FloatOut,10,2,10> momOut;
@@ -354,6 +368,23 @@ namespace quda {
 	  } else {
 	    errorQuda("Gauge field orders %d not supported", in.Order());
 	  }
+	} else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
+	  typedef QDPOrder<FloatOut,10> momOut;
+#ifdef BUILD_QDP_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    typedef FloatNOrder<FloatIn,10,2,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In, 0, override), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+	    typedef MILCOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
+#else
+	  errorQuda("QDP interface has not been built\n");
+#endif
 	} else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 	  typedef MILCOrder<FloatOut,10> momOut;
 #ifdef BUILD_MILC_INTERFACE
@@ -363,6 +394,10 @@ namespace quda {
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	    typedef MILCOrder<FloatIn,10> momIn;
+	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
+	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
+          } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+	    typedef QDPOrder<FloatIn,10> momIn;
 	    CopyGaugeArg<momOut,momIn> arg(momOut(out, Out), momIn(in, In), in);
 	    copyMom<FloatOut,FloatIn,10,momOut,momIn>(arg,out,in,location);
 	  } else {
@@ -427,37 +462,15 @@ namespace quda {
 	} else {
 	  errorQuda("Gauge field orders %d not supported", out.Order());
 	}
+      }
     }
-  }
+  };
 
-  // this is the function that is actually called, from here on down we instantiate all required templates
-  template <typename FloatOut>
+  template <typename FloatIn>
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
-      void **ghostOut, void **ghostIn, int type)
+                        void **ghostOut, void **ghostIn, int type)
   {
-    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-      copyGauge(out, in, location, (FloatOut *)Out, (double *)In, (FloatOut **)ghostOut, (double **)ghostIn, type);
-    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
-#if QUDA_PRECISION & 4
-      copyGauge(out, in, location, (FloatOut *)Out, (float *)In, (FloatOut **)ghostOut, (float **)ghostIn, type);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (in.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      copyGauge(out, in, location, (FloatOut *)Out, (short *)In, (FloatOut **)ghostOut, (short **)ghostIn, type);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      copyGauge(out, in, location, (FloatOut *)Out, (char *)In, (FloatOut **)ghostOut, (char **)ghostIn, type);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
-    } else {
-      errorQuda("Unsupported precision %d", in.Precision());
-    }
+    instantiatePrecision2<GaugeCopy, FloatIn>(out, in, location, Out, In, ghostOut, ghostIn, type);
   }
 
 } // namespace quda

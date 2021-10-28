@@ -1,6 +1,7 @@
 ---
 BasedOnStyle: Webkit
 IndentWidth: 2
+AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignTrailingComments: true
 AllowShortBlocksOnASingleLine: true

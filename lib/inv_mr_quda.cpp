@@ -13,9 +13,15 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), rp(nullptr), r_sloppy(nullptr),
-    Arp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), x_sloppy(nullptr), init(false)
+  MR::MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile),
+    rp(nullptr),
+    r_sloppy(nullptr),
+    Arp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    x_sloppy(nullptr),
+    init(false)
   {
     if (param.schwarz_type == QUDA_MULTIPLICATIVE_SCHWARZ && param.Nsteps % 2 == 1) {
       errorQuda("For multiplicative Schwarz, number of solver steps %d must be even", param.Nsteps);

@@ -87,14 +87,10 @@ namespace quda {
       return;
     }
 
-
-
-
-  MPCG::MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat)
-  {
-
-  }
+    MPCG::MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+      Solver(mat, mat, mat, mat, param, profile)
+    {
+    }
 
   MPCG::~MPCG() {
 

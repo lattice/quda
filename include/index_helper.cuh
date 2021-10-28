@@ -10,7 +10,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
-  static __device__ __host__ inline int linkIndexShift(const I x[], const J dx[], const K X[4]) {
+  __device__ __host__ inline int linkIndexShift(const I x[], const J dx[], const K X[4]) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
@@ -28,7 +28,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I, typename J, typename K>
-  static __device__ __host__ inline int linkIndexShift(I y[], const I x[], const J dx[], const K X[4]) {
+  __device__ __host__ inline int linkIndexShift(I y[], const I x[], const J dx[], const K X[4]) {
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -43,7 +43,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I>
-  static __device__ __host__ inline int linkIndex(const int x[], const I X[4]) {
+  __device__ __host__ inline int linkIndex(const int x[], const I X[4]) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     return idx;
   }
@@ -57,7 +57,7 @@ namespace quda {
      @param X Full lattice dimensions
    */
   template <typename I>
-  static __device__ __host__ inline int linkIndex(int y[], const int x[], const I X[4]) {
+  __device__ __host__ inline int linkIndex(int y[], const int x[], const I X[4]) {
     int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     y[0] = x[0]; y[1] = x[1]; y[2] = x[2]; y[3] = x[3];
     return idx;
@@ -72,8 +72,8 @@ namespace quda {
        @param X Full lattice dimensions
        @param mu direction in which to add n hops
      */
-  template <typename I, int n>
-  static __device__ __host__ inline int linkIndexDn(const int x[], const I X[4], const int mu)
+  template <typename I, int n, typename Coord>
+  __device__ __host__ inline int linkIndexDn(const Coord &x, const I X[4], const int mu)
   {
     int y[4];
 #pragma unroll
@@ -91,7 +91,7 @@ namespace quda {
      @param X Full lattice dimensions
      @param mu direction in which to subtract 1
    */
-  template <typename I> static __device__ __host__ inline int linkIndexM1(const int x[], const I X[4], const int mu)
+  template <typename I, typename Coord> __device__ __host__ inline int linkIndexM1(const Coord &x, const I X[4], const int mu)
   {
     return linkIndexDn<I, -1>(x, X, mu);
   }
@@ -104,7 +104,7 @@ namespace quda {
      @param X Full lattice dimensions
      @param mu direction in which to subtract 3
    */
-  template <typename I> static __device__ __host__ inline int linkIndexM3(const int x[], const I X[4], const int mu)
+  template <typename I, typename Coord> __device__ __host__ inline int linkIndexM3(const Coord &x, const I X[4], const int mu)
   {
     return linkIndexDn<I, -3>(x, X, mu);
   }
@@ -118,7 +118,7 @@ namespace quda {
      @param mu direction in which to add 1
    */
   template <typename I>
-  static __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
+  __device__ __host__ inline int linkNormalIndexP1(const int x[], const I X[4], const int mu) {
     int y[4];
 #pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
@@ -135,8 +135,8 @@ namespace quda {
      @param X Full lattice dimensions
      @param mu direction in which to add 1
    */
-  template <typename I>
-  static __device__ __host__ inline int linkIndexP1(const int x[], const I X[4], const int mu) {
+  template <typename I, typename Coord>
+  __device__ __host__ inline int linkIndexP1(const Coord &x, const I X[4], const int mu) {
     return linkIndexDn<I, 1>(x, X, mu);
   }
 
@@ -148,41 +148,49 @@ namespace quda {
      @param X Full lattice dimensions
      @param mu direction in which to add 3
    */
-  template <typename I> static __device__ __host__ inline int linkIndexP3(const int x[], const I X[4], const int mu)
+  template <typename I, typename Coord> __device__ __host__ inline int linkIndexP3(const Coord &x, const I X[4], const int mu)
   {
     return linkIndexDn<I, 3>(x, X, mu);
   }
 
+  template <int nDim>
+  struct Coord {
+    int x[nDim]; // nDim lattice coordinates
+    int x_cb;    // checkerboard lattice site index
+    int s;       // fifth dimension coord
+    int X;       // full lattice site index
+    constexpr const int& operator[](int i) const { return x[i]; }
+    constexpr int& operator[](int i) { return x[i]; }
+  };
+
   /**
      @brief Compute the checkerboard 1-d index for the nearest
      neighbor
-     @param[in] x nDim lattice coordinates
+     @param[in] lattice coordinates
      @param[in] mu dimension in which to add 1
      @param[in] dir direction (+1 or -1)
      @param[in] arg parameter struct
      @return 1-d checkboard index
    */
-  template <int nDim = 4, typename Arg>
-  static __device__ __host__ inline int getNeighborIndexCB(const int x[], int mu, int dir, const Arg &arg)
+  template <typename Coord, typename Arg>
+  __device__ __host__ inline int getNeighborIndexCB(const Coord &x, int mu, int dir, const Arg &arg)
   {
-    int idx = nDim == 4 ? ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0] :
-                          (((x[4] * arg.X[3] + x[3]) * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
     switch (dir) {
     case +1: // positive direction
       switch (mu) {
-      case 0: return (x[0] == arg.X[0] - 1 ? idx - (arg.X[0] - 1) : idx + 1) >> 1;
-      case 1: return (x[1] == arg.X[1] - 1 ? idx - arg.X2X1mX1 : idx + arg.X[0]) >> 1;
-      case 2: return (x[2] == arg.X[2] - 1 ? idx - arg.X3X2X1mX2X1 : idx + arg.X2X1) >> 1;
-      case 3: return (x[3] == arg.X[3] - 1 ? idx - arg.X4X3X2X1mX3X2X1 : idx + arg.X3X2X1) >> 1;
-      case 4: return (x[4] == arg.X[4] - 1 ? idx - arg.X5X4X3X2X1mX4X3X2X1 : idx + arg.X4X3X2X1) >> 1;
+      case 0: return (x[0] == arg.X[0] - 1 ? x.X - (arg.X[0] - 1) : x.X + 1) >> 1;
+      case 1: return (x[1] == arg.X[1] - 1 ? x.X - arg.X2X1mX1 : x.X + arg.X[0]) >> 1;
+      case 2: return (x[2] == arg.X[2] - 1 ? x.X - arg.X3X2X1mX2X1 : x.X + arg.X2X1) >> 1;
+      case 3: return (x[3] == arg.X[3] - 1 ? x.X - arg.X4X3X2X1mX3X2X1 : x.X + arg.X3X2X1) >> 1;
+      case 4: return (x[4] == arg.X[4] - 1 ? x.X - arg.X5X4X3X2X1mX4X3X2X1 : x.X + arg.X4X3X2X1) >> 1;
       }
     case -1:
       switch (mu) {
-      case 0: return (x[0] == 0 ? idx + (arg.X[0] - 1) : idx - 1) >> 1;
-      case 1: return (x[1] == 0 ? idx + arg.X2X1mX1 : idx - arg.X[0]) >> 1;
-      case 2: return (x[2] == 0 ? idx + arg.X3X2X1mX2X1 : idx - arg.X2X1) >> 1;
-      case 3: return (x[3] == 0 ? idx + arg.X4X3X2X1mX3X2X1 : idx - arg.X3X2X1) >> 1;
-      case 4: return (x[4] == 0 ? idx + arg.X5X4X3X2X1mX4X3X2X1 : idx - arg.X4X3X2X1) >> 1;
+      case 0: return (x[0] == 0 ? x.X + (arg.X[0] - 1) : x.X - 1) >> 1;
+      case 1: return (x[1] == 0 ? x.X + arg.X2X1mX1 : x.X - arg.X[0]) >> 1;
+      case 2: return (x[2] == 0 ? x.X + arg.X3X2X1mX2X1 : x.X - arg.X2X1) >> 1;
+      case 3: return (x[3] == 0 ? x.X + arg.X4X3X2X1mX3X2X1 : x.X - arg.X3X2X1) >> 1;
+      case 4: return (x[4] == 0 ? x.X + arg.X5X4X3X2X1mX4X3X2X1 : x.X - arg.X4X3X2X1) >> 1;
       }
     }
     return 0; // should never reach here
@@ -196,9 +204,10 @@ namespace quda {
      @param[in] X Full lattice dimensions
      @param[in] X0h Half of x-dim lattice dimension
      @param[in] parity Site parity
+     @return Full linear lattice index
    */
-  template <typename I, typename J>
-  static __device__ __host__ inline void getCoordsCB(int x[], int cb_index, const I X[], J X0h, int parity)
+  template <typename Coord, typename I, typename J>
+  __device__ __host__ inline int getCoordsCB(Coord &x, int cb_index, const I X[], J X0h, int parity)
   {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
@@ -211,8 +220,9 @@ namespace quda {
     x[3] = (zb / X[2]);
     x[2] = (zb - x[3] * X[2]);
     int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * cb_index + x1odd  - za * X[0]);
-    return;
+    int x_idx = 2 * cb_index + x1odd;
+    x[0] = (x_idx  - za * X[0]);
+    return x_idx;
   }
 
   /**
@@ -224,10 +234,11 @@ namespace quda {
      @param[in] X Full lattice dimensions
      @param[in] X0h Half of x-dim lattice dimension
      @param[in] parity Site parity
+     @return Full linear lattice index
    */
-  template <typename I> static __device__ __host__ inline void getCoords(int x[], int cb_index, const I X[], int parity)
+  template <typename Coord, typename I> __device__ __host__ inline int getCoords(Coord &x, int cb_index, const I X[], int parity)
   {
-    getCoordsCB(x, cb_index, X, X[0] >> 1, parity);
+    return getCoordsCB(x, cb_index, X, X[0] >> 1, parity);
   }
 
   /**
@@ -239,7 +250,7 @@ namespace quda {
      @param parity Site parity
    */
   template <typename I, typename J>
-  static __device__ __host__ inline void getCoordsExtended(I x[], int cb_index, const J X[], int parity, const int R[]) {
+  __device__ __host__ inline void getCoordsExtended(I x[], int cb_index, const J X[], int parity, const int R[]) {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
     //x[1] = (cb_index/(X[0]/2)) % X[1];
@@ -265,10 +276,10 @@ namespace quda {
      @param[in] X Full lattice dimensions
      @param[in] X0h Half of x-dim lattice dimension
      @param[in] parity Site parity
+     @return Full linear lattice index
    */
-  template <typename I, typename J>
-  static __device__ __host__ inline void getCoords5CB(
-      int x[5], int cb_index, const I X[5], J X0h, int parity, QudaPCType pc_type)
+  template <typename Coord, typename I, typename J>
+  __device__ __host__ inline int getCoords5CB(Coord &x, int cb_index, const I X[5], J X0h, int parity, QudaPCType pc_type)
   {
     //x[4] = cb_index/(X[3]*X[2]*X[1]*X[0]/2);
     //x[3] = (cb_index/(X[2]*X[1]*X[0]/2) % X[3];
@@ -284,8 +295,9 @@ namespace quda {
     x[4] = (zc / X[3]);
     x[3] = zc - x[4] * X[3];
     int x1odd = (x[1] + x[2] + x[3] + (pc_type==QUDA_5D_PC ? x[4] : 0) + parity) & 1;
-    x[0] = (2 * cb_index + x1odd)  - za * X[0];
-    return;
+    int x_idx = 2 * cb_index + x1odd;
+    x[0] = x_idx  - za * X[0];
+    return x_idx;
   }
 
   /**
@@ -296,11 +308,12 @@ namespace quda {
      @param[in] cb_index 1-d checkerboarded index
      @param[in] X Full lattice dimensions
      @param[in] parity Site parity
+     @return Full linear lattice index
    */
   template <typename I>
-  static __device__ __host__ inline void getCoords5(int x[5], int cb_index, const I X[5], int parity, QudaPCType pc_type)
+  __device__ __host__ inline int getCoords5(int x[5], int cb_index, const I X[5], int parity, QudaPCType pc_type)
   {
-    getCoords5CB(x, cb_index, X, X[0] >> 1, parity, pc_type);
+    return getCoords5CB(x, cb_index, X, X[0] >> 1, parity, pc_type);
   }
 
   /**
@@ -313,7 +326,7 @@ namespace quda {
      @param parity Site parity
    */
   template <typename I>
-  static __device__ __host__ inline int getIndexFull(int cb_index, const I X[4], int parity) {
+  __device__ __host__ inline int getIndexFull(int cb_index, const I X[4], int parity) {
     int za = (cb_index / (X[0] / 2));
     int zb =  (za / X[1]);
     int x1 = za - zb * X[1];
@@ -321,6 +334,29 @@ namespace quda {
     int x2 = zb - x3 * X[2];
     int x1odd = (x1 + x2 + x3 + parity) & 1;
     return 2 * cb_index + x1odd;
+  }
+
+  /** Compute the 1-d checkerboard index and parity from
+      the full linear lattice (not what's used for
+      indexing into fields, re:padding argument for getIndexFull).
+
+      @param[out] out_parity Output site parity
+      @param[in] X full lattice dimensions
+      @param[in] full_index full linear lattice index
+      @return 1-d checkerboard index
+   */
+  template <typename I>
+  __device__ __host__ inline int getParityCBFromFull(int& out_parity, const I X[4], const int full_index) {
+
+    const int za = (full_index / X[0]);
+    const int x0 = full_index % X[0];
+    const int zb =  (za / X[1]);
+    const int x1 = (za - zb * X[1]);
+    const int x3 = (zb / X[2]);
+    const int x2 = (zb - x3 * X[2]);
+    out_parity = (x0 + x1 + x2 + x3) & 1;
+
+    return full_index >> 1;
   }
 
   /**
@@ -331,8 +367,8 @@ namespace quda {
      @param dim dimension
      @param nFace depth of ghost
   */
-  template <int dir, int nDim = 4, typename I>
-  __device__ __host__ inline int ghostFaceIndex(const int x_[], const I X_[], int dim, int nFace)
+  template <int dir, int nDim = 4, typename Coord, typename I>
+  __device__ __host__ inline int ghostFaceIndex(const Coord &x_, const I X_[], int dim, int nFace)
   {
     static_assert((nDim == 4 || nDim == 5), "Number of dimensions must be 4 or 5");
     int index = 0;
@@ -343,7 +379,7 @@ namespace quda {
     case 0:
       switch(dir) {
       case 0:
-	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
 	break;
       case 1:
 	index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
@@ -376,7 +412,7 @@ namespace quda {
 	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
 	break;
       case 1:
-	index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+	index = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
 	break;
       }
       break;
@@ -392,8 +428,8 @@ namespace quda {
     @param dim dimension
     @param nFace depth of ghost
  */
-  template <int dir, int nDim = 4, typename I>
-  __device__ __host__ inline int ghostFaceIndexStaggered(const int x_[], const I X_[], int dim, int nFace)
+  template <int dir, int nDim = 4, typename Coord, typename I>
+  __device__ __host__ inline int ghostFaceIndexStaggered(const Coord &x_, const I X_[], int dim, int nFace)
   {
     static_assert((nDim == 4 || nDim == 5), "Number of dimensions must be 4 or 5");
     int index = 0;
@@ -468,6 +504,7 @@ namespace quda {
     EXTERIOR_KERNEL_Y = 1,
     EXTERIOR_KERNEL_Z = 2,
     EXTERIOR_KERNEL_T = 3,
+    UBER_KERNEL = 4,
     KERNEL_POLICY = 7
   };
 
@@ -484,9 +521,9 @@ namespace quda {
      @param[in] parity Parity index
      @param[in] arg Argument struct with required meta data
   */
-  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Coord, typename Arg>
   inline __device__ __host__ void coordsFromFaceIndex(
-      int &idx, int &cb_idx, Int *const x, int face_idx, const int &face_num, int parity, const Arg &arg)
+      int &idx, int &cb_idx, Coord &x, int face_idx, const int &face_num, int parity, const Arg &arg)
   {
     constexpr int dim = (dim_ == INTERIOR_KERNEL || dim_ == EXTERIOR_KERNEL_ALL) ? 0 : dim_; // silence compiler warning
 
@@ -581,9 +618,9 @@ namespace quda {
      @brief Overloaded variant of indexFromFaceIndex where we use the
      parity declared in arg.
    */
-  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Int, typename Arg>
+  template <int nDim, QudaPCType type, int dim_, int nLayers, typename Coord, typename Arg>
   inline __device__ __host__ void coordsFromFaceIndex(
-      int &idx, int &cb_idx, Int *const x, int face_idx, const int &face_num, const Arg &arg)
+      int &idx, int &cb_idx, Coord &x, int face_idx, const int &face_num, const Arg &arg)
   {
     coordsFromFaceIndex<nDim, type, dim_, nLayers>(idx, cb_idx, x, face_idx, face_num, arg.parity, arg);
   }
@@ -714,7 +751,7 @@ namespace quda {
   // int idx = indexFromFaceIndex<4,QUDA_4D_PC,dim,nFace,0>(ghost_idx, parity, arg);
 
   template <int nDim, QudaPCType type, int dim, int nLayers, int face_num, typename Arg>
-  static inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
+  inline __device__ int indexFromFaceIndexStaggered(int face_idx_in, int parity, const Arg &arg)
   {
     const auto *X = arg.dc.X;            // grid dimension
     const auto *dims = arg.dc.dims[dim]; // dimensions of the face
@@ -814,7 +851,7 @@ namespace quda {
   /**
      @brief Swizzler for reordering the (x) thread block indices - use on
      conjunction with swizzle-factor autotuning to find the optimum
-     swizzle factor.  Specfically, the thread block id is remapped by
+     swizzle factor.  Specifically, the thread block id is remapped by
      transposing its coordinates: if the original order can be
      parametrized by
 
@@ -864,8 +901,8 @@ namespace quda {
      @param[in] dir Direction of the unit hop (+1 or -1)
      @param[in] tboundary Boundary condition
    */
-  template <typename Arg>
-  __device__ __host__ inline auto StaggeredPhase(const int coords[], int dim, int dir, const Arg &arg) -> typename Arg::real
+  template <typename Coord, typename Arg>
+  __device__ __host__ inline auto StaggeredPhase(const Coord &coords, int dim, int dir, const Arg &arg) -> typename Arg::real
   {
     using real = typename Arg::real;
     constexpr auto phase = Arg::phase;
@@ -896,6 +933,134 @@ namespace quda {
       }
     }
     return sign;
+  }
+
+  /*
+     Indexing functions used by the outer product kernels.  Should be
+     reconciled with the above at some point.  These have added
+     functionality that may be useful for dealing with odd-sized local
+     dimensions.
+   */
+  enum IndexType {
+    EVEN_X = 0,
+    EVEN_Y = 1,
+    EVEN_Z = 2,
+    EVEN_T = 3
+  };
+
+  template <IndexType idxType>
+  __device__ __host__ inline void coordsFromIndex(int &idx, int c[4], unsigned int cb_idx, int parity, const int X[4])
+  {
+    const int &LX = X[0];
+    const int &LY = X[1];
+    const int &LZ = X[2];
+    const int XYZ = X[2]*X[1]*X[0];
+    const int XY = X[1]*X[0];
+
+    idx = 2*cb_idx;
+
+    int x, y, z, t;
+
+    if (idxType == EVEN_X /*!(LX & 1)*/) { // X even
+      //   t = idx / XYZ;
+      //   z = (idx / XY) % Z;
+      //   y = (idx / X) % Y;
+      //   idx += (parity + t + z + y) & 1;
+      //   x = idx % X;
+      // equivalent to the above, but with fewer divisions/mods:
+      int aux1 = idx / LX;
+      x = idx - aux1 * LX;
+      int aux2 = aux1 / LY;
+      y = aux1 - aux2 * LY;
+      t = aux2 / LZ;
+      z = aux2 - t * LZ;
+      aux1 = (parity + t + z + y) & 1;
+      x += aux1;
+      idx += aux1;
+    } else if (idxType == EVEN_Y /*!(LY & 1)*/) { // Y even
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      idx += (parity + t + z) & 1;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else if (idxType == EVEN_Z /*!(LZ & 1)*/) { // Z even
+      t = idx / XYZ;
+      idx += (parity + t) & 1;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    } else {
+      idx += parity;
+      t = idx / XYZ;
+      z = (idx / XY) % LZ;
+      y = (idx / LX) % LY;
+      x = idx % LX;
+    }
+
+    c[0] = x;
+    c[1] = y;
+    c[2] = z;
+    c[3] = t;
+  }
+
+  // Get the  coordinates for the exterior kernels
+  __device__ __host__ inline void coordsFromIndexExterior(int x[4], const unsigned int cb_idx, const int X[4],
+                                                          const unsigned int dir, const int displacement, const unsigned int parity)
+  {
+    int Xh[2] = {X[0] / 2, X[1] / 2};
+    switch (dir) {
+    case 0:
+      x[2] = cb_idx / Xh[1] % X[2];
+      x[3] = cb_idx / (Xh[1] * X[2]) % X[3];
+      x[0] = cb_idx / (Xh[1] * X[2] * X[3]);
+      x[0] += (X[0] - displacement);
+      x[1] = 2 * (cb_idx % Xh[1]) + ((x[0] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 1:
+      x[2] = cb_idx / Xh[0] % X[2];
+      x[3] = cb_idx / (Xh[0] * X[2]) % X[3];
+      x[1] = cb_idx / (Xh[0] * X[2] * X[3]);
+      x[1] += (X[1] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 2:
+      x[1] = cb_idx / Xh[0] % X[1];
+      x[3] = cb_idx / (Xh[0] * X[1]) % X[3];
+      x[2] = cb_idx / (Xh[0] * X[1] * X[3]);
+      x[2] += (X[2] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+
+    case 3:
+      x[1] = cb_idx / Xh[0] % X[1];
+      x[2] = cb_idx / (Xh[0] * X[1]) % X[2];
+      x[3] = cb_idx / (Xh[0] * X[1] * X[2]);
+      x[3] += (X[3] - displacement);
+      x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+    }
+    return;
+  }
+
+  __device__ __host__ inline int neighborIndex(unsigned int cb_idx, const int shift[4], const bool partitioned[4], int parity,
+                                               const int X[4])
+  {
+    int full_idx;
+    int x[4];
+
+    coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
+
+    for(int dim = 0; dim<4; ++dim){
+      if( partitioned[dim] )
+	if( (x[dim]+shift[dim])<0 || (x[dim]+shift[dim])>=X[dim]) return -1;
+    }
+
+    for(int dim=0; dim<4; ++dim){
+      x[dim] = shift[dim] ? (x[dim]+shift[dim] + X[dim]) % X[dim] : x[dim];
+    }
+    return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
   }
 
 } // namespace quda

@@ -13,68 +13,37 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct TwistedMassLaunch {
-    static constexpr const char *kernel = "quda::twistedMassGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(xpay == true, "Twisted-mass operator only defined for xpay");
-      dslash.launch(twistedMassGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedMass : public Dslash<Float>
+  template <typename Arg> class TwistedMass : public Dslash<twistedMass, Arg>
   {
+    using Dslash = Dslash<twistedMass, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+  public:
+    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-public:
-    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_twisted_mass.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~TwistedMass() {}
-
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash<Float>::template instantiate<TwistedMassLaunch, nDim, nColor, true>(tp, arg, stream);
+        Dslash::template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Twisted-mass operator only defined for xpay=true");
     }
 
     long long flops() const
     {
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // twisted-mass flops are in the interior kernel
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * nColor * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
+      default: break; // twisted-mass flops are in the interior kernel
       }
       return flops;
-    }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
     }
   };
 
@@ -85,15 +54,13 @@ public:
                             TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      TwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
-      TwistedMass<Float, nDim, nColor, TwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
+      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
+      TwistedMass<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
       policy.apply(0);
-
-      checkCudaError();
     }
   };
 
@@ -105,16 +72,6 @@ public:
                         TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-mass dslash has not been built");

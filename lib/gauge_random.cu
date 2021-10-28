@@ -5,16 +5,21 @@
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
 #include <index_helper.cuh>
 #include <random_quda.h>
+#include <instantiate.h>
 
 namespace quda {
 
-  template <typename Float, QudaReconstructType recon, bool group_> struct GaugeGaussArg {
-    using Gauge = typename gauge_mapper<Float, recon>::type;
+  template <typename Float_, int nColor_, QudaReconstructType recon_, bool group_> struct GaugeGaussArg {
+    using Float = Float_;
     using real = typename mapper<Float>::type;
+    static constexpr int nColor = nColor_;
+    static constexpr QudaReconstructType recon = recon_;
     static constexpr bool group = group_;
+
+    using Gauge = typename gauge_mapper<Float, recon>::type;
+
     int threads; // number of active threads required
     int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
@@ -68,10 +73,10 @@ namespace quda {
     return ret;
   }
 
-  template <typename Float, typename Arg> __global__ void computeGenGauss(Arg arg)
+  template <typename Arg> __global__ void computeGenGauss(Arg arg)
   {
-    using real = typename mapper<Float>::type;
-    using Link = Matrix<complex<real>, 3>;
+    using real = typename mapper<typename Arg::Float>::type;
+    using Link = Matrix<complex<real>, Arg::nColor>;
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     if (x_cb >= arg.threads) return;
@@ -102,27 +107,24 @@ namespace quda {
     }
   }
 
-  template <typename Float, typename Arg> class GaugeGauss : TunableVectorY
+  template <typename Arg> class GaugeGauss : TunableVectorY
   {
     Arg &arg;
     const GaugeField &meta;
 
-private:
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
 
-public:
-    GaugeGauss(Arg &arg, GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {}
-    ~GaugeGauss() {}
+  public:
+    GaugeGauss(Arg &arg, GaugeField &meta) :
+      TunableVectorY(2),
+      arg(arg),
+      meta(meta) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        computeGenGauss<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-      } else {
-        errorQuda("Randomize GaugeFields on CPU not supported yet\n");
-      }
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      qudaLaunchKernel(computeGenGauss<Arg>, tp, stream, arg);
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
@@ -134,46 +136,46 @@ public:
     void postTune() { arg.rngstate.restore(); }
   };
 
-  template <typename Float, QudaReconstructType recon, bool group>
-  void genGauss(GaugeField &U, RNG &rngstate, double sigma)
-  {
-    GaugeGaussArg<Float, recon, group> arg(U, rngstate, sigma);
-    GaugeGauss<Float, decltype(arg)> gaugeGauss(arg, U);
-    gaugeGauss.apply(0);
-  }
-
-  template <typename Float> void gaugeGauss(GaugeField &U, RNG &rngstate, double sigma)
-  {
-    if (U.LinkType() == QUDA_SU3_LINKS) { // generate Gaussian distributed SU(3) field
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Creating Gaussian distrbuted gauge field with sigma = %e\n", sigma);
-      switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float, QUDA_RECONSTRUCT_NO, true>(U, rngstate, sigma); break;
-      case QUDA_RECONSTRUCT_13: genGauss<Float, QUDA_RECONSTRUCT_13, true>(U, rngstate, sigma); break;
-      case QUDA_RECONSTRUCT_12: genGauss<Float, QUDA_RECONSTRUCT_12, true>(U, rngstate, sigma); break;
-      case QUDA_RECONSTRUCT_9: genGauss<Float, QUDA_RECONSTRUCT_9, true>(U, rngstate, sigma); break;
-      case QUDA_RECONSTRUCT_8: genGauss<Float, QUDA_RECONSTRUCT_8, true>(U, rngstate, sigma); break;
-      default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
-      }
-    } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) { // generate Gaussian distributed su(3) field
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating Gaussian distrbuted momentum field\n");
-      switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float, QUDA_RECONSTRUCT_NO, false>(U, rngstate, sigma); break;
-      case QUDA_RECONSTRUCT_10: genGauss<Float, QUDA_RECONSTRUCT_10, false>(U, rngstate, sigma); break;
-      default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
-      }
+  template <typename Float, int nColor, QudaReconstructType recon>
+  struct GenGaussGroup {
+    GenGaussGroup(GaugeField &U, RNG &rngstate, double sigma)
+    {
+      constexpr bool group = true;
+      GaugeGaussArg<Float, nColor, recon, group> arg(U, rngstate, sigma);
+      GaugeGauss<decltype(arg)> gaugeGauss(arg, U);
+      gaugeGauss.apply(0);
     }
-  }
+  };
 
-  void gaugeGauss(GaugeField &U, RNG &rngstate, double sigma)
+  template <typename Float, int nColor, QudaReconstructType recon>
+  struct GenGaussAlgebra {
+    GenGaussAlgebra(GaugeField &U, RNG &rngstate, double sigma)
+    {
+      constexpr bool group = false;
+      GaugeGaussArg<Float, nColor, recon, group> arg(U, rngstate, sigma);
+      GaugeGauss<decltype(arg)> gaugeGauss(arg, U);
+      gaugeGauss.apply(0);
+    }
+  };
+
+  void gaugeGauss(GaugeField &U, RNG &rng, double sigma)
   {
     if (!U.isNative()) errorQuda("Order %d with %d reconstruct not supported", U.Order(), U.Reconstruct());
-    if (U.Ncolor() != 3) errorQuda("Nc = %d not supported", U.Ncolor());
 
-    switch (U.Precision()) {
-    case QUDA_DOUBLE_PRECISION: gaugeGauss<double>(U, rngstate, sigma); break;
-    case QUDA_SINGLE_PRECISION: gaugeGauss<float>(U, rngstate, sigma); break;
-    default: errorQuda("Precision %d not supported", U.Precision());
+    if (U.LinkType() == QUDA_SU3_LINKS) {
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Creating Gaussian distrbuted gauge field with sigma = %e\n", sigma);
+      instantiate<GenGaussGroup, ReconstructFull>(U, rng, sigma);
+
+    } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) {
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Creating Gaussian distrbuted momentum field\n");
+      instantiate<GenGaussAlgebra, ReconstructMom>(U, rng, sigma);
+
+    } else {
+      errorQuda("Unexpected linkt type %d", U.LinkType());
     }
 
     // ensure multi-gpu consistency if required

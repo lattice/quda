@@ -1,35 +1,25 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
-#include <random_quda.h>
-#include <cuda.h>
-#include <quda_internal.h>
 
+#include <quda_internal.h>
+#include <tune_quda.h>
+#include <random_quda.h>
 #include <comm_quda.h>
 #include <index_helper.cuh>
 
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
-#define CUDA_SAFE_CALL_NO_SYNC( call) {                                 \
-    cudaError err = call;                                               \
-    if( cudaSuccess != err) {                                           \
-      fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",     \
-              __FILE__, __LINE__, cudaGetErrorString( err) );           \
-      exit(EXIT_FAILURE);                                               \
-    }                                                                   \
-  }
-#define CUDA_SAFE_CALL( call) CUDA_SAFE_CALL_NO_SYNC(call);
-
 
 namespace quda {
 
-  dim3 GetBlockDim(size_t threads, size_t size) {
+  dim3 GetGridDim(size_t threads, size_t size) {
     int blockx = BLOCKSDIVUP(size, threads);
     dim3 blocks(blockx,1,1);
     return blocks;
   }
 
   struct rngArg {
-    int commDim[QUDA_MAX_DIM];
+    size_t commDim[QUDA_MAX_DIM];
     int commCoord[QUDA_MAX_DIM];
     int X[QUDA_MAX_DIM];
     rngArg(const int X_[]) {
@@ -57,7 +47,7 @@ namespace quda {
       int x[4];
       getCoords(x, id, arg.X, parity);
       for (int i = 0; i < 4; i++) x[i] += arg.commCoord[i] * arg.X[i];
-      int idd
+      size_t idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
       curand_init(seed, idd, 0, &state[parity * size_cb + id]);
@@ -74,11 +64,12 @@ namespace quda {
   */
   void launch_kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
   {
-    dim3 nthreads(128,1,1);
-    dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
+    TuneParam tp;
+    tp.block = dim3(128, 1, 1);
+    tp.grid = GetGridDim(tp.block.x, size_cb);
     rngArg arg(X);
-    nblocks.y = n_parity;
-    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
+    tp.block.y = n_parity;
+    qudaLaunchKernel(kernel_random, tp, 0, state, seed, size_cb, arg);
     qudaDeviceSynchronize();
   }
 
@@ -130,7 +121,7 @@ namespace quda {
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
       state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(cuRNGState)));
+      qudaMemset(state, 0, size * sizeof(cuRNGState));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                    size * sizeof(cuRNGState) / (float)(1048576));
@@ -152,24 +143,18 @@ namespace quda {
     }
   }
 
-  /*! @brief Restore CURAND array states initialization */
-  void RNG::restore() {
-    cudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to restore curand rng states array\n");
-    }
-    host_free(backup_state);
+  /*! @brief Backup CURAND array states initialization */
+  void RNG::backup()
+  {
+    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
+    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
   }
 
-  /*! @brief Backup CURAND array states initialization */
-  void RNG::backup() {
-    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    cudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to backup curand rng states array\n");
-    }
+  /*! @brief Restore CURAND array states initialization */
+  void RNG::restore()
+  {
+    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
+    host_free(backup_state);
   }
 
 } // namespace quda

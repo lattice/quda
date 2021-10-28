@@ -31,12 +31,12 @@ namespace quda {
     Complex *matProj; 
 
     /** projection matrix leading dimension */
-    int ld;                 
+    int ld;
 
-    /** projection matrix full (maximum) dimension (nev*deflation_grid) */
-    int tot_dim; 
+    /** projection matrix full (maximum) dimension (n_ev*deflation_grid) */
+    int tot_dim;
 
-    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) */           
+    /** current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_n_evs <= n_ev * rhs_idx) */
     int cur_dim;
 
     /** use inverse Ritz values for deflation (for the best performance) */            
@@ -52,7 +52,7 @@ namespace quda {
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
-        //redesign: param.nk => param.nev, param.np => param.deflation_grid*param.nev;
+        // redesign: param.nk => param.n_ev, param.np => param.deflation_grid*param.n_ev;
         tot_dim      = param.np;
         ld           = ((tot_dim+15) / 16) * tot_dim;
         //allocate deflation resources:
@@ -121,17 +121,17 @@ namespace quda {
     /**
        In the incremental eigcg: expands deflation space.
        @param V container of new eigenvectors
-       @param nev number of vectors to load
+       @param n_ev number of vectors to load
      */
-    void increment(ColorSpinorField &V, int nev);
+    void increment(ColorSpinorField &V, int n_ev);
 
     /**
-       In the incremental eigcg: reduce deflation space 
-       based on the following criteria:    
+       In the incremental eigcg: reduce deflation space
+       based on the following criteria:
        @param tol : keep all eigenvectors with residual norm less then tol
-       @param max_nev : keep the lowest max_nev eigenvectors (conservative)
+       @param max_n_ev : keep the lowest max_n_ev eigenvectors (conservative)
      */
-    void reduce(double tol, int max_nev);
+    void reduce(double tol, int max_n_ev);
 
     /**
        This applies deflation operation on a given spinor vector(s)

@@ -101,9 +101,9 @@ namespace quda {
       strcat(aux, meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      qudaLaunchKernel(SpinorNoiseGPU<real, Ns, Nc, type, Arg>, tp, stream, arg);
     }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -163,6 +163,10 @@ namespace quda {
       spinorNoise<real,Ns,24>(src, randstates, type);
     } else if (src.Ncolor() == 32) {
       spinorNoise<real,Ns,32>(src, randstates, type);
+    } else if (src.Ncolor() == 64) {
+      spinorNoise<real,Ns,64>(src, randstates, type);
+    } else if (src.Ncolor() == 96) {
+      spinorNoise<real,Ns,96>(src, randstates, type);
     } else {
       errorQuda("nColor = %d not implemented", src.Ncolor());
     }
@@ -172,11 +176,23 @@ namespace quda {
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
   {
     if (src.Nspin() == 4) {
+#ifdef NSPIN4
       spinorNoise<real,4>(src, randstates, type);
+#else
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+#endif
     } else if (src.Nspin() == 2) {
+#ifdef NSPIN2
       spinorNoise<real,2>(src, randstates, type);
+#else
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+#endif
     } else if (src.Nspin() == 1) {
+#ifdef NSPIN1
       spinorNoise<real,1>(src, randstates, type);
+#else
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
+#endif
     } else {
       errorQuda("Nspin = %d not implemented", src.Nspin());
     }

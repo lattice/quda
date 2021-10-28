@@ -13,8 +13,8 @@
 
 namespace quda {
 
-  XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param,profile), mat(mat)
+  XSD::XSD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, mat, mat, mat, param, profile)
   {
     sd = new SD(mat,param,profile);
     for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*comm_dim_partitioned(i);

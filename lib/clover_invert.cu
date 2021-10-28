@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <clover_field.h>
 #include <launch_kernel.cuh>
+#include <instantiate.h>
 
 #include <jitify_helper.cuh>
 #include <kernels/clover_invert.cuh>
@@ -9,113 +10,73 @@ namespace quda {
 
   using namespace clover;
 
-#ifdef GPU_CLOVER_DIRAC
-
-  template <typename Float, typename Arg>
-  class CloverInvert : TunableLocalParity {
-    Arg arg;
+  template <typename store_t>
+  class CloverInvert : TunableLocalParityReduction {
+    CloverInvertArg<store_t> arg;
     const CloverField &meta; // used for meta data only
 
-  private:
-    bool tuneGridDim() const { return true; }
-
   public:
-    CloverInvert(Arg &arg, const CloverField &meta) : arg(arg), meta(meta) {
-      writeAuxString("stride=%d,prec=%lu,trlog=%s,twist=%s", arg.clover.stride, sizeof(Float),
-		     arg.computeTraceLog ? "true" : "false", arg.twist ? "true" : "false");
+    CloverInvert(CloverField &clover, bool compute_tr_log) :
+      arg(clover, compute_tr_log),
+      meta(clover)
+    {
+      writeAuxString("stride=%d,prec=%lu,trlog=%s,twist=%s", arg.clover.stride, sizeof(store_t),
+		     compute_tr_log ? "true" : "false", arg.twist ? "true" : "false");
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/clover_invert.cuh");
 #endif
       }
+
+      apply(0);
+      if (compute_tr_log) {
+        arg.complete(*clover.TrLog());
+        comm_allreduce_array(clover.TrLog(), 2);
+      }
     }
 
-    virtual ~CloverInvert() { ; }
-  
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      arg.result_h[0] = make_double2(0.,0.);
+      using Arg = decltype(arg);
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::cloverInvertKernel")
-                           .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>(), arg.computeTraceLog, arg.twist)
+                           .instantiate((int)tp.block.x, Type<Arg>(), arg.compute_tr_log, arg.twist)
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        if (arg.computeTraceLog) {
+        if (arg.compute_tr_log) {
           if (arg.twist) {
 	    errorQuda("Not instantiated");
 	  } else {
-	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Arg, true, false);
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, (*this), tp, stream, arg, Arg, true, false);
 	  }
         } else {
           if (arg.twist) {
-            cloverInvertKernel<1,Float,Arg,false,true> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,true>, tp, stream, arg);
           } else {
-            cloverInvertKernel<1,Float,Arg,false,false> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            qudaLaunchKernel(cloverInvertKernel<1,Arg,false,false>, tp, stream, arg);
           }
         }
 #endif
       } else {
-	if (arg.computeTraceLog) {
-	  if (arg.twist) {
-	    cloverInvert<Float, Arg, true, true>(arg);
-	  } else {
-	    cloverInvert<Float, Arg, true, false>(arg);
-	  }
-	} else {
-	  if (arg.twist) {
-	    cloverInvert<Float, Arg, false, true>(arg);
-	  } else {
-	    cloverInvert<Float, Arg, false, false>(arg);
-	  }
-	}
+        errorQuda("Not implemented");
       }
     }
 
-    TuneKey tuneKey() const {
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
-    }
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     long long flops() const { return 0; } 
     long long bytes() const { return 2*arg.clover.volumeCB*(arg.inverse.Bytes() + arg.clover.Bytes()); } 
-
     void preTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.save(); }
     void postTune() { if (arg.clover.clover == arg.inverse.clover) arg.inverse.load(); }
-
   };
 
-  template <typename Float>
-  void cloverInvert(CloverField &clover, bool computeTraceLog) {
-    CloverInvertArg<Float> arg(clover, computeTraceLog);
-    CloverInvert<Float,CloverInvertArg<Float>> invert(arg, clover);
-    invert.apply(0);
-
-    if (arg.computeTraceLog) {
-      qudaDeviceSynchronize();
-      comm_allreduce_array((double*)arg.result_h, 2);
-      clover.TrLog()[0] = arg.result_h[0].x;
-      clover.TrLog()[1] = arg.result_h[0].y;
-    }
-  }
-
-#endif
-
   // this is the function that is actually called, from here on down we instantiate all required templates
-  void cloverInvert(CloverField &clover, bool computeTraceLog) {
-
+  void cloverInvert(CloverField &clover, bool computeTraceLog)
+  {
 #ifdef GPU_CLOVER_DIRAC
-    if (clover.Precision() == QUDA_HALF_PRECISION && clover.Order() > 4) 
-      errorQuda("Half precision not supported for order %d", clover.Order());
-
-    if (clover.Precision() == QUDA_DOUBLE_PRECISION) {
-      cloverInvert<double>(clover, computeTraceLog);
-    } else if (clover.Precision() == QUDA_SINGLE_PRECISION) {
-      cloverInvert<float>(clover, computeTraceLog);
-    } else {
-      errorQuda("Precision %d not supported", clover.Precision());
-    }
+    instantiate<CloverInvert>(clover, computeTraceLog);
 #else
     errorQuda("Clover has not been built");
 #endif

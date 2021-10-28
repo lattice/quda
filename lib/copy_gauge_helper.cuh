@@ -79,7 +79,7 @@ public:
 
     virtual ~CopyGauge() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (!is_ghost) {
@@ -95,11 +95,9 @@ public:
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (!is_ghost) {
-          copyGaugeKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(copyGaugeKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
         } else {
-          copyGhostKernel<FloatOut, FloatIn, length, Arg>
-            <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          qudaLaunchKernel(copyGhostKernel<FloatOut, FloatIn, length, Arg>, tp, stream, arg);
         }
 #endif
       } else {

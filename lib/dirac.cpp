@@ -42,10 +42,12 @@ namespace quda {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
 
+  // Destroy
   Dirac::~Dirac() {   
     if (getVerbosity() > QUDA_VERBOSE) profile.Print();
   }
 
+  // Assignment
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
     if (&dirac != this) {
@@ -81,7 +83,7 @@ namespace quda {
   void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
       delete *a;
-      *a = NULL;
+      *a = nullptr;
     }
   }
 
@@ -111,16 +113,6 @@ namespace quda {
 		out.GammaBasis(), in.GammaBasis());
     }
 
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input precision %d and output spinor precision %d don't match in dslash_quda",
-		in.Precision(), out.Precision());
-    }
-
-    if (in.Stride() != out.Stride()) {
-      errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", 
-		in.Stride(), out.Stride());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
@@ -132,13 +124,13 @@ namespace quda {
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	  (out.Volume() != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
+        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
       }
     } else {
       // Domain wall fermions, compare 4d volumes not 5d
       if ((out.Volume()/out.X(4) != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	  (out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
+        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
       }
     }
   }
@@ -167,6 +159,12 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
+      return new DiracCloverHasenbuschTwist(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwistPC operator\n");
+      return new DiracCloverHasenbuschTwistPC(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
       return new DiracCloverPC(param);
@@ -188,18 +186,30 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofa operator\n");
+      return new DiracMobiusEofa(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusEofaPC operator\n");
+      return new DiracMobiusEofaPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
     } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);
+    } else if (param.type == QUDA_STAGGEREDKD_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracStaggeredKD operator\n");
+      return new DiracStaggeredKD(param);
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
       return new DiracImprovedStaggered(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
       return new DiracImprovedStaggeredPC(param);
+    } else if (param.type == QUDA_ASQTADKD_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredKD operator\n");
+      return new DiracImprovedStaggeredKD(param);
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
       if (param.Ls == 1) {
@@ -260,6 +270,7 @@ namespace quda {
 	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
       case QUDA_STAGGERED_DIRAC:
@@ -270,6 +281,7 @@ namespace quda {
         break;
       case QUDA_WILSONPC_DIRAC:
       case QUDA_CLOVERPC_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
       case QUDA_DOMAIN_WALLPC_DIRAC:
       case QUDA_DOMAIN_WALL_4DPC_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
@@ -288,6 +300,13 @@ namespace quda {
     }
     
     return steps; 
+  }
+
+  void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
+  {
+    if (gauge) gauge->prefetch(mem_space, stream);
+    if (tmp1) tmp1->prefetch(mem_space, stream);
+    if (tmp2) tmp2->prefetch(mem_space, stream);
   }
 
 } // namespace quda

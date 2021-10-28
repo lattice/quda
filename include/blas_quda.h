@@ -12,11 +12,7 @@ namespace quda {
 
     // creates and destroys reduction buffers
     void init();
-    void end(void);
-
-    void* getDeviceReduceBuffer();
-    void* getMappedHostReduceBuffer();
-    void* getHostReduceBuffer();
+    void destroy();
 
     void setParam(int kernel, int prec, int threads, int blocks);
 
@@ -24,7 +20,19 @@ namespace quda {
     extern unsigned long long bytes;
 
     void zero(ColorSpinorField &a);
-    void copy(ColorSpinorField &dst, const ColorSpinorField &src);
+
+    inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
+    {
+      if (&dst == &src) return;
+
+      if (dst.Location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        static_cast<cudaColorSpinorField &>(dst).copy(static_cast<const cudaColorSpinorField &>(src));
+      } else if (dst.Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
+        static_cast<cpuColorSpinorField &>(dst).copy(static_cast<const cpuColorSpinorField &>(src));
+      } else {
+        errorQuda("Cannot call copy with fields with different locations");
+      }
+    }
 
     void ax(double a, ColorSpinorField &x);
 
@@ -52,14 +60,10 @@ namespace quda {
     void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z);
-    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
-		     ColorSpinorField &y, ColorSpinorField &z);
+    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void tripleCGUpdate(double alpha, double beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
-    void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
 
     // reduction kernels - defined in reduce_quda.cu
 
@@ -105,11 +109,79 @@ namespace quda {
     double quadrupleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
     double quadrupleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
-    double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-    double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
-
-
     // multi-blas kernels - defined in multi_blas.cu
+
+    /**
+       @brief Compute the block "axpy" with over the set of
+              ColorSpinorFields.  E.g., it computes y = x * a + y
+              The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+      @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy" with a
+       composite ColorSpinorField.  E.g., it computes
+       y = x * a + y
+       @param a[in] Matrix of real coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "axpy_U" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       Where 'a' must be a square, upper triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy_U(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "axpy_L" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       Where 'a' must be a square, lower triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy_L(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Compute the block "caxpy" with over the set of
@@ -226,7 +298,7 @@ namespace quda {
 
        z = x * a + y
 
-       Where 'a' is assumed to be upper triangular. 
+       Where 'a' is assumed to be upper triangular.
 
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields

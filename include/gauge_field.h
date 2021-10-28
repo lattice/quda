@@ -5,7 +5,41 @@
 #include <quda.h>
 #include <lattice_field.h>
 
+#include <comm_key.h>
+
 namespace quda {
+
+  namespace gauge
+  {
+
+    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
+    {
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
+                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+        }
+      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+#ifdef FLOAT8
+          if (order == QUDA_FLOAT8_GAUGE_ORDER) return true;
+#else
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+#endif
+        }
+      }
+      return false;
+    }
+
+  } // namespace gauge
 
   struct GaugeFieldParam : public LatticeFieldParam {
 
@@ -99,64 +133,66 @@ namespace quda {
     {
     }
 
-  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
-    : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
-      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
-      order(param.gauge_order), fixed(param.gauge_fix),
-      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge),
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
-      compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
-      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
-      site_offset(param.gauge_offset), site_size(param.site_size)
-	{
-	  switch(link_type) {
-	  case QUDA_SU3_LINKS:
-	  case QUDA_GENERAL_LINKS:
-	  case QUDA_SMEARED_LINKS:
-	  case QUDA_MOMENTUM_LINKS:
-	    nFace = 1; break;
-	  case QUDA_THREE_LINKS:
-	    nFace = 3; break;
-	  default:
-	    errorQuda("Error: invalid link type(%d)\n", link_type);
-	  }
-	}
+    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+      LatticeFieldParam(param),
+      location(QUDA_CPU_FIELD_LOCATION),
+      nColor(3),
+      nFace(0),
+      reconstruct(QUDA_RECONSTRUCT_NO),
+      order(param.gauge_order),
+      fixed(param.gauge_fix),
+      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
+      t_boundary(param.t_boundary),
+      anisotropy(param.anisotropy),
+      tadpole(param.tadpole_coeff),
+      gauge(h_gauge),
+      create(QUDA_REFERENCE_FIELD_CREATE),
+      geometry(QUDA_VECTOR_GEOMETRY),
+      compute_fat_link_max(false),
+      staggeredPhaseType(param.staggered_phase_type),
+      staggeredPhaseApplied(param.staggered_phase_applied),
+      i_mu(param.i_mu),
+      site_offset(param.gauge_offset),
+      site_size(param.site_size)
+    {
+      switch (link_type) {
+      case QUDA_SU3_LINKS:
+      case QUDA_GENERAL_LINKS:
+      case QUDA_SMEARED_LINKS:
+      case QUDA_MOMENTUM_LINKS: nFace = 1; break;
+      case QUDA_THREE_LINKS: nFace = 3; break;
+      default: errorQuda("Error: invalid link type(%d)\n", link_type);
+      }
+    }
 
-        /**
-           @brief Helper function for setting the precision and corresponding
-           field order for QUDA internal fields.
-           @param precision The precision to use
-         */
-        void setPrecision(QudaPrecision precision, bool force_native = false)
-        {
-          // is the current status in native field order?
-          bool native = force_native ? true : false;
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-          } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-                     || precision == QUDA_QUARTER_PRECISION) {
-            if (reconstruct == QUDA_RECONSTRUCT_NO) {
-              if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-              if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-              if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-              if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-            }
-          }
+    /**
+       @brief Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use
+    */
+    void setPrecision(QudaPrecision precision, bool force_native = false)
+    {
+      // is the current status in native field order?
+      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
+      this->precision = precision;
+      this->ghost_precision = precision;
 
-          this->precision = precision;
-          this->ghost_precision = precision;
-
-          if (native) {
-            order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
-                     || reconstruct == QUDA_RECONSTRUCT_10) ?
-              QUDA_FLOAT2_GAUGE_ORDER :
-              QUDA_FLOAT4_GAUGE_ORDER;
-          }
+      if (native) {
+        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
+            || reconstruct == QUDA_RECONSTRUCT_10) {
+          order = QUDA_FLOAT2_GAUGE_ORDER;
+        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
+#ifdef FLOAT8
+          order = QUDA_FLOAT8_GAUGE_ORDER;
+#else
+          order = QUDA_FLOAT4_GAUGE_ORDER;
+#endif
+        } else {
+          order = QUDA_FLOAT4_GAUGE_ORDER;
         }
+      }
+    }
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
@@ -260,6 +296,11 @@ namespace quda {
     bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
 
     /**
+     * Define the parameter type for this field.
+     */
+    using param_type = GaugeFieldParam;
+
+    /**
        Apply the staggered phase factors to the gauge field.
        @param[in] phase The phase we will apply to the field.  If this
        is QUDA_STAGGERED_PHASE_INVALID, the default value, then apply
@@ -281,7 +322,7 @@ namespace quda {
     int Nface() const { return nFace; }
 
     /**
-       @brief This does routine will populate the border / halo region of a
+       @brief This routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
@@ -290,7 +331,7 @@ namespace quda {
     virtual void exchangeExtendedGhost(const int *R, bool no_comms_fill = false) = 0;
 
     /**
-       @brief This does routine will populate the border / halo region
+       @brief This routine will populate the border / halo region
        of a gauge field that has been created using copyExtendedGauge.
        Overloaded variant that will start and stop a comms profile.
        @param R The thickness of the extended region in each dimension
@@ -306,11 +347,13 @@ namespace quda {
        This function returns true if the field is stored in an
        internal field order for the given precision.
     */
-    bool isNative() const;
+    bool isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
+
+    size_t TotalBytes() const { return bytes; }
 
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
@@ -319,6 +362,8 @@ namespace quda {
     virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual int full_dim(int d) const { return x[d]; }
 
     const void** Ghost() const {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
@@ -358,28 +403,28 @@ namespace quda {
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
      */
-    double norm1(int dim=-1) const;
+    double norm1(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared
      */
-    double norm2(int dim=-1) const;
+    double norm2(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute maximum value
      */
-    double abs_max(int dim=-1) const;
+    double abs_max(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute minimum value
      */
-    double abs_min(int dim=-1) const;
+    double abs_min(int dim = -1, bool fixed = false) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -389,7 +434,7 @@ namespace quda {
        a field has changed with a global update algorithm.
        @return checksum value
      */
-    uint64_t checksum(bool mini=false) const;
+    uint64_t checksum(bool mini = false) const;
 
     /**
        @brief Create the gauge field, with meta data specified in the
@@ -413,17 +458,6 @@ namespace quda {
        @brief Initialize the padded region to 0
      */
     void zeroPad();
-
-#ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t phaseTex;
-    cudaTextureObject_t evenPhaseTex;
-    cudaTextureObject_t oddPhaseTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
-    void destroyTexObject();
-#endif
 
   public:
     cudaGaugeField(const GaugeFieldParam &);
@@ -479,7 +513,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, qudaStream_t *stream_p = nullptr);
 
     /**
        @brief Wait for communication to complete
@@ -551,13 +585,17 @@ namespace quda {
     const void* Even_p() const { return even; }
     const void *Odd_p() const { return odd; }
 
-#ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
-    const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
-#endif
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
@@ -575,6 +613,14 @@ namespace quda {
        @brief Restores the cudaGaugeField to CUDA memory
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and buffers to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -642,6 +688,18 @@ namespace quda {
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
 
+    /**
+      @brief Copy all contents of the field to a host buffer.
+      @param[in] the host buffer to copy to.
+    */
+    virtual void copy_to_buffer(void *buffer) const;
+
+    /**
+      @brief Copy all contents of the field from a host buffer to this field.
+      @param[in] the host buffer to copy from.
+    */
+    virtual void copy_from_buffer(void *buffer);
+
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
 
     /**
@@ -697,6 +755,17 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
+  /**
+    @brief This function is used for copying from a source gauge field to a destination gauge field
+      with an offset.
+    @param out The output field to which we are copying
+    @param in The input field from which we are copying
+    @param offset The offset for the larger field between out and in.
+    @param pc_type Whether the field order uses 4d or 5d even-odd preconditioning.
+ */
+  void copyFieldOffset(GaugeField &out, const GaugeField &in, CommKey offset, QudaPCType pc_type);
+
   /**
      This function is used for copying the gauge field into an
      extended gauge field.  Defined in copy_extended_gauge.cu.
@@ -708,6 +777,28 @@ namespace quda {
   */
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out=0, void *In=0);
+
+  /**
+     This function is used for creating an exteneded gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @param profile The `TimeProfile`
+     @param redundant_comms
+     @param recon The reconsturction type
+     @return the pointer to the extended gauge field
+  */
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
+
+  /**
+     This function is used for creating an exteneded (cpu) gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @return the pointer to the extended gauge field
+  */
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
@@ -749,6 +840,40 @@ namespace quda {
      @return checksum value
   */
   uint64_t Checksum(const GaugeField &u, bool mini=false);
+
+  /**
+     @brief Helper function for determining if the reconstruct of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If reconstruct is unique return the reconstruct
+   */
+  inline QudaReconstructType Reconstruct_(const char *func, const char *file, int line, const GaugeField &a,
+                                          const GaugeField &b)
+  {
+    QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID;
+    if (a.Reconstruct() == b.Reconstruct())
+      reconstruct = a.Reconstruct();
+    else
+      errorQuda("Reconstruct %d %d do not match (%s:%d in %s())\n", a.Reconstruct(), b.Reconstruct(), file, line, func);
+    return reconstruct;
+  }
+
+  /**
+     @brief Helper function for determining if the reconstruct of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check reconstruct on
+     @return If reconstruct is unique return the reconstrict
+   */
+  template <typename... Args>
+  inline QudaReconstructType Reconstruct_(const char *func, const char *file, int line, const GaugeField &a,
+                                          const GaugeField &b, const Args &... args)
+  {
+    return static_cast<QudaReconstructType>(Reconstruct_(func, file, line, a, b)
+                                            & Reconstruct_(func, file, line, a, args...));
+  }
+
+#define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
 

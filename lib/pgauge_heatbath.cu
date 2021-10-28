@@ -10,9 +10,7 @@
 #include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
-#include <cub_helper.cuh>
-
-
+#include <instantiate.h>
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -23,10 +21,7 @@
 
 namespace quda {
 
-#ifdef GPU_GAUGE_ALG
-
-
-/**
+  /**
     @brief Calculate the SU(2) index block in the SU(Nc) matrix
     @param block number to calculate the index's, the total number of blocks is NCOLORS * ( NCOLORS - 1) / 2.
     @return Returns two index's in int2 type, accessed by .x and .y.
@@ -52,20 +47,20 @@ namespace quda {
     id.x = i1;
     return id;
   }
-/**
+
+  /**
     @brief Calculate the SU(2) index block in the SU(Nc) matrix
     @param block number to calculate de index's, the total number of blocks is NCOLORS * ( NCOLORS - 1) / 2.
     @param p store the first index
     @param q store the second index
  */
   template<int NCOLORS>
-  __host__ __device__ static inline void   IndexBlock(int block, int &p, int &q){
+  __host__ __device__ static inline void IndexBlock(int block, int &p, int &q){
     if ( NCOLORS == 3 ) {
       if ( block == 0 ) { p = 0; q = 1; }
       else if ( block == 1 ) { p = 1; q = 2; }
-      else{ p = 0; q = 2; }
-    }
-    else if ( NCOLORS > 3 ) {
+      else { p = 0; q = 2; }
+    } else if ( NCOLORS > 3 ) {
       int i1;
       int found = 0;
       int del_i = 0;
@@ -85,7 +80,7 @@ namespace quda {
     }
   }
 
-/**
+  /**
     @brief Generate full SU(2) matrix (four real numbers instead of 2x2 complex matrix) and update link matrix.
     Get from MILC code.
     @param al weight
@@ -154,8 +149,7 @@ namespace quda {
     return a;
   }
 
-
-/**
+  /**
     @brief Return SU(2) subgroup (4 real numbers) from SU(3) matrix
     @param tmp1 input SU(3) matrix
     @param block to retrieve from 0 to 2.
@@ -187,7 +181,7 @@ namespace quda {
     return r;
   }
 
-/**
+  /**
     @brief Return SU(2) subgroup (4 real numbers) from SU(Nc) matrix
     @param tmp1 input SU(Nc) matrix
     @param id the two indices to retrieve SU(2) block
@@ -203,7 +197,7 @@ namespace quda {
     return r;
   }
 
-/**
+  /**
     @brief Create a SU(Nc) identity matrix and fills with the SU(2) block
     @param rr SU(2) matrix represented only by four real numbers
     @param id the two indices to fill in the SU(3) matrix
@@ -219,7 +213,8 @@ namespace quda {
     tmp1(id.y,id.y) = complex<T>( rr(0,0),-rr(1,1) );
     return tmp1;
   }
-/**
+
+  /**
     @brief Update the SU(Nc) link with the new SU(2) matrix, link <- u * link
     @param u SU(2) matrix represented by four real numbers
     @param link SU(Nc) matrix
@@ -234,7 +229,7 @@ namespace quda {
     }
   }
 
-/**
+  /**
     @brief Update the SU(3) link with the new SU(2) matrix, link <- u * link
     @param U SU(3) matrix
     @param a00 element (0,0) of the SU(2) matrix
@@ -283,9 +278,7 @@ namespace quda {
     }
   }
 
-
-
-// v * u^dagger
+  // v * u^dagger
   template <class Float>
   __host__ __device__ static inline Matrix<Float,2> mulsu2UVDagger(Matrix<Float,2> v, Matrix<Float,2> u){
     Matrix<Float,2> b;
@@ -296,12 +289,12 @@ namespace quda {
     return b;
   }
 
-/**
+  /**
     @brief Link update by pseudo-heatbath
     @param U link to be updated
     @param F staple
     @param localstate CURAND rng state
- */
+  */
   template <class Float, int NCOLORS>
   __device__ inline void heatBathSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F,
                                       cuRNGState& localState, Float BetaOverNc ){
@@ -365,8 +358,7 @@ namespace quda {
         //FLOP_min = (NCOLORS * 64 + 19 + 28 + 28) * 3 = NCOLORS * 192 + 225
       }
       //////////////////////////////////////////////////////////////////
-    }
-    else if ( NCOLORS > 3 ) {
+    } else if ( NCOLORS > 3 ) {
       //////////////////////////////////////////////////////////////////
       //TESTED IN SU(4) SP THIS IS WORST
       Matrix<complex<Float>,NCOLORS> M = U * F;
@@ -572,33 +564,25 @@ namespace quda {
     }
   }
 
-
   template <typename Gauge, typename Float, int NCOLORS>
   struct MonteArg {
     int threads;       // number of active threads required
     int X[4];       // grid dimensions
-#ifdef MULTI_GPU
     int border[4];
-#endif
     Gauge dataOr;
-    cudaGaugeField &data;
+    GaugeField &data;
     Float BetaOverNc;
     RNG rngstate;
-    MonteArg(const Gauge &dataOr, cudaGaugeField & data, Float Beta, RNG &rngstate)
+    MonteArg(const Gauge &dataOr, GaugeField & data, Float Beta, RNG &rngstate)
       : dataOr(dataOr), data(data), rngstate(rngstate) {
       BetaOverNc = Beta / (Float)NCOLORS;
-#ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
         border[dir] = data.R()[dir];
         X[dir] = data.X()[dir] - border[dir] * 2;
       } 
-#else
-      for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-#endif
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
     }
   };
-
 
   template<typename Float, typename Gauge, int NCOLORS, bool HeatbathOrRelax>
   __global__ void compute_heatBath(MonteArg<Gauge, Float, NCOLORS> arg, int mu, int parity){
@@ -606,19 +590,17 @@ namespace quda {
     if ( idx >= arg.threads ) return;
     int id = idx;
     int X[4];
-    #pragma unroll
+#pragma unroll
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
 
     int x[4];
     getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-    #pragma unroll
+#pragma unroll
     for ( int dr = 0; dr < 4; ++dr ) {
       x[dr] += arg.border[dr];
       X[dr] += 2 * arg.border[dr];
     }
     idx = linkIndex(x,X);
-#endif
 
     Matrix<complex<Float>,NCOLORS> staple;
     setZero(&staple);
@@ -664,7 +646,6 @@ namespace quda {
     int mu;
     int parity;
     mutable char aux_string[128];       // used as a label in the autotuner
-    private:
     unsigned int sharedBytesPerThread() const {
       return 0;
     }
@@ -683,15 +664,17 @@ namespace quda {
     GaugeHB(MonteArg<Gauge, Float, NCOLORS> &arg)
       : arg(arg), mu(0), parity(0) {
     }
-    ~GaugeHB () {
-    }
-    void SetParam(int _mu, int _parity){
+
+    void SetParam(int _mu, int _parity)
+    {
       mu = _mu;
       parity = _parity;
     }
-    void apply(const cudaStream_t &stream){
+
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax > <<< tp.grid,tp.block, tp.shared_bytes, stream >>> (arg, mu, parity);
+      qudaLaunchKernel(compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax>, tp, stream, arg, mu, parity);
     }
 
     TuneKey tuneKey() const {
@@ -712,8 +695,8 @@ namespace quda {
       arg.data.restore();
       if(HeatbathOrRelax) arg.rngstate.restore();
     }
-    long long flops() const {
-
+    long long flops() const
+    {
       //NEED TO CHECK THIS!!!!!!
       if ( NCOLORS == 3 ) {
         long long flop = 2268LL;
@@ -725,8 +708,7 @@ namespace quda {
         }
         flop *= arg.threads;
         return flop;
-      }
-      else{
+      } else {
         long long flop = NCOLORS * NCOLORS * NCOLORS * 84LL;
         if ( HeatbathOrRelax ) {
           flop += NCOLORS * NCOLORS * NCOLORS + (NCOLORS * ( NCOLORS - 1) / 2) * (46LL + 48LL + 56LL * NCOLORS);
@@ -738,15 +720,16 @@ namespace quda {
         return flop;
       }
     }
-    long long bytes() const {
+
+    long long bytes() const
+    {
       //NEED TO CHECK THIS!!!!!!
       if ( NCOLORS == 3 ) {
         long long byte = 20LL * NElems * sizeof(Float);
         if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
         byte *= arg.threads;
         return byte;
-      }
-      else{
+      } else {
         long long byte = 20LL * NCOLORS * NCOLORS * 2 * sizeof(Float);
         if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
         byte *= arg.threads;
@@ -755,117 +738,70 @@ namespace quda {
     }
   };
 
+  template <typename Float, int nColor, QudaReconstructType recon>
+  struct MonteAlg {
+    MonteAlg(GaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover)
+    {
+      TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
+      using Gauge = typename gauge_mapper<Float, recon>::type;
 
-
-
-
-
-
-
-
-  template<typename Float, int NElems, int NCOLORS, typename Gauge>
-  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
-
-    TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
-    MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
-    GaugeHB<Float, Gauge, NCOLORS, NElems, true> hb(montearg);
-    for ( int step = 0; step < nhb; ++step ) {
-      for ( int parity = 0; parity < 2; ++parity ) {
-        for ( int mu = 0; mu < 4; ++mu ) {
-          hb.SetParam(mu, parity);
-          hb.apply(0);
-        #ifdef MULTI_GPU
-          PGaugeExchange( data, mu, parity);
-        #endif
+      MonteArg<Gauge, Float, nColor> montearg(Gauge(data), data, Beta, rngstate);
+      if (getVerbosity() >= QUDA_SUMMARIZE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
+      GaugeHB<Float, Gauge, nColor, recon, true> hb(montearg);
+      for ( int step = 0; step < nhb; ++step ) {
+        for ( int parity = 0; parity < 2; ++parity ) {
+          for ( int mu = 0; mu < 4; ++mu ) {
+            hb.SetParam(mu, parity);
+            hb.apply(0);
+            PGaugeExchange(data, mu, parity);
+          }
         }
       }
-    }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      qudaDeviceSynchronize();
-      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-      double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
-      double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
-    #ifdef MULTI_GPU
-      printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
-    #else
-      printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-    #endif
-    }
+      if (getVerbosity() >= QUDA_VERBOSE) {
+        qudaDeviceSynchronize();
+        profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
+        double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
+        double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
+        double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
+        printfQuda("HB: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+      }
 
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
-    GaugeHB<Float, Gauge, NCOLORS, NElems, false> relax(montearg);
-    for ( int step = 0; step < nover; ++step ) {
-      for ( int parity = 0; parity < 2; ++parity ) {
-        for ( int mu = 0; mu < 4; ++mu ) {
-          relax.SetParam(mu, parity);
-          relax.apply(0);
-        #ifdef MULTI_GPU
-          PGaugeExchange( data, mu, parity);
-        #endif
+      if (getVerbosity() >= QUDA_VERBOSE) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
+      GaugeHB<Float, Gauge, nColor, recon, false> relax(montearg);
+      for ( int step = 0; step < nover; ++step ) {
+        for ( int parity = 0; parity < 2; ++parity ) {
+          for ( int mu = 0; mu < 4; ++mu ) {
+            relax.SetParam(mu, parity);
+            relax.apply(0);
+            PGaugeExchange(data, mu, parity);
+          }
         }
       }
-    }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
-      qudaDeviceSynchronize();
-      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
-      double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
-      double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);
-    #ifdef MULTI_GPU
-      printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
-    #else
-      printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-    #endif
-    }
-  }
-
-
-
-  template<typename Float>
-  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, int nhb, int nover) {
-
-    if ( data.isNative() ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;	
-        Monte<Float, 18, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;	
-        Monte<Float, 12, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;	
-        Monte<Float, 8, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
+      if (getVerbosity() >= QUDA_VERBOSE) {
+        qudaDeviceSynchronize();
+        profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
+        double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
+        double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
+        double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);
+        printfQuda("OVR: Time = %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
       }
-    } else {
-      errorQuda("Invalid Gauge Order\n");
     }
-  }
-#endif // GPU_GAUGE_ALG
+  };
 
-/** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
- *
- * @param[in,out] data Gauge field
- * @param[in,out] rngstate state of the CURAND random number generator
- * @param[in] Beta inverse of the gauge coupling, beta = 2 Nc / g_0^2
- * @param[in] nhb number of heatbath steps
- * @param[in] nover number of overrelaxation steps
- */
-  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
+  /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
+   *
+   * @param[in,out] data Gauge field
+   * @param[in,out] rngstate state of the CURAND random number generator
+   * @param[in] Beta inverse of the gauge coupling, beta = 2 Nc / g_0^2
+   * @param[in] nhb number of heatbath steps
+   * @param[in] nover number of overrelaxation steps
+   */
+  void Monte(GaugeField& data, RNG &rngstate, double Beta, int nhb, int nover) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
-      Monte<float> (data, rngstate, (float)Beta, nhb, nover);
-    } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
-      Monte<double>(data, rngstate, Beta, nhb, nover);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
+    instantiate<MonteAlg>(data, rngstate, (float)Beta, nhb, nover);
 #else
     errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
   }
-
 
 }

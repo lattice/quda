@@ -41,7 +41,7 @@ bool getRankVerbosity() {
       if (rank_list.peek() == ',') rank_list.ignore();
     }
   } else if (!init) {
-    rank_verbosity = comm_rank() == 0 ? true : false; // default is process 0 only
+    rank_verbosity = comm_rank_global() == 0 ? true : false; // default is process 0 only
   }
   init = true;
 
@@ -85,7 +85,7 @@ void pushVerbosity(QudaVerbosity verbosity)
   vstack.push(getVerbosity());
   setVerbosity(verbosity);
 
-  if (vstack.size() > 10) {
+  if (vstack.size() > 15) {
     warningQuda("Verbosity stack contains %u elements.  Is there a missing popVerbosity() somewhere?",
 		static_cast<unsigned int>(vstack.size()));
   }
@@ -112,7 +112,7 @@ void pushOutputPrefix(const char *prefix)
   // set new prefix
   setOutputPrefix(prefix);
 
-  if (pstack.size() > 10) {
+  if (pstack.size() > 15) {
     warningQuda("Verbosity stack contains %u elements.  Is there a missing popOutputPrefix() somewhere?",
                 static_cast<unsigned int>(vstack.size()));
   }

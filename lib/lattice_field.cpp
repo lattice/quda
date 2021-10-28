@@ -5,6 +5,8 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 
+#include <shmem_helper.cuh>
+
 namespace quda {
 
   bool LatticeField::initIPCComms = false;
@@ -57,32 +59,33 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param) :
-      volume(1),
-      pad(param.pad),
-      total_bytes(0),
-      nDim(param.nDim),
-      precision(param.Precision()),
-      ghost_precision(param.GhostPrecision()),
-      ghost_precision_reset(false),
-      scale(param.scale),
-      siteSubset(param.siteSubset),
-      ghostExchange(param.ghostExchange),
-      ghost_bytes(0),
-      ghost_bytes_old(0),
-      ghost_face_bytes {},
-      ghostOffset(),
-      ghostNormOffset(),
-      my_face_h {},
-      my_face_hd {},
-      my_face_d {},
-      from_face_h {},
-      from_face_hd {},
-      from_face_d {},
-      initComms(false),
-      mem_type(param.mem_type),
-      backup_h(nullptr),
-      backup_norm_h(nullptr),
-      backed_up(false)
+    volume(1),
+    localVolume(1),
+    pad(param.pad),
+    total_bytes(0),
+    nDim(param.nDim),
+    precision(param.Precision()),
+    ghost_precision(param.GhostPrecision()),
+    ghost_precision_reset(false),
+    scale(param.scale),
+    siteSubset(param.siteSubset),
+    ghostExchange(param.ghostExchange),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    initComms(false),
+    mem_type(param.mem_type),
+    backup_h(nullptr),
+    backup_norm_h(nullptr),
+    backed_up(false)
   {
     precisionCheck();
 
@@ -115,6 +118,7 @@ namespace quda {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
       volume *= param.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -124,6 +128,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
 
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
@@ -147,32 +152,33 @@ namespace quda {
   }
 
   LatticeField::LatticeField(const LatticeField &field) :
-      volume(1),
-      pad(field.pad),
-      total_bytes(0),
-      nDim(field.nDim),
-      precision(field.precision),
-      ghost_precision(field.ghost_precision),
-      ghost_precision_reset(false),
-      scale(field.scale),
-      siteSubset(field.siteSubset),
-      ghostExchange(field.ghostExchange),
-      ghost_bytes(0),
-      ghost_bytes_old(0),
-      ghost_face_bytes {},
-      ghostOffset(),
-      ghostNormOffset(),
-      my_face_h {},
-      my_face_hd {},
-      my_face_d {},
-      from_face_h {},
-      from_face_hd {},
-      from_face_d {},
-      initComms(false),
-      mem_type(field.mem_type),
-      backup_h(nullptr),
-      backup_norm_h(nullptr),
-      backed_up(false)
+    volume(1),
+    localVolume(1),
+    pad(field.pad),
+    total_bytes(0),
+    nDim(field.nDim),
+    precision(field.precision),
+    ghost_precision(field.ghost_precision),
+    ghost_precision_reset(false),
+    scale(field.scale),
+    siteSubset(field.siteSubset),
+    ghostExchange(field.ghostExchange),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    initComms(false),
+    mem_type(field.mem_type),
+    backup_h(nullptr),
+    backup_norm_h(nullptr),
+    backed_up(false)
   {
     precisionCheck();
 
@@ -194,6 +200,7 @@ namespace quda {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
       volume *= field.x[i];
+      localVolume *= (x[i] - 2 * r[i]);
       surface[i] = 1;
       for (int j=0; j<nDim; j++) {
 	if (i==j) continue;
@@ -203,6 +210,7 @@ namespace quda {
 
     if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
     stride = volumeCB + pad;
   
     // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
@@ -230,33 +238,37 @@ namespace quda {
           qudaDeviceSynchronize();
           comm_barrier();
           for (int b=0; b<2; b++) {
-	    device_pinned_free(ghost_recv_buffer_d[b]);
-	    device_pinned_free(ghost_send_buffer_d[b]);
-	    host_free(ghost_pinned_send_buffer_h[b]);
-	    host_free(ghost_pinned_recv_buffer_h[b]);
-	  }
+            device_comms_pinned_free(ghost_recv_buffer_d[b]);
+            device_comms_pinned_free(ghost_send_buffer_d[b]);
+            host_free(ghost_pinned_send_buffer_h[b]);
+            host_free(ghost_pinned_recv_buffer_h[b]);
+          }
         }
       }
 
       if (ghost_bytes > 0) {
         for (int b = 0; b < 2; ++b) {
           // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          ghost_recv_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_recv_buffer_d[b], 0, ghost_bytes);
 
-	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
-	  ghost_send_buffer_d[b] = device_pinned_malloc(ghost_bytes);
+          // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+          ghost_send_buffer_d[b] = device_comms_pinned_malloc(ghost_bytes);
+          // silence any false cuda-memcheck initcheck errors
+          qudaMemset(ghost_send_buffer_d[b], 0, ghost_bytes);
 
-	  // pinned buffer used for sending
-	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for sending
+          ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
+          // set the matching device-mapped pointer
+          ghost_pinned_send_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_send_buffer_h[b]);
 
-	  // pinned buffer used for receiving
-	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for receiving
+          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  cudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
+          // set the matching device-mapped pointer
+          ghost_pinned_recv_buffer_hd[b] = get_mapped_device_pointer(ghost_pinned_recv_buffer_h[b]);
         }
 
         initGhostFaceBuffer = true;
@@ -276,11 +288,11 @@ namespace quda {
 
     for (int b=0; b<2; b++) {
       // free receive buffer
-      if (ghost_recv_buffer_d[b]) device_pinned_free(ghost_recv_buffer_d[b]);
+      if (ghost_recv_buffer_d[b]) device_comms_pinned_free(ghost_recv_buffer_d[b]);
       ghost_recv_buffer_d[b] = nullptr;
 
       // free send buffer
-      if (ghost_send_buffer_d[b]) device_pinned_free(ghost_send_buffer_d[b]);
+      if (ghost_send_buffer_d[b]) device_comms_pinned_free(ghost_send_buffer_d[b]);
       ghost_send_buffer_d[b] = nullptr;
 
       // free pinned send memory buffer
@@ -318,35 +330,30 @@ namespace quda {
     }
 
     // initialize ghost send pointers
-    size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
       if (!commDimPartitioned(i) && no_comms_fill==false) continue;
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][0] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][0] = static_cast<char*>(from_face_h[b]) + offset;
+        my_face_dim_dir_h[b][i][0] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][0];
+        from_face_dim_dir_h[b][i][0] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][0];
 
-	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
+        my_face_dim_dir_hd[b][i][0] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][0];
+        from_face_dim_dir_hd[b][i][0] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][0];
 
-        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0] * ghost_precision;
+        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][0];
+        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][0];
       } // loop over b
-
-      // if not bidir then forwards and backwards will alias
-      if (bidir) offset += ghost_face_bytes[i];
 
       for (int b=0; b<2; ++b) {
-	my_face_dim_dir_h[b][i][1] = static_cast<char*>(my_face_h[b]) + offset;
-	from_face_dim_dir_h[b][i][1] = static_cast<char*>(from_face_h[b]) + offset;
+        my_face_dim_dir_h[b][i][1] = static_cast<char *>(my_face_h[b]) + ghost_offset[i][1];
+        from_face_dim_dir_h[b][i][1] = static_cast<char *>(from_face_h[b]) + ghost_offset[i][1];
 
-	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
-	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
+        my_face_dim_dir_hd[b][i][1] = static_cast<char *>(my_face_hd[b]) + ghost_offset[i][1];
+        from_face_dim_dir_hd[b][i][1] = static_cast<char *>(from_face_hd[b]) + ghost_offset[i][1];
 
-        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + offset;
-        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1] * ghost_precision;
+        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + ghost_offset[i][1];
+        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghost_offset[i][1];
       } // loop over b
-      offset += ghost_face_bytes[i];
 
     } // loop over dimension
 
@@ -404,7 +411,6 @@ namespace quda {
       comm_barrier();
 
       initComms = false;
-      checkCudaError();
     }
 
   }
@@ -415,11 +421,13 @@ namespace quda {
     if (!initComms) errorQuda("Can only be called after create comms");
     if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
       errorQuda("ghost_field appears not to be allocated");
-
+#ifndef NVSHMEM_COMMS
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
+#endif
 
     for (int b=0; b<2; b++) {
+#ifndef NVSHMEM_COMMS
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
 	for (int dir=0; dir<2; ++dir) {
@@ -453,19 +461,27 @@ namespace quda {
       }
 
       checkCudaError();
-
+#endif
       // open the remote memory handles and set the send ghost pointers
-      for (int dim=0; dim<4; ++dim) {
-	if (comm_dim(dim)==1) continue;
+      for (int dim = 0; dim < 4; ++dim) {
+#ifndef NVSHMEM_COMMS
+        // TODO: We maybe can force loopback comms to use the IB path here
+        if (comm_dim(dim) == 1) continue;
+#endif
         // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-        const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-	for (int dir=0; dir<num_dir; ++dir) {
-	  if (!comm_peer2peer_enabled(dir,dim)) continue;
-	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
-	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-			       cudaIpcMemLazyEnablePeerAccess);
-	}
-	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
+        const int num_dir
+          = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
+        for (int dir = 0; dir < num_dir; ++dir) {
+#ifndef NVSHMEM_COMMS
+          if (!comm_peer2peer_enabled(dir, dim)) continue;
+          void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
+          cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], cudaIpcMemLazyEnablePeerAccess);
+#else
+          ghost_remote_send_buffer_d[b][dim][dir]
+            = nvshmem_ptr(static_cast<char *>(ghost_recv_buffer_d[b]), comm_neighbor_rank(dir, dim));
+#endif
+        }
+        if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
 
@@ -556,7 +572,6 @@ namespace quda {
   void LatticeField::destroyIPCComms() {
 
     if (!initIPCComms) return;
-    checkCudaError();
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state
@@ -566,15 +581,19 @@ namespace quda {
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
+#ifndef NVSHMEM_COMMS
       const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
-
+#endif
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
 	    // only close this handle if it doesn't alias the back ghost
-	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
-	  }
+
+#ifndef NVSHMEM_COMMS
+            if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+#endif
+          }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
           if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
         }
@@ -582,8 +601,11 @@ namespace quda {
 	if (comm_peer2peer_enabled(0,dim)) {
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
-	  }
+
+#ifndef NVSHMEM_COMMS
+            cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+#endif
+          }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
         }
@@ -632,23 +654,24 @@ namespace quda {
     if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
     if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && a.ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
       // if source is extended by I am not then we need to compare their interior volume to my volume
-      int a_volume_interior = 1;
+      size_t a_volume_interior = 1;
       for (int i=0; i<nDim; i++) {
 	if (a.x[i]-2*a.r[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]-2*a.r[i]);
 	a_volume_interior *= a.x[i] - 2*a.r[i];
       }
-      if (a_volume_interior != volume) errorQuda("Interior volume does not match %d %d", volume, a_volume_interior);
+      if (a_volume_interior != volume) errorQuda("Interior volume does not match %lu %lu", volume, a_volume_interior);
     } else if (a.ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
       // if source is extended by I am not then we need to compare their interior volume to my volume
-      int this_volume_interior = 1;
+      size_t this_volume_interior = 1;
       for (int i=0; i<nDim; i++) {
 	if (x[i]-2*r[i] != a.x[i]) errorQuda("x[%d] does not match %d %d", i, x[i]-2*r[i], a.x[i]);
 	this_volume_interior *= x[i] - 2*r[i];
       }
-      if (this_volume_interior != a.volume) errorQuda("Interior volume does not match %d %d", this_volume_interior, a.volume);
+      if (this_volume_interior != a.volume)
+        errorQuda("Interior volume does not match %lu %lu", this_volume_interior, a.volume);
     } else {
-      if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
-      if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
+      if (a.volume != volume) errorQuda("Volume does not match %lu %lu", volume, a.volume);
+      if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %lu %lu", volumeCB, a.volumeCB);
       for (int i=0; i<nDim; i++) {
 	if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
 	if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);

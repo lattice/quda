@@ -22,7 +22,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -198,7 +198,6 @@ namespace quda {
       }
     }
 
-
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
     __global__ void copyInteriorKernel(CopySpinorExArg<OutOrder,InOrder,Basis> arg)
     {
@@ -221,9 +220,6 @@ namespace quda {
       }
     }
 
-
-
-
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis, bool extend>
     class CopySpinorEx : Tunable {
 
@@ -231,7 +227,6 @@ namespace quda {
       const ColorSpinorField &meta;
       QudaFieldLocation location;
 
-      private:
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
       bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
@@ -243,29 +238,21 @@ namespace quda {
         : arg(arg), meta(meta), location(location) {
 	writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
       }
-      virtual ~CopySpinorEx() {}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        if(location == QUDA_CPU_FIELD_LOCATION){
+        if (location == QUDA_CPU_FIELD_LOCATION) {
           copyInterior<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>(arg);    
-        }else if(location == QUDA_CUDA_FIELD_LOCATION){
-          copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>
-            <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);    
+        } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+          qudaLaunchKernel(copyInteriorKernel<FloatOut,FloatIn,Ns,Nc,OutOrder,InOrder,Basis,extend>, tp, stream, arg);
         }
       } 
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
       long long flops() const { return 0; }
-      long long bytes() const {
-        return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));
-      }
-
+      long long bytes() const { return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));  }
     }; // CopySpinorEx
-
-
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
     void copySpinorEx(OutOrder outOrder, const InOrder inOrder, const Basis basis, const int *E, 
@@ -279,7 +266,6 @@ namespace quda {
         CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, meta, location);
         copier.apply(0);
       }
-      if(location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
     }
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
@@ -433,13 +419,13 @@ namespace quda {
         errorQuda("source and destination spins must match");
 
       if(dst.Nspin() == 4){
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#ifdef NSPIN4
         copyExtendedColorSpinor<4>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields",dst.Nspin());
 #endif
       }else if(dst.Nspin() == 1){
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
         copyExtendedColorSpinor<1>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields", dst.Nspin());
@@ -455,6 +441,7 @@ namespace quda {
       QudaFieldLocation location, const int parity, void *Dst, void *Src, 
       void *dstNorm, void *srcNorm){
 
+#if 0
     if(dst.Precision() == QUDA_DOUBLE_PRECISION){
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<double*>(Dst), static_cast<double*>(Src));
@@ -485,9 +472,22 @@ namespace quda {
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
       }
+    } else if (dst.Precision() == QUDA_QUARTER_PRECISION){
+      if(src.Precision() == QUDA_DOUBLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<double*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_SINGLE_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
+      }else if(src.Precision() == QUDA_HALF_PRECISION){
+        CopyExtendedColorSpinor(dst, src, parity, location, static_cast<char*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
+      }else{
+        errorQuda("Unsupported Precision %d", src.Precision());
+      }
     }else{
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
+#else
+    errorQuda("Disabled");
+#endif
   }
 
 } // quda

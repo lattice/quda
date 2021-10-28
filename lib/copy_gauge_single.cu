@@ -2,8 +2,8 @@
 namespace quda {
 
   // this is the function that is actually called, from here on down we instantiate all required templates
-  void copyGenericGaugeSingleOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
-      void **ghostOut, void **ghostIn, int type)
+  void copyGenericGaugeSingleIn(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+                                void **ghostOut, void **ghostIn, int type)
   {
 #if QUDA_PRECISION & 4
     copyGenericGauge<float>(out, in, location, Out, In, ghostOut, ghostIn, type);

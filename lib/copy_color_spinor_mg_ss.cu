@@ -7,8 +7,8 @@ namespace quda {
 				  void *dstNorm, void *srcNorm) {
 
 #ifdef GPU_MULTIGRID
-    float *dst_ptr = static_cast<float*>(Dst);
-    float *src_ptr = static_cast<float*>(Src);
+    auto *dst_ptr = static_cast<float*>(Dst);
+    auto *src_ptr = static_cast<float*>(Src);
 
     INSTANTIATE_COLOR;
 #else

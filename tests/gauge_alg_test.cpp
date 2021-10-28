@@ -7,7 +7,8 @@
 #include <gauge_field.h>
 
 #include <comm_quda.h>
-#include <test_util.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
@@ -16,76 +17,9 @@
 
 #include <qio_field.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <gtest/gtest.h>
 
-using   namespace quda;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
-
-int num_failures=0;
-int *num_failures_dev;
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-
-
-void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
-
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
-  gauge_param.cpu_prec = cpu_prec;
-
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif
-}
-
+using namespace quda;
 
 class GaugeAlgTest : public ::testing::Test {
  protected:
@@ -102,39 +36,29 @@ class GaugeAlgTest : public ::testing::Test {
 
   }
 
-  bool checkDimsPartitioned(){
-    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
+  bool checkDimsPartitioned()
+  {
+    if (comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
+      return true;
     return false;
   }
 
   bool comparePlaquette(double3 a, double3 b){
     double a0,a1,a2;
-    a0 = DABS(a.x - b.x);
-    a1=DABS(a.y - b.y);
-    a2=DABS(a.z - b.z);
+    a0 = std::abs(a.x - b.x);
+    a1 = std::abs(a.y - b.y);
+    a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if( (a0 < prec_val) && (a1  < prec_val)  && (a2  < prec_val) ) return true;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+    if ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val)) return true;
     return false;
   }
 
   bool CheckDeterminant(double2 detu){
     double prec_val = 5e-8;
-    if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
-    if(DABS(1.0 - detu.x) < prec_val && DABS(detu.y) < prec_val) return true;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+    if (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val) return true;
     return false;
-  }
-
-
-  void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
-    unitarizeLinks(*cudaInGauge, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-    if(num_failures>0){
-      cudaFree(num_failures_dev);
-      errorQuda("Error in the unitarization\n");
-      exit(1);
-    }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
   }
 
   virtual void SetUp() {
@@ -142,7 +66,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     param = newQudaGaugeParam();
 
-    //Setup Gauge container!!!!!!
+    // Setup gauge container.
     param.cpu_prec = prec;
     param.cpu_prec = prec;
     param.cuda_prec = prec;
@@ -170,7 +94,7 @@ class GaugeAlgTest : public ::testing::Test {
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = param.type;
     gParam.reconstruct = param.reconstruct;
-    gParam.order       = (param.cuda_prec == QUDA_DOUBLE_PRECISION || param.reconstruct == QUDA_RECONSTRUCT_NO ) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
 
 #ifdef MULTI_GPU
     int y[4];
@@ -186,9 +110,9 @@ class GaugeAlgTest : public ::testing::Test {
     gParamEx.t_boundary = gParam.t_boundary;
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
-    cudaInGauge = new cudaGaugeField(gParamEx);
+    U = new cudaGaugeField(gParamEx);
 #else
-    cudaInGauge = new cudaGaugeField(gParam);
+    U = new cudaGaugeField(gParam);
 #endif
     // CURAND random generator initialization
     randstates = new RNG(gParam, 1234);
@@ -203,40 +127,46 @@ class GaugeAlgTest : public ::testing::Test {
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);
 
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
-    if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-    if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
-     else{
-       InitGaugeField( *cudaInGauge, *randstates );
-     }
+    int *num_failures_h = (int *)mapped_malloc(sizeof(int));
+    int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
+
+    if (link_recon != QUDA_RECONSTRUCT_8 && coldstart)
+      InitGaugeField(*U);
+    else
+      InitGaugeField(*U, *randstates);
+
     // Reunitarization setup
     SetReunitarizationConsts();
-    plaquette(*cudaInGauge);
+    plaquette(*U);
 
     for(int step=1; step<=nsteps; ++step){
       printfQuda("Step %d\n",step);
-      Monte( *cudaInGauge, *randstates, beta_value, nhbsteps, novrsteps);
+      Monte(*U, *randstates, beta_value, nhbsteps, novrsteps);
+
       //Reunitarize gauge links...
-      CallUnitarizeLinks(cudaInGauge);
-      plaquette(*cudaInGauge);
+      *num_failures_h = 0;
+      unitarizeLinks(*U, num_failures_d);
+      qudaDeviceSynchronize();
+      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+
+      plaquette(*U);
     }
     a1.Stop(__func__, __FILE__, __LINE__);
 
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
-    plaq = plaquette(*cudaInGauge);
-    printfQuda("Plaq: %.16e , %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+    plaq = plaquette(*U);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+
+    host_free(num_failures_h);
   }
 
   virtual void TearDown() {
-    detu = getLinkDeterminant(*cudaInGauge);
-    double2 tru = getLinkTrace(*cudaInGauge);
+    detu = getLinkDeterminant(*U);
+    double2 tru = getLinkTrace(*U);
     printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
     printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
 
-
-    delete cudaInGauge;
-    cudaFree(num_failures_dev);
+    delete U;
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
@@ -246,13 +176,12 @@ class GaugeAlgTest : public ::testing::Test {
     delete randstates;
   }
 
-
   QudaGaugeParam param;
 
   Timer a0,a1;
-  double2 detu;// = getLinkDeterminant(*cudaInGauge);
-  double3 plaq;// = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
-  cudaGaugeField *cudaInGauge;
+  double2 detu;
+  double3 plaq;
+  cudaGaugeField *U;
   int nsteps;
   int nhbsteps;
   int novrsteps;
@@ -262,68 +191,82 @@ class GaugeAlgTest : public ::testing::Test {
 
 };
 
-
-TEST_F(GaugeAlgTest,Generation){
-  detu = getLinkDeterminant(*cudaInGauge);
-  plaq = plaquette(*cudaInGauge);
+TEST_F(GaugeAlgTest, Generation)
+{
+  detu = getLinkDeterminant(*U);
+  plaq = plaquette(*U);
   bool testgen = false;
   //check plaquette value for beta = 6.2
-  if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
+  if (plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
 
-  if(testgen){
-    ASSERT_TRUE(CheckDeterminant(detu));
-  }
+  if (testgen) { ASSERT_TRUE(CheckDeterminant(detu)); }
 }
 
-TEST_F(GaugeAlgTest,Landau_Overrelaxation){
+TEST_F(GaugeAlgTest, Landau_Overrelaxation)
+{
   const int reunit_interval = 10;
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+  gaugeFixingOVR(*U, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*U);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
-TEST_F(GaugeAlgTest,Coulomb_Overrelaxation){
+TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
+{
   const int reunit_interval = 10;
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+  gaugeFixingOVR(*U, 3, 100, 10, 1.5, 0, reunit_interval, 1);
+  auto plaq_gf = plaquette(*U);
+  printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+  ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
 }
 
-TEST_F(GaugeAlgTest,Landau_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest, Landau_FFT)
+{
+  if (!checkDimsPartitioned()) {
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-    ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+    gaugeFixingFFT(*U, 4, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
 
-TEST_F(GaugeAlgTest,Coulomb_FFT){
-  if(!checkDimsPartitioned()){
+TEST_F(GaugeAlgTest, Coulomb_FFT)
+{
+  if (!checkDimsPartitioned()) {
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
-    ASSERT_TRUE(comparePlaquette(plaq, plaquette(*cudaInGauge)));
+    gaugeFixingFFT(*U, 3, 100, 10, 0.08, 0, 0, 1);
+    auto plaq_gf = plaquette(*U);
+    printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
   }
 }
 
-
-int main(int argc, char **argv){
+int main(int argc, char **argv)
+{
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;
   xdim=ydim=zdim=tdim=32;
-  int i;
-  for (i=1; i<argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
 
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+  // command line options
+  auto app = make_app();
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  initQuda(device);
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
+  initQuda(device_ordinal);
   test_rc = RUN_ALL_TESTS();
   endQuda();
 

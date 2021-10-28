@@ -1,3 +1,5 @@
+#pragma once
+
 #/*
 # enum_quda_fortran.h
 #
@@ -9,23 +11,19 @@
 #   gfortran).
 #*/
 
-#ifndef _ENUM_FORTRAN_QUDA_H
-#define _ENUM_FORTRAN_QUDA_H
-
 #/* can't include limits.h in a Fortran program */
 #define QUDA_INVALID_ENUM (-2147483647 - 1) 
 
 #define QudaLinkType integer(4)
 
+#define QUDA_SUCCESS 0
+#define QUDA_ERROR 1
+#define QUDA_ERROR_UNINITIALIZED 2
+
 #define QUDA_MEMORY_DEVICE 0
 #define QUDA_MEMORY_PINNED 1
 #define QUDA_MEMORY_MAPPED 2
 #define QUDA_MEMORY_INVALID QUDA_INVALID_ENUM
-
-#define QUDA_CUSOLVE_EXTLIB  0
-#define QUDA_EIGEN_EXTLIB    1
-#define QUDA_MAGMA_EXTLIB    2
-#define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
 
 #define QUDA_SU3_LINKS      0
 #define QUDA_GENERAL_LINKS  1
@@ -44,15 +42,18 @@
 #define QudaGaugeFieldOrder integer(4)
 #define QUDA_FLOAT_GAUGE_ORDER 1
 #define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
-#define QUDA_FLOAT4_GAUGE_ORDER 4 //8 and 12 reconstruct half and single
-#define QUDA_QDP_GAUGE_ORDER 5 //expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_QDPJIT_GAUGE_ORDER 6 //expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
-#define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
-#define QUDA_MILC_SITE_GAUGE_ORDER 9 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-#define QUDA_BQCD_GAUGE_ORDER 10 //expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 11
-#define QUDA_TIFR_PADDED_GAUGE_ORDER 12
+#define QUDA_FLOAT4_GAUGE_ORDER 4 // 8 reconstruct single, and 12 reconstruct single, half, quarter
+#define QUDA_FLOAT8_GAUGE_ORDER 8 // 8 reconstruct half and quarter
+#define QUDA_NATIVE_GAUGE_ORDER 9 // used to denote one of the above types in a trait, not used directly
+#define QUDA_QDP_GAUGE_ORDER 10   // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_QDPJIT_GAUGE_ORDER 11     // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_CPS_WILSON_GAUGE_ORDER 12 // expect *gauge even-odd spacetime column-row color
+#define QUDA_MILC_GAUGE_ORDER 13       // expect *gauge even-odd mu spacetime row-column order
+#define QUDA_MILC_SITE_GAUGE_ORDER                                                                                     \
+  14                             // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_TIFR_GAUGE_ORDER 16
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 17
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -86,14 +87,17 @@
 #define QudaDslashType integer(4)
 #define QUDA_WILSON_DSLASH 0 
 #define QUDA_CLOVER_WILSON_DSLASH 1
-#define QUDA_DOMAIN_WALL_DSLASH 2
-#define QUDA_DOMAIN_WALL_4D_DSLASH 3
-#define QUDA_MOBIUS_DWF_DSLASH 4
-#define QUDA_STAGGERED_DSLASH 5
-#define QUDA_ASQTAD_DSLASH 7
-#define QUDA_TWISTED_MASS_DSLASH 7
-#define QUDA_TWISTED_CLOVER_DSLASH 8 
-#define QUDA_LAPLACE_DSLASH 9
+#define QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH 2
+#define QUDA_DOMAIN_WALL_DSLASH 3
+#define QUDA_DOMAIN_WALL_4D_DSLASH 4
+#define QUDA_MOBIUS_DWF_DSLASH 5
+#define QUDA_MOBIUS_DWF_EOFA_DSLASH 6
+#define QUDA_STAGGERED_DSLASH 7
+#define QUDA_ASQTAD_DSLASH 8
+#define QUDA_TWISTED_MASS_DSLASH 9
+#define QUDA_TWISTED_CLOVER_DSLASH 10
+#define QUDA_LAPLACE_DSLASH 11
+#define QUDA_COVDEV_DSLASH 12
 #define QUDA_INVALID_DSLASH QUDA_INVALID_ENUM
 
 #define QudaInverterType integer(4)
@@ -127,17 +131,18 @@
 
 #define QudaEigType integer(4)
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
-#define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
-#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_BLK_IR_LANCZOS 1 // Block Thick Restarted Lanczos Solver
+#define QUDA_EIG_IR_ARNOLDI 2     // Implicitly restarted Arnoldi solver
+#define QUDA_EIG_BLK_IR_ARNOLDI 3 // Block Implicitly restarted Arnoldi solver (not yet implemented)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
 #define QudaEigSpectrumType integer(4)
-#define QUDA_SPECTRUM_SR_EIG 0
-#define QUDA_SPECTRUM_LR_EIG 1
-#define QUDA_SPECTRUM_SM_EIG 2
-#define QUDA_SPECTRUM_LM_EIG 3
-#define QUDA_SPECTRUM_SI_EIG 4
-#define QUDA_SPECTRUM_LI_EIG 5
+#define QUDA_SPECTRUM_LM_EIG 0
+#define QUDA_SPECTRUM_SM_EIG 1
+#define QUDA_SPECTRUM_LR_EIG 2
+#define QUDA_SPECTRUM_SR_EIG 3
+#define QUDA_SPECTRUM_LI_EIG 4
+#define QUDA_SPECTRUM_SI_EIG 5
 #define QUDA_SPECTRUM_INVALID QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)
@@ -271,25 +276,31 @@
 #define QUDA_WILSONPC_DIRAC 1
 #define QUDA_CLOVER_DIRAC 2
 #define QUDA_CLOVERPC_DIRAC 3
-#define QUDA_DOMAIN_WALL_DIRAC 4
-#define QUDA_DOMAIN_WALLPC_DIRAC 5
-#define QUDA_DOMAIN_WALL_4D_DIRAC 6
-#define QUDA_DOMAIN_WALL_4DPC_DIRAC 7
-#define QUDA_MOBIUS_DOMAIN_WALL_DIRAC 8
-#define QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC 9
-#define QUDA_STAGGERED_DIRAC 10
-#define QUDA_STAGGEREDPC_DIRAC 11
-#define QUDA_ASQTAD_DIRAC 12
-#define QUDA_ASQTADPC_DIRAC 13
-#define QUDA_TWISTED_MASS_DIRAC 14
-#define QUDA_TWISTED_MASSPC_DIRAC 15
-#define QUDA_TWISTED_CLOVER_DIRAC 16
-#define QUDA_TWISTED_CLOVERPC_DIRAC 17
-#define QUDA_COARSE_DIRAC 18
-#define QUDA_COARSEPC_DIRAC 19
-#define QUDA_GAUGE_LAPLACE_DIRAC 20
-#define QUDA_GAUGE_LAPLACEPC_DIRAC 21
-#define QUDA_GAUGE_COVDEV_DIRAC 22
+#define QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC 4
+#define QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC 5
+#define QUDA_DOMAIN_WALL_DIRAC 6
+#define QUDA_DOMAIN_WALLPC_DIRAC 7
+#define QUDA_DOMAIN_WALL_4D_DIRAC 8
+#define QUDA_DOMAIN_WALL_4DPC_DIRAC 9
+#define QUDA_MOBIUS_DOMAIN_WALL_DIRAC 10
+#define QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC 11
+#define QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC 12
+#define QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC 13
+#define QUDA_STAGGERED_DIRAC 14
+#define QUDA_STAGGEREDPC_DIRAC 15
+#define QUDA_STAGGEREDKD_DIRAC 16
+#define QUDA_ASQTAD_DIRAC 17
+#define QUDA_ASQTADPC_DIRAC 18
+#define QUDA_ASQTADKD_DIRAC 19
+#define QUDA_TWISTED_MASS_DIRAC 20
+#define QUDA_TWISTED_MASSPC_DIRAC 21
+#define QUDA_TWISTED_CLOVER_DIRAC 22
+#define QUDA_TWISTED_CLOVERPC_DIRAC 23
+#define QUDA_COARSE_DIRAC 24
+#define QUDA_COARSEPC_DIRAC 25
+#define QUDA_GAUGE_LAPLACE_DIRAC 26
+#define QUDA_GAUGE_LAPLACEPC_DIRAC 27
+#define QUDA_GAUGE_COVDEV_DIRAC 28
 #define QUDA_INVALID_DIRAC QUDA_INVALID_ENUM
 
 ! Where the field is stored
@@ -316,11 +327,12 @@
 #define QUDA_FLOAT_FIELD_ORDER 1 // spin-color-complex-space
 #define QUDA_FLOAT2_FIELD_ORDER 2 // (spin-color-complex)/2-space-(spin-color-complex)%2
 #define QUDA_FLOAT4_FIELD_ORDER 4 // (spin-color-complex)/4-space-(spin-color-complex)%4
-#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 5 // CPS/QDP++ ordering
-#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 6 // QLA ordering (spin inside color)
-#define QUDA_QDPJIT_FIELD_ORDER 7 // QDP field ordering (complex-color-spin-spacetime)
-#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 8 // QOP domain-wall ordering
-#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 9 // TIFR RHMC ordering
+#define QUDA_FLOAT8_FIELD_ORDER 8 // (spin-color-complex)/8-space-(spin-color-complex)%8
+#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 9         // CPS/QDP++ ordering
+#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 10        // QLA ordering (spin inside color)
+#define QUDA_QDPJIT_FIELD_ORDER 11                  // QDP field ordering (complex-color-spin-spacetime)
+#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 12         // QOP domain-wall ordering
+#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 13 // TIFR RHMC ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)
@@ -399,12 +411,36 @@
 #define QUDA_TEST_VECTOR_SETUP 1
 #define QUDA_INVALID_SETUP_TYPE QUDA_INVALID_ENUM
 
+#define QudaTransferType integer(4)
+#define QUDA_TRANSFER_AGGREGATE 0
+#define QUDA_TRANSFER_COARSE_KD 1
+#define QUDA_TRANSFER_OPTIMIZED_KD 2
+#define QUDA_TRANSFER_INVALID QUDA_INVALID_ENUM
+
 #define QudaBoolean integer(4)
 #define QUDA_BOOLEAN_FALSE 0
 #define QUDA_BOOLEAN_TRUE 1
 #define QUDA_BOOLEAN_INVALID QUDA_INVALID_ENUM
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE // backwards compatibility
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE // backwards compatibility
+
+#define QudaBLASOperation integer(4)
+#define QUDA_BLAS_OP_N = 0 // No transpose
+#define QUDA_BLAS_OP_T = 1 // Transpose only
+#define QUDA_BLAS_OP_C = 2 // Conjugate transpose
+#define QUDA_BLAS_OP_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataType integer(4)
+#define QUDA_BLAS_DATATYPE_S 0 // Single
+#define QUDA_BLAS_DATATYPE_D 1 // Double
+#define QUDA_BLAS_DATATYPE_C 2 // Complex(single)
+#define QUDA_BLAS_DATATYPE_Z 3 // Complex(double)
+#define QUDA_BLAS_DATATYPE_INVALID QUDA_INVALID_ENUM
+
+#define QudaBLASDataOrder integer(4)
+#define QUDA_BLAS_DATAORDER_ROW 0
+#define QUDA_BLAS_DATAORDER_COL 1
+#define QUDA_BLAS_DATAORDER_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1
@@ -439,7 +475,6 @@
 #define QudaContractType integer(4)
 #define QUDA_CONTRACT_TYPE_OPEN ,
 #define QUDA_CONTRACT_TYPE_DR ,
-#define QUDA_CONTRACT_TYPE_DP ,
 #define QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
 
 #define QudaContractGamma integer(4)
@@ -466,5 +501,3 @@
 #define QUDA_EIGEN_EXTLIB 1
 #define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
-
-#endif 

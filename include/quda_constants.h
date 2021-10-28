@@ -1,5 +1,5 @@
 #define QUDA_VERSION_MAJOR     1
-#define QUDA_VERSION_MINOR     0
+#define QUDA_VERSION_MINOR     1
 #define QUDA_VERSION_SUBMINOR  0
 
 /**
@@ -53,11 +53,11 @@
  * @brief Maximum number of multi-grid levels.  This number may be
  * increased if needed.
  */
-#define QUDA_MAX_MG_LEVEL 4
+#define QUDA_MAX_MG_LEVEL 5
 
 /**
  * @def QUDA_MAX_MULTI_REDUCE
  * @brief Maximum number of simultaneous reductions that can take
  * place.  This number may be increased if needed.
  */
-#define QUDA_MAX_MULTI_REDUCE 256
+#define QUDA_MAX_MULTI_REDUCE 1024

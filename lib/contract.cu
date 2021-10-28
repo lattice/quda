@@ -40,9 +40,8 @@ public:
       create_jitify_program("kernels/contraction.cuh");
 #endif
     }
-    virtual ~Contraction() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -61,10 +60,8 @@ public:
                          .launch(arg);
 #else
         switch (cType) {
-        case QUDA_CONTRACT_TYPE_OPEN: computeColorContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-        case QUDA_CONTRACT_TYPE_DR:
-          computeDegrandRossiContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-          break;
+        case QUDA_CONTRACT_TYPE_OPEN: qudaLaunchKernel(computeColorContraction<real, Arg>, tp, stream, arg); break;
+        case QUDA_CONTRACT_TYPE_DR:   qudaLaunchKernel(computeDegrandRossiContraction<real, Arg>, tp, stream, arg); break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 #endif

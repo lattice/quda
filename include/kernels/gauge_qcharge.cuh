@@ -1,23 +1,27 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <cub_helper.cuh>
-
-#ifndef Pi2
-#define Pi2 6.2831853071795864769252867665590
-#endif
+#include <reduce_helper.h>
 
 namespace quda
 {
 
-  template <typename Float, typename Gauge, bool density_ = false> struct QChargeArg : public ReduceArg<double> {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
+    public ReduceArg<double3>
+  {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
+    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static constexpr QudaReconstructType recon = recon_;
     static constexpr bool density = density_;
+    typedef typename gauge_mapper<Float,recon>::type F;
+
     int threads; // number of active threads required
-    Gauge data;
+    F f;
     Float *qDensity;
 
-    QChargeArg(const Gauge &data, const GaugeField &Fmunu, Float *qDensity = nullptr) :
-      ReduceArg<double>(),
-      data(data),
+    QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
+      ReduceArg<double3>(),
+      f(Fmunu),
       threads(Fmunu.VolumeCB()),
       qDensity(qDensity)
     {
@@ -25,33 +29,57 @@ namespace quda
   };
 
   // Core routine for computing the topological charge from the field strength
-  template <int blockSize, typename Float, typename Arg> __global__ void qChargeComputeKernel(Arg arg)
+  template <int blockSize, typename Arg> __global__ void qChargeComputeKernel(Arg arg)
   {
+    using real = typename Arg::Float;
+    using Link = Matrix<complex<real>, Arg::nColor>;
+    constexpr real q_norm = static_cast<real>(-1.0 / (4*M_PI*M_PI));
+    constexpr real n_inv = static_cast<real>(1.0 / Arg::nColor);
+
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
-    double Q = 0.0;
+    double3 E = make_double3(0.0, 0.0, 0.0);
+    double &Q = E.z;
 
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
-      Matrix<complex<Float>, 3> F[] = {arg.data(0, x_cb, parity), arg.data(1, x_cb, parity), arg.data(2, x_cb, parity),
-                                       arg.data(3, x_cb, parity), arg.data(4, x_cb, parity), arg.data(5, x_cb, parity)};
+      //F0 = F[Y,X], F1 = F[Z,X], F2 = F[Z,Y],
+      //F3 = F[T,X], F4 = F[T,Y], F5 = F[T,Z]
+      Link F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
+		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
 
-      double Q1 = getTrace(F[0] * F[5]).real();
-      double Q2 = getTrace(F[1] * F[4]).real();
-      double Q3 = getTrace(F[3] * F[2]).real();
-      double Q_idx = (Q1 + Q3 - Q2);
-      Q += Q_idx;
+      // first compute the field energy
+      Link iden;
+      setIdentity(&iden);
+#pragma unroll
+      for (int i=0; i<6; i++) {
+	// Make traceless
+	auto tmp = F[i] - n_inv * getTrace(F[i]) * iden;
 
-      if (Arg::density) {
-        int idx = x_cb + parity * arg.threads;
-        arg.qDensity[idx] = Q_idx / (Pi2 * Pi2);
+	// Sum trace of square, normalise in .cu
+	if (i<3) E.x -= getTrace(tmp * tmp).real(); //spatial
+	else     E.y -= getTrace(tmp * tmp).real(); //temporal
       }
+
+      // now compute topological charge
+      double Q_idx = 0.0;
+      double Qi[3] = {0.0,0.0,0.0};
+      // unroll computation
+#pragma unroll
+      for (int i=0; i<3; i++) {
+	Qi[i] = getTrace(F[i] * F[5 - i]).real();
+      }
+
+      // apply correct levi-civita symbol
+      for (int i=0; i<3; i++) i%2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
+      Q += Q_idx * q_norm;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx * q_norm;
+
       x_cb += blockDim.x * gridDim.x;
     }
-    Q /= (Pi2 * Pi2);
 
-    reduce2d<blockSize, 2>(arg, Q);
+    arg.template reduce2d<blockSize, 2>(E);
   }
 
 } // namespace quda

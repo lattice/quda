@@ -172,7 +172,6 @@ namespace quda {
     Arg &arg;
     int size;
     const GaugeField &meta;
-    QudaFieldLocation location;
     bool extract;
 
   private:
@@ -183,12 +182,13 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
   public:
-    ExtractGhost(Arg &arg, const GaugeField &meta, QudaFieldLocation location, bool extract)
+    ExtractGhost(Arg &arg, const GaugeField &meta, bool extract)
 #ifndef FINE_GRAINED_ACCESS
-      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+      : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), extract(extract)
 #else
-      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), extract(extract)
 #endif
+    {
       int faceMax = 0;
       for (int d=0; d<nDim; d++)
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
@@ -201,18 +201,16 @@ namespace quda {
 #endif
     }
 
-    virtual ~ExtractGhost() { ; }
-
-    void apply(const cudaStream_t &stream) {
-      if (location==QUDA_CPU_FIELD_LOCATION) {
+    void apply(const qudaStream_t &stream) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (extract) extractGhost<nDim,true>(arg);
 	else extractGhost<nDim,false>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (extract) {
-	  extractGhostKernel<nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostKernel<nDim, true, Arg>, tp, stream, arg);
 	} else {
-	  extractGhostKernel<nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  qudaLaunchKernel(extractGhostKernel<nDim, false, Arg>, tp, stream, arg);
 	}
       }
     }
@@ -227,13 +225,12 @@ namespace quda {
     }
   };
 
-
   /**
      Generic gauge ghost extraction and packing (or the converse)
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, typename Order>
-  void extractGhost(Order order, const GaugeField &u, QudaFieldLocation location, bool extract, int offset) {
+  void extractGhost(Order order, const GaugeField &u, bool extract, int offset) {
     const int *X = u.X();
     constexpr int nDim = 4;
     //loop variables: a, b, c with a the most signifcant and c the least significant
@@ -263,7 +260,7 @@ namespace quda {
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
     ExtractGhostArg<Float, gauge::Ncolor(length), Order, nDim> arg(order, u, A, B, C, f, localParity, offset);
-    ExtractGhost<nDim, decltype(arg)> extractor(arg, u, location, extract);
+    ExtractGhost<nDim, decltype(arg)> extractor(arg, u, extract);
     extractor.apply(0);
   }
 

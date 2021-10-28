@@ -152,3 +152,19 @@ static inline __device__ float atomicMax(float *addr, float val){
 
   return __uint_as_float(old);
 }
+
+/**
+   @brief Implementation of single-precision atomic max specialized
+   for positive-definite numbers.  Here we take advantage of the
+   property that when positive floating point numbers are
+   reinterpretted as unsigned integers, they have the same unique
+   sorted order.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ float atomicAbsMax(float *addr, float val){
+  uint32_t val_ = __float_as_uint(val);
+  uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
+  return atomicMax(addr_, val_);
+}

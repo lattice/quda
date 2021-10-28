@@ -3,13 +3,10 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-
 #include "quda.h"
 #include "gauge_field.h"
-#include "test_util.h"
-#include "llfat_reference.h"
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "misc.h"
 #include "util_quda.h"
 #include "llfat_quda.h"
@@ -28,11 +25,6 @@
 
 using namespace quda;
 
-
-extern void usage(char** argv);
-
-extern int device;
-
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
@@ -40,27 +32,19 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern bool verify_results;
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
 cudaGaugeField *cudaFatLink, *cudaULink;
 
-const double tol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
+const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
 TEST(unitarization, verify) {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
-    
-  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(),
-			   4*cudaResult->Volume()*gaugeSiteSize, tol, cpu_prec);
+
+  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gauge_site_size,
+                           unittol, cpu_prec);
 
 #ifdef MULTI_GPU
   comm_allreduce_int(&res);
@@ -73,8 +57,6 @@ TEST(unitarization, verify) {
 static int unitarize_link_test(int &test_rc)
 {
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
-
-  initQuda(device);
 
   qudaGaugeParam.anisotropy = 1.0;
 
@@ -113,29 +95,21 @@ static int unitarize_link_test(int &test_rc)
 
   TimeProfile profile("dummy");
 
-  void* fatlink = (void*)malloc(4*V*gaugeSiteSize*cpu_prec);
-  if(fatlink == NULL){
-    errorQuda("ERROR: allocating fatlink failed\n");
-  }
+  void *inlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
+  void *fatlink = (void *)safe_malloc(4 * V * gauge_site_size * cpu_prec);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*cpu_prec);
-    if(sitelink[i] == NULL){
-      errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
-    }
-  }
+  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * cpu_prec);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
-  void* inlink =  (void*)malloc(4*V*gaugeSiteSize*cpu_prec);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }
@@ -144,8 +118,8 @@ static int unitarize_link_test(int &test_rc)
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }
@@ -189,17 +163,14 @@ static int unitarize_link_test(int &test_rc)
 			     svd_rel_error,
 			     svd_abs_error);
 
-  int *num_failures_h = (int*)mapped_malloc(sizeof(int));
-  int *num_failures_d = nullptr;
-  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  int *num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
+  int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
   *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {
@@ -212,36 +183,31 @@ static int unitarize_link_test(int &test_rc)
   delete cpuFatLink;
   delete cudaFatLink;
   delete cudaULink;
-  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+  for (int dir = 0; dir < 4; ++dir) host_free(sitelink[dir]);
 
-  free(fatlink);
+  host_free(fatlink);
 
   int num_failures = *num_failures_h;
   host_free(num_failures_h);
 
-  free(inlink);
+  host_free(inlink);
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif
-  endQuda();
 
   printfQuda("Unitarization time: %g ms\n", TDIFF(t0,t1)*1000); 
   return num_failures;
 }
 
-  static void
-display_test_info()
+static void display_test_info()
 {
   printfQuda("running the following test:\n");
 
   printfQuda("link_precision      link_reconstruct           space_dimension        T_dimension    algorithm           max allowed error  deviation tolerance\n");
-  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g             %g\n",
-	     get_prec_str(prec),
-	     get_recon_str(link_recon),
-	     xdim, ydim, zdim, tdim,
-	     get_unitarization_str(reunit_svd_only),
-	     max_allowed_error,
-	     tol);
+  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g        "
+             "     %g\n",
+             get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim,
+             get_unitarization_str(reunit_svd_only), max_allowed_error, unittol);
 
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
@@ -251,11 +217,7 @@ display_test_info()
       dimPartitioned(2),
       dimPartitioned(3));
 #endif
-
-  return ;
-
 }
-
 
 int main(int argc, char **argv)
 {
@@ -267,17 +229,19 @@ int main(int argc, char **argv)
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
 
-  int i;
-  for (i=1; i<argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+  initQuda(device_ordinal);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   display_test_info();
   int num_failures = unitarize_link_test(test_rc);
@@ -294,6 +258,8 @@ int main(int argc, char **argv)
   }else{
     printfQuda("Unitarization successfull!\n");
   }
+
+  endQuda();
   finalizeComms();
 
   return test_rc;

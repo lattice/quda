@@ -93,7 +93,7 @@ void CloseMagma(){
 #define FLOPS_ZGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 #define FLOPS_CGETRI(n_) (6. * FMULS_GETRI((double)(n_)) + 2.0 * FADDS_GETRI((double)(n_)) )
 
-void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const int batch, const int prec)
+void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, const uint64_t batch, const int prec)
 {
 #ifdef MAGMA_LIB
   printfQuda("%s with n=%d and batch=%d\n", __func__, n, batch);

@@ -8,57 +8,25 @@
 
 /**
    This is the basic gauged Wilson operator
-
    TODO
    - gauge fix support
-   - ghost texture support in accessors
-   - CPU support
 */
 
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonLaunch {
-    static constexpr const char *kernel = "quda::wilsonGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(wilsonGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Wilson : public Dslash<Float>
+  template <typename Arg> class Wilson : public Dslash<wilson, Arg>
   {
+    using Dslash = Dslash<wilson, Arg>;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+  public:
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_wilson.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~Wilson() {}
-
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
-      Dslash<Float>::template instantiate<WilsonLaunch, nDim, nColor>(tp, arg, stream);
-    }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packShmem>(tp, stream);
     }
   };
 
@@ -68,15 +36,13 @@ public:
                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonArg<Float, nColor, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      Wilson<Float, nDim, nColor, WilsonArg<Float, nColor, recon>> wilson(arg, out, in);
+      WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
+      Wilson<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
       policy.apply(0);
-
-      checkCudaError();
     }
   };
 
@@ -87,16 +53,6 @@ public:
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_WILSON_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Wilson dslash has not been built");

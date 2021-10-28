@@ -12,6 +12,9 @@
  * The header file defines the milc interface to enable easy
  * interfacing between QUDA and the MILC software packed.
  */
+#if __COMPUTE_CAPABILITY__ >= 600
+#define USE_QUDA_MANAGED 1
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -151,7 +154,20 @@ extern "C" {
    * @param ptr Pointer to memory to be free
    */
   void qudaFreePinned(void *ptr);
-  
+
+  /**
+   * Allocate managed memory to reduce CPU-GPU transfers
+   * @param bytes The size of the requested allocation
+   * @return Pointer to allocated memory
+   */
+  void *qudaAllocateManaged(size_t bytes);
+
+  /**
+   * Free managed memory
+   * @param ptr Pointer to memory to be free
+   */
+  void qudaFreeManaged(void *ptr);
+
   /**
    * Set the algorithms to use for HISQ fermion calculations, e.g.,
    * SVD parameters for reunitarization.
@@ -292,6 +308,62 @@ extern "C" {
 		  double* const final_resid,
 		  double* const final_rel_resid,
 		  int* num_iters);
+
+  /**
+   * Prepare a staggered/HISQ multigrid solve with given fat and
+   * long links. All fields passed are host (CPU) fields
+   * in MILC order. This function requires persistent gauge fields.
+   * This interface is experimental.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata; required for tadpole, naik coeff
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param mg_param_file Path to an input text file describing the MG solve, to be documented on QUDA wiki
+   * @return Void pointer wrapping a pack of multigrid-related structures
+   */
+  void *qudaMultigridCreate(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                            const void *const milc_fatlink, const void *const milc_longlink,
+                            const char *const mg_param_file);
+
+  /**
+   * Solve Ax=b for an improved staggered operator using MG.
+   * All fields are fields passed and returned are host (CPU)
+   * field in MILC order.  This function requires that persistent
+   * gauge and clover fields have been created prior. It also
+   * requires a multigrid parameter built from qudaSetupMultigrid
+   * This interface is experimental.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata
+   * @param target_residual Target residual
+   * @param target_relative_residual Target Fermilab residual
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param mg_pack_ptr MG preconditioner structure created by qudaSetupMultigrid
+   * @param mg_rebuild_type whether to do a full (1) or thin (0) MG rebuild
+   * @param source Right-hand side source field
+   * @param solution Solution spinor field
+   * @param final_residual True residual
+   * @param final_relative_residual True Fermilab residual
+   * @param num_iters Number of iterations taken
+   */
+  void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                    double target_residual, double target_fermilab_residual, const void *const milc_fatlink,
+                    const void *const milc_longlink, void *mg_pack_ptr, int mg_rebuild_type, void *source,
+                    void *solution, double *const final_residual, double *const final_fermilab_residual, int *num_iters);
+
+  /**
+   * Clean up a staggered/HISQ multigrid object, freeing all internal
+   * fields and otherwise allocated memory.
+   *
+   * @param mg_pack_ptr Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
+   */
+  void qudaMultigridDestroy(void *mg_pack_ptr);
 
   /**
    * Solve Ax=b for an improved staggered operator with many right hand sides. 
@@ -629,7 +701,7 @@ extern "C" {
 		     void* const milc_momentum);
 
   /**
-   * Compute the gauge force and update the mometum field.  All fields
+   * Compute the gauge force and update the momentum field.  All fields
    * here are CPU fields in MILC order, and their precisions should
    * match.
    *
@@ -646,6 +718,21 @@ extern "C" {
 		      QudaMILCSiteArg_t *arg);
 
   /**
+   * Compute the gauge force and update the momentum field.  All fields
+   * here are CPU fields in MILC order, and their precisions should
+   * match.
+   *
+   * @param precision The precision of the field (2 - double, 1 - single)
+   * @param num_loop_types 1, 2 or 3
+   * @param milc_loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param eb3 The integration step size (for MILC this is dt*beta/3)
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_coeff[3], double eb3,
+                            QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
    *
@@ -658,17 +745,60 @@ extern "C" {
 		   QudaMILCSiteArg_t *arg);
 
   /**
-   * Evaluate the momentum contribution to the Hybrid Monte Carlo
-   * action.  The momentum field is assumed to be in MILC order.  MILC
-   * convention is applied, subtracting 4.0 from each momentum matrix
-   * to increased stability.
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
    *
    * @param precision Precision of the field (2 - double, 1 - single)
-   * @param momentum The momentum field
+   * @param dt The integration step size step
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaUpdateUPhased(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in);
+
+  /**
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t).  All fields are CPU fields in MILC order.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param dt The integration step size step
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   * @param want_gaugepipe whether to enabled QUDA gaugepipe for HMC
+   */
+  void qudaUpdateUPhasedPipeline(int precision, double eps, QudaMILCSiteArg_t *arg, int phase_in, int want_gaugepipe);
+
+  /**
+   * Download the momentum from MILC and place into QUDA's resident
+   * momentum field.  The source momentum field can either be as part
+   * of a MILC site struct (QUDA_MILC_SITE_GAUGE_ORDER) or as a
+   * separate field (QUDA_MILC_GAUGE_ORDER).
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param arg Metadata for MILC's internal site struct array
+   */
+  void qudaMomLoad(int precision, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Upload the momentum to MILC from QUDA's resident momentum field.
+   * The destination momentum field can either be as part of a MILC site
+   * struct (QUDA_MILC_SITE_GAUGE_ORDER) or as a separate field
+   * (QUDA_MILC_GAUGE_ORDER).
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param arg Metadata for MILC's internal site struct array
+   */
+  void qudaMomSave(int precision, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Evaluate the momentum contribution to the Hybrid Monte Carlo
+   * action.  MILC convention is applied, subtracting 4.0 from each
+   * momentum matrix to increase stability.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param arg Metadata for MILC's internal site struct array
    * @return momentum action
    */
-  double qudaMomAction(int precision,
-		       void *momentum);
+  double qudaMomAction(int precision, QudaMILCSiteArg_t *arg);
 
   /**
    * Apply the staggered phase factors to the gauge field.  If the
@@ -692,6 +822,17 @@ extern "C" {
    * @param arg Metadata for MILC's internal site struct array
    */
   void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg);
+
+  /**
+   * Project the input field on the SU(3) group.  If the target
+   * tolerance is not met, this routine will give a runtime error.
+   *
+   * @param prec Precision of the gauge field
+   * @param tol The tolerance to which we iterate
+   * @param arg Metadata for MILC's internal site struct array
+   * @param phase_in whether staggered phases are applied
+   */
+  void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int phase_in);
 
   /**
    * Compute the clover force contributions in each dimension mu given

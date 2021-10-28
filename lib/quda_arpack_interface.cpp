@@ -65,13 +65,13 @@ namespace quda
     int *ipntr_ = (int *)safe_malloc(14 * sizeof(int));
     int *iparam_ = (int *)safe_malloc(11 * sizeof(int));
     int n_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
-    int nEv_ = eig_param->nEv;
-    int nKr_ = eig_param->nKr;
+    int n_ev_ = eig_param->n_ev;
+    int n_kr_ = eig_param->n_kr;
     int ldv_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
-    int lworkl_ = (3 * nKr_ * nKr_ + 5 * nKr_) * 2;
+    int lworkl_ = (3 * n_kr_ * n_kr_ + 5 * n_kr_) * 2;
     int rvec_ = 1;
-    int max_iter = eig_param->max_restarts * (nKr_ - nEv_) + nEv_;
-    int *h_evals_sorted_idx = (int *)safe_malloc(nKr_ * sizeof(int));
+    int max_iter = eig_param->max_restarts * (n_kr_ - n_ev_) + n_ev_;
+    int *h_evals_sorted_idx = (int *)safe_malloc(n_kr_ * sizeof(int));
 
     // Assign values to ARPACK params
     iparam_[0] = 1;
@@ -104,7 +104,7 @@ namespace quda
     }
 
     double tol_ = eig_param->tol;
-    double *mod_h_evals_sorted = (double *)safe_malloc(nKr_ * sizeof(double));
+    double *mod_h_evals_sorted = (double *)safe_malloc(n_kr_ * sizeof(double));
 
     // ARPACK workspace
     Complex I(0.0, 1.0);
@@ -118,15 +118,15 @@ namespace quda
     Complex sigma_ = 0.0;
     Complex *w_workd_ = (Complex *)safe_malloc(3 * ldv_ * sizeof(Complex));
     Complex *w_workl_ = (Complex *)safe_malloc(lworkl_ * sizeof(Complex));
-    Complex *w_workev_ = (Complex *)safe_malloc(2 * nKr_ * sizeof(Complex));
-    double *w_rwork_ = (double *)safe_malloc(nKr_ * sizeof(double));
-    int *select_ = (int *)safe_malloc(nKr_ * sizeof(int));
+    Complex *w_workev_ = (Complex *)safe_malloc(2 * n_kr_ * sizeof(Complex));
+    double *w_rwork_ = (double *)safe_malloc(n_kr_ * sizeof(double));
+    int *select_ = (int *)safe_malloc(n_kr_ * sizeof(int));
 
-    Complex *h_evecs_ = (Complex *)safe_malloc(nKr_ * ldv_ * sizeof(Complex));
-    Complex *h_evals_ = (Complex *)safe_malloc(nEv_ * sizeof(Complex));
+    Complex *h_evecs_ = (Complex *)safe_malloc(n_kr_ * ldv_ * sizeof(Complex));
+    Complex *h_evals_ = (Complex *)safe_malloc(n_ev_ * sizeof(Complex));
     std::vector<ColorSpinorField *> h_evecs_arpack;
 
-    for (int i = 0; i < nKr_; i++) {
+    for (int i = 0; i < n_kr_; i++) {
       // create container wrapping the vectors returned from ARPACK
       ColorSpinorParam param(*h_evecs[0]);
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -208,7 +208,7 @@ namespace quda
       //----------------------------
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
       ARPACK(pznaupd)
-      (fcomm_, &ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
+      (fcomm_, &ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_,
        w_workl_, &lworkl_, w_rwork_, &info_, 1, 2);
 
       if (info_ != 0) {
@@ -217,7 +217,7 @@ namespace quda
       }
 #else
       ARPACK(znaupd)
-      (&ido_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
+      (&ido_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_,
        &lworkl_, w_rwork_, &info_, 1, 2);
       if (info_ != 0) {
         arpackErrorHelpNAUPD();
@@ -282,7 +282,7 @@ namespace quda
 
     } while (99 != ido_ && iter_count < max_iter);
 
-    // Subspace calulated sucessfully. Compute nEv eigenvectors and values
+    // Subspace calulated sucessfully. Compute n_ev eigenvectors and values
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Finish: iter=%04d  info=%d  ido=%d\n", iter_count, info_, ido_);
@@ -295,8 +295,8 @@ namespace quda
     //----------------------------
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     ARPACK(pzneupd)
-    (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_,
-     resid_, &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    (fcomm_, &rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &n_ev_, &tol_,
+     resid_, &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in pzneupd info = %d. You likely need to\n"
@@ -308,8 +308,8 @@ namespace quda
     }
 #else
     ARPACK(zneupd)
-    (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &nEv_, &tol_, resid_,
-     &nKr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
+    (&rvec_, &howmny, select_, h_evals_, h_evecs_, &n_, &sigma_, w_workev_, &bmat, &n_, spectrum, &n_ev_, &tol_, resid_,
+     &n_kr_, h_evecs_, &n_, iparam_, ipntr_, w_workd_, w_workl_, &lworkl_, w_rwork_, &info_, 1, 1, 2);
     if (info_ == -15) {
       arpackErrorHelpNEUPD();
       errorQuda("\nError in zneupd info = %d. You likely need to\n"
@@ -403,7 +403,7 @@ namespace quda
 
     // cleanup
     host_free(h_evals_);
-    for (int i = 0; i < nKr_; i++) delete h_evecs_arpack[i];
+    for (int i = 0; i < n_kr_; i++) delete h_evecs_arpack[i];
     host_free(h_evecs_);
     host_free(ipntr_);
     host_free(iparam_);

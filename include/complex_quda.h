@@ -459,8 +459,7 @@ template<>
 {
 public:
   typedef float value_type;
-  __host__ __device__
-    inline complex<float>(){};
+  __host__ __device__ inline complex<float>() {};
   __host__ __device__
     inline complex<float>(const float & re, const float& im = float())
     {
@@ -581,8 +580,7 @@ template<>
 {
 public:
   typedef double value_type;
-  __host__ __device__
-    inline complex<double>(){};
+  __host__ __device__ inline complex<double>() {};
   __host__ __device__
     inline complex<double>(const double & re, const double& im = double())
     {
@@ -706,52 +704,50 @@ public:
     __host__ __device__ inline complex<double>(const colorspinor::fieldorder_wrapper<otherFloat,storeFloat> &a);
 };
 
-template<>
-struct complex <char> : public char2
-{
+template <> struct complex<int8_t> : public char2 {
 public:
-  typedef char value_type;
+  typedef int8_t value_type;
 
-  __host__ __device__ inline complex<char>(){};
+  __host__ __device__ inline complex<int8_t>() : char2() {};
 
-  __host__ __device__ inline complex<char>(const char & re, const char& im = float())
-    {
-      real(re);
-      imag(im);
-    }
+  __host__ __device__ inline complex<int8_t>(const int8_t &re, const int8_t &im = float())
+  {
+    real(re);
+    imag(im);
+  }
 
-  __host__ __device__ inline complex<char>(const complex<char> & z) : char2(z){}
+  __host__ __device__ inline complex<int8_t>(const complex<int8_t> &z) : char2(z) {}
 
-  __host__ __device__ inline complex<char>& operator+=(const complex<char> z)
-    {
-      real(real()+z.real());
-      imag(imag()+z.imag());
-      return *this;
-    }
+  __host__ __device__ inline complex<int8_t> &operator+=(const complex<int8_t> z)
+  {
+    real(real() + z.real());
+    imag(imag() + z.imag());
+    return *this;
+  }
 
-  __host__ __device__ inline complex<char>& operator-=(const complex<char> z)
-    {
-      real(real()-z.real());
-      imag(imag()-z.imag());
-      return *this;
-    }
+  __host__ __device__ inline complex<int8_t> &operator-=(const complex<int8_t> z)
+  {
+    real(real() - z.real());
+    imag(imag() - z.imag());
+    return *this;
+  }
 
-  __host__ __device__ inline char real() const volatile{ return x; }
-  __host__ __device__ inline char imag() const volatile{ return y; }
-  __host__ __device__ inline char real() const{ return x; }
-  __host__ __device__ inline char imag() const{ return y; }
-  __host__ __device__ inline void real(char re)volatile{ x = re; }
-  __host__ __device__ inline void imag(char im)volatile{ y = im; }
-  __host__ __device__ inline void real(char re){ x = re; }
-  __host__ __device__ inline void imag(char im){ y = im; }
+  __host__ __device__ inline int8_t real() const volatile { return x; }
+  __host__ __device__ inline int8_t imag() const volatile { return y; }
+  __host__ __device__ inline int8_t real() const { return x; }
+  __host__ __device__ inline int8_t imag() const { return y; }
+  __host__ __device__ inline void real(int8_t re) volatile { x = re; }
+  __host__ __device__ inline void imag(int8_t im) volatile { y = im; }
+  __host__ __device__ inline void real(int8_t re) { x = re; }
+  __host__ __device__ inline void imag(int8_t im) { y = im; }
 
   // cast operators
-  inline operator std::complex<char>() const { return std::complex<char>(real(),imag()); }
-  template <typename T>
-  inline __host__ __device__ operator complex<T>() const { return complex<T>(static_cast<T>(real()),static_cast<T>(imag())); }
-
+  inline operator std::complex<int8_t>() const { return std::complex<int8_t>(real(), imag()); }
+  template <typename T> inline __host__ __device__ operator complex<T>() const
+  {
+    return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
+  }
 };
-
 
 template<>
 struct complex <short> : public short2
@@ -759,7 +755,7 @@ struct complex <short> : public short2
 public:
   typedef short value_type;
 
-  __host__ __device__ inline complex<short>(){};
+  __host__ __device__ inline complex<short>() {};
 
   __host__ __device__ inline complex<short>(const short & re, const short& im = float())
     {
@@ -805,7 +801,7 @@ struct complex <int> : public int2
 public:
   typedef int value_type;
 
-  __host__ __device__ inline complex<int>(){};
+  __host__ __device__ inline complex<int>() {};
 
   __host__ __device__ inline complex<int>(const int& re, const int& im = float())
     {
@@ -1377,6 +1373,16 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     w.y += x.imag() * y.real();
     w.y += x.real() * y.imag();
     return w;
+  }
+
+  template <typename real> __host__ __device__ inline complex<real> i_(const complex<real> &a)
+  {
+    // FIXME compiler generates worse code with "optimal" code
+#if 1
+    return complex<real>(0.0, 1.0) * a;
+#else
+    return complex<real>(-a.imag(), a.real());
+#endif
   }
 
 } // end namespace quda

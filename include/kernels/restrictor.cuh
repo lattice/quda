@@ -57,7 +57,7 @@ namespace quda {
     for (int s=0; s<fineSpin; s++)
 #pragma unroll
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
+        out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
       }
 
 #pragma unroll
@@ -90,9 +90,9 @@ namespace quda {
   void Restrict(Arg arg) {
     for (int parity_coarse=0; parity_coarse<2; parity_coarse++) 
       for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
-	for (int s=0; s<coarseSpin; s++) 
-	  for (int c=0; c<coarseColor; c++)
-	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
+        for (int s=0; s<coarseSpin; s++) 
+          for (int c=0; c<coarseColor; c++)
+            arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
 
     // loop over fine degrees of freedom
     for (int parity=0; parity<arg.nParity; parity++) {
@@ -100,24 +100,24 @@ namespace quda {
 
       for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
 
-	int x = parity*arg.in.VolumeCB() + x_cb;
-	int x_coarse = arg.fine_to_coarse[x];
-	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
-	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
-	
-	for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
-	  complex<Float> tmp[fineSpin*coarse_colors_per_thread];
-	  rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
-	    (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
+        int x = parity*arg.in.VolumeCB() + x_cb;
+        int x_coarse = arg.fine_to_coarse[x];
+        int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
+        int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 
-	  for (int s=0; s<fineSpin; s++) {
-	    for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	      int c = coarse_color_block + coarse_color_local;
-	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s,parity),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
-	    }
-	  }
+        for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
+          complex<Float> tmp[fineSpin*coarse_colors_per_thread];
+          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
+            (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
 
-	}
+          for (int s=0; s<fineSpin; s++) {
+            for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+              int c = coarse_color_block + coarse_color_local;
+              arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s,parity),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
+            }
+          }
+
+        }
       }
     }
 
@@ -180,7 +180,7 @@ namespace quda {
     // first lets coarsen spin locally
     for (int s=0; s<fineSpin; s++) {
       for (int v=0; v<coarse_colors_per_thread; v++) {
-	reduced[arg.spin_map(s,parity)*coarse_colors_per_thread+v] += tmp[s*coarse_colors_per_thread+v];
+        reduced[arg.spin_map(s,parity)*coarse_colors_per_thread+v] += tmp[s*coarse_colors_per_thread+v];
       }
     }
 
@@ -201,10 +201,10 @@ namespace quda {
 
     if (threadIdx.x==0 && threadIdx.y == 0) {
       for (int s=0; s<coarseSpin; s++) {
-	for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
-	  int v = coarse_color_block + coarse_color_local;
-	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_colors_per_thread+coarse_color_local];
-	}
+        for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+          int v = coarse_color_block + coarse_color_local;
+          arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_colors_per_thread+coarse_color_local];
+        }
       }
     }
   }

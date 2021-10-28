@@ -8,74 +8,71 @@
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
-#include <cub_helper.cuh>
+#include <reduce_helper.h>
 #include <index_helper.cuh>
+#include <instantiate.h>
 
 namespace quda {
-
-#ifdef GPU_GAUGE_ALG
-
-  static int numParams = 18;
 
 #define LAUNCH_KERNEL_GAUGEFIX(kernel, tp, stream, arg, parity, ...)                                                   \
   if (tp.aux.x == 0) {                                                                                                 \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<0, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<0, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<0, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<0, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<0, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<0, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<0, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<0, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 1) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<1, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<1, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<1, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<1, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<1, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<1, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<1, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<1, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 2) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 256: kernel<2, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<2, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 768: kernel<2, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 1024: kernel<2, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 256: qudaLaunchKernel(kernel<2, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<2, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 768: qudaLaunchKernel(kernel<2, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 1024: qudaLaunchKernel(kernel<2, 128, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 3) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<3, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<3, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<3, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<3, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<3, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<3, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<3, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<3, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<3, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<3, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<3, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<3, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<3, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<3, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<3, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<3, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 4) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<4, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<4, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<4, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<4, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<4, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<4, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<4, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<4, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<4, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<4, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<4, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<4, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<4, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<4, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<4, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<4, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else if (tp.aux.x == 5) {                                                                                          \
     switch (tp.block.x) {                                                                                              \
-    case 128: kernel<5, 32, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 256: kernel<5, 64, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 384: kernel<5, 96, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;      \
-    case 512: kernel<5, 128, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 640: kernel<5, 160, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 768: kernel<5, 192, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 896: kernel<5, 224, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;     \
-    case 1024: kernel<5, 256, __VA_ARGS__><<<tp.grid.x, tp.block.x, tp.shared_bytes, stream>>>(arg, parity); break;    \
+    case 128: qudaLaunchKernel(kernel<5, 32, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 256: qudaLaunchKernel(kernel<5, 64, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 384: qudaLaunchKernel(kernel<5, 96, __VA_ARGS__>, tp, stream, arg, parity); break;      \
+    case 512: qudaLaunchKernel(kernel<5, 128, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 640: qudaLaunchKernel(kernel<5, 160, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 768: qudaLaunchKernel(kernel<5, 192, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 896: qudaLaunchKernel(kernel<5, 224, __VA_ARGS__>, tp, stream, arg, parity); break;     \
+    case 1024: qudaLaunchKernel(kernel<5, 256, __VA_ARGS__>, tp, stream, arg, parity); break;    \
     default: errorQuda("%s not implemented for %d threads", #kernel, tp.block.x);                                      \
     }                                                                                                                  \
   } else {                                                                                                             \
@@ -93,7 +90,8 @@ namespace quda {
     int border[4];
 #endif
     Gauge dataOr;
-    GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
+    double2 result;
+    GaugeFixQualityArg(const Gauge &dataOr, const GaugeField &data)
       : ReduceArg<double2>(), dataOr(dataOr) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
@@ -104,10 +102,9 @@ namespace quda {
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
-    double getAction(){ return result_h[0].x; }
-    double getTheta(){ return result_h[0].y; }
+    double getAction(){ return result.x; }
+    double getTheta(){ return result.y; }
   };
-
 
   /**
    * @brief Measure gauge fixing quality
@@ -122,7 +119,7 @@ namespace quda {
     double2 data = make_double2(0.0,0.0);
     while (idx_cb < argQ.threads) {
       int X[4];
-    #pragma unroll
+#pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
 
       int x[4];
@@ -160,56 +157,41 @@ namespace quda {
 
       idx_cb += blockDim.x * gridDim.x;
     }
-    reduce2d<blockSize,2>(argQ, data);
+    argQ.template reduce2d<blockSize,2>(data);
   }
-
 
   /**
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template<typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : TunableLocalParity {
-    GaugeFixQualityArg<Gauge> argQ;
-    mutable char aux_string[128]; // used as a label in the autotuner
-
-  private:
-    bool tuneGridDim() const { return true; }
+  class GaugeFixQuality : TunableLocalParityReduction {
+    GaugeFixQualityArg<Gauge> &arg;
+    const GaugeField &meta;
 
   public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
-    ~GaugeFixQuality () { }
+    GaugeFixQuality(GaugeFixQualityArg<Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta)
+    { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.result_h[0] = make_double2(0.0,0.0);
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
-      qudaDeviceSynchronize();
-      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
-      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, arg, Float, Gauge, gauge_dir);
+      auto reset = true; // apply is called multiple times with the same arg instance so we need to reset
+      arg.complete(arg.result, stream, reset);
+      if (!activeTuning()) {
+        comm_allreduce_array((double*)&arg.result, 2);
+        arg.result.x /= (double)(3 * gauge_dir * 2 * arg.threads * comm_size());
+        arg.result.y /= (double)(3 * 2 * arg.threads * comm_size());
+      }
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << argQ.X[0] << "x";
-      vol << argQ.X[1] << "x";
-      vol << argQ.X[2] << "x";
-      vol << argQ.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-
-    }
-
-    long long flops() const {
-      return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
-    }                                                                   // Only correct if there is no link reconstruction, no cub reduction accounted also
-    //long long bytes() const { return (1)*2*gauge_dir*argQ.dataOr.Bytes(); }//no accounting the reduction!!!! argQ.dataOr.Bytes() return 0....
-    long long bytes() const {
-      return 2LL * gauge_dir * 2 * argQ.threads * numParams * sizeof(Float);
-    }                                                                                   //no accounting the reduction!!!!
-
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
+    long long flops() const { return (36LL * gauge_dir + 65LL) * meta.Volume(); }
+    //long long bytes() const { return (1)*2*gauge_dir*arg.Bytes(); }
+    long long bytes() const { return 2LL * gauge_dir * meta.Volume() * meta.Reconstruct() * sizeof(Float); }
   };
-
 
   /**
    * @brief container to pass parameters for the gauge fixing kernel
@@ -222,10 +204,10 @@ namespace quda {
     int border[4];
 #endif
     Gauge dataOr;
-    cudaGaugeField &data;
+    GaugeField &data;
     const Float relax_boost;
 
-    GaugeFixArg(Gauge & dataOr, cudaGaugeField & data, const Float relax_boost)
+    GaugeFixArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
       : dataOr(dataOr), data(data), relax_boost(relax_boost) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
@@ -239,15 +221,13 @@ namespace quda {
   };
 
 
-
-
   /**
    * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU
    */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
+  __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity)
+  {
     typedef complex<Float> Cmplx;
-
     int tid = (threadIdx.x + blockSize) % blockSize;
     int idx = blockIdx.x * blockSize + tid;
 
@@ -323,29 +303,28 @@ namespace quda {
 
       arg.dataOr(mu, idx, parity) = link;
       arg.dataOr(mu, idx1, 1 - parity) = link1;
-
     }
   }
-
 
   /**
    * @brief Tunable object for the gauge fixing kernel
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFix : Tunable {
-    GaugeFixArg<Float, Gauge> arg;
+    GaugeFixArg<Float, Gauge> &arg;
+    const GaugeField &meta;
     int parity;
-    mutable char aux_string[128]; // used as a label in the autotuner
-protected:
+
     dim3 createGrid(const TuneParam &param) const
     {
       unsigned int blockx = param.block.x / 8;
       if (param.aux.x > 2) blockx = param.block.x / 4;
-      unsigned int gx  = (arg.threads + blockx - 1) / blockx;
+      unsigned int gx  = std::max((arg.threads + blockx - 1) / blockx, 1u);
       return dim3(gx, 1, 1);
     }
 
-    bool advanceBlockDim  (TuneParam &param) const {
+    bool advanceBlockDim (TuneParam &param) const
+    {
       // Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
@@ -402,10 +381,7 @@ protected:
       }
     }
 
-private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       switch (param.aux.x) {
       case 0: return param.block.x * 4 * sizeof(Float);
@@ -416,25 +392,19 @@ private:
       }
     }
 
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
 public:
-    GaugeFix(GaugeFixArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
-    ~GaugeFix () { }
+    GaugeFix(GaugeFixArg<Float, Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta),
+      parity(0) { }
 
-    void setParity(const int par){
-      parity = par;
-    }
+    void setParity(const int par) { parity = par; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -447,19 +417,9 @@ public:
       param.shared_bytes = sharedBytesPerBlock(param);
     }
 
-    virtual void defaultTuneParam(TuneParam &param) const {
-      initTuneParam(param);
-    }
+    virtual void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
@@ -467,24 +427,11 @@ public:
       return ps.str();
     }
 
-    //need this
-    void preTune() {
-      arg.data.backup();
-    }
-    void postTune() {
-      arg.data.restore();
-    }
-    long long flops() const {
-      return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads;
-    }                                                                                  // Only correct if there is no link reconstruction
-    //long long bytes() const { return (1)*8*2*arg.dataOr.Bytes(); } // Only correct if there is no link reconstruction load+save
-    long long bytes() const {
-      return 8LL * 2 * arg.threads * numParams * sizeof(Float);
-    }                                                                          //no accounting the reduction!!!!
+    void preTune() { arg.data.backup(); }
+    void postTune() { arg.data.restore(); }
+    long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads; }
+    long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float);  }
   };
-
-
-
 
 #ifdef MULTI_GPU
   template <typename Float, typename Gauge>
@@ -495,9 +442,9 @@ public:
     int border[4];
 #endif
     Gauge dataOr;
-    cudaGaugeField &data;
+    GaugeField &data;
     const Float relax_boost;
-    GaugeFixInteriorPointsArg(Gauge & dataOr, cudaGaugeField & data, const Float relax_boost)
+    GaugeFixInteriorPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost)
       : dataOr(dataOr), data(data), relax_boost(relax_boost) {
 
 #ifdef MULTI_GPU
@@ -510,10 +457,9 @@ public:
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
 #endif
       threads = X[0] * X[1] * X[2] * X[3] >> 1;
+      if (this->threads == 0) errorQuda("Local volume is too small");
     }
   };
-
-
 
 
   /**
@@ -598,10 +544,10 @@ public:
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixInteriorPoints : Tunable {
-    GaugeFixInteriorPointsArg<Float, Gauge> arg;
+    GaugeFixInteriorPointsArg<Float, Gauge> &arg;
+    const GaugeField &meta;
     int parity;
-    mutable char aux_string[128]; // used as a label in the autotuner
-protected:
+
     dim3 createGrid(const TuneParam &param) const
     {
       unsigned int blockx = param.block.x / 8;
@@ -610,7 +556,8 @@ protected:
       return dim3(gx, 1, 1);
     }
 
-    bool advanceBlockDim  (TuneParam &param) const {
+    bool advanceBlockDim(TuneParam &param) const
+    {
       // Use param.aux.x to tune and save state for best kernel option
       // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
       const unsigned int min_threads0 = 32 * 8;
@@ -667,10 +614,7 @@ protected:
       }
     }
 
-private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       switch (param.aux.x) {
       case 0: return param.block.x * 4 * sizeof(Float);
@@ -681,24 +625,19 @@ private:
       }
     }
 
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
 public:
-    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) {}
-
-    ~GaugeFixInteriorPoints () { }
+    GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta),
+      parity(0) {}
 
     void setParity(const int par) { parity = par; }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixInteriorPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
@@ -714,15 +653,7 @@ public:
 
     virtual void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
@@ -730,22 +661,11 @@ public:
       return ps.str();
     }
 
-    //need this
-    void preTune() {
-      arg.data.backup();
-    }
-    void postTune() {
-      arg.data.restore();
-    }
-    long long flops() const {
-      return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads;
-    }                                                                                  // Only correct if there is no link reconstruction
-    //long long bytes() const { return (1)*8*2*arg.dataOr.Bytes(); } // Only correct if there is no link reconstruction load+save
-    long long bytes() const {
-      return 8LL * 2 * arg.threads * numParams * sizeof(Float);
-    }                                                                           // Only correct if there is no link reconstruction load+save
+    void preTune() { arg.data.backup(); }
+    void postTune() { arg.data.restore(); }
+    long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads; }
+    long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
-
 
   template <typename Float, typename Gauge>
   struct GaugeFixBorderPointsArg {
@@ -757,13 +677,12 @@ public:
     size_t faceVolume[4];
     size_t faceVolumeCB[4];
     Gauge dataOr;
-    cudaGaugeField &data;
+    GaugeField &data;
     const Float relax_boost;
 
-    GaugeFixBorderPointsArg(Gauge & dataOr, cudaGaugeField & data, const Float relax_boost, size_t faceVolume_[4], size_t faceVolumeCB_[4])
-      : dataOr(dataOr), data(data), relax_boost(relax_boost) {
-
-
+    GaugeFixBorderPointsArg(Gauge & dataOr, GaugeField & data, const Float relax_boost, size_t faceVolume_[4], size_t faceVolumeCB_[4])
+      : dataOr(dataOr), data(data), relax_boost(relax_boost)
+    {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
@@ -847,88 +766,82 @@ public:
     }
   }
 
-
-
-
   /**
    * @brief Tunable object for the border points of the gauge fixing kernel in multi-GPU implementation
    */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixBorderPoints : Tunable {
-    GaugeFixBorderPointsArg<Float, Gauge> arg;
+    GaugeFixBorderPointsArg<Float, Gauge> &arg;
+    const GaugeField &meta;
     int parity;
-    mutable char aux_string[128]; // used as a label in the autotuner
-    protected:
-        dim3 createGrid(const TuneParam &param) const
-        {
-          unsigned int blockx = param.block.x / 8;
-          if (param.aux.x > 2) blockx = param.block.x / 4;
-          unsigned int gx = (arg.threads + blockx - 1) / blockx;
-          return dim3(gx, 1, 1);
-        }
 
-        bool advanceBlockDim(TuneParam &param) const
-        {
-          // Use param.aux.x to tune and save state for best kernel option
-          // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
-          const unsigned int min_threads0 = 32 * 8;
-          const unsigned int min_threads1 = 32 * 4;
-          const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
-          const unsigned int atmadd = 0;
-          unsigned int min_threads = min_threads0;
-          param.aux.x += atmadd; // USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
-          if (param.aux.x > 2) min_threads = 32 * 4;
-          param.block.x += min_threads;
-          param.block.y = 1;
-          param.grid = createGrid(param);
-
-          if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
-            param.shared_bytes = sharedBytesPerBlock(param);
-            return true;
-          } else if (param.aux.x == 0) {
-            param.block.x = min_threads0;
-            param.block.y = 1;
-            param.aux.x = 1; // USE FOR ATOMIC ADD
-            param.grid = createGrid(param);
-            param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
-            return true;
-          } else if (param.aux.x == 1) {
-            param.block.x = min_threads0;
-            param.block.y = 1;
-            param.aux.x = 2; // USE FOR NO ATOMIC ADD and LESS SHARED MEM
-            param.grid = createGrid(param);
-            param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
-            return true;
-          } else if (param.aux.x == 2) {
-            param.block.x = min_threads1;
-            param.block.y = 1;
-            param.aux.x = 3; // USE FOR NO ATOMIC ADD
-            param.grid = createGrid(param);
-            param.shared_bytes = param.block.x * 4 * sizeof(Float);
-            return true;
-          } else if (param.aux.x == 3) {
-            param.block.x = min_threads1;
-            param.block.y = 1;
-            param.aux.x = 4;
-            param.grid = createGrid(param);
-            param.shared_bytes = param.block.x * sizeof(Float);
-            return true;
-          } else if (param.aux.x == 4) {
-            param.block.x = min_threads1;
-            param.block.y = 1;
-            param.aux.x = 5;
-            param.grid = createGrid(param);
-            param.shared_bytes = param.block.x * sizeof(Float);
-            return true;
-          } else {
-            return false;
-          }
-        }
-
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
+    dim3 createGrid(const TuneParam &param) const
+    {
+      unsigned int blockx = param.block.x / 8;
+      if (param.aux.x > 2) blockx = param.block.x / 4;
+      unsigned int gx = (arg.threads + blockx - 1) / blockx;
+      return dim3(gx, 1, 1);
     }
+
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      // Use param.aux.x to tune and save state for best kernel option
+      // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
+      const unsigned int min_threads0 = 32 * 8;
+      const unsigned int min_threads1 = 32 * 4;
+      const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
+      const unsigned int atmadd = 0;
+      unsigned int min_threads = min_threads0;
+      param.aux.x += atmadd; // USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+      if (param.aux.x > 2) min_threads = 32 * 4;
+      param.block.x += min_threads;
+      param.block.y = 1;
+      param.grid = createGrid(param);
+
+      if ((param.block.x >= min_threads) && (param.block.x <= max_threads)) {
+        param.shared_bytes = sharedBytesPerBlock(param);
+        return true;
+      } else if (param.aux.x == 0) {
+        param.block.x = min_threads0;
+        param.block.y = 1;
+        param.aux.x = 1; // USE FOR ATOMIC ADD
+        param.grid = createGrid(param);
+        param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+        return true;
+      } else if (param.aux.x == 1) {
+        param.block.x = min_threads0;
+        param.block.y = 1;
+        param.aux.x = 2; // USE FOR NO ATOMIC ADD and LESS SHARED MEM
+        param.grid = createGrid(param);
+        param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+        return true;
+      } else if (param.aux.x == 2) {
+        param.block.x = min_threads1;
+        param.block.y = 1;
+        param.aux.x = 3; // USE FOR NO ATOMIC ADD
+        param.grid = createGrid(param);
+        param.shared_bytes = param.block.x * 4 * sizeof(Float);
+        return true;
+      } else if (param.aux.x == 3) {
+        param.block.x = min_threads1;
+        param.block.y = 1;
+        param.aux.x = 4;
+        param.grid = createGrid(param);
+        param.shared_bytes = param.block.x * sizeof(Float);
+        return true;
+      } else if (param.aux.x == 4) {
+        param.block.x = min_threads1;
+        param.block.y = 1;
+        param.aux.x = 5;
+        param.grid = createGrid(param);
+        param.shared_bytes = param.block.x * sizeof(Float);
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       switch (param.aux.x) {
       case 0: return param.block.x * 4 * sizeof(Float);
@@ -939,26 +852,23 @@ public:
       }
     }
 
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
 
 public:
-    GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg), parity(0) { }
+    GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg, const GaugeField &meta) :
+      arg(arg),
+      meta(meta),
+      parity(0) { }
+
     ~GaugeFixBorderPoints () {
       if ( comm_partitioned() ) for ( int i = 0; i < 2; i++ ) pool_device_free(arg.borderpoints[i]);
     }
-    void setParity(const int par){
-      parity = par;
-    }
 
-    void apply(const cudaStream_t &stream){
+    void setParity(const int par) { parity = par; }
+
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -971,19 +881,9 @@ public:
       param.shared_bytes = sharedBytesPerBlock(param);
     }
 
-    virtual void defaultTuneParam(TuneParam &param) const {
-      initTuneParam(param);
-    }
+    virtual void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d",arg.threads,sizeof(Float),gauge_dir);
-      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     std::string paramString(const TuneParam &param) const {
       std::stringstream ps(Tunable::paramString(param));
@@ -991,44 +891,22 @@ public:
       return ps.str();
     }
 
-    //need this
-    void preTune() {
-      arg.data.backup();
-    }
-    void postTune() {
-      arg.data.restore();
-    }
-    long long flops() const {
-      return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads;
-    }                                                                                  // Only correct if there is no link reconstruction
+    void preTune() { arg.data.backup(); }
+    void postTune() { arg.data.restore(); }
+    long long flops() const { return 3LL * (22 + 28 * gauge_dir + 224 * 3) * arg.threads; }
     //long long bytes() const { return (1)*8*2*arg.dataOr.Bytes(); } // Only correct if there is no link reconstruction load+save
-    long long bytes() const {
-      return 8LL * 2 * arg.threads * numParams * sizeof(Float);
-    }                                                                           // Only correct if there is no link reconstruction load+save
-
+    long long bytes() const { return 8LL * 2 * arg.threads * meta.Reconstruct() * sizeof(Float); }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  template <typename Gauge>
+  template <int NElems_, typename Gauge>
   struct GaugeFixUnPackArg {
+    static constexpr int NElems = NElems_;
     int X[4]; // grid dimensions
 #ifdef MULTI_GPU
     int border[4];
 #endif
     Gauge dataOr;
-    GaugeFixUnPackArg(Gauge & dataOr, cudaGaugeField & data)
+    GaugeFixUnPackArg(Gauge & dataOr, GaugeField & data)
       : dataOr(dataOr) {
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -1039,9 +917,9 @@ public:
     }
   };
 
-
-  template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackGhost(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
+  template <typename Float, bool pack, typename Arg>
+  __global__ void Kernel_UnPackGhost(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
+  {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -1093,16 +971,16 @@ public:
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
-    RegType tmp[NElems];
+    RegType tmp[Arg::NElems];
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
       }
     } else {
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -1111,9 +989,9 @@ public:
     }
   }
 
-
-  template<int NElems, typename Float, typename Gauge, bool pack>
-  __global__ void Kernel_UnPackTop(int size, GaugeFixUnPackArg<Gauge> arg, complex<Float> *array, int parity, int face, int dir){
+  template <typename Float, bool pack, typename Arg>
+  __global__ void Kernel_UnPackTop(int size, Arg arg, complex<Float> *array, int parity, int face, int dir)
+  {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if ( idx >= size ) return;
     int X[4];
@@ -1162,15 +1040,15 @@ public:
     int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
-    RegType tmp[NElems];
+    RegType tmp[Arg::NElems];
     Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) {
+      for ( int i = 0; i < Arg::NElems / 2; ++i ) {
         tmp[2*i+0] = array[idx + size * i].real();
         tmp[2*i+1] = array[idx + size * i].imag();
       }
@@ -1182,12 +1060,11 @@ public:
 
 
   template<typename Float, typename Gauge, int NElems, int gauge_dir>
-  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data,
+  void gaugefixingOVR( Gauge dataOr, GaugeField& data,
 		       const int Nsteps, const int verbose_interval,
 		       const Float relax_boost, const double tolerance,
-		       const int reunit_interval, const int stopWtheta) {
-
-
+		       const int reunit_interval, const int stopWtheta)
+  {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
     profileInternalGaugeFixOVR.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -1202,7 +1079,6 @@ public:
     printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
     printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
 
-
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
@@ -1214,13 +1090,13 @@ public:
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     GaugeFixQualityArg<Gauge> argQ(dataOr, data);
-    GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ);
+    GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ, data);
 
     GaugeFixArg<Float, Gauge> arg(dataOr, data, relax_boost);
-    GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg);
+    GaugeFix<Float,Gauge, gauge_dir> gaugeFix(arg, data);
 
 #ifdef MULTI_GPU
     void *send[4];
@@ -1232,7 +1108,7 @@ public:
     void *sendg_d[4];
     void *recvg_d[4];
     void *hostbuffer_h[4];
-    cudaStream_t GFStream[9];
+    qudaStream_t GFStream[9];
     size_t offset[4];
     size_t bytes[4];
     size_t faceVolume[4];
@@ -1243,14 +1119,13 @@ public:
     MsgHandle *mh_send_fwd[4];
     MsgHandle *mh_send_back[4];
     int X[4];
-    dim3 block[4];
-    dim3 grid[4];
+    TuneParam tp[4];
 
     if ( comm_partitioned() ) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
-        if ( !commDimPartitioned(dir) && data.R()[dir] != 0 ) errorQuda("Not supported!\n");
+        if ( !commDimPartitioned(dir) && data.R()[dir] != 0 ) errorQuda("Not supported!");
       }
       for ( int i = 0; i < 4; i++ ) {
         faceVolume[i] = 1;
@@ -1274,8 +1149,8 @@ public:
       #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
-        block[d] = make_uint3(128, 1, 1);
-        grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
+        tp[d].block = make_uint3(128, 1, 1);
+        tp[d].grid = make_uint3((faceVolumeCB[d] + tp[d].block.x - 1) / tp[d].block.x, 1, 1);
       }
       cudaStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
@@ -1297,11 +1172,11 @@ public:
         mh_send_fwd[d]  = comm_declare_send_relative(send[d], d, +1, bytes[d]);
       }
     }
-    GaugeFixUnPackArg<Gauge> dataexarg(dataOr, data);
+    GaugeFixUnPackArg<NElems,Gauge> dataexarg(dataOr, data);
     GaugeFixBorderPointsArg<Float, Gauge> argBorder(dataOr, data, relax_boost, faceVolume, faceVolumeCB);
-    GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder);
+    GaugeFixBorderPoints<Float,Gauge, gauge_dir> gfixBorderPoints(argBorder, data);
     GaugeFixInteriorPointsArg<Float, Gauge> argInt(dataOr, data, relax_boost);
-    GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt);
+    GaugeFixInteriorPoints<Float,Gauge, gauge_dir> gfixIntPoints(argInt, data);
   #endif
 
     GaugeFixQuality.apply(0);
@@ -1310,7 +1185,6 @@ public:
     double action0 = argQ.getAction();
     printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
-
     unitarizeLinks(data, data, num_failures_dev);
     qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
@@ -1318,7 +1192,7 @@ public:
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
@@ -1353,9 +1227,11 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackTop<Float, true, decltype(dataexarg)>, tp[d], GFStream[d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, true, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1368,11 +1244,11 @@ public:
         #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
+            qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
         #endif
           //compute interior points
@@ -1389,12 +1265,12 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-            cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[d]);
+            qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-            cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
+            qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[4 + d]);
           }
         #endif
           for ( int d = 0; d < 4; d++ ) {
@@ -1402,14 +1278,16 @@ public:
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            Kernel_UnPackGhost<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
+            qudaLaunchKernel(Kernel_UnPackGhost<Float, false, decltype(dataexarg)>, tp[d], GFStream[d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
           #ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
+            qudaLaunchKernel(Kernel_UnPackTop<Float, false, decltype(dataexarg)>, tp[d], GFStream[4 + d],
+                             faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
@@ -1421,57 +1299,12 @@ public:
           qudaStreamSynchronize(GFStream[8]);
         }
       #endif
-        /*gaugeFix.setParity(p);
-           gaugeFix.apply(0);
-           flop += (double)gaugeFix.flops();
-           byte += (double)gaugeFix.bytes();
-           #ifdef MULTI_GPU
-           if(comm_partitioned()){//exchange updated top face links in current parity
-           for (int d=0; d<4; d++) {
-            if (!commDimPartitioned(d)) continue;
-            comm_start(mh_recv_back[d]);
-            //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(send_d[d]), p, d, d, true);
-           #ifndef GPU_COMMS
-            cudaMemcpy(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost);
-           #else
-            qudaDeviceSynchronize();
-           #endif
-            comm_start(mh_send_fwd[d]);
-            comm_wait(mh_recv_back[d]);
-            comm_wait(mh_send_fwd[d]);
-           #ifndef GPU_COMMS
-            cudaMemcpy(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice);
-           #endif
-            //inject top face in ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recv_d[d]), p, d, d, false);
-           }
-           //exchange updated ghost links in opposite parity
-           for (int d=0; d<4; d++) {
-            if (!commDimPartitioned(d)) continue;
-            comm_start(mh_recv_fwd[d]);
-            Kernel_UnPackGhost<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(sendg_d[d]), 1-p, d, d, true);
-           #ifndef GPU_COMMS
-            cudaMemcpy(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost);
-           #else
-            qudaDeviceSynchronize();
-           #endif
-            comm_start(mh_send_back[d]);
-            comm_wait(mh_recv_fwd[d]);
-            comm_wait(mh_send_back[d]);
-           #ifndef GPU_COMMS
-            cudaMemcpy(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice);
-           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge><<<grid[d], block[d]>>>(faceVolumeCB[d], dataexarg, reinterpret_cast<Float*>(recvg_d[d]), 1-p, d, d, false);
-           }
-           }
-         #endif*/
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
         unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-        cudaMemset(num_failures_dev, 0, sizeof(int));
+        qudaMemset(num_failures_dev, 0, sizeof(int));
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
@@ -1494,7 +1327,7 @@ public:
       unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-      cudaMemset(num_failures_dev, 0, sizeof(int));
+      qudaMemset(num_failures_dev, 0, sizeof(int));
       flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
@@ -1530,67 +1363,32 @@ public:
       cudaStreamDestroy(GFStream[8]);
     }
   #endif
-    checkCudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);
-	  double gflops = (flop * 1e-9) / (secs);
-	  double gbytes = byte / (secs * 1e9);
-	  #ifdef MULTI_GPU
-	  printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
-	  #else
-	  printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-	  #endif
-	}
-  }
-
-  template<typename Float, int NElems, typename Gauge>
-  void gaugefixingOVR( Gauge dataOr,  cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                       const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta) {
-    if ( gauge_dir != 3 ) {
-      printfQuda("Starting Landau gauge fixing...\n");
-      gaugefixingOVR<Float, Gauge, NElems, 4>(dataOr, data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-    }
-    else {
-      printfQuda("Starting Coulomb gauge fixing...\n");
-      gaugefixingOVR<Float, Gauge, NElems, 3>(dataOr, data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+      double gflops = (flop * 1e-9) / (secs);
+      double gbytes = byte / (secs * 1e9);
+      printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
     }
   }
 
-
-
-  template<typename Float>
-  void gaugefixingOVR( cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-		       const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta) {
-
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    if ( data.isNative() ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        numParams = 18;
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-        gaugefixingOVR<Float, 18>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        numParams = 12;
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-        gaugefixingOVR<Float, 12>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        numParams = 8;
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-        gaugefixingOVR<Float, 8>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+  template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
+    GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                   const Float relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
+    {
+      using Gauge = typename gauge_mapper<Float, recon>::type;
+      if (gauge_dir == 4) {
+        printfQuda("Starting Landau gauge fixing...\n");
+        gaugefixingOVR<Float, Gauge, recon, 4>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+      } else if (gauge_dir == 3) {
+        printfQuda("Starting Coulomb gauge fixing...\n");
+        gaugefixingOVR<Float, Gauge, recon, 3>(Gauge(data), data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
+        errorQuda("Unexpected gauge_dir = %d", gauge_dir);
       }
-    } else {
-      errorQuda("Invalid Gauge Order\n");
     }
-  }
-
-#endif // GPU_GAUGE_ALG
-
+  };
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -1603,23 +1401,13 @@ public:
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingOVR( cudaGaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                       const double tolerance, const int reunit_interval, const int stopWtheta) {
+  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
+                      const double tolerance, const int reunit_interval, const int stopWtheta) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
-    if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
-      gaugefixingOVR<float> (data, gauge_dir, Nsteps, verbose_interval, (float)relax_boost, tolerance, reunit_interval, stopWtheta);
-    } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
-      gaugefixingOVR<double>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
+    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
 #else
     errorQuda("Gauge fixing has not been built");
 #endif // GPU_GAUGE_ALG
   }
-
 
 }   //namespace quda

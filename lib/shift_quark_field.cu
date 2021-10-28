@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
 #include <quda_internal.h>
 
 namespace quda {
@@ -63,61 +62,54 @@ namespace quda {
       return  (((t*X3 + z)*X2 + y)*X1 + x) >> 1;
     }
 
+  template <typename FloatN, int N, typename Arg>
+  __global__ void shiftColorSpinorFieldKernel(Arg arg)
+  {
+    int shift[4] = {0,0,0,0};
+    shift[arg.dir] = arg.shift;
 
-  template <typename FloatN, int N, typename Output, typename Input>
-    __global__ void shiftColorSpinorFieldKernel(ShiftQuarkArg<Output,Input> arg){
+    unsigned int idx = blockIdx.x*(blockDim.x) + threadIdx.x;
+    unsigned int gridSize = gridDim.x*blockDim.x;
 
-      int shift[4] = {0,0,0,0};
-      shift[arg.dir] = arg.shift;
-
-      unsigned int idx = blockIdx.x*(blockDim.x) + threadIdx.x;
-      unsigned int gridSize = gridDim.x*blockDim.x;
-
-      FloatN x[N];
-      while(idx<arg.length){
-        const int new_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity);
+    FloatN x[N];
+    while(idx<arg.length){
+      const int new_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity);
 #ifdef MULTI_GPU
-        if(new_idx > 0){
+      if(new_idx > 0){
 #endif
-          arg.in.load(x, new_idx);
-          arg.out.save(x, idx);
-#ifdef MULTI_GPU
-        }
-#endif       
-        idx += gridSize;
-      }  
-      return;
-    }
-
-  template<typename FloatN, int N, typename Output, typename Input>
-    __global__ void shiftColorSpinorFieldExternalKernel(ShiftQuarkArg<Output,Input> arg){
-
-      unsigned int idx = blockIdx.x*(blockDim.x) + threadIdx.x;
-      unsigned int gridSize = gridDim.x*blockDim.x;
-
-      Float x[N];
-      unsigned int coord[4];
-      while(idx<arg.length){
-
-        // compute the coordinates in the ghost zone 
-        coordsFromIndex<1>(coord, idx, arg.X, arg.dir, arg.parity);
-
-        unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3,3>(arg.X, coord, arg.dir, arg.shift);
-
-        arg.in.load(x, ghost_idx);
+        arg.in.load(x, new_idx);
         arg.out.save(x, idx);
-
-        idx += gridSize;
+#ifdef MULTI_GPU
       }
+#endif       
+      idx += gridSize;
+    }  
+  }
 
+  template<typename FloatN, int N, typename Arg>
+  __global__ void shiftColorSpinorFieldExternalKernel(Arg arg)
+  {
+    unsigned int idx = blockIdx.x*(blockDim.x) + threadIdx.x;
+    unsigned int gridSize = gridDim.x*blockDim.x;
 
-      return;
+    Float x[N];
+    unsigned int coord[4];
+    while(idx<arg.length){
+
+      // compute the coordinates in the ghost zone 
+      coordsFromIndex<1>(coord, idx, arg.X, arg.dir, arg.parity);
+
+      unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3,3>(arg.X, coord, arg.dir, arg.shift);
+
+      arg.in.load(x, ghost_idx);
+      arg.out.save(x, idx);
+
+      idx += gridSize;
     }
+  }
 
   template<typename Output, typename Input> 
     class ShiftColorSpinorField : public Tunable {
-
-      private:
         ShiftColorSpinorFieldArg<Output,Input> arg;
         const int *X; // pointer to lattice dimensions
 
@@ -156,10 +148,10 @@ namespace quda {
           : arg(arg), location(location)  {}
         virtual ~ShiftColorSpinorField() {}
 
-        void apply(const cudaStream_t &stream){
+        void apply(const qudaStream_t &stream){
           if(location == QUDA_CUDA_FIELD_LOCATION){
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            shiftColorSpinorFieldKernel<Output,Input><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            qudaLaunchKernel(shiftColorSpinorFieldKernel<decltype(arg)>, tp, stream, arg);
 #ifdef MULTI_GPU
             // Need to perform some communication and call exterior kernel, I guess
 #endif

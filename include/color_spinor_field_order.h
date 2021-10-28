@@ -13,14 +13,14 @@
  */
 
 #include <register_traits.h>
+#include <convert.h>
 #include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
-#include <thrust_helper.cuh>
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -199,10 +199,10 @@ namespace quda {
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
     };
 
-    template<typename ReduceType> struct square_<ReduceType,char> {
+    template <typename ReduceType> struct square_<ReduceType, int8_t> {
       const ReduceType scale;
       square_(ReduceType scale) : scale(scale) { }
-      __host__ __device__ inline ReduceType operator()(const quda::complex<char> &x)
+      __host__ __device__ inline ReduceType operator()(const quda::complex<int8_t> &x)
       { return norm(scale * complex<ReduceType>(x.real(), x.imag())); }
     };
 
@@ -218,10 +218,10 @@ namespace quda {
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
-    template<typename Float> struct abs_<Float,char> {
+    template <typename Float> struct abs_<Float, int8_t> {
       Float scale;
       abs_(const Float scale) : scale(scale) { }
-      __host__ __device__ Float operator()(const quda::complex<char> &x)
+      __host__ __device__ Float operator()(const quda::complex<int8_t> &x)
       { return abs(scale * complex<Float>(x.real(), x.imag())); }
     };
 
@@ -247,6 +247,19 @@ namespace quda {
     {
       return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
     }
+
+    /**
+     * @brief This and the following `wrap_index` method returns the index for the pointer that points to
+     * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+     * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+     * @param parity Parity index
+     * @param x_cb 1-d checkboarding site index
+     * @param s spin index
+     */
+    __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
+    {
+      return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
+    }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -262,14 +275,23 @@ namespace quda {
       GhostAccessorCB() : ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
+
+      /**
+       * @brief This `wrap_index` method for ghost.
+       */
+      __device__ __host__ inline int wrap_index(int dim, int dir, int parity, int x_cb, int s) const
+      {
+        return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec;
+      }
     };
 
-    template<int nSpin, int nColor, int nVec, int N>
-      __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride) {
-      int k = ((s*nColor+c)*nVec+v)*2; // factor of two for complexity
-      int j = k / N; // factor of two for complexity
-      int i = k % N;
-      return ((j*stride+x_cb)*N+i) / 2; // back to a complex offset
+    template <int nSpin, int nColor, int nVec, int N> // note this will not work for N=1
+    __device__ __host__ inline int indexFloatN(int x_cb, int s, int c, int v, int stride)
+    {
+      int k = (s * nColor + c) * nVec + v;
+      int j = k / (N / 2);
+      int i = k % (N / 2);
+      return (j * stride + x_cb) * (N / 2) + i;
     };
 
     template <typename Float, int nSpin, int nColor, int nVec>
@@ -281,11 +303,25 @@ namespace quda {
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-    AccessorCB(): stride(0), offset_cb(0) { }
-    __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
-    {
-      return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
-    }
+      AccessorCB() : stride(0), offset_cb(0) {}
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      {
+        return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
+      }
+
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
+      {
+        using vec_t = typename VectorType<Float, 2>::type;
+        constexpr int M = nSpinBlock * nColor * nVec;
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+                                         (chi * M + i) * stride + x_cb);
+          memcpy(&out[i], &tmp, sizeof(vec_t));
+        }
+      }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -312,11 +348,25 @@ namespace quda {
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
-    AccessorCB() : stride(0), offset_cb(0) { }
-    __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
-    {
-      return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
-    }
+      AccessorCB() : stride(0), offset_cb(0) {}
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      {
+        return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
+      }
+
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
+      {
+        using vec_t = typename VectorType<Float, 4>::type;
+        constexpr int M = (nSpinBlock * nColor * nVec * 2) / 4;
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          vec_t tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb),
+                                         (chi * M + i) * stride + x_cb);
+          memcpy(&out[i * 2], &tmp, sizeof(vec_t));
+        }
+      }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -324,24 +374,79 @@ namespace quda {
       int faceVolumeCB[4];
       int ghostOffset[4];
       GhostAccessorCB(const ColorSpinorField &a, int nFace = 1) {
-  for (int d=0; d<4; d++) {
-    faceVolumeCB[d] = nFace*a.SurfaceCB(d);
-    ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin*nVec;
-  }
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
+        }
       }
-    GhostAccessorCB() : faceVolumeCB{ }, ghostOffset{ } { }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + indexFloatN<nSpin,nColor,nVec,4>(x_cb, s, c, v, faceVolumeCB[dim]); }
     };
 
+    template <typename Float, int nSpin, int nColor, int nVec>
+    struct AccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
+      const int stride;
+      const int offset_cb;
+      AccessorCB(const ColorSpinorField &field) :
+        stride(field.Stride()),
+        offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
+      {
+      }
+      AccessorCB() : stride(0), offset_cb(0) {}
+      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
+      {
+        return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, stride);
+      }
+
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], complex<Float> *in,
+                                           int parity, int x_cb, int chi) const
+      {
+        using vec_t = typename VectorType<Float, 8>::type;
+
+        // in case the vector length isn't divisible by 8, load in the entire vector and then pick the chirality
+        // (the compiler will remove any unused loads)
+        constexpr int N = nSpin * nColor * nVec * 2; // real numbers in the loaded vector
+        constexpr int M = N / 8;
+        Float tmp[N];
+#pragma unroll
+        for (int i = 0; i < M; i++) {
+          vec_t ld_tmp = vector_load<vec_t>(reinterpret_cast<const vec_t *>(in + parity * offset_cb), i * stride + x_cb);
+          memcpy(&tmp[i * 8], &ld_tmp, sizeof(vec_t));
+        }
+        constexpr int N_chi = N / (nSpin / nSpinBlock);
+#pragma unroll
+        for (int i = 0; i < N_chi; i++)
+          out[i] = complex<Float>(tmp[chi * N_chi + 2 * i + 0], tmp[chi * N_chi + 2 * i + 1]);
+      }
+    };
+
+    template <typename Float, int nSpin, int nColor, int nVec>
+    struct GhostAccessorCB<Float, nSpin, nColor, nVec, QUDA_FLOAT8_FIELD_ORDER> {
+      int faceVolumeCB[4];
+      int ghostOffset[4];
+      GhostAccessorCB(const ColorSpinorField &a, int nFace = 1)
+      {
+        for (int d = 0; d < 4; d++) {
+          faceVolumeCB[d] = nFace * a.SurfaceCB(d);
+          ghostOffset[d] = faceVolumeCB[d] * nColor * nSpin * nVec;
+        }
+      }
+      GhostAccessorCB() : faceVolumeCB {}, ghostOffset {} {}
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      {
+        return parity * ghostOffset[dim] + indexFloatN<nSpin, nColor, nVec, 8>(x_cb, s, c, v, faceVolumeCB[dim]);
+      }
+    };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,char>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
     template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
-    template<> __host__ __device__ inline constexpr bool match<char,char>() { return true; }
+    template <> __host__ __device__ inline constexpr bool match<int8_t, int8_t>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<int,int>() { return true; }
     template<> __host__ __device__ inline constexpr bool match<short,short>() { return true; }
 
@@ -354,18 +459,28 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
-  complex<storeFloat> *v;
-  const int idx;
-  const Float scale;
-  const Float scale_inv;
-  static constexpr bool fixed = fixed_point<Float,storeFloat>();
+      /**
+       * computing type and storage types that can be inferred from this object.
+       */
+      using type = Float;
+      using store_type = storeFloat;
+      complex<storeFloat> *v;
+      const int idx;
+      const Float scale;
+      const Float scale_inv;
+      static constexpr bool fixed = fixed_point<Float, storeFloat>();
 
-  /**
-     @brief fieldorder_wrapper constructor
-     @param idx Field index
-  */
-        __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv)
-    : v(v), idx(idx), scale(scale), scale_inv(scale_inv) {}
+      /**
+         @brief fieldorder_wrapper constructor
+         @param idx Field index
+      */
+      __device__ __host__ inline fieldorder_wrapper(complex<storeFloat> *v, int idx, Float scale, Float scale_inv) :
+        v(v),
+        idx(idx),
+        scale(scale),
+        scale_inv(scale_inv)
+      {
+      }
 
   __device__ __host__ inline Float real() const {
     if (!fixed) {
@@ -397,6 +512,13 @@ namespace quda {
       v[idx].imag(storeFloat(round(scale * a)));
     }
   }
+
+  /**
+   * @brief returns the pointor of this wrapper object
+   */
+  __device__ __host__ inline auto data() { return &v[idx]; }
+
+  __device__ __host__ inline const auto data() const { return &v[idx]; }
 
   /**
      @brief negation operator
@@ -462,25 +584,28 @@ namespace quda {
 
       };
 
+      template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat = Float,
+                typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
+      class FieldOrderCB
+      {
+        typedef float norm_type;
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order,
-      typename storeFloat=Float, typename ghostFloat=storeFloat, bool disable_ghost=false, bool block_float=false, bool use_tex=false>
-      class FieldOrderCB {
+      public:
+        /** Does this field type support ghost zones? */
+        static constexpr bool supports_ghost_zone = true;
 
-      typedef float norm_type;
-
-  protected:
-      complex<storeFloat> *v;
-    const AccessorCB<storeFloat,nSpin,nColor,nVec,order> accessor;
-      // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
-      union {
-        norm_type *norm;
-        Float scale;
-      };
-      union {
-        Float scale_inv;
-        int norm_offset;
-      };
+      protected:
+        complex<storeFloat> *v;
+        const AccessorCB<storeFloat, nSpin, nColor, nVec, order> accessor;
+        // since these variables are mutually exclusive, we use a union to minimize the accessor footprint
+        union {
+          norm_type *norm;
+          Float scale;
+        };
+        union {
+          Float scale_inv;
+          int norm_offset;
+        };
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable norm_type *ghost_norm[8];
@@ -537,9 +662,12 @@ namespace quda {
       {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
-          ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
-              + a.GhostNormOffset(dim, dir) * sizeof(norm_type) - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
+            ghost[2 * dim + dir] = static_cast<complex<ghostFloat> *>(ghost_[2 * dim + dir]);
+            ghost_norm[2 * dim + dir] = !block_float_ghost ?
+              nullptr :
+              reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                            + nParity * nColor * nSpin * nVec * 2 * ghostAccessor.faceVolumeCB[dim]
+                                              * sizeof(ghostFloat));
           }
         }
       }
@@ -561,6 +689,36 @@ namespace quda {
       }
 
       /**
+       * Read-only accessor function.  This specialized load returns
+       * the entire site vector for a given chirality
+       * @tparam nSpinBlock The number of spin components in a chiral block
+       * @param[out] out, The loaded site vector
+       * @param[in] parity The site parity
+       * @param[in] x_cb 1-d checkerboard site index
+       * @param[in] chi The desired chirality
+       */
+      template <int nSpinBlock>
+      __device__ __host__ inline void load(complex<Float> out[nSpinBlock * nColor * nVec], int parity, int x_cb,
+                                           int chi) const
+      {
+        if (!fixed) {
+          accessor.template load<nSpinBlock>((complex<storeFloat> *)out, v, parity, x_cb, chi);
+        } else {
+          complex<storeFloat> tmp[nSpinBlock * nColor * nVec];
+          accessor.template load<nSpinBlock>(tmp, v, parity, x_cb, chi);
+          Float norm_ = block_float ? norm[parity * norm_offset + x_cb] : scale_inv;
+          for (int s = 0; s < nSpinBlock; s++) {
+            for (int c = 0; c < nColor; c++) {
+              for (int v = 0; v < nVec; v++) {
+                int k = (s * nColor + c) * nVec + v;
+                out[k] = norm_ * complex<Float>(static_cast<Float>(tmp[k].real()), static_cast<Float>(tmp[k].imag()));
+              }
+            }
+          }
+        }
+      }
+
+      /**
        * Read-only complex-member accessor function.  The last
        * parameter n is only used for indexed into the packed
        * null-space vectors.
@@ -571,13 +729,15 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
         if (!fixed) {
-          return complex<Float>( use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)]);
-	} else {
-	  complex<storeFloat> tmp = use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)];
-	  Float norm_ = block_float ? (use_tex ? __ldg(norm + parity*norm_offset+x_cb) : norm[parity*norm_offset+x_cb]) : scale_inv;
-	  return norm_*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
+          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          return complex<Float>(v_.x, v_.y);
+        } else {
+          auto v_ = __ldg(v + accessor.index(parity, x_cb, s, c, n));
+          complex<storeFloat> tmp(v_.x, v_.y);
+          Float norm_ = block_float ? __ldg(norm + parity * norm_offset + x_cb) : scale_inv;
+          return norm_ * complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
         if (!fixed) {
@@ -589,7 +749,6 @@ namespace quda {
         }
 #endif
       }
-
 
       /**
        * Writable complex-member accessor function.  The last
@@ -603,6 +762,27 @@ namespace quda {
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
   { return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
 
+  /**
+   * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+   * the start of the memory chunk corresponds to the matrix at parity, x_cb, s. Only available for the
+   * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+   * @param parity Parity index
+   * @param x_cb 1-d checkboarding site index
+   * @param s spin index
+   */
+  __device__ __host__ inline const auto wrap(int parity, int x_cb, int s) const
+  {
+    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+  }
+
+  /**
+   * The non-const `wrap` method.
+   */
+  __device__ __host__ inline auto wrap(int parity, int x_cb, int s)
+  {
+    return fieldorder_wrapper<Float, storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+  }
+
 #ifndef DISABLE_GHOST
       /**
        * Read-only complex-member accessor function for the ghost
@@ -615,16 +795,16 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#if (__CUDA_ARCH__ >= 320 && __CUDA_ARCH__ < 520)
         if (!ghost_fixed) {
-          return complex<Float>( use_tex ? __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
-				 ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          return complex<Float>(v_.x, v_.y);
         } else {
           Float scale = ghost_scale_inv;
-          if (block_float_ghost) scale *= (use_tex ? __ldg(ghost_norm[2*dim+dir]+parity*ghostAccessor.faceVolumeCB[dim] + x_cb) :
-					   ghost_norm[2*dim+dir][parity*ghostAccessor.faceVolumeCB[dim] + x_cb]);
-          complex<ghostFloat> tmp = (use_tex ? __ldg(ghost[2*dim+dir] + ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
-				     ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]);
+          if (block_float_ghost)
+            scale *= __ldg(ghost_norm[2 * dim + dir] + parity * ghostAccessor.faceVolumeCB[dim] + x_cb);
+          auto v_ = __ldg(ghost[2 * dim + dir] + ghostAccessor.index(dim, dir, parity, x_cb, s, c, n));
+          complex<ghostFloat> tmp(v_.x, v_.y);
           return scale*complex<Float>(static_cast<Float>(tmp.x), static_cast<Float>(tmp.y));
         }
 #else
@@ -657,6 +837,31 @@ namespace quda {
               block_float_ghost ? ghost_scale/max : ghost_scale,
               block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
 
+      }
+
+      /**
+       * @brief This and the following method (eventually) creates a fieldorder_wrapper object whose pointer points to
+       * the start of the memory chunk corresponds to the matrix at dim, dir, parity, x_cb, s. Only available for the
+       * QUDA_SPACE_SPIN_COLOR_FIELD_ORDER order.
+       * @param dim
+       * @param dir
+       * @param parity Parity index
+       * @param x_cb 1-d checkboarding site index
+       * @param s spin index
+       */
+      __device__ __host__ inline const auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
+      }
+
+      /**
+       * @brief the non-const `wrap_ghost` method
+       */
+      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s)
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
       /**
@@ -743,17 +948,10 @@ namespace quda {
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
-      __host__ double norm2(bool global=true) const {
-        double nrm2 = 0;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(v);
-          nrm2 = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-          square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-        } else {
-          nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-          square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-        }
+      __host__ double norm2(bool global = true) const
+      {
+        double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
         if (global) comm_allreduce(&nrm2);
         return nrm2;
       }
@@ -763,25 +961,17 @@ namespace quda {
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
       */
-      __host__ double abs_max(bool global=true) const {
-
-	double absmax = 0;
-	if (location == QUDA_CUDA_FIELD_LOCATION) {
-	  thrust_allocator alloc;
-	  thrust::device_ptr<complex<storeFloat> > ptr(v);
-	  absmax = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
-	} else {
-	  absmax = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
-	}
-	if (global) comm_allreduce_max(&absmax);
-	return absmax;
+      __host__ double abs_max(bool global = true) const
+      {
+        double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        if (global) comm_allreduce_max(&absmax);
+        return absmax;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
 #endif
-    };
+      };
 
     /**
        @brief Accessor routine for ColorSpinorFields in native field order.
@@ -794,122 +984,78 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N, bool spin_project = false, bool huge_alloc = false>
-    struct FloatNOrder {
-      using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
-      using real = typename mapper<Float>::type;
-      using complex = complex<real>;
-      typedef typename VectorType<Float, N>::type Vector;
-      typedef typename VectorType<real, N>::type RegVector;
-      typedef typename AllocType<huge_alloc>::type AllocInt;
-      typedef float norm_type;
-      static constexpr int length = 2 * Ns * Nc;
-      static constexpr int length_ghost = spin_project ? length / 2 : length;
-      static constexpr int M = length / N;
-      static constexpr int M_ghost = spin_project ? M / 2 : M;
-      Float *field;
-      norm_type *norm;
-      const AllocInt offset; // offset can be 32-bit or 64-bit
-      const AllocInt norm_offset;
-#ifdef USE_TEXTURE_OBJECTS
-      typedef typename TexVectorType<real, N>::type TexVector;
-      cudaTextureObject_t tex;
-      cudaTextureObject_t texNorm;
-      const int tex_offset;
-#if 0 // unused at present
-        cudaTextureObject_t ghostTex;
-        cudaTextureObject_t ghostTexNorm;
-#endif
-#endif
-      int volumeCB;
-      int faceVolumeCB[4];
-      int stride;
-      mutable Float *ghost[8];
-      mutable norm_type *ghost_norm[8];
-      int nParity;
-      void *backup_h; //! host memory for backing up the field when tuning
-      size_t bytes;
+      template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false>
+      struct FloatNOrder {
+        static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
+        static constexpr int length = 2 * Ns * Nc;
+        static constexpr int length_ghost = spin_project ? length / 2 : length;
+        static constexpr int N = N_;
+        static constexpr int M = length / N;
+        // if spin projecting, check that short vector length is compatible, if not halve the vector length
+        static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N / 2;
+        static constexpr int M_ghost = length_ghost / N_ghost;
+        using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
+        using real = typename mapper<Float>::type;
+        using complex = complex<real>;
+        using Vector = typename VectorType<Float, N>::type;
+        using GhostVector = typename VectorType<Float, N_ghost>::type;
+        using AllocInt = typename AllocType<huge_alloc>::type;
+        using norm_type = float;
+        Float *field;
+        norm_type *norm;
+        const AllocInt offset; // offset can be 32-bit or 64-bit
+        const AllocInt norm_offset;
+        int volumeCB;
+        int faceVolumeCB[4];
+        int stride;
+        mutable Float *ghost[8];
+        mutable norm_type *ghost_norm[8];
+        int nParity;
+        void *backup_h; //! host memory for backing up the field when tuning
+        size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0,
-          bool override = false) :
+        FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0,
+                    Float **ghost_ = 0, bool override = false) :
           field(field_ ? field_ : (Float *)a.V()),
-          offset(a.Bytes() / (2 * sizeof(Float))),
+          offset(a.Bytes() / (2 * sizeof(Float) * N)),
           norm(norm_ ? norm_ : (norm_type *)a.Norm()),
           norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
-#ifdef USE_TEXTURE_OBJECTS
-          tex(0),
-          texNorm(0),
-          tex_offset(offset / N),
-#endif
           volumeCB(a.VolumeCB()),
           stride(a.Stride()),
           nParity(a.SiteSubset()),
           backup_h(nullptr),
           bytes(a.Bytes())
-  {
-    for (int i=0; i<4; i++) {
-      faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
-    }
-    resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
-#ifdef USE_TEXTURE_OBJECTS
-    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      tex = static_cast<const cudaColorSpinorField&>(a).Tex();
-      texNorm = static_cast<const cudaColorSpinorField&>(a).TexNorm();
-    }
-    if (!huge_alloc && (this->field != a.V() || (a.Precision() == QUDA_HALF_PRECISION && this->norm != a.Norm()) || (a.Precision() == QUDA_QUARTER_PRECISION && this->norm != a.Norm())) && !override) {
-      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-    }
-#endif
-  }
+        {
+          for (int i = 0; i < 4; i++) { faceVolumeCB[i] = a.SurfaceCB(i) * nFace; }
+          resetGhost(a, ghost_ ? (void **)ghost_ : a.Ghost());
+        }
 
-  void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
-  {
-    for (int dim = 0; dim < 4; dim++) {
-      for (int dir = 0; dir < 2; dir++) {
-        ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
-        ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ?
-          nullptr :
-          reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
-                                        + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
-      }
-    }
-  }
+        void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
+        {
+          for (int dim = 0; dim < 4; dim++) {
+            for (int dir = 0; dir < 2; dir++) {
+              ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
+              ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ?
+                nullptr :
+                reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
+                                              + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
+            }
+          }
+        }
 
-  __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
-  {
-    real v[length];
-    norm_type nrm;
-    if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      // use textures unless we have a large alloc
-      nrm = !huge_alloc ? tex1Dfetch_<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
-#else
-      nrm = norm[x + parity * norm_offset];
-#endif
-    }
+        __device__ __host__ inline void load(complex out[length / 2], int x, int parity = 0) const
+        {
+          real v[length];
+          norm_type nrm;
+          if (isFixed<Float>::value) { nrm = vector_load<float>(norm, x + parity * norm_offset); }
 
 #pragma unroll
     for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-      if (!huge_alloc) { // use textures unless we have a huge alloc
-        // first do texture load from memory
-        TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*i + x);
-        // now insert into output array
+      // first load from memory
+      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
+      // now copy into output and scale
 #pragma unroll
-        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-        if (isFixed<Float>::value) {
-#pragma unroll
-          for (int j = 0; j < N; j++) v[i * N + j] *= nrm;
-        }
-      } else
-#endif
-      {
-        // first load from memory
-        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
-        // now copy into output and scale
-#pragma unroll
-        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-      }
+      for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
 #pragma unroll
@@ -952,7 +1098,7 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
       // second do vectorized copy into memory
-      vector_store(field + parity*offset, x + stride*i, vecTmp);
+      vector_store(field, parity * offset + x + stride * i, vecTmp);
     }
   }
 
@@ -988,28 +1134,14 @@ namespace quda {
   {
     real v[length_ghost];
     norm_type nrm;
-    if (isFixed<Float>::value) { nrm = ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x]; }
+    if (isFixed<Float>::value) { nrm = vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x); }
 
 #pragma unroll
-    for (int i = 0; i < M_ghost; i++) {                         // to do - add texture support
-                                                                // first do vectorized copy from memory into registers
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
-      if (!huge_alloc) {                                        // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch_<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
+    for (int i = 0; i < M_ghost; i++) {
+      GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir],
+                                                    parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
 #pragma unroll
-        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-        if (isFixed<Float>::value) {
-#pragma unroll
-          for (int i = 0; i < N; i++) v[i * N + j] *= nrm;
-        }
-      } else
-#endif
-      {
-        Vector vecTmp = vector_load<Vector>(
-            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x);
-#pragma unroll
-        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-      }
+      for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
 #pragma unroll
@@ -1049,12 +1181,12 @@ namespace quda {
 
 #pragma unroll
     for (int i = 0; i < M_ghost; i++) {
-      Vector vecTmp;
+      GhostVector vecTmp;
       // first do scalar copy converting into storage type
 #pragma unroll
-      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+      for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
       // second do vectorized copy into memory
-      vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x, vecTmp);
+      vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
     }
   }
 
@@ -1096,25 +1228,23 @@ namespace quda {
   void save() {
     if (backup_h) errorQuda("Already allocated host backup");
     backup_h = safe_malloc(bytes);
-    cudaMemcpy(backup_h, field, bytes, cudaMemcpyDeviceToHost);
-    checkCudaError();
+    qudaMemcpy(backup_h, field, bytes, cudaMemcpyDeviceToHost);
   }
 
   /**
      @brief Restore the field from the host after tuning
   */
   void load() {
-    cudaMemcpy(field, backup_h, bytes, cudaMemcpyHostToDevice);
+    qudaMemcpy(field, backup_h, bytes, cudaMemcpyHostToDevice);
     host_free(backup_h);
     backup_h = nullptr;
-    checkCudaError();
   }
 
   size_t Bytes() const
   {
     return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
   }
-    };
+      };
 
     /**
        @brief This is just a dummy structure we use for trove to define the
@@ -1519,7 +1649,9 @@ namespace quda {
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
-  { if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
+      {
+        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
+      }
 
   __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
   {
@@ -1630,12 +1762,18 @@ namespace quda {
     typedef colorspinor::FloatNOrder<float, 1, Nc, 2, false, huge_alloc> type;
   };
 
+#ifdef FLOAT8
+#define N8 8
+#else
+#define N8 4
+#endif
+
   // half precision
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, false, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, false, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, 4, true, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, true, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 2, Nc, false, huge_alloc> {
     typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type;
@@ -1645,18 +1783,20 @@ namespace quda {
   };
 
   // quarter precision
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, false, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 4, Nc, 4, true, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, true, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, true, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 2, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 2, Nc, 2, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 2, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 2, Nc, 2, false, huge_alloc> type;
   };
-  template <int Nc, bool huge_alloc> struct colorspinor_mapper<char, 1, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<char, 1, Nc, 2, false, huge_alloc> type;
+  template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 1, Nc, false, huge_alloc> {
+    typedef colorspinor::FloatNOrder<int8_t, 1, Nc, 2, false, huge_alloc> type;
   };
+
+#undef N8
 
   template<typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper { };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type; };

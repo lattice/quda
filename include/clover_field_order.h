@@ -8,13 +8,13 @@
  */
 
 #include <register_traits.h>
+#include <convert.h>
 #include <clover_field.h>
 #include <complex_quda.h>
-#include <thrust_helper.cuh>
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <trove_helper.cuh>
-#include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -176,8 +176,8 @@ namespace quda {
 	return dummy;
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double i) const
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double i, reducer r) const
       {
         return 0.0;
       }
@@ -221,21 +221,13 @@ namespace quda {
 
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
-        } else {
-          // just use offset_cb, since factor of two from parity is equivalent to complexity
-          complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
-          result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
-        }
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      {
+        // just use offset_cb, since factor of two from parity is equivalent to complexity
+        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
         return 2.0 * result; // factor of two is normalization
       }
-
     };
 
     template<int N>
@@ -286,21 +278,13 @@ namespace quda {
 
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
-        } else {
-          // just use offset_cb, since factor of two from parity is equivalent to complexity
-          complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
-          result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
-        }
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      {
+        // just use offset_cb, since factor of two from parity is equivalent to complexity
+        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
         return 2.0 * result; // factor of two is normalization
       }
-
     };
 
     template<typename Float, int nColor, int nSpin> 
@@ -342,7 +326,7 @@ namespace quda {
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         errorQuda("Not implemented");
 	return 0.0;
@@ -388,19 +372,22 @@ namespace quda {
     template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order>
       struct FieldOrder {
 
-      protected:
-	/** An internal reference to the actual field we are accessing */
-	CloverField &A;
-	const int volumeCB;
-	const Accessor<Float,nColor,nSpin,order> accessor;
-	bool inverse;
-	const QudaFieldLocation location;
+      /** Does this field type support ghost zones? */
+      static constexpr bool supports_ghost_zone = false;
 
-      public:
-	/** 
-	 * Constructor for the FieldOrder class
-	 * @param field The field that we are accessing
-	 */
+    protected:
+      /** An internal reference to the actual field we are accessing */
+      CloverField &A;
+      const int volumeCB;
+      const Accessor<Float, nColor, nSpin, order> accessor;
+      bool inverse;
+      const QudaFieldLocation location;
+
+    public:
+      /**
+       * Constructor for the FieldOrder class
+       * @param field The field that we are accessing
+       */
       FieldOrder(CloverField &A, bool inverse=false)
       : A(A), volumeCB(A.VolumeCB()), accessor(A,inverse), inverse(inverse), location(A.Location())
 	{ }
@@ -481,48 +468,44 @@ namespace quda {
 	 * @return L1 norm
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
-          double nrm1 = accessor.transform_reduce(location, abs_<double,Float>(),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
+          if (global) comm_allreduce(&nrm1);
+          return nrm1;
+        }
 
-	/**
-	 * @brief Returns the L2 norm suared of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
-	 * @return L1 norm
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
-          double nrm2 = accessor.transform_reduce(location, square_<double,Float>(),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+        /**
+         * @brief Returns the L2 norm suared of the field
+         * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
+         * @return L1 norm
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
+          double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
+          if (global) comm_allreduce(&nrm2);
+          return nrm2;
+        }
 
-	/**
-	 * @brief Returns the Linfinity norm of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, abs_<Float,Float>(),
-                                                    thrust::maximum<Float>(), 0.0);
-	  if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+        /**
+         * @brief Returns the Linfinity norm of the field
+         * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
+          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
+          if (global) comm_allreduce_max(&absmax);
+          return absmax;
+        }
 
-	/**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, abs_<Float,Float>(),
-                                                    thrust::minimum<Float>(), std::numeric_limits<double>::max());
-	  if (global) comm_allreduce_min(&absmax);
-	  return absmax;
-	}
-
+        /**
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
+          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
+                                                    minimum<Float>());
+          if (global) comm_allreduce_min(&absmax);
+          return absmax;
+        }
       };
 
     /**
@@ -550,12 +533,6 @@ namespace quda {
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
       const AllocInt norm_offset;
-#ifdef USE_TEXTURE_OBJECTS
-	typedef typename TexVectorType<real, N>::type TexVector;
-	cudaTextureObject_t tex;
-	cudaTextureObject_t normTex;
-	const int tex_offset;
-#endif
 	const int volumeCB;
 	const int stride;
 
@@ -570,40 +547,23 @@ namespace quda {
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = 0, norm_type *norm_ = 0,
                     bool override = false) :
-            offset(clover.Bytes() / (2 * sizeof(Float))),
-            norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
-#ifdef USE_TEXTURE_OBJECTS
-            tex(0),
-            normTex(0),
-            tex_offset(offset / N),
-#endif
-            volumeCB(clover.VolumeCB()),
-            stride(clover.Stride()),
-            twisted(clover.Twisted()),
-            mu2(clover.Mu2()),
-            rho(clover.Rho()),
-            bytes(clover.Bytes()),
-            norm_bytes(clover.NormBytes()),
-            backup_h(nullptr),
-            backup_norm_h(nullptr)
-	{
-	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
+          offset(clover.Bytes() / (2 * sizeof(Float) * N)),
+          norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
+          volumeCB(clover.VolumeCB()),
+          stride(clover.Stride()),
+          twisted(clover.Twisted()),
+          mu2(clover.Mu2()),
+          rho(clover.Rho()),
+          bytes(clover.Bytes()),
+          norm_bytes(clover.NormBytes()),
+          backup_h(nullptr),
+          backup_norm_h(nullptr)
+        {
+          if (clover.Order() != N) {
+            errorQuda("Invalid clover order %d for FloatN (N=%d) accessor", clover.Order(), N);
+          }
+          this->clover = clover_ ? clover_ : (Float *)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
-#ifdef USE_TEXTURE_OBJECTS
-	  if (clover.Location() == QUDA_CUDA_FIELD_LOCATION) {
-	    if (is_inverse) {
-	      tex = static_cast<const cudaCloverField&>(clover).InvTex();
-	      normTex = static_cast<const cudaCloverField&>(clover).InvNormTex();
-	    } else {
-	      tex = static_cast<const cudaCloverField&>(clover).Tex();
-	      normTex = static_cast<const cudaCloverField&>(clover).NormTex();
-	    }
-	    if (!huge_alloc && (this->clover != clover.V(is_inverse) ||
-				((clover.Precision() == QUDA_HALF_PRECISION || clover.Precision() == QUDA_QUARTER_PRECISION) && this->norm != clover.Norm(is_inverse)) ) && !override) {
-	      errorQuda("Cannot use texture read since data pointer does not equal field pointer - use with huge_alloc=true instead");
-	    }
-	  }
-#endif
 	}
 
 	bool Twisted() const { return twisted; }
@@ -650,37 +610,16 @@ namespace quda {
 	__device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
         {
           norm_type nrm;
-          if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-            nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
-                                norm[parity * norm_offset + chirality * stride + x];
-#else
-            nrm = norm[parity * norm_offset + chirality * stride + x];
-#endif
-          }
+          if (isFixed<Float>::value) { nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x); }
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-	    if (!huge_alloc) { // use textures unless we have a huge alloc
-                               // first do texture load from memory
-              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
-              // now insert into output array
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
+            // second do scalar copy converting into register type
 #pragma unroll
-              for (int j = 0; j < N; j++) {
-                copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
-                if (isFixed<Float>::value) v[i * N + j] *= nrm;
-              }
-            } else
-#endif
-	    {
-              // first load from memory
-              Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
-	      // second do scalar copy converting into register type
-#pragma unroll
-              for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
-            }
-	  }
+            for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+          }
 
           if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
         }
@@ -721,7 +660,7 @@ namespace quda {
             // first do scalar copy converting into storage type
             for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
             // second do vectorized copy into memory
-	    vector_store(clover + parity*offset, x + stride*(chirality*M+i), vecTmp);
+            vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
         }
 
@@ -755,34 +694,34 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
-	  if (norm_bytes) {
-	    backup_norm_h = safe_malloc(norm_bytes);
-	    cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
-	  }
-	  checkCudaError();
-	}
+          qudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+          if (norm_bytes) {
+            backup_norm_h = safe_malloc(norm_bytes);
+            qudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+          }
+        }
 
-	/**
-	   @brief Restore the field from the host after tuning
-	*/
-	void load() {
-	  cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
-	  host_free(backup_h);
-	  backup_h = nullptr;
-	  if (norm_bytes) {
-	    cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
-	    host_free(backup_norm_h);
-	    backup_norm_h = nullptr;
-	  }
-	  checkCudaError();
-	}
+        /**
+           @brief Restore the field from the host after tuning
+        */
+        void load()
+        {
+          qudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+          host_free(backup_h);
+          backup_h = nullptr;
+          if (norm_bytes) {
+            qudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+            host_free(backup_norm_h);
+            backup_norm_h = nullptr;
+          }
+        }
 
-	size_t Bytes() const {
-	  size_t bytes = length*sizeof(Float);
+        size_t Bytes() const
+        {
+          size_t bytes = length * sizeof(Float);
           if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
           return bytes;
-	}
+        }
       };
 
     /**
@@ -810,7 +749,10 @@ namespace quda {
       QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), offset(clover.Bytes()/(2*sizeof(Float))),
 	twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover = clover_ ? clover_ : (Float*)(clover.V(inverse));
+        if (clover.Order() != QUDA_PACKED_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
       }
 
 	bool  Twisted()	const	{return twisted;}
@@ -859,8 +801,11 @@ namespace quda {
 
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
-	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+        if (clover.Order() != QUDA_QDPJIT_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        offdiag = clover_ ? ((Float **)clover_)[0] : ((Float **)clover.V(inverse))[0];
+        diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
       }
 	
       bool  Twisted()	const	{return twisted;}
@@ -925,8 +870,11 @@ namespace quda {
 
       BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
-	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
+        if (clover.Order() != QUDA_BQCD_CLOVER_ORDER) {
+          errorQuda("Invalid clover order %d for this accessor", clover.Order());
+        }
+        this->clover[0] = clover_ ? clover_ : (Float *)(clover.V(inverse));
+        this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
       }
 
 
@@ -984,7 +932,9 @@ namespace quda {
   template<int N, bool add_rho> struct clover_mapper<short,N,add_rho> { typedef clover::FloatNOrder<short, N, 4, add_rho> type; };
 
   // quarter precision uses Float4
-  template<int N, bool add_rho> struct clover_mapper<char,N,add_rho> { typedef clover::FloatNOrder<char, N, 4, add_rho> type; };
+  template <int N, bool add_rho> struct clover_mapper<int8_t, N, add_rho> {
+    typedef clover::FloatNOrder<int8_t, N, 4, add_rho> type;
+  };
 
 } // namespace quda
 

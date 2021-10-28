@@ -4,6 +4,26 @@ namespace quda
 {
 
   /**
+   * @brief Calculates a variety of gauge-field observables.
+   * @param[in] Gauge field upon which we are measuring.
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   * @param[in] profile TimeProfile instance used for profiling.
+   */
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
+
+  /**
+   * @brief Project the input gauge field onto the SU(3) group.  This
+   * is a destructive operation.  The number of link failures is
+   * reported so appropriate action can be taken.
+   *
+   * @param U Gauge field that we are projecting onto SU(3)
+   * @param tol Tolerance to which the iterative algorithm works
+   * @param fails Number of link failures (device pointer)
+   */
+  void projectSU3(GaugeField &U, double tol, int *fails);
+
+  /**
      @brief Compute the plaquette of the gauge field
 
      @param[in] U The gauge field upon which to compute the plaquette
@@ -54,7 +74,7 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] alpha smearing parameter
   */
-  void APEStep(GaugeField &dataDs, const GaugeField &dataOr, double alpha);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -63,7 +83,7 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
   */
-  void STOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -73,7 +93,21 @@ namespace quda
      @param[in] rho smearing parameter
      @param[in] epsilon smearing parameter
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho, double epsilon);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon);
+
+  /**
+     @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field.
+     This routine assumes that the input and output fields are
+     extended, with the input field being exchanged prior to calling
+     this function.  On exit from this routine, the output field will
+     have been exchanged.
+     @param[out] dataDs Output smeared field
+     @param[in] dataTemp Temp space
+     @param[in] dataOr Input gauge field
+     @param[in] epsilon Step size
+     @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples
+  */
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaWFlowType wflow_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -88,14 +122,8 @@ namespace quda
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingOVR( cudaGaugeField& data,
-		       const int gauge_dir,
-                       const int Nsteps,
-		       const int verbose_interval,
-		       const double relax_boost,
-                       const double tolerance,
-		       const int reunit_interval,
-		       const int stopWtheta);
+  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -110,13 +138,8 @@ namespace quda
    * maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir,
-		       const int Nsteps,
-		       const int verbose_interval,
-		       const double alpha,
-		       const int autotune,
-                       const double tolerance,
-		       const int stopWtheta);
+  void gaugeFixingFFT(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
+                      const double alpha, const int autotune, const double tolerance, const int stopWtheta);
 
   /**
      @brief Compute the Fmunu tensor
@@ -126,18 +149,23 @@ namespace quda
   void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge);
 
   /**
-     @brief Compute the topological charge
-     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @return double The total topological charge
+     @brief Compute the topological charge and field energy
+     @param[out] energy The total, spatial, and temporal field energy
+     @param[out] qcharge The total topological charge
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a
+     smeared configuration
    */
-  double computeQCharge(const GaugeField &Fmunu);
+  void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu);
 
   /**
-     @brief Compute the topological charge density per lattice site
-     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @param[out] qDensity The topological charge at each lattice site
-     @return double The total topological charge
+     @brief Compute the topological charge, field energy and the
+     topological charge density per lattice site
+     @param[out] energy The total, spatial, and temporal field energy
+     @param[out] qcharge The total topological charge
+     @param[out] qdensity The topological charge at each lattice site
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a
+     smeared configuration
   */
-  double computeQChargeDensity(const GaugeField &Fmunu, void *result);
+  void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu);
 
 } // namespace quda

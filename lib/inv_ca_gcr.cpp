@@ -1,21 +1,29 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
-#include <Eigen/Dense>
+#include <eigen_helper.h>
 
 namespace quda {
 
-  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+  CAGCR::CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+               const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile),
+    matMdagM(matEig.Expose()),
+    init(false),
+    use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO && param.precision == param.precision_sloppy
+               && param.use_init_guess == QUDA_USE_INIT_GUESS_NO && !param.deflate),
+    basis(param.ca_basis),
+    alpha(nullptr),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr)
+  {
+  }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (init) {
       if (alpha) delete []alpha;
-      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
-                         param.precision == param.precision_sloppy &&
-                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
       if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
       } else {
@@ -27,12 +35,7 @@ namespace quda {
       if (rp) delete rp;
     }
 
-    if (deflate_init) {
-      for (auto veci : param.evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -48,8 +51,6 @@ namespace quda {
       alpha = new Complex[param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
-      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && !mixed &&
-                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -83,12 +84,8 @@ namespace quda {
         }
       }
 
-      // Once the GCR operator is called, we are able to construct an appropriate
-      // Krylov space for deflation
-      if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
-
       //sloppy temporary for mat-vec
-      tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+      tmp_sloppy = mixed ? tmpp->CreateAlias(csParam) : nullptr;
 
       if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -98,7 +95,6 @@ namespace quda {
 
   void CAGCR::solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b)
   {
-    using namespace Eigen;
     typedef Matrix<Complex, Dynamic, Dynamic> matrix;
     typedef Matrix<Complex, Dynamic, 1> vector;
 
@@ -171,12 +167,12 @@ namespace quda {
   */
   void CAGCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    const int nKrylov = param.Nkrylov;
+    const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
     if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
 
-    if (param.maxiter == 0 || nKrylov == 0) {
+    if (param.maxiter == 0 || n_krylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
@@ -190,9 +186,38 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // compute b2, but only if we need to
-    bool fixed_iteration = param.sloppy_converge && nKrylov==param.maxiter && !param.compute_true_res;
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
+
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
+      if (deflate_compute) {
+        // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        (*eig_solve)(evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -210,22 +235,18 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `defl_tmp2` as a temp.
-      blas::copy(*defl_tmp2[0], r);
-      rhs.push_back(defl_tmp2[0]);
-
-      // Deflate: Hardcoded to SVD
-      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      eig_solve->deflateSVD(x, r, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0]);
-      r2 = blas::xmyNorm(*rhs[0], r);
-
-      // defl_tmp must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);
+      mat(r, x, tmp);
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r);
+      } else {
+        blas::xpay(b, -1.0, r);
+        r2 = b2; // dummy setting
+      }
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -236,7 +257,7 @@ namespace quda {
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
         return;
-            } else {
+      } else {
         b2 = r2;
       }
     }
@@ -265,6 +286,7 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     double r2_old = r2;
+    double maxr_deflate = sqrt(r2);
     bool l2_converge = false;
 
     blas::copy(*p[0], r); // no op if uni-precision
@@ -272,10 +294,10 @@ namespace quda {
     PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
-      // build up a space of size nKrylov
-      for (int k=0; k<nKrylov; k++) {
+      // build up a space of size n_krylov
+      for (int k = 0; k < n_krylov; k++) {
         matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k<nKrylov-1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k+1], *q[k]);
+        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k + 1], *q[k]);
       }
 
       solve(alpha, q, *p[0]);
@@ -283,9 +305,9 @@ namespace quda {
       // update the solution vector
       std::vector<ColorSpinorField*> X;
       X.push_back(&x);
-      // need to make sure P is only length nKrylov
+      // need to make sure P is only length n_krylov
       std::vector<ColorSpinorField*> P;
-      for (int i=0; i<nKrylov; i++) P.push_back(p[i]);
+      for (int i = 0; i < n_krylov; i++) P.push_back(p[i]);
       blas::caxpy(alpha, P, X);
 
       // no need to compute residual vector if not returning
@@ -294,11 +316,11 @@ namespace quda {
         // update the residual vector
         std::vector<ColorSpinorField*> R;
         R.push_back(&r);
-        for (int i=0; i<nKrylov; i++) alpha[i] = -alpha[i];
+        for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }
 
-      total_iter+=nKrylov;
+      total_iter += n_krylov;
       if ( !fixed_iteration || getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         // only compute the residual norm if we need to
         r2 = blas::norm2(r);
@@ -306,13 +328,25 @@ namespace quda {
 
       PrintStats("CA-GCR", total_iter, r2, b2, heavy_quark_res);
 
-      // update since nKrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every nKrylov steps
+      // update since n_krylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every n_krylov steps
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp);
-        r2 = blas::xmyNorm(b, r);  
+        r2 = blas::xmyNorm(b, r);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflateSVD(x, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, x, tmp);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
         // break-out check if we have reached the limit of the precision
@@ -370,7 +404,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;
@@ -379,6 +413,8 @@ namespace quda {
       blas::flops = 0;
       mat.flops();
       matSloppy.flops();
+      matPrecon.flops();
+      matMdagM.flops();
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
