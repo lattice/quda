@@ -210,6 +210,7 @@ namespace quda
   template <bool sync, bool dagger, bool shared, class Vector, class Arg, Dslash5Type type = Arg::type>
   __device__ __host__ inline Vector d5(const Arg &arg, const Vector &in, int parity, int x_cb, int s)
   {
+    QUDA_RT_CONSTS;
 
     using real = typename Arg::real;
     constexpr bool is_variable = true;
