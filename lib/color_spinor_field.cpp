@@ -490,7 +490,7 @@ namespace quda {
             qudaMemcpy(send_back[i], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToHost);
             qudaMemcpy(send_fwd[i], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToHost);
           }
-	} else if (no_comms_fill) {
+        } else if (no_comms_fill) {
           qudaMemcpy(ghost[2 * i + 1], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToDevice);
           qudaMemcpy(ghost[2 * i + 0], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToDevice);
         }

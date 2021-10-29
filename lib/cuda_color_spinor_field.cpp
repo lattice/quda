@@ -688,11 +688,11 @@ namespace quda {
 	// record the event
         qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
         // send to the processor in the -1 direction
-	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+        comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
         qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
         // send to the processor in the +1 direction
-	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
+        comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
     }
   }
@@ -955,7 +955,7 @@ namespace quda {
             const_cast<cudaColorSpinorField *>(this)->sendStart(2 * dim + dir, device::get_stream(2 * dim + dir),
                                                                 gdr_send);
           }
-	}
+        }
       }
     }
 
@@ -967,12 +967,12 @@ namespace quda {
 	  if (!comms_complete[dim*2+dir]) {
             comms_complete[2 * dim + dir] = const_cast<cudaColorSpinorField *>(this)->commsQuery(
               2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
-            if (comms_complete[2*dim+dir]) {
-	      comms_done++;
+            if (comms_complete[2 * dim + dir]) {
+              comms_done++;
               if (comm_peer2peer_enabled(1 - dir, dim))
                 qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
             }
-	  }
+          }
 	}
       }
     }

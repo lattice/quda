@@ -1176,7 +1176,7 @@ namespace quda {
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
           faceVolumeCB[i] = a.SurfaceCB(i) * nFace;
         }
-  }
+      }
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
@@ -1263,7 +1263,7 @@ namespace quda {
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
           faceVolumeCB[i] = a.SurfaceCB(i) * nFace;
         }
-  }
+      }
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
@@ -1353,7 +1353,7 @@ namespace quda {
         exDim[0] *= (nParity == 1) ? 2 : 1; // need to full dimensions
 
         offset = exVolumeCB * Ns * Nc * 2; // compute manually since Bytes is likely wrong due to z-padding
-  }
+      }
 
   /**
      @brief Compute the index into the padded field.  Assumes that

@@ -972,9 +972,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       if (!dynamic_clover_inverse()) {
         cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
         if (inv_param->compute_clover_trlog) {
-	  inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
+          inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
 	  inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
-	}
+        }
       }
       profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
@@ -5554,7 +5554,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
 }
 
 int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixParam *fix_param, double *timeinfo)
-{  
+{
   profileGaugeFix.TPSTART(QUDA_PROFILE_TOTAL);
 
   // Check parameters
@@ -5576,40 +5576,44 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
   profileGaugeFix.TPSTART(QUDA_PROFILE_H2D);
   cudaInGauge->loadCPUField(*cpuGauge);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_H2D);
-  
+
   // Perform the update
-  switch(fix_param->fix_type) {
-    
+  switch (fix_param->fix_type) {
+
   case QUDA_GAUGEFIX_TYPE_OVR:
     if (comm_size() == 1) {
       profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
-      gaugeFixingOVR(*cudaInGauge, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval, fix_param->ovr_relaxation_boost, fix_param->tolerance, fix_param->reunit_interval, fix_param->theta_condition);
+      gaugeFixingOVR(*cudaInGauge, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval,
+                     fix_param->ovr_relaxation_boost, fix_param->tolerance, fix_param->reunit_interval,
+                     fix_param->theta_condition);
       profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
     } else {
       // For MPI, we must perform a halo exchange
       cudaGaugeField *cudaInGaugeEx = createExtendedGauge(*cudaInGauge, R, profileGaugeFix);
       profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
-      gaugeFixingOVR(*cudaInGaugeEx, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval, fix_param->ovr_relaxation_boost, fix_param->tolerance, fix_param->reunit_interval, fix_param->theta_condition);
+      gaugeFixingOVR(*cudaInGaugeEx, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval,
+                     fix_param->ovr_relaxation_boost, fix_param->tolerance, fix_param->reunit_interval,
+                     fix_param->theta_condition);
       profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
       copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
     }
     break;
-    
+
   case QUDA_GAUGEFIX_TYPE_FFT:
     profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugeFixingFFT(*cudaInGauge, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval, fix_param->fft_alpha, fix_param->fft_autotune, fix_param->tolerance, fix_param->theta_condition);
+    gaugeFixingFFT(*cudaInGauge, fix_param->gauge_dir, fix_param->maxiter, fix_param->verbosity_interval,
+                   fix_param->fft_alpha, fix_param->fft_autotune, fix_param->tolerance, fix_param->theta_condition);
     profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
     break;
-    
-  default:
-    errorQuda("Unkown gauge fix type %d", fix_param->fix_type);
+
+  default: errorQuda("Unkown gauge fix type %d", fix_param->fix_type);
   }
-  
+
   // Copy the fixed gauge field back to the host
   profileGaugeFix.TPSTART(QUDA_PROFILE_D2H);
   cudaInGauge->saveCPUField(*cpuGauge);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_D2H);
-  
+
   profileGaugeFix.TPSTOP(QUDA_PROFILE_TOTAL);
   if (g_param->make_resident_gauge) {
     if (gaugePrecise != nullptr) delete gaugePrecise;

@@ -1092,7 +1092,6 @@ void printQudaGaugeFixParam(QudaGaugeFixParam *param)
 #endif
 }
 
-
 // clean up
 #undef INVALID_INT
 #undef INVALID_DOUBLE

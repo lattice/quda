@@ -205,7 +205,7 @@ namespace quda
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       } // --- note, revisit Nc == 96 -> Nc == 96 in the future
-#endif // NSPIN1
+#endif  // NSPIN1
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

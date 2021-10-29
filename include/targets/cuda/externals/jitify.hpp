@@ -129,10 +129,10 @@
 #error "Unsupported platform"
 #endif
 
-#ifdef _MSC_VER       // MSVC compiler
-#include <dbghelp.h>  // For UnDecorateSymbolName
+#ifdef _MSC_VER      // MSVC compiler
+#include <dbghelp.h> // For UnDecorateSymbolName
 #else
-#include <cxxabi.h>  // For abi::__cxa_demangle
+#include <cxxabi.h> // For abi::__cxa_demangle
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -575,8 +575,7 @@ inline bool load_source(
   if (!source_stream) {
     std::string fullpath = path_join(current_dir, filename);
     // Try loading from callback
-    if (!file_callback ||
-        !((source_stream = file_callback(fullpath, string_stream)) != 0)) {
+    if (!file_callback || !((source_stream = file_callback(fullpath, string_stream)) != 0)) {
 #if JITIFY_ENABLE_EMBEDDED_FILES
       // Try loading as embedded file
       EmbeddedData embedded;
@@ -672,11 +671,8 @@ inline bool load_source(
       // TODO: Handle block comments (currently they cause a compilation error).
       size_t comment_start = line_after_pragma.find("//");
       std::string pragma_args = line_after_pragma.substr(0, comment_start);
-      std::string comment = comment_start != std::string::npos
-                                ? line_after_pragma.substr(comment_start)
-                                : "";
-      line = line.substr(0, pragma_beg) + "_Pragma(\"" + pragma_args + "\")" +
-             comment;
+      std::string comment = comment_start != std::string::npos ? line_after_pragma.substr(comment_start) : "";
+      line = line.substr(0, pragma_beg) + "_Pragma(\"" + pragma_args + "\")" + comment;
     }
 
     source += line + "\n";
@@ -773,9 +769,10 @@ inline std::string value_string<bool>(const bool& x) {
 }
 
 // Removes all tokens that start with double underscores.
-inline void strip_double_underscore_tokens(char* s) {
+inline void strip_double_underscore_tokens(char *s)
+{
   using jitify::detail::is_tokenchar;
-  char* w = s;
+  char *w = s;
   do {
     if (*s == '_' && *(s + 1) == '_') {
       while (is_tokenchar(*++s))
@@ -786,279 +783,252 @@ inline void strip_double_underscore_tokens(char* s) {
 
 //#if CUDA_VERSION < 8000
 #ifdef _MSC_VER  // MSVC compiler
-inline std::string demangle_cuda_symbol(const char* mangled_name) {
-  // We don't have a way to demangle CUDA symbol names under MSVC.
-  return mangled_name;
-}
-inline std::string demangle_native_type(const std::type_info& typeinfo) {
-  // Get the decorated name and skip over the leading '.'.
-  const char* decorated_name = typeinfo.raw_name() + 1;
-  char undecorated_name[4096];
-  if (UnDecorateSymbolName(
-          decorated_name, undecorated_name,
-          sizeof(undecorated_name) / sizeof(*undecorated_name),
-          UNDNAME_NO_ARGUMENTS |          // Treat input as a type name
-              UNDNAME_NAME_ONLY           // No "class" and "struct" prefixes
-          /*UNDNAME_NO_MS_KEYWORDS*/)) {  // No "__cdecl", "__ptr64" etc.
-    // WAR for UNDNAME_NO_MS_KEYWORDS messing up function types.
-    strip_double_underscore_tokens(undecorated_name);
-    return undecorated_name;
-  }
-  throw std::runtime_error("UnDecorateSymbolName failed");
-}
+      inline std::string demangle_cuda_symbol(const char *mangled_name)
+      {
+        // We don't have a way to demangle CUDA symbol names under MSVC.
+        return mangled_name;
+      }
+      inline std::string demangle_native_type(const std::type_info &typeinfo)
+      {
+        // Get the decorated name and skip over the leading '.'.
+        const char *decorated_name = typeinfo.raw_name() + 1;
+        char undecorated_name[4096];
+        if (UnDecorateSymbolName(decorated_name, undecorated_name, sizeof(undecorated_name) / sizeof(*undecorated_name),
+                                 UNDNAME_NO_ARGUMENTS |         // Treat input as a type name
+                                   UNDNAME_NAME_ONLY            // No "class" and "struct" prefixes
+                                 /*UNDNAME_NO_MS_KEYWORDS*/)) { // No "__cdecl", "__ptr64" etc.
+          // WAR for UNDNAME_NO_MS_KEYWORDS messing up function types.
+          strip_double_underscore_tokens(undecorated_name);
+          return undecorated_name;
+        }
+        throw std::runtime_error("UnDecorateSymbolName failed");
+      }
 #else  // not MSVC
-inline std::string demangle_cuda_symbol(const char* mangled_name) {
-  size_t bufsize = 0;
-  char* buf = nullptr;
-  std::string demangled_name;
-  int status;
-  auto demangled_ptr = std::unique_ptr<char, decltype(free)*>(
-      abi::__cxa_demangle(mangled_name, buf, &bufsize, &status), free);
-  if (status == 0) {
-    demangled_name = demangled_ptr.get();  // all worked as expected
-  } else if (status == -2) {
-    demangled_name = mangled_name;  // we interpret this as plain C name
-  } else if (status == -1) {
-    throw std::runtime_error(
-        std::string("memory allocation failure in __cxa_demangle"));
-  } else if (status == -3) {
-    throw std::runtime_error(std::string("invalid argument to __cxa_demangle"));
-  }
-  return demangled_name;
-}
-inline std::string demangle_native_type(const std::type_info& typeinfo) {
-  return demangle_cuda_symbol(typeinfo.name());
-}
-#endif  // not MSVC
-//#endif // CUDA_VERSION < 8000
+      inline std::string demangle_cuda_symbol(const char *mangled_name)
+      {
+        size_t bufsize = 0;
+        char *buf = nullptr;
+        std::string demangled_name;
+        int status;
+        auto demangled_ptr
+          = std::unique_ptr<char, decltype(free) *>(abi::__cxa_demangle(mangled_name, buf, &bufsize, &status), free);
+        if (status == 0) {
+          demangled_name = demangled_ptr.get(); // all worked as expected
+        } else if (status == -2) {
+          demangled_name = mangled_name; // we interpret this as plain C name
+        } else if (status == -1) {
+          throw std::runtime_error(std::string("memory allocation failure in __cxa_demangle"));
+        } else if (status == -3) {
+          throw std::runtime_error(std::string("invalid argument to __cxa_demangle"));
+        }
+        return demangled_name;
+      }
+      inline std::string demangle_native_type(const std::type_info &typeinfo)
+      {
+        return demangle_cuda_symbol(typeinfo.name());
+      }
+#endif // not MSVC
+      //#endif // CUDA_VERSION < 8000
 
-template <typename>
-class JitifyTypeNameWrapper_ {};
+      template <typename> class JitifyTypeNameWrapper_
+      {
+      };
 
-template <typename T>
-struct type_reflection {
-  inline static std::string name() {
-    //#if CUDA_VERSION < 8000
-    // TODO: Use nvrtcGetTypeName once it has the same behavior as this.
-    // WAR for typeid discarding cv qualifiers on value-types
-    // Wrap type in dummy template class to preserve cv-qualifiers, then strip
-    // off the wrapper from the resulting string.
-    std::string wrapped_name =
-        demangle_native_type(typeid(JitifyTypeNameWrapper_<T>));
-    // Note: The reflected name of this class also has namespace prefixes.
-    const std::string wrapper_class_name = "JitifyTypeNameWrapper_<";
-    size_t start = wrapped_name.find(wrapper_class_name);
-    if (start == std::string::npos) {
-      throw std::runtime_error("Type reflection failed: " + wrapped_name);
+      template <typename T> struct type_reflection {
+        inline static std::string name()
+        {
+          //#if CUDA_VERSION < 8000
+          // TODO: Use nvrtcGetTypeName once it has the same behavior as this.
+          // WAR for typeid discarding cv qualifiers on value-types
+          // Wrap type in dummy template class to preserve cv-qualifiers, then strip
+          // off the wrapper from the resulting string.
+          std::string wrapped_name = demangle_native_type(typeid(JitifyTypeNameWrapper_<T>));
+          // Note: The reflected name of this class also has namespace prefixes.
+          const std::string wrapper_class_name = "JitifyTypeNameWrapper_<";
+          size_t start = wrapped_name.find(wrapper_class_name);
+          if (start == std::string::npos) { throw std::runtime_error("Type reflection failed: " + wrapped_name); }
+          start += wrapper_class_name.size();
+          std::string name = wrapped_name.substr(start, wrapped_name.size() - (start + 1));
+          return name;
+          //#else
+          //         std::string ret;
+          //         nvrtcResult status = nvrtcGetTypeName<T>(&ret);
+          //         if( status != NVRTC_SUCCESS ) {
+          //                 throw std::runtime_error(std::string("nvrtcGetTypeName
+          // failed:
+          //")+ nvrtcGetErrorString(status));
+          //         }
+          //         return ret;
+          //#endif
+        }
+      }; // namespace detail
+      template <typename T, T VALUE> struct type_reflection<NonType<T, VALUE>> {
+        inline static std::string name() { return jitify::reflection::reflect(VALUE); }
+      };
+
+    } // namespace detail
+
+    //! \endcond
+
+    /*! Create an Instance object that contains a const reference to the
+     *  value.  We use this to wrap abstract objects from which we want to extract
+     *  their type at runtime (e.g., derived type).  This is used to facilitate
+     *  templating on derived type when all we know at compile time is abstract
+     * type.
+     */
+    template <typename T> struct Instance {
+      const T &value;
+      Instance(const T &value_arg) : value(value_arg) { }
+    };
+
+    /*! Create an Instance object from which we can extract the value's run-time
+     * type.
+     *  \param value The const value to be captured.
+     */
+    template <typename T> inline Instance<T const> instance_of(T const &value) { return Instance<T const>(value); }
+
+    /*! A wrapper used for representing types as values.
+     */
+    template <typename T> struct Type {
+    };
+
+    // Type reflection
+    // E.g., reflect<float>() -> "float"
+    // Note: This strips trailing const and volatile qualifiers
+    /*! Generate a code-string for a type.
+     *  \code{.cpp}reflect<float>() --> "float"\endcode
+     */
+    template <typename T> inline std::string reflect() { return detail::type_reflection<T>::name(); }
+    // Value reflection
+    // E.g., reflect(3.14f) -> "(float)3.14"
+    /*! Generate a code-string for a value.
+     *  \code{.cpp}reflect(3.14f) --> "(float)3.14"\endcode
+     */
+    template <typename T> inline std::string reflect(T const &value)
+    {
+      return "(" + reflect<T>() + ")" + detail::value_string(value);
     }
-    start += wrapper_class_name.size();
-    std::string name =
-        wrapped_name.substr(start, wrapped_name.size() - (start + 1));
-    return name;
-    //#else
-    //         std::string ret;
-    //         nvrtcResult status = nvrtcGetTypeName<T>(&ret);
-    //         if( status != NVRTC_SUCCESS ) {
-    //                 throw std::runtime_error(std::string("nvrtcGetTypeName
-    // failed:
-    //")+ nvrtcGetErrorString(status));
-    //         }
-    //         return ret;
-    //#endif
-  }
-};  // namespace detail
-template <typename T, T VALUE>
-struct type_reflection<NonType<T, VALUE> > {
-  inline static std::string name() {
-    return jitify::reflection::reflect(VALUE);
-  }
-};
+    // Non-type template arg reflection (implicit conversion to int64_t)
+    // E.g., reflect<7>() -> "(int64_t)7"
+    /*! Generate a code-string for an integer non-type template argument.
+     *  \code{.cpp}reflect<7>() --> "(int64_t)7"\endcode
+     */
+    template <int64_t N> inline std::string reflect() { return reflect<NonType<int64_t, N>>(); }
+    // Non-type template arg reflection (explicit type)
+    // E.g., reflect<int,7>() -> "(int)7"
+    /*! Generate a code-string for a generic non-type template argument.
+     *  \code{.cpp} reflect<int,7>() --> "(int)7" \endcode
+     */
+    template <typename T, T N> inline std::string reflect() { return reflect<NonType<T, N>>(); }
+    // Type reflection via value
+    // E.g., reflect(Type<float>()) -> "float"
+    /*! Generate a code-string for a type wrapped as a Type instance.
+     *  \code{.cpp}reflect(Type<float>()) --> "float"\endcode
+     */
+    template <typename T> inline std::string reflect(jitify::reflection::Type<T>) { return reflect<T>(); }
 
-}  // namespace detail
-
-//! \endcond
-
-/*! Create an Instance object that contains a const reference to the
- *  value.  We use this to wrap abstract objects from which we want to extract
- *  their type at runtime (e.g., derived type).  This is used to facilitate
- *  templating on derived type when all we know at compile time is abstract
- * type.
- */
-template <typename T>
-struct Instance {
-  const T& value;
-  Instance(const T& value_arg) : value(value_arg) {}
-};
-
-/*! Create an Instance object from which we can extract the value's run-time
- * type.
- *  \param value The const value to be captured.
- */
-template <typename T>
-inline Instance<T const> instance_of(T const& value) {
-  return Instance<T const>(value);
-}
-
-/*! A wrapper used for representing types as values.
- */
-template <typename T>
-struct Type {};
-
-// Type reflection
-// E.g., reflect<float>() -> "float"
-// Note: This strips trailing const and volatile qualifiers
-/*! Generate a code-string for a type.
- *  \code{.cpp}reflect<float>() --> "float"\endcode
- */
-template <typename T>
-inline std::string reflect() {
-  return detail::type_reflection<T>::name();
-}
-// Value reflection
-// E.g., reflect(3.14f) -> "(float)3.14"
-/*! Generate a code-string for a value.
- *  \code{.cpp}reflect(3.14f) --> "(float)3.14"\endcode
- */
-template <typename T>
-inline std::string reflect(T const& value) {
-  return "(" + reflect<T>() + ")" + detail::value_string(value);
-}
-// Non-type template arg reflection (implicit conversion to int64_t)
-// E.g., reflect<7>() -> "(int64_t)7"
-/*! Generate a code-string for an integer non-type template argument.
- *  \code{.cpp}reflect<7>() --> "(int64_t)7"\endcode
- */
-template <int64_t N>
-inline std::string reflect() {
-  return reflect<NonType<int64_t, N> >();
-}
-// Non-type template arg reflection (explicit type)
-// E.g., reflect<int,7>() -> "(int)7"
-/*! Generate a code-string for a generic non-type template argument.
- *  \code{.cpp} reflect<int,7>() --> "(int)7" \endcode
- */
-template <typename T, T N>
-inline std::string reflect() {
-  return reflect<NonType<T, N> >();
-}
-// Type reflection via value
-// E.g., reflect(Type<float>()) -> "float"
-/*! Generate a code-string for a type wrapped as a Type instance.
- *  \code{.cpp}reflect(Type<float>()) --> "float"\endcode
- */
-template <typename T>
-inline std::string reflect(jitify::reflection::Type<T>) {
-  return reflect<T>();
-}
-
-/*! Generate a code-string for a type wrapped as an Instance instance.
- *  \code{.cpp}reflect(Instance<float>(3.1f)) --> "float"\endcode
- *  or more simply when passed to a instance_of helper
- *  \code{.cpp}reflect(instance_of(3.1f)) --> "float"\endcodei
- *  This is specifically for the case where we want to extract the run-time
- * type, e.g., derived type, of an object pointer.
- */
-template <typename T>
-inline std::string reflect(jitify::reflection::Instance<T>& value) {
-  return detail::demangle_native_type(typeid(value.value));
-}
-
-// Type from value
-// E.g., type_of(3.14f) -> Type<float>()
-/*! Create a Type object representing a value's type.
- *  \param value The value whose type is to be captured.
- */
-template <typename T>
-inline Type<T> type_of(T&) {
-  return Type<T>();
-}
-/*! Create a Type object representing a value's type.
- *  \param value The const value whose type is to be captured.
- */
-template <typename T>
-inline Type<T const> type_of(T const&) {
-  return Type<T const>();
-}
-
-// Multiple value reflections one call, returning list of strings
-template <typename... Args>
-inline std::vector<std::string> reflect_all(Args... args) {
-  return {reflect(args)...};
-}
-
-inline std::string reflect_list(jitify::detail::vector<std::string> const& args,
-                                std::string opener = "",
-                                std::string closer = "") {
-  std::stringstream ss;
-  ss << opener;
-  for (int i = 0; i < (int)args.size(); ++i) {
-    if (i > 0) ss << ",";
-    ss << args[i];
-  }
-  ss << closer;
-  return ss.str();
-}
-
-// Template instantiation reflection
-// inline std::string reflect_template(std::vector<std::string> const& args) {
-inline std::string reflect_template(
-    jitify::detail::vector<std::string> const& args) {
-  // Note: The space in " >" is a WAR to avoid '>>' appearing
-  return reflect_list(args, "<", " >");
-}
-// TODO: See if can make this evaluate completely at compile-time
-template <typename... Ts>
-inline std::string reflect_template() {
-  return reflect_template({reflect<Ts>()...});
-  // return reflect_template<sizeof...(Ts)>({reflect<Ts>()...});
-}
-
-}  // namespace reflection
-
-//! \cond
-
-namespace detail {
-
-// Demangles nested variable names using the PTX name mangling scheme
-// (which follows the Itanium64 ABI). E.g., _ZN1a3Foo2bcE -> a::Foo::bc.
-inline std::string demangle_ptx_variable_name(const char* name) {
-  std::stringstream ss;
-  const char* c = name;
-  if (*c++ != '_' || *c++ != 'Z') return name;  // Non-mangled name
-  if (*c++ != 'N') return "";  // Not a nested name, unsupported
-  while (true) {
-    // Parse identifier length.
-    int n = 0;
-    while (std::isdigit(*c)) {
-      n = n * 10 + (*c - '0');
-      c++;
+    /*! Generate a code-string for a type wrapped as an Instance instance.
+     *  \code{.cpp}reflect(Instance<float>(3.1f)) --> "float"\endcode
+     *  or more simply when passed to a instance_of helper
+     *  \code{.cpp}reflect(instance_of(3.1f)) --> "float"\endcodei
+     *  This is specifically for the case where we want to extract the run-time
+     * type, e.g., derived type, of an object pointer.
+     */
+    template <typename T> inline std::string reflect(jitify::reflection::Instance<T> &value)
+    {
+      return detail::demangle_native_type(typeid(value.value));
     }
-    if (!n) return "";  // Invalid or unsupported mangled name
-    // Parse identifier.
-    const char* c0 = c;
-    while (n-- && *c) c++;
-    if (!*c) return "";  // Mangled name is truncated
-    std::string id(c0, c);
-    // Identifiers starting with "_GLOBAL" are anonymous namespaces.
-    ss << (id.substr(0, 7) == "_GLOBAL" ? "(anonymous namespace)" : id);
-    // Nested name specifiers end with 'E'.
-    if (*c == 'E') break;
-    // There are more identifiers to come, add join token.
-    ss << "::";
-  }
-  return ss.str();
-}
 
-static const char* get_current_executable_path() {
-  static const char* path = []() -> const char* {
-    static char buffer[JITIFY_PATH_MAX] = {};
+    // Type from value
+    // E.g., type_of(3.14f) -> Type<float>()
+    /*! Create a Type object representing a value's type.
+     *  \param value The value whose type is to be captured.
+     */
+    template <typename T> inline Type<T> type_of(T &) { return Type<T>(); }
+    /*! Create a Type object representing a value's type.
+     *  \param value The const value whose type is to be captured.
+     */
+    template <typename T> inline Type<T const> type_of(T const &) { return Type<T const>(); }
+
+    // Multiple value reflections one call, returning list of strings
+    template <typename... Args> inline std::vector<std::string> reflect_all(Args... args) { return {reflect(args)...}; }
+
+    inline std::string reflect_list(jitify::detail::vector<std::string> const &args, std::string opener = "",
+                                    std::string closer = "")
+    {
+      std::stringstream ss;
+      ss << opener;
+      for (int i = 0; i < (int)args.size(); ++i) {
+        if (i > 0) ss << ",";
+        ss << args[i];
+      }
+      ss << closer;
+      return ss.str();
+    }
+
+    // Template instantiation reflection
+    // inline std::string reflect_template(std::vector<std::string> const& args) {
+    inline std::string reflect_template(jitify::detail::vector<std::string> const &args)
+    {
+      // Note: The space in " >" is a WAR to avoid '>>' appearing
+      return reflect_list(args, "<", " >");
+    }
+    // TODO: See if can make this evaluate completely at compile-time
+    template <typename... Ts> inline std::string reflect_template()
+    {
+      return reflect_template({reflect<Ts>()...});
+      // return reflect_template<sizeof...(Ts)>({reflect<Ts>()...});
+    }
+
+  } // namespace reflection
+
+  //! \cond
+
+  namespace detail
+  {
+
+    // Demangles nested variable names using the PTX name mangling scheme
+    // (which follows the Itanium64 ABI). E.g., _ZN1a3Foo2bcE -> a::Foo::bc.
+    inline std::string demangle_ptx_variable_name(const char *name)
+    {
+      std::stringstream ss;
+      const char *c = name;
+      if (*c++ != '_' || *c++ != 'Z') return name; // Non-mangled name
+      if (*c++ != 'N') return "";                  // Not a nested name, unsupported
+      while (true) {
+        // Parse identifier length.
+        int n = 0;
+        while (std::isdigit(*c)) {
+          n = n * 10 + (*c - '0');
+          c++;
+        }
+        if (!n) return ""; // Invalid or unsupported mangled name
+        // Parse identifier.
+        const char *c0 = c;
+        while (n-- && *c) c++;
+        if (!*c) return ""; // Mangled name is truncated
+        std::string id(c0, c);
+        // Identifiers starting with "_GLOBAL" are anonymous namespaces.
+        ss << (id.substr(0, 7) == "_GLOBAL" ? "(anonymous namespace)" : id);
+        // Nested name specifiers end with 'E'.
+        if (*c == 'E') break;
+        // There are more identifiers to come, add join token.
+        ss << "::";
+      }
+      return ss.str();
+    }
+
+    static const char *get_current_executable_path()
+    {
+      static const char *path = []() -> const char * {
+        static char buffer[JITIFY_PATH_MAX] = {};
 #ifdef __linux__
-    if (!::realpath("/proc/self/exe", buffer)) return nullptr;
+        if (!::realpath("/proc/self/exe", buffer)) return nullptr;
 #elif defined(_WIN32) || defined(_WIN64)
-    if (!GetModuleFileNameA(nullptr, buffer, JITIFY_PATH_MAX)) return nullptr;
+        if (!GetModuleFileNameA(nullptr, buffer, JITIFY_PATH_MAX)) return nullptr;
 #endif
-    return buffer;
-  }();
+        return buffer;
+      }();
   return path;
 }
 
@@ -1152,8 +1122,7 @@ class CUDAKernel {
           // Infer based on filename.
           jit_input_type = get_cuda_jit_input_type(&link_file);
         }
-        result = cuLinkAddFile(_link_state, jit_input_type, link_file.c_str(),
-                               0, 0, 0);
+        result = cuLinkAddFile(_link_state, jit_input_type, link_file.c_str(), 0, 0, 0);
         int path_num = 0;
         while (result == CUDA_ERROR_FILE_NOT_FOUND &&
                path_num < (int)link_paths.size()) {
@@ -1166,8 +1135,7 @@ class CUDAKernel {
           std::cerr << "Linker error: Device library not found: " << link_file
                     << std::endl;
         } else if (result != CUDA_SUCCESS) {
-          std::cerr << "Linker error: Failed to add file: " << link_file
-                    << std::endl;
+          std::cerr << "Linker error: Failed to add file: " << link_file << std::endl;
           std::cerr << _error_log << std::endl;
         }
 #endif
@@ -1182,9 +1150,7 @@ class CUDAKernel {
     }
 #ifdef JITIFY_PRINT_LINKER_LOG
     std::cout << "---------------------------------------" << std::endl;
-    std::cout << "--- Linker for "
-              << reflection::detail::demangle_cuda_symbol(_func_name.c_str())
-              << " ---" << std::endl;
+    std::cout << "--- Linker for " << reflection::detail::demangle_cuda_symbol(_func_name.c_str()) << " ---" << std::endl;
     std::cout << "---------------------------------------" << std::endl;
     std::cout << _info_log << std::endl;
     std::cout << std::endl;
@@ -1199,10 +1165,9 @@ class CUDAKernel {
           cuModuleGetFunction(&_kernel, _module, _func_name.c_str()));
     }
   }
-  inline void destroy_module() {
-    if (_link_state) {
-      cuda_safe_call(cuLinkDestroy(_link_state));
-    }
+  inline void destroy_module()
+  {
+    if (_link_state) { cuda_safe_call(cuLinkDestroy(_link_state)); }
     _link_state = 0;
     if (_module) {
       cuModuleUnload(_module);
@@ -1299,31 +1264,30 @@ class CUDAKernel {
                           block.z, smem, stream, arg_ptrs.data(), NULL);
   }
 
-  inline void safe_launch(dim3 grid, dim3 block, unsigned int smem,
-                          CUstream stream, std::vector<void*> arg_ptrs) const {
-    return cuda_safe_call(cuLaunchKernel(_kernel, grid.x, grid.y, grid.z,
-                                         block.x, block.y, block.z, smem,
-                                         stream, arg_ptrs.data(), NULL));
+  inline void safe_launch(dim3 grid, dim3 block, unsigned int smem, CUstream stream, std::vector<void *> arg_ptrs) const
+  {
+    return cuda_safe_call(
+      cuLaunchKernel(_kernel, grid.x, grid.y, grid.z, block.x, block.y, block.z, smem, stream, arg_ptrs.data(), NULL));
   }
 
-  inline int get_func_attribute(CUfunction_attribute attribute) const {
+  inline int get_func_attribute(CUfunction_attribute attribute) const
+  {
     int value;
     cuda_safe_call(cuFuncGetAttribute(&value, attribute, _kernel));
     return value;
   }
 
-  inline void set_func_attribute(CUfunction_attribute attribute,
-                                 int value) const {
+  inline void set_func_attribute(CUfunction_attribute attribute, int value) const
+  {
     cuda_safe_call(cuFuncSetAttribute(_kernel, attribute, value));
   }
 
-  inline CUdeviceptr get_global_ptr(const char* name,
-                                    size_t* size = nullptr) const {
+  inline CUdeviceptr get_global_ptr(const char *name, size_t *size = nullptr) const
+  {
     CUdeviceptr global_ptr = 0;
     auto global = _global_map.find(name);
     if (global != _global_map.end()) {
-      cuda_safe_call(cuModuleGetGlobal(&global_ptr, size, _module,
-                                       global->second.c_str()));
+      cuda_safe_call(cuModuleGetGlobal(&global_ptr, size, _module, global->second.c_str()));
     } else {
       throw std::runtime_error(std::string("failed to look up global ") + name);
     }
@@ -1331,8 +1295,8 @@ class CUDAKernel {
   }
 
   template <typename T>
-  inline CUresult get_global_data(const char* name, T* data, size_t count,
-                                  CUstream stream = 0) const {
+  inline CUresult get_global_data(const char *name, T *data, size_t count, CUstream stream = 0) const
+  {
     size_t size_bytes;
     CUdeviceptr ptr = get_global_ptr(name, &size_bytes);
     size_t given_size_bytes = count * sizeof(T);
@@ -1366,7 +1330,7 @@ class CUDAKernel {
   const std::vector<std::string>& link_paths() const { return _link_paths; }
 };
 
-static const char* jitsafe_header_preinclude_h = R"(
+static const char *jitsafe_header_preinclude_h = R"(
 //// WAR for Thrust (which appears to have forgotten to include this in result_of_adaptable_function.h
 //#include <type_traits>
 
@@ -1387,7 +1351,7 @@ static const char* jitsafe_header_preinclude_h = R"(
 #define catch(...)
 )";
 
-static const char* jitsafe_header_float_h = R"(
+static const char *jitsafe_header_float_h = R"(
 #pragma once
 
 #define FLT_RADIX       2
@@ -1416,7 +1380,7 @@ static const char* jitsafe_header_float_h = R"(
 #endif
 )";
 
-static const char* jitsafe_header_limits_h = R"(
+static const char *jitsafe_header_limits_h = R"(
 #pragma once
 
 #if defined _WIN32 || defined _WIN64
@@ -1460,7 +1424,7 @@ enum {
 #define ULLONG_MAX 18446744073709551615ULL
 )";
 
-static const char* jitsafe_header_iterator = R"(
+static const char *jitsafe_header_iterator = R"(
 #pragma once
 
 namespace std {
@@ -1499,7 +1463,7 @@ struct iterator_traits<T const*> {
 // TODO: This is incomplete; need floating point limits
 //   Joe Eaton: added IEEE float and double types, none of the smaller types
 //              using type specific structs since we can't template on floats.
-static const char* jitsafe_header_limits = R"(
+static const char *jitsafe_header_limits = R"(
 #pragma once
 #include <cfloat>
 #include <climits>
@@ -1658,7 +1622,7 @@ __jitify_detail::DoubleLimits
 )";
 
 // TODO: This is highly incomplete
-static const char* jitsafe_header_type_traits = R"(
+static const char *jitsafe_header_type_traits = R"(
     #pragma once
     #if __cplusplus >= 201103L
     namespace std {
@@ -1890,103 +1854,101 @@ static const char* jitsafe_header_type_traits = R"(
 )";
 
 // TODO: INT_FAST8_MAX et al. and a few other misc constants
-static const char* jitsafe_header_stdint_h =
-    "#pragma once\n"
-    "#include <climits>\n"
-    "namespace __jitify_stdint_ns {\n"
-    "typedef signed char      int8_t;\n"
-    "typedef signed short     int16_t;\n"
-    "typedef signed int       int32_t;\n"
-    "typedef signed long long int64_t;\n"
-    "typedef signed char      int_fast8_t;\n"
-    "typedef signed short     int_fast16_t;\n"
-    "typedef signed int       int_fast32_t;\n"
-    "typedef signed long long int_fast64_t;\n"
-    "typedef signed char      int_least8_t;\n"
-    "typedef signed short     int_least16_t;\n"
-    "typedef signed int       int_least32_t;\n"
-    "typedef signed long long int_least64_t;\n"
-    "typedef signed long long intmax_t;\n"
-    "typedef signed long      intptr_t; //optional\n"
-    "typedef unsigned char      uint8_t;\n"
-    "typedef unsigned short     uint16_t;\n"
-    "typedef unsigned int       uint32_t;\n"
-    "typedef unsigned long long uint64_t;\n"
-    "typedef unsigned char      uint_fast8_t;\n"
-    "typedef unsigned short     uint_fast16_t;\n"
-    "typedef unsigned int       uint_fast32_t;\n"
-    "typedef unsigned long long uint_fast64_t;\n"
-    "typedef unsigned char      uint_least8_t;\n"
-    "typedef unsigned short     uint_least16_t;\n"
-    "typedef unsigned int       uint_least32_t;\n"
-    "typedef unsigned long long uint_least64_t;\n"
-    "typedef unsigned long long uintmax_t;\n"
-    "#define INT8_MIN    SCHAR_MIN\n"
-    "#define INT16_MIN   SHRT_MIN\n"
-    "#if defined _WIN32 || defined _WIN64\n"
-    "#define WCHAR_MIN   SHRT_MIN\n"
-    "#define WCHAR_MAX   SHRT_MAX\n"
-    "typedef unsigned long long uintptr_t; //optional\n"
-    "#else\n"
-    "#define WCHAR_MIN   INT_MIN\n"
-    "#define WCHAR_MAX   INT_MAX\n"
-    "typedef unsigned long      uintptr_t; //optional\n"
-    "#endif\n"
-    "#define INT32_MIN   INT_MIN\n"
-    "#define INT64_MIN   LLONG_MIN\n"
-    "#define INT8_MAX    SCHAR_MAX\n"
-    "#define INT16_MAX   SHRT_MAX\n"
-    "#define INT32_MAX   INT_MAX\n"
-    "#define INT64_MAX   LLONG_MAX\n"
-    "#define UINT8_MAX   UCHAR_MAX\n"
-    "#define UINT16_MAX  USHRT_MAX\n"
-    "#define UINT32_MAX  UINT_MAX\n"
-    "#define UINT64_MAX  ULLONG_MAX\n"
-    "#define INTPTR_MIN  LONG_MIN\n"
-    "#define INTMAX_MIN  LLONG_MIN\n"
-    "#define INTPTR_MAX  LONG_MAX\n"
-    "#define INTMAX_MAX  LLONG_MAX\n"
-    "#define UINTPTR_MAX ULONG_MAX\n"
-    "#define UINTMAX_MAX ULLONG_MAX\n"
-    "#define PTRDIFF_MIN INTPTR_MIN\n"
-    "#define PTRDIFF_MAX INTPTR_MAX\n"
-    "#define SIZE_MAX    UINT64_MAX\n"
-    "} // namespace __jitify_stdint_ns\n"
-    "namespace std { using namespace __jitify_stdint_ns; }\n"
-    "using namespace __jitify_stdint_ns;\n";
+static const char *jitsafe_header_stdint_h = "#pragma once\n"
+                                             "#include <climits>\n"
+                                             "namespace __jitify_stdint_ns {\n"
+                                             "typedef signed char      int8_t;\n"
+                                             "typedef signed short     int16_t;\n"
+                                             "typedef signed int       int32_t;\n"
+                                             "typedef signed long long int64_t;\n"
+                                             "typedef signed char      int_fast8_t;\n"
+                                             "typedef signed short     int_fast16_t;\n"
+                                             "typedef signed int       int_fast32_t;\n"
+                                             "typedef signed long long int_fast64_t;\n"
+                                             "typedef signed char      int_least8_t;\n"
+                                             "typedef signed short     int_least16_t;\n"
+                                             "typedef signed int       int_least32_t;\n"
+                                             "typedef signed long long int_least64_t;\n"
+                                             "typedef signed long long intmax_t;\n"
+                                             "typedef signed long      intptr_t; //optional\n"
+                                             "typedef unsigned char      uint8_t;\n"
+                                             "typedef unsigned short     uint16_t;\n"
+                                             "typedef unsigned int       uint32_t;\n"
+                                             "typedef unsigned long long uint64_t;\n"
+                                             "typedef unsigned char      uint_fast8_t;\n"
+                                             "typedef unsigned short     uint_fast16_t;\n"
+                                             "typedef unsigned int       uint_fast32_t;\n"
+                                             "typedef unsigned long long uint_fast64_t;\n"
+                                             "typedef unsigned char      uint_least8_t;\n"
+                                             "typedef unsigned short     uint_least16_t;\n"
+                                             "typedef unsigned int       uint_least32_t;\n"
+                                             "typedef unsigned long long uint_least64_t;\n"
+                                             "typedef unsigned long long uintmax_t;\n"
+                                             "#define INT8_MIN    SCHAR_MIN\n"
+                                             "#define INT16_MIN   SHRT_MIN\n"
+                                             "#if defined _WIN32 || defined _WIN64\n"
+                                             "#define WCHAR_MIN   SHRT_MIN\n"
+                                             "#define WCHAR_MAX   SHRT_MAX\n"
+                                             "typedef unsigned long long uintptr_t; //optional\n"
+                                             "#else\n"
+                                             "#define WCHAR_MIN   INT_MIN\n"
+                                             "#define WCHAR_MAX   INT_MAX\n"
+                                             "typedef unsigned long      uintptr_t; //optional\n"
+                                             "#endif\n"
+                                             "#define INT32_MIN   INT_MIN\n"
+                                             "#define INT64_MIN   LLONG_MIN\n"
+                                             "#define INT8_MAX    SCHAR_MAX\n"
+                                             "#define INT16_MAX   SHRT_MAX\n"
+                                             "#define INT32_MAX   INT_MAX\n"
+                                             "#define INT64_MAX   LLONG_MAX\n"
+                                             "#define UINT8_MAX   UCHAR_MAX\n"
+                                             "#define UINT16_MAX  USHRT_MAX\n"
+                                             "#define UINT32_MAX  UINT_MAX\n"
+                                             "#define UINT64_MAX  ULLONG_MAX\n"
+                                             "#define INTPTR_MIN  LONG_MIN\n"
+                                             "#define INTMAX_MIN  LLONG_MIN\n"
+                                             "#define INTPTR_MAX  LONG_MAX\n"
+                                             "#define INTMAX_MAX  LLONG_MAX\n"
+                                             "#define UINTPTR_MAX ULONG_MAX\n"
+                                             "#define UINTMAX_MAX ULLONG_MAX\n"
+                                             "#define PTRDIFF_MIN INTPTR_MIN\n"
+                                             "#define PTRDIFF_MAX INTPTR_MAX\n"
+                                             "#define SIZE_MAX    UINT64_MAX\n"
+                                             "} // namespace __jitify_stdint_ns\n"
+                                             "namespace std { using namespace __jitify_stdint_ns; }\n"
+                                             "using namespace __jitify_stdint_ns;\n";
 
 // TODO: offsetof
-static const char* jitsafe_header_stddef_h =
-    "#pragma once\n"
-    "#include <climits>\n"
-    "namespace __jitify_stddef_ns {\n"
-    "#if __cplusplus >= 201103L\n"
-    "typedef decltype(nullptr) nullptr_t;\n"
-    "#if defined(_MSC_VER)\n"
-    "  typedef double max_align_t;\n"
-    "#elif defined(__APPLE__)\n"
-    "  typedef long double max_align_t;\n"
-    "#else\n"
-    "  // Define max_align_t to match the GCC definition.\n"
-    "  typedef struct {\n"
-    "    long long __jitify_max_align_nonce1\n"
-    "        __attribute__((__aligned__(__alignof__(long long))));\n"
-    "    long double __jitify_max_align_nonce2\n"
-    "        __attribute__((__aligned__(__alignof__(long double))));\n"
-    "  } max_align_t;\n"
-    "#endif\n"
-    "#endif  // __cplusplus >= 201103L\n"
-    "#if __cplusplus >= 201703L\n"
-    "enum class byte : unsigned char {};\n"
-    "#endif  // __cplusplus >= 201703L\n"
-    "} // namespace __jitify_stddef_ns\n"
-    "namespace std {\n"
-    "  // NVRTC provides built-in definitions of ::size_t and ::ptrdiff_t.\n"
-    "  using ::size_t;\n"
-    "  using ::ptrdiff_t;\n"
-    "  using namespace __jitify_stddef_ns;\n"
-    "} // namespace std\n"
-    "using namespace __jitify_stddef_ns;\n";
+static const char *jitsafe_header_stddef_h = "#pragma once\n"
+                                             "#include <climits>\n"
+                                             "namespace __jitify_stddef_ns {\n"
+                                             "#if __cplusplus >= 201103L\n"
+                                             "typedef decltype(nullptr) nullptr_t;\n"
+                                             "#if defined(_MSC_VER)\n"
+                                             "  typedef double max_align_t;\n"
+                                             "#elif defined(__APPLE__)\n"
+                                             "  typedef long double max_align_t;\n"
+                                             "#else\n"
+                                             "  // Define max_align_t to match the GCC definition.\n"
+                                             "  typedef struct {\n"
+                                             "    long long __jitify_max_align_nonce1\n"
+                                             "        __attribute__((__aligned__(__alignof__(long long))));\n"
+                                             "    long double __jitify_max_align_nonce2\n"
+                                             "        __attribute__((__aligned__(__alignof__(long double))));\n"
+                                             "  } max_align_t;\n"
+                                             "#endif\n"
+                                             "#endif  // __cplusplus >= 201103L\n"
+                                             "#if __cplusplus >= 201703L\n"
+                                             "enum class byte : unsigned char {};\n"
+                                             "#endif  // __cplusplus >= 201703L\n"
+                                             "} // namespace __jitify_stddef_ns\n"
+                                             "namespace std {\n"
+                                             "  // NVRTC provides built-in definitions of ::size_t and ::ptrdiff_t.\n"
+                                             "  using ::size_t;\n"
+                                             "  using ::ptrdiff_t;\n"
+                                             "  using namespace __jitify_stddef_ns;\n"
+                                             "} // namespace std\n"
+                                             "using namespace __jitify_stddef_ns;\n";
 
 static const char* jitsafe_header_stdlib_h =
     "#pragma once\n"
@@ -2021,225 +1983,216 @@ static const char* jitsafe_header_iostream =
     "#include <ostream>\n"
     "#include <istream>\n";
 // HACK TESTING (WAR for Thrust)
-static const char* jitsafe_header_ostream =
-    "#pragma once\n"
-    "\n"
-    "namespace std {\n"
-    "template<class CharT,class Traits=void>\n"  // = std::char_traits<CharT>
-                                                 // >\n"
-    "struct basic_ostream {\n"
-    "};\n"
-    "typedef basic_ostream<char> ostream;\n"
-    "ostream& endl(ostream& os);\n"
-    "ostream& operator<<( ostream&, ostream& (*f)( ostream& ) );\n"
-    "template< class CharT, class Traits > basic_ostream<CharT, Traits>& endl( "
-    "basic_ostream<CharT, Traits>& os );\n"
-    "template< class CharT, class Traits > basic_ostream<CharT, Traits>& "
-    "operator<<( basic_ostream<CharT,Traits>& os, const char* c );\n"
-    "#if __cplusplus >= 201103L\n"
-    "template< class CharT, class Traits, class T > basic_ostream<CharT, "
-    "Traits>& operator<<( basic_ostream<CharT,Traits>&& os, const T& value );\n"
-    "#endif  // __cplusplus >= 201103L\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_ostream = "#pragma once\n"
+                                            "\n"
+                                            "namespace std {\n"
+                                            "template<class CharT,class Traits=void>\n" // = std::char_traits<CharT>
+                                                                                        // >\n"
+                                            "struct basic_ostream {\n"
+                                            "};\n"
+                                            "typedef basic_ostream<char> ostream;\n"
+                                            "ostream& endl(ostream& os);\n"
+                                            "ostream& operator<<( ostream&, ostream& (*f)( ostream& ) );\n"
+                                            "template< class CharT, class Traits > basic_ostream<CharT, Traits>& endl( "
+                                            "basic_ostream<CharT, Traits>& os );\n"
+                                            "template< class CharT, class Traits > basic_ostream<CharT, Traits>& "
+                                            "operator<<( basic_ostream<CharT,Traits>& os, const char* c );\n"
+                                            "#if __cplusplus >= 201103L\n"
+                                            "template< class CharT, class Traits, class T > basic_ostream<CharT, "
+                                            "Traits>& operator<<( basic_ostream<CharT,Traits>&& os, const T& value );\n"
+                                            "#endif  // __cplusplus >= 201103L\n"
+                                            "}  // namespace std\n";
 
-static const char* jitsafe_header_istream =
-    "#pragma once\n"
-    "\n"
-    "namespace std {\n"
-    "template<class CharT,class Traits=void>\n"  // = std::char_traits<CharT>
-                                                 // >\n"
-    "struct basic_istream {\n"
-    "};\n"
-    "typedef basic_istream<char> istream;\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_istream = "#pragma once\n"
+                                            "\n"
+                                            "namespace std {\n"
+                                            "template<class CharT,class Traits=void>\n" // = std::char_traits<CharT>
+                                                                                        // >\n"
+                                            "struct basic_istream {\n"
+                                            "};\n"
+                                            "typedef basic_istream<char> istream;\n"
+                                            "}  // namespace std\n";
 
-static const char* jitsafe_header_sstream =
-    "#pragma once\n"
-    "#include <ostream>\n"
-    "#include <istream>\n";
+static const char *jitsafe_header_sstream = "#pragma once\n"
+                                            "#include <ostream>\n"
+                                            "#include <istream>\n";
 
-static const char* jitsafe_header_utility =
-    "#pragma once\n"
-    "namespace std {\n"
-    "template<class T1, class T2>\n"
-    "struct pair {\n"
-    "	T1 first;\n"
-    "	T2 second;\n"
-    "	inline pair() {}\n"
-    "	inline pair(T1 const& first_, T2 const& second_)\n"
-    "		: first(first_), second(second_) {}\n"
-    "	// TODO: Standard includes many more constructors...\n"
-    "	// TODO: Comparison operators\n"
-    "};\n"
-    "template<class T1, class T2>\n"
-    "pair<T1,T2> make_pair(T1 const& first, T2 const& second) {\n"
-    "	return pair<T1,T2>(first, second);\n"
-    "}\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_utility = "#pragma once\n"
+                                            "namespace std {\n"
+                                            "template<class T1, class T2>\n"
+                                            "struct pair {\n"
+                                            "	T1 first;\n"
+                                            "	T2 second;\n"
+                                            "	inline pair() {}\n"
+                                            "	inline pair(T1 const& first_, T2 const& second_)\n"
+                                            "		: first(first_), second(second_) {}\n"
+                                            "	// TODO: Standard includes many more constructors...\n"
+                                            "	// TODO: Comparison operators\n"
+                                            "};\n"
+                                            "template<class T1, class T2>\n"
+                                            "pair<T1,T2> make_pair(T1 const& first, T2 const& second) {\n"
+                                            "	return pair<T1,T2>(first, second);\n"
+                                            "}\n"
+                                            "}  // namespace std\n";
 
 // TODO: incomplete
-static const char* jitsafe_header_vector =
-    "#pragma once\n"
-    "namespace std {\n"
-    "template<class T, class Allocator=void>\n"  // = std::allocator> \n"
-    "struct vector {\n"
-    "};\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_vector = "#pragma once\n"
+                                           "namespace std {\n"
+                                           "template<class T, class Allocator=void>\n" // = std::allocator> \n"
+                                           "struct vector {\n"
+                                           "};\n"
+                                           "}  // namespace std\n";
 
 // TODO: incomplete
-static const char* jitsafe_header_string =
-    "#pragma once\n"
-    "namespace std {\n"
-    "template<class CharT,class Traits=void,class Allocator=void>\n"
-    "struct basic_string {\n"
-    "basic_string();\n"
-    "basic_string( const CharT* s );\n"  //, const Allocator& alloc =
-                                         // Allocator() );\n"
-    "const CharT* c_str() const;\n"
-    "bool empty() const;\n"
-    "void operator+=(const char *);\n"
-    "void operator+=(const basic_string &);\n"
-    "};\n"
-    "typedef basic_string<char> string;\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_string = "#pragma once\n"
+                                           "namespace std {\n"
+                                           "template<class CharT,class Traits=void,class Allocator=void>\n"
+                                           "struct basic_string {\n"
+                                           "basic_string();\n"
+                                           "basic_string( const CharT* s );\n" //, const Allocator& alloc =
+                                                                               // Allocator() );\n"
+                                           "const CharT* c_str() const;\n"
+                                           "bool empty() const;\n"
+                                           "void operator+=(const char *);\n"
+                                           "void operator+=(const basic_string &);\n"
+                                           "};\n"
+                                           "typedef basic_string<char> string;\n"
+                                           "}  // namespace std\n";
 
 // TODO: incomplete
-static const char* jitsafe_header_stdexcept =
-    "#pragma once\n"
-    "namespace std {\n"
-    "struct runtime_error {\n"
-    "explicit runtime_error( const std::string& what_arg );"
-    "explicit runtime_error( const char* what_arg );"
-    "virtual const char* what() const;\n"
-    "};\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_stdexcept = "#pragma once\n"
+                                              "namespace std {\n"
+                                              "struct runtime_error {\n"
+                                              "explicit runtime_error( const std::string& what_arg );"
+                                              "explicit runtime_error( const char* what_arg );"
+                                              "virtual const char* what() const;\n"
+                                              "};\n"
+                                              "}  // namespace std\n";
 
 // TODO: incomplete
-static const char* jitsafe_header_complex =
-    "#pragma once\n"
-    "namespace std {\n"
-    "template<typename T>\n"
-    "class complex {\n"
-    "	T _real;\n"
-    "	T _imag;\n"
-    "public:\n"
-    "	complex() : _real(0), _imag(0) {}\n"
-    "	complex(T const& real, T const& imag)\n"
-    "		: _real(real), _imag(imag) {}\n"
-    "	complex(T const& real)\n"
-    "               : _real(real), _imag(static_cast<T>(0)) {}\n"
-    "	T const& real() const { return _real; }\n"
-    "	T&       real()       { return _real; }\n"
-    "	void real(const T &r) { _real = r; }\n"
-    "	T const& imag() const { return _imag; }\n"
-    "	T&       imag()       { return _imag; }\n"
-    "	void imag(const T &i) { _imag = i; }\n"
-    "       complex<T>& operator+=(const complex<T> z)\n"
-    "         { _real += z.real(); _imag += z.imag(); return *this; }\n"
-    "};\n"
-    "template<typename T>\n"
-    "complex<T> operator*(const complex<T>& lhs, const complex<T>& rhs)\n"
-    "  { return complex<T>(lhs.real()*rhs.real()-lhs.imag()*rhs.imag(),\n"
-    "                      lhs.real()*rhs.imag()+lhs.imag()*rhs.real()); }\n"
-    "template<typename T>\n"
-    "complex<T> operator*(const complex<T>& lhs, const T & rhs)\n"
-    "  { return complexs<T>(lhs.real()*rhs,lhs.imag()*rhs); }\n"
-    "template<typename T>\n"
-    "complex<T> operator*(const T& lhs, const complex<T>& rhs)\n"
-    "  { return complexs<T>(rhs.real()*lhs,rhs.imag()*lhs); }\n"
-    "}  // namespace std\n";
+static const char *jitsafe_header_complex = "#pragma once\n"
+                                            "namespace std {\n"
+                                            "template<typename T>\n"
+                                            "class complex {\n"
+                                            "	T _real;\n"
+                                            "	T _imag;\n"
+                                            "public:\n"
+                                            "	complex() : _real(0), _imag(0) {}\n"
+                                            "	complex(T const& real, T const& imag)\n"
+                                            "		: _real(real), _imag(imag) {}\n"
+                                            "	complex(T const& real)\n"
+                                            "               : _real(real), _imag(static_cast<T>(0)) {}\n"
+                                            "	T const& real() const { return _real; }\n"
+                                            "	T&       real()       { return _real; }\n"
+                                            "	void real(const T &r) { _real = r; }\n"
+                                            "	T const& imag() const { return _imag; }\n"
+                                            "	T&       imag()       { return _imag; }\n"
+                                            "	void imag(const T &i) { _imag = i; }\n"
+                                            "       complex<T>& operator+=(const complex<T> z)\n"
+                                            "         { _real += z.real(); _imag += z.imag(); return *this; }\n"
+                                            "};\n"
+                                            "template<typename T>\n"
+                                            "complex<T> operator*(const complex<T>& lhs, const complex<T>& rhs)\n"
+                                            "  { return complex<T>(lhs.real()*rhs.real()-lhs.imag()*rhs.imag(),\n"
+                                            "                      lhs.real()*rhs.imag()+lhs.imag()*rhs.real()); }\n"
+                                            "template<typename T>\n"
+                                            "complex<T> operator*(const complex<T>& lhs, const T & rhs)\n"
+                                            "  { return complexs<T>(lhs.real()*rhs,lhs.imag()*rhs); }\n"
+                                            "template<typename T>\n"
+                                            "complex<T> operator*(const T& lhs, const complex<T>& rhs)\n"
+                                            "  { return complexs<T>(rhs.real()*lhs,rhs.imag()*lhs); }\n"
+                                            "}  // namespace std\n";
 
 // TODO: This is incomplete (missing binary and integer funcs, macros,
 // constants, types)
-static const char* jitsafe_header_math_h =
-    "#pragma once\n"
-    "namespace __jitify_math_ns {\n"
-    "#if __cplusplus >= 201103L\n"
-    "#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f) \\\n"
-    "	inline double      f(double x)         { return ::f(x); } \\\n"
-    "	inline float       f##f(float x)       { return ::f(x); } \\\n"
-    "	/*inline long double f##l(long double x) { return ::f(x); }*/ \\\n"
-    "	inline float       f(float x)          { return ::f(x); } \\\n"
-    "	/*inline long double f(long double x)    { return ::f(x); }*/\n"
-    "#else\n"
-    "#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f) \\\n"
-    "	inline double      f(double x)         { return ::f(x); } \\\n"
-    "	inline float       f##f(float x)       { return ::f(x); } \\\n"
-    "	/*inline long double f##l(long double x) { return ::f(x); }*/\n"
-    "#endif\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(cos)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(sin)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(tan)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(acos)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(asin)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(atan)\n"
-    "template<typename T> inline T atan2(T y, T x) { return ::atan2(y, x); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(cosh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(sinh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(tanh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(exp)\n"
-    "template<typename T> inline T frexp(T x, int* exp) { return ::frexp(x, "
-    "exp); }\n"
-    "template<typename T> inline T ldexp(T x, int  exp) { return ::ldexp(x, "
-    "exp); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(log)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(log10)\n"
-    "template<typename T> inline T modf(T x, T* intpart) { return ::modf(x, "
-    "intpart); }\n"
-    "template<typename T> inline T pow(T x, T y) { return ::pow(x, y); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(sqrt)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(ceil)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(floor)\n"
-    "template<typename T> inline T fmod(T n, T d) { return ::fmod(n, d); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(fabs)\n"
-    "template<typename T> inline T abs(T x) { return ::abs(x); }\n"
-    "#if __cplusplus >= 201103L\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(acosh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(asinh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(atanh)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(exp2)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(expm1)\n"
-    "template<typename T> inline int ilogb(T x) { return ::ilogb(x); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(log1p)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(log2)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(logb)\n"
-    "template<typename T> inline T scalbn (T x, int n)  { return ::scalbn(x, "
-    "n); }\n"
-    "template<typename T> inline T scalbln(T x, long n) { return ::scalbn(x, "
-    "n); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(cbrt)\n"
-    "template<typename T> inline T hypot(T x, T y) { return ::hypot(x, y); }\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(erf)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(erfc)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(tgamma)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(lgamma)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(trunc)\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(round)\n"
-    "template<typename T> inline long lround(T x) { return ::lround(x); }\n"
-    "template<typename T> inline long long llround(T x) { return ::llround(x); "
-    "}\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(rint)\n"
-    "template<typename T> inline long lrint(T x) { return ::lrint(x); }\n"
-    "template<typename T> inline long long llrint(T x) { return ::llrint(x); "
-    "}\n"
-    "DEFINE_MATH_UNARY_FUNC_WRAPPER(nearbyint)\n"
-    // TODO: remainder, remquo, copysign, nan, nextafter, nexttoward, fdim,
-    // fmax, fmin, fma
-    "#endif\n"
-    "#undef DEFINE_MATH_UNARY_FUNC_WRAPPER\n"
-    "} // namespace __jitify_math_ns\n"
-    "namespace std { using namespace __jitify_math_ns; }\n"
-    "#define M_PI 3.14159265358979323846\n"
-    // Note: Global namespace already includes CUDA math funcs
-    "//using namespace __jitify_math_ns;\n";
+static const char *jitsafe_header_math_h = "#pragma once\n"
+                                           "namespace __jitify_math_ns {\n"
+                                           "#if __cplusplus >= 201103L\n"
+                                           "#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f) \\\n"
+                                           "	inline double      f(double x)         { return ::f(x); } \\\n"
+                                           "	inline float       f##f(float x)       { return ::f(x); } \\\n"
+                                           "	/*inline long double f##l(long double x) { return ::f(x); }*/ \\\n"
+                                           "	inline float       f(float x)          { return ::f(x); } \\\n"
+                                           "	/*inline long double f(long double x)    { return ::f(x); }*/\n"
+                                           "#else\n"
+                                           "#define DEFINE_MATH_UNARY_FUNC_WRAPPER(f) \\\n"
+                                           "	inline double      f(double x)         { return ::f(x); } \\\n"
+                                           "	inline float       f##f(float x)       { return ::f(x); } \\\n"
+                                           "	/*inline long double f##l(long double x) { return ::f(x); }*/\n"
+                                           "#endif\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(cos)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(sin)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(tan)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(acos)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(asin)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(atan)\n"
+                                           "template<typename T> inline T atan2(T y, T x) { return ::atan2(y, x); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(cosh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(sinh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(tanh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(exp)\n"
+                                           "template<typename T> inline T frexp(T x, int* exp) { return ::frexp(x, "
+                                           "exp); }\n"
+                                           "template<typename T> inline T ldexp(T x, int  exp) { return ::ldexp(x, "
+                                           "exp); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(log)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(log10)\n"
+                                           "template<typename T> inline T modf(T x, T* intpart) { return ::modf(x, "
+                                           "intpart); }\n"
+                                           "template<typename T> inline T pow(T x, T y) { return ::pow(x, y); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(sqrt)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(ceil)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(floor)\n"
+                                           "template<typename T> inline T fmod(T n, T d) { return ::fmod(n, d); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(fabs)\n"
+                                           "template<typename T> inline T abs(T x) { return ::abs(x); }\n"
+                                           "#if __cplusplus >= 201103L\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(acosh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(asinh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(atanh)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(exp2)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(expm1)\n"
+                                           "template<typename T> inline int ilogb(T x) { return ::ilogb(x); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(log1p)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(log2)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(logb)\n"
+                                           "template<typename T> inline T scalbn (T x, int n)  { return ::scalbn(x, "
+                                           "n); }\n"
+                                           "template<typename T> inline T scalbln(T x, long n) { return ::scalbn(x, "
+                                           "n); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(cbrt)\n"
+                                           "template<typename T> inline T hypot(T x, T y) { return ::hypot(x, y); }\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(erf)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(erfc)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(tgamma)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(lgamma)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(trunc)\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(round)\n"
+                                           "template<typename T> inline long lround(T x) { return ::lround(x); }\n"
+                                           "template<typename T> inline long long llround(T x) { return ::llround(x); "
+                                           "}\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(rint)\n"
+                                           "template<typename T> inline long lrint(T x) { return ::lrint(x); }\n"
+                                           "template<typename T> inline long long llrint(T x) { return ::llrint(x); "
+                                           "}\n"
+                                           "DEFINE_MATH_UNARY_FUNC_WRAPPER(nearbyint)\n"
+                                           // TODO: remainder, remquo, copysign, nan, nextafter, nexttoward, fdim,
+                                           // fmax, fmin, fma
+                                           "#endif\n"
+                                           "#undef DEFINE_MATH_UNARY_FUNC_WRAPPER\n"
+                                           "} // namespace __jitify_math_ns\n"
+                                           "namespace std { using namespace __jitify_math_ns; }\n"
+                                           "#define M_PI 3.14159265358979323846\n"
+                                           // Note: Global namespace already includes CUDA math funcs
+                                           "//using namespace __jitify_math_ns;\n";
 
-static const char* jitsafe_header_memory_h = R"(
+static const char *jitsafe_header_memory_h = R"(
     #pragma once
     #include <string.h>
  )";
 
 // TODO: incomplete
-static const char* jitsafe_header_mutex = R"(
+static const char *jitsafe_header_mutex = R"(
     #pragma once
     #if __cplusplus >= 201103L
     namespace std {
@@ -2253,7 +2206,7 @@ static const char* jitsafe_header_mutex = R"(
     #endif
  )";
 
-static const char* jitsafe_header_algorithm = R"(
+static const char *jitsafe_header_algorithm = R"(
     #pragma once
     #if __cplusplus >= 201103L
     namespace std {
@@ -2277,7 +2230,7 @@ static const char* jitsafe_header_algorithm = R"(
     #endif
  )";
 
-static const char* jitsafe_header_time_h = R"(
+static const char *jitsafe_header_time_h = R"(
     #pragma once
     #define NULL 0
     #define CLOCKS_PER_SEC 1000000
@@ -2310,7 +2263,7 @@ static const char* jitsafe_header_time_h = R"(
     using namespace __jitify_time_ns;
  )";
 
-static const char* jitsafe_header_tuple = R"(
+static const char *jitsafe_header_tuple = R"(
     #pragma once
     #if __cplusplus >= 201103L
     namespace std {
@@ -2319,23 +2272,15 @@ static const char* jitsafe_header_tuple = R"(
     #endif
  )";
 
-static const char* jitsafe_header_assert = R"(
+static const char *jitsafe_header_assert = R"(
     #pragma once
  )";
 
 // WAR: These need to be pre-included as a workaround for NVRTC implicitly using
 // /usr/include as an include path. The other built-in headers will be included
 // lazily as needed.
-static const char* preinclude_jitsafe_header_names[] = {"jitify_preinclude.h",
-                                                        "limits.h",
-                                                        "math.h",
-                                                        "memory.h",
-                                                        "stdint.h",
-                                                        "stdlib.h",
-                                                        "stdio.h",
-                                                        "string.h",
-                                                        "time.h",
-                                                        "assert.h"};
+static const char *preinclude_jitsafe_header_names[] = {
+  "jitify_preinclude.h", "limits.h", "math.h", "memory.h", "stdint.h", "stdlib.h", "stdio.h", "string.h", "time.h", "assert.h"};
 
 template <class T, int N>
 int array_size(T (&)[N]) {
@@ -2344,58 +2289,58 @@ int array_size(T (&)[N]) {
 const int preinclude_jitsafe_headers_count =
     array_size(preinclude_jitsafe_header_names);
 
-static const std::map<std::string, std::string>& get_jitsafe_headers_map() {
-  static const std::map<std::string, std::string> jitsafe_headers_map = {
-      {"jitify_preinclude.h", jitsafe_header_preinclude_h},
-      {"float.h", jitsafe_header_float_h},
-      {"cfloat", jitsafe_header_float_h},
-      {"limits.h", jitsafe_header_limits_h},
-      {"climits", jitsafe_header_limits_h},
-      {"stdint.h", jitsafe_header_stdint_h},
-      {"cstdint", jitsafe_header_stdint_h},
-      {"stddef.h", jitsafe_header_stddef_h},
-      {"cstddef", jitsafe_header_stddef_h},
-      {"stdlib.h", jitsafe_header_stdlib_h},
-      {"cstdlib", jitsafe_header_stdlib_h},
-      {"stdio.h", jitsafe_header_stdio_h},
-      {"cstdio", jitsafe_header_stdio_h},
-      {"string.h", jitsafe_header_string_h},
-      {"cstring", jitsafe_header_cstring},
-      {"iterator", jitsafe_header_iterator},
-      {"limits", jitsafe_header_limits},
-      {"type_traits", jitsafe_header_type_traits},
-      {"utility", jitsafe_header_utility},
-      {"math.h", jitsafe_header_math_h},
-      {"cmath", jitsafe_header_math_h},
-      {"memory.h", jitsafe_header_memory_h},
-      {"complex", jitsafe_header_complex},
-      {"iostream", jitsafe_header_iostream},
-      {"ostream", jitsafe_header_ostream},
-      {"istream", jitsafe_header_istream},
-      {"sstream", jitsafe_header_sstream},
-      {"vector", jitsafe_header_vector},
-      {"string", jitsafe_header_string},
-      {"stdexcept", jitsafe_header_stdexcept},
-      {"mutex", jitsafe_header_mutex},
-      {"algorithm", jitsafe_header_algorithm},
-      {"time.h", jitsafe_header_time_h},
-      {"ctime", jitsafe_header_time_h},
-      {"tuple", jitsafe_header_tuple},
-      {"assert.h", jitsafe_header_assert},
-      {"cassert", jitsafe_header_assert}};
+static const std::map<std::string, std::string> &get_jitsafe_headers_map()
+{
+  static const std::map<std::string, std::string> jitsafe_headers_map
+    = {{"jitify_preinclude.h", jitsafe_header_preinclude_h},
+       {"float.h", jitsafe_header_float_h},
+       {"cfloat", jitsafe_header_float_h},
+       {"limits.h", jitsafe_header_limits_h},
+       {"climits", jitsafe_header_limits_h},
+       {"stdint.h", jitsafe_header_stdint_h},
+       {"cstdint", jitsafe_header_stdint_h},
+       {"stddef.h", jitsafe_header_stddef_h},
+       {"cstddef", jitsafe_header_stddef_h},
+       {"stdlib.h", jitsafe_header_stdlib_h},
+       {"cstdlib", jitsafe_header_stdlib_h},
+       {"stdio.h", jitsafe_header_stdio_h},
+       {"cstdio", jitsafe_header_stdio_h},
+       {"string.h", jitsafe_header_string_h},
+       {"cstring", jitsafe_header_cstring},
+       {"iterator", jitsafe_header_iterator},
+       {"limits", jitsafe_header_limits},
+       {"type_traits", jitsafe_header_type_traits},
+       {"utility", jitsafe_header_utility},
+       {"math.h", jitsafe_header_math_h},
+       {"cmath", jitsafe_header_math_h},
+       {"memory.h", jitsafe_header_memory_h},
+       {"complex", jitsafe_header_complex},
+       {"iostream", jitsafe_header_iostream},
+       {"ostream", jitsafe_header_ostream},
+       {"istream", jitsafe_header_istream},
+       {"sstream", jitsafe_header_sstream},
+       {"vector", jitsafe_header_vector},
+       {"string", jitsafe_header_string},
+       {"stdexcept", jitsafe_header_stdexcept},
+       {"mutex", jitsafe_header_mutex},
+       {"algorithm", jitsafe_header_algorithm},
+       {"time.h", jitsafe_header_time_h},
+       {"ctime", jitsafe_header_time_h},
+       {"tuple", jitsafe_header_tuple},
+       {"assert.h", jitsafe_header_assert},
+       {"cassert", jitsafe_header_assert}};
   return jitsafe_headers_map;
 }
 
-inline void add_options_from_env(std::vector<std::string>& options) {
+inline void add_options_from_env(std::vector<std::string> &options)
+{
   // Add options from environment variable
-  const char* env_options = std::getenv("JITIFY_OPTIONS");
+  const char *env_options = std::getenv("JITIFY_OPTIONS");
   if (env_options) {
     std::stringstream ss;
     ss << env_options;
     std::string opt;
-    while (!(ss >> opt).fail()) {
-      options.push_back(opt);
-    }
+    while (!(ss >> opt).fail()) { options.push_back(opt); }
   }
   // Add options from JITIFY_OPTIONS macro
 #ifdef JITIFY_OPTIONS
@@ -2404,15 +2349,14 @@ inline void add_options_from_env(std::vector<std::string>& options) {
   std::stringstream ss;
   ss << JITIFY_TOSTRING(JITIFY_OPTIONS);
   std::string opt;
-  while (!(ss >> opt).fail()) {
-    options.push_back(opt);
-  }
+  while (!(ss >> opt).fail()) { options.push_back(opt); }
 #undef JITIFY_TOSTRING
 #undef JITIFY_TOSTRING_IMPL
-#endif  // JITIFY_OPTIONS
+#endif // JITIFY_OPTIONS
 }
 
-inline void detect_and_add_cuda_arch(std::vector<std::string>& options) {
+inline void detect_and_add_cuda_arch(std::vector<std::string> &options)
+{
   for (int i = 0; i < (int)options.size(); ++i) {
     // Note that this will also match the middle of "--gpu-architecture".
     if (options[i].find("-arch") != std::string::npos) {
@@ -2635,12 +2579,10 @@ inline nvrtcResult compile_kernel(std::string program_name,
   }
 #endif
 
-#define CHECK_NVRTC(call)                         \
-  do {                                            \
-    nvrtcResult check_nvrtc_macro_ret = call;     \
-    if (check_nvrtc_macro_ret != NVRTC_SUCCESS) { \
-      return check_nvrtc_macro_ret;               \
-    }                                             \
+#define CHECK_NVRTC(call)                                                                                              \
+  do {                                                                                                                 \
+    nvrtcResult check_nvrtc_macro_ret = call;                                                                          \
+    if (check_nvrtc_macro_ret != NVRTC_SUCCESS) { return check_nvrtc_macro_ret; }                                      \
   } while (0)
 
   nvrtcProgram nvrtc_program;
@@ -2673,9 +2615,7 @@ inline nvrtcResult compile_kernel(std::string program_name,
     std::vector<char> vptx(ptxsize);
     CHECK_NVRTC(nvrtcGetPTX(nvrtc_program, vptx.data()));
     ptx->assign(vptx.data(), ptxsize);
-    if (should_remove_unused_globals) {
-      detail::ptx_remove_unused_globals(ptx);
-    }
+    if (should_remove_unused_globals) { detail::ptx_remove_unused_globals(ptx); }
   }
 
   if (!instantiation.empty() && mangled_instantiation) {
@@ -3026,13 +2966,11 @@ class KernelLauncher_impl {
   inline CUresult launch(
       jitify::detail::vector<void*> arg_ptrs,
       jitify::detail::vector<std::string> arg_types = 0) const;
-  inline void safe_launch(
-      jitify::detail::vector<void*> arg_ptrs,
-      jitify::detail::vector<std::string> arg_types = 0) const;
+  inline void safe_launch(jitify::detail::vector<void *> arg_ptrs,
+                          jitify::detail::vector<std::string> arg_types = 0) const;
 
- private:
-  inline void pre_launch(
-      jitify::detail::vector<std::string> arg_types = 0) const;
+private:
+  inline void pre_launch(jitify::detail::vector<std::string> arg_types = 0) const;
 };
 
 /*! An object representing a configured and instantiated kernel ready
@@ -3067,9 +3005,9 @@ class KernelLauncher {
    *
    *  \see launch
    */
-  inline void safe_launch(
-      std::vector<void*> arg_ptrs = std::vector<void*>(),
-      jitify::detail::vector<std::string> arg_types = 0) const {
+  inline void safe_launch(std::vector<void *> arg_ptrs = std::vector<void *>(),
+                          jitify::detail::vector<std::string> arg_types = 0) const
+  {
     _impl->safe_launch(arg_ptrs, arg_types);
   }
 
@@ -3078,16 +3016,16 @@ class KernelLauncher {
    *
    *  \see launch
    */
-  template <typename... ArgTypes>
-  inline CUresult operator()(const ArgTypes&... args) const {
+  template <typename... ArgTypes> inline CUresult operator()(const ArgTypes &...args) const
+  {
     return this->launch(args...);
   }
   /*! Launch the kernel.
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes>
-  inline CUresult launch(const ArgTypes&... args) const {
+  template <typename... ArgTypes> inline CUresult launch(const ArgTypes &...args) const
+  {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
@@ -3095,10 +3033,9 @@ class KernelLauncher {
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes>
-  inline void safe_launch(const ArgTypes&... args) const {
-    this->safe_launch(std::vector<void*>({(void*)&args...}),
-                      {reflection::reflect<ArgTypes>()...});
+  template <typename... ArgTypes> inline void safe_launch(const ArgTypes &...args) const
+  {
+    this->safe_launch(std::vector<void *>({(void *)&args...}), {reflection::reflect<ArgTypes>()...});
   }
 };
 
@@ -3109,7 +3046,7 @@ class KernelInstantiation {
   friend class KernelLauncher;
   std::unique_ptr<KernelInstantiation_impl const> _impl;
 
- public:
+public:
   inline KernelInstantiation(Kernel const& kernel,
                              std::vector<std::string> const& template_args);
 
@@ -3124,8 +3061,8 @@ class KernelInstantiation {
    *
    *  \see configure
    */
-  inline KernelLauncher operator()(dim3 grid, dim3 block, unsigned int smem = 0,
-                                   cudaStream_t stream = 0) const {
+  inline KernelLauncher operator()(dim3 grid, dim3 block, unsigned int smem = 0, cudaStream_t stream = 0) const
+  {
     return this->configure(grid, block, smem, stream);
   }
   /*! Configure the kernel launch.
@@ -3136,8 +3073,8 @@ class KernelInstantiation {
    * bytes.
    *  \param stream The CUDA stream to launch the kernel in.
    */
-  inline KernelLauncher configure(dim3 grid, dim3 block, unsigned int smem = 0,
-                                  cudaStream_t stream = 0) const {
+  inline KernelLauncher configure(dim3 grid, dim3 block, unsigned int smem = 0, cudaStream_t stream = 0) const
+  {
     return KernelLauncher(*this, grid, block, smem, stream);
   }
   /*! Configure the kernel launch with a 1-dimensional block and grid chosen
@@ -3165,15 +3102,16 @@ class KernelInstantiation {
   /*
    * Returns the function attribute requested from the kernel
    */
-  inline int get_func_attribute(CUfunction_attribute attribute) const {
+  inline int get_func_attribute(CUfunction_attribute attribute) const
+  {
     return _impl->cuda_kernel().get_func_attribute(attribute);
   }
 
   /*
    * Set the function attribute requested for the kernel
    */
-  inline void set_func_attribute(CUfunction_attribute attribute,
-                                 int value) const {
+  inline void set_func_attribute(CUfunction_attribute attribute, int value) const
+  {
     _impl->cuda_kernel().set_func_attribute(attribute, value);
   }
 
@@ -3209,9 +3147,8 @@ class KernelInstantiation {
    * Copy a value from a global __constant__ or __device__ variable to the host
    * using its un-mangled name.
    */
-  template <typename T>
-  inline CUresult get_global_value(const char* name, T* value,
-                                   CUstream stream = 0) const {
+  template <typename T> inline CUresult get_global_value(const char *name, T *value, CUstream stream = 0) const
+  {
     return get_global_array(name, value, 1, stream);
   }
 
@@ -3438,8 +3375,8 @@ inline std::ostream& operator<<(std::ostream& stream, dim3 d) {
   return stream;
 }
 
-inline void KernelLauncher_impl::pre_launch(
-    jitify::detail::vector<std::string> arg_types) const {
+inline void KernelLauncher_impl::pre_launch(jitify::detail::vector<std::string> arg_types) const
+{
   (void)arg_types;
 #if JITIFY_PRINT_LAUNCH
   Kernel_impl const& kernel = _kernel_inst._kernel;
@@ -3456,28 +3393,25 @@ inline void KernelLauncher_impl::pre_launch(
   }
 }
 
-inline CUresult KernelLauncher_impl::launch(
-    jitify::detail::vector<void*> arg_ptrs,
-    jitify::detail::vector<std::string> arg_types) const {
+inline CUresult KernelLauncher_impl::launch(jitify::detail::vector<void *> arg_ptrs,
+                                            jitify::detail::vector<std::string> arg_types) const
+{
   pre_launch(arg_types);
   return _kernel_inst._cuda_kernel->launch(_grid, _block, _smem, _stream,
                                            arg_ptrs);
 }
 
-inline void KernelLauncher_impl::safe_launch(
-    jitify::detail::vector<void*> arg_ptrs,
-    jitify::detail::vector<std::string> arg_types) const {
+inline void KernelLauncher_impl::safe_launch(jitify::detail::vector<void *> arg_ptrs,
+                                             jitify::detail::vector<std::string> arg_types) const
+{
   pre_launch(arg_types);
-  _kernel_inst._cuda_kernel->safe_launch(_grid, _block, _smem, _stream,
-                                         arg_ptrs);
+  _kernel_inst._cuda_kernel->safe_launch(_grid, _block, _smem, _stream, arg_ptrs);
 }
 
 inline KernelInstantiation_impl::KernelInstantiation_impl(
     Kernel_impl const& kernel, std::vector<std::string> const& template_args)
     : _kernel(kernel), _options(kernel._options) {
-  _template_inst =
-      (template_args.empty() ? ""
-                             : reflection::reflect_template(template_args));
+  _template_inst = (template_args.empty() ? "" : reflection::reflect_template(template_args));
   using detail::hash_combine;
   using detail::hash_larson64;
   _hash = _kernel._hash;
@@ -3503,10 +3437,10 @@ inline KernelInstantiation_impl::KernelInstantiation_impl(
   }
 }
 
-inline void KernelInstantiation_impl::print() const {
+inline void KernelInstantiation_impl::print() const
+{
   std::string options_string = reflection::reflect_list(_options);
-  std::cout << _kernel._name << _template_inst << " [" << options_string << "]"
-            << std::endl;
+  std::cout << _kernel._name << _template_inst << " [" << options_string << "]" << std::endl;
 }
 
 inline void KernelInstantiation_impl::build_kernel() {
@@ -4194,15 +4128,16 @@ class KernelInstantiation {
   /*
    * Returns the function attribute requested from the kernel
    */
-  inline int get_func_attribute(CUfunction_attribute attribute) const {
+  inline int get_func_attribute(CUfunction_attribute attribute) const
+  {
     return _cuda_kernel->get_func_attribute(attribute);
   }
 
   /*
    * Set the function attribute requested for the kernel
    */
-  inline void set_func_attribute(CUfunction_attribute attribute,
-                                 int value) const {
+  inline void set_func_attribute(CUfunction_attribute attribute, int value) const
+  {
     _cuda_kernel->set_func_attribute(attribute, value);
   }
 
@@ -4284,20 +4219,19 @@ class KernelLauncher {
   unsigned int _smem;
   cudaStream_t _stream;
 
- private:
-  void pre_launch(std::vector<std::string> arg_types = {}) const {
+private:
+  void pre_launch(std::vector<std::string> arg_types = {}) const
+  {
     (void)arg_types;
 #if JITIFY_PRINT_LAUNCH
-    std::string arg_types_string =
-        (arg_types.empty() ? "..." : reflection::reflect_list(arg_types));
-    std::cout << "Launching " << _kernel_inst->_cuda_kernel->function_name()
-              << "<<<" << _grid << "," << _block << "," << _smem << ","
-              << _stream << ">>>"
+    std::string arg_types_string = (arg_types.empty() ? "..." : reflection::reflect_list(arg_types));
+    std::cout << "Launching " << _kernel_inst->_cuda_kernel->function_name() << "<<<" << _grid << "," << _block << ","
+              << _smem << "," << _stream << ">>>"
               << "(" << arg_types_string << ")" << std::endl;
 #endif
   }
 
- public:
+public:
   KernelLauncher(KernelInstantiation const* kernel_inst, dim3 grid, dim3 block,
                  unsigned int smem = 0, cudaStream_t stream = 0)
       : _kernel_inst(kernel_inst),
@@ -4324,31 +4258,28 @@ class KernelLauncher {
                                               arg_ptrs);
   }
 
-  void safe_launch(std::vector<void*> arg_ptrs = {},
-                   std::vector<std::string> arg_types = {}) const {
+  void safe_launch(std::vector<void *> arg_ptrs = {}, std::vector<std::string> arg_types = {}) const
+  {
     pre_launch(arg_types);
-    _kernel_inst->_cuda_kernel->safe_launch(_grid, _block, _smem, _stream,
-                                            arg_ptrs);
+    _kernel_inst->_cuda_kernel->safe_launch(_grid, _block, _smem, _stream, arg_ptrs);
   }
 
   /*! Launch the kernel.
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes>
-  CUresult launch(const ArgTypes&... args) const {
-    return this->launch(std::vector<void*>({(void*)&args...}),
-                        {reflection::reflect<ArgTypes>()...});
+  template <typename... ArgTypes> CUresult launch(const ArgTypes &...args) const
+  {
+    return this->launch(std::vector<void *>({(void *)&args...}), {reflection::reflect<ArgTypes>()...});
   }
 
   /*! Launch the kernel and check for cuda errors.
    *
    *  \param args Function arguments for the kernel.
    */
-  template <typename... ArgTypes>
-  void safe_launch(const ArgTypes&... args) const {
-    return this->safe_launch(std::vector<void*>({(void*)&args...}),
-                             {reflection::reflect<ArgTypes>()...});
+  template <typename... ArgTypes> void safe_launch(const ArgTypes &...args) const
+  {
+    return this->safe_launch(std::vector<void *>({(void *)&args...}), {reflection::reflect<ArgTypes>()...});
   }
 };
 
@@ -4364,12 +4295,11 @@ inline KernelInstantiation Kernel::instantiate(
 
 template <typename... TemplateArgs>
 inline KernelInstantiation Kernel::instantiate() const {
-  return this->instantiate(
-      std::vector<std::string>({reflection::reflect<TemplateArgs>()...}));
+  return this->instantiate(std::vector<std::string>({reflection::reflect<TemplateArgs>()...}));
 }
 
-template <typename... TemplateArgs>
-inline KernelInstantiation Kernel::instantiate(TemplateArgs... targs) const {
+template <typename... TemplateArgs> inline KernelInstantiation Kernel::instantiate(TemplateArgs... targs) const
+{
   return this->instantiate(
       std::vector<std::string>({reflection::reflect(targs)...}));
 }
@@ -4385,8 +4315,7 @@ inline KernelLauncher KernelInstantiation::configure_1d_max_occupancy(
   int grid;
   int block;
   CUfunction func = *_cuda_kernel;
-  detail::get_1d_max_occupancy(func, smem_callback, &smem, max_block_size,
-                               flags, &grid, &block);
+  detail::get_1d_max_occupancy(func, smem_callback, &smem, max_block_size, flags, &grid, &block);
   return this->configure(grid, block, smem, stream);
 }
 

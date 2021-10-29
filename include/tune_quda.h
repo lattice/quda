@@ -132,7 +132,7 @@ namespace quda {
         param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
         param.block.x = ((param.block.x + step - 1) / step) * step; // round up to nearest step size
         if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
-	  errorQuda("Local lattice volume is too large for device");
+          errorQuda("Local lattice volume is too large for device");
       }
     }
 
@@ -193,7 +193,7 @@ namespace quda {
           = std::min(device::max_threads_per_processor() / (param.block.x * param.block.y * param.block.z),
                      device::max_blocks_per_processor());
         int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
-	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
+        if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
 
 	if (param.shared_bytes > max_shared) {

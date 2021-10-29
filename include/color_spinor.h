@@ -335,7 +335,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 1: // y dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -353,7 +353,7 @@ namespace quda {
           }
           break;
         }
-      	break;
+        break;
       case 2: // z dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -371,7 +371,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 3: // t dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -389,7 +389,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 4:
         switch (sign) {
         case 1: // positive projector
@@ -757,7 +757,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 1: // y dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -801,7 +801,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 3: // t dimension
 	switch (sign) {
 	case 1: // positive projector
@@ -812,7 +812,7 @@ namespace quda {
             recon(2, i) = 0;
             recon(3, i) = 0;
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
@@ -823,7 +823,7 @@ namespace quda {
           }
           break;
         }
-	break;
+        break;
       case 4:
         switch (sign) {
         case 1: // positive projector

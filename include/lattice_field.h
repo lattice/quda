@@ -91,7 +91,7 @@ namespace quda {
     {
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
         x[i] = 0;
-	r[i] = 0;
+        r[i] = 0;
       }
     }
 

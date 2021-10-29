@@ -256,7 +256,7 @@ namespace quda {
             * complex<Float>(a_[indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x)],
                              a_[indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x)]);
         } else {
-	  // requesting upper triangular so return conjugate transpose
+          // requesting upper triangular so return conjugate transpose
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
           int idx = N + 2*k;
@@ -265,7 +265,6 @@ namespace quda {
             * complex<Float>(a_[indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 0, stride, x)],
                              -a_[indexFloatN<QUDA_FLOAT4_CLOVER_ORDER>(idx + 1, stride, x)]);
         }
-
       }
 
       template <typename helper, typename reducer>
@@ -416,28 +415,28 @@ namespace quda {
         __device__ __host__ inline complex<Float> operator()(int, int parity, int x, int s_row, int s_col, int c_row,
                                                              int c_col) const
         {
-          return accessor(parity,x,s_row,s_col,c_row,c_col);
+          return accessor(parity, x, s_row, s_col, c_row, c_col);
         }
 
         /**
-	 * @brief Complex-member accessor function
-	 *
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	/*
-	__device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row,
-							     int s_col, int c_row, int c_col) {
-	  //errorQuda("Clover accessor not implemented as a lvalue");
-	  return accessor(parity, x, s_row, s_col, c_row, c_col);
-	  }
-	*/
-	
-	/** Returns the number of field colors */
+         * @brief Complex-member accessor function
+         *
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param s_row row spin index
+         * @param c_row row color index
+         * @param s_col col spin index
+         * @param c_col col color index
+         */
+        /*
+        __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row,
+                                                             int s_col, int c_row, int c_col) {
+          //errorQuda("Clover accessor not implemented as a lvalue");
+          return accessor(parity, x, s_row, s_col, c_row, c_col);
+          }
+        */
+
+        /** Returns the number of field colors */
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
 	/** Returns the field volume */
@@ -565,7 +564,7 @@ namespace quda {
         }
 
         bool Twisted() const { return twisted; }
-	real Mu2() const { return mu2; }
+        real Mu2() const { return mu2; }
 
         /**
            @brief This accessor routine returns a const clover_wrapper to this object,
@@ -642,7 +641,7 @@ namespace quda {
           }
         }
 
-	/**
+        /**
 	   @brief Load accessor for the clover matrix
 	   @param[out] v Vector of loaded elements
 	   @param[in] x Checkerboarded site index
@@ -668,9 +667,9 @@ namespace quda {
         }
 
         /**
-	   @brief Backup the field to the host when tuning
-	*/
-	void save() {
+           @brief Backup the field to the host when tuning
+        */
+        void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
           qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
@@ -708,8 +707,8 @@ namespace quda {
     */
       template <typename Float, int length = 72> struct QDPOrder {
         typedef typename mapper<Float>::type RegType;
-	Float *clover;
-	const int volumeCB;
+        Float *clover;
+        const int volumeCB;
 	const int stride;
 	const int offset;
 
@@ -729,10 +728,10 @@ namespace quda {
           this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
         }
 
-        bool  Twisted()	const	{return twisted;}
-	Float Mu2()	const	{return mu2;}
+        bool Twisted() const { return twisted; }
+        Float Mu2() const { return mu2; }
 
-	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
           Float v_[length];
           block_load<Float, length>(v_, &clover[parity * offset + x * length]);
@@ -746,7 +745,7 @@ namespace quda {
           block_store<Float, length>(&clover[parity * offset + x * length], v_);
         }
 
-        size_t Bytes() const { return length*sizeof(Float); }
+        size_t Bytes() const { return length * sizeof(Float); }
       };
 
     /**
@@ -754,8 +753,8 @@ namespace quda {
     */
       template <typename Float, int length = 72> struct QDPJITOrder {
         typedef typename mapper<Float>::type RegType;
-	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
-	Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
+        Float *diag;      /**< Pointers to the off-diagonal terms (two parities) */
+        Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
 	const int volumeCB;
 	const int stride;
 
@@ -772,8 +771,8 @@ namespace quda {
           diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
         }
 
-      bool  Twisted()	const	{return twisted;}
-      Float Mu2()	const	{return mu2;}
+        bool Twisted() const { return twisted; }
+        Float Mu2() const { return mu2; }
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
@@ -797,8 +796,8 @@ namespace quda {
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           // the factor of 2.0 comes from undoing the basis change
-	  for (int chirality=0; chirality<2; chirality++) {
-	    // set diagonal elements
+          for (int chirality = 0; chirality < 2; chirality++) {
+            // set diagonal elements
 	    for (int i=0; i<6; i++) {
 	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
 	    }
@@ -810,10 +809,10 @@ namespace quda {
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
 	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
 	    }
-	  }
+          }
         }
 
-        size_t Bytes() const { return length*sizeof(Float); }
+        size_t Bytes() const { return length * sizeof(Float); }
       };
 
     /**
@@ -824,8 +823,8 @@ namespace quda {
     */
       template <typename Float, int length = 72> struct BQCDOrder {
         typedef typename mapper<Float>::type RegType;
-	Float *clover[2];
-	const int volumeCB;
+        Float *clover[2];
+        const int volumeCB;
 	const int stride;
 
 	const bool twisted;
@@ -841,10 +840,10 @@ namespace quda {
           this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
         }
 
-        bool  Twisted()	const	{return twisted;}
-	Float Mu2()	const	{return mu2;}
+        bool Twisted() const { return twisted; }
+        Float Mu2() const { return mu2; }
 
-	/**
+        /**
 	   @param v The output clover matrix in QUDA order
 	   @param x The checkerboarded lattice site
 	   @param parity The parity of the lattice site
@@ -875,7 +874,7 @@ namespace quda {
 	// FIXME implement the save routine for BQCD ordered fields
         __device__ __host__ inline void save(RegType[length], int, int) const { }
 
-        size_t Bytes() const { return length*sizeof(Float); }
+        size_t Bytes() const { return length * sizeof(Float); }
       };
 
   } // namespace clover

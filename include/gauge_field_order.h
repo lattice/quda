@@ -381,7 +381,7 @@ namespace quda {
                                                  const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-        vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
+        vec2 *u2 = reinterpret_cast<vec2 *>(u[dim] + parity * cb_offset + (x_cb * nColor + row) * nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
@@ -418,8 +418,8 @@ namespace quda {
       GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
         scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
-        for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+        for (int d = 0; d < 4; d++) {
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
 	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
@@ -427,9 +427,9 @@ namespace quda {
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
 	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+        }
 
-	resetScale(U.Scale());
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max) {
@@ -488,7 +488,8 @@ namespace quda {
                                                  const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-        vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
+        vec2 *u2
+          = reinterpret_cast<vec2 *>(u + (((parity * volumeCB + x_cb) * geometry + dim) * nColor + row) * nColor + col);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
@@ -523,8 +524,8 @@ namespace quda {
       GhostAccessor(const GaugeField &U, void * = nullptr, void **ghost_ = nullptr) :
         scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
-        for (int d=0; d<4; d++) {
-	  ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
+        for (int d = 0; d < 4; d++) {
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
 	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
@@ -532,9 +533,9 @@ namespace quda {
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
 	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
 	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
-	}
+        }
 
-	resetScale(U.Scale());
+        resetScale(U.Scale());
       }
 
       void resetScale(Float max) {
@@ -603,7 +604,7 @@ namespace quda {
       __device__ __host__ inline wrapper operator()(int dim, int parity, int x_cb, int row, int col) const
       {
         auto index = parity * offset_cb + dim * stride * nColor * nColor + (row * nColor + col) * stride + x_cb;
-        return fieldorder_wrapper<Float,storeFloat>(u, index, scale, scale_inv);
+        return fieldorder_wrapper<Float, storeFloat>(u, index, scale, scale_inv);
       }
 
       template <typename theirFloat>
@@ -611,7 +612,8 @@ namespace quda {
                                           const complex<theirFloat> &val) const
       {
         using vec2 = vector_type<storeFloat, 2>;
-        vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+        vec2 *u2 = reinterpret_cast<vec2 *>(u + parity * offset_cb + dim * stride * nColor * nColor
+                                            + (row * nColor + col) * stride + x_cb);
 
         vec2 val_ = (fixed && !match<storeFloat, theirFloat>()) ?
           vec2(static_cast<storeFloat>(round(scale * val.real())), static_cast<storeFloat>(round(scale * val.imag()))) :
@@ -671,8 +673,8 @@ namespace quda {
       __device__ __host__ inline wrapper operator()(int d, int parity, int x_cb, int row, int col) const
       {
 	if (native_ghost)
-	  return accessor(d%4, parity, x_cb+(d/4)*ghostVolumeCB[d]+volumeCB, row, col);
-	else
+          return accessor(d % 4, parity, x_cb + (d / 4) * ghostVolumeCB[d] + volumeCB, row, col);
+        else
           return wrapper(ghost[d], ((parity * nColor + row) * nColor + col) * ghostVolumeCB[d] + x_cb, scale, scale_inv);
       }
     };
@@ -727,9 +729,9 @@ namespace quda {
         ghostAccessor(U, (void *)gauge_, (void **)ghost_)
       {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
-	}
+      }
 
-	void resetScale(double max) {
+        void resetScale(double max) {
 	  accessor.resetScale(max);
 	  ghostAccessor.resetScale(max);
 	}
@@ -812,36 +814,37 @@ namespace quda {
         __device__ __host__ inline void atomicAdd(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col,
                                                   const complex<theirFloat> &val) const
         {
-          accessor.atomic_add(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col, val);
+          accessor.atomic_add(d, parity, x, s_row * nColorCoarse + c_row, s_col * nColorCoarse + c_col, val);
         }
 
         /** Returns the number of field colors */
-	__device__ __host__ inline int Ncolor() const { return nColor; }
+        __device__ __host__ inline int Ncolor() const { return nColor; }
 
-	/** Returns the field volume */
-	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+        /** Returns the field volume */
+        __device__ __host__ inline int Volume() const { return 2 * volumeCB; }
 
-	/** Returns the field volume */
-	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+        /** Returns the field volume */
+        __device__ __host__ inline int VolumeCB() const { return volumeCB; }
 
-	/** Returns the field geometric dimension */
-	__device__ __host__ inline int Ndim() const { return nDim; }
+        /** Returns the field geometric dimension */
+        __device__ __host__ inline int Ndim() const { return nDim; }
 
-	/** Returns the field geometry */
-	__device__ __host__ inline int Geometry() const { return geometry; }
+        /** Returns the field geometry */
+        __device__ __host__ inline int Geometry() const { return geometry; }
 
-	/** Returns the number of coarse gauge field spins */
-	__device__ __host__ inline int NspinCoarse() const { return nSpinCoarse; }
+        /** Returns the number of coarse gauge field spins */
+        __device__ __host__ inline int NspinCoarse() const { return nSpinCoarse; }
 
-	/** Returns the number of coarse gauge field colors */
-	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
+        /** Returns the number of coarse gauge field colors */
+        __device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
-	/**
-	 * @brief Returns the L1 norm of the field in a given dimension
-	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-	 * @return L1 norm
-	 */
-	__host__ double norm1(int dim=-1, bool global=true) const {
+        /**
+         * @brief Returns the L1 norm of the field in a given dimension
+         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+         * @return L1 norm
+         */
+        __host__ double norm1(int dim = -1, bool global = true) const
+        {
           commGlobalReductionPush(global);
           double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
@@ -1551,14 +1554,14 @@ namespace quda {
       }
 
       /**
-	 @brief This accessor routine returns a gauge_wrapper to this object,
-	 allowing us to overload various operators for manipulating at
-	 the site level interms of matrix operations.
-	 @param[in] dir Which dimension are we requesting
-	 @param[in] x_cb Checkerboarded space-time index we are requesting
-	 @param[in] parity Parity we are requesting
-	 @return Instance of a gauge_wrapper that curries in access to
-	 this field at the above coordinates.
+         @brief This accessor routine returns a gauge_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] dir Which dimension are we requesting
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a gauge_wrapper that curries in access to
+         this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity, real phase = 1.0) const
       {
@@ -1795,31 +1798,33 @@ namespace quda {
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const int volumeCB;
-    QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
-
-        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-        {
-          auto in = &gauge[dir][(parity * volumeCB + x) * length];
-          block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+      QDPOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
+      {
+        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : ((Float **)u.Gauge_p())[i];
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
-        auto out = &gauge[dir][(parity * volumeCB + x) * length];
-        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+        auto in = &gauge[dir][(parity * volumeCB + x) * length];
+        block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+        }
+
+        __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+        {
+          auto out = &gauge[dir][(parity * volumeCB + x) * length];
+          block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
-	 @brief This accessor routine returns a gauge_wrapper to this object,
-	 allowing us to overload various operators for manipulating at
-	 the site level interms of matrix operations.
-	 @param[in] dir Which dimension are we requesting
-	 @param[in] x_cb Checkerboarded space-time index we are requesting
-	 @param[in] parity Parity we are requesting
-	 @return Instance of a gauge_wrapper that curries in access to
-	 this field at the above coordinates.
+         @brief This accessor routine returns a gauge_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] dir Which dimension are we requesting
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a gauge_wrapper that curries in access to
+         this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
       {
@@ -1839,35 +1844,37 @@ namespace quda {
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
       const int volumeCB;
-    QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
-      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
-	{ for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
-
-        __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-        {
-          for (int i = 0; i < length / 2; i++) {
-            v[i].real((real)gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
-            v[i].imag((real)gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
-          }
+      QDPJITOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+        LegacyOrder<Float, length>(u, ghost_), volumeCB(u.VolumeCB())
+      {
+        for (int i = 0; i < 4; i++) gauge[i] = gauge_ ? ((Float **)gauge_)[i] : ((Float **)u.Gauge_p())[i];
       }
 
-      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
       {
         for (int i = 0; i < length / 2; i++) {
-          gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
-          gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].imag();
+          v[i].real((real)gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
+          v[i].imag((real)gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x]);
         }
       }
 
+        __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+        {
+          for (int i = 0; i < length / 2; i++) {
+            gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
+            gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].imag();
+          }
+      }
+
       /**
-	 @brief This accessor routine returns a gauge_wrapper to this object,
-	 allowing us to overload various operators for manipulating at
-	 the site level interms of matrix operations.
-	 @param[in] dir Which dimension are we requesting
-	 @param[in] x_cb Checkerboarded space-time index we are requesting
-	 @param[in] parity Parity we are requesting
-	 @return Instance of a gauge_wrapper that curries in access to
-	 this field at the above coordinates.
+         @brief This accessor routine returns a gauge_wrapper to this object,
+         allowing us to overload various operators for manipulating at
+         the site level interms of matrix operations.
+         @param[in] dir Which dimension are we requesting
+         @param[in] x_cb Checkerboarded space-time index we are requesting
+         @param[in] parity Parity we are requesting
+         @return Instance of a gauge_wrapper that curries in access to
+         this field at the above coordinates.
        */
       __device__ __host__ inline auto operator()(int dim, int x_cb, int parity) const
       {
@@ -1888,20 +1895,25 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const int geometry;
-  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) :
-    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-      volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
-
-  __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
-  {
-    auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-    block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+    MILCOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0) :
+      LegacyOrder<Float, length>(u, ghost_),
+      gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+      volumeCB(u.VolumeCB()),
+      geometry(u.Geometry())
+    {
+      ;
     }
 
-    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real = 1.0) const
     {
-      auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
+  }
+
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+  {
+    auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+    block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
     }
 
     /**

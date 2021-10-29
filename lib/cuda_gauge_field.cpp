@@ -365,11 +365,11 @@ namespace quda {
 	// record the event
         qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
         // send to the processor in the -1 direction
-	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+        comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } else {
         qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
         // send to the processor in the +1 direction
-	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
+        comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
     }
   }
@@ -445,9 +445,9 @@ namespace quda {
       if (comm_dim_partitioned(dim)) {
         qudaDeviceSynchronize(); // synchronize before issuing mem copies in different streams - could replace with event post and wait
 
-        for (int dir=0; dir<2; dir++) recvStart(dim, dir);
+        for (int dir = 0; dir < 2; dir++) recvStart(dim, dir);
 
-	for (int dir=0; dir<2; dir++) {
+        for (int dir=0; dir<2; dir++) {
 	  // issue host-to-device copies if needed
 	  if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
@@ -599,7 +599,7 @@ namespace quda {
           }
 
         } else {
-	  void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
+          void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
 	  size_t ghost_bytes[8];
 	  int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
 	  for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();

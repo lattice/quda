@@ -367,7 +367,7 @@ namespace quda {
               tmp.imag(tmp.imag() + (*this)(i, j).real() * (*this)(j, k).imag());
               tmp.imag(tmp.imag() + (*this)(i, j).imag() * (*this)(j, k).real());
             }
-	    result(i,k) = tmp;
+            result(i,k) = tmp;
 	  }
 	}
 	return result;
@@ -542,7 +542,7 @@ namespace quda {
             result(i, k).imag(result(i, k).imag() + a(i, j).real() * b(j, k).imag());
             result(i, k).imag(result(i, k).imag() + a(i, j).imag() * b(j, k).real());
           }
-	}
+        }
       }
       return result;
     }

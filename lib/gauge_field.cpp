@@ -243,7 +243,7 @@ namespace quda {
 	if (!comm_dim_partitioned(i)) continue;
         qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
         pool_pinned_free(send[i]);
-	pool_pinned_free(receive[i]);
+        pool_pinned_free(receive[i]);
       }
     }
 

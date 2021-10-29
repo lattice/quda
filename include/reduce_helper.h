@@ -249,9 +249,9 @@ namespace quda
         // if we use a sense reversal barrier, avoiding the need to
         // reset the count at the end
         arg.count[idx].store(0, cuda::std::memory_order_relaxed); // set to zero for next time
-        }
       }
     }
+  }
 
 #else
     /**
@@ -305,7 +305,7 @@ namespace quda
         arg.count[idx] = 0; // set to zero for next time
       }
     }
-    }
+  }
 #endif
 
 } // namespace quda

@@ -146,8 +146,8 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
             for (b = 0; b < B[dir]; b++) {
               for (c = 0; c < C[dir]; c++) {
                 int index = (a * f[dir][0] + b * f[dir][1] + c * f[dir][2] + d * f[dir][3]) >> 1;
-                int oddness = (a+b+c+d)%2;
-		if (oddness == 0){ //even
+                int oddness = (a + b + c + d) % 2;
+                if (oddness == 0){ //even
 		  for(int i=0;i < 18;i++){
 		    even_dst[18*even_dst_index+i] = even_src[18*index + i];
 		  }

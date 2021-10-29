@@ -470,7 +470,7 @@ namespace quda {
 	shift_update.updateNupdate(1);
         shift_update.apply();
 
-        for (int j=0; j<num_offset_now; j++) iter[j] = k+1;
+        for (int j = 0; j < num_offset_now; j++) iter[j] = k + 1;
       }
       
       k++;
