@@ -138,7 +138,7 @@ namespace quda {
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
         int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-        int parity_offset = x_fine_offset_tx >= arg.aggregate_size_cb ? 1 : 0;
+        int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
         x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
         parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
 
