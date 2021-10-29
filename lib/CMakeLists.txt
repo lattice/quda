@@ -102,6 +102,13 @@ set(QUDA_DSLASH_OBJS
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
+  dslash_domain_wall_4d_m5inv.cu
+  dslash_domain_wall_4d_m5pre.cu
+  dslash_domain_wall_4d_m5pre_m5inv.cu
+  dslash_domain_wall_4d_m5inv_m5pre.cu
+  dslash_domain_wall_4d_m5inv_m5inv.cu
+  dslash_domain_wall_4d_m5mob.cu
+  dslash_domain_wall_4d_m5pre_m5mob.cu
   dslash_pack2.cu laplace.cu covDev.cu)
 
 if(QUDA_NVSHMEM)
