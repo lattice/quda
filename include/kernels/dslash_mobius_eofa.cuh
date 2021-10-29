@@ -75,17 +75,17 @@ namespace quda
           errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
         switch (type) {
-        case M5_EOFA:
+        case Dslash5Type::M5_EOFA:
           for (int s = 0; s < Ls; s++) { coeff.u[s] = eofa_u[s]; }
           break;
-        case M5INV_EOFA:
+        case Dslash5Type::M5INV_EOFA:
           for (int s = 0; s < Ls; s++) {
             coeff.u[s] = eofa_u[s];
             coeff.x[s] = eofa_x[s];
             coeff.y[s] = eofa_y[s];
           }
           break;
-        default: errorQuda("Unexpected EOFA Dslash5Type %d", type);
+        default: errorQuda("Unexpected EOFA Dslash5Type %d", static_cast<int>(type));
         }
       }
     };
@@ -136,7 +136,7 @@ namespace quda
           }
         }
 
-        if (Arg::type == M5_EOFA) {
+        if (Arg::type == Dslash5Type::M5_EOFA) {
           Vector diagonal = cache.load(threadIdx.x, s, threadIdx.z);
           out = (static_cast<real>(0.5) * arg.kappa) * out + diagonal; // 1 + kappa*D5; the 0.5 for spin projection
 

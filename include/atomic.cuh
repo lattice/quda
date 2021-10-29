@@ -94,6 +94,34 @@ static inline uint32_t atomicMax(uint32_t *x, uint32_t v)
 }
 #endif
 
+#if defined(__NVCC__) && defined(__CUDA_ARCH__) && (__COMPUTE_CAPABILITY__ < 600)
+/**
+   @brief Implementation of double-precision atomic addition using
+   compare and swap. Taken from the CUDA programming guide.  This is
+   for pre-Pascal GPUs only, and is only supported on nvcc.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ double atomicAdd(double* address, double val)
+{
+  unsigned long long int* address_as_ull =
+                            (unsigned long long int*)address;
+  unsigned long long int old = *address_as_ull, assumed;
+
+  do {
+    assumed = old;
+    old = atomicCAS(address_as_ull, assumed,
+                    __double_as_longlong(val +
+                           __longlong_as_double(assumed)));
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+  } while (assumed != old);
+
+  return __longlong_as_double(old);
+}
+#endif
+
 /**
    @brief Implementation of double2 atomic addition using two
    double-precision additions.
