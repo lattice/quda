@@ -1045,8 +1045,55 @@ void printQudaBLASParam(QudaBLASParam *param)
 #endif
 }
 
-// clean up
+#if defined INIT_PARAM
+QudaGaugeFixParam newQudaGaugeFixParam(void)
+{
+  QudaGaugeFixParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeFixParam(QudaGaugeFixParam *param)
+{
+#else
+void printQudaGaugeFixParam(QudaGaugeFixParam *param)
+{
+  printfQuda("QUDA gauge fix parameters:\n");
+#endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeFixParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+#ifdef INIT_PARAM
+  P(gauge_dir, 4);
+  P(maxiter, 10000);
+  P(verbosity_interval, 100);
+  P(reunit_interval, 10);
+  P(ovr_relaxation_boost, 0.0);
+  P(fft_alpha, 0.0);
+  P(tolerance, 0.0);
+  P(fft_autotune, QUDA_BOOLEAN_FALSE);
+  P(theta_condition, QUDA_BOOLEAN_FALSE);
+#else
+  P(gauge_dir, INVALID_INT);
+  P(maxiter, INVALID_INT);
+  P(verbosity_interval, INVALID_INT);
+  P(reunit_interval, INVALID_INT);
+  P(ovr_relaxation_boost, INVALID_DOUBLE);
+  P(fft_alpha, INVALID_DOUBLE);
+  P(tolerance, INVALID_DOUBLE);
+  P(fft_autotune, QUDA_BOOLEAN_FALSE);
+  P(theta_condition, QUDA_BOOLEAN_FALSE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+
+// clean up
 #undef INVALID_INT
 #undef INVALID_DOUBLE
 #undef P

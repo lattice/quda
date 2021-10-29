@@ -550,6 +550,12 @@ typedef enum QudaWFlowType_s {
   QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
 } QudaWFlowType;
 
+typedef enum QudaGaugeFixType_s {
+  QUDA_GAUGEFIX_TYPE_OVR = 0,
+  QUDA_GAUGEFIX_TYPE_FFT = 1,
+  QUDA_GAUGEFIX_TYPE_INVALID = QUDA_INVALID_ENUM
+} QudaGaugeFixType;
+
 // Allows to choose an appropriate external library
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,

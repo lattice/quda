@@ -182,31 +182,20 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingFFT(GaugeField& data, int Nsteps, int verbose_interval,
-                      double alpha0, int autotune, double tolerance, int stopWtheta)
+  void gaugeFixingFFT(GaugeField& data, int steps, int verbose_interval,
+                      double alpha0, QudaBoolean autotune, double tolerance, QudaBoolean theta_condition)
   {
-    // We hardcode the value of autotune to 1 at this point as it is the last
-    // point before computation begins. This ensures that the the user cannot
-    // override alpha autotuning. This is done because it is very easy for the
-    // FFT gauge fixing to fail with a poorly chosen value of alpha, but
-    // autotuning ensures optimal behaviour.
-    // Users who wish to change this behaviour may remove the follwing line
-    // of code and recompile to regain control of alpha autotuning.
-    autotune = 1;
-    
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
-      if(autotune == 1) printfQuda("\tAuto tune active: alpha will be adjusted as the algorithm progresses\n");
-      else if(autotune == 0) printfQuda("\tAuto tune not active: alpha will remain constant as the algorithm progresses\n");
-      else errorQuda("Unknown value of autotune = %d", autotune);
-      
+      if(autotune == QUDA_BOOLEAN_TRUE) printfQuda("\tAuto tune active: alpha will be adjusted as the algorithm progresses\n");
+      else printfQuda("\tAuto tune not active: alpha will remain constant as the algorithm progresses\n");      
       printfQuda("\tAlpha parameter of the Steepest Descent Method: %e\n", alpha0);
       printfQuda("\tTolerance: %e\n", tolerance);
-      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
-      printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+      printfQuda("\tStop criterion method: %s\n", theta_condition == QUDA_BOOLEAN_TRUE ? "Theta" : "Delta");
+      printfQuda("\tMaximum number of iterations: %d\n", steps);
       printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
     }
     
@@ -233,7 +222,7 @@ namespace quda {
 
     double diff = 0.0;
     int iter = 0;
-    for (iter = 0; iter < Nsteps; iter++) {
+    for (iter = 0; iter < steps; iter++) {
       for (int k = 0; k < 6; k++) {
         //------------------------------------------------------------------------
         // Set a pointer do the element k in lattice volume
@@ -298,7 +287,7 @@ namespace quda {
       diff = abs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_SUMMARIZE)
         printf("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
-      if ( autotune && ((action - action0) < -1e-14) ) {
+      if ( autotune == QUDA_BOOLEAN_TRUE && ((action - action0) < -1e-14) ) {
         if ( arg.alpha > 0.01 ) {
           arg.alpha = 0.95 * arg.alpha;
           if(getVerbosity() >= QUDA_SUMMARIZE) printf("Changing alpha down -> %.4e\n", arg.alpha);
@@ -307,7 +296,7 @@ namespace quda {
       //------------------------------------------------------------------------
       // Check gauge fix quality criterion
       //------------------------------------------------------------------------
-      if ( stopWtheta ) {   if ( argQ.getTheta() < tolerance ) break; }
+      if ( theta_condition == QUDA_BOOLEAN_TRUE ) {   if ( argQ.getTheta() < tolerance ) break; }
       else { if ( diff < tolerance ) break; }
 
       action0 = action;
@@ -368,21 +357,22 @@ namespace quda {
     
     gflops = (gflops * 1e-9) / (secs);
     gbytes = gbytes / (secs * 1e9);
-    if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-
+    if (getVerbosity() > QUDA_SUMMARIZE)
+      printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
+    
     host_free(num_failures_h);
   }
 
   template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
-    GaugeFixingFFT(GaugeField& data, int gauge_dir, int Nsteps, int verbose_interval,
-                   double alpha, int autotune, double tolerance, int stopWtheta)
+    GaugeFixingFFT(GaugeField& data, int gauge_dir, int steps, int verbose_interval,
+                   double alpha, QudaBoolean autotune, double tolerance, QudaBoolean theta_condition)
     {
       if (gauge_dir != 3) {
 	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 4>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        gaugeFixingFFT<Float, recon, 4>(data, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
       } else {
 	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 3>(data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        gaugeFixingFFT<Float, recon, 3>(data, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
       }
     }
   };
@@ -391,22 +381,22 @@ namespace quda {
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] steps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune (legacy), 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value. We hardcode this to true.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
+   * @param[in] autotune QUDA_BOOLEAN_TRUE to autotune the method, i.e., if the fix quality inverts its tendency we decrease the alpha value.
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by steps
+   * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
    */
 #if defined(GPU_GAUGE_ALG)
-  void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double alpha,
-                      const int autotune, const double tolerance, const int stopWtheta)
+  void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int steps, const int verbose_interval, const double alpha,
+                      const QudaBoolean autotune, const double tolerance, const QudaBoolean theta_condition)
   {
     if (comm_partitioned()) errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
-    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
   }
 #else
-  void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const int, const double, const int)
+  void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const QudaBoolean, const double, const QudaBoolean)
   {
     errorQuda("Gauge fixing has bot been built");
   }

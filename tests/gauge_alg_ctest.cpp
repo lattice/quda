@@ -66,29 +66,35 @@ int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;
 double gf_ovr_relaxation_boost = 1.5;
 double gf_fft_alpha = 0.8;
+QudaBoolean gf_fft_autotune = QUDA_BOOLEAN_TRUE;
 int gf_reunit_interval = 10;
 double gf_tolerance = 1e-6;
-bool gf_theta_condition = false;
+QudaBoolean gf_theta_condition = QUDA_BOOLEAN_FALSE;
+QudaGaugeFixType fix_type = QUDA_GAUGEFIX_TYPE_OVR;
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
+  CLI::TransformPairs<QudaGaugeFixType> fix_type_map {{"ovr", QUDA_GAUGEFIX_TYPE_OVR},
+                                                      {"fft", QUDA_GAUGEFIX_TYPE_FFT}};
+  
   // Option group for gauge fixing related options
   auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
   opgroup->add_option("--gf-dir", gf_gauge_dir,
-                      "The orthogonal direction of teh gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
+                      "The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4)");
   opgroup->add_option("--gf-maxiter", gf_maxiter,
-                      "The maximun number of gauge fixing iterations to be applied (default 10000) ");
+                      "The maximun number of gauge fixing iterations to be applied (default 10000)");
   opgroup->add_option("--gf-verbosity-interval", gf_verbosity_interval,
                       "Print the gauge fixing progress every N steps (default 100)");
   opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
                       "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
   opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
+  opgroup->add_option("--gf-fft-autotune", gf_fft_autotune, "Autotune the Alpha parameter in the FFT method (default true)");
   opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
                       "Reunitarise the gauge field every N steps (default 10)");
   opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
-  opgroup->add_option(
-    "--gf-theta-condition", gf_theta_condition,
-    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option("--gf-theta-condition", gf_theta_condition,
+		      "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option("--gf-fix-type", fix_type, "The type of algorithm to use for fixing (default ovr)")->transform(CLI::QUDACheckedTransformer(fix_type_map));
 }
 
 class GaugeAlgTest : public ::testing::Test {
@@ -147,9 +153,9 @@ protected:
   {
     if (execute) {
       setVerbosity(QUDA_VERBOSE);
-      param = newQudaGaugeParam();
-
+      
       // Setup gauge container.
+      param = newQudaGaugeParam();
       setWilsonGaugeParam(param);
       param.t_boundary = QUDA_PERIODIC_T;
 
@@ -298,13 +304,7 @@ protected:
     if (execute) {
       if (!checkDimsPartitioned()) {
         printfQuda("%s gauge fixing with steepest descent method with FFT\n", gf_gauge_dir == 4 ? "Landau" : "Coulomb");
-	// We hardcode the value of autotune to 1 in the kernel call (lib/gauge_fix_fft.cu)
-	// This ensures that the user can not override alpha autotuning. This is done because
-	// it is very easy for the FFT gauge fixing to fail with a poorly chosen value of
-	// alpha, but autotuning alpha ensures optimal behaviour.
-	// Users who wish to change this behaviour may read the comment in
-	// lib/gauge_fix_fft.cu to regain control.
-	gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, 1, gf_tolerance,
+	gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                        gf_theta_condition);
 
         auto plaq_gf = plaquette(*U);
@@ -393,13 +393,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Landau gauge fixing with steepest descent method with FFT\n");
-      // We hardcode the value of autotune to 1 in the kernel call (lib/gauge_fix_fft.cu)
-      // This ensures that the user can not override alpha autotuning. This is done because
-      // it is very easy for the FFT gauge fixing to fail with a poorly chosen value of
-      // alpha, but autotuning alpha ensures optimal behaviour.
-      // Users who wish to change this behaviour may read the comment in
-      // lib/gauge_fix_fft.cu to regain control.
-      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, 1, gf_tolerance,
+      gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                      gf_theta_condition);
       auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
@@ -415,13 +409,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Coulomb gauge fixing with steepest descent method with FFT\n");
-      // We hardcode the value of autotune to 1 in the kernel call (lib/gauge_fix_fft.cu)
-      // This ensures that the user can not override alpha autotuning. This is done because
-      // it is very easy for the FFT gauge fixing to fail with a poorly chosen value of
-      // alpha, but autotuning alpha ensures optimal behaviour.
-      // Users who wish to change this behaviour may read the comment in
-      // lib/gauge_fix_fft.cu to regain control.
-      gaugeFixingFFT(*U, 3, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, 1, gf_tolerance,
+      gaugeFixingFFT(*U, 3, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                      gf_theta_condition);
 auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);

@@ -779,6 +779,22 @@ extern "C" {
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
   } QudaBLASParam;
 
+  typedef struct QudaGaugeFixParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+
+    QudaGaugeFixType fix_type;   /**< The aglorithm to use for gauge fixing */
+    int gauge_dir;               /**< The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4) */
+    int maxiter;                 /**< The maximun number of gauge fixing iterations to be applied (default 10000) */
+    int verbosity_interval;      /**< Print the gauge fixing progress every N steps (default 100) */
+    double ovr_relaxation_boost; /**< The overrelaxation boost parameter for the overrelaxation method (default 1.5) */
+    double fft_alpha;            /**< The Alpha parameter in the FFT method (default 0.8) */
+    QudaBoolean fft_autotune;    /**< Autotune the Alpha parameter in the FFT method (default true) */
+    int reunit_interval;         /**< Reunitarise the gauge field every N steps (default 10) */
+    double tolerance;            /**< The tolerance of the gauge fixing quality (default 1e-6) */
+    QudaBoolean theta_condition; /**< "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)" */
+  } QudaGaugeFixParam;
+
+  
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -956,6 +972,15 @@ extern "C" {
   QudaBLASParam newQudaBLASParam(void);
 
   /**
+   * A new QudaGaugeFixParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeFixParam fix_param = newQudaGaugeFixParam();
+   */
+  QudaGaugeFixParam newQudaGaugeFixParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -991,6 +1016,12 @@ extern "C" {
    */
   void printQudaBLASParam(QudaBLASParam *param);
 
+  /**
+   * Print the members of QudaGaugeFixParam.
+   * @param param The QudaGaugeFixParam whose elements we are to print.
+   */
+  void printQudaGaugeFixParam(QudaGaugeFixParam *param);
+  
   /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1505,42 +1536,14 @@ extern "C" {
                     const int *X);
 
   /**
-   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU, and steepest descent FFT with support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
-   * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
-   * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
+   * @param[in] gauge_param The parameters of the external fields and the computation settings
+   * @param[in] fix_param Container for the gauge fixing algorithm and parameters to use.
+   * @param[out] timeinfo Array to track timings 
    */
-  int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
-                                const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                                const unsigned int reunit_interval, const unsigned int stopWtheta,
-                                QudaGaugeParam *param, double *timeinfo);
-  /**
-   * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
-   * @param[in,out] gauge, gauge field to be fixed
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune (legacy), 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value. We hardocde this to 1 to ensure optimal behaviour. Instructions on how the user may regain control of this parameter are located in comments in lib/gauge_fix_fft.cu
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
-   * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
-   * @param[in] param The parameters of the external fields and the computation settings
-   * @param[out] timeinfo
-   */
-  int computeGaugeFixingFFTQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
-                                const unsigned int verbose_interval, const double alpha, const unsigned int autotune,
-                                const double tolerance, const unsigned int stopWtheta, QudaGaugeParam *param,
-                                double *timeinfo);
-
+  int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *gauge_param, QudaGaugeFixParam *fix_param, double *timeinfo);
+  
   /**
    * @brief Strided Batched GEMM
    * @param[in] arrayA The array containing the A matrix data
