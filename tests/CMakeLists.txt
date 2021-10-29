@@ -812,8 +812,8 @@ foreach(prec IN LISTS TEST_PRECS)
 
   if(QUDA_GAUGE_ALG)
     add_test(NAME gauge_alg_${prec}
-             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg ctest> ${MPIEXEC_POSTFLAGS}
-                     --dim 2 4 6 8 --prec ${prec}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dim 4 6 8 10 --prec ${prec}
                      --gtest_output=xml:gauge_arg_test_${prec}.xml)
   endif()
 
