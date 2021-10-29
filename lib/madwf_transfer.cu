@@ -28,7 +28,6 @@ namespace quda
         TunableKernel3D(out, out.X(4), out.SiteSubset()), out(out), in(in), wm_p(wm_p), dagger(dagger)
       {
         TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
-        // FIXME: the threadblock must only have one parity
 
         strcpy(aux, out.AuxString());
         char tmp[512];
@@ -50,21 +49,28 @@ namespace quda
         }
       }
 
-      long long flops() const { return 0; }
+      long long flops() const { return 8ll * out.X(4) * 4ll * in.VolumeCB(); }
       long long bytes() const { return in.Bytes() + out.Bytes(); }
     };
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
     template <class transfer_float, transfer_5D_type transfer_type>
     void transfer_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, const device_vector<float> &tp, bool dagger)
     {
       using matrix_type = typename transfer_5D_mapper<transfer_float, transfer_type>::type;
 
-#ifdef GPU_DOMAIN_WALL_DIRAC
       checkLocation(out, in); // check all locations match
+
+      if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
+        errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d",
+            in.SiteSubset(), out.SiteSubset());
+      }
+
       size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
       if (tp.size() * sizeof(float) != m_size) {
         errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.size() * sizeof(float), m_size);
       }
+
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
         transfer_5D_wrapper<short, matrix_type> w(out, in, reinterpret_cast<const matrix_type *>(tp.data()), dagger);
@@ -75,13 +81,17 @@ namespace quda
 
       default: errorQuda("Unsupported precision %d\n", in.Precision());
       }
-#else
-      errorQuda("Mobius dslash has not been built");
-#endif
     }
+#else
+    template <class transfer_float, transfer_5D_type transfer_type>
+    void transfer_5d_hh(ColorSpinorField &, const ColorSpinorField &, const device_vector<float> &, bool)
+    {
+      errorQuda("Mobius dslash has not been built");
+    }
+#endif
 
-    template void transfer_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &out, const ColorSpinorField &in,
-                                                                const device_vector<float> &tp, bool dagger);
+    template void transfer_5d_hh<float, transfer_5D_type::Spin>(ColorSpinorField &, const ColorSpinorField &,
+                                                                const device_vector<float> &, bool);
 
   } // namespace madwf_ml
 } // namespace quda
