@@ -210,6 +210,8 @@ reports are especially welcome.
 
 ## Acknowledging QUDA:
 
+[![DOI](https://zenodo.org/badge/1300564.svg)](https://zenodo.org/badge/latestdoi/1300564)
+  
 If you find this software useful in your work, please cite:
 
 M. A. Clark, R. Babich, K. Barros, R. Brower, and C. Rebbi, "Solving
