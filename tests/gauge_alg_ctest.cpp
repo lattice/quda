@@ -95,8 +95,8 @@ class GaugeAlgTest : public ::testing::Test {
 
 protected:
   QudaGaugeParam param;
-  
-  Timer<false> a0,a1;
+
+  device_timer_t device_timer_1, device_timer_2;
   double2 detu;
   double3 plaq;
   cudaGaugeField *U;
@@ -158,7 +158,7 @@ protected:
       int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
       SetReunitarizationConsts();
 
-      a0.start();
+      device_timer_1.start();
 
       // If no field is loaded, create a physical quenched field on the device
       if (!gauge_load) {
@@ -181,7 +181,7 @@ protected:
         novrsteps = heatbath_num_overrelax_per_step;
         coldstart = heatbath_coldstart;
         beta_value = heatbath_beta_value;
-        a1.start();
+        device_timer_2.start();
 
         if (coldstart)
           InitGaugeField(*U);
@@ -201,8 +201,8 @@ protected:
           printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
         }
 
-        a1.stop();
-        printfQuda("Time Monte -> %.6f s\n", a1.last());
+        device_timer_2.stop();
+        printfQuda("Time Monte -> %.6f s\n", device_timer_2.last());
       } else {
 
         // If a field is loaded, create a device field and copy
@@ -270,8 +270,8 @@ protected:
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
       PGaugeExchangeFree();
 
-      a0.stop(__func__, __FILE__, __LINE__);
-      printfQuda("Time -> %.6f s\n", a0.last());
+      device_timer_1.stop();
+      printfQuda("Time -> %.6f s\n", device_timer_1.last());
     }
     // If we performed a specific instance, switch off the
     // Google testing.
@@ -328,7 +328,7 @@ protected:
     setWilsonGaugeParam(gauge_param);
 
     void *cpu_gauge[4];
-    for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+    for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
     GaugeFieldParam gParam(param);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
