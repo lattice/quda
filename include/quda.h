@@ -791,10 +791,10 @@ extern "C" {
     QudaBoolean fft_autotune;    /**< Autotune the Alpha parameter in the FFT method (default true) */
     int reunit_interval;         /**< Reunitarise the gauge field every N steps (default 10) */
     double tolerance;            /**< The tolerance of the gauge fixing quality (default 1e-6) */
-    QudaBoolean theta_condition; /**< "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)" */
+    QudaBoolean theta_condition; /**< "Use the theta value to determine the gauge fixing if true. If false, use the
+                                    delta value (default false)" */
   } QudaGaugeFixParam;
 
-  
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -1021,7 +1021,7 @@ extern "C" {
    * @param param The QudaGaugeFixParam whose elements we are to print.
    */
   void printQudaGaugeFixParam(QudaGaugeFixParam *param);
-  
+
   /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1536,14 +1536,15 @@ extern "C" {
                     const int *X);
 
   /**
-   * @brief Gauge fixing with overrelaxation with support for single and multi GPU, and steepest descent FFT with support for single GPU only.
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU, and steepest descent FFT with
+   * support for single GPU only.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_param The parameters of the external fields and the computation settings
    * @param[in] fix_param Container for the gauge fixing algorithm and parameters to use.
-   * @param[out] timeinfo Array to track timings 
+   * @param[out] timeinfo Array to track timings
    */
   int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *gauge_param, QudaGaugeFixParam *fix_param, double *timeinfo);
-  
+
   /**
    * @brief Strided Batched GEMM
    * @param[in] arrayA The array containing the A matrix data

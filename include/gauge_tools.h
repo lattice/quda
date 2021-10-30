@@ -124,7 +124,8 @@ namespace quda
    * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
    */
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int steps, const int verbose_interval,
-                      const double relax_boost, const double tolerance, const int reunit_interval, const QudaBoolean theta_condition);
+                      const double relax_boost, const double tolerance, const int reunit_interval,
+                      const QudaBoolean theta_condition);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
@@ -133,14 +134,16 @@ namespace quda
    * @param[in] steps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune, QUDA_BOOLEAN_TRUE to autotune the method, i.e., if the fix quality inverts its tendency we decrease the alpha value
+   * @param[in] autotune, QUDA_BOOLEAN_TRUE to autotune the method, i.e., if the fix quality inverts its tendency we
+   * decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this
    * value is zero then the method stops when iteration reachs the
    * maximum number of steps defined by steps
    * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
    */
   void gaugeFixingFFT(GaugeField &data, const int gauge_dir, const int steps, const int verbose_interval,
-                      const double alpha, const QudaBoolean autotune, const double tolerance, const QudaBoolean theta_condition);
+                      const double alpha, const QudaBoolean autotune, const double tolerance,
+                      const QudaBoolean theta_condition);
 
   /**
      @brief Compute the Fmunu tensor

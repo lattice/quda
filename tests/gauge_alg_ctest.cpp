@@ -74,9 +74,8 @@ QudaGaugeFixType fix_type = QUDA_GAUGEFIX_TYPE_OVR;
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
-  CLI::TransformPairs<QudaGaugeFixType> fix_type_map {{"ovr", QUDA_GAUGEFIX_TYPE_OVR},
-                                                      {"fft", QUDA_GAUGEFIX_TYPE_FFT}};
-  
+  CLI::TransformPairs<QudaGaugeFixType> fix_type_map {{"ovr", QUDA_GAUGEFIX_TYPE_OVR}, {"fft", QUDA_GAUGEFIX_TYPE_FFT}};
+
   // Option group for gauge fixing related options
   auto opgroup = quda_app->add_option_group("gaugefix", "Options controlling gauge fixing tests");
   opgroup->add_option("--gf-dir", gf_gauge_dir,
@@ -88,16 +87,20 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--gf-ovr-relaxation-boost", gf_ovr_relaxation_boost,
                       "The overrelaxation boost parameter for the overrelaxation method (default 1.5)");
   opgroup->add_option("--gf-fft-alpha", gf_fft_alpha, "The Alpha parameter in the FFT method (default 0.8)");
-  opgroup->add_option("--gf-fft-autotune", gf_fft_autotune, "Autotune the Alpha parameter in the FFT method (default true)");
+  opgroup->add_option("--gf-fft-autotune", gf_fft_autotune,
+                      "Autotune the Alpha parameter in the FFT method (default true)");
   opgroup->add_option("--gf-reunit-interval", gf_reunit_interval,
                       "Reunitarise the gauge field every N steps (default 10)");
   opgroup->add_option("--gf-tol", gf_tolerance, "The tolerance of the gauge fixing quality (default 1e-6)");
-  opgroup->add_option("--gf-theta-condition", gf_theta_condition,
-		      "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
-  opgroup->add_option("--gf-fix-type", fix_type, "The type of algorithm to use for fixing (default ovr)")->transform(CLI::QUDACheckedTransformer(fix_type_map));
+  opgroup->add_option(
+    "--gf-theta-condition", gf_theta_condition,
+    "Use the theta value to determine the gauge fixing if true. If false, use the delta value (default false)");
+  opgroup->add_option("--gf-fix-type", fix_type, "The type of algorithm to use for fixing (default ovr)")
+    ->transform(CLI::QUDACheckedTransformer(fix_type_map));
 }
 
-class GaugeAlgTest : public ::testing::Test {
+class GaugeAlgTest : public ::testing::Test
+{
 
 protected:
   QudaGaugeParam param;
@@ -111,19 +114,17 @@ protected:
   int novrsteps;
   bool coldstart;
   double beta_value;
-  RNG * randstates;
-  
-  void SetReunitarizationConsts(){
+  RNG *randstates;
+
+  void SetReunitarizationConsts()
+  {
     const double unitarize_eps = 1e-14;
     const double max_error = 1e-10;
     const int reunit_allow_svd = 1;
-    const int reunit_svd_only  = 0;
+    const int reunit_svd_only = 0;
     const double svd_rel_error = 1e-6;
     const double svd_abs_error = 1e-6;
-    setUnitarizeLinksConstants(unitarize_eps, max_error,
-                               reunit_allow_svd, reunit_svd_only,
-                               svd_rel_error, svd_abs_error);
-
+    setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
   }
 
   bool checkDimsPartitioned()
@@ -133,8 +134,9 @@ protected:
     return false;
   }
 
-  bool comparePlaquette(double3 a, double3 b){
-    double a0,a1,a2;
+  bool comparePlaquette(double3 a, double3 b)
+  {
+    double a0, a1, a2;
     a0 = std::abs(a.x - b.x);
     a1 = std::abs(a.y - b.y);
     a2 = std::abs(a.z - b.z);
@@ -143,7 +145,8 @@ protected:
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
-  bool CheckDeterminant(double2 detu){
+  bool CheckDeterminant(double2 detu)
+  {
     double prec_val = 5e-8;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
     return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
@@ -153,7 +156,7 @@ protected:
   {
     if (execute) {
       setVerbosity(QUDA_VERBOSE);
-      
+
       // Setup gauge container.
       param = newQudaGaugeParam();
       setWilsonGaugeParam(param);
@@ -236,7 +239,7 @@ protected:
           U = new cudaGaugeField(gauge_field_param);
           U->copy(*host);
         }
-	
+
         delete host;
 
         // Reunitarization
@@ -259,7 +262,7 @@ protected:
       case 2: run_fft(); break;
       default: errorQuda("Invalid test type %d ", test_type);
       }
-      
+
       host_free(num_failures_h);
     }
   }
@@ -283,11 +286,11 @@ protected:
     // Google testing.
     if (test_type != 0) execute = false;
   }
-  
+
   virtual void run_ovr()
   {
     if (execute) {
-      printfQuda("%s gauge fixing with overrelaxation method\n",  gf_gauge_dir == 4 ? "Landau" : "Coulomb");
+      printfQuda("%s gauge fixing with overrelaxation method\n", gf_gauge_dir == 4 ? "Landau" : "Coulomb");
       gaugeFixingOVR(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance,
                      gf_reunit_interval, gf_theta_condition);
       auto plaq_gf = plaquette(*U);
@@ -304,7 +307,7 @@ protected:
     if (execute) {
       if (!checkDimsPartitioned()) {
         printfQuda("%s gauge fixing with steepest descent method with FFT\n", gf_gauge_dir == 4 ? "Landau" : "Coulomb");
-	gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
+        gaugeFixingFFT(*U, gf_gauge_dir, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                        gf_theta_condition);
 
         auto plaq_gf = plaquette(*U);
@@ -411,7 +414,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
       printfQuda("Coulomb gauge fixing with steepest descent method with FFT\n");
       gaugeFixingFFT(*U, 3, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
                      gf_theta_condition);
-auto plaq_gf = plaquette(*U);
+      auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
       ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
@@ -425,7 +428,7 @@ int main(int argc, char **argv)
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);
 
-  // command line options  
+  // command line options
   auto app = make_app();
   add_gaugefix_option_group(app);
   add_heatbath_option_group(app);
@@ -488,6 +491,6 @@ int main(int argc, char **argv)
   endQuda();
 
   finalizeComms();
-  
-  return test_rc;  
+
+  return test_rc;
 }

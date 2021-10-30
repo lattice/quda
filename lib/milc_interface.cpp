@@ -2698,9 +2698,8 @@ void qudaCloverMultishiftInvert(int external_precision, int quda_precision, int 
 void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int verbose_interval, double relax_boost,
                         double tolerance, unsigned int reunit_interval, unsigned int stopWtheta, void *milc_sitelink)
 {
-  QudaGaugeParam gauge_param = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_SU3_LINKS);
+  QudaGaugeParam gauge_param
+    = newMILCGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_SU3_LINKS);
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 
@@ -2712,7 +2711,7 @@ void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int v
   fix_param.tolerance = tolerance;
   fix_param.reunit_interval = reunit_interval;
   fix_param.theta_condition = stopWtheta == 0 ? QUDA_BOOLEAN_FALSE : QUDA_BOOLEAN_TRUE;
-  
+
   double timeinfo[3];
   computeGaugeFixingQuda(milc_sitelink, &gauge_param, &fix_param, timeinfo);
 
@@ -2733,9 +2732,8 @@ void qudaGaugeFixingFFT( int precision,
     void* milc_sitelink
     )
 {
-  QudaGaugeParam gauge_param = newMILCGaugeParam(localDim,
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
+  QudaGaugeParam gauge_param
+    = newMILCGaugeParam(localDim, (precision == 1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, QUDA_GENERAL_LINKS);
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 
@@ -2750,7 +2748,7 @@ void qudaGaugeFixingFFT( int precision,
 
   double timeinfo[3];
   computeGaugeFixingQuda(milc_sitelink, &gauge_param, &fix_param, timeinfo);
-  
+
   printfQuda("Time H2D: %lf\n", timeinfo[0]);
   printfQuda("Time to Compute: %lf\n", timeinfo[1]);
   printfQuda("Time D2H: %lf\n", timeinfo[2]);
