@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -19,6 +19,7 @@ set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 # add a directory for cmake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(cmake/CPM.cmake)
 
 find_package(Git)
 find_package(PythonInterp)
@@ -448,12 +449,7 @@ check_language(CUDA)
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
   set(QUDA_CUDA_BUILD_TYPE "NVCC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
-
-if(${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  if(CMAKE_VERSION VERSION_LESS 3.18)
-    message(ERROR "Building QUDA with clang as CMAKE_CUDA_COMPILER requires CMake 3.18+")
-  endif()
+elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
   set(QUDA_CUDA_BUILD_TYPE "Clang")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
@@ -488,12 +484,7 @@ message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 
 # CUDA Wrapper for finding libs etc
-if(CMAKE_VERSION VERSION_LESS 3.17)
-  find_package(CUDAWrapper)
-else()
-  # for cmake 3.17+ we rely on
-  find_package(CUDAToolkit)
-endif()
+find_package(CUDAToolkit REQUIRED)
 
 
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
@@ -514,41 +505,31 @@ if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
   message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
 endif()
 
+if(QUDA_OPENMP)
+  find_package(OpenMP REQUIRED)
+endif()
 
-# ######################################################################################################################
-# QUDA depends on Eigen this part makes sure we can download eigen if it is not found
+#####################################################################
+# Handle dependencies
+#####################################################################
+if(QUDA_BUILD_SHAREDLIB)
+  set(BUILD_SHARED_LIBS ON)
+endif()
+
+####################################
+# Eigen
+####################################
+add_library(Eigen INTERFACE IMPORTED)
+# set(CPM_USE_LOCAL_PACKAGES TRUE)
 if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.3.9)
-  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_SHA 0fa5cafe78f66d2b501b43016858070d52ba47bd9b1016b0165a7b8e04675677)
-  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
-    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
-  endif()
-  file(
-    DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION}
-    EXPECTED_HASH SHA256=${EIGEN_SHA}
-    STATUS EIGEN_DOWNLOADED)
-  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
-  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
-  if(${EIGEN_DOWNLOADED_CODE})
-    message(
-      SEND_ERROR
-        "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again."
+  set(EIGEN_VERSION 3.4.0)
+  CPMAddPackage(
+    NAME Eigen
+    VERSION ${EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY YES 
     )
-  endif()
-
-  include(ExternalProject)
-  ExternalProject_Add(
-    Eigen
-    URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
-    URL_HASH SHA256=${EIGEN_SHA}
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ""
-    INSTALL_COMMAND "")
-  ExternalProject_Get_Property(Eigen source_dir)
-  set(EIGEN_INCLUDE_DIRS ${source_dir})
+  target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
 else()
   # fall back to using find_package
   find_package(Eigen QUIET)
@@ -558,6 +539,15 @@ else()
         "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
     )
   endif()
+  target_include_directories(Eigen SYSTEM INTERFACE ${EIGEN_INCLUDE_DIRS})
+endif()
+
+####################################
+# MPI
+####################################
+# we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
+if(QUDA_ARPACK OR QUDA_OPENBLAS)
+  enable_language(Fortran)
 endif()
 
 if(QUDA_MPI OR QUDA_QMP)
@@ -584,19 +574,12 @@ if(QUDA_MPI OR QUDA_QMP)
       "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
     )
   endif()
-  # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
-  if(QUDA_ARPACK OR QUDA_OPENBLAS)
-    enable_language(Fortran)
-  endif()
-  find_package(MPI)
+  find_package(MPI REQUIRED)
 endif()
 
-if(QUDA_DOWNLOAD_USQCD)
-  find_program(MAKE_EXE NAMES gmake nmake make)
-  find_program(INSTALL_EXE NAMES install)
-  find_program(AUTORECONF_EXE NAMES autoreconf)
-endif()
-
+####################################
+# NVSHMEM
+####################################
 if(QUDA_NVSHMEM)
   if(QUDA_DOWNLOAD_NVSHMEM)
   # workaround potential UCX interaction issue with CUDA 11.3+ and UCX in NVSHMEM 2.1.2
@@ -645,6 +628,71 @@ if(QUDA_NVSHMEM)
 endif()
 
 
+####################################
+# USQCD 
+####################################
+# We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/usqcd CACHE PATH "..." FORCE)
+endif()
+
+####################################
+# QMP
+####################################
+if(QUDA_QMP)
+  #message(STATUS "Looking for QMP")
+  find_package(QMP QUIET) 
+  #if( QMP_FOUND ) 
+  #  message(STATUS "Found QMP")
+  #else()
+  #  message(STATUS "QMP not found")
+  #endif()
+#TODO: Think about logic here 
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+    CPMAddPackage(
+      NAME QMP
+      GITHUB_REPOSITORY usqcd-software/qmp
+      GIT_TAG 9b0f958
+      OPTIONS
+      "QMP_MPI ON"
+      "QMP_TESTING" "OFF"
+      "QMP_BUILD_DOCS" "OFF"
+    )
+  endif()
+endif()
+
+####################################
+# QIO
+####################################
+if(QUDA_QIO)
+  if(NOT QUDA_QMP)
+    message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
+  endif()
+ # message(STATUS "Looking for QIO")
+  find_package(QIO QUIET)
+  # if( QIO_FOUND )
+    # message(STATUS "QIO Found")
+  # else() 
+    # message(STATUS "QIO Not Found")
+  #endif()
+#TODO: Think about logic here 
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    CPMAddPackage(
+      NAME QIO
+      GITHUB_REPOSITORY usqcd-software/qio
+      GIT_TAG 0627f013
+      OPTIONS 
+        "QIO_ENABLE_PARALLEL_BUILD ON"
+        "QIO_ENABLE_QMP_ROUTE OFF" 
+        "QIO_ENABLE_OUTPUT_BUFFERING ON" 
+        "QIO_DML_BUF_BYTES 33554432"
+    )
+  endif()
+endif()
+
+####################################
+# USQCD QDPJIT
+####################################
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
@@ -658,136 +706,9 @@ if(QUDA_QDPJIT)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
-if(QUDA_QMP)
-  find_library(QMP_FOUND qmp HINTS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
-  mark_as_advanced(QMP_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    ExternalProject_Add(
-      QMP
-      GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-      GIT_TAG qmp2-5-3
-      GIT_SHALLOW YES
-      PREFIX usqcd
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-      BUILD_COMMAND ${MAKE_EXE}
-      INSTALL_COMMAND ${MAKE_EXE} install
-      LOG_INSTALL ON
-      LOG_BUILD ON
-      LOG_DOWNLOAD ON)
-
-    ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QMPHOME
-        ${INSTALL_DIR}
-        CACHE PATH "path to QMP" FORCE)
-    set(QUDA_QMP_LDFLAGS
-        "-L${QUDA_QMPHOME}/lib"
-        CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS
-        "-lqmp"
-        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-    ExternalProject_Add_Step(
-      QMP reconf
-      COMMAND ${AUTORECONF_EXE} -fi
-      WORKING_DIRECTORY <SOURCE_DIR>
-      DEPENDERS configure
-      DEPENDEES download)
-
-  else()
-    if("${QUDA_QMPHOME}" STREQUAL "")
-      message(FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF")
-    endif()
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QUDA_QMP_CFLAGS
-                                                                                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
-                                                                                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
-                                                                                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-    set(QUDA_QMP_LDFLAGS
-        ${QUDA_QMP_LDFLAGS_INTERNAL}
-        CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS
-        ${QUDA_QMP_LIBS_INTERNAL}
-        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  endif()
-endif()
-
-if(QUDA_QIO)
-  if(NOT QUDA_QMP)
-    message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
-  endif()
-  find_library(QIO_FOUND qio HINTS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
-  mark_as_advanced(QIO_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    set(QIO_BRANCH
-        "extended")
-    if(QUDA_DOWNLOAD_QIO_LEGACY)
-      set(QIO_BRANCH
-          "qio2-5-0")
-    endif()
-    ExternalProject_Add(
-      QIO
-      GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-      GIT_TAG "${QIO_BRANCH}"
-      GIT_SHALLOW YES
-      PREFIX usqcd
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
-                        "CFLAGS=-Wall -O3 -std=c99 " --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
-                        --enable-largefile --disable-qmp-route --enable-dml-output-buffering
-      BUILD_COMMAND make
-      INSTALL_COMMAND make install
-      DEPENDS QMP
-      LOG_INSTALL ON
-      LOG_BUILD ON
-      LOG_DOWNLOAD ON)
-    ExternalProject_Get_Property(QIO INSTALL_DIR)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QIOHOME
-        ${INSTALL_DIR}
-        CACHE PATH "path to QIO" FORCE)
-    set(QUDA_LIMEHOME
-        ${INSTALL_DIR}
-        CACHE PATH "path to LIME" FORCE)
-    ExternalProject_Add_Step(
-      QIO reconf
-      COMMAND ${AUTORECONF_EXE} -fi
-      WORKING_DIRECTORY <SOURCE_DIR>
-      DEPENDERS configure
-      DEPENDEES download)
-    set(QUDA_QIO_LDFLAGS
-        "-L${QUDA_QIOHOME}/lib"
-        CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS
-        "-lqio -llime"
-        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-
-  else()
-    if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
-      message(
-        FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF")
-    endif()
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags OUTPUT_VARIABLE QUDA_QIO_CFLAGS
-                                                                                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
-                                                                                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
-                                                                                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-    set(QUDA_QIO_LDFLAGS
-        ${QUDA_QIO_LDFLAGS_INTERNAL}
-        CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS
-        ${QUDA_QIO_LIBS_INTERNAL}
-        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-  endif()
-endif()
-
-if(QUDA_OPENMP)
-  find_package(OpenMP)
-endif()
-
+####################################
+# MAGMA
+####################################
 if(QUDA_MAGMA)
   add_library(MAGMA::MAGMA INTERFACE IMPORTED)
   target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
@@ -812,7 +733,9 @@ if(QUDA_MAGMA)
   target_link_libraries(MAGMA::MAGMA INTERFACE OpenMP::OpenMP_CXX)
 endif(QUDA_MAGMA)
 
-# This selects arpack or parpack for Multi GPU
+####################################
+# ARPACK
+####################################
 if(QUDA_ARPACK)
   enable_language(Fortran)
 
@@ -823,6 +746,7 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
+  #TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       ARPACK-NG
@@ -852,7 +776,6 @@ if(QUDA_ARPACK)
 
   else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
-
     # We always need the serial library
     pkg_check_modules(ARPACK QUIET arpack)
     if(NOT ARPACK_FOUND OR QUDA_ARPACK_HOME)
@@ -860,7 +783,6 @@ if(QUDA_ARPACK)
     else()
       find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
     endif()
-
     # Link the parallel library if required
     if(QUDA_MPI OR QUDA_QMP)
       pkg_check_modules(PARPACK QUIET parpack)
@@ -873,10 +795,14 @@ if(QUDA_ARPACK)
   endif(QUDA_DOWNLOAD_ARPACK)
 endif(QUDA_ARPACK)
 
+####################################
+# OPENBLAS
+####################################
 if(QUDA_OPENBLAS)
   enable_language(Fortran)
 
   if(QUDA_DOWNLOAD_OPENBLAS)
+  #TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       OPENBLAS
@@ -893,10 +819,8 @@ if(QUDA_OPENBLAS)
     set_target_properties(openblas PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(openblas PROPERTIES IMPORTED_LOCATION
                                                ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
-
   else(QUDA_DOWNLOAD_OPENBLAS)
     find_package(PkgConfig REQUIRED)
-
     pkg_check_modules(OPENBLAS QUIET openblas)
     if(NOT OPENBLAS_FOUND OR QUDA_OPENBLAS_HOME)
       find_library(OPENBLAS openblas PATH ${QUDA_OPENBLAS_HOME})
@@ -906,8 +830,9 @@ if(QUDA_OPENBLAS)
   endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
-
+####################################
 # BACKWARDS
+####################################
 if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
@@ -953,6 +878,9 @@ if(QUDA_ZFP)
   endif(QUDA_DOWNLOAD_ZFP)
 endif(QUDA_ZFP)
 
+#####################################################################
+# ADVANCED setup 
+#####################################################################
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -992,3 +920,16 @@ include(CTest)
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake 
+	INSTALL_DESTINATION lib/cmake/QUDA)
+
+write_basic_package_version_file(
+	QUDAVersion.cmake
+	VERSION ${PACKAGE_VERSION}
+	COMPATIBILITY AnyNewerVersion)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
+	DESTINATION lib/cmake/QUDA)
