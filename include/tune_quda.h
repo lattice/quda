@@ -194,7 +194,7 @@ namespace quda {
                      device::max_blocks_per_processor());
         int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
         if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
-	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
+        param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
 
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);

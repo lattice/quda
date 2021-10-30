@@ -1030,7 +1030,7 @@ inline void strip_double_underscore_tokens(char *s)
         return buffer;
       }();
   return path;
-}
+    }
 
 inline bool endswith(const std::string& str, const std::string& suffix) {
   return str.size() >= suffix.size() &&
@@ -2839,7 +2839,7 @@ inline void get_1d_max_occupancy(CUfunction func,
   }
 }
 
-}  // namespace detail
+  } // namespace detail
 
 //! \endcond
 

@@ -455,7 +455,7 @@ public:
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
     __host__ __device__ inline complex<float> &operator-=(const complex<float> &z)
     {
@@ -520,7 +520,7 @@ public:
     real(real() + z.real());
     imag(imag() + z.imag());
     return *this;
-    }
+  }
 
     __host__ __device__ inline complex<double> &operator+=(const complex<float> &z)
     {
@@ -635,7 +635,7 @@ public:
   template <typename T> inline __host__ __device__ operator complex<T>() const
   {
     return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
-    }
+  }
 };
 
 template<>
@@ -671,7 +671,7 @@ public:
   template <typename T> inline __host__ __device__ operator complex<T>() const
   {
     return complex<T>(static_cast<T>(real()), static_cast<T>(imag()));
-    }
+  }
 };
 
   // Binary arithmetic operations

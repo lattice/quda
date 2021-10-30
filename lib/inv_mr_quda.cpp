@@ -120,8 +120,8 @@ namespace quda {
         commGlobalReductionPush(param.global_reduction); // use local reductions for DD solver
 
         blas::zero(xSloppy); // can get rid of this for a special first update kernel
-        double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r);  // c2 holds the initial r2
-	scale = c2 > 0.0 ? sqrt(c2) : 1.0;
+        double c2 = param.global_reduction == QUDA_BOOLEAN_TRUE ? r2 : blas::norm2(r); // c2 holds the initial r2
+        scale = c2 > 0.0 ? sqrt(c2) : 1.0;
 
 	// domain-wise normalization of the initial residual to prevent underflow
 	if (c2 > 0.0) {

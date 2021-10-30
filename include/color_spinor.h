@@ -813,7 +813,7 @@ namespace quda {
             recon(3, i) = 0;
           }
           break;
-	case -1: // negative projector
+        case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
 	    recon(0,i) = 0;

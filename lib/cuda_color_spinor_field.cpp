@@ -973,7 +973,7 @@ namespace quda {
                 qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
             }
           }
-	}
+        }
       }
     }
 

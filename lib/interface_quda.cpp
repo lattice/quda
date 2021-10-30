@@ -973,7 +973,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
         cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
         if (inv_param->compute_clover_trlog) {
           inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
-	  inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
+          inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
         }
       }
       profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);

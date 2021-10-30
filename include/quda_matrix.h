@@ -367,8 +367,8 @@ namespace quda {
               tmp.imag(tmp.imag() + (*this)(i, j).real() * (*this)(j, k).imag());
               tmp.imag(tmp.imag() + (*this)(i, j).imag() * (*this)(j, k).real());
             }
-            result(i,k) = tmp;
-	  }
+            result(i, k) = tmp;
+          }
 	}
 	return result;
       }

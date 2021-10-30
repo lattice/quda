@@ -419,9 +419,9 @@ namespace quda {
         scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
         for (int d = 0; d < 4; d++) {
-          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat> *>(ghost_[d]) :
+                              static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d]));
+          ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
@@ -525,9 +525,9 @@ namespace quda {
         scale(static_cast<Float>(1.0)), scale_inv(static_cast<Float>(1.0))
       {
         for (int d = 0; d < 4; d++) {
-          ghost[d] = ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d]));
-	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d] = ghost_ ? static_cast<complex<storeFloat> *>(ghost_[d]) :
+                              static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d]));
+          ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 
 	  ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
 	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
@@ -731,12 +731,13 @@ namespace quda {
         if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("GaugeField ordering not supported with reconstruction");
       }
 
-        void resetScale(double max) {
-	  accessor.resetScale(max);
-	  ghostAccessor.resetScale(max);
-	}
+      void resetScale(double max)
+      {
+        accessor.resetScale(max);
+        ghostAccessor.resetScale(max);
+      }
 
-	static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
+        static constexpr bool fixedPoint() { return fixed_point<Float,storeFloat>(); }
 
         /**
          * accessor function
@@ -1808,12 +1809,12 @@ namespace quda {
       {
         auto in = &gauge[dir][(parity * volumeCB + x) * length];
         block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-        }
+      }
 
-        __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
-        {
-          auto out = &gauge[dir][(parity * volumeCB + x) * length];
-          block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      {
+        auto out = &gauge[dir][(parity * volumeCB + x) * length];
+        block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
       }
 
       /**
@@ -1858,12 +1859,12 @@ namespace quda {
         }
       }
 
-        __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
-        {
-          for (int i = 0; i < length / 2; i++) {
-            gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
-            gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].imag();
-          }
+      __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+      {
+        for (int i = 0; i < length / 2; i++) {
+          gauge[dir][((0 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].real();
+          gauge[dir][((1 * (length / 2) + i) * 2 + parity) * volumeCB + x] = v[i].imag();
+        }
       }
 
       /**
@@ -1908,12 +1909,12 @@ namespace quda {
     {
       auto in = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
       block_load<complex, length / 2>(v, reinterpret_cast<complex *>(in));
-  }
+    }
 
-  __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
-  {
-    auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
-    block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
+    __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity) const
+    {
+      auto out = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+      block_store<complex, length / 2>(reinterpret_cast<complex *>(out), v);
     }
 
     /**
