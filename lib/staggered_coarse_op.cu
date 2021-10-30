@@ -195,25 +195,26 @@ namespace quda {
 
   }
 
-  template <typename Float, typename vFloat, typename vFloatXinv, int fineColor, int fineSpin, int xinvColor, int xinvSpin, int coarseColor, int coarseSpin>
+  template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin, int uvSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X,
-                        const Transfer &T, const GaugeField &g, const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                        const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
 
-    //Create a field UV which holds U*V.  Has the same structure as V,
-    // No need to double spin for the staggered operator, will need to double it for the K-D op.
+    // Create a field UV which holds U*V.  Has roughly the same structure as V,
+    // though we need to double the spin for the KD operator to keep track of from even vs from odd.
     ColorSpinorParam UVparam(T.Vectors(location));
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     UVparam.location = location;
+    UVparam.nSpin = uvSpin;
     UVparam.setPrecision(T.Vectors(location).Precision());
     UVparam.mem_type = Y.MemType(); // allocate temporaries to match coarse-grid link field
 
     ColorSpinorField *uv = ColorSpinorField::Create(UVparam);
 
     ColorSpinorField *av = (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? ColorSpinorField::Create(UVparam) : &const_cast<ColorSpinorField&>(T.Vectors(location));
-    
+
     GaugeField *Yatomic = &Y;
     GaugeField *Xatomic = &X;
 
@@ -238,8 +239,8 @@ namespace quda {
     bool need_bidirectional = false;
     if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) need_bidirectional = true;
 
-    constexpr QudaGaugeFieldOrder xinvOrder = QUDA_MILC_GAUGE_ORDER;
-    if (XinvKD.FieldOrder() != xinvOrder && XinvKD.Bytes()) errorQuda("unsupported field order %d\n", XinvKD.FieldOrder());
+    // need to exchange with depth 3 b/c of long links
+    const int nFace = (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? 3 : 1;
 
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -251,19 +252,19 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>;
-      using F = typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder,vFloat>; // will need 2x the spin components for the KD op
+      using F = typename colorspinor::FieldOrderCB<Float,uvSpin,fineColor,coarseColor,csOrder,vFloat>;
       using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
-      using xinvFine = typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv>;
       using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,storeType>;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
       V vAccessor(const_cast<ColorSpinorField&>(v));
-      V uvAccessor(*uv); // will need 2x the spin components for the KD op
+      F uvAccessor(*uv);
       F avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField&>(g));
-      xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
+      gFine lAccessor(const_cast<GaugeField&>(l));
+      gFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField&>(Y));
       gCoarse xAccessor(const_cast<GaugeField&>(X));
       gCoarseAtomic yAccessorAtomic(*Yatomic);
@@ -271,9 +272,10 @@ namespace quda {
       
       // the repeated xinvAccessor is intentional
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor, xinvAccessor, xinvAccessor,
-        Y, X, *Yatomic, *Xatomic, *uv, *av, v, kappa, mass, mu_dummy,
-        mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
+        lAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
+        kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
     } else {
 
       constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -284,19 +286,19 @@ namespace quda {
       if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
 
       using V = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>;
-      using F = typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>; // will need 2x the spin components for the KD op
+      using F = typename colorspinor::FieldOrderCB<Float, uvSpin, fineColor, coarseColor, csOrder, vFloat, vFloat, false, false>;
       using gFine =  typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
-      using xinvFine = typename gauge::FieldOrder<typename mapper<vFloatXinv>::type,xinvColor,xinvSpin,xinvOrder,true,vFloatXinv>;
       using gCoarse = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, vFloat>;
       using gCoarseAtomic = typename gauge::FieldOrder<Float, coarseColor * coarseSpin, coarseSpin, gOrder, true, storeType>;
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
       V vAccessor(const_cast<ColorSpinorField &>(v));
-      V uvAccessor(*uv); // will need 2x the spin components for the KD op
+      F uvAccessor(*uv);
       F avAccessor(*av);
       gFine gAccessor(const_cast<GaugeField &>(g));
-      xinvFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
+      gFine lAccessor(const_cast<GaugeField &>(l));
+      gFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
       gCoarse yAccessor(const_cast<GaugeField &>(Y));
       gCoarse xAccessor(const_cast<GaugeField &>(X));
       gCoarseAtomic yAccessorAtomic(*Yatomic);
@@ -305,7 +307,7 @@ namespace quda {
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
-        xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
+        lAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
         kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
     }
@@ -319,31 +321,26 @@ namespace quda {
 
   }
 
-  // template on precision of XinvKD
+  // template on UV spin, which can be 1 for the non-KD ops but needs to be 2 for the KD op
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
+  void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (XinvKD.Ncolor() != 16*fineColor)
-      errorQuda("Invalid Nc %d", XinvKD.Ncolor());
-
-    constexpr int xinvColor = 16 * fineColor;
-    constexpr int xinvSpin = 2;
-
-    if (XinvKD.Precision() == QUDA_SINGLE_PRECISION) {
-      aggregateStaggeredY<Float,vFloat,float,fineColor,fineSpin,xinvColor,xinvSpin,coarseColor,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
-    //} else if (XinvKD.Precision() == QUDA_HALF_PRECISION) { --- unnecessary until we add KD coarsening support
-    //  aggregateStaggeredY<Float,vFloat,short,fineColor,fineSpin,xinvColor,xinvSpin,coarseColor,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+    if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
+      // uvSpin == 1
+      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 1>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+    } else if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
+      // uvSpin == 2
+      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 2>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
     } else {
-      errorQuda("Unsupported precision %d", XinvKD.Precision());
+      errorQuda("Unexpected dirac type %d\n", dirac);
     }
   }
-
 
   // template on the number of coarse degrees of freedom, branch between naive K-D 
   // and actual aggregation
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     const int coarseSpin = 2;
@@ -351,14 +348,16 @@ namespace quda {
 
     if (coarseColor == 24) {
       if (T.getTransferType() == QUDA_TRANSFER_COARSE_KD)
-        // the permutation routines don't need Yatomic, Xatomic, uv, av
+        // the permutation routines don't need Yatomic, Xatomic, uv, av, l
         calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
       else {
         // free field aggregation
-        aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+        aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
       }
     } else if (coarseColor == 64) {
-      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+    } else if (coarseColor == 96) {
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
     } else { // note --- may revisit 3 -> 96 in the future
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -366,11 +365,11 @@ namespace quda {
 
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (T.Vectors().Nspin() == 1) {
-      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
     } else {
       errorQuda("Unsupported number of spins %d\n", T.Vectors(X.Location()).Nspin());
     }
@@ -378,20 +377,20 @@ namespace quda {
 
   // template on fine colors
   template <typename Float, typename vFloat>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (g.Ncolor() == 3) {
-      calculateStaggeredY<Float,vFloat,3>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+    if (g.Ncolor() == 3 && l.Ncolor() == 3) {
+      calculateStaggeredY<Float,vFloat,3>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
+      errorQuda("Unsupported number of colors %d %d\n", g.Ncolor(), l.Ncolor());
     }
   }
 
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
   // FIXME: the empty GaugeField& is a placeholder for the long links for now
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &,
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {
     checkPrecision(T.Vectors(X.Location()), X, Y);
@@ -401,7 +400,7 @@ namespace quda {
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-        calculateStaggeredY<double,double>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<double,double>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", Y.Precision());
       }
@@ -412,7 +411,7 @@ namespace quda {
 #if QUDA_PRECISION & 4
     if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-        calculateStaggeredY<float,float>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<float,float>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
@@ -421,7 +420,7 @@ namespace quda {
 #if QUDA_PRECISION & 2
     if (Y.Precision() == QUDA_HALF_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-        calculateStaggeredY<float,short>(Y, X, T, g, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<float,short>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }

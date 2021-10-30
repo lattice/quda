@@ -777,6 +777,7 @@ namespace quda {
      preconditioned clover operator else in general this just aliases V
      @param V[in] Packed null-space vector accessor
      @param G[in] Fine grid link / gauge field accessor
+     @param L[in] Fine grid long link field accessor
      @param C[in] Fine grid clover field accessor, or Xinv accessor for the KD operator
      @param Cinv[in] Fine grid clover inverse field accessor, or Xinv accessor for the KD operator
      @param Y_[out] Coarse link field
@@ -794,12 +795,14 @@ namespace quda {
             int coarseColor, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic,
             typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, Ftmp &UV,
-                  F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
+                  F &AV, Vt &V, fineGauge &G, fineGauge &L, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
                   GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
                   const ColorSpinorField &v, double kappa, double mass, double mu,
                   double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
+    // FIXME: silence warnings for now
+    (void)L;
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
