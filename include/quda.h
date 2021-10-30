@@ -784,7 +784,7 @@ extern "C" {
 
     QudaGaugeFixType fix_type;   /**< The aglorithm to use for gauge fixing */
     int gauge_dir;               /**< The orthogonal direction of the gauge fixing, 3=Coulomb, 4=Landau. (default 4) */
-    int maxiter;                 /**< The maximun number of gauge fixing iterations to be applied (default 10000) */
+    int maxiter;                 /**< The maximum number of gauge fixing iterations to be applied (default 10000) */
     int verbosity_interval;      /**< Print the gauge fixing progress every N steps (default 100) */
     double ovr_relaxation_boost; /**< The overrelaxation boost parameter for the overrelaxation method (default 1.5) */
     double fft_alpha;            /**< The Alpha parameter in the FFT method (default 0.8) */
