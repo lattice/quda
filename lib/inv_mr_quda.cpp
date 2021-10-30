@@ -124,7 +124,7 @@ namespace quda {
         scale = c2 > 0.0 ? sqrt(c2) : 1.0;
 
         // domain-wise normalization of the initial residual to prevent underflow
-	if (c2 > 0.0) {
+        if (c2 > 0.0) {
 	  blas::ax(1/scale, rSloppy); // can merge this with the prior copy
 	  r2 = 1.0; // by definition by this is now true
 	}

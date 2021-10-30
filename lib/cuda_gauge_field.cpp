@@ -449,7 +449,7 @@ namespace quda {
 
         for (int dir = 0; dir < 2; dir++) {
           // issue host-to-device copies if needed
-          if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
+          if (!comm_peer2peer_enabled(dir, dim) && !comm_gdr_enabled()) {
             qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
                             ghost_face_bytes[dim], qudaMemcpyDeviceToHost, device::get_stream(dir));
           }
@@ -601,8 +601,8 @@ namespace quda {
         } else {
           void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
           size_t ghost_bytes[8];
-          int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
-	  for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
+          int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2 * nColor * nColor;
+          for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
 	  void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {

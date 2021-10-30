@@ -440,7 +440,7 @@ namespace quda {
         __device__ __host__ inline int Ncolor() const { return nColor; }
 
         /** Returns the field volume */
-	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+        __device__ __host__ inline int Volume() const { return 2*volumeCB; }
 
 	/** Returns the field volume */
 	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
@@ -655,12 +655,12 @@ namespace quda {
         }
 
         /**
-	   @brief Store accessor for the clover matrix
-	   @param[out] v Vector of elements to be stored
-	   @param[in] x Checkerboarded site index
-	   @param[in] parity Field parity
-	   @param[in] chirality Chiral block index
-	 */
+           @brief Store accessor for the clover matrix
+           @param[out] v Vector of elements to be stored
+           @param[in] x Checkerboarded site index
+           @param[in] parity Field parity
+           @param[in] chirality Chiral block index
+         */
         __device__ __host__ inline void save(const real v[length], int x, int parity) const
         {
 #pragma unroll
@@ -714,7 +714,7 @@ namespace quda {
         const int stride;
         const int offset;
 
-	const bool twisted;
+        const bool twisted;
 	const Float mu2;
 
         QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
@@ -761,7 +761,7 @@ namespace quda {
         const int volumeCB;
         const int stride;
 
-	const bool twisted;
+        const bool twisted;
 	const Float mu2;
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
@@ -780,7 +780,7 @@ namespace quda {
         __device__ __host__ inline void load(RegType v[length], int x, int parity) const
         {
           // the factor of 0.5 comes from a basis change
-	  for (int chirality=0; chirality<2; chirality++) {
+          for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
 	    for (int i=0; i<6; i++) {
 	      v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
@@ -803,11 +803,11 @@ namespace quda {
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
             for (int i = 0; i < 6; i++) {
-              diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+              diag[((i * 2 + chirality) * 2 + parity) * volumeCB + x] = 2.0 * v[chirality * 36 + i];
             }
 
             // the off diagonal elements
-	    for (int i=0; i<30; i++) {
+            for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
@@ -832,7 +832,7 @@ namespace quda {
         const int stride;
 
         const bool twisted;
-	const Float mu2;
+        const Float mu2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2())
@@ -854,14 +854,14 @@ namespace quda {
         */
         __device__ __host__ inline void load(RegType v[length], int x, int parity) const
         {
-          int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
-			 28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
-			 34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
-			 10, 11, 18, 19, 26, 27,                  // column 3  24
-			 2,  3,  4,  5,                           // column 4  30
-			 12, 13};
-	  
-	  // flip the sign of the imaginary components
+          int bq[36] = {21, 32, 33, 0,  1,  20,                 // diagonal
+                        28, 29, 30, 31, 6,  7,  14, 15, 22, 23, // column 1  6
+                        34, 35, 8,  9,  16, 17, 24, 25,         // column 2  16
+                        10, 11, 18, 19, 26, 27,                 // column 3  24
+                        2,  3,  4,  5,                          // column 4  30
+                        12, 13};
+
+          // flip the sign of the imaginary components
 	  int sign[36];
 	  for (int i=0; i<6; i++) sign[i] = 1;
 	  for (int i=6; i<36; i+=2) {

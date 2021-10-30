@@ -423,10 +423,10 @@ namespace quda {
                               static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d]));
           ghostOffset[d] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
 
-          ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+                     static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4]));
+          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
         resetScale(U.Scale());
@@ -529,10 +529,10 @@ namespace quda {
                               static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d]));
           ghostOffset[d] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
 
-          ghost[d+4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
-	    ghost_ ? static_cast<complex<storeFloat>*>(ghost_[d+4]) :
-	    static_cast<complex<storeFloat>*>(const_cast<void*>(U.Ghost()[d+4]));
-	  ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
+            ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
+                     static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4]));
+          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
         }
 
         resetScale(U.Scale());
@@ -750,7 +750,7 @@ namespace quda {
       __device__ __host__ inline auto operator()(int d, int parity, int x, int row, int col) const
       {
         return accessor(d, parity, x, row, col);
-        }
+      }
 
         __device__ __host__ inline auto Ghost(int d, int parity, int x) const { return ghostAccessor(d, parity, x); }
 

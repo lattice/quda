@@ -370,7 +370,7 @@ namespace quda {
             result(i, k) = tmp;
             }
         }
-	return result;
+        return result;
       }
 
       /**
