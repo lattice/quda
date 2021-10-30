@@ -102,7 +102,7 @@ class GaugeAlgTest : public ::testing::Test {
 protected:
   QudaGaugeParam param;
 
-  device_timer_t device_timer_1, device_timer_2;
+  host_timer_t host_timer_1, host_timer_2;
   double2 detu;
   double3 plaq;
   cudaGaugeField *U;
@@ -164,7 +164,7 @@ protected:
       int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
       SetReunitarizationConsts();
 
-      device_timer_1.start();
+      host_timer_1.start();
 
       // If no field is loaded, create a physical quenched field on the device
       if (!gauge_load) {
@@ -187,7 +187,7 @@ protected:
         novrsteps = heatbath_num_overrelax_per_step;
         coldstart = heatbath_coldstart;
         beta_value = heatbath_beta_value;
-        device_timer_2.start();
+        host_timer_2.start();
 
         if (coldstart)
           InitGaugeField(*U);
@@ -207,8 +207,8 @@ protected:
           printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
         }
 
-        device_timer_2.stop();
-        printfQuda("Time Monte -> %.6f s\n", device_timer_2.last());
+        host_timer_2.stop();
+        printfQuda("Time Monte -> %.6f s\n", host_timer_2.last());
       } else {
 
         // If a field is loaded, create a device field and copy
@@ -276,8 +276,8 @@ protected:
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
       PGaugeExchangeFree();
 
-      device_timer_1.stop();
-      printfQuda("Time -> %.6f s\n", device_timer_1.last());
+      host_timer_1.stop();
+      printfQuda("Time -> %.6f s\n", host_timer_1.last());
     }
     // If we performed a specific instance, switch off the
     // Google testing.
