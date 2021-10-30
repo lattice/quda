@@ -148,15 +148,11 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
                 int index = (a * f[dir][0] + b * f[dir][1] + c * f[dir][2] + d * f[dir][3]) >> 1;
                 int oddness = (a + b + c + d) % 2;
                 if (oddness == 0) { // even
-                  for(int i=0;i < 18;i++){
-		    even_dst[18*even_dst_index+i] = even_src[18*index + i];
-		  }
-		  even_dst_index++;
+                  for (int i = 0; i < 18; i++) { even_dst[18 * even_dst_index + i] = even_src[18 * index + i]; }
+                  even_dst_index++;
                 } else { // odd
-                  for(int i=0;i < 18;i++){
-		    odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
-		  }
-		  odd_dst_index++;
+                  for (int i = 0; i < 18; i++) { odd_dst[18 * odd_dst_index + i] = odd_src[18 * index + i]; }
+                  odd_dst_index++;
                 }
               } // c
             }   // b

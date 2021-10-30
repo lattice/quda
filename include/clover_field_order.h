@@ -258,7 +258,7 @@ namespace quda {
         } else {
           // requesting upper triangular so return conjugate transpose
           // switch coordinates to count from bottom right instead of top left of matrix
-          int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+          int k = N * (N - 1) / 2 - (N - row) * (N - row - 1) / 2 + col - row - 1;
           int idx = N + 2*k;
 
           return static_cast<Float>(2)
@@ -439,7 +439,7 @@ namespace quda {
         /** Returns the number of field colors */
         __device__ __host__ inline int Ncolor() const { return nColor; }
 
-	/** Returns the field volume */
+        /** Returns the field volume */
 	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
 
 	/** Returns the field volume */
@@ -648,12 +648,13 @@ namespace quda {
            @param[in] parity Field parity
            @param[in] chirality Chiral block index
          */
-        __device__ __host__ inline void load(real v[length], int x, int parity) const {
+        __device__ __host__ inline void load(real v[length], int x, int parity) const
+        {
 #pragma unroll
           for (int chirality = 0; chirality < 2; chirality++) load(&v[chirality * block], x, parity, chirality);
         }
 
-	/**
+        /**
 	   @brief Store accessor for the clover matrix
 	   @param[out] v Vector of elements to be stored
 	   @param[in] x Checkerboarded site index
@@ -672,7 +673,7 @@ namespace quda {
         void save()
         {
           if (backup_h) errorQuda("Already allocated host backup");
-	  backup_h = safe_malloc(bytes);
+          backup_h = safe_malloc(bytes);
           qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
           if (norm_bytes) {
             backup_norm_h = safe_malloc(norm_bytes);
@@ -711,7 +712,7 @@ namespace quda {
         Float *clover;
         const int volumeCB;
         const int stride;
-	const int offset;
+        const int offset;
 
 	const bool twisted;
 	const Float mu2;
@@ -758,7 +759,7 @@ namespace quda {
         Float *diag;    /**< Pointers to the off-diagonal terms (two parities) */
         Float *offdiag; /**< Pointers to the diagonal terms (two parities) */
         const int volumeCB;
-	const int stride;
+        const int stride;
 
 	const bool twisted;
 	const Float mu2;
@@ -776,8 +777,9 @@ namespace quda {
         bool Twisted() const { return twisted; }
         Float Mu2() const { return mu2; }
 
-        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  // the factor of 0.5 comes from a basis change
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const
+        {
+          // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
 	    for (int i=0; i<6; i++) {
@@ -793,18 +795,18 @@ namespace quda {
 	    }
 
 	  }
-	}
+        }
 
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           // the factor of 2.0 comes from undoing the basis change
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
-            for (int i=0; i<6; i++) {
-	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
-	    }
+            for (int i = 0; i < 6; i++) {
+              diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+            }
 
-	    // the off diagonal elements
+            // the off diagonal elements
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
@@ -829,7 +831,7 @@ namespace quda {
         const int volumeCB;
         const int stride;
 
-	const bool twisted;
+        const bool twisted;
 	const Float mu2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
@@ -850,8 +852,9 @@ namespace quda {
            @param x The checkerboarded lattice site
            @param parity The parity of the lattice site
         */
-        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
-	  int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const
+        {
+          int bq[36] = { 21, 32, 33, 0,  1, 20,                   // diagonal
 			 28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
 			 34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
 			 10, 11, 18, 19, 26, 27,                  // column 3  24
@@ -870,10 +873,9 @@ namespace quda {
 	  for (int chirality=0; chirality<2; chirality++) 
 	    for (int i=0; i<M; i++) 
 	      v[chirality*M+i] = sign[i] * clover[parity][x*length+chirality*M+bq[i]];
-	
-	}
-  
-	// FIXME implement the save routine for BQCD ordered fields
+        }
+
+        // FIXME implement the save routine for BQCD ordered fields
         __device__ __host__ inline void save(RegType[length], int, int) const { }
 
         size_t Bytes() const { return length * sizeof(Float); }
