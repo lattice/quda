@@ -593,7 +593,7 @@ namespace quda {
           pnorm = pnorm + alpha[j] * alpha[j] * (ppnorm);
           xnorm = sqrt(pnorm);
           d_new = d + u * rNorm + uhigh * Anorm * xnorm;
-          if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
+          if (steps_since_reliable == 0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
         }
         steps_since_reliable++;

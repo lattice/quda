@@ -602,8 +602,8 @@ namespace quda {
           void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
           size_t ghost_bytes[8];
           int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2 * nColor * nColor;
-          for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
-	  void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
+          for (int d = 0; d < geometry; d++) ghost_bytes[d] = nFace * surface[d % 4] * srcNinternal * src.Precision();
+          void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {
 	    for (int d=0; d<geometry; d++) {

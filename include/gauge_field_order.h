@@ -426,7 +426,7 @@ namespace quda {
           ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
             ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
                      static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4]));
-          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
         resetScale(U.Scale());
@@ -532,7 +532,7 @@ namespace quda {
           ghost[d + 4] = (U.Geometry() != QUDA_COARSE_GEOMETRY) ? nullptr :
             ghost_                                              ? static_cast<complex<storeFloat> *>(ghost_[d + 4]) :
                      static_cast<complex<storeFloat> *>(const_cast<void *>(U.Ghost()[d + 4]));
-          ghostOffset[d+4] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+          ghostOffset[d + 4] = U.Nface() * U.SurfaceCB(d) * U.Ncolor() * U.Ncolor();
         }
 
         resetScale(U.Scale());

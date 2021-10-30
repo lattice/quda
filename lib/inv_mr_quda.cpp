@@ -125,11 +125,11 @@ namespace quda {
 
         // domain-wise normalization of the initial residual to prevent underflow
         if (c2 > 0.0) {
-	  blas::ax(1/scale, rSloppy); // can merge this with the prior copy
+          blas::ax(1/scale, rSloppy); // can merge this with the prior copy
 	  r2 = 1.0; // by definition by this is now true
-	}
+        }
 
-	int k = 0;
+        int k = 0;
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("MR: %d cycle, %d iterations, r2 = %e\n", step, k, r2);
 
 	double3 Ar3;

@@ -440,9 +440,9 @@ namespace quda {
         __device__ __host__ inline int Ncolor() const { return nColor; }
 
         /** Returns the field volume */
-        __device__ __host__ inline int Volume() const { return 2*volumeCB; }
+        __device__ __host__ inline int Volume() const { return 2 * volumeCB; }
 
-	/** Returns the field volume */
+        /** Returns the field volume */
 	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
 
 	/** Return the size of the allocation (parity left out and added as needed in Tunable::bytes) */
@@ -715,7 +715,7 @@ namespace quda {
         const int offset;
 
         const bool twisted;
-	const Float mu2;
+        const Float mu2;
 
         QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()),
@@ -762,7 +762,7 @@ namespace quda {
         const int stride;
 
         const bool twisted;
-	const Float mu2;
+        const Float mu2;
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2())
@@ -780,8 +780,8 @@ namespace quda {
         __device__ __host__ inline void load(RegType v[length], int x, int parity) const
         {
           // the factor of 0.5 comes from a basis change
-          for (int chirality=0; chirality<2; chirality++) {
-	    // set diagonal elements
+          for (int chirality = 0; chirality < 2; chirality++) {
+            // set diagonal elements
 	    for (int i=0; i<6; i++) {
 	      v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
@@ -793,8 +793,7 @@ namespace quda {
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
 	      v[chirality*36 + 6 + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
-
-	  }
+          }
         }
 
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
@@ -807,12 +806,12 @@ namespace quda {
             }
 
             // the off diagonal elements
-            for (int i=0; i<30; i++) {
-	      int z = i%2;
+            for (int i = 0; i < 30; i++) {
+              int z = i%2;
 	      int off = i/2;
 	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
 	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
-	    }
+            }
           }
         }
 
@@ -862,7 +861,7 @@ namespace quda {
                         12, 13};
 
           // flip the sign of the imaginary components
-	  int sign[36];
+          int sign[36];
 	  for (int i=0; i<6; i++) sign[i] = 1;
 	  for (int i=6; i<36; i+=2) {
 	    if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }

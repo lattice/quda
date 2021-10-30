@@ -198,7 +198,7 @@ namespace quda {
 
         if (param.shared_bytes > max_shared) {
           TuneParam next(param);
-	  advanceBlockDim(next); // to get next blockDim
+          advanceBlockDim(next); // to get next blockDim
 	  int nthreads = next.block.x * next.block.y * next.block.z;
           param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(next));
           return false;
