@@ -155,6 +155,12 @@ bool mg_use_mma = true;
 bool mg_use_mma = false;
 #endif
 
+#ifdef NVSHMEM_COMMS
+bool use_mobius_fused_kernel = false;
+#else
+bool use_mobius_fused_kernel = true;
+#endif
+
 int n_ev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -656,6 +662,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--tgridsize", grid_t, "Set grid size in T dimension (default 1)")->excludes(gridsizeopt);
 
+  quda_app->add_option("--mobius-fused-kernel", use_mobius_fused_kernel, "Use fused kernels for Mobius, default true");
   return quda_app;
 }
 

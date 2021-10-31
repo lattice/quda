@@ -1725,6 +1725,8 @@ namespace quda {
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec);
+
+    diracParam.use_mobius_fused_kernel = inv_param->use_mobius_fused_kernel;
   }
 
 
