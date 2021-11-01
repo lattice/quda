@@ -26,7 +26,7 @@ namespace quda
                                    ColorSpinorField &, int, bool, const int *, double,
                                    TimeProfile &)
   {
-  errorQuda("Domain-wall dslash has not been built");
-}
+    errorQuda("Domain-wall dslash has not been built");
+  }
 #endif // GPU_DOMAIN_WALL_DIRAC
 } // namespace quda

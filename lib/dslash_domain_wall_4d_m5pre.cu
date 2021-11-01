@@ -19,14 +19,14 @@ namespace quda
     auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS_PRE>();
     instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
                                           dummy_list, profile);
-}
+  }
 #else
   void ApplyDomainWall4DM5pre(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
                               double, const Complex *, const Complex *, const ColorSpinorField &,
                               ColorSpinorField &, int, bool, const int *, double,
                               TimeProfile &)
   {
-  errorQuda("Domain-wall dslash has not been built");
-}
+    errorQuda("Domain-wall dslash has not been built");
+  }
 #endif // GPU_DOMAIN_WALL_DIRAC
 } // namespace quda
