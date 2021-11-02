@@ -16,7 +16,6 @@ namespace quda
                               ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
                               TimeProfile &profile)
   {
-
     auto dummy_list = Dslash5TypeList<Dslash5Type::DSLASH5_MOBIUS>();
     instantiate<DomainWall4DApplyFusedM5>(out, in, U, a, m_5, b_5, c_5, x, y, parity, dagger, comm_override, m_f,
                                           dummy_list, profile);
@@ -24,10 +23,10 @@ namespace quda
 #else
   void ApplyDomainWall4DM5mob(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
                               double, const Complex *, const Complex *, const ColorSpinorField &,
-                              ColorSpinorField &, int, bool, const int *, double,
-                              TimeProfile &)
+                              ColorSpinorField &, int, bool, const int *, double, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");
   }
 #endif // GPU_DOMAIN_WALL_DIRAC
+
 } // namespace quda

@@ -23,10 +23,10 @@ namespace quda
 #else
   void ApplyDomainWall4DM5invM5inv(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
                                    double, const Complex *, const Complex *, const ColorSpinorField &,
-                                   ColorSpinorField &, int, bool, const int *, double,
-                                   TimeProfile &)
+                                   ColorSpinorField &, int, bool, const int *, double, TimeProfile &)
   {
     errorQuda("Domain-wall dslash has not been built");
   }
 #endif // GPU_DOMAIN_WALL_DIRAC
+
 } // namespace quda
