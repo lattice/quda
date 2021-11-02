@@ -215,6 +215,8 @@ namespace quda
       if (param.n_calls > 0 && is_policy) async_total_time += param.n_calls * param.time;
     }
 
+    double cumulative_percent = 0;
+    double cumulative_percent_async = 0;
     while (!q.empty()) {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
@@ -228,21 +230,30 @@ namespace quda
       // synchronous profile
       if (param.n_calls > 0 && !is_policy && !is_nested_policy) {
         double time = param.n_calls * param.time;
+        double percent = 100 * time / total_time;
+        cumulative_percent += percent;
 
-        out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
-        out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16)
-            << key.volume << "\t";
+        out << std::setw(12) << time << "\t";
+        out << std::setw(12) << percent << "\t";
+        out << std::setw(12) << cumulative_percent << "\t";
+        out << std::setw(12) << param.n_calls << "\t";
+        out << std::setw(12) << param.time << "\t";
+        out << std::setw(16) << key.volume << "\t";
         out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
       // async policy profile
       if (param.n_calls > 0 && is_policy) {
         double time = param.n_calls * param.time;
+        double percent = 100 * time / async_total_time;
+        cumulative_percent_async += percent;
 
-        async_out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12)
-                  << (time / async_total_time) * 100 << "\t";
-        async_out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16)
-                  << key.volume << "\t";
+        async_out << std::setw(12) << time << "\t";
+        async_out << std::setw(12) << percent << "\t";
+        async_out << std::setw(12) << cumulative_percent_async << "\t";
+        async_out << std::setw(12) << param.n_calls << "\t";
+        async_out << std::setw(12) << param.time << "\t";
+        async_out << std::setw(16) << key.volume << "\t";
         async_out << key.name << "\t" << key.aux << "\t" << param.comment; // param.comment ends with a newline
       }
 
@@ -590,11 +601,12 @@ namespace quda
 #ifdef GITVERSION
       profile_file << "\t" << gitversion;
 #else
-    profile_file << "\t" << quda_version;
+      profile_file << "\t" << quda_version;
 #endif
       profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       profile_file << std::setw(12) << "total time"
-                   << "\t" << std::setw(12) << "percentage"
+                   << "\t" << std::setw(12) << "percent"
+                   << "\t" << std::setw(12) << "cum. percent"
                    << "\t" << std::setw(12) << "calls"
                    << "\t" << std::setw(12) << "time / call"
                    << "\t" << std::setw(16) << "volume"
@@ -604,11 +616,12 @@ namespace quda
 #ifdef GITVERSION
       async_profile_file << "\t" << gitversion;
 #else
-    async_profile_file << "\t" << quda_version;
+      async_profile_file << "\t" << quda_version;
 #endif
       async_profile_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       async_profile_file << std::setw(12) << "total time"
-                         << "\t" << std::setw(12) << "percentage"
+                         << "\t" << std::setw(12) << "percent"
+                         << "\t" << std::setw(12) << "cum. percent"
                          << "\t" << std::setw(12) << "calls"
                          << "\t" << std::setw(12) << "time / call"
                          << "\t" << std::setw(16) << "volume"
@@ -656,9 +669,9 @@ namespace quda
     aux(),
     time(FLT_MAX),
     n_calls(0)
-    {
-      aux = make_int4(1,1,1,1);
-    }
+  {
+    aux = make_int4(1, 1, 1, 1);
+  }
 
   int Tunable::blockStep() const { return device::warp_size(); }
   int Tunable::blockMin() const { return device::warp_size(); }

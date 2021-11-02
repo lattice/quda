@@ -19,14 +19,14 @@ inline void write_gauge_field(const char *, void *[], QudaPrecision, const int *
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void read_spinor_field(const char *, void *[], QudaPrecision, const int *,
-                              QudaSiteSubset, QudaParity, int, int, int, int, char *[])
+inline void read_spinor_field(const char *, void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity, int, int,
+                              int, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void write_spinor_field(const char *, void *[], QudaPrecision, const int *,
-                               QudaSiteSubset, QudaParity, int, int, int, int, char *[])
+inline void write_spinor_field(const char *, void *[], QudaPrecision, const int *, QudaSiteSubset, QudaParity, int, int,
+                               int, int, char *[])
 {
   printf("QIO support has not been enabled\n");
   exit(-1);
