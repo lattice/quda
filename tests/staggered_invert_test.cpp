@@ -319,6 +319,7 @@ int main(int argc, char **argv)
 
   // QUDA invert test
   //----------------------------------------------------------------------------
+  for (int rep=0; rep<2; rep++) {  // repeat test twice
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system
@@ -416,6 +417,7 @@ int main(int argc, char **argv)
   default: errorQuda("Unsupported test type");
 
   } // switch
+  } // rep
 
   // Compute timings
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);

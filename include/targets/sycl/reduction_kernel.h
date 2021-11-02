@@ -1,6 +1,7 @@
 #pragma once
 #include <tune_quda.h>
 #include <reduce_helper.h>
+#include <timer.h>
 
 namespace quda {
 
@@ -17,9 +18,9 @@ namespace quda {
     ReduceKernelArg(const Arg &arg) : Arg(arg) { }
   };
 
-#if 0
-  template <int block_size_x, int block_size_y, template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __global__ void Reduction2D(Arg arg, sycl::nd_item<3> ndi)
+#if 1
+  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  void Reduction2DImpl(const Arg &arg, sycl::nd_item<3> &ndi)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
     Transformer<Arg> t(arg);
@@ -66,20 +67,23 @@ namespace quda {
     //sycl::range<3> localSize{1,tp.block.y,1};
     sycl::nd_range<3> ndRange{globalSize, localSize};
     auto q = device::get_target_stream(stream);
+    host_timer_t timer;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Reduction2D grid_stride: %s  sizeof(arg): %lu\n",
 		 grid_stride?"true":"false", sizeof(arg));
       printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
 		 str(localSize).c_str(), str(arg.threads).c_str());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
+      timer.start();
     }
 #if 0
     //arg.debug();
     q.submit([&](sycl::handler& h) {
-      h.parallel_for<class Reduction2D>
+      //h.parallel_for<class Reduction2D>
+      h.parallel_for
 	(ndRange,
 	 [=](sycl::nd_item<3> ndi) {
-	   quda::Reduction2D<Transformer, Arg, grid_stride>(arg, ndi);
+	   quda::Reduction2DImpl<Transformer, Arg, grid_stride>(arg, ndi);
 	 });
     });
     //q.wait();
@@ -118,6 +122,8 @@ namespace quda {
       err = QUDA_ERROR;
     }
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      timer.stop();
+      printfQuda("  launch time: %g\n", timer.last());
       if (commAsyncReduction()) {
 	q.memcpy(result_h, result_d, sizeof(reduce_t));
       }

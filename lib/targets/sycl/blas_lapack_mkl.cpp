@@ -1,11 +1,13 @@
 #include <complex.h>
 #include <blas_lapack.h>
+#include <timer.h>
 #ifdef NATIVE_LAPACK_LIB
-#include <cublas_v2.h>
+#include <oneapi/mkl.hpp>
 #include <malloc_quda.h>
+using namespace oneapi::mkl;
 #endif
 
-//#define _DEBUG
+#define _DEBUG
 
 #ifdef _DEBUG
 #include <eigen_helper.h>
@@ -20,37 +22,25 @@ namespace quda
     namespace native
     {
 
-#ifdef NATIVE_LAPACK_LIB
-      static cublasHandle_t handle;
-#endif
-      static bool cublas_init = false;
+      static bool native_init = false;
 
       void init()
       {
-        if (!cublas_init) {
-#ifdef NATIVE_LAPACK_LIB
-          cublasStatus_t error = cublasCreate(&handle);
-          if (error != CUBLAS_STATUS_SUCCESS) errorQuda("cublasCreate failed with error %d", error);
-          else
-            printfQuda("cublasCreated successfully\n");
-          cublas_init = true;
-#else
+        if (!native_init) {
+          native_init = true;
+	  //#ifndef NATIVE_LAPACK_LIB
 	  quda::blas_lapack::generic::init();
-#endif
+	  //#endif
         }
       }
 
       void destroy()
       {
-        if (cublas_init) {
-#ifdef NATIVE_LAPACK_LIB
-          cublasStatus_t error = cublasDestroy(handle);
-          if (error != CUBLAS_STATUS_SUCCESS)
-            errorQuda("\nError indestroying cublas context, error code = %d\n", error);
-          cublas_init = false;
-#else
+        if (native_init) {
+          native_init = false;
+	  //#ifndef NATIVE_LAPACK_LIB
 	  quda::blas_lapack::generic::destroy();
-#endif
+	  //#endif
         }
       }
 
@@ -75,7 +65,7 @@ namespace quda
       }
 #endif
 
-#ifdef NATIVE_LAPACK_LIB
+#ifdef XNATIVE_LAPACK_LIB
       // FIXME do this in pipelined fashion to reduce memory overhead.
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
 				  QudaPrecision prec, QudaFieldLocation location)
@@ -331,19 +321,19 @@ namespace quda
           qudaMemcpy(C_d, C_data, sizeCarr, qudaMemcpyHostToDevice);
         }
 
-        cublasOperation_t trans_a = CUBLAS_OP_N;
+        transpose trans_a = transpose::N;
         switch (blas_param.trans_a) {
-        case QUDA_BLAS_OP_N: trans_a = CUBLAS_OP_N; break;
-        case QUDA_BLAS_OP_T: trans_a = CUBLAS_OP_T; break;
-        case QUDA_BLAS_OP_C: trans_a = CUBLAS_OP_C; break;
+        case QUDA_BLAS_OP_N: trans_a = transpose::N; break;
+        case QUDA_BLAS_OP_T: trans_a = transpose::T; break;
+        case QUDA_BLAS_OP_C: trans_a = transpose::C; break;
         default: errorQuda("Unknown QUDA_BLAS_OP type %d\n", blas_param.trans_a);
         }
 
-        cublasOperation_t trans_b = CUBLAS_OP_N;
+        transpose trans_b = transpose::N;
         switch (blas_param.trans_b) {
-        case QUDA_BLAS_OP_N: trans_b = CUBLAS_OP_N; break;
-        case QUDA_BLAS_OP_T: trans_b = CUBLAS_OP_T; break;
-        case QUDA_BLAS_OP_C: trans_b = CUBLAS_OP_C; break;
+        case QUDA_BLAS_OP_N: trans_b = transpose::N; break;
+        case QUDA_BLAS_OP_T: trans_b = transpose::T; break;
+        case QUDA_BLAS_OP_C: trans_b = transpose::C; break;
         default: errorQuda("Unknown QUDA_BLAS_OP type %d\n", blas_param.trans_b);
         }
         //-------------------------------------------------------------------------
@@ -351,105 +341,99 @@ namespace quda
         // Call CUBLAS
         //-------------------------------------------------------------------------
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
+          typedef std::complex<double> Z;
 
-          typedef cuDoubleComplex Z;
+          const Z alpha(static_cast<std::complex<double>>(blas_param.alpha));
+	  const Z beta(static_cast<std::complex<double>>(blas_param.beta));
 
-          const Z alpha = make_double2((double)(static_cast<std::complex<double>>(blas_param.alpha).real()),
-                                       (double)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
-
-          const Z beta = make_double2((double)(static_cast<std::complex<double>>(blas_param.beta).real()),
-                                      (double)(static_cast<std::complex<double>>(blas_param.beta).imag()));
-
-          cublasStatus_t error;
+	  auto q = device::defaultQueue();
+	  sycl::event evnt;
           if (batch > 1) {
-            error = cublasZgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-
-            if (error != CUBLAS_STATUS_SUCCESS)
-              errorQuda("\nError in cuBLASZGEMMStridedBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm_batch
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+	       (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+	       (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+	    evnt.wait();
           } else {
-            error = cublasZgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
+	    evnt = blas::column_major::gemm
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (Z *)A_d + blas_param.a_offset, blas_param.lda,
+	       (Z *)B_d + blas_param.b_offset, blas_param.ldb, beta,
+	       (Z *)C_d + blas_param.c_offset, blas_param.ldc);
+	    evnt.wait();
+	  }
+	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
+          typedef std::complex<float> C;
 
-            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);
-          }
-        } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
+          const C alpha(static_cast<std::complex<double>>(blas_param.alpha));
+	  const C beta(static_cast<std::complex<double>>(blas_param.beta));
 
-          typedef cuFloatComplex C;
-
-          const C alpha = make_float2((float)(static_cast<std::complex<double>>(blas_param.alpha).real()),
-                                      (float)(static_cast<std::complex<double>>(blas_param.alpha).imag()));
-
-          const C beta = make_float2((float)(static_cast<std::complex<double>>(blas_param.beta).real()),
-                                     (float)(static_cast<std::complex<double>>(blas_param.beta).imag()));
-
-          cublasStatus_t error;
+	  auto q = device::defaultQueue();
+	  sycl::event evnt;
           if (batch > 1) {
-            error = cublasCgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-
-            if (error != CUBLAS_STATUS_SUCCESS)
-              errorQuda("\nError in cuBLASCGEMMStridedBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm_batch
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+	       (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+	       (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+	    evnt.wait();
           } else {
-            error = cublasCgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
-
-            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (C *)A_d + blas_param.a_offset, blas_param.lda,
+	       (C *)B_d + blas_param.b_offset, blas_param.ldb, beta,
+	       (C *)C_d + blas_param.c_offset, blas_param.ldc);
+	    evnt.wait();
           }
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
-
           typedef double D;
 
-          const D alpha = (D)(static_cast<std::complex<double>>(blas_param.alpha).real());
-          const D beta = (D)(static_cast<std::complex<double>>(blas_param.beta).real());
+          const D alpha = (D) static_cast<std::complex<double>>(blas_param.alpha).real();
+          const D beta = (D) static_cast<std::complex<double>>(blas_param.beta).real();
 
-          cublasStatus_t error;
+	  auto q = device::defaultQueue();
+	  sycl::event evnt;
           if (batch > 1) {
-            error = cublasDgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-
-            if (error != CUBLAS_STATUS_SUCCESS)
-              errorQuda("\nError in cuBLASDGEMMStridedBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm_batch
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+	       (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+	       (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+	    evnt.wait();
           } else {
-            error = cublasDgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
-
-            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (D *)A_d + blas_param.a_offset, blas_param.lda,
+	       (D *)B_d + blas_param.b_offset, blas_param.ldb, beta,
+	       (D *)C_d + blas_param.c_offset, blas_param.ldc);
+	    evnt.wait();
           }
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
-
           typedef float S;
 
-          const S alpha = (S)(static_cast<std::complex<float>>(blas_param.alpha).real());
-          const S beta = (S)(static_cast<std::complex<float>>(blas_param.beta).real());
+          const S alpha = (S) static_cast<std::complex<float>>(blas_param.alpha).real();
+          const S beta = (S) static_cast<std::complex<float>>(blas_param.beta).real();
 
-          cublasStatus_t error;
+	  auto q = device::defaultQueue();
+	  sycl::event evnt;
           if (batch > 1) {
-            error = cublasSgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
-
-            if (error != CUBLAS_STATUS_SUCCESS)
-              errorQuda("\nError in cuBLASSGEMMStridedBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm_batch
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+	       (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, beta,
+	       (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+	    evnt.wait();
           } else {
-            error = cublasSgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
-
-            if (error != CUBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
+	    evnt = blas::column_major::gemm
+	      (q, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, alpha,
+	       (S *)A_d + blas_param.a_offset, blas_param.lda,
+	       (S *)B_d + blas_param.b_offset, blas_param.ldb, beta,
+	       (S *)C_d + blas_param.c_offset, blas_param.ldc);
+	    evnt.wait();
           }
         } else {
-          errorQuda("cublasGEMM type %d not implemented\n", blas_param.data_type);
+          errorQuda("MKL GEMM type %d not implemented\n", blas_param.data_type);
         }
         //-------------------------------------------------------------------------
 
