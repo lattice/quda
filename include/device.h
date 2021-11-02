@@ -51,14 +51,6 @@ namespace quda
     unsigned int get_default_stream_idx();
 
     /**
-       @brief Return CUDA stream from QUDA stream.  This is a
-       temporary addition until all kernels have been made generic.
-       @param stream QUDA stream we which to convert to CUDA stream
-       @return CUDA stream
-     */
-    cudaStream_t get_cuda_stream(const qudaStream_t &stream);
-
-    /**
        @brief Report if the target device supports managed memory
        @return Return true if managed memory is supported
      */

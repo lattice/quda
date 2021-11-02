@@ -8,6 +8,7 @@
 #include <linalg.cuh>
 #include <matrix_tile.cuh>
 #include <mma_tensor_op/gemm.cuh>
+#include <cub_helper.cuh>
 #include <kernel.h>
 #include <kernels/coarse_op_kernel.cuh>
 
@@ -45,12 +46,15 @@ namespace quda
         Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
        */
       template <typename Wtype, typename Arg>
-      __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
+      __device__ __host__ inline auto computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
       {
+        using real = typename Arg::Float;
         constexpr int fineSpin = Arg::fineSpin;
 
         int coord[4];
         getCoords(coord, x_cb, arg.x_size, parity);
+
+        real uvMax = 0.0;
 
         constexpr int nFace = 1;
 
@@ -58,7 +62,6 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
-        constexpr bool compute_max_only = false;
 
         // Here instead of fineColor x coarseColor x fineColor,
         // we do (fineColor * fineSpin) x coarseColor x fineColor
@@ -81,7 +84,7 @@ namespace quda
             auto b = Wacc(parity, x_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
           }
 
         } else if (arg.comm_dim[Arg::dim] && (coord[Arg::dim] + nFace >= arg.x_size[Arg::dim])) {
@@ -94,7 +97,7 @@ namespace quda
             auto b = Wacc.Ghost(Arg::dim, 1, (parity + 1) & 1, ghost_idx, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
           }
 
         } else {
@@ -107,9 +110,11 @@ namespace quda
             auto b = Wacc((parity + 1) & 1, y_cb, s_col, 0, 0);
             auto c = arg.UV(parity, x_cb, s_col * fineSpin, 0, 0);
 
-            Config::template perform_mma<a_dagger, b_dagger, compute_max_only>(a, b, c, 0, 0);
+            uvMax = Config::template perform_mma<a_dagger, b_dagger, Arg::compute_max>(a, b, c, 0, 0);
           }
         }
+
+        return uvMax;
       } // computeUV
 
     } // namespace impl
@@ -125,10 +130,19 @@ namespace quda
         if (x_cb >= arg.fineVolumeCB) return;
         int parity = blockIdx.y;
 
+        using real = typename Arg::Float;
+        real max = 0.0;
         if (Arg::dir == QUDA_FORWARDS || Arg::dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV
-          impl::computeUV(arg, arg.V, parity, x_cb);
+          max = impl::computeUV(arg, arg.V, parity, x_cb);
         else
-          impl::computeUV(arg, arg.AV, parity, x_cb);
+          max = impl::computeUV(arg, arg.AV, parity, x_cb);
+
+        if (Arg::compute_max) {
+          using BlockReduce = cub::BlockReduce<unsigned, 1, cub::BLOCK_REDUCE_WARP_REDUCTIONS, Arg::block_y, Arg::block_z, __COMPUTE_CAPABILITY__>;
+          __shared__ typename BlockReduce::TempStorage temp_storage;
+          unsigned aggregate = BlockReduce(temp_storage).Reduce(__float_as_uint(max), cub::Max());
+          if (threadIdx.y == 0 && threadIdx.z == 0) atomicAbsMax(arg.max_d, __uint_as_float(aggregate));
+        }
       }
     };
 

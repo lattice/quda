@@ -95,7 +95,7 @@ namespace quda {
 	for (int j=0; j<Arg::fineColor; j+=color_unroll) {
 #pragma unroll
 	  for (int k=0; k<color_unroll; k++)
-	    partial[k] += conj(arg.V(v_parity, x_cb, s, j+k, i)) * arg.in(spinor_parity, x_cb, s, j+k);
+	    partial[k] = cmac(conj(arg.V(v_parity, x_cb, s, j+k, i)), arg.in(spinor_parity, x_cb, s, j+k), partial[k]);
 	}
 
 #pragma unroll

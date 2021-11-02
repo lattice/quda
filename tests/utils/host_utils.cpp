@@ -1,3 +1,4 @@
+#include <limits>
 #include <complex>
 #include <stdlib.h>
 #include <stdio.h>
@@ -107,6 +108,7 @@ void setQudaDefaultMgTestParams()
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
+    block_ortho_two_pass[i] = true;
 
     // Default eigensolver params
     mg_eig[i] = false;
@@ -212,8 +214,9 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
-  } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) &&
-             (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+  } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
+                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
     cs_param->nDim = 5;
     cs_param->x[4] = 2;
   } else {

@@ -498,7 +498,7 @@ namespace quda
       *B[i] = *vec_space[i];
     }
     
-    transfer = new Transfer(B, n_conv, n_block_ortho,
+    transfer = new Transfer(B, n_conv, n_block_ortho, true, //?
 			    geo_block_size, spin_block_size, vec_space[0]->Precision(),
 			    QUDA_TRANSFER_AGGREGATE, profile);
     

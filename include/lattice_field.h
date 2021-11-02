@@ -89,8 +89,8 @@ namespace quda {
       siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
-      for (int i=0; i<nDim; i++) {
-	x[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        x[i] = 0;
 	r[i] = 0;
       }
     }
@@ -110,9 +110,9 @@ namespace quda {
       ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = x[i];
-	this->r[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        this->x[i] = i < nDim ? x[i] : 0;
+        this->r[i] = 0;
       }
     }
     
@@ -127,9 +127,9 @@ namespace quda {
       siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
       ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
-      for (int i=0; i<nDim; i++) {
-	this->x[i] = param.X[i];
-	this->r[i] = 0;
+      for (int i = 0; i < QUDA_MAX_DIM; i++) {
+        this->x[i] = i < nDim ? param.X[i] : 0;
+        this->r[i] = 0;
       }
     }
 
@@ -455,7 +455,7 @@ namespace quda {
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
     */
-    void createComms(bool no_comms_fill=false);
+    void createComms(bool no_comms_fill = false);
 
     /**
        Destroy the communication handlers
@@ -485,12 +485,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -515,12 +515,12 @@ namespace quda {
     /**
        @return Extended field radius
     */
-    const int* R() const { return r; }
+    const int *R() const { return r; }
 
     /**
        @return Local checkboarded lattice dimensions
     */
-    const int* LocalX() const { return local_x; }
+    const int *LocalX() const { return local_x; }
 
     /**
       @return The pointer to the **full** lattice-dimension array
@@ -563,7 +563,7 @@ namespace quda {
        @param i The dimension of the requested local surface
        @return The single-parity local surface of dimension i
     */
-    const int* LocalSurfaceCB() const { return local_surfaceCB; }
+    const int *LocalSurfaceCB() const { return local_surfaceCB; }
 
     /**
        @param i The dimension of the requested local surface
@@ -701,7 +701,11 @@ namespace quda {
 
     virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); return 0; }
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool)
+    {
+      errorQuda("Not implemented");
+      return 0;
+    }
 
     virtual void commsWait(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 

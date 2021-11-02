@@ -12,7 +12,7 @@ namespace quda {
   namespace colorspinor
   {
 
-    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int )
+    inline bool isNative(QudaFieldOrder order, QudaPrecision precision, int nSpin, int)
     {
       if (precision == QUDA_DOUBLE_PRECISION) {
         if (order == QUDA_FLOAT2_FIELD_ORDER) return true;
@@ -553,7 +553,7 @@ namespace quda {
     /**
        @brief Get the dslash_constant structure from this field
     */
-    const DslashConstant& getDslashConstant() const { return *dslash_constant; }
+    const DslashConstant &getDslashConstant() const { return *dslash_constant; }
 
     const ColorSpinorField& Even() const;
     const ColorSpinorField& Odd() const;
@@ -734,9 +734,9 @@ namespace quda {
        @param[in] b Twisted mass parameter (flavor twist factor, default=0)
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
-    void packGhost(const int nFace, const QudaParity parity, const int dagger,
-                   qudaStream_t stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
-                   bool spin_project, double a = 0, double b = 0, double c = 0, int shmem = 0);
+    void packGhost(const int nFace, const QudaParity parity, const int dagger, const qudaStream_t &stream,
+                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label, bool spin_project,
+                   double a = 0, double b = 0, double c = 0, int shmem = 0);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -745,7 +745,7 @@ namespace quda {
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
+    void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -754,7 +754,7 @@ namespace quda {
       @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
       @param stream The array of streams to use
       */
-    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, qudaStream_t stream);
+    void unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir, const qudaStream_t &stream);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -773,7 +773,8 @@ namespace quda {
        @param[in] c Used for twisted mass (flavor twist factor)
     */
     void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
-              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0, int shmem = 0);
+              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
+              int shmem = 0);
 
     /**
        @brief Copies the ghost to the host from the device, prior to
@@ -788,7 +789,6 @@ namespace quda {
        @brief Initiate halo communication receive
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] stream (presently unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
     void recvStart(int dir, const qudaStream_t &stream, bool gdr = false);
@@ -828,7 +828,6 @@ namespace quda {
        @brief Wait on halo communication to complete
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is
        the scatter-centric direction (0=backwards,1=forwards)
-       @param[in] dagger Whether this exchange is for the conjugate operator
        @param[in] stream (unused)
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
@@ -845,7 +844,7 @@ namespace quda {
      */
     void scatter(int d, const qudaStream_t &stream);
 
-    const void* Ghost2() const;
+    const void *Ghost2() const;
 
     /**
        @brief This is a unified ghost exchange function for doing a complete
@@ -955,7 +954,7 @@ namespace quda {
     static void freeGhostBuffer(void);
 
     void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
-    void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir);
+    void unpackGhost(void *ghost_spinor, const int dim, const QudaDirection dir);
 
     void copy(const cpuColorSpinorField&);
     void zero();

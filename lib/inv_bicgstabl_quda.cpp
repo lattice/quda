@@ -196,10 +196,9 @@ namespace quda {
     int n_update; 
 
   public:
-    BiCGstabLUpdate(ColorSpinorField* x, std::vector<ColorSpinorField*>& r, std::vector<ColorSpinorField*>& u,
-                    Complex* alpha, Complex* beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
-      x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max),
-      n_update(n_update)
+    BiCGstabLUpdate(ColorSpinorField *x, std::vector<ColorSpinorField *> &r, std::vector<ColorSpinorField *> &u,
+                    Complex *alpha, Complex *beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+      x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max), n_update(n_update)
     {
       
     }
@@ -247,9 +246,7 @@ namespace quda {
   }
 
   BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile),
-    n_krylov(param.Nkrylov),
-    init(false)
+    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile), n_krylov(param.Nkrylov), init(false)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
