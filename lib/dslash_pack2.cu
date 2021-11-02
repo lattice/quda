@@ -1,7 +1,7 @@
 #include <color_spinor_field.h>
 
 // STRIPED - spread the blocks throughout the workload to ensure we
-// work on all directions/dimensions simultanesouly to maximize NVLink saturation
+// work on all directions/dimensions simultaneously to maximize NVLink saturation
 // if not STRIPED then this means we assign one thread block per direction / dimension
 // currently does not work with NVSHMEM
 #ifndef NVSHMEM_COMMS
