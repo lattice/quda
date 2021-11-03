@@ -228,7 +228,7 @@ namespace quda {
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double &, const double &) const 
+                         const double &, const double &, const QudaParity parity) const 
     {
       errorQuda("Not implemented!\n");
     }
@@ -1261,7 +1261,7 @@ public:
       double kappa, double mass, double mu=0., double mu_factor=0.) const;
       
     
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;          
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity) const;          
   };
 
   // Even-odd preconditioned staggered
@@ -1467,7 +1467,7 @@ public:
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
     
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity) const;    
   };
 
   // Even-odd preconditioned staggered
@@ -1849,7 +1849,7 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity) const;
     
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };

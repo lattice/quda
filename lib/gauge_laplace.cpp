@@ -51,7 +51,7 @@ namespace quda {
   }
 
   void GaugeLaplace::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const double &a, const double &b) const
+                             const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const
   {
     checkSpinorAlias(in, out);
 
@@ -62,7 +62,7 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
 
-    ApplyLaplace(out, in, *gauge, laplace3D, a, b, in, QUDA_INVALID_PARITY, dagger, comm_dim, profile);
+    ApplyLaplace(out, in, *gauge, laplace3D, a, b, in, parity, dagger, comm_dim, profile);
     flops += 1368ll*in.Volume(); // FIXME
   }
 

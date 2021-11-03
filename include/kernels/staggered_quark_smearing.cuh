@@ -35,13 +35,13 @@ namespace quda
     const G U;    /** the gauge field */
     int dir;      /** The direction from which to omit the derivative */
 
-    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
+    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir, 
                bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, QUDA_INVALID_PARITY, dagger, false, 1, false, comm_override),
-      out(out),
-      in(in),
-      in_pack(in),
+      DslashArg<Float, nDim>(in, U, parity, dagger, false, 3, false, comm_override),
+      out(out, 3),
+      in(in, 3),
+      in_pack(in, 3),
       U(U),
       dir(dir)
     {
@@ -73,6 +73,7 @@ namespace quda
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
+    const int their_spinor_parity = (arg.nParity == 2) ? parity : 0;
 
 #pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
@@ -85,13 +86,13 @@ namespace quda
 
             const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 2);//check nFace=2, requires improved staggered fields
             const Link U = arg.U(d, coord.x_cb, parity);
-            const Vector in = arg.in.Ghost(d, 1, ghost_idx, parity);//?
+            const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);//?
 
             out += U * in;
 
           } else if (doBulk<kernel_type>() && !ghost) {//doBulk
             const int _2hop_fwd_idx    = linkIndexP2(coord, arg.dim, d);
-            const Vector in_2hop       = arg.in(_2hop_fwd_idx, parity);
+            const Vector in_2hop       = arg.in(_2hop_fwd_idx, their_spinor_parity);
             const Link U_2link         = arg.U(d, coord.x_cb, parity);            
             out += U_2link * in_2hop;
           }
@@ -105,7 +106,7 @@ namespace quda
             // when updating replace arg.nFace with 1 here
             const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 2);//check nFace=2, requires improved staggered field
             const Link U = arg.U.Ghost(d, ghost_idx, parity);
-            const Vector in = arg.in.Ghost(d, 0, ghost_idx, parity);
+            const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
 	    
             out += conj(U) * in;	    
 
@@ -115,7 +116,7 @@ namespace quda
             const int _2hop_gauge_idx= _2hop_back_idx;          
           
             const Link   U_2link = arg.U(d, _2hop_gauge_idx, parity);
-            const Vector in_2hop = arg.in(_2hop_back_idx, parity);
+            const Vector in_2hop = arg.in(_2hop_back_idx, their_spinor_parity);
             out += conj(U_2link) * in_2hop;
           }
         }
@@ -134,7 +135,7 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
+      using Vector = ColorSpinor<real, Arg::nColor, 1>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;
@@ -142,11 +143,10 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, s, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-
       // We instantiate two kernel types:
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.

@@ -131,7 +131,7 @@ namespace quda {
   }
   
   void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const double &a, const double &b) const
+                             const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const
   {
     checkSpinorAlias(in, out);
 
@@ -142,7 +142,12 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
 
-    ApplyStaggeredQSmear(out, in, *gauge, laplace3D, dagger, comm_dim, profile);
+    if (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+      ApplyStaggeredQSmear(out.Even(), in.Even(), *gauge, QUDA_EVEN_PARITY, laplace3D, dagger, comm_dim, profile);
+      ApplyStaggeredQSmear(out.Odd(),  in.Odd(),  *gauge, QUDA_ODD_PARITY,  laplace3D, dagger, comm_dim, profile);
+    } else {
+      ApplyStaggeredQSmear(out, in, *gauge, parity, laplace3D, dagger, comm_dim, profile);	    
+    }
     flops += 1368ll*in.Volume(); // FIXME
   }  
 
