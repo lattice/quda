@@ -101,7 +101,7 @@ if(GIT_FOUND)
       COMMAND wc -l
       OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} describe --long --dirty
+      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always  --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
@@ -450,7 +450,6 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # This is needed now GPU ARCH
-set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
 set(COMP_CAP "${COMP_CAP}0")
