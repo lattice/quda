@@ -108,6 +108,7 @@ static void hisq_force_end()
 
 TEST(hisq_force_unitarize, verify)
 {
+  setVerbosity(verbosity);
   hisq_force_init();
 
   double unitarize_eps = 1e-5;
