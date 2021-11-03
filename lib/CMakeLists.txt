@@ -315,7 +315,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
-          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
                             $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
