@@ -1084,32 +1084,7 @@ namespace quda {
       }
       return os;
     }
-  
-  template<class Cmplx, class Real, int Nc>
-    inline void copyArrayToLink(Matrix<Cmplx,Nc>* link, Real* array)
-  {
-#pragma unroll
-    for (int i=0; i<Nc; ++i){
-#pragma unroll
-      for (int j=0; j<Nc; ++j){
-	(*link)(i,j).x = array[(i*Nc+j)*2];
-	(*link)(i,j).y = array[(i*Nc+j)*2 + 1];
-      }
-    }
-  }  
-
-  template<class Cmplx, class Real, int Nc>
-    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,Nc>& link){
-#pragma unroll
-    for (int i=0; i<Nc; ++i){
-#pragma unroll
-      for (int j=0; j<Nc; ++j){
-	array[(i*Nc+j)*2] = link(i,j).x;
-	array[(i*Nc+j)*2 + 1] = link(i,j).y;
-      }
-    }
-  }
-  
+    
   template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
