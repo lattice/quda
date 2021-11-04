@@ -22,7 +22,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(cmake/CPM.cmake)
 
 find_package(Git)
-find_package(PythonInterp)
 
 # by default we will build DEVEL
 if(DEFINED ENV{QUDA_BUILD_TYPE})
