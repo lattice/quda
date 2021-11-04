@@ -4,7 +4,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
-target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+#target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_link_libraries(quda_test PUBLIC Eigen)
 target_link_libraries(quda_test PUBLIC QUDA::quda)
 set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -18,8 +18,6 @@ endif()
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
-  # adding the linker language here as a workaround -- was not needed for cmake 3.16
-  set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
