@@ -614,6 +614,7 @@ endif()
 # QMP
 ####################################
 if(QUDA_QMP)
+  if(QUDA_DOWNLOAD_USQCD)
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
@@ -625,6 +626,7 @@ if(QUDA_QMP)
     )
   else()
     find_package(QMP REQUIRED) 
+  endif()
 endif()
 
 ####################################
