@@ -103,8 +103,6 @@ void setQudaDefaultMgTestParams()
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
     coarse_solver_maxiter[i] = 100;
-    solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
-    setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
