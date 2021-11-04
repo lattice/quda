@@ -496,11 +496,12 @@ endif()
 add_library(Eigen INTERFACE IMPORTED)
 # set(CPM_USE_LOCAL_PACKAGES TRUE)
 if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.4.0)
+  set(QUDA_EIGEN_VERSION "3.4.0" CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
+  mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
     NAME Eigen
-    VERSION ${EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2
+    VERSION ${QUDA_EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
     DOWNLOAD_ONLY YES 
     )
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
@@ -615,10 +616,12 @@ endif()
 ####################################
 if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
+    set(QUDA_QMP_TAG "3010fef" CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
+    mark_as_advanced(QUDA_QMP_TAG)  
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG 3010fef
+      GIT_TAG ${QUDA_QMP_TAG}
       OPTIONS
       "QMP_MPI ON"
       "QMP_TESTING OFF"
@@ -637,10 +640,12 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
+    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
       GITHUB_REPOSITORY usqcd-software/qio
-      GIT_TAG 0627f013
+      GIT_TAG ${QUDA_QIO_TAG}
       OPTIONS 
         "QIO_ENABLE_PARALLEL_BUILD ON"
         "QIO_ENABLE_QMP_ROUTE OFF" 
