@@ -102,9 +102,10 @@ namespace quda {
     complex<Float> det = getDeterminant(out);
     Float mod = pow(norm(det), negative_one_on_2N);
     Float angle = arg(det);
-    complex<Float> cTemp;
 
-    quda::sincos(negative_one_on_N * angle, &cTemp.y, &cTemp.x);
-    in = (mod*cTemp)*out;
+    Float re, im;
+    quda::sincos(negative_one_on_N * angle, &im, &re);
+
+    in = complex<Float>(mod * re, mod * im) * out;
   }
 } // namespace quda

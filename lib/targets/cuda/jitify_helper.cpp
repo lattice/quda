@@ -34,6 +34,9 @@
 #include "jitify_options.hpp"
 #include "jitify_helper.h"
 
+#define CHECK_CUDA_ERROR(func)                                                                                         \
+  target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+
 namespace quda
 {
 
@@ -54,7 +57,7 @@ namespace quda
         = { "-ftz=true",
             "-prec-div=false",
             "-prec-sqrt=false",       // match offline optimization options
-            "-remove-unused-globals", // remove unused globals to monimize module size
+            "-remove-unused-globals", // remove unused globals to minimize module size
 
 #if __cplusplus >= 201703L
             "-std=c++17", // use C++17 dialect
@@ -65,16 +68,18 @@ namespace quda
 #ifdef DEVICE_DEBUG
             "-G",
 #endif
-
-#if CUDA_VERSION >= 11200
-            "-err-no", // display error/warning numbers
-            // disable warnings that are unavoidable
-            "-diag-suppress=64", // declaration does not declare anything (anonymous structs in CUB)
-            "-diag-suppress=161" // unknown pragmas, e.g., OpenMP
-#endif
           };
 
-      // add an extra compilation options specific to this instance
+      // since CUDA 11.2, we can remove some unavoidable warnings
+      int runtime_version;
+      CHECK_CUDA_ERROR(cudaRuntimeGetVersion(&runtime_version));
+      if (runtime_version >= 11020) {
+        options.push_back("-err-no");            // display error/warning numbers
+        options.push_back("-diag-suppress=64");  // declaration does not declare anything (anonymous structs in CUB)
+        options.push_back("-diag-suppress=161"); // unknown pragmas, e.g., OpenMP
+      }
+
+      // add any extra compilation options specific to this instance
       for (auto option : extra_options) options.push_back(option);
 
       jitify::Program *program = new jitify::Program(kernel_cache->program(file, 0, options));

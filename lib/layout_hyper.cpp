@@ -121,9 +121,8 @@ int quda_node_index(const int x[])
 {
   size_t node_idx = quda_node_index_helper(x);
 
-  if (node_idx > static_cast<size_t>(std::numeric_limits<int>::max()))
-    errorQuda("Invalid node_idx %lu", node_idx);
-  
+  if (node_idx > static_cast<size_t>(std::numeric_limits<int>::max())) errorQuda("Invalid node_idx %lu", node_idx);
+
   return static_cast<int>(node_idx);
 }
 #endif // QIO_HAS_EXTENDED_LAYOUT
