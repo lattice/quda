@@ -1,9 +1,7 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
 
-# QUDA_HASH for tunecache
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
-set(GITVERSION "${PROJECT_VERSION}-${QUDA_GPU_ARCH} ${GITVERSION}")
+
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -157,11 +155,7 @@ target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<
 
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
-# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
-target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
-if(GITVERSION)
-  target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
-endif()
+
 
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
@@ -225,6 +219,12 @@ add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
 
 add_subdirectory(interface)
+
+# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
+if(GITVERSION)
+  target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
+endif()
 
 # propagate CXX flags to CUDA host compiler
 #TODO: Do we still need that? 

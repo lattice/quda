@@ -69,18 +69,7 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA")
-  set(QUDA_TARGET_CUDA ON)
-  set(QUDA_TARGET_LIBRARY quda_cuda_target)
-endif()
 
-if( ${CHECK_TARGET_TYPE} STREQUAL "HIP")
-  set(QUDA_TARGET_HIP ON)
-  set(QUDA_TARGET_LIBRARY quda_hip_target)
-endif()
-#
-# PROJECT is QUDA
-#
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} show
@@ -122,19 +111,7 @@ message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
-if(DEFINED ENV{QUDA_GPU_ARCH})
-  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
-else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_70)
-endif()
-if(NOT QUDA_GPU_ARCH)
-  message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
-endif()
 
-set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -221,11 +198,9 @@ set(QUDA_MAGMA_LIBS
 option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
 option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ON)
-option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
+
 option(QUDA_FLOAT8 "enable float-8 ordered fixed-point fields?" ON)
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
-option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
+
 option(QUDA_BUILD_NATIVE_LAPACK "build the native blas/lapack library according to QUDA_TARGET" ON)
 
 set(QUDA_MAX_MULTI_BLAS_N
@@ -242,8 +217,7 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
-set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
-set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
+
 
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
@@ -260,12 +234,7 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-# QIO legacy support
-option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
 
-# NVTX options
-option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
-option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
@@ -276,10 +245,7 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
-option(QUDA_JITIFY "build QUDA using Jitify" OFF)
-option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 
-set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
@@ -287,14 +253,11 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 # mark as advanced
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
-mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
-mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+
 mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
 mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
-mark_as_advanced(QUDA_VERBOSE_BUILD)
+
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
@@ -305,13 +268,7 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
-mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_MPI_NVTX)
-mark_as_advanced(QUDA_INTERFACE_NVTX)
 mark_as_advanced(QUDA_INTERFACE_ALL)
 
 mark_as_advanced(QUDA_SSTEP)
@@ -319,7 +276,7 @@ mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
-mark_as_advanced(QUDA_JITIFY)
+
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
@@ -448,10 +405,7 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     "-g "
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
-# This is needed now GPU ARCH
-string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
-set(COMP_CAP "${COMP_CAP}0")
+
 
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
@@ -459,25 +413,6 @@ message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 
 # CUDA Wrapper for finding libs etc
 find_package(CUDAToolkit REQUIRED)
-
-
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
-  set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
-endif()
-include(CMakeDependentOption)
-CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
-
-if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
-endif()
-
-if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
-  message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
-endif()
 
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
@@ -550,56 +485,6 @@ if(QUDA_MPI OR QUDA_QMP)
     )
   endif()
   find_package(MPI REQUIRED)
-endif()
-
-####################################
-# NVSHMEM
-####################################
-if(QUDA_NVSHMEM)
-  if(QUDA_DOWNLOAD_NVSHMEM)
-  # workaround potential UCX interaction issue with CUDA 11.3+ and UCX in NVSHMEM 2.1.2
-  if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "11.3")
-    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.1.2/source/nvshmem_src_2.1.2-0.txz" CACHE STRING "location of NVSHMEM tarball")
-  else()
-    set(QUDA_DOWNLOAD_NVSHMEM_TAR "https://developer.download.nvidia.com/compute/redist/nvshmem/2.2.1/source/nvshmem_src_2.2.1-0.txz" CACHE STRING "location of NVSHMEM tarball")
-  endif()
-    get_filename_component(NVSHMEM_CUDA_HOME ${CUDAToolkit_INCLUDE_DIRS} DIRECTORY)
-    find_path(GDRCOPY_HOME NAME gdrapi.h PATHS "/usr/local/gdrcopy" ${QUDA_GDRCOPY_HOME} PATH_SUFFIXES "include")
-    mark_as_advanced(GDRCOPY_HOME)
-    if(NOT GDRCOPY_HOME)
-      message(SEND_ERROR "QUDA_DOWNLOAD_NVSHMEM requires gdrcopy to be installed. Please set QUDA_GDRCOPY_HOME to the location of your gdrcopy installation.")
-    endif()
-    get_filename_component(NVSHMEM_GDRCOPY_HOME ${GDRCOPY_HOME} DIRECTORY)
-    ExternalProject_Add(NVSHMEM
-                        URL ${QUDA_DOWNLOAD_NVSHMEM_TAR}
-                        PREFIX nvshmem
-                        CONFIGURE_COMMAND ""
-                        BUILD_IN_SOURCE ON
-                        BUILD_COMMAND  make -j8 MPICC=${MPI_C_COMPILER} CUDA_HOME=${NVSHMEM_CUDA_HOME} NVSHMEM_PREFIX=<INSTALL_DIR> NVSHMEM_MPI_SUPPORT=1 GDRCOPY_HOME=${NVSHMEM_GDRCOPY_HOME} install
-                        INSTALL_COMMAND ""
-                        LOG_INSTALL ON
-                        LOG_BUILD ON
-                        LOG_DOWNLOAD ON
-                        )
-    ExternalProject_Get_Property(NVSHMEM INSTALL_DIR)
-    set(QUDA_NVSHMEM_HOME ${INSTALL_DIR} CACHE PATH "path to NVSHMEM" FORCE)
-    set(NVSHMEM_LIBS  ${INSTALL_DIR}/lib/libnvshmem.a)
-    set(NVSHMEM_INCLUDE ${INSTALL_DIR}/include/)   
-  else()
-    if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
-      message( FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set" )
-    endif()
-      find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/"  )
-      find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" )
-  endif()
-    
-  mark_as_advanced(NVSHMEM_LIBS)
-  mark_as_advanced(NVSHMEM_INCLUDE)
-  add_library(nvshmem_lib STATIC IMPORTED)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LOCATION ${NVSHMEM_LIBS})
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_target_properties(nvshmem_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
-  set_target_properties(nvshmem_lib PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES CUDA)
 endif()
 
 
