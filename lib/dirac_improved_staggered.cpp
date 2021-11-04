@@ -51,7 +51,7 @@ namespace quda {
   void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
+    printfQuda("Running pure dslash for improved staggered :: parity %d, dagger %d \n", parity, dagger);
     ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, parity, dagger, commDim, profile);
     flops += 1146ll*in.Volume();
   }
@@ -60,7 +60,7 @@ namespace quda {
       const ColorSpinorField &x, const double &k) const
   {    
     checkParitySpinor(in, out);
-
+    printfQuda("Running pure dslash xpay for improved staggered :: parity %d \n", parity);
     // Need to catch the zero mass case.
     if (k == 0.0) {
       // There's a sign convention difference for Dslash vs DslashXpay, which is
@@ -81,6 +81,7 @@ namespace quda {
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
+    printfQuda("Running M for improved staggered %d \n");
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
       if (dagger == QUDA_DAG_YES) {
@@ -139,15 +140,17 @@ namespace quda {
     // only switch on comms needed for directions with a derivative
     for (int i = 0; i < 4; i++) {
       comm_dim[i] = comm_dim_partitioned(i);
-      if (laplace3D == i) comm_dim[i] = 0;
+      if (laplace3D == i) comm_dim[i] = 0;//FIXME
+    }
+ 
+    if (in.SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      ApplyStaggeredQSmear(out, in, *longGauge, parity, laplace3D, dagger, comm_dim, profile);//FIXME
+    } else {
+	    
+      ApplyStaggeredQSmear(out, in, *longGauge, QUDA_EVEN_PARITY, laplace3D, dagger, comm_dim, profile);//FIXME
+      ApplyStaggeredQSmear(out, in, *longGauge, QUDA_ODD_PARITY, laplace3D, dagger, comm_dim, profile);//FIXME    
     }
 
-    if (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-      ApplyStaggeredQSmear(out.Even(), in.Even(), *gauge, QUDA_EVEN_PARITY, laplace3D, dagger, comm_dim, profile);
-      ApplyStaggeredQSmear(out.Odd(),  in.Odd(),  *gauge, QUDA_ODD_PARITY,  laplace3D, dagger, comm_dim, profile);
-    } else {
-      ApplyStaggeredQSmear(out, in, *gauge, parity, laplace3D, dagger, comm_dim, profile);	    
-    }
     flops += 1368ll*in.Volume(); // FIXME
   }  
 
