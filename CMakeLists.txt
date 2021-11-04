@@ -163,13 +163,7 @@ option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various inter
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
 
-# Locations for QIO / QMP
-set(QUDA_QIOHOME
-    ""
-    CACHE PATH "path to QIO")
-set(QUDA_QMPHOME
-    ""
-    CACHE PATH "path to QMP")
+# Locations for some libraries
 set(QUDA_LIMEHOME
     ""
     CACHE PATH "path to LIME")
