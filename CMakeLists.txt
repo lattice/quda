@@ -189,13 +189,7 @@ option(QUDA_INTERFACE_ALL "enable all data-orders triggered by the various inter
 # QDPJIT
 option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
 
-# Locations for QIO / QMP
-set(QUDA_QIOHOME
-    ""
-    CACHE PATH "path to QIO")
-set(QUDA_QMPHOME
-    ""
-    CACHE PATH "path to QMP")
+# Locations for some libraries
 set(QUDA_LIMEHOME
     ""
     CACHE PATH "path to LIME")
@@ -260,11 +254,7 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-# QIO legacy support
-option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
-
 # NVTX options
-option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 
 # features in development
@@ -304,8 +294,6 @@ mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
-
-mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
