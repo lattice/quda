@@ -813,7 +813,7 @@ if(QUDA_BACKWARDS)
   FetchContent_Declare(
     backward-cpp
     GIT_REPOSITORY https://github.com/bombela/backward-cpp.git
-    GIT_TAG v1.5
+    GIT_TAG v1.6
     GIT_SHALLOW ON)
   FetchContent_GetProperties(backward-cpp)
   if(NOT backward-cpp_POPULATED)
