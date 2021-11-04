@@ -1,5 +1,5 @@
 
-set(QUDA_TARGET_CUDA ON)
+
 find_package(CUDAToolkit REQUIRED)
 # add target specific files / options
 include(CMakeDependentOption)

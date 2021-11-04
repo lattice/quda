@@ -172,10 +172,12 @@ endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_subdirectory(targets/cuda)
   enable_language(CUDA) # this seems to be needed here ... mayeb we can get rid of that somehow
+  set(QUDA_TARGET_CUDA ON)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_subdirectory(targets/hip)
   target_include_directories(quda PRIVATE ../include/targets/hip)
+  set(QUDA_TARGET_HIP ON)
 endif()
 
 
