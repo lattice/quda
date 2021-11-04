@@ -144,9 +144,6 @@ option(QUDA_QIO "build QIO code for binary I/O" OFF)
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 
-# Magma library
-option(QUDA_MAGMA "build magma interface" OFF)
-
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
 option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
@@ -185,12 +182,7 @@ set(QUDA_ARPACK_HOME
 set(QUDA_OPENBLAS_HOME
     ""
     CACHE PATH "path to OpenBLAS")
-set(QUDA_MAGMAHOME
-    ""
-    CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
-set(QUDA_MAGMA_LIBS
-    ""
-    CACHE STRING "additional linker flags required to link against magma")
+
 
 # ######################################################################################################################
 # QUDA ADVANCED OPTIONS that usually should not be changed by users
@@ -368,9 +360,6 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
 
-#TODO: CUDA Wrapper for finding libs etc
-find_package(CUDAToolkit REQUIRED)
-
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
 endif()
@@ -515,33 +504,7 @@ if(QUDA_QDPJIT)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
-####################################
-# MAGMA
-####################################
-#TODO
-if(QUDA_MAGMA)
-  add_library(MAGMA::MAGMA INTERFACE IMPORTED)
-  target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
-  if("${QUDA_MAGMAHOME}" STREQUAL "")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(MAGMA magma)
-    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${MAGMA_INCLUDEDIR})
-    message("${MAGMA_INCLUDEDIR}")
-    find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
-  else()
-    # prefer static library
-    find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
-    # append additional libraries required by magma
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cublas_LIBRARY})
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cusparse_LIBRARY})
-    target_link_libraries(MAGMA::MAGMA INTERFACE ${QUDA_MAGMA_LIBS})
-    # and any additional OpenMP linker flags
-    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${QUDA_MAGMAHOME}/include)
-  endif()
-  target_link_libraries(MAGMA::MAGMA INTERFACE ${MAGMA})
-  find_package(OpenMP)
-  target_link_libraries(MAGMA::MAGMA INTERFACE OpenMP::OpenMP_CXX)
-endif(QUDA_MAGMA)
+
 
 ####################################
 # ARPACK

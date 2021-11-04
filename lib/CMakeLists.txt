@@ -448,10 +448,6 @@ if(QUDA_OPENMP)
   target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-if(QUDA_MAGMA)
-  target_link_libraries(quda PUBLIC MAGMA::MAGMA)
-endif()
-
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})

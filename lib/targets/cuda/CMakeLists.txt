@@ -1,5 +1,6 @@
 
 set(QUDA_TARGET_CUDA ON)
+find_package(CUDAToolkit REQUIRED)
 # add target specific files / options
 include(CMakeDependentOption)
 
@@ -258,7 +259,7 @@ endif()
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
-
+  set_target_properties(quda_pack PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
   target_include_directories(quda_pack PRIVATE dslash_core)
   target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda_pack PRIVATE .)
