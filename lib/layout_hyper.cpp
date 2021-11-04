@@ -192,7 +192,7 @@ void quda_get_coords_ext(int x[], int node, QIO_Index index, void *arg)
 {
   (void)arg;
 
-  if (index > static_cast<QIO_Index>(std::numeric_limits<int>::max()) || index < 0)
+  if (index > static_cast<QIO_Index>(std::numeric_limits<int>::max()))
     errorQuda("Invalid index %lu", index);
   quda_get_coords_helper(x, node, static_cast<size_t>(index));
 }
