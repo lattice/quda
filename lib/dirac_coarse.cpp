@@ -29,7 +29,6 @@ namespace quda {
     init_cpu(!gpu_setup),
     mapped(mapped)
   {
-    if (gpu_setup == false) errorQuda("CPU setup of the coarse Dirac operator is disabled");
     initializeCoarse();
   }
 
