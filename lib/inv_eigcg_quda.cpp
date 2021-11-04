@@ -12,9 +12,6 @@
 #include <util_quda.h>
 #include <string.h>
 
-#ifdef MAGMA_LIB 
-#include <blas_magma.h>
-#endif
 
 #include <eigen_helper.h>
 #include <deflation.h>
@@ -39,7 +36,7 @@ namespace quda {
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
-   enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
+   enum  class libtype {eigen_lib, lapack_lib, mkl_lib};
 
    class EigCGArgs
    {
@@ -293,9 +290,7 @@ namespace quda {
   {
     EigCGArgs &args = *eigcg_args;
 
-    if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
-      ComputeRitz<libtype::magma_lib>(args);
-    } else if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
+    if( param.extlib_type == QUDA_EIGEN_EXTLIB ) {
       ComputeRitz<libtype::eigen_lib>(args);//if args.m > 128, one may better use libtype::magma_lib
     } else {
       errorQuda("Library type %d is currently not supported.", param.extlib_type);
