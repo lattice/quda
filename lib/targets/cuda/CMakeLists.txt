@@ -55,6 +55,58 @@ mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
 
+
+####################################
+##
+# define CUDA flags
+set(CMAKE_CUDA_HOST_COMPILER
+    "${CMAKE_CXX_COMPILER}"
+    CACHE FILEPATH "Host compiler to be used by nvcc")
+set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD_REQUIRED True)
+mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
+
+include(CheckLanguage)
+check_language(CUDA)
+
+if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
+  set(QUDA_CUDA_BUILD_TYPE "NVCC")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
+  set(QUDA_CUDA_BUILD_TYPE "Clang")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+endif()
+
+set(CMAKE_CUDA_FLAGS_DEVEL
+    "-g -O3 "
+    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+set(CMAKE_CUDA_FLAGS_STRICT
+    "-g -O3"
+    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
+set(CMAKE_CUDA_FLAGS_RELEASE
+    "-O3 -w"
+    CACHE STRING "Flags used by the CUDA compiler during release builds.")
+set(CMAKE_CUDA_FLAGS_HOSTDEBUG
+    "-g"
+    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
+set(CMAKE_CUDA_FLAGS_DEBUG
+    "-g -G"
+    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+set(CMAKE_CUDA_FLAGS_SANITIZE
+    "-g "
+    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
+
+
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
+mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
+mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
+mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
+mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
+enable_language(CUDA)
+message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
+message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
+
 ####################################
 # NVSHMEM
 ####################################
@@ -109,6 +161,7 @@ endif()
 # This is needed now GPU ARCH
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
 set(COMP_CAP "${COMP_CAP}0")
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
@@ -199,8 +252,20 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 # version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
 target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
+if(CUDAToolkit_FOUND)
+target_link_libraries(quda INTERFACE CUDA::cudart_static)
+endif()
 
+# nvshmem enabled parts need SEPARABLE_COMPILATION ...
 if(QUDA_NVSHMEM)
+
+  target_include_directories(quda_pack PRIVATE dslash_core)
+  target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
+  target_include_directories(quda_pack PRIVATE .)
+  set_target_properties(quda_pack PROPERTIES POSITION_INDEPENDENT_CODE ${QUDA_BUILD_SHAREDLIB})
+  target_compile_definitions(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
+  target_include_directories(quda_pack PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
+  target_compile_options(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
   if((${COMP_CAP} LESS "700"))
     message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
   endif()

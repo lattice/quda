@@ -155,24 +155,39 @@ target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<
 
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
+if(QUDA_BUILD_SHAREDLIB)
+  set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+  add_library(quda SHARED)
+else()
+  add_library(quda STATIC )
+endif()
+add_library(QUDA::quda ALIAS quda)
+
+#TODO: temporary workaround
+if(QUDA_NVSHMEM)
+  add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
+endif()
+
+# add target specific files
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_subdirectory(targets/cuda)
+  enable_language(CUDA) # this seems to be needed here ... mayeb we can get rid of that somehow
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  add_subdirectory(targets/hip)
+  target_include_directories(quda PRIVATE ../include/targets/hip)
+endif()
 
 
 # make one library
-if(QUDA_BUILD_SHAREDLIB)
-  set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-  add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
-  if(CUDAToolkit_FOUND)
-    target_link_libraries(quda INTERFACE CUDA::cudart_static)
-  endif()
-else()
-  add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
-endif()
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
+
+
 
 include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
-add_library(QUDA::quda ALIAS quda)
 
 # set up QUDA compile options
 target_compile_definitions(
@@ -194,26 +209,9 @@ target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFIN
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
-# nvshmem enabled parts need SEPARABLE_COMPILATION ...
-if(QUDA_NVSHMEM)
-  add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
-  target_include_directories(quda_pack PRIVATE dslash_core)
-  target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
-  target_include_directories(quda_pack PRIVATE .)
-  set_target_properties(quda_pack PROPERTIES POSITION_INDEPENDENT_CODE ${QUDA_BUILD_SHAREDLIB})
-  target_compile_definitions(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
-  target_include_directories(quda_pack PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
-  target_compile_options(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
-endif()
 
-# add target specific files
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  add_subdirectory(targets/cuda)
-endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  add_subdirectory(targets/hip)
-  target_include_directories(quda PRIVATE ../include/targets/hip)
-endif()
+
+
 
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)

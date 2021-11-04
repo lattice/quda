@@ -367,51 +367,8 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
-# define CUDA flags
-set(CMAKE_CUDA_HOST_COMPILER
-    "${CMAKE_CXX_COMPILER}"
-    CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
-set(CMAKE_CUDA_STANDARD_REQUIRED True)
-mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
-include(CheckLanguage)
-check_language(CUDA)
-
-if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
-  set(QUDA_CUDA_BUILD_TYPE "NVCC")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  set(QUDA_CUDA_BUILD_TYPE "Clang")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
-
-set(CMAKE_CUDA_FLAGS_DEVEL
-    "-g -O3 "
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
-set(CMAKE_CUDA_FLAGS_STRICT
-    "-g -O3"
-    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
-set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 -w"
-    CACHE STRING "Flags used by the CUDA compiler during release builds.")
-set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g"
-    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
-set(CMAKE_CUDA_FLAGS_SANITIZE
-    "-g "
-    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
-
-
-
-enable_language(CUDA)
-message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
-message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
-
-# CUDA Wrapper for finding libs etc
+#TODO: CUDA Wrapper for finding libs etc
 find_package(CUDAToolkit REQUIRED)
 
 if(QUDA_OPENMP)
@@ -561,6 +518,7 @@ endif()
 ####################################
 # MAGMA
 ####################################
+#TODO
 if(QUDA_MAGMA)
   add_library(MAGMA::MAGMA INTERFACE IMPORTED)
   target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
@@ -711,12 +669,7 @@ endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
-mark_as_advanced(CMAKE_CUDA_FLAGS_STRICT)
-mark_as_advanced(CMAKE_CUDA_FLAGS_RELEASE)
-mark_as_advanced(CMAKE_CUDA_FLAGS_DEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_HOSTDEBUG)
-mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
+
 
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
