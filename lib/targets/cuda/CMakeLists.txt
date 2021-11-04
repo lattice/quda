@@ -46,6 +46,7 @@ if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+set(QUDA_HETEROGENEOUS_ATOMIC ${QUDA_HETEROGENEOUS_ATOMIC} PARENT_SCOPE)
 mark_as_advanced(QUDA_JITIFY)
 
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
@@ -161,9 +162,12 @@ endif()
 
 # This is needed now GPU ARCH
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP}) 
+
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
-set(COMP_CAP "${COMP_CAP}0")
+set(COMP_CAP "${COMP_CAP}0" PARENT_SCOPE)
+
+message(${COMP_CAP})
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${QUDA_GPU_ARCH} ${GITVERSION}")
@@ -267,7 +271,7 @@ if(QUDA_NVSHMEM)
   target_compile_definitions(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
   target_include_directories(quda_pack PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
   target_compile_options(quda_pack PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
-  if((${COMP_CAP} LESS "700"))
+  if((${COMP_CAP} LESS "70"))
     message(SEND_ERROR "QUDA_NVSHMEM=ON requires at least QUDA_GPU_ARCH=sm_70")
   endif()
   set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
