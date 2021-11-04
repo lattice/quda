@@ -628,7 +628,7 @@ if(QUDA_QMP)
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG 1e14e4b
+      GIT_TAG 3010fef
       OPTIONS
       "QMP_MPI ON"
       "QMP_TESTING OFF"
