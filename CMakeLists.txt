@@ -614,15 +614,6 @@ endif()
 # QMP
 ####################################
 if(QUDA_QMP)
-  #message(STATUS "Looking for QMP")
-  find_package(QMP QUIET) 
-  #if( QMP_FOUND ) 
-  #  message(STATUS "Found QMP")
-  #else()
-  #  message(STATUS "QMP not found")
-  #endif()
-#TODO: Think about logic here 
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
@@ -632,7 +623,8 @@ if(QUDA_QMP)
       "QMP_TESTING OFF"
       "QMP_BUILD_DOCS OFF"
     )
-  endif()
+  else()
+    find_package(QMP REQUIRED) 
 endif()
 
 ####################################
@@ -642,15 +634,7 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
- # message(STATUS "Looking for QIO")
-  find_package(QIO QUIET)
-  # if( QIO_FOUND )
-    # message(STATUS "QIO Found")
-  # else() 
-    # message(STATUS "QIO Not Found")
-  #endif()
-#TODO: Think about logic here 
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+  if(QUDA_DOWNLOAD_USQCD)
     CPMAddPackage(
       NAME QIO
       GITHUB_REPOSITORY usqcd-software/qio
@@ -661,6 +645,8 @@ if(QUDA_QIO)
         "QIO_ENABLE_OUTPUT_BUFFERING ON" 
         "QIO_DML_BUF_BYTES 33554432"
     )
+  else()
+    find_package(QIO REQUIRED)
   endif()
 endif()
 
@@ -669,7 +655,7 @@ endif()
 ####################################
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
   endif()
   execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
                   OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
