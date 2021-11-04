@@ -139,7 +139,7 @@ namespace quda {
   }
   
   void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const
+                             const double &a, const double &b, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
 
