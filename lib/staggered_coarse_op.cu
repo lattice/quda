@@ -465,6 +465,10 @@ namespace quda {
     std::unique_ptr<GaugeField> tmp_L(nullptr);
     std::unique_ptr<GaugeField> tmp_Xinv(nullptr);
 
+    bool need_tmp_U = false;
+    bool need_tmp_L = false;
+    bool need_tmp_Xinv = false;
+
     if (location == QUDA_CPU_FIELD_LOCATION) {
       //First make a cpu gauge field from the cuda gauge field
       int pad = 0;
@@ -481,6 +485,7 @@ namespace quda {
       gf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
       tmp_U = std::make_unique<cpuGaugeField>(gf_param);
+      need_tmp_U = true;
 
       //Copy the cuda gauge field to the cpu
       gauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_U));
@@ -501,6 +506,7 @@ namespace quda {
       lgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
       tmp_L = std::make_unique<cpuGaugeField>(lgf_param);
+      need_tmp_L = true;
 
       //Copy the cuda gauge field to the cpu
       if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
@@ -526,6 +532,7 @@ namespace quda {
       xgf_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 
       tmp_Xinv = std::make_unique<cpuGaugeField>(xgf_param);
+      need_tmp_Xinv = true;
 
       //Copy the cuda gauge field to the cpu
       //if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
@@ -544,6 +551,7 @@ namespace quda {
         lgf_param.setPrecision(lgf_param.Precision());
         lgf_param.create = QUDA_NULL_FIELD_CREATE;
         tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
+        need_tmp_L = true;
       } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
         // create a copy of the gauge field with no reconstruction
         GaugeFieldParam lgf_param(longGauge);
@@ -553,6 +561,7 @@ namespace quda {
         tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
 
         tmp_L->copy(longGauge);
+        need_tmp_L = true;
       }
 
       if (!(dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
@@ -564,6 +573,7 @@ namespace quda {
         xgf_param.setPrecision(xgf_param.Precision());
         xgf_param.create = QUDA_NULL_FIELD_CREATE;
         tmp_Xinv = std::make_unique<cudaGaugeField>(xgf_param);
+        need_tmp_Xinv = true;
       }
       // no need to worry about XinvKD's reconstruct
 
@@ -574,14 +584,15 @@ namespace quda {
         gf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         gf_param.setPrecision(gf_param.Precision());
         tmp_U = std::make_unique<cudaGaugeField>(gf_param);
+        need_tmp_U = true;
 
         tmp_U->copy(gauge);
       }
     }
 
-    const GaugeField& U = (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) ? reinterpret_cast<const GaugeField&>(gauge) : *tmp_U;
-    const GaugeField& L = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(longGauge) : *tmp_L);
-    const GaugeField& Xinv = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(XinvKD) : *tmp_Xinv);
+    const GaugeField& U = need_tmp_U ? *tmp_U : reinterpret_cast<const GaugeField&>(gauge);
+    const GaugeField& L = need_tmp_L ? *tmp_L : reinterpret_cast<const GaugeField&>(longGauge);
+    const GaugeField& Xinv = need_tmp_Xinv ? *tmp_Xinv : reinterpret_cast<const GaugeField&>(XinvKD);
 
     calculateStaggeredY(Y, X, T, U, L, Xinv, mass, dirac, matpc);
 
