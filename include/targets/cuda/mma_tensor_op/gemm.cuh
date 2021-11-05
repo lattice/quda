@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array.h>
 
 #if (__COMPUTE_CAPABILITY__ == 700)
 
@@ -129,8 +130,8 @@ namespace quda
                 } else {
 
                   using store_type = typename GmemAccessor::store_type;
-                  using store_vector_type = typename VectorType<store_type, 4>::type;
-                  store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
+                  using store_array = typename VectorType<store_type, 4>::type;
+                  store_array v = *reinterpret_cast<store_array *>(&p[n_idx * ld + m_idx]);
 
                   if (fixed) {
                     reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);

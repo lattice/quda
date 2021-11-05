@@ -1,8 +1,7 @@
-#include "color_spinor_field_order.h"
-#include "gauge_field_order.h"
-#include "color_spinor.h"
-#include "index_helper.cuh"
-#include "kernel.h"
+#include <color_spinor_field_order.h>
+#include <gauge_field_order.h>
+#include <index_helper.cuh>
+#include <register_traits.h>
 
 namespace quda {
 

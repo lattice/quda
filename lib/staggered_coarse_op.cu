@@ -579,7 +579,7 @@ namespace quda {
       }
     }
 
-    const GaugeField& U = (location == QUDA_CUDA_FIELD_LOCATION ? reinterpret_cast<const GaugeField&>(gauge) : *tmp_U);
+    const GaugeField& U = (location == QUDA_CUDA_FIELD_LOCATION && gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) ? reinterpret_cast<const GaugeField&>(gauge) : *tmp_U;
     const GaugeField& L = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(longGauge) : *tmp_L);
     const GaugeField& Xinv = ((location == QUDA_CUDA_FIELD_LOCATION && (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) ? reinterpret_cast<const GaugeField&>(XinvKD) : *tmp_Xinv);
 
