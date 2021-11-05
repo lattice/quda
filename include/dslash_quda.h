@@ -741,7 +741,7 @@ namespace quda
      @param[in] a Scale factor applied to derivative
      @param[in] b Scale factor applied to aux field
   */
-  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, 
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir, 
                     bool dagger, const int *comm_override, TimeProfile &profile);                             
 
   /**
