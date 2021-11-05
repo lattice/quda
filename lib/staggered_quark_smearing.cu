@@ -144,7 +144,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
-    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField &U, int dir,
+    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir,
                         bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
