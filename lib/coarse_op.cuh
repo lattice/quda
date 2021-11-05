@@ -792,10 +792,10 @@ namespace quda {
      if some previous level was preconditioned, even if this one isn't
    */
   template <bool use_mma, QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin,
-            int coarseColor, typename F, typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic,
+            int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor, typename coarseGauge, typename coarseGaugeAtomic,
             typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, Ftmp &UV,
-                  F &AV, Vt &V, fineGauge &G, fineGauge &L, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
+  void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, uvSpinor &UV,
+                  avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
                   GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
                   const ColorSpinorField &v, double kappa, double mass, double mu,
                   double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
@@ -845,9 +845,12 @@ namespace quda {
       else printfQuda("Doing uni-directional link coarsening\n");
     }
 
+    // Figure out nFace
+    const int nFace = (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? 3 : 1;
+
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
-    using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
+    using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
@@ -858,8 +861,7 @@ namespace quda {
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
-    // do exchange of null-space vectors
-    const int nFace = 1;
+    // do exchange of null-space vectors; 3 for long-link operators
     v.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
     arg.V.resetGhost(v.Ghost());  // point the accessor to the correct ghost buffer
     if (&v == &av) arg.AV.resetGhost(av.Ghost());

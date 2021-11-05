@@ -259,9 +259,9 @@ namespace quda {
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
-      V vAccessor(const_cast<ColorSpinorField&>(v));
-      F uvAccessor(*uv);
-      F avAccessor(*av);
+      V vAccessor(const_cast<ColorSpinorField&>(v), nFace);
+      F uvAccessor(*uv, nFace);
+      F avAccessor(*av, nFace);
       gFine gAccessor(const_cast<GaugeField&>(g));
       gFine lAccessor(const_cast<GaugeField&>(l));
       gFine xinvAccessor(const_cast<GaugeField&>(XinvKD));
@@ -293,9 +293,9 @@ namespace quda {
 
       const ColorSpinorField &v = T.Vectors(Y.Location());
 
-      V vAccessor(const_cast<ColorSpinorField &>(v));
-      F uvAccessor(*uv);
-      F avAccessor(*av);
+      V vAccessor(const_cast<ColorSpinorField &>(v), nFace);
+      F uvAccessor(*uv, nFace);
+      F avAccessor(*av, nFace);
       gFine gAccessor(const_cast<GaugeField &>(g));
       gFine lAccessor(const_cast<GaugeField &>(l));
       gFine xinvAccessor(const_cast<GaugeField&>(XinvKD));

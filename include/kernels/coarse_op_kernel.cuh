@@ -27,10 +27,14 @@ namespace quda {
       construction.  The same instance is reused for different
       kernels */
   template <bool from_coarse_, typename Float_, int fineSpin_, int coarseSpin_, int fineColor_, int coarseColor_, typename coarseGauge,
-            typename coarseGaugeAtomic, typename fineGauge, typename fineSpinor, typename fineSpinorTmp,
-            typename fineSpinorV, typename fineClover>
+            typename coarseGaugeAtomic, typename fineGauge, typename fineSpinorAV_, typename fineSpinorUV_,
+            typename fineSpinorV_, typename fineClover>
   struct CalculateYArg : kernel_param<> {
     using Float = Float_; /** Float Precision of the computation */
+
+    using fineSpinorV = fineSpinorV_; /** Type of the fine grid spinor field */
+    using fineSpinorUV = fineSpinorUV_; /** Type of the temporary that stores the fine-link * spinor field product */
+    using fineSpinorAV = fineSpinorAV_; /** Type of the temporary that stores the clover/kd-inv * spinor field product */
 
     static constexpr int fineSpin = fineSpin_; /** Number of spins on the fine grid */
     static constexpr int coarseSpin = coarseSpin_; /** Number of spins on the coarse grid */
@@ -50,8 +54,8 @@ namespace quda {
     coarseGaugeAtomic Y_atomic;    /** Y atomic accessor used for computation before conversion to final format */
     coarseGaugeAtomic X_atomic;    /** X atomic accessor used for computation before conversion to final format */
 
-    fineSpinorTmp UV;        /** Temporary that stores the fine-link * spinor field product */
-    fineSpinor AV;           /** Temporary that stores the clover * spinor field product */
+    fineSpinorUV UV;        /** Temporary that stores the fine-link * spinor field product */
+    fineSpinorAV AV;           /** Temporary that stores the clover * spinor field product */
 
     const fineGauge U;       /** Fine grid link field */
     const fineSpinorV V;     /** Fine grid spinor field */
@@ -158,7 +162,7 @@ namespace quda {
      */
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-      fineSpinorTmp &UV, fineSpinor &AV, const fineGauge &U, const fineSpinorV &V,
+      fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineSpinorV &V,
       const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
       const int *x_size_, const int *xc_size_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
