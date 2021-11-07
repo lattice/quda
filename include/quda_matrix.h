@@ -642,6 +642,8 @@ namespace quda {
   /**
      @brief Specialization of complex matrix multiplication that will issue optimal fma instructions
    */
+  // DMH: Use template specialisation enable_if_t here
+#if N_COLORS > 2
   template< template<typename> class complex, typename T, int N>
     __device__ __host__ inline Matrix<complex<T>,N> operator*(const Matrix<complex<T>,N> &a, const Matrix<complex<T>,N> &b)
     {
@@ -665,6 +667,7 @@ namespace quda {
       }
       return result;
     }
+#endif
 
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
@@ -739,7 +742,7 @@ namespace quda {
       Matrix<T,2> uinv;
       const T det = getDeterminant(u);
       const T det_inv = static_cast<typename T::value_type>(1.0)/det;
-      T temp;
+
       uinv(0,0) = det_inv*u(1,1);
       uinv(0,1) = det_inv*u(1,0);
       uinv(1,0) = det_inv*u(0,1);
