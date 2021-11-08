@@ -1,4 +1,4 @@
-
+## CUDA specific part of CMakeLists
 
 find_package(CUDAToolkit REQUIRED)
 # add target specific files / options
@@ -22,9 +22,8 @@ set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
 mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 
 
-
 ####
-# CUDA specific options
+# CUDA specific QUDA options options
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
 option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
 option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
@@ -32,16 +31,15 @@ option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
 set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
-
 set(QUDA_GDRCOPY_HOME "/usr/local/gdrcopy" CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
 # NVTX options
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
   message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
-CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
@@ -75,11 +73,15 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 include(CheckLanguage)
 check_language(CUDA)
 
+#TODO: Do we stil use that?
 if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
   set(QUDA_CUDA_BUILD_TYPE "NVCC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
   set(QUDA_CUDA_BUILD_TYPE "Clang")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+elseif(if (${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
+  set(QUDA_CUDA_BUILD_TYPE "NVHPC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
@@ -211,7 +213,7 @@ target_compile_options(
           -Xclang -fcuda-allow-variadic-functions>)
 target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-               -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+               -Wno-deprecated-gpu-targets --expt-relaxed-constexpr>)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
@@ -230,13 +232,6 @@ endif()
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
 target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 
-# workaround for 10.2
-if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA"
-   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2"
-   AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(
-    quda PRIVATE "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
-endif()
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:--cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-Xfatbin=-compress-all>)
 target_include_directories(quda PRIVATE ${CMAKE_SOURCE_DIR}/include/targets/cuda)
