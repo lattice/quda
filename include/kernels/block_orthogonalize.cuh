@@ -140,7 +140,7 @@ namespace quda {
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
         int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-        int parity_offset = x_fine_offset_tx >= arg.aggregate_size_cb ? 1 : 0;
+        int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
         x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
         parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
 
@@ -186,7 +186,7 @@ namespace quda {
               for (int m = 0; m < mVec; m++) dot[m] += innerProduct(vi[tx], v[m][tx]);
             }
 
-            dot = dot_reducer.AllSum(dot);
+            dot = dot_reducer.template AllSum<false>(dot);
 
             // subtract the blocks to orthogonalise
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
@@ -207,7 +207,7 @@ namespace quda {
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
             
-            dot = dot_reducer.AllSum(dot);
+            dot = dot_reducer.template AllSum<false>(dot);
             
             sum_t nrm = 0.0;
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
@@ -217,7 +217,7 @@ namespace quda {
               nrm += norm2(v[m][tx]);
             }
 
-            nrm = norm_reducer.AllSum(nrm);
+            nrm = norm_reducer.template AllSum<false>(nrm);
             auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
             for (int tx = 0; tx < n_sites_per_thread; tx++) {

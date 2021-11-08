@@ -110,7 +110,7 @@ namespace quda
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
     __shared__ bool isLastBlockDone;
 
-    T aggregate = BlockReduce().template Reduce<true>(in, r);
+    T aggregate = BlockReduce().Reduce(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       arg.partial[idx * target::grid_dim().x + target::block_idx().x] = aggregate;

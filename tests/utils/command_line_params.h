@@ -251,7 +251,6 @@ extern int max_res_increase_total;
 
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
-
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
@@ -292,6 +291,8 @@ extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
+
+extern bool use_mobius_fused_kernel;
 
 extern int n_ev;
 extern int max_search_dim;

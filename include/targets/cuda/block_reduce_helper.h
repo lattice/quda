@@ -37,7 +37,7 @@ namespace quda
        @param[in] all Whether we want all threads to have visibility
        to the result (all = true) or just the first thread in the
        warp (all = false)
-       @param[in] r The reduction operation we which to apply
+       @param[in] r The reduction operation we want to apply
        @return The warp-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
@@ -76,7 +76,7 @@ namespace quda
        @param[in] all Whether we want all threads to have visibility
        to the result (all = true) or just the first thread in the
        block (all = false)
-       @param[in] r The reduction operation we which to apply
+       @param[in] r The reduction operation we want to apply
        @return The block-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
