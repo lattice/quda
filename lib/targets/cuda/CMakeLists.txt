@@ -17,6 +17,10 @@ set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
     CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
+set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
+mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
+
 
 
 ####
@@ -162,9 +166,17 @@ endif()
 
 # This is needed now GPU ARCH
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP}) 
+if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
+  set(QUDA_GPU_ARCH_SUFFIX real)
+endif()
+if(QUDA_GPU_ARCH_SUFFIX)
+  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+ else()
+  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+endif()
+set(COMP_CAP ${COMP_CAP}0)
+set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
-set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${COMP_CAP})
 set(COMP_CAP "${COMP_CAP}0" PARENT_SCOPE)
 
 # QUDA_HASH for tunecache
@@ -203,9 +215,8 @@ target_compile_options(
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
-                                    -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
-                                    --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+                                    --expt-relaxed-constexpr>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
 if(QUDA_VERBOSE_BUILD)
