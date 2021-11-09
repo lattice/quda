@@ -982,6 +982,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-smear", gauge_smear, "Smear the gauge field prior to inversion (default false)");
+  
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+  
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-stout-rho", stout_smear_rho,
@@ -999,7 +1004,6 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");

@@ -407,7 +407,14 @@ namespace quda
 	constexpr int k_tile = 12;
 #elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 16)
 	constexpr int k_tile = 16;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 32)
+	constexpr int k_tile = 32;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 64)
+	constexpr int k_tile = 64;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 128)
+	constexpr int k_tile = 128;
 #endif
+
 	if (query_max) return 2;
 	switch (tp.aux.x) {
 	  // clang-format off

@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 # set the project name and version
-project(QUDAexamples VERSION 1.0.0)
+project(QUDAexamples VERSION 0.0.0)
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)

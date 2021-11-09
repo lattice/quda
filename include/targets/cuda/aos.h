@@ -26,12 +26,14 @@ namespace quda
   };
 
 #ifndef DEVICE_DEBUG
+#if N_COLORS < 8
   /**
      @brief Device block_load that uses trove (except when DEVICE_DEBUG is enabled)
   */
   template <> struct block_load_impl<true> {
     template <typename T> __device__ inline T operator()(const T *in) { return *(trove::coalesced_ptr<const T>(in)); }
   };
+#endif
 #endif
 
   /**
@@ -69,6 +71,7 @@ namespace quda
   };
 
 #ifndef DEVICE_DEBUG
+#if N_COLORS < 8
   /**
      @brief Device block_store that uses trove (except when DEVICE_DEBUG is enabled)
   */
@@ -78,6 +81,7 @@ namespace quda
       *(trove::coalesced_ptr<T>(out)) = in;
     }
   };
+#endif
 #endif
 
   /**

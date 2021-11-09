@@ -128,9 +128,9 @@ set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 set(QUDA_N_COLORS
   "3"
   CACHE STRING "Set the SU(N) (1 - 8)")
-if(QUDA_N_COLORS GREATER 8)
-  message(SEND_ERROR "Maximum QUDA_N_COLORS is 8.")
-endif()
+#if(QUDA_N_COLORS GREATER 8)
+#  message(SEND_ERROR "Maximum QUDA_N_COLORS is 8.")
+#endif()
 
 if(QUDA_N_COLORS LESS 1)
   message(SEND_ERROR "Minimum QUDA_N_COLORS is 1.")
