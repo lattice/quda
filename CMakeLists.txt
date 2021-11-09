@@ -639,7 +639,7 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
