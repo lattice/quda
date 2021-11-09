@@ -2,10 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <clover_field_order.h>
-#include <index_helper.cuh>
-#include <color_spinor.h>
 #include <linalg.cuh>
-#include <kernel.h>
 
 namespace quda {
 
