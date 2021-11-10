@@ -294,6 +294,8 @@ namespace quda {
       return ss.str();
     }
 
+    virtual std::string miscString(const TuneParam &) const { return std::string(); }
+
     virtual void initTuneParam(TuneParam &param) const
     {
       const unsigned int max_threads = device::max_threads_per_block_dim(0);

@@ -24,6 +24,7 @@
 #include <complex>
 #include <sstream>
 #include <cstdint>
+#include <type_traits>
 
 #include <quda_api.h>
 

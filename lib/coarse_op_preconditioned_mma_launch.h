@@ -3,10 +3,8 @@
 #include <gauge_field.h>
 #include <tunable_nd.h>
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-
+#ifdef QUDA_MMA_AVAILABLE
 #include <kernels/coarse_op_preconditioned_mma.cuh>
-
 #endif
 
 /**
@@ -20,7 +18,7 @@ namespace quda
   namespace mma
   {
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 
     template <int bM, int bN, int bK, int block_y, int block_z, int min_block_cta = 1, class Arg, typename Tunable>
     typename std::enable_if<!Arg::is_mma_compatible, void>::type launch_kernel(TuneParam &, const qudaStream_t &, Arg &,
@@ -159,7 +157,7 @@ namespace quda
       return -1;
     }
 
-#endif // compute capability >= 700, CUDA >= 10.1
+#endif // QUDA_MMA_AVAILABLE
 
   } // namespace mma
 

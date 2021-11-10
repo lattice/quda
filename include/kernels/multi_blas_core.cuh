@@ -2,7 +2,7 @@
 
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
-#include <float_vector.h>
+#include <array.h>
 #include <constant_kernel_arg.h>
 #include <kernel.h>
 #include <warp_collective.h>
@@ -80,7 +80,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int k, int parity)
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         // partition the warp between grid points and the NXZ update
         constexpr int warp_size = device::warp_size();

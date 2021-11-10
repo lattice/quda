@@ -3,6 +3,7 @@
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
 #include <kernel.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda {
 
@@ -295,7 +296,7 @@ QUDA_UNROLL
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
-        TensorCoreSharedMemory<float> shared_memory_data;
+        SharedMemoryCache<half2> cache;
 
         static_assert(Arg::block_dim_x * Ls / 32 < 32, "Number of threads in a threadblock should be less than 1024.");
 
@@ -305,9 +306,7 @@ QUDA_UNROLL
         constexpr int N_sm = N + sm_n_pad_size(N);
         constexpr int M_sm = M + sm_m_pad_size(M);
 
-        float *smem_scale = shared_memory_data;
-
-        half2 *sm_b = reinterpret_cast<half2 *>(smem_scale + 32);
+        half2 *sm_b = cache.data();
         half *sm_c = reinterpret_cast<half *>(sm_b);
 
         half *sm_a = Arg::reload ? sm_c + M * N_sm : sm_c;
@@ -401,7 +400,8 @@ QUDA_UNROLL
             }
             // store result to shared memory
           }
-          load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
+          float scale;
+          load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, false>(in_vec, sm_b, scale); // acc(accumulation) = false
 
           __syncthreads();
           mma_sync_gemm<Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a, sm_a, sm_c, sm_c, wrm);
@@ -418,8 +418,8 @@ QUDA_UNROLL
                 aux_in_vec = arg.x(sid_back, explicit_parity);
               }
             }
-            load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
-            if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
+            load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, true>(aux_in_vec, sm_b, scale, arg.m_scale); // acc = true
+            if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, scale); }
             __syncthreads();
             mma_sync_gemm<Arg::block_dim_x, Arg::Ls, M, N, M_sm, N_sm, Arg::reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
             __syncthreads();
@@ -428,16 +428,16 @@ QUDA_UNROLL
             Vector aux_in_vec;
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
-            load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+            load_matrix_b_vector<Arg::block_dim_x, Arg::Ls, N_sm / 2, true, false>(aux_in_vec, sm_b, scale, arg.m_scale);
             if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
           }
 
           if (Arg::type == MdwfFusedDslashType::D4DAG_D5PREDAG) {
 
           } else if (Arg::type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
-            if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]); }
+            if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, scale); }
           } else {
-            if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0] * arg.m_scale); }
+            if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, scale * arg.m_scale); }
           }
 
           s4_shift_base += gridDim.x * blockDim.x;

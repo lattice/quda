@@ -3,6 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
 #include <reduce_helper.h>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
@@ -68,7 +69,7 @@ namespace quda
 
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int) const
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;

@@ -237,7 +237,6 @@ extern int mg_levels;
 
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
-
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include <reducer.h>
+#include <array.h>
 #include <kernel.h>
 
 namespace quda
@@ -59,7 +60,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int parity) const
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         arg.f.init();
 

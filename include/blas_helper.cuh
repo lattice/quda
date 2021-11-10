@@ -1,10 +1,10 @@
 #pragma once
 
 #include <color_spinor_field.h>
-#include <reduce_helper.h>
 #include <load_store.h>
 #include <convert.h>
-#include <math_helper.cuh>
+#include <float_vector.h>
+#include <array.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -66,28 +66,28 @@ namespace quda
 
   // Vector types used for AoS load-store on CPU
   template <> struct VectorType<double, 24> {
-    using type = vector_type<double, 24>;
+    using type = array<double, 24>;
   };
   template <> struct VectorType<float, 24> {
-    using type = vector_type<float, 24>;
+    using type = array<float, 24>;
   };
   template <> struct VectorType<short, 24> {
-    using type = vector_type<short, 24>;
+    using type = array<short, 24>;
   };
   template <> struct VectorType<int8_t, 24> {
-    using type = vector_type<int8_t, 24>;
+    using type = array<int8_t, 24>;
   };
   template <> struct VectorType<double, 6> {
-    using type = vector_type<double, 6>;
+    using type = array<double, 6>;
   };
   template <> struct VectorType<float, 6> {
-    using type = vector_type<float, 6>;
+    using type = array<float, 6>;
   };
   template <> struct VectorType<short, 6> {
-    using type = vector_type<short, 6>;
+    using type = array<short, 6>;
   };
   template <> struct VectorType<int8_t, 6> {
-    using type = vector_type<int8_t, 6>;
+    using type = array<int8_t, 6>;
   };
 
   namespace blas
@@ -188,7 +188,7 @@ namespace quda
          @tparam n Complex vector length
       */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &, int, int) const
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const array<complex<real>, n> &, int, int) const
       {
         return 1.0;
       }
@@ -203,7 +203,7 @@ namespace quda
          @param[in] parity site parity
       */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const array<complex<real>, n> &v, int x, int parity) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -226,13 +226,12 @@ QUDA_UNROLL
          @param[in] parity site parity
       */
       template <typename real, int n>
-      __device__ __host__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
+      __device__ __host__ inline void load(array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
         float nrm = load_norm<isFixed<store_t>::value>(x, parity);
 
-        // if(x>=0 && x<=4) printf("Spinor::load x %d parity %d spinor %p spinor[0] %g\n", x, parity, spinor, spinor[0]);
-        vector_type<real, len> v_;
+        array<real, len> v_;
 
         constexpr int M = len / N;
 QUDA_UNROLL
@@ -256,10 +255,10 @@ QUDA_UNROLL
          @param[in] parity site parity
       */
       template <typename real, int n>
-      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0) const
+      __device__ __host__ inline void save(const array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        vector_type<real, len> v_;
+        array<real, len> v_;
 
         if (isFixed<store_t>::value) {
           real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
