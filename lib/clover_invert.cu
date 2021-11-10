@@ -16,10 +16,8 @@ namespace quda {
       clover(clover),
       compute_tr_log(compute_tr_log)
     {
-      writeAuxString("trlog=%s,twist=%s",
-                     compute_tr_log ? "true" : "false",
-                     clover.Twisted() ? "true" : "false");
-
+      strcat(aux, compute_tr_log ? ",trlog=true" : "trlog=false");
+      strcat(aux, clover.Twisted() ? ",twist=true" : ",twisted=false");
       apply(device::get_default_stream());
 
       if (compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
