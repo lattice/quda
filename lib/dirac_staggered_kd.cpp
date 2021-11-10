@@ -211,8 +211,7 @@ namespace quda
     // nothing required for left block preconditioning
   }
 
-  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *,
-                                      cudaGaugeField *, CloverField *)
+  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
 

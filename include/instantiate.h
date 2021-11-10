@@ -164,7 +164,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
-  constexpr void instantiate2(G &U, Args &&... args)
+  constexpr void instantiate2(G &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
       instantiate<Apply, Recon, double>(U, args...);

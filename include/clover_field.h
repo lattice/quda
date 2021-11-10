@@ -27,9 +27,15 @@ namespace quda {
        @brief Precision mapper that is used for the Cholesky
        factorization when inverting the clover matrices
     */
-    template <typename T> struct cholesky_mapper { using type = double; };
-    template <> struct cholesky_mapper<short> { using type = float; };
-    template <> struct cholesky_mapper<int8_t> { using type = float; };
+    template <typename T> struct cholesky_mapper {
+      using type = double;
+    };
+    template <> struct cholesky_mapper<short> {
+      using type = float;
+    };
+    template <> struct cholesky_mapper<int8_t> {
+      using type = float;
+    };
 
     template <typename T> using cholesky_t = typename cholesky_mapper<T>::type;
 
@@ -74,7 +80,7 @@ namespace quda {
 
   struct CloverFieldParam : public LatticeFieldParam {
     bool reconstruct; /** Whether to create a compressed that requires reconstruction */
-    bool inverse; /** whether to create the inverse clover */
+    bool inverse;     /** whether to create the inverse clover */
     void *clover;
     void *cloverInv;
     double csw;  //! C_sw clover coefficient
@@ -142,7 +148,7 @@ namespace quda {
     {
     }
 
-  CloverFieldParam(const QudaInvertParam &inv_param, const int *x) :
+    CloverFieldParam(const QudaInvertParam &inv_param, const int *x) :
       LatticeFieldParam(),
       reconstruct(clover::reconstruct()),
       inverse(true),
@@ -156,13 +162,13 @@ namespace quda {
       mu2(twisted ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
       rho(inv_param.clover_rho),
       location(QUDA_INVALID_FIELD_LOCATION)
-      {
-        siteSubset = QUDA_FULL_SITE_SUBSET;
-        pad = inv_param.cl_pad;
-        for (int i = 0; i < nDim; i++) this->x[i] = x[i];
-      }
+    {
+      siteSubset = QUDA_FULL_SITE_SUBSET;
+      pad = inv_param.cl_pad;
+      for (int i = 0; i < nDim; i++) this->x[i] = x[i];
+    }
 
-      CloverFieldParam(const CloverField &field);
+    CloverFieldParam(const CloverField &field);
   };
 
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
@@ -450,10 +456,8 @@ namespace quda {
      @param Out The output buffer (optional)
      @param In The input buffer (optional)
   */
-  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
-			 QudaFieldLocation location, void *Out=0, const void *In=0);
-
-
+  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
+                         void *Out = 0, const void *In = 0);
 
   /**
      @brief This function compute the Cholesky decomposition of each clover

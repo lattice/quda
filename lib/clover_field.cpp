@@ -43,7 +43,7 @@ namespace quda {
     clover(0),
     cloverInv(0),
     diagonal(0),
-    max{0, 0},
+    max {0, 0},
     csw(param.csw),
     coeff(param.coeff),
     twisted(param.twisted),
@@ -52,10 +52,11 @@ namespace quda {
     order(param.order),
     create(param.create),
     location(param.location),
-    trlog{0, 0}
+    trlog {0, 0}
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
-    if (!isNative() && precision < QUDA_SINGLE_PRECISION) errorQuda("Fixed-point precision only supported on native field");
+    if (!isNative() && precision < QUDA_SINGLE_PRECISION)
+      errorQuda("Fixed-point precision only supported on native field");
     if (!isNative() && param.pad != 0) errorQuda("pad must be zero");
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
@@ -156,9 +157,9 @@ namespace quda {
   void CloverField::restore(bool which) const
   {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
-      qudaMemcpy((void*)V(which), backup_h + which * bytes, bytes, qudaMemcpyHostToDevice);
+      qudaMemcpy((void *)V(which), backup_h + which * bytes, bytes, qudaMemcpyHostToDevice);
     } else {
-      memcpy((void*)V(which), backup_h + which * bytes, bytes);
+      memcpy((void *)V(which), backup_h + which * bytes, bytes);
     }
   }
 
@@ -171,10 +172,7 @@ namespace quda {
     backup_h = nullptr;
   }
 
-  CloverField *CloverField::Create(const CloverFieldParam &param)
-  {
-    return new CloverField(param);
-  }
+  CloverField *CloverField::Create(const CloverFieldParam &param) { return new CloverField(param); }
 
   void CloverField::setRho(double rho_)
   {
@@ -201,14 +199,17 @@ namespace quda {
 
     checkField(src);
     if (!V(is_inverse)) errorQuda("Destination field's is_inverse=%d component does not exist", is_inverse);
-    if (!src.V(is_inverse) && !dynamic_inverse_copy) errorQuda("Source field's is_inverse=%d component does not exist", is_inverse);
+    if (!src.V(is_inverse) && !dynamic_inverse_copy)
+      errorQuda("Source field's is_inverse=%d component does not exist", is_inverse);
 
     auto src_v = dynamic_inverse_copy ? src.V(false) : src.V(is_inverse);
 
     // if we copying to a reconstruction field, we must find the overall scale factor to allow us to reconstruct
     if (Reconstruct()) {
-      if (src.Reconstruct()) Diagonal(src.Diagonal());
-      else Diagonal(-1);
+      if (src.Reconstruct())
+        Diagonal(src.Diagonal());
+      else
+        Diagonal(-1);
     }
 
     if (precision < QUDA_SINGLE_PRECISION) {
@@ -291,7 +292,8 @@ namespace quda {
 
   void CloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
-    if (location == QUDA_CUDA_FIELD_LOCATION) prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
+    if (location == QUDA_CUDA_FIELD_LOCATION)
+      prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
   }
 
   void CloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
@@ -302,8 +304,8 @@ namespace quda {
       auto cloverInv_parity = cloverInv;
       auto bytes_parity = parity == QUDA_INVALID_PARITY ? bytes : bytes / 2;
       if (parity != QUDA_INVALID_PARITY && parity == QUDA_ODD_PARITY) {
-        clover_parity = static_cast<char*>(clover_parity) + bytes_parity;
-        cloverInv_parity = static_cast<char*>(cloverInv_parity) + bytes_parity;
+        clover_parity = static_cast<char *>(clover_parity) + bytes_parity;
+        cloverInv_parity = static_cast<char *>(cloverInv_parity) + bytes_parity;
       }
 
       switch (type) {
@@ -328,7 +330,7 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param)
   {
     output << static_cast<const LatticeFieldParam&>(param);
-    output << "reconstruct = "  << param.reconstruct << std::endl;
+    output << "reconstruct = " << param.reconstruct << std::endl;
     output << "inverse = "   << param.inverse << std::endl;
     output << "clover = "    << param.clover << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;

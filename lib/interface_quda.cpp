@@ -863,7 +863,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (!h_clover || inv_param->compute_clover) {
     device_calc = true;
-    if (inv_param->clover_coeff == 0.0 && inv_param->clover_csw == 0.0) errorQuda("neither clover coefficient nor Csw set");
+    if (inv_param->clover_coeff == 0.0 && inv_param->clover_csw == 0.0)
+      errorQuda("neither clover coefficient nor Csw set");
     if (gaugePrecise->Anisotropy() != 1.0) errorQuda("cannot compute anisotropic clover field");
   }
   if (!h_clover && !device_calc) errorQuda("Uninverted clover term not loaded");
@@ -884,7 +885,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // Adjust inv_param->clover_coeff: if a user has set kappa and Csw,
   // populate inv_param->clover_coeff for them as the computeClover
   // routines uses that value
-  inv_param->clover_coeff = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);  
+  inv_param->clover_coeff = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
 
   CloverField *in = nullptr;
 
@@ -896,12 +897,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   double coeff_old = cloverPrecise ? cloverPrecise->Coeff() : 0.0;
   double rho_old = cloverPrecise ? cloverPrecise->Rho() : 0.0;
   double mu2_old = cloverPrecise ? cloverPrecise->Mu2() : 0.0;
-  if (!cloverPrecise || invalidate_clover ||
-      inv_param->clover_coeff != coeff_old ||
-      inv_param->clover_csw != csw_old ||
-      inv_param->clover_csw != csw_old ||
-      inv_param->clover_rho != rho_old ||
-      4 * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu != mu2_old)
+  if (!cloverPrecise || invalidate_clover || inv_param->clover_coeff != coeff_old || inv_param->clover_csw != csw_old
+      || inv_param->clover_csw != csw_old || inv_param->clover_rho != rho_old
+      || 4 * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu != mu2_old)
     clover_update = true;
 
   // compute or download clover field only if gauge field has been updated or clover field doesn't exist
@@ -931,7 +929,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     if (!device_calc) {
       profileClover.TPSTART(QUDA_PROFILE_H2D);
       cloverPrecise->copy(*in, false);
-      if ((h_clovinv && !inv_param->compute_clover_inverse) && !clover::dynamic_inverse()) cloverPrecise->copy(*in, true);
+      if ((h_clovinv && !inv_param->compute_clover_inverse) && !clover::dynamic_inverse())
+        cloverPrecise->copy(*in, true);
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
       profileClover.TPSTOP(QUDA_PROFILE_TOTAL);

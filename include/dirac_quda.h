@@ -1394,8 +1394,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              CloverField *)
+    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, CloverField *)
     {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
