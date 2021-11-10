@@ -204,7 +204,7 @@ namespace quda
           atomic_t sum_tmp[n];
           memcpy(sum_tmp, &sum, sizeof(sum));
 #pragma unroll
-          for (int i = 0; i < n; i++) {
+          for (unsigned int i = 0; i < n; i++) {
             // catch the case where the computed value is equal to the init_value
             sum_tmp[i] = sum_tmp[i] == init_value<atomic_t>() ? terminate_value<atomic_t>() : sum_tmp[i];
             arg.result_d[n * idx + i].store(sum_tmp[i], cuda::std::memory_order_relaxed);
