@@ -14,6 +14,9 @@ using device_reduce_t = doubledouble;
 using device_reduce_t = double;
 #endif
 
+#include <cuda/std/climits>
+#include <cuda/std/type_traits>
+#include <cuda/std/limits>
 #include <cuda/std/atomic>
 using count_t = cuda::atomic<unsigned int, cuda::thread_scope_device>;
 
@@ -23,13 +26,13 @@ namespace quda
   /**
      @brief The initialization value we used to check for completion
    */
-  template <typename T> constexpr T init_value() { return -std::numeric_limits<T>::infinity(); }
+  template <typename T> constexpr T init_value() { return -cuda::std::numeric_limits<T>::infinity(); }
 
   /**
      @brief The termination value we use to prevent a possible hang in
      case the computed reduction is equal to the initialization
   */
-  template <typename T> constexpr T terminate_value() { return std::numeric_limits<T>::infinity(); }
+  template <typename T> constexpr T terminate_value() { return cuda::std::numeric_limits<T>::infinity(); }
 
   /**
      @brief The atomic word size we use for a given reduction type.
