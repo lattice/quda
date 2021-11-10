@@ -54,12 +54,23 @@ namespace quda {
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      auto diagonal = location == QUDA_CUDA_FIELD_LOCATION ? diagonal_d :diagonal_h;
-      launch<CloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+      auto diagonal = location == QUDA_CUDA_FIELD_LOCATION ? diagonal_d : diagonal_h;
+      if constexpr (OutOrder::enable_reconstruct && InOrder::enable_reconstruct) {
+        launch<CompressedCloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+      } else {
+        launch<CloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+      }
 
       if (compute_diagonal) {
-        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy(diagonal_h, diagonal_d, sizeof(real), qudaMemcpyDeviceToHost);
-        out.Diagonal(*diagonal_h / 2);
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          qudaMemcpyAsync(diagonal_h, diagonal_d, sizeof(real), qudaMemcpyDeviceToHost, stream);
+          qudaDeviceSynchronize();
+        }
+        double diagonal = 0.0;
+        // only use the result from node 0 (site 0) for multi-node determinism
+        if (comm_rank() == 0) diagonal = *diagonal_h / 2; // factor of two for native normalization
+        comm_broadcast(&diagonal, sizeof(double));
+        out.Diagonal(diagonal);
       }
     }
 

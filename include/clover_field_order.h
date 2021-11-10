@@ -541,8 +541,9 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
     */
-    template <typename Float, int length, int N, bool add_rho=false, bool enable_reconstruct = clover::reconstruct(), bool huge_alloc=false>
+    template <typename Float, int length, int N, bool add_rho=false, bool enable_reconstruct_ = clover::reconstruct(), bool huge_alloc=false>
     struct FloatNOrder {
+      static constexpr bool enable_reconstruct = enable_reconstruct_;
       using Accessor = FloatNOrder<Float, length, N, add_rho, enable_reconstruct, huge_alloc>;
       using real = typename mapper<Float>::type;
       typedef typename VectorType<Float, N>::type Vector;
@@ -636,11 +637,15 @@ namespace quda {
             for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
           }
 
+#pragma unroll
           for (int i = 0; i < compressed_block; i++) tmp2[i] = tmp[i + chirality * compressed_block % N];
 
           recon.unpack(v, tmp2);
 
-          if (add_rho) for (int i=0; i<6; i++) v[i] += rho;
+          if (add_rho) {
+#pragma unroll
+            for (int i=0; i<6; i++) v[i] += rho;
+          }
         }
 
 	/**
@@ -682,7 +687,85 @@ namespace quda {
           }
         }
 
+        /**
+	   @brief Load accessor for a single compressed chiral block
+	   @param[out] v Vector of loaded elements
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+        __device__ __host__ inline void raw_load(real v[compressed_block], int x, int parity, int chirality) const
+        {
+          constexpr int M = (compressed_block + N - 1)/ N; // number of short vectors per chiral block
+          constexpr int M_offset = compressed_block / N; // number of short vectors per chiral block
+
+          vector_type<real, M * N> tmp;
+
+#pragma unroll
+	  for (int i=0; i<M; i++) {
+            // first load from memory
+            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M_offset + i));
+
+            // second do scalar copy converting into register type
+#pragma unroll
+            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
+          }
+
+#pragma unroll
+          for (int i = 0; i < compressed_block; i++) v[i] = tmp[i + chirality * compressed_block % N];
+        }
+
+	__device__ __host__ inline void raw_load(real v[2 * compressed_block], int x, int parity) const
+        {
+#pragma unroll
+          for (int ch = 0; ch < 2; ch++) raw_load(v + ch * compressed_block, x, parity, ch);
+        }
+
 	/**
+	   @brief Store accessor for a single chiral block
+	   @param[out] v Vector of elements to be stored
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+	__device__ __host__ inline void raw_save(const real v[compressed_block], int x, int parity, int chirality) const
+        {
+          constexpr int M = (compressed_block + N - 1)/ N; // number of short vectors per chiral block
+          constexpr int M_offset = compressed_block / N; // number of short vectors per chiral block
+
+          vector_type<real, compressed_block> tmp;
+#pragma unroll
+          for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
+
+#pragma unroll
+          for (int i = 0; i < M_offset; i++) {
+            Vector vecTmp;
+            // first do scalar copy converting into storage type
+#pragma unroll
+            for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * Nrem + i * N + j]);
+            // second do vectorized copy into memory
+            vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
+          }
+
+          if (Nrem) {
+            typename VectorType<Float, std::max(Nrem, 1)>::type vecTmp;
+            // first do scalar copy converting into storage type
+#pragma unroll
+            for (int j = 0; j < Nrem; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
+
+            char *ptr = reinterpret_cast<char*>(reinterpret_cast<Vector*>(clover) + parity * offset + x);
+            ptr += (stride * (M_offset * N) + chirality * Nrem) * sizeof(Float);
+            vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
+          }
+        }
+
+	__device__ __host__ inline void raw_save(const real v[2 * compressed_block], int x, int parity) const
+        {
+#pragma unroll
+          for (int ch = 0; ch < 2; ch++) raw_save(v + ch * compressed_block, x, parity, ch);
+        }
+
+        /**
 	   @brief Load accessor for the clover matrix
 	   @param[out] v Vector of loaded elements
 	   @param[in] x Checkerboarded site index
@@ -735,6 +818,7 @@ namespace quda {
     */
     template <typename Float, int length = 72>
       struct QDPOrder {
+        static constexpr bool enable_reconstruct = false;
 	typedef typename mapper<Float>::type RegType;
 	Float *clover;
 	const int volumeCB;
@@ -760,11 +844,13 @@ namespace quda {
 	  // factor of 0.5 comes from basis change
           Float v_[length];
           block_load<Float, length>(v_, &clover[parity*offset + x*length]);
+#pragma unroll
           for (int i=0; i<length; i++) v[i] = 0.5*v_[i];
 	}
 
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
           Float v_[length];
+#pragma unroll
           for (int i=0; i<length; i++) v_[i] = 2.0*v[i];
           block_store<Float, length>(&clover[parity*offset + x*length], v_);
 	}
@@ -777,6 +863,7 @@ namespace quda {
     */
     template <typename Float, int length = 72>
       struct QDPJITOrder {
+        static constexpr bool enable_reconstruct = false;
 	typedef typename mapper<Float>::type RegType;
 	Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
 	Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
@@ -800,13 +887,16 @@ namespace quda {
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
+#pragma unroll
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
+#pragma unroll
 	    for (int i=0; i<6; i++) {
 	      v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	    }
 
 	    // the off diagonal elements
+#pragma unroll
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
@@ -819,13 +909,16 @@ namespace quda {
 
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) const {
 	  // the factor of 2.0 comes from undoing the basis change
+#pragma unroll
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
+#pragma unroll
 	    for (int i=0; i<6; i++) {
 	      diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
 	    }
 
 	    // the off diagonal elements
+#pragma unroll
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
@@ -847,6 +940,7 @@ namespace quda {
     */
     template <typename Float, int length = 72>
       struct BQCDOrder {
+        static constexpr bool enable_reconstruct = false;
 	typedef typename mapper<Float>::type RegType;
 	Float *clover[2];
 	const int volumeCB;
@@ -883,14 +977,18 @@ namespace quda {
 
 	  // flip the sign of the imaginary components
 	  int sign[36];
+#pragma unroll
 	  for (int i=0; i<6; i++) sign[i] = 1;
+#pragma unroll
 	  for (int i=6; i<36; i+=2) {
 	    if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
 	  }
 
 	  const int M=length/2;
+#pragma unroll
 	  for (int chirality=0; chirality<2; chirality++)
+#pragma unroll
 	    for (int i=0; i<M; i++)
 	      v[chirality*M+i] = sign[i] * clover[parity][x*length+chirality*M+bq[i]];
 
