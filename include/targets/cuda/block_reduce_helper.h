@@ -85,7 +85,7 @@ namespace quda
     {
       using block_reduce_t = cub::BlockReduce<T, param_t::block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS,
                                               param_t::block_size_y, param_t::block_size_z, __COMPUTE_CAPABILITY__>;
-      static __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
+      __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
       block_reduce_t block_reduce(storage[batch]);
       if (!async) __syncthreads(); // only synchronize if we are not pipelining
       T value = reducer_t::do_sum ? block_reduce.Sum(value_) : block_reduce.Reduce(value_, r);
