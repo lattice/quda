@@ -5,6 +5,7 @@
 #include <oneapi/mkl.hpp>
 #include <malloc_quda.h>
 using namespace oneapi::mkl;
+using namespace oneapi::mkl::lapack;
 #endif
 
 #define _DEBUG
@@ -28,9 +29,9 @@ namespace quda
       {
         if (!native_init) {
           native_init = true;
-	  //#ifndef NATIVE_LAPACK_LIB
+#ifndef NATIVE_LAPACK_LIB
 	  quda::blas_lapack::generic::init();
-	  //#endif
+#endif
         }
       }
 
@@ -38,15 +39,16 @@ namespace quda
       {
         if (native_init) {
           native_init = false;
-	  //#ifndef NATIVE_LAPACK_LIB
+#ifndef NATIVE_LAPACK_LIB
 	  quda::blas_lapack::generic::destroy();
-	  //#endif
+#endif
         }
       }
 
 #ifdef _DEBUG
       template <typename EigenMatrix, typename Float>
-      __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h, int n, uint64_t batch)
+      __host__ void checkEigen(std::complex<Float> *A_h, std::complex<Float> *Ainv_h,
+			       int n, uint64_t batch)
       {
         EigenMatrix A = EigenMatrix::Zero(n, n);
         EigenMatrix Ainv = EigenMatrix::Zero(n, n);
@@ -61,113 +63,88 @@ namespace quda
         EigenMatrix unit = EigenMatrix::Identity(n, n);
         EigenMatrix prod = A * Ainv;
         Float L2norm = ((prod - unit).norm() / (n * n));
-        printfQuda("cuBLAS: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
+        printfQuda("oneMKL: Norm of (A * Ainv - I) batch %lu = %e\n", batch, L2norm);
       }
 #endif
 
-#ifdef XNATIVE_LAPACK_LIB
+#ifdef NATIVE_LAPACK_LIB
       // FIXME do this in pipelined fashion to reduce memory overhead.
       long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch,
 				  QudaPrecision prec, QudaFieldLocation location)
       {
         init();
         if (getVerbosity() >= QUDA_VERBOSE)
-          printfQuda("BatchInvertMatrix (native - cuBLAS): Nc = %d, batch = %lu\n", n, batch);
+          printfQuda("BatchInvertMatrix (native - oneMKL): Nc = %d, batch = %lu\n", n, batch);
 
         long long flops = 0;
         timeval start, stop;
         gettimeofday(&start, NULL);
 
+	std::int64_t stride_a = n * n;
         size_t size = 2 * n * n * prec * batch;
-        void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
-        void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
-        if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
-
-#ifdef _DEBUG
-        // Debug code: Copy original A matrix to host
-        std::complex<float> *A_h
-          = (location == QUDA_CUDA_FIELD_LOCATION ? static_cast<std::complex<float> *>(pool_pinned_malloc(size)) :
-                                                    static_cast<std::complex<float> *>(A_d));
-        if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy((void *)A_h, A_d, size, qudaMemcpyDeviceToHost);
-#endif
-
-        int *dipiv = static_cast<int *>(pool_device_malloc(batch * n * sizeof(int)));
-        int *dinfo_array = static_cast<int *>(pool_device_malloc(batch * sizeof(int)));
-        int *info_array = static_cast<int *>(pool_pinned_malloc(batch * sizeof(int)));
-        memset(info_array, '0', batch * sizeof(int)); // silence memcheck warnings
+	std::int64_t *dipiv = static_cast<std::int64_t *>(pool_device_malloc(batch * n * sizeof(std::int64_t)));
+	auto q = device::defaultQueue();
 
         if (prec == QUDA_SINGLE_PRECISION) {
-          typedef cuFloatComplex C;
-          C **A_array = static_cast<C **>(pool_device_malloc(2 * batch * sizeof(C *)));
-          C **Ainv_array = A_array + batch;
-          C **A_array_h = static_cast<C **>(pool_pinned_malloc(2 * batch * sizeof(C *)));
-          C **Ainv_array_h = A_array_h + batch;
-          for (uint64_t i = 0; i < batch; i++) {
-            A_array_h[i] = static_cast<C *>(A_d) + i * n * n;
-            Ainv_array_h[i] = static_cast<C *>(Ainv_d) + i * n * n;
-          }
-          qudaMemcpy(A_array, A_array_h, 2 * batch * sizeof(C *), qudaMemcpyHostToDevice);
+          typedef std::complex<float> C;
 
-          cublasStatus_t error = cublasCgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
-          flops += batch * FLOPS_CGETRF(n, n);
+	  C *A_d = static_cast<C *>(A);
+	  C *Ainv_d = static_cast<C *>(Ainv);
+	  if(location == QUDA_CUDA_FIELD_LOCATION) {
+	    A_d = static_cast<C *>(pool_device_malloc(size));
+	    Ainv_d = static_cast<C *>(pool_device_malloc(size));
+	    qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
+	  }
 
-          if (error != CUBLAS_STATUS_SUCCESS)
-            errorQuda("\nError in LU decomposition (cublasCgetrfBatched), error code = %d\n", error);
+#ifdef _DEBUG
+	  // Debug code: Copy original A matrix to host
+	  C *A_h = static_cast<C *>(pool_pinned_malloc(size));
+	  qudaMemcpy(A_h, A_d, size, qudaMemcpyDeviceToHost);
+#endif
 
-          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
-          for (uint64_t i = 0; i < batch; i++) {
-            if (info_array[i] < 0) {
-              errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed",
-                        i);
-            } else if (info_array[i] > 0) {
-              errorQuda("%lu factorization completed but the factor U is exactly singular", i);
-            }
-          }
+	  try {
+	    std::int64_t getrf_scratchpad_size = getrf_batch_scratchpad_size<C>(q, n, n, n, stride_a, n, batch);
+	    C *getrf_scratchpad = static_cast<C *>(pool_device_malloc(getrf_scratchpad_size*sizeof(C)));
+	    auto getrf_event = getrf_batch(q, n, n, A_d, n, stride_a, dipiv, n, batch, getrf_scratchpad, getrf_scratchpad_size);
+	    flops += batch * FLOPS_CGETRF(n, n);
 
-          error = cublasCgetriBatched(handle, n, (const C **)A_array, n, dipiv, Ainv_array, n, dinfo_array, batch);
-          flops += batch * FLOPS_CGETRI(n);
-
-          if (error != CUBLAS_STATUS_SUCCESS)
-            errorQuda("\nError in matrix inversion (cublasCgetriBatched), error code = %d\n", error);
-
-          qudaMemcpy(info_array, dinfo_array, batch * sizeof(int), qudaMemcpyDeviceToHost);
-
-          for (uint64_t i = 0; i < batch; i++) {
-            if (info_array[i] < 0) {
-              errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed",
-                        i);
-            } else if (info_array[i] > 0) {
-              errorQuda("%lu factorization completed but the factor U is exactly singular", i);
-            }
-          }
-
-          pool_device_free(A_array);
-          pool_pinned_free(A_array_h);
+	    std::int64_t getri_scratchpad_size = getri_batch_scratchpad_size<C>(q, n, n, n, n, batch);
+	    C *getri_scratchpad = static_cast<C *>(pool_device_malloc(getri_scratchpad_size*sizeof(C)));
+	    auto getri_event = getri_batch(q, n, A_d, n, stride_a, dipiv, n, Ainv_d, n, stride_a, batch, getri_scratchpad, getri_scratchpad_size, {getrf_event});
+	    flops += batch * FLOPS_CGETRI(n);
+	    getri_event.wait_and_throw();
+	    pool_device_free(getrf_scratchpad);
+	    pool_device_free(getri_scratchpad);
+	  } catch(oneapi::mkl::lapack::exception const& e) {
+	    // Handle LAPACK related exceptions happened during synchronous call
+	    errorQuda("Unexpected exception caught during synchronous call to LAPACK API:\nreason: %s\ninfo: %ld", e.what(), e.info());
+	  } catch(cl::sycl::exception const& e) {
+	    // Handle not LAPACK related exceptions happened during synchronous call
+	    errorQuda("Unexpected exception caught during synchronous call to SYCL API:\n %s", e.what());
+	  }
 
 #ifdef _DEBUG
           // Debug code: Copy computed Ainv to host
-          std::complex<float> *Ainv_h = static_cast<std::complex<float> *>(pool_pinned_malloc(size));
-          qudaMemcpy((void *)Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
-
-          for (uint64_t i = 0; i < batch; i++) { checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i); }
+          C *Ainv_h = static_cast<C *>(pool_pinned_malloc(size));
+          qudaMemcpy(Ainv_h, Ainv_d, size, qudaMemcpyDeviceToHost);
+          for (uint64_t i = 0; i < batch; i++) {
+	    checkEigen<MatrixXcf, float>(A_h, Ainv_h, n, i);
+	  }
           pool_pinned_free(Ainv_h);
           pool_pinned_free(A_h);
 #endif
+	  if (location == QUDA_CPU_FIELD_LOCATION) {
+	    qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
+	    pool_device_free(Ainv_d);
+	    pool_device_free(A_d);
+	  }
         } else {
           errorQuda("%s not implemented for precision=%d", __func__, prec);
         }
 
-        if (location == QUDA_CPU_FIELD_LOCATION) {
-          qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
-          pool_device_free(Ainv_d);
-          pool_device_free(A_d);
-        }
-
         pool_device_free(dipiv);
-        pool_device_free(dinfo_array);
-        pool_pinned_free(info_array);
 
-        qudaDeviceSynchronize();
+        //qudaDeviceSynchronize();
         gettimeofday(&stop, NULL);
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
@@ -191,6 +168,7 @@ namespace quda
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
 				 QudaBLASParam blas_param, QudaFieldLocation location)
       {
+	warningQuda("using mkl stridedBatchGEMM");
         long long flops = 0;
         timeval start, stop;
         gettimeofday(&start, NULL);
@@ -363,6 +341,7 @@ namespace quda
 	       (Z *)C_d + blas_param.c_offset, blas_param.ldc);
 	    evnt.wait();
 	  }
+	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
 	} else if (blas_param.data_type == QUDA_BLAS_DATATYPE_C) {
           typedef std::complex<float> C;
 
@@ -386,6 +365,7 @@ namespace quda
 	       (C *)C_d + blas_param.c_offset, blas_param.ldc);
 	    evnt.wait();
           }
+	  flops += batch * FLOPS_CGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_D) {
           typedef double D;
 
@@ -409,6 +389,7 @@ namespace quda
 	       (D *)C_d + blas_param.c_offset, blas_param.ldc);
 	    evnt.wait();
           }
+	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else if (blas_param.data_type == QUDA_BLAS_DATATYPE_S) {
           typedef float S;
 
@@ -432,6 +413,7 @@ namespace quda
 	       (S *)C_d + blas_param.c_offset, blas_param.ldc);
 	    evnt.wait();
           }
+	  flops += batch * FLOPS_SGEMM(blas_param.m, blas_param.n, blas_param.k);
         } else {
           errorQuda("MKL GEMM type %d not implemented\n", blas_param.data_type);
         }
@@ -460,7 +442,7 @@ namespace quda
         long ds = stop.tv_sec - start.tv_sec;
         long dus = stop.tv_usec - start.tv_usec;
         double time = ds + 0.000001 * dus;
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+        //if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
           printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
         //-------------------------------------------------------------------------
 
@@ -470,6 +452,7 @@ namespace quda
       long long stridedBatchGEMM(void *A_data, void *B_data, void *C_data,
 				 QudaBLASParam blas_param, QudaFieldLocation location)
       {
+	warningQuda("using generic stridedBatchGEMM");
 	return quda::blas_lapack::generic::stridedBatchGEMM(A_data, B_data, C_data,
 							    blas_param, location);
       }

@@ -2,6 +2,10 @@
 
 #pragma once
 
+// assumes alpha = beta = 1
+#define FLOPS_SGEMM(m,n,k) (2*(m)*(n)*(k))
+#define FLOPS_CGEMM(m,n,k) (8*(m)*(n)*(k))
+
 #define FMULS_GETRF(m_, n_)                                                                                            \
   (((m_) < (n_)) ? (0.5 * (m_) * ((m_) * ((n_) - (1. / 3.) * (m_)-1.) + (n_)) + (2. / 3.) * (m_)) :                    \
                    (0.5 * (n_) * ((n_) * ((m_) - (1. / 3.) * (n_)-1.) + (m_)) + (2. / 3.) * (n_)))

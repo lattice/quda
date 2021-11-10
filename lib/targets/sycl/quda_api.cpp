@@ -374,10 +374,11 @@ namespace quda
   {
     auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
     auto q = device::get_target_stream(stream);
-    *pe = q.submit([&](sycl::handler& cgh) {
-		     cgh.single_task<class EventRecord>([=](){});
-		     //cgh.codeplay_host_task([=](){});
-		   });
+    //*pe = q.submit([&](sycl::handler& cgh) {
+    //	     cgh.single_task<class EventRecord>([=](){});
+    //		     //cgh.codeplay_host_task([=](){});
+    //		   });
+    *pe = q.submit_barrier();
   }
 
   void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
