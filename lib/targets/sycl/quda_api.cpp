@@ -374,11 +374,11 @@ namespace quda
   {
     auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
     auto q = device::get_target_stream(stream);
-    //*pe = q.submit([&](sycl::handler& cgh) {
-    //	     cgh.single_task<class EventRecord>([=](){});
-    //		     //cgh.codeplay_host_task([=](){});
-    //		   });
-    *pe = q.submit_barrier();
+    *pe = q.submit([&](sycl::handler& cgh) {
+      cgh.single_task<class EventRecord>([=](){});
+      //cgh.host_task([=](){});
+    });
+    //*pe = q.submit_barrier();
   }
 
   void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
@@ -414,6 +414,7 @@ namespace quda
     auto t0 = (*pe0).get_profiling_info<sycl::info::event_profiling::command_end>();
     auto t1 = (*pe1).get_profiling_info<sycl::info::event_profiling::command_start>();
     auto elapsed_time = 1e-9*(t1-t0);
+    //printfQuda("qudaEventElapsedTime: %lu %lu %g\n", t0, t1, elapsed_time);
     return elapsed_time;
   }
 

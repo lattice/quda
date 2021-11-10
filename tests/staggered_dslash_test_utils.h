@@ -525,7 +525,7 @@ struct StaggeredDslashTestWrapper {
       if (std::isnan(spinor_out_norm2)) { failed = true; }
 
       double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
+      printfQuda("Results: CPU=%f, CUDA=%f, (CPU-CUDA)/CPU=%e\n", spinor_ref_norm2, cuda_spinor_out_norm2, 1.0-cuda_spinor_out_norm2/spinor_ref_norm2);
       deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
       if (failed) { deviation = 1.0; }
     }
