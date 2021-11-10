@@ -135,6 +135,9 @@ set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
     CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
+set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
+mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -438,8 +441,16 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
 
 # This is needed now GPU ARCH
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
-set(COMP_CAP "${COMP_CAP}0")
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
+  set(QUDA_GPU_ARCH_SUFFIX real)
+endif()
+if(QUDA_GPU_ARCH_SUFFIX)
+  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+else()
+  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+endif()
+set(COMP_CAP ${COMP_CAP}0)
 
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
@@ -628,7 +639,7 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
