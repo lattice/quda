@@ -40,9 +40,9 @@ namespace quda {
     bytes(0),
     nColor(3),
     nSpin(4),
-    clover(0),
-    cloverInv(0),
-    diagonal(0),
+    clover(nullptr),
+    cloverInv(nullptr),
+    diagonal(0.0),
     max {0, 0},
     csw(param.csw),
     coeff(param.coeff),
@@ -303,25 +303,27 @@ namespace quda {
       auto clover_parity = clover;
       auto cloverInv_parity = cloverInv;
       auto bytes_parity = parity == QUDA_INVALID_PARITY ? bytes : bytes / 2;
-      if (parity != QUDA_INVALID_PARITY && parity == QUDA_ODD_PARITY) {
-        clover_parity = static_cast<char *>(clover_parity) + bytes_parity;
-        cloverInv_parity = static_cast<char *>(cloverInv_parity) + bytes_parity;
+      if (parity == QUDA_ODD_PARITY) {
+        clover_parity = clover ? static_cast<char *>(clover_parity) + bytes_parity : nullptr;
+        cloverInv_parity = cloverInv ? static_cast<char *>(cloverInv_parity) + bytes_parity : nullptr;
       }
 
       switch (type) {
       case CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE:
         if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
-        if (clover_parity != cloverInv_parity) {
-          if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
-        }
+        if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
         break;
       case CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE:
         if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
         break;
       case CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE:
-        if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+        if (!clover::dynamic_inverse()) {
+          if (cloverInv_parity) qudaMemPrefetchAsync(cloverInv_parity, bytes_parity, mem_space, stream);
+        } else {
+          if (clover_parity) qudaMemPrefetchAsync(clover_parity, bytes_parity, mem_space, stream);
+        }
         break;
-      default: errorQuda("Invalid CloverPrefetchType.");
+      default: errorQuda("Invalid CloverPrefetchType %d", static_cast<int>(type));
       }
     }
   }
