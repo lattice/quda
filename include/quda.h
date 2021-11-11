@@ -1271,7 +1271,7 @@ extern "C" {
    * Compute the product of gauge along a path and add to/overwrite the output field
    *
    * @param out The output field to be updated
-   * @param sitelink The gauge field from which we compute the force
+   * @param sitelink The gauge field from which we compute the products of gauge links
    * @param input_path_buf[dim][num_paths][path_length]
    * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
    * @param loop_coeff Coefficients of the different loops in the Symanzik action
