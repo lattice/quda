@@ -66,8 +66,12 @@ module quda_fortran
      integer(4) :: overlap ! width of domain overlap
 
      ! When computing momentum, should we overwrite it or accumulate
-     ! to it (only presenty support in gauge-force)
+     ! to it (only presently used in gauge-force)
      integer(4) :: overwrite_mom
+
+     ! When computing products of gauge links, should we overwrite the output or accumulate
+     ! to it? (only presently used in gauge-path)
+     integer(4) :: overwrite_gauge
 
      integer(4) :: use_resident_gauge  ! Use the resident gauge field
      integer(4) :: use_resident_mom    ! Use the resident momentume field
