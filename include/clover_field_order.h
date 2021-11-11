@@ -178,7 +178,7 @@ namespace quda {
       constexpr auto compress_idx(int i) const { return i; }
       constexpr auto pack_compress_idx(int i) const { return i; }
 
-      template <typename T> constexpr T decompress(const T &in, int k) const { return in; }
+      template <typename T> constexpr T decompress(const T &in, int) const { return in; }
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
