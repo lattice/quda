@@ -38,8 +38,8 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    double csw;  //! Clover coefficient
-    double coeff;  //! Overall clover coefficient
+    double csw;   //! C_sw clover coefficient
+    double coeff; //! Overall clover coefficient
     QudaTwistFlavorType twist_flavor;
     double mu2;
     double epsilon2;
