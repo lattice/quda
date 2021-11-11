@@ -85,25 +85,12 @@ namespace quda {
     __device__ __host__ reduce_t init() const{ return reduce_t(); }
   };
 
-  template <typename Arg> struct MomUpdate {
+  template <typename Arg> struct MomUpdate : maximum<vector_type<double, 2>> {
     using reduce_t = vector_type<double, 2>;
+    using maximum<reduce_t>::operator();
     const Arg &arg;
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
-
-    static constexpr bool do_sum = false;
-
-    /**
-       @brief Functor for finding the maximum over a vec2 field.  Each
-       lane is evaluated separately.
-    */
-    __device__ __host__ inline reduce_t operator()(const reduce_t &a, const reduce_t &b) const
-    {
-      auto c = a;
-      if (b[0] > a[0]) c[0] = b[0];
-      if (b[1] > a[1]) c[1] = b[1];
-      return c;
-    }
 
     // calculate the momentum contribution to the action.  This uses the
     // MILC convention where we subtract 4.0 from each matrix norm in

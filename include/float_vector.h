@@ -174,4 +174,14 @@ namespace quda {
     for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
     return c;
   }
+
+  template <typename scalar, int n>
+  __device__ __host__ inline vector_type<scalar, n> max(const vector_type<scalar, n> &a,
+							const vector_type<scalar, n> &b)
+  {
+    vector_type<scalar, n> c;
+#pragma unroll
+    for (int i = 0; i < n; i++) c[i] = quda::max(a[i], b[i]);
+    return c;
+  }
 }

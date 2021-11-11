@@ -97,14 +97,15 @@ namespace quda {
       result_d = reinterpret_cast<reduce_t *>(quda::reducer::get_device_buffer());
       q.memcpy(result_d, result_h, sizeof(reduce_t));
     }
-    //auto red = sycl::ONEAPI::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+    auto red = sycl::reduction(result_d, arg.init(),
+			       typename Transformer<Arg>::reducer_t());
     //auto red = sycl::ONEAPI::reduction(result_d, Transformer<Arg>::init(),
     //			       typename Transformer<Arg>::reducer_t());
     //warningQuda("nd: %i\n", nd);
     //using da = double[nd];
-    constexpr int nd = sizeof(*result_h)/sizeof(double);
-    using da = sycl::vec<double,nd>;
-    auto red = sycl::reduction((da*)result_d, *(da*)result_h, sycl::plus<da>());
+    //constexpr int nd = sizeof(*result_h)/sizeof(double);
+    //using da = sycl::vec<double,nd>;
+    //auto red = sycl::reduction((da*)result_d, *(da*)result_h, sycl::plus<da>());
     try {
       q.submit([&](sycl::handler& h) {
 	//h.parallel_for<class Reduction2Dn>
@@ -112,7 +113,8 @@ namespace quda {
 	  (ndRange, red,
 	   [=](sycl::nd_item<3> ndi, auto &sum) {
 	     using Sum = decltype(sum);
-	     quda::Reduction2DImplN<Transformer, Arg, Sum, da, grid_stride>(arg, ndi, sum);
+	     quda::Reduction2DImplN<Transformer, Arg, Sum, reduce_t, grid_stride>(arg, ndi, sum);
+	     //quda::Reduction2DImplN<Transformer, Arg, Sum, da, grid_stride>(arg, ndi, sum);
 	   });
       });
     } catch (sycl::exception const& e) {

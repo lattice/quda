@@ -24,8 +24,8 @@ namespace quda
     static constexpr bool do_sum = true;
     using reducer_t = plus<T>;
     __device__ __host__ T operator()(T a, T b) const { return a + b; }
-    __device__ __host__ static T reduce(T a, T b) { return a + b; }
-    __device__ __host__ static T init() { return quda::zero<T>(); }
+    //__device__ __host__ static T reduce(T a, T b) { return a + b; }
+    //__device__ __host__ static T init() { return quda::zero<T>(); }
   };
 
   /**
@@ -34,7 +34,8 @@ namespace quda
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
     using reducer_t = maximum<T>;
-    __device__ __host__ T operator()(T a, T b) const { return a > b ? a : b; }
+    //__device__ __host__ T operator()(T a, T b) const { return a > b ? a : b; }
+    __device__ __host__ T operator()(T a, T b) const { return quda::max(a,b); }
   };
 
   /**
