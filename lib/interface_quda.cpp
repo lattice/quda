@@ -882,7 +882,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // Adjust inv_param->clover_coeff: if a user has set kappa and Csw,
   // populate inv_param->clover_coeff for them as the computeClover
   // routines uses that value
-  inv_param->clover_coeff = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
+  inv_param->clover_coeff
+    = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
 
   CloverField *in = nullptr;
 
