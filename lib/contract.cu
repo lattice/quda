@@ -78,7 +78,7 @@ namespace quda {
 	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 3;
 	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
+	  launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_DR_FT_Z:
@@ -86,7 +86,7 @@ namespace quda {
 	  constexpr int nSpin  = 4;
 	  constexpr int ft_dir = 2;
 	  ContractionSummedArg<Float, nColor, nSpin, ft_dir> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<DegrandRossiContractFT>(result_local, tp, stream, arg);
+	  launch<DegrandRossiContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	}
 	break;
       case QUDA_CONTRACT_TYPE_STAGGERED_FT_T:
@@ -94,7 +94,7 @@ namespace quda {
 	  constexpr int nSpin  = 1;
 	  constexpr int ft_dir = 3;
 	  ContractionSummedArg<Float, nColor, nSpin, ft_dir, staggered_contract_array> arg(x, y, source_position, mom_mode, fft_type, s1, b1);
-	  launch<StaggeredContractFT>(result_local, tp, stream, arg);
+	  launch<StaggeredContractFT, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	}
 	break;
       default:
