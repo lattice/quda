@@ -8,18 +8,16 @@ namespace quda
 {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) :
-    DiracImprovedStaggered(param),
-    Xinv(param.xInvKD)
+    DiracImprovedStaggered(param), Xinv(param.xInvKD)
   {
   }
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac) :
-    DiracImprovedStaggered(dirac),
-    Xinv(dirac.Xinv)
+    DiracImprovedStaggered(dirac), Xinv(dirac.Xinv)
   {
   }
 
-  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() {}
+  DiracImprovedStaggeredKD::~DiracImprovedStaggeredKD() { }
 
   DiracImprovedStaggeredKD &DiracImprovedStaggeredKD::operator=(const DiracImprovedStaggeredKD &dirac)
   {
@@ -196,8 +194,7 @@ namespace quda
     }
   }
 
-  void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &,
-                                             const QudaSolutionType) const
+  void DiracImprovedStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
 
@@ -239,8 +236,8 @@ namespace quda
     BuildStaggeredKahlerDiracInverse(*Xinv, *fatGauge, mass);
   }
 
-  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double,
-                                                double, double, double) const
+  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double,
+                                                double) const
   {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 

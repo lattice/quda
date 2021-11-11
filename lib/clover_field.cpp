@@ -131,8 +131,8 @@ namespace quda {
   {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
-    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Nc=%d", volume, stride,
-                         precision, nColor);
+    int check
+      = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Nc=%d", volume, stride, precision, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
@@ -148,7 +148,7 @@ namespace quda {
   void CloverField::backup() const
   {
     if (backup_h) errorQuda("Already allocated host backup");
-    backup_h = static_cast<char*>(safe_malloc(2 * bytes));
+    backup_h = static_cast<char *>(safe_malloc(2 * bytes));
 
     if (V(false)) backup(false);
     if (V(true)) backup(true);
@@ -335,7 +335,7 @@ namespace quda {
     output << "clover = "    << param.clover << std::endl;
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "csw = "       << param.csw << std::endl;
-    output << "coeff = "     << param.coeff << std::endl;
+    output << "coeff = " << param.coeff << std::endl;
     output << "twisted = "   << param.twisted << std::endl;
     output << "mu2 = "       << param.mu2 << std::endl;
     output << "rho = "       << param.rho << std::endl;

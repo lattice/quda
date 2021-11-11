@@ -33,8 +33,8 @@ namespace quda {
     TuneParam();
     TuneParam(const TuneParam &) = default;
     TuneParam(TuneParam &&) = default;
-    TuneParam& operator=(const TuneParam &) = default;
-    TuneParam& operator=(TuneParam &&) = default;
+    TuneParam &operator=(const TuneParam &) = default;
+    TuneParam &operator=(TuneParam &&) = default;
 
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
@@ -43,7 +43,6 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
-
   };
 
   /**
@@ -90,7 +89,10 @@ namespace quda {
        @brief Return the maximum block size in the x dimension
        explored by the autotuner.
      */
-    virtual unsigned int maxBlockSize(const TuneParam &param) const { return device::max_threads_per_block() / (param.block.y*param.block.z); }
+    virtual unsigned int maxBlockSize(const TuneParam &param) const
+    {
+      return device::max_threads_per_block() / (param.block.y * param.block.z);
+    }
 
     /**
        @brief Return the maximum grid size in the x dimension explored
@@ -99,7 +101,7 @@ namespace quda {
        will help (if a kernels needs more parallelism, the autotuner
        will find this through increased block size.
      */
-    virtual unsigned int maxGridSize() const { return 2*device::processor_count(); }
+    virtual unsigned int maxGridSize() const { return 2 * device::processor_count(); }
 
     /**
        @brief Return the minimum grid size in the x dimension explored
@@ -128,8 +130,8 @@ namespace quda {
 
         // ensure the blockDim is large enough given the limit on gridDim
         param.block.x = (minThreads() + max_blocks - 1) / max_blocks;
-        param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
-	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
+        param.block.x = ((param.block.x + step - 1) / step) * step; // round up to nearest step size
+        if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
       }
     }
@@ -148,7 +150,7 @@ namespace quda {
         resetBlockDim(param);
         int nthreads = param.block.x * param.block.y * param.block.z;
         param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
-	ret = false;
+        ret = false;
       } else {
         ret = true;
       }
@@ -187,8 +189,10 @@ namespace quda {
     {
       if (tuneSharedBytes()) {
         const auto max_shared = maxSharedBytesPerBlock();
-        const int max_blocks_per_sm = std::min(device::max_threads_per_processor() / (param.block.x*param.block.y*param.block.z), device::max_blocks_per_processor());
-	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
+        const int max_blocks_per_sm
+          = std::min(device::max_threads_per_processor() / (param.block.x * param.block.y * param.block.z),
+                     device::max_blocks_per_processor());
+        int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
 	param.shared_bytes = (blocks_per_sm > 0 ? max_shared / blocks_per_sm + 1 : max_shared + 1);
 
@@ -257,6 +261,8 @@ namespace quda {
       return ss.str();
     }
 
+    virtual std::string miscString(const TuneParam &) const { return std::string(); }
+
     virtual void initTuneParam(TuneParam &param) const
     {
       const unsigned int max_threads = device::max_threads_per_block_dim(0);
@@ -298,41 +304,37 @@ namespace quda {
      */
     void checkLaunchParam(TuneParam &tp)
     {
-      if (tp.block.x*tp.block.y*tp.block.z > device::max_threads_per_block())
-        errorQuda("Requested block size %dx%dx%d=%d greater than max %d",
-                  tp.block.x, tp.block.y, tp.block.z, tp.block.x*tp.block.y*tp.block.z,
-                  device::max_threads_per_block());
+      if (tp.block.x * tp.block.y * tp.block.z > device::max_threads_per_block())
+        errorQuda("Requested block size %dx%dx%d=%d greater than max %d", tp.block.x, tp.block.y, tp.block.z,
+                  tp.block.x * tp.block.y * tp.block.z, device::max_threads_per_block());
 
       if (tp.block.x > device::max_threads_per_block_dim(0))
-        errorQuda("Requested X-dimension block size %d greater than max %d",
-                  tp.block.x, device::max_threads_per_block_dim(0));
+        errorQuda("Requested X-dimension block size %d greater than max %d", tp.block.x,
+                  device::max_threads_per_block_dim(0));
 
       if (tp.block.y > device::max_threads_per_block_dim(1))
-        errorQuda("Requested Y-dimension block size %d greater than max %d",
-                  tp.block.y, device::max_threads_per_block_dim(1));
+        errorQuda("Requested Y-dimension block size %d greater than max %d", tp.block.y,
+                  device::max_threads_per_block_dim(1));
 
       if (tp.block.z > device::max_threads_per_block_dim(2))
-        errorQuda("Requested Z-dimension block size %d greater than max %d",
-                  tp.block.z, device::max_threads_per_block_dim(2));
+        errorQuda("Requested Z-dimension block size %d greater than max %d", tp.block.z,
+                  device::max_threads_per_block_dim(2));
 
       if (tp.grid.x > device::max_grid_size(0))
-        errorQuda("Requested X-dimension grid size %d greater than max %d",
-                  tp.grid.x, device::max_grid_size(0));
+        errorQuda("Requested X-dimension grid size %d greater than max %d", tp.grid.x, device::max_grid_size(0));
 
       if (tp.grid.y > device::max_grid_size(1))
-        errorQuda("Requested Y-dimension grid size %d greater than max %d",
-                  tp.grid.y, device::max_grid_size(1));
+        errorQuda("Requested Y-dimension grid size %d greater than max %d", tp.grid.y, device::max_grid_size(1));
 
       if (tp.grid.z > device::max_grid_size(2))
-        errorQuda("Requested Z-dimension grid size %d greater than max %d",
-                  tp.grid.z, device::max_grid_size(2));
+        errorQuda("Requested Z-dimension grid size %d greater than max %d", tp.grid.z, device::max_grid_size(2));
 
       if (tuneAuxDim() && tp.aux.x == -1 && tp.aux.y == -1 && tp.aux.z == -1 && tp.aux.w == -1)
-          errorQuda("aux tuning enabled but param.aux is not initialized");
+        errorQuda("aux tuning enabled but param.aux is not initialized");
     }
 
     qudaError_t launchError() const { return launch_error; }
-    qudaError_t& launchError() { return launch_error; }
+    qudaError_t &launchError() { return launch_error; }
   };
 
   /**
