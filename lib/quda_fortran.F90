@@ -111,8 +111,9 @@ module quda_fortran
      real(8) :: mq2; ! EOFA parameter
      real(8) :: mq3; ! EOFA parameter
 
-     real(8) :: mu    ! Twisted mass parameter
-     real(8) :: epsilon ! Twisted mass parameter
+     real(8) :: mu    ! Chiral twisted mass parameter
+     real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
