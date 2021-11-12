@@ -14,17 +14,8 @@ static bool zeroCopy = false;
 
 namespace quda {
 
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
-    ColorSpinorField(param),
-    alloc(false),
-    init(true)
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param)
   {
-    // this must come before create
-    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      v = param.v;
-      norm = param.norm;
-    }
-
     create(param.create);
 
     switch (param.create) {
@@ -36,20 +27,14 @@ namespace quda {
     }
   }
 
-  cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+  cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : ColorSpinorField(src)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
 
   // creates a copy of src, any differences defined in param
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) : ColorSpinorField(src)
   {
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -95,10 +80,7 @@ namespace quda {
 
   }
 
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) :
-    ColorSpinorField(src),
-    alloc(false),
-    init(true)
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src)
   {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -282,58 +264,15 @@ namespace quda {
       }
     }
 
-
-    if (composite_descr.is_composite) 
-    {
-       CompositeColorSpinorField::iterator vec;
-       for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
+    if (composite_descr.is_composite) {
+      CompositeColorSpinorField::iterator vec;
+      for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
     } 
 
-    if ( siteSubset == QUDA_FULL_SITE_SUBSET && (!composite_descr.is_composite || composite_descr.is_component) ) {
+    if (siteSubset == QUDA_FULL_SITE_SUBSET && (!composite_descr.is_composite || composite_descr.is_component) ) {
       delete even;
       delete odd;
     }
-  }
-
-  void cudaColorSpinorField::backup() const {
-    if (backed_up) errorQuda("ColorSpinorField already backed up");
-    backup_h = new char[bytes];
-    qudaMemcpy(backup_h, v, bytes, qudaMemcpyDefault);
-    if (norm_bytes) {
-      backup_norm_h = new char[norm_bytes];
-      qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDefault);
-    }
-    backed_up = true;
-  }
-
-  void cudaColorSpinorField::restore() const
-  {
-    if (!backed_up) errorQuda("Cannot restore since not backed up");
-    qudaMemcpy(v, backup_h, bytes, qudaMemcpyDefault);
-    delete []backup_h;
-    if (norm_bytes) {
-      qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyDefault);
-      delete []backup_norm_h;
-    }
-    backed_up = false;
-  }
-
-  void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
-  {
-    // conditionals based on destructor
-    if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE) {
-      qudaMemPrefetchAsync(v, bytes, mem_space, stream);
-      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0)
-        qudaMemPrefetchAsync(norm, norm_bytes, mem_space, stream);
-    }
-  }
-
-  // cuda's floating point format, IEEE-754, represents the floating point
-  // zero as 4 zero bytes
-  void cudaColorSpinorField::zero() {
-    qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-      qudaMemsetAsync(norm, 0, norm_bytes, device::get_default_stream());
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -382,12 +321,6 @@ namespace quda {
                         subset_bytes - (size_t)stride * sizeof(float), device::get_default_stream());
       }
     }
-  }
-
-  void cudaColorSpinorField::copy(const cudaColorSpinorField &src)
-  {
-    checkField(*this, src);
-    copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
   }
 
   void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src)
@@ -497,72 +430,7 @@ namespace quda {
     qudaDeviceSynchronize(); // need to sync before data can be used on CPU
   }
 
-  void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const
-  {
-    createGhostZone(nFace, spin_project);
-    LatticeField::allocateGhostBuffer(ghost_bytes);
-  }
-
-  // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dagger,
-                                       const qudaStream_t &stream, MemoryLocation location[2 * QUDA_MAX_DIM],
-                                       MemoryLocation location_label, bool spin_project, double a, double b, double c,
-                                       int shmem)
-  {
-    void *packBuffer[4 * QUDA_MAX_DIM] = {};
-
-    for (int dim=0; dim<4; dim++) {
-      for (int dir=0; dir<2; dir++) {
-        switch (location[2 * dim + dir]) {
-
-        case Device: // pack to local device buffer
-          packBuffer[2 * dim + dir] = my_face_dim_dir_d[bufferIndex][dim][dir];
-          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = nullptr;
-          break;
-        case Shmem:
-          // this is the remote buffer when using shmem ...
-          // if the ghost_remote_send_buffer_d exists we can directly use it
-          // - else we need pack locally and send data to the recv buffer
-          packBuffer[2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
-            static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
-            my_face_dim_dir_d[bufferIndex][dim][dir];
-          packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr ?
-            nullptr :
-            static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
-          break;
-	case Host:   // pack to zero-copy memory
-	  packBuffer[2*dim+dir] = my_face_dim_dir_hd[bufferIndex][dim][dir];
-          break;
-        case Remote: // pack to remote peer memory
-          packBuffer[2 * dim + dir]
-            = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir];
-          break;
-	default: errorQuda("Undefined location %d", location[2*dim+dir]);
-        }
-      }
-    }
-
-    PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, shmem, stream);
-  }
- 
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
-                                       const qudaStream_t &stream)
-  {
-    void *gpu_buf
-      = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
-    qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, stream);
-  }
-
-  void cudaColorSpinorField::unpackGhost(const void *ghost_spinor, const int dim, const QudaDirection dir,
-                                         const qudaStream_t &stream)
-  {
-    const void *src = ghost_spinor;
-    auto offset = (dir == QUDA_BACKWARDS) ? ghost_offset[dim][0] : ghost_offset[dim][1];
-    void *ghost_dst = static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + offset;
-
-    qudaMemcpyAsync(ghost_dst, src, ghost_face_bytes[dim], qudaMemcpyHostToDevice, stream);
-  }
 
   void cudaColorSpinorField::createComms(int nFace, bool spin_project)
   {
@@ -606,418 +474,6 @@ namespace quda {
     createComms(nFace, spin_project); // must call this first
 
     packGhost(nFace, (QudaParity)parity, dagger, stream, location, location_label, spin_project, a, b, c, shmem);
-  }
-
-  void cudaColorSpinorField::gather(int dir, const qudaStream_t &stream)
-  {
-    int dim = dir/2;
-
-    if (dir%2 == 0) {
-      // backwards copy to host
-      if (comm_peer2peer_enabled(0,dim)) return;
-
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][0], dim, QUDA_BACKWARDS, stream);
-    } else {
-      // forwards copy to host
-      if (comm_peer2peer_enabled(1,dim)) return;
-
-      sendGhost(my_face_dim_dir_h[bufferIndex][dim][1], dim, QUDA_FORWARDS, stream);
-    }
-  }
-
-  void cudaColorSpinorField::recvStart(int d, const qudaStream_t &, bool gdr)
-  {
-    // note this is scatter centric, so dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards)
-
-    int dim = d/2;
-    int dir = d%2;
-    if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-
-    if (dir == 0) { // receive from forwards
-      // receive from the processor in the +1 direction
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_fwd[bufferIndex][dim]);
-      }
-    } else { // receive from backwards
-      // receive from the processor in the -1 direction
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_back[bufferIndex][dim]);
-      }
-    }
-  }
-
-  void cudaColorSpinorField::sendStart(int d, const qudaStream_t &stream, bool gdr, bool remote_write)
-  {
-    // note this is scatter centric, so dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards)
-
-    int dim = d/2;
-    int dir = d%2;
-    if (!commDimPartitioned(dim)) return;
-    if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-
-    if (!comm_peer2peer_enabled(dir,dim)) {
-      if (dir == 0)
-	if (gdr) comm_start(mh_send_rdma_back[bufferIndex][dim]);
-	else comm_start(mh_send_back[bufferIndex][dim]);
-      else
-	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-	else comm_start(mh_send_fwd[bufferIndex][dim]);
-    } else { // doing peer-to-peer
-
-      // if not using copy engine then the packing kernel will remotely write the halos
-      if (!remote_write) {
-        // all goes here
-        void *ghost_dst
-          = static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][(dir + 1) % 2];
-
-        qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
-      } // remote_write
-
-      if (dir == 0) {
-	// record the event
-        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
-        // send to the processor in the -1 direction
-	comm_start(mh_send_p2p_back[bufferIndex][dim]);
-      } else {
-        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
-        // send to the processor in the +1 direction
-	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
-      }
-    }
-  }
-
-  void cudaColorSpinorField::commsStart(int dir, const qudaStream_t &stream, bool gdr_send, bool gdr_recv)
-  {
-    recvStart(dir, stream, gdr_recv);
-    sendStart(dir, stream, gdr_send);
-  }
-
-  static bool complete_recv_fwd[QUDA_MAX_DIM] = { };
-  static bool complete_recv_back[QUDA_MAX_DIM] = { };
-  static bool complete_send_fwd[QUDA_MAX_DIM] = { };
-  static bool complete_send_back[QUDA_MAX_DIM] = { };
-
-  int cudaColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
-  {
-    // note this is scatter centric, so dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards)
-
-    int dim = d/2;
-    int dir = d%2;
-
-    if (!commDimPartitioned(dim)) return 1;
-    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-
-    if (dir==0) {
-
-      // first query send to backwards
-      if (comm_peer2peer_enabled(0,dim)) {
-	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
-      } else if (gdr_send) {
-	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-	if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second query receive from forwards
-      if (comm_peer2peer_enabled(1,dim)) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_recv) {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-	complete_send_back[dim] = false;
-	complete_recv_fwd[dim] = false;
-	return 1;
-      }
-
-    } else { // dir == 1
-
-      // first query send to forwards
-      if (comm_peer2peer_enabled(1,dim)) {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_send) {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-	if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second query receive from backwards
-      if (comm_peer2peer_enabled(0,dim)) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr_recv) {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
-      }
-
-      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-	complete_send_fwd[dim] = false;
-	complete_recv_back[dim] = false;
-	return 1;
-      }
-
-    }
-
-    return 0;
-  }
-
-  void cudaColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
-  {
-    // note this is scatter centric, so dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards)
-
-    int dim = d/2;
-    int dir = d%2;
-
-    if (!commDimPartitioned(dim)) return;
-    if ( (gdr_send && gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-
-    if (dir==0) {
-
-      // first wait on send to backwards
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_send) {
-	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second wait on receive from forwards
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_recv) {
-	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-    } else {
-
-      // first wait on send to forwards
-      if (comm_peer2peer_enabled(1,dim)) {
-	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_send) {
-	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second wait on receive from backwards
-      if (comm_peer2peer_enabled(0,dim)) {
-	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_recv) {
-	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-	comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
-
-    }
-  }
-
-  void cudaColorSpinorField::scatter(int dim_dir, const qudaStream_t &stream)
-  {
-    // note this is scatter centric, so input expects dir=0 (1) is send backwards
-    // (forwards) and receive from forwards (backwards), so here we need flip to receive centric
-
-    int dim = dim_dir/2;
-    int dir = (dim_dir+1)%2; // dir = 1 - receive from forwards, dir == 0 recive from backwards
-    if (!commDimPartitioned(dim)) return;
-    if (comm_peer2peer_enabled(dir,dim)) return;
-
-    unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, stream);
-  }
-
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
-                                           const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
-                                           bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_) const
-  {
-
-    // we are overriding the ghost precision, and it doesn't match what has already been allocated
-    if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
-      ghost_precision_reset = true;
-      ghost_precision = ghost_precision_;
-    }
-
-    // not overriding the ghost precision, but we did previously so need to update
-    if (ghost_precision == QUDA_INVALID_PRECISION && ghost_precision != precision) {
-      ghost_precision_reset = true;
-      ghost_precision = precision;
-    }
-
-    if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-    const_cast<cudaColorSpinorField&>(*this).createComms(nFace, false);
-
-    // first set default values to device if needed
-    MemoryLocation pack_destination[2*QUDA_MAX_DIM], halo_location[2*QUDA_MAX_DIM];
-    for (int i=0; i<2*nDimComms; i++) {
-      pack_destination[i] = pack_destination_ ? pack_destination_[i] : Device;
-      halo_location[i] = halo_location_ ? halo_location_[i] : Device;
-    }
-
-    // Contiguous send buffers and we aggregate copies to reduce
-    // latency.  Only if all locations are "Device" and no p2p
-    bool fused_pack_memcpy = true;
-
-    // Contiguous recv buffers and we aggregate copies to reduce
-    // latency.  Only if all locations are "Device" and no p2p
-    bool fused_halo_memcpy = true;
-
-    bool pack_host = false; // set to true if any of the ghost packing is being done to Host memory
-    bool halo_host = false; // set to true if the final halos will be left in Host memory
-
-    void *send[2*QUDA_MAX_DIM];
-    for (int d=0; d<nDimComms; d++) {
-      for (int dir=0; dir<2; dir++) {
-	send[2*d+dir] = pack_destination[2*d+dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] : my_face_dim_dir_d[bufferIndex][d][dir];
-	ghost_buf[2*d+dir] = halo_location[2*d+dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] : from_face_dim_dir_d[bufferIndex][d][dir];
-      }
-
-      // if doing p2p, then we must pack to and load the halo from device memory
-      for (int dir=0; dir<2; dir++) {
-	if (comm_peer2peer_enabled(dir,d)) { pack_destination[2*d+dir] = Device; halo_location[2*d+1-dir] = Device; }
-      }
-
-      // if zero-copy packing or p2p is enabled then we cannot do fused memcpy
-      if (pack_destination[2*d+0] != Device || pack_destination[2*d+1] != Device || comm_peer2peer_enabled_global()) fused_pack_memcpy = false;
-      // if zero-copy halo read or p2p is enabled then we cannot do fused memcpy
-      if (halo_location[2*d+0] != Device || halo_location[2*d+1] != Device || comm_peer2peer_enabled_global()) fused_halo_memcpy = false;
-
-      if (pack_destination[2*d+0] == Host || pack_destination[2*d+1] == Host) pack_host = true;
-      if (halo_location[2*d+0] == Host || halo_location[2*d+1] == Host) halo_host = true;
-    }
-
-    // Error if zero-copy and p2p for now
-    if ( (pack_host || halo_host) && comm_peer2peer_enabled_global()) errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
-
-    genericPackGhost(send, *this, parity, nFace, dagger, pack_destination); // FIXME - need support for asymmetric topologies
-
-    size_t total_bytes = 0;
-    for (int i = 0; i < nDimComms; i++)
-      if (comm_dim_partitioned(i)) total_bytes += 2 * ghost_face_bytes_aligned[i]; // 2 for fwd/bwd
-
-    if (!gdr_send)  {
-      if (!fused_pack_memcpy) {
-	for (int i=0; i<nDimComms; i++) {
-	  if (comm_dim_partitioned(i)) {
-	    if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
-		pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-              qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                              2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
-            } else {
-              if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                                ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
-              if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
-                                ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
-            }
-          }
-        }
-      } else if (total_bytes && !pack_host) {
-        qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, qudaMemcpyDeviceToHost,
-                        device::get_default_stream());
-      }
-    }
-
-    // prepost receive
-    for (int i = 0; i < 2 * nDimComms; i++)
-      const_cast<cudaColorSpinorField *>(this)->recvStart(i, device::get_default_stream(), gdr_recv);
-
-    bool sync = pack_host ? true : false; // no p2p if pack_host so we need to synchronize
-    // if not p2p in any direction then need to synchronize before MPI
-    for (int i=0; i<nDimComms; i++) if (!comm_peer2peer_enabled(0,i) || !comm_peer2peer_enabled(1,i)) sync = true;
-    if (sync) qudaDeviceSynchronize(); // need to make sure packing and/or memcpy has finished before kicking off MPI
-
-    for (int p2p=0; p2p<2; p2p++) {
-      for (int dim=0; dim<nDimComms; dim++) {
-	for (int dir=0; dir<2; dir++) {
-	  if ( (comm_peer2peer_enabled(dir,dim) + p2p) % 2 == 0 ) { // issue non-p2p transfers first
-            const_cast<cudaColorSpinorField *>(this)->sendStart(2 * dim + dir, device::get_stream(2 * dim + dir),
-                                                                gdr_send);
-          }
-	}
-      }
-    }
-
-    bool comms_complete[2*QUDA_MAX_DIM] = { };
-    int comms_done = 0;
-    while (comms_done < 2*nDimComms) { // non-blocking query of each exchange and exit once all have completed
-      for (int dim=0; dim<nDimComms; dim++) {
-	for (int dir=0; dir<2; dir++) {
-	  if (!comms_complete[dim*2+dir]) {
-            comms_complete[2 * dim + dir] = const_cast<cudaColorSpinorField *>(this)->commsQuery(
-              2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
-            if (comms_complete[2*dim+dir]) {
-	      comms_done++;
-              if (comm_peer2peer_enabled(1 - dir, dim))
-                qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
-            }
-	  }
-	}
-      }
-    }
-
-    if (!gdr_recv) {
-      if (!fused_halo_memcpy) {
-	for (int i=0; i<nDimComms; i++) {
-	  if (comm_dim_partitioned(i)) {
-	    if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i) && // fuse forwards and backwards if possible
-		halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i)) {
-              qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                              2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
-            } else {
-              if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
-                qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
-              if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
-                                ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
-            }
-          }
-        }
-      } else if (total_bytes && !halo_host) {
-        qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, qudaMemcpyHostToDevice,
-                        device::get_default_stream());
-      }
-    }
-
-    // ensure that the p2p sending is completed before returning
-    for (int dim = 0; dim < nDimComms; dim++) {
-      if (!comm_dim_partitioned(dim)) continue;
-      for (int dir = 0; dir < 2; dir++) {
-        if (comm_peer2peer_enabled(dir, dim))
-          qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dir][dim], 0);
-      }
-    }
-  }
-
-  std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
-    out << (const ColorSpinorField&)a;
-    out << "v = " << a.v << std::endl;
-    out << "norm = " << a.norm << std::endl;
-    out << "alloc = " << a.alloc << std::endl;
-    out << "init = " << a.init << std::endl;
-    return out;
   }
 
 //! for composite fields:
@@ -1120,22 +576,6 @@ namespace quda {
       return ghost_recv_buffer_d[bufferIndex];
     } else {
       return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
-    }
-  }
-
-  void cudaColorSpinorField::copy_to_buffer(void *buffer) const
-  {
-    qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
-    if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
-    }
-  }
-
-  void cudaColorSpinorField::copy_from_buffer(void *buffer)
-  {
-    qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
-    if (precision < QUDA_SINGLE_PRECISION) {
-      qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
     }
   }
 

@@ -144,8 +144,8 @@ void staggeredDslash(ColorSpinorField *out, void **fatlink, void **longlink, voi
 
   in->exchangeGhost(otherparity, nFace, daggerBit);
 
-  void **fwd_nbr_spinor = ((cpuColorSpinorField *)in)->fwdGhostFaceBuffer;
-  void **back_nbr_spinor = ((cpuColorSpinorField *)in)->backGhostFaceBuffer;
+  void **fwd_nbr_spinor = in->fwdGhostFaceBuffer;
+  void **back_nbr_spinor = in->backGhostFaceBuffer;
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
