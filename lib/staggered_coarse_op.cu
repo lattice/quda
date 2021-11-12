@@ -448,7 +448,7 @@ namespace quda {
     QudaFieldLocation location = checkLocation(Y, X);
 
     // sanity check long link coarsening
-    if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && &gauge == &longGauge)
+    if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && &gauge == &longGauge)
       errorQuda("Dirac type is %d but fat and long gauge links alias", dirac);
 
     // sanity check KD op coarsening
@@ -509,7 +509,7 @@ namespace quda {
       need_tmp_L = true;
 
       //Copy the cuda gauge field to the cpu
-      if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
+      if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
         longGauge.saveCPUField(reinterpret_cast<cpuGaugeField&>(*tmp_L));
 
       // Create either a real or a dummy Xinv field
@@ -542,7 +542,7 @@ namespace quda {
       int pad = 0;
 
       // create some dummy fields if need be
-      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
+      if (!(dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)) {
         // create a dummy field
         GaugeFieldParam lgf_param(longGauge);
         for (int i = 0; i < lgf_param.nDim; i++) lgf_param.x[i] = 0;
@@ -552,15 +552,17 @@ namespace quda {
         lgf_param.create = QUDA_NULL_FIELD_CREATE;
         tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
         need_tmp_L = true;
-      } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
+      } else if ((dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) && longGauge.Reconstruct() != QUDA_RECONSTRUCT_NO) {
         // create a copy of the gauge field with no reconstruction
         GaugeFieldParam lgf_param(longGauge);
+
         lgf_param.reconstruct = QUDA_RECONSTRUCT_NO;
         lgf_param.order = QUDA_FLOAT2_GAUGE_ORDER;
         lgf_param.setPrecision(lgf_param.Precision());
         tmp_L = std::make_unique<cudaGaugeField>(lgf_param);
 
         tmp_L->copy(longGauge);
+        tmp_L->exchangeGhost();
         need_tmp_L = true;
       }
 
@@ -587,6 +589,7 @@ namespace quda {
         need_tmp_U = true;
 
         tmp_U->copy(gauge);
+        tmp_U->exchangeGhost();
       }
     }
 

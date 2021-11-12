@@ -58,6 +58,7 @@ namespace quda {
     fineSpinorAV AV;           /** Temporary that stores the clover * spinor field product */
 
     const fineGauge U;       /** Fine grid link field */
+    const fineGauge L;       /** Fine grid long link field for asqtad/hisq op */
     const fineSpinorV V;     /** Fine grid spinor field */
     const fineClover C;      /** Fine grid clover field, or Xinv for coarsening the optimized KD op */
     const fineClover Cinv;   /** Fine grid clover field, or Xinv for coarsening the optimize KD op */
@@ -147,9 +148,10 @@ namespace quda {
        @param[in,out] UV Accessor to the uv temp packed colorspinor field
        @param[in,out] AV Accessor to the av temp packed colorspinor field
        @param[in] U Accessor to the fine gauge field
+       @param[in] L Accessor to the fine long-link field
        @param[in] V Accessor to the packed nullspace colorspinor field
-       @param[in] C Accessor to the fine clover field
-       @param[in] Cinv Accessor to the fine inverse clover field
+       @param[in] C Accessor to the fine clover field, or KD inverse field
+       @param[in] Cinv Accessor to the fine inverse clover field, or KD inverse field
        @param[in] kappa Kappa parameter from the fine operator
        @param[in] mass Mass parameter from the fine operator
        @param[in] mu Twisted mass parameter from the fine operator
@@ -162,12 +164,12 @@ namespace quda {
      */
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
       coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
-      fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineSpinorV &V,
+      fineSpinorUV &UV, fineSpinorAV &AV, const fineGauge &U, const fineGauge &L, const fineSpinorV &V,
       const fineClover &C, const fineClover &Cinv, double kappa, double mass, double mu, double mu_factor,
       const int *x_size_, const int *xc_size_, int spin_bs_,
       const int *fine_to_coarse, const int *coarse_to_fine, bool bidirectional)
       : Y(Y), X(X), Y_atomic(Y_atomic), X_atomic(X_atomic),
-      UV(UV), AV(AV), U(U), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
+      UV(UV), AV(AV), U(U), L(L), V(V), C(C), Cinv(Cinv), spin_bs(spin_bs_), spin_map(),
       kappa(static_cast<Float>(kappa)), mass(static_cast<Float>(mass)), mu(static_cast<Float>(mu)), mu_factor(static_cast<Float>(mu_factor)),
       fineVolumeCB(V.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
       fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
@@ -203,7 +205,7 @@ namespace quda {
      @param[in] nFace Depth of the halo
      @param[in] arg Kernel argument
   */
-  template <typename Arg> constexpr bool isHalo(const int coord[], int dim, int nFace, const Arg &arg)
+  template <typename Arg> constexpr bool isHalo(const int coord[], int dim, const int nFace, const Arg &arg)
   {
     switch (dim) {
     case 0: return arg.comm_dim[0] && coord[0] + nFace >= arg.x_size[0];
@@ -224,36 +226,36 @@ namespace quda {
      @param[in] dim Dimension
      @param[in] arg Kernel argument
   */
-  template <typename Arg> constexpr bool isCoarseDiagonal(const int coord[], const int coord_coarse[], int dim, const Arg &arg)
+  template <typename Arg> constexpr bool isCoarseDiagonal(const int coord[], const int coord_coarse[], int dim, const int nFace, const Arg &arg)
   {
     switch (dim) {
-    case 0: return ((coord[0] + 1) % arg.x_size[0]) / arg.geo_bs[0] == coord_coarse[0];
-    case 1: return ((coord[1] + 1) % arg.x_size[1]) / arg.geo_bs[1] == coord_coarse[1];
-    case 2: return ((coord[2] + 1) % arg.x_size[2]) / arg.geo_bs[2] == coord_coarse[2];
-    case 3: return ((coord[3] + 1) % arg.x_size[3]) / arg.geo_bs[3] == coord_coarse[3];
+    case 0: return ((coord[0] + nFace) % arg.x_size[0]) / arg.geo_bs[0] == coord_coarse[0];
+    case 1: return ((coord[1] + nFace) % arg.x_size[1]) / arg.geo_bs[1] == coord_coarse[1];
+    case 2: return ((coord[2] + nFace) % arg.x_size[2]) / arg.geo_bs[2] == coord_coarse[2];
+    case 3: return ((coord[3] + nFace) % arg.x_size[3]) / arg.geo_bs[3] == coord_coarse[3];
     }
     return false;
   }
 
   /**
-     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
+     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu) for Wilson-type fermions
      Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
      or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
 
      @return The maximum element of the result (if Arg::compute_max == true)
      @param[in] arg Kernel argumnt
+     @param[in] Gacc Input gauge vector, always arg.U for nSpin == 4 (Wilson fermions) so we ignore it
      @param[in] Wacc Input vector accessor
      @param[in] parity Parity index
      @param[in] x_cb Checkerboard index
      @param[in] i0 Color color row index (coarse)
      @param[in] j0 Color column index (fine)
   */
-  template <typename Wtype, typename Arg>
-  __device__ __host__ inline std::enable_if_t<!Arg::from_coarse, typename Arg::Float>
-  computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  template <int nFace, typename gType, typename Wtype, typename Arg>
+  __device__ __host__ inline std::enable_if_t<!Arg::from_coarse && Arg::fineSpin == 4, typename Arg::Float>
+  computeUV(const Arg &arg, const gType&, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
     constexpr int uvSpin = Arg::fineSpin;
-    constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using real = typename Arg::Float;
     using complex = complex<real>;
@@ -312,24 +314,104 @@ namespace quda {
   } // computeUV
 
   /**
-     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
+     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu) for staggered-type fermions
      Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
      or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
 
      @return The maximum element of the result (if Arg::compute_max == true)
      @param[in] arg Kernel argumnt
+     @param[in] Gacc Input gauge vector
      @param[in] Wacc Input vector accessor
      @param[in] parity Parity index
      @param[in] x_cb Checkerboard index
      @param[in] i0 Color color row index (coarse)
      @param[in] j0 Color column index (fine)
   */
-  template <typename Wtype, typename Arg>
+  template <int nFace, typename gType, typename Wtype, typename Arg>
+  __device__ __host__ inline std::enable_if_t<!Arg::from_coarse && Arg::fineSpin == 1, typename Arg::Float>
+  computeUV(const Arg &arg, const gType& Gacc, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  {
+    // once we support KD coarsening, where UVspin depends on if we're coarsening the KD op or not
+    // constexpr int uvSpin = Arg::fineSpinorUV::nSpin;
+    constexpr int uvSpin = 1;
+
+    using real = typename Arg::Float;
+    using complex = complex<real>;
+    using TileType = typename Arg::uvTileType;
+    auto &tile = arg.uvTile;
+    using Ctype = decltype(make_tile_C<complex, false>(tile));
+    Ctype UV[uvSpin];
+
+    int coord[4];
+    getCoords(coord, x_cb, arg.x_size, parity);
+
+    if ( isHalo(coord, arg.dim, nFace, arg) ) {
+
+      int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.x_size, arg.dim, nFace);
+      auto W = make_tile_B<complex, true>(tile);
+
+      // non-KD op path
+#pragma unroll
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of the gauge field
+        auto U = make_tile_A<complex, false>(tile);
+        U.load(Gacc, arg.dim, parity, x_cb, i0, k);
+        // loading from V == AV, which has nSpin == 1
+        W.loadCS(Wacc, arg.dim, 1, (parity+1)&1, ghost_idx, 0, k, j0);
+        UV[0].mma_nn(U, W);
+      } // fine color columns
+
+      // else KD op path eventually
+
+    } else {
+
+      int y_cb = linkIndexHop(coord, arg.x_size, arg.dim, nFace);
+      auto W = make_tile_B<complex, false>(tile);
+
+      // non-KD op path
+#pragma unroll
+      for (int k = 0; k < TileType::k; k += TileType::K) { // Fine Color columns of the gauge field
+        auto U = make_tile_A<complex, false>(tile);
+        U.load(Gacc, arg.dim, parity, x_cb, i0, k);
+        // loading from V == AV, which has nSpin == 1
+        W.loadCS(Wacc, 0, 0, (parity+1)&1, y_cb, 0, k, j0);
+        UV[0].mma_nn(U, W);
+      } // fine color columns
+
+      // else KD op path eventually
+    }
+
+    real uv_max = static_cast<real>(0.0);
+#pragma unroll
+    for (int s = 0; s < uvSpin; s++) {
+      IF_CONSTEXPR (Arg::compute_max) {
+        uv_max = fmax(UV[s].abs_max(), uv_max);
+      } else {
+        UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+      }
+    }
+
+    return uv_max;
+  } // computeUV
+
+  /**
+     @brief Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu) for coarse operators
+     Where: mu = dim, s = fine spin, c' = coarse color, c = fine color
+     or, if dir == QUDA_IN_PLACE, UV^{s,c'}(x) = \sum_c C^{c}_mu(x) * V^{s,c}_mu(x+mu)
+
+     @return The maximum element of the result (if Arg::compute_max == true)
+     @param[in] arg Kernel argumnt
+     @param[in] Gacc Input gauge vector, always arg.U for nSpin == 4 (Wilson fermions) so we ignore it
+     @param[in] Wacc Input vector accessor
+     @param[in] parity Parity index
+     @param[in] x_cb Checkerboard index
+     @param[in] i0 Color color row index (coarse)
+     @param[in] j0 Color column index (fine)
+  */
+  template <int nFace, typename Gtype, typename Wtype, typename Arg>
   __device__ __host__ inline std::enable_if_t<Arg::from_coarse, typename Arg::Float>
-  computeUV(const Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+  computeUV(const Arg &arg, const Gtype&, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
     constexpr int uvSpin = Arg::fineSpin * 2;
-    constexpr int nFace = 1; // to do: nFace == 3 version for long links
 
     using real = typename Arg::Float;
     using complex = complex<real>;
@@ -423,6 +505,7 @@ namespace quda {
   */
   template <typename Arg> struct compute_uv {
     using real = typename Arg::Float;
+    static constexpr int nFace = 1;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_uv(const Arg &arg) : arg(arg) { }
@@ -440,9 +523,47 @@ namespace quda {
 
       real max;
       if (arg.dir == QUDA_FORWARDS || arg.dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
-        max = computeUV(arg, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+        max = computeUV<nFace>(arg, arg.U, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
       else
-        max = computeUV(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+        max = computeUV<nFace>(arg, arg.U, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+
+      if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
+    }
+  };
+
+  /**
+     Functor for the LV computation.
+
+     If Arg::compute_max is true, then we do not save the result, and
+     instead merely compute the maximum element.  This is used for
+     setting the scale for fixed point.
+  */
+  template <typename Arg> struct compute_lv {
+    using real = typename Arg::Float;
+    static constexpr int nFace = 3;
+
+    static_assert(Arg::fineSpin == 1, "compute_lv is only defined for the staggered dslash");
+
+    const Arg &arg;
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    constexpr compute_lv(const Arg &arg) : arg(arg) { }
+
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] ic_parity parity * output color column
+       @param[in] jc output color row
+    */
+    __device__ __host__ void operator()(int x_cb, int ic_parity, int jc)
+    {
+      int ic = ic_parity % arg.uvTile.M_tiles;
+      int parity = ic_parity / arg.uvTile.M_tiles;
+
+      real max;
+      if (arg.dir == QUDA_FORWARDS || arg.dir == QUDA_IN_PLACE) // only for preconditioned clover is V != AV, will need extra logic for staggered KD
+        max = computeUV<nFace>(arg, arg.L, arg.V, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
+      else
+        max = computeUV<nFace>(arg, arg.L, arg.AV, parity, x_cb, ic * arg.uvTile.M, jc * arg.uvTile.N);
 
       if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
     }
@@ -850,6 +971,8 @@ namespace quda {
     using TileType = typename Arg::vuvTileType;
     auto &tile = arg.vuvTile;
 
+    // this is for the non-KD case
+
     // the KD op will even to even, odd to odd terms
     const int s_c_row = arg.spin_map(0, parity);
 
@@ -878,6 +1001,8 @@ namespace quda {
         vuv[s_c_row*Arg::coarseSpin+s_c_col].mma_tn(AV, UV);
       }
     }
+
+    // there will be some divergent logic for the KD case
   }
 
   /**
@@ -1132,7 +1257,7 @@ namespace quda {
 
   }
 
-  template <typename Arg>
+  template <int nFace, typename Arg>
   __device__ __host__ void computeVUV(const Arg &arg, int parity, int x_cb, int i0, int j0, int parity_coarse_, int coarse_x_cb_)
   {
     using real = typename Arg::Float;
@@ -1146,7 +1271,7 @@ namespace quda {
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
     const bool isFromCoarseClover = Arg::fineSpin == 2 && arg.dir == QUDA_IN_PLACE;
-    const bool isDiagonal = (isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, arg.dim, arg)) ? true : false;
+    const bool isDiagonal = (isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, arg.dim, nFace, arg)) ? true : false;
 
     int coarse_parity = arg.shared_atomic ? parity_coarse_ : 0;
     if (!arg.shared_atomic) {
@@ -1229,7 +1354,8 @@ namespace quda {
     }
   };
 
-    template <typename Arg> struct compute_vuv {
+  template <typename Arg> struct compute_vuv {
+    static constexpr int nFace = 1;
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
     constexpr compute_vuv(const Arg &arg) : arg(arg) { }
@@ -1250,7 +1376,33 @@ namespace quda {
       if (c_col >= arg.vuvTile.N_tiles) return;
       if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
 
-      computeVUV(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+      computeVUV<nFace>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
+    }
+  };
+
+  template <typename Arg> struct compute_vlv {
+    static constexpr int nFace = 3;
+    const Arg &arg;
+    static constexpr const char *filename() { return KERNEL_FILE; }
+    constexpr compute_vlv(const Arg &arg) : arg(arg) { }
+
+    /**
+       3-d parallelism
+       @param[in] x_cb e/o fine-grid spacetime
+       @param[in] parity_c_row parity * output color row
+       @param[in] c_col output coarse color column
+    */
+    __device__ __host__ inline void operator()(int x_cb, int parity_c_row, int c_col)
+    {
+      int parity, parity_coarse, x_coarse_cb, c_row;
+      target::dispatch<getIndices>(parity_coarse, x_coarse_cb, parity, x_cb, parity_c_row, c_row, c_col, arg);
+
+      if (parity > 1) return;
+      if (c_row >= arg.vuvTile.M_tiles) return;
+      if (c_col >= arg.vuvTile.N_tiles) return;
+      if (!arg.shared_atomic && x_cb >= arg.fineVolumeCB) return;
+
+      computeVUV<nFace>(arg, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
     }
   };
 

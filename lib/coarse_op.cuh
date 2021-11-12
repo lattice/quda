@@ -14,10 +14,12 @@ namespace quda {
 
   enum ComputeType {
     COMPUTE_UV,
+    COMPUTE_LV,
     COMPUTE_AV,
     COMPUTE_TMAV,
     COMPUTE_TMCAV,
     COMPUTE_VUV,
+    COMPUTE_VLV,
     COMPUTE_COARSE_CLOVER,
     COMPUTE_REVERSE_Y,
     COMPUTE_DIAGONAL,
@@ -50,13 +52,16 @@ namespace quda {
     QudaDirection dir;
     ComputeType type;
     bool compute_max;
+    int nFace;
 
     long long flops() const
     {
       long long flops_ = 0;
       switch (type) {
       case COMPUTE_UV:
+      case COMPUTE_LV:
         // when fine operator is coarse take into account that the link matrix has spin dependence
+        // FIXME: double check this makes sense for long link; might vary for KD op
         flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
 	break;
       case COMPUTE_AV:
@@ -69,7 +74,9 @@ namespace quda {
 	flops_ = 4l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
+      // FIXME: double check this makes sense for long link; might vary for KD op
       flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_COARSE_CLOVER:
@@ -94,9 +101,13 @@ namespace quda {
     long long bytes() const
     {
       long long bytes_ = 0;
+      long long link_bytes = 0;
       switch (type) {
       case COMPUTE_UV:
-	bytes_ = compute_max * arg.UV.Bytes() + arg.V.Bytes() + 2*arg.U.Bytes()*coarseColor;
+      case COMPUTE_LV:
+        // FIXME: may vary for KD op b/c we need to keep track of from even vs from odd
+        link_bytes = (type == COMPUTE_UV) ? arg.U.Bytes() : arg.L.Bytes();
+	bytes_ = compute_max * arg.UV.Bytes() + arg.V.Bytes() + 2 * link_bytes * coarseColor;
 	break;
       case COMPUTE_AV:
 	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
@@ -112,6 +123,8 @@ namespace quda {
 #endif
 	break;
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
+        // FIXME: may vary for KD op b/c we need to keep track of from even vs from odd
         {
           // formula for shared-atomic variant assuming parity_flip = true
           int writes = 4;
@@ -148,10 +161,12 @@ namespace quda {
       unsigned int threads = 0;
       switch (type) {
       case COMPUTE_UV:
+      case COMPUTE_LV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
       case COMPUTE_COARSE_CLOVER:
 	threads = arg.fineVolumeCB;
 	break;
@@ -171,17 +186,17 @@ namespace quda {
     }
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
-    bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
+    bool tuneAuxDim() const { return (type != COMPUTE_VUV && type != COMPUTE_VLV) ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if (type == COMPUTE_VUV)
+      if (type == COMPUTE_VUV || type == COMPUTE_VLV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
 
   public:
     CalculateY(Arg &arg, const ColorSpinorField &V, GaugeField &Y, GaugeField &X, GaugeField &Y_atomic,
-               GaugeField &X_atomic) :
+               GaugeField &X_atomic, int nFace) :
       TunableKernel3D(V, 2, 1),
       arg(arg),
       V(V),
@@ -192,7 +207,8 @@ namespace quda {
       dim(0),
       dir(QUDA_BACKWARDS),
       type(COMPUTE_INVALID),
-      compute_max(false)
+      compute_max(false),
+      nFace(nFace)
     {
       strcat(aux, comm_dim_partitioned_string());
     }
@@ -211,6 +227,15 @@ namespace quda {
       if (type == COMPUTE_UV) {
         if (compute_max) launch_host<compute_uv>(tp, stream, ArgMax<Arg>(arg));
         else launch_host<compute_uv>(tp, stream, arg);
+      } else if (type == COMPUTE_LV) {
+        if (fineSpin != 1) errorQuda("compute_lv should only be called for a staggered operator");
+
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+        if (compute_max) launch_host<compute_lv>(tp, stream, ArgMax<Arg>(arg));
+        else launch_host<compute_lv>(tp, stream, arg);
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
       } else if (type == COMPUTE_AV) {
         if (from_coarse) errorQuda("compute_av should only be called from the fine grid");
 
@@ -242,6 +267,14 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
         launch_host<compute_vuv>(tp, stream, arg);
+      } else if (type == COMPUTE_VLV) {
+        if (fineSpin != 1) errorQuda("compute_vlv should only be called for a staggered operator");
+
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+        else launch_host<compute_vlv>(tp, stream, arg);
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
       } else if (type == COMPUTE_COARSE_CLOVER) {
 #if defined(WILSONCOARSE)
         launch_host<compute_coarse_clover>(tp, stream, arg);
@@ -304,6 +337,15 @@ namespace quda {
           else launch_device<compute_uv>(tp, stream, arg);
         }
 
+      } else if (type == COMPUTE_LV) {
+        if (fineSpin != 1) errorQuda("compute_lv should only be called for a staggered operator");
+
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+        if (compute_max) launch_device<compute_lv>(tp, stream, ArgMax<Arg>(arg));
+        else launch_device<compute_lv>(tp, stream, arg);
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
       } else if (type == COMPUTE_AV) {
 
         if (from_coarse) errorQuda("compute_av should only be called from the fine grid");
@@ -392,6 +434,65 @@ namespace quda {
 
         } // if use_mma
 
+      } else if (type == COMPUTE_VLV) {
+
+        if (fineSpin != 1) errorQuda("compute_vlv should only be called for a staggered operator");
+
+        // FIXME: there's a lot of boilerplate copy+paste with COMPUTE_VUV, we should more cleanly unify these with a utility function
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+
+        // need to resize the grid since we don't tune over the entire coarseColor dimension
+        // factor of two comes from parity onto different blocks (e.g. in the grid)
+        tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
+        tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
+
+        arg.shared_atomic = tp.aux.y;
+        arg.parity_flip = tp.aux.z;
+
+        if (arg.shared_atomic) {
+          // check we have a valid problem size for shared atomics
+          // constraint is due to how shared memory initialization and global store are done
+          int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
+          if (block_size / 2 < Arg::coarseSpin * Arg::coarseSpin)
+            errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
+
+          arg.aggregates_per_block = tp.aux.x;
+          tp.block.x *= tp.aux.x;
+          tp.grid.x /= tp.aux.x;
+        }
+
+        if (arg.coarse_color_wave) {
+          // swap x and y grids
+          std::swap(tp.grid.y, tp.grid.x);
+          // augment x grid with coarseColor row grid (z grid)
+          arg.grid_z = tp.grid.z;
+          arg.coarse_color_grid_z = arg.vuvTile.M_tiles * tp.grid.z;
+          tp.grid.x *= tp.grid.z;
+          tp.grid.z = 1;
+        }
+
+        // this will ensure we pass the generic kernel bounds check
+        arg.threads.x = tp.grid.x * tp.block.x;
+        resizeVector(tp.grid.y * tp.block.y, tp.grid.z * tp.block.z);
+        launch_device<compute_vlv>(tp, stream, arg);
+        arg.threads.x = minThreads();
+        resizeVector((arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
+
+        if (arg.coarse_color_wave) {
+          // revert the grids
+          tp.grid.z = arg.grid_z;
+          tp.grid.x /= tp.grid.z;
+          std::swap(tp.grid.x,tp.grid.y);
+        }
+
+        if (arg.shared_atomic) {
+          tp.block.x /= tp.aux.x;
+          tp.grid.x *= tp.aux.x;
+        }
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
+
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
 #if defined(WILSONCOARSE)
@@ -443,11 +544,11 @@ namespace quda {
       arg.threads.x = minThreads();
       arg.dim = dim;
       arg.dir = dir;
-      if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+      if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
-      if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
+      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
       Launch<location_template>(arg, tp, type, stream);
-      if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
+      if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 
     /**
@@ -472,6 +573,7 @@ namespace quda {
       type = type_;
       switch(type) {
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
         arg.shared_atomic = false;
         arg.parity_flip = false;
         arg.coarse_color_wave = false;
@@ -485,6 +587,7 @@ namespace quda {
 	resizeVector(2 * coarseColor, coarseColor);
         break;
       case COMPUTE_UV:
+      case COMPUTE_LV:
         resizeVector(2 * arg.uvTile.M_tiles, arg.uvTile.N_tiles); break;
       case COMPUTE_AV:
       case COMPUTE_TMCAV:
@@ -496,10 +599,10 @@ namespace quda {
       }
 
       resizeStep(1,1);
-      if (type == COMPUTE_VUV && !arg.parity_flip) resizeStep(2,1);
+      if ((type == COMPUTE_VUV || type == COMPUTE_VLV) && !arg.parity_flip) resizeStep(2,1);
 
       // do not tune spatial block size for VUV or COARSE_CLOVER
-      tune_block_x = (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) ? false : true;
+      tune_block_x = (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_COARSE_CLOVER) ? false : true;
     }
 
     void setComputeMax(bool compute_max_) { compute_max = compute_max_; }
@@ -572,16 +675,17 @@ namespace quda {
 
     bool advanceAux(TuneParam &param) const
     {
-      return (type == COMPUTE_VUV ? (advanceAtomic(param) || advanceParityFlip(param) || advanceSwizzle(param)) : false);
+      return ((type == COMPUTE_VUV || type == COMPUTE_VLV) ? (advanceAtomic(param) || advanceParityFlip(param) || advanceSwizzle(param)) : false);
     }
 
     bool advanceSharedBytes(TuneParam &param) const {
-      return ( (!arg.shared_atomic && !from_coarse && type == COMPUTE_VUV) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
+      return ( (!arg.shared_atomic && !from_coarse && (type == COMPUTE_VUV || type == COMPUTE_VLV)) || type == COMPUTE_COARSE_CLOVER) ? false : Tunable::advanceSharedBytes(param);
     }
 
     bool advanceTuneParam(TuneParam &param) const
     {
-      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
+      // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
+      if (use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
         constexpr bool query_max = true;
         int max = 0;
         if (type == COMPUTE_UV) {
@@ -606,13 +710,14 @@ namespace quda {
     void initTuneParam(TuneParam &param) const
     {
       TunableKernel3D::initTuneParam(param);
-      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
+      // note: for now there aren't MMA versions of COMPUTE_LV or COMPUTE_VLV, this is just forward thinking if we find it makes sense one day
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_UV || type == COMPUTE_LV) && use_mma) ? 0 : 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip;
       param.aux.w = arg.coarse_color_wave;
 
-      // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
-      if (arg.shared_atomic && type == COMPUTE_VUV) {
+      // with shared-atomic VUV, VLV, each block.x matches exactly to a c/b aggregate
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV)) {
 	param.block.x = arg.fineVolumeCB/(2*arg.coarseVolumeCB); // checker-boarded block size
 	param.grid.x = 2*arg.coarseVolumeCB;
       }
@@ -622,13 +727,13 @@ namespace quda {
     void defaultTuneParam(TuneParam &param) const
     {
       TunableKernel3D::defaultTuneParam(param);
-      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_UV) && use_mma) ? 0 : 1; // aggregates per block
+      param.aux.x = ((type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_UV || type == COMPUTE_LV) && use_mma) ? 0 : 1; // aggregates per block
       param.aux.y = arg.shared_atomic;
       param.aux.z = arg.parity_flip;
       param.aux.w = arg.coarse_color_wave;
 
-      // with shared-atomic VUV, each block.x matches exactly to a c/b aggregate
-      if (arg.shared_atomic && type == COMPUTE_VUV) {
+      // with shared-atomic VUV, VLV, each block.x matches exactly to a c/b aggregate
+      if (arg.shared_atomic && (type == COMPUTE_VUV || type == COMPUTE_VLV)) {
 	param.block.x = arg.fineVolumeCB/(2*arg.coarseVolumeCB); // checker-boarded block size
 	param.grid.x = 2*arg.coarseVolumeCB;
       }
@@ -641,14 +746,18 @@ namespace quda {
       if (type == COMPUTE_UV) {
         strcat(Aux, ",computeUV");
         if (use_mma) strcat(Aux, ",mma");
-      } else if (type == COMPUTE_AV)
+      }
+      else if (type == COMPUTE_LV) strcat(Aux, ",computeLV");
+      else if (type == COMPUTE_AV)
         strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
         if (use_mma) strcat(Aux, ",MMA");
-      } else if (type == COMPUTE_COARSE_CLOVER)
+      }
+      else if (type == COMPUTE_VLV) strcat(Aux, ",computeVLV");
+      else if (type == COMPUTE_COARSE_CLOVER)
         strcat(Aux, ",computeCoarseClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
@@ -663,20 +772,20 @@ namespace quda {
 #ifdef DYNAMIC_CLOVER
       if (type == COMPUTE_AV || type == COMPUTE_TMCAV) strcat(Aux, ",Dynamic");
 #endif
-      if (!use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
+      if (!use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
         strcat(Aux, ",tile_size=");
         char tile[16];
-        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.M : arg.vuvTile.M);
+        u32toa(tile, (type == COMPUTE_UV || type == COMPUTE_LV) ? arg.uvTile.M : arg.vuvTile.M);
         strcat(Aux, tile);
         strcat(Aux,"x");
-        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.N : arg.vuvTile.N);
+        u32toa(tile, (type == COMPUTE_UV || type == COMPUTE_LV) ? arg.uvTile.N : arg.vuvTile.N);
         strcat(Aux, tile);
         strcat(Aux,"x");
-        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.K : arg.vuvTile.K);
+        u32toa(tile, (type == COMPUTE_UV || type == COMPUTE_LV) ? arg.uvTile.K : arg.vuvTile.K);
         strcat(Aux, tile);
       }
 
-      if (type == COMPUTE_UV || type == COMPUTE_VUV) {
+      if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
         if      (dim == 0) strcat(Aux, ",dim=0");
         else if (dim == 1) strcat(Aux, ",dim=1");
         else if (dim == 2) strcat(Aux, ",dim=2");
@@ -686,13 +795,20 @@ namespace quda {
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
         else if (dir == QUDA_IN_PLACE) strcat(Aux,",dir=clover");
 
-        if (arg.bidirectional && type == COMPUTE_VUV) strcat(Aux,",bidirectional");
+        if ((type == COMPUTE_UV || type == COMPUTE_LV) && dir != QUDA_IN_PLACE) {
+          strcat(Aux, ",nFace=");
+          char nfc[2];
+          u32toa(nfc, nFace);
+          strcat(Aux, nfc);
+        }
+
+        if (arg.bidirectional && (type == COMPUTE_VUV || type == COMPUTE_VLV)) strcat(Aux,",bidirectional");
       }
 
       const char *vol_str = (type == COMPUTE_REVERSE_Y || type == COMPUTE_DIAGONAL || type == COMPUTE_STAGGEREDMASS || type == COMPUTE_TMDIAGONAL ||
                              type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) ? X.VolString () : V.VolString();
 
-      if (type == COMPUTE_VUV || type == COMPUTE_COARSE_CLOVER) {
+      if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_COARSE_CLOVER) {
 	strcat(Aux, (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
                location == QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
 	strcat(Aux,"coarse_vol=");
@@ -708,6 +824,7 @@ namespace quda {
     void preTune() {
       switch (type) {
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
         Y_atomic.backup();
 	X_atomic.backup();
         break;
@@ -725,6 +842,7 @@ namespace quda {
         Y.backup();
         break;
       case COMPUTE_UV:
+      case COMPUTE_LV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
@@ -738,6 +856,7 @@ namespace quda {
     void postTune() {
       switch (type) {
       case COMPUTE_VUV:
+      case COMPUTE_VLV:
 	Y_atomic.restore();
 	X_atomic.restore();
         break;
@@ -755,6 +874,7 @@ namespace quda {
         Y.restore();
         break;
       case COMPUTE_UV:
+      case COMPUTE_LV:
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
@@ -801,8 +921,6 @@ namespace quda {
                   double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
-    // FIXME: silence warnings for now
-    (void)L;
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -833,6 +951,10 @@ namespace quda {
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
+    // needed to detect if we can safely coarsen long links
+    int geo_bs[QUDA_MAX_DIM] = { };
+    for (int d = 0; d < 4; d++) geo_bs[d] = x_size[d] / xc_size[d];
+
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
     // If doing a preconditioned operator with a clover term then we
@@ -848,15 +970,18 @@ namespace quda {
     // Figure out nFace
     const int nFace = (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? 3 : 1;
 
+    // BIG FIXME: there's an outstanding tunekey degeneracy issue somewhere if you tune a staggered run then separately a hisq run
+    // exact source of the issue tbd, but it doesn't block forward progress for now
+
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
+    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 
-    CalculateY<use_mma, location, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_);
+    CalculateY<use_mma, location, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_, nFace);
 
     QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
@@ -934,6 +1059,8 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
     }
 
+    saveTuneCache();
+
     // work out what to set the scales to
     if (coarseGaugeAtomic::fixedPoint()) {
       double max = 500.0; // Should be more than sufficient
@@ -955,7 +1082,7 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
         y.setDimension(d);
       	y.setDirection(QUDA_FORWARDS);
-	y.setComputeType(COMPUTE_UV);  // compute U*V product
+        y.setComputeType(COMPUTE_UV);  // compute U*V product
 
         if (uv.Precision() == QUDA_HALF_PRECISION) {
           y.setComputeMax(true);
@@ -967,14 +1094,48 @@ namespace quda {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)  printfQuda("%d uv_max = %e\n", from_coarse ? d+4 : d, uv_max);
         }
 
-	y.apply(device::get_default_stream());
+        y.apply(device::get_default_stream());
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
+
+        saveTuneCache();
 
         // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
         y.apply(device::get_default_stream());
+
+        saveTuneCache();
+
+        // long link coarsen, if necessary
+        if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
+          // required to make sure coarsened three-hop links stay in X and Y (as opposed to needing a coarse two-hop term)
+          if (geo_bs[d] >= 3) {
+            y.setComputeType(COMPUTE_LV); // compute L*V product
+
+            if (uv.Precision() == QUDA_HALF_PRECISION) {
+              y.setComputeMax(true);
+              y.apply(device::get_default_stream());
+              y.setComputeMax(false);
+              auto lv_max = *arg.max_h;
+              // we still reuse uv
+              uv.Scale(lv_max);
+              arg.UV.resetScale(lv_max);
+              if (getVerbosity() >= QUDA_DEBUG_VERBOSE)  printfQuda("%d lv_max = %e\n", d, lv_max);
+            }
+
+            y.apply(device::get_default_stream());
+            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LV2[%d] = %e\n", d, arg.UV.norm2());
+            saveTuneCache();
+
+            // *do not* zero out X and Y --- X;Y = VUV + VLV
+            y.setComputeType(COMPUTE_VLV); // compute Y += VLV
+            y.apply(device::get_default_stream());
+            saveTuneCache();
+
+          } else if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+        }
+
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
           printfQuda("Y2[%d] (atomic) = %e\n", 4+d, Y_atomic_.norm2((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
@@ -1040,11 +1201,45 @@ namespace quda {
       y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UAV2[%d] = %e\n", d, arg.UV.norm2());
 
+      saveTuneCache();
+
       // if we are writing to a temporary, we need to zero it before each computation
       if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(device::get_default_stream());
+
+      saveTuneCache();
+
+      // long link coarsen, if necessary
+      if (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
+        // required to make sure coarsened three-hop links stay in X and Y (as opposed to needing a coarse two-hop term)
+        if (geo_bs[d] >= 3) {
+          y.setComputeType(COMPUTE_LV); // compute L*V product
+
+          if (uv.Precision() == QUDA_HALF_PRECISION) {
+            y.setComputeMax(true);
+            y.apply(device::get_default_stream());
+            y.setComputeMax(false);
+            auto lv_max = *arg.max_h;
+            // we still reuse uv
+            uv.Scale(lv_max);
+            arg.UV.resetScale(lv_max);
+            if (getVerbosity() >= QUDA_DEBUG_VERBOSE)  printfQuda("%d lv_max = %e\n", d, lv_max);
+          }
+
+          y.apply(device::get_default_stream());
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("LAV2[%d] = %e\n", d, arg.UV.norm2());
+          saveTuneCache();
+
+          // *do not* zero out X and Y --- X;Y = VUV + VLV
+          y.setComputeType(COMPUTE_VLV); // compute Y += VLV
+          y.apply(device::get_default_stream());
+          saveTuneCache();
+
+        } else if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+      }
+
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Y2[%d] (atomic) = %e\n", d, Y_atomic_.norm2(d%arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
@@ -1137,6 +1332,16 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing staggered mass contribution to coarse clover\n");
       y.setComputeType(COMPUTE_STAGGEREDMASS);
       y.apply(device::get_default_stream());
+    } else if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
+      if (arg.mass != static_cast<Float>(0.)) {
+        // We can write coarsening the coarse KD op as ( K^dag V) . (V)
+        y.setDimension(-1);
+        y.setDirection(QUDA_IN_PLACE);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing staggered mass times KD inverse contribution to coarse clover\n");
+        y.setComputeType(COMPUTE_VUV);
+        y.apply(device::get_default_stream());
+      }
     } else {  //Otherwise, we just have to add the identity matrix
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Summing diagonal contribution to coarse clover\n");
       y.setComputeType(COMPUTE_DIAGONAL);
