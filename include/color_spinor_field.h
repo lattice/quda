@@ -346,6 +346,8 @@ namespace quda {
     void destroy();
 
   protected:
+    void create2(const QudaFieldCreate);
+    void destroy2();
     bool init;
     bool alloc; // whether we allocated memory
     bool reference; // whether the field is a reference or not
@@ -450,6 +452,13 @@ namespace quda {
 
     void zero();
 
+    /**
+       @brief Zero the padded regions added on to the field.  Ensures
+       correct reductions and silences false positive warnings
+       regarding uninitialized memory.
+     */
+    void zeroPad();
+
     int Ncolor() const { return nColor; }
     int Nspin() const { return nSpin; }
     int Nvec() const { return nVec; }
@@ -492,6 +501,13 @@ namespace quda {
     void allocateGhostBuffer(int nFace, bool spin_project=true) const;
 
     /**
+       @brief Create the communication handlers and buffers
+       @param[in] nFace Depth of each halo
+       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
+    */
+    void createComms(int nFace, bool spin_project=true);
+
+    /**
        @brief Packs the cudaColorSpinorField's ghost zone
        @param[in] nFace How many faces to pack (depth)
        @param[in] parity Parity of the field
@@ -513,6 +529,26 @@ namespace quda {
 
     // fuse with above
     void packGhostHost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
+
+    /**
+       Pack the field halos in preparation for halo exchange, e.g., for Dslash
+       @param[in] nFace Depth of faces
+       @param[in] parity Field parity
+       @param[in] dagger Whether this exchange is for the conjugate operator
+       @param[in] stream Stream to be used for packing kernel
+       @param[in] location Array of field locations where each halo
+       will be sent (Host, Device or Remote)
+       @param[in] location_label Consistent label used for labeling
+       the packing tunekey since location can be difference for each
+       process
+       @param[in] spin_project Whether we are spin projecting when face packing
+       @param[in] a Used for twisted mass (scale factor)
+       @param[in] b Used for twisted mass (chiral twist factor)
+       @param[in] c Used for twisted mass (flavor twist factor)
+    */
+    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
+              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
+              int shmem = 0);
 
     /**
       @brief Initiate the gpu to cpu send of the ghost zone (halo)
@@ -697,18 +733,6 @@ namespace quda {
       return components;
     };
 
-    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
-
-    virtual void PrintVector(unsigned int x) const = 0;
-
-    /**
-     * @brief Thin wrapper around PrintVector that takes in a checkerboard index and
-     * a parity instead of a full index
-     * @param[in] x_cb checkerboard index
-     * @param[in] parity site parity
-     */
-    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
-
     /**
      * Compute the n-dimensional site index given the 1-d offset index
      * @param y n-dimensional site index
@@ -794,34 +818,35 @@ namespace quda {
     */
     void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
 
+    /**
+       @brief Fill the field with a defined source type
+       @param[in] sourceType The type of source
+       @param[in] x local site index
+       @param[in] s spin index
+       @param[in] c color index
+    */
+    void Source(QudaSourceType sourceType, unsigned int x = 0, int s = 0, int c = 0);
+
+    /**
+       @brief Print the site vector
+       @param[in] x local site index (full index)
+    */
+    void PrintVector(unsigned int x) const;
+
+    /**
+     * @brief Thin wrapper around PrintVector that takes in a checkerboard index and
+     * a parity instead of a full index
+     * @param[in] x_cb checkerboard index
+     * @param[in] parity site parity
+     */
+    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
+
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
 
   // CUDA implementation
   class cudaColorSpinorField : public ColorSpinorField {
-
-    friend class cpuColorSpinorField;
-
-  private:
-    void create(const QudaFieldCreate);
-    void destroy();
-
-    /**
-       @brief Zero the padded regions added on to the field.  Ensures
-       correct reductions and silences false positive warnings
-       regarding uninitialized memory.
-     */
-    void zeroPad();
-
-    /**
-      This function is responsible for calling the correct copy kernel
-      given the nature of the source field and the desired destination.
-      */
-    void copySpinorField(const ColorSpinorField &src);
-
-    void loadSpinorField(const ColorSpinorField &src);
-    void saveSpinorField (ColorSpinorField &src) const;
 
   public:
     cudaColorSpinorField(const cudaColorSpinorField&);
@@ -830,72 +855,24 @@ namespace quda {
     cudaColorSpinorField(const ColorSpinorParam&);
     virtual ~cudaColorSpinorField();
 
-    ColorSpinorField& operator=(const ColorSpinorField &);
-    cudaColorSpinorField& operator=(const cudaColorSpinorField&);
-    cudaColorSpinorField& operator=(const cpuColorSpinorField&);
-
     void switchBufferPinned();
-
-    /**
-       @brief Create the communication handlers and buffers
-       @param[in] nFace Depth of each halo
-       @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
-    */
-    void createComms(int nFace, bool spin_project=true);
-
-    /**
-       Pack the field halos in preparation for halo exchange, e.g., for Dslash
-       @param[in] nFace Depth of faces
-       @param[in] parity Field parity
-       @param[in] dagger Whether this exchange is for the conjugate operator
-       @param[in] stream Stream to be used for packing kernel
-       @param[in] location Array of field locations where each halo
-       will be sent (Host, Device or Remote)
-       @param[in] location_label Consistent label used for labeling
-       the packing tunekey since location can be difference for each
-       process
-       @param[in] spin_project Whether we are spin projecting when face packing
-       @param[in] a Used for twisted mass (scale factor)
-       @param[in] b Used for twisted mass (chiral twist factor)
-       @param[in] c Used for twisted mass (flavor twist factor)
-    */
-    void pack(int nFace, int parity, int dagger, const qudaStream_t &stream, MemoryLocation location[],
-              MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0,
-              int shmem = 0);
 
     const void *Ghost2() const;
 
     cudaColorSpinorField& Component(const int idx) const;
     CompositeColorSpinorField& Components() const;
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
-
-    void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
-
-    void PrintVector(unsigned int x) const;
   };
 
   // CPU implementation
   class cpuColorSpinorField : public ColorSpinorField {
 
-    friend class cudaColorSpinorField;
-
-  private:
-    void create(const QudaFieldCreate);
-    void destroy();
-
-    public:
-    //cpuColorSpinorField();
+  public:
     cpuColorSpinorField(const cpuColorSpinorField&);
     cpuColorSpinorField(const ColorSpinorField&);
     cpuColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
     cpuColorSpinorField(const ColorSpinorParam&);
     virtual ~cpuColorSpinorField();
-
-    ColorSpinorField& operator=(const ColorSpinorField &);
-    cpuColorSpinorField& operator=(const cpuColorSpinorField&);
-    cpuColorSpinorField& operator=(const cudaColorSpinorField&);
-
-    void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
 
     /**
        @brief Perform a component by component comparison of two
@@ -910,8 +887,6 @@ namespace quda {
      */
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
 
-    void PrintVector(unsigned int x) const;
-
     static void freeGhostBuffer(void);
 
     void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
@@ -919,8 +894,9 @@ namespace quda {
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-      QudaFieldLocation location, void *Dst=0, void *Src=0,
-      void *dstNorm=0, void*srcNorm=0);
+                              QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr,
+                              void * dstNorm = nullptr, const void* srcNorm = nullptr);
+
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
 

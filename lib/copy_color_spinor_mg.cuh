@@ -78,7 +78,7 @@ namespace quda {
     }
   }
 
-  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *, void *, const void *>;
 
   template <int Ns, int Nc, typename dstFloat, typename srcFloat>
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, const copy_pack_t &pack)

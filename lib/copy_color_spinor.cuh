@@ -7,8 +7,8 @@ namespace quda {
 
   template <int Ns, int Nc, typename Out, typename In, typename param_t>
   class CopyColorSpinor : TunableKernel2D {
-    using FloatOut = typename std::remove_pointer<typename std::tuple_element<3, param_t>::type>::type;
-    using FloatIn = typename std::remove_pointer<typename std::tuple_element<4, param_t>::type>::type;
+    using FloatOut = std::remove_pointer_t<typename std::tuple_element<3, param_t>::type>;
+    using FloatIn = std::remove_pointer_t<typename std::tuple_element<4, param_t>::type>;
     template <template <int, int> class Basis> using Arg = CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In, Basis>;
     FloatOut *Out_;
     FloatIn *In_;
@@ -85,7 +85,7 @@ namespace quda {
   {
     auto &out = std::get<0>(param);
     auto &in = std::get<1>(param);
-    using FloatOut = typename std::remove_pointer<typename std::tuple_element<3, param_t>::type>::type;
+    using FloatOut = std::remove_pointer_t<typename std::tuple_element<3, param_t>::type>;
     if (out.isNative()) {
       using O = typename colorspinor_mapper<FloatOut,Ns,Nc>::type;
       CopyColorSpinor<Ns, Nc, O, I, param_t>(out, in, param);
@@ -126,7 +126,7 @@ namespace quda {
   void genericCopyColorSpinor(const param_t &param)
   {
     auto &in = std::get<1>(param);
-    using FloatIn = typename std::remove_pointer<typename std::tuple_element<4, param_t>::type>::type;
+    using FloatIn = std::remove_pointer_t<typename std::tuple_element<4, param_t>::type>;
     if (in.isNative()) {
       using I = typename colorspinor_mapper<FloatIn,Ns,Nc>::type;
       genericCopyColorSpinor<Ns, Nc, I>(param);
@@ -198,7 +198,7 @@ namespace quda {
 
   template <typename dst_t, typename src_t> using param_t =
     std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, dst_t *, src_t *, float *, float *>;
-  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *, void *, const void *>;
 
   template <int Nc, typename dst_t, typename src_t>
   void CopyGenericColorSpinor(const copy_pack_t &pack)
@@ -206,8 +206,8 @@ namespace quda {
     auto &dst = std::get<0>(pack);
     auto &src = std::get<1>(pack);
     param_t<dst_t, src_t> param(std::get<0>(pack), std::get<1>(pack), std::get<2>(pack),
-                                static_cast<dst_t*>(std::get<3>(pack)), static_cast<src_t*>(std::get<4>(pack)),
-                                static_cast<float*>(std::get<5>(pack)), static_cast<float*>(std::get<6>(pack)));
+                                static_cast<dst_t*>(std::get<3>(pack)), static_cast<src_t*>(const_cast<void *>(std::get<4>(pack))),
+                                static_cast<float*>(std::get<5>(pack)), static_cast<float*>(const_cast<void *>(std::get<6>(pack))));
 
     if (dst.Nspin() != src.Nspin()) errorQuda("source and destination spins must match");
 

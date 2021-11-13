@@ -5,7 +5,7 @@ namespace quda
 {
 
   using copy_pack
-    = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+    = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *, void *, const void *>;
   void copyGenericColorSpinorDD(const copy_pack &pack);
   void copyGenericColorSpinorDS(const copy_pack &pack);
   void copyGenericColorSpinorDH(const copy_pack &pack);
@@ -41,7 +41,7 @@ namespace quda
   void copyGenericColorSpinorMGQQ(const copy_pack &pack);
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location, void *Dst,
-                              void *Src, void *dstNorm, void *srcNorm)
+                              const void *Src, void *dstNorm, const void *srcNorm)
   {
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
