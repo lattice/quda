@@ -1489,7 +1489,7 @@ void endQuda(void)
   if(momResident) delete momResident;
 
   LatticeField::freeGhostBuffer();
-  cpuColorSpinorField::freeGhostBuffer();
+  ColorSpinorField::freeGhostBuffer();
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();

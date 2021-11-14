@@ -439,6 +439,7 @@ namespace quda {
     static void* backGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
     static int initGhostFaceBuffer;
     static size_t ghostFaceBytes[QUDA_MAX_DIM];
+    static void freeGhostBuffer(void);
 
     //ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
@@ -446,7 +447,7 @@ namespace quda {
 
     virtual ~ColorSpinorField();
 
-    virtual ColorSpinorField& operator=(const ColorSpinorField &);
+    ColorSpinorField& operator=(const ColorSpinorField &);
 
     void copy(const ColorSpinorField &);
 
@@ -841,6 +842,19 @@ namespace quda {
      */
     void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
 
+    /**
+       @brief Perform a component by component comparison of two
+       color-spinor fields.  In doing we normalize with respect to the
+       first colorspinor field, e.g., we compare || a_i - b_i || / || a ||
+       @param[in] a Ground truth color spinor field
+       @param[in] b Field we are checking
+
+       @param[in] resolution How many bins per order of magnitude to
+       use.  The default resolution=1 means that we have 16 bins
+       covering the range [1e-15,1.0].
+     */
+    static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
+
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
@@ -854,6 +868,13 @@ namespace quda {
     cudaColorSpinorField(const ColorSpinorField&);
     cudaColorSpinorField(const ColorSpinorParam&);
     virtual ~cudaColorSpinorField();
+
+    cudaColorSpinorField& operator=(const cudaColorSpinorField &src) {
+      return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
+    }
+    cudaColorSpinorField& operator=(const ColorSpinorField &src) {
+      return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
+    }
 
     void switchBufferPinned();
 
@@ -874,20 +895,12 @@ namespace quda {
     cpuColorSpinorField(const ColorSpinorParam&);
     virtual ~cpuColorSpinorField();
 
-    /**
-       @brief Perform a component by component comparison of two
-       color-spinor fields.  In doing we normalize with respect to the
-       first colorspinor field, e.g., we compare || a_i - b_i || / || a ||
-       @param[in] a Ground truth color spinor field
-       @param[in] b Field we are checking
-
-       @param[in] resolution How many bins per order of magnitude to
-       use.  The default resolution=1 means that we have 16 bins
-       covering the range [1e-15,1.0].
-     */
-    static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
-
-    static void freeGhostBuffer(void);
+    cpuColorSpinorField& operator=(const cpuColorSpinorField &src) {
+      return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));
+    }
+    cpuColorSpinorField& operator=(const ColorSpinorField &src) {
+      return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));
+    }
 
     void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
     void unpackGhost(void *ghost_spinor, const int dim, const QudaDirection dir);

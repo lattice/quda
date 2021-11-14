@@ -65,26 +65,6 @@ namespace quda {
 
   cpuColorSpinorField::~cpuColorSpinorField() { destroy2(); }
 
-  int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
-				   const int tol) {    
-    checkField(a,b);
-    return genericCompare(a, b, tol);
-  }
-
-  void cpuColorSpinorField::freeGhostBuffer(void)
-  {
-    if(!initGhostFaceBuffer) return;
-
-    for(int i=0; i < 4; i++){  // make nDimComms static?
-      host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
-      host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
-      host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
-      host_free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
-    } 
-    initGhostFaceBuffer = 0;
-  }
-
-
   void cpuColorSpinorField::unpackGhost(void *, const int, const QudaDirection)
   {
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){

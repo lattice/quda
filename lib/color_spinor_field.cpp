@@ -252,7 +252,7 @@ namespace quda {
   void ColorSpinorField::zeroPad()
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
-    if (!isNative()) errorQuda("Field type not supported");
+    if (!isNative()) errorQuda("Field order %d, precision %d not supported", fieldOrder, precision);
 
     size_t pad_bytes = (stride - volumeCB) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
@@ -1269,6 +1269,21 @@ namespace quda {
     return fine;
   }
 
+  // legacy CPU static ghost destructor
+  void ColorSpinorField::freeGhostBuffer(void)
+  {
+    if (!initGhostFaceBuffer) return;
+
+    for(int i=0; i < 4; i++){  // make nDimComms static?
+      host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+      host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+      host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
+      host_free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
+    }
+    initGhostFaceBuffer = 0;
+  }
+
+
   void ColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const
   {
     createGhostZone(nFace, spin_project);
@@ -1959,6 +1974,13 @@ namespace quda {
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) genericPrintVector(*this, x);
     else genericCudaPrintVector(*this, x);
+  }
+
+  int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
+  {
+    if (checkLocation(a, b) == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
+    checkField(a, b);
+    return genericCompare(a, b, tol);
   }
 
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
