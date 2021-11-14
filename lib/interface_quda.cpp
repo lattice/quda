@@ -4206,6 +4206,73 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
+{
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(param);
+
+  GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
+  gParam.gauge     = twolink;
+  cpuGaugeField cpuTwoLink(gParam);  // create the host twolink
+  gParam.link_type = param->type;
+  gParam.gauge     = inlink;
+  cpuGaugeField cpuInLink(gParam);    // create the host sitelink
+
+  // create the device fields
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec, true);
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+
+  cudaInLink->loadCPUField(cpuInLink, profileGaussianSmear);
+  
+  cudaGaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileGaussianSmear);
+  
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.setPrecision(param->cuda_prec, true);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
+ 
+  cudaGaugeField *gtmp = new cudaGaugeField(gParam);
+
+  if(gaugeSmeared != nullptr) delete gaugeSmeared;
+  gaugeSmeared         = createExtendedGauge(*cudaInLink, R, profileGauge);
+  
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
+  computeTwoLink(*gaugeSmeared, *cudaInLinkEx);
+
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
+  copyExtendedGauge(*gtmp, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+  //
+  gtmp->saveCPUField(cpuLongLink, profileGaussianSmear);
+
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+  
+  delete gaugeSmeared;gaugeSmeared = nullptr;
+  delete gtmp;
+ 
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  
+  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+
+  delete cudaInLink;
+  delete cudaInLinkEx;
+
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
 {

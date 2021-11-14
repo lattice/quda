@@ -199,6 +199,12 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(llfat_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS llfat_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+  add_executable(staggered_twolink_test.cpp)
+  target_link_libraries(staggered_twolink_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_twolink_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS staggered_twolink_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+
   add_executable(unitarize_link_test unitarize_link_test.cpp)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   quda_checkbuildtest(unitarize_link_test QUDA_BUILD_ALL_TESTS)

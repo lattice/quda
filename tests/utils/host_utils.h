@@ -57,6 +57,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
                                 QudaDslashType dslash_type);
 void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
+void computeTwoLinkCPU(void **twolink, void **sitelink, QudaPrecision prec);
 void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
                          void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik);
 template <typename Float>
