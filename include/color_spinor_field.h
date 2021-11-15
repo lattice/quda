@@ -485,9 +485,14 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
-    virtual const void* Ghost2() const { return nullptr; }
 
-    virtual int full_dim(int d) const { return (d == 0 && siteSubset == 1) ? x[d] * 2 : x[d]; }
+    /**
+       @brief Returns the full lattice dimension regardless if this
+       field is a subset or not
+       @param[in] d Dimension we are querying
+       @return The full lattice dimension in dimension d
+    */
+    int full_dim(int d) const { return (d == 0 && siteSubset == 1) ? x[d] * 2 : x[d]; }
 
     /**
      * Define the parameter type for this field.
@@ -509,13 +514,13 @@ namespace quda {
     void createComms(int nFace, bool spin_project=true);
 
     /**
-       @brief Packs the cudaColorSpinorField's ghost zone
+       @brief Packs the ColorSpinorField's ghost zone
        @param[in] nFace How many faces to pack (depth)
        @param[in] parity Parity of the field
        @param[in] dagger Whether the operator is the Hermitian conjugate or not
        @param[in] stream Which stream to use for the kernel
        @param[out] buffer Optional parameter where the ghost should be
-       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+       stored (default is to use ColorSpinorField::ghostFaceBuffer)
        @param[in] location Are we packing directly into local device memory, zero-copy memory or remote memory
        @param[in] location_label Consistent label used for labeling
        the packing tunekey since location can be difference for each process
@@ -710,6 +715,7 @@ namespace quda {
     const void* Ghost(const int i) const;
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
+    const void* Ghost2() const;
 
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
@@ -727,12 +733,21 @@ namespace quda {
     ColorSpinorField& Even();
     ColorSpinorField& Odd();
 
-    ColorSpinorField& Component(const int idx) const;
-    ColorSpinorField& Component(const int idx);
+    CompositeColorSpinorField& Components(){ return components; };
 
-    CompositeColorSpinorField& Components(){
-      return components;
-    };
+    ColorSpinorField& Component(int idx)
+    {
+      if (!IsComposite()) errorQuda("Not composite field");
+      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+      return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+    }
+
+    const ColorSpinorField& Component(int idx) const
+    {
+      if (!IsComposite()) errorQuda("Not composite field");
+      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+      return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+    }
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index
@@ -803,13 +818,13 @@ namespace quda {
       @brief Copy all contents of the field to a host buffer.
       @param[in] the host buffer to copy to.
     */
-    virtual void copy_to_buffer(void *buffer) const;
+    void copy_to_buffer(void *buffer) const;
 
     /**
       @brief Copy all contents of the field from a host buffer to this field.
       @param[in] the host buffer to copy from.
     */
-    virtual void copy_from_buffer(void *buffer);
+    void copy_from_buffer(void *buffer);
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -876,13 +891,7 @@ namespace quda {
       return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
     }
 
-    void switchBufferPinned();
-
-    const void *Ghost2() const;
-
     cudaColorSpinorField& Component(const int idx) const;
-    CompositeColorSpinorField& Components() const;
-    void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
   };
 
   // CPU implementation
@@ -901,9 +910,6 @@ namespace quda {
     cpuColorSpinorField& operator=(const ColorSpinorField &src) {
       return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));
     }
-
-    void packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const;
-    void unpackGhost(void *ghost_spinor, const int dim, const QudaDirection dir);
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

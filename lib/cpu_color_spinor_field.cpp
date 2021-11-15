@@ -65,11 +65,4 @@ namespace quda {
 
   cpuColorSpinorField::~cpuColorSpinorField() { destroy2(); }
 
-  void cpuColorSpinorField::unpackGhost(void *, const int, const QudaDirection)
-  {
-    if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in unpackGhost for cpu");
-    }
-  }
-
 } // namespace quda

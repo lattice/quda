@@ -1006,33 +1006,6 @@ namespace quda {
     return *odd;
   }
 
-  ColorSpinorField& ColorSpinorField::Component(const int idx) {
-    if (this->IsComposite()) {
-      if (idx < this->CompositeDim()) {  //  setup eigenvector form the set
-        return *(dynamic_cast<ColorSpinorField*>(components[idx]));
-      }
-      else{
-        errorQuda("Incorrect component index...");
-      }
-    }
-    errorQuda("Cannot get requested component");
-    exit(-1);
-  }
-
-  ColorSpinorField& ColorSpinorField::Component(const int idx) const {
-    if (this->IsComposite()) {
-      if (idx < this->CompositeDim()) {  //  setup eigenvector form the set
-        return *(dynamic_cast<ColorSpinorField*>(components[idx]));
-      }
-      else{
-        errorQuda("Incorrect component index...");
-      }
-    }
-    errorQuda("Cannot get requested component");
-    exit(-1);
-  }
-
-
   void* ColorSpinorField::Ghost(const int i) {
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
     return ghost[i];
@@ -1056,6 +1029,19 @@ namespace quda {
 
   void* const* ColorSpinorField::Ghost() const {
     return ghost_buf;
+  }
+
+  const void* ColorSpinorField::Ghost2() const
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) {
+      return nullptr;
+    } else {
+      if (bufferIndex < 2) {
+        return ghost_recv_buffer_d[bufferIndex];
+      } else {
+        return ghost_pinned_recv_buffer_hd[bufferIndex % 2];
+      }
+    }
   }
 
   /*
