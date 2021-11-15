@@ -571,6 +571,7 @@ namespace quda {
         static constexpr int Nc = 3;
         static constexpr int block = (Nc * Ns / 2) * (Nc * Ns / 2); // elements in a chiral block
         static_assert(2 * block == length, "2 * block != length");
+        static_assert(!enable_reconstruct || (enable_reconstruct && Nc == 3), "Reconstruct requires Nc=3");
         reconstruct_t<real, block, enable_reconstruct> recon;
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
         static constexpr int Nrem = compressed_block % N;
@@ -1041,21 +1042,21 @@ namespace quda {
   };
 
 #ifdef FLOAT8
-#define N8 8
+#define FLOATN 8
 #else
-#define N8 4
+#define FLOATN 4
 #endif
 
   // half precision uses Float4
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<short, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<short, N, N8, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<short, N, FLOATN, add_rho, enable_reconstruct>;
   };
 
   // quarter precision uses Float4
   template <int N, bool add_rho, bool enable_reconstruct> struct clover_mapper<int8_t, N, add_rho, enable_reconstruct> {
-    using type = clover::FloatNOrder<int8_t, N, N8, add_rho, enable_reconstruct>;
+    using type = clover::FloatNOrder<int8_t, N, FLOATN, add_rho, enable_reconstruct>;
   };
 
-#undef N8
+#undef FLOATN
 
 } // namespace quda

@@ -72,27 +72,26 @@ namespace quda {
 
   // Prefetch type
   enum class CloverPrefetchType {
-    BOTH_CLOVER_PREFETCH_TYPE,    // clover and inverse
-    CLOVER_CLOVER_PREFETCH_TYPE,  // clover only
-    INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
+    BOTH_CLOVER_PREFETCH_TYPE,     /** clover and inverse */
+      CLOVER_CLOVER_PREFETCH_TYPE, /** clover only */
+      INVERSE_CLOVER_PREFETCH_TYPE,/** inverse clover only */
     INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
   };
 
   struct CloverFieldParam : public LatticeFieldParam {
-    bool reconstruct; /** Whether to create a compressed that requires reconstruction */
-    bool inverse;     /** whether to create the inverse clover */
-    void *clover;
-    void *cloverInv;
-    double csw;   //! C_sw clover coefficient
-    double coeff; //! Overall clover coefficient
-    bool twisted; // whether to create twisted mass clover
-    double mu2;
-    double rho;
+    bool reconstruct; /** Whether to create a compressed clover field that requires reconstruction */
+    bool inverse;     /** Whether to create the inverse clover field */
+    void *clover;     /** Pointer to the clover field */
+    void *cloverInv;  /** Pointer to the clover inverse field */
+    double csw;       /** C_sw clover coefficient */
+    double coeff;     /** Overall clover coefficient */
+    bool twisted;     /** Whether to create twisted mass clover */
+    double mu2;       /** Twisted mass term */
+    double rho;       /** Hasenbusch rho term */
 
-    QudaCloverFieldOrder order;
-    QudaFieldCreate create;
-
-    QudaFieldLocation location;
+    QudaCloverFieldOrder order; /** Field order */
+    QudaFieldCreate create;     /** Creation type */
+    QudaFieldLocation location; /** Location of the field */
 
     /**
        @brief Helper function for setting the precision and corresponding

@@ -237,7 +237,7 @@
 #define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
-#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float4 ordering
+#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float8 ordering
 #define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
 #define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
 #define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
