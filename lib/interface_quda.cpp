@@ -5575,8 +5575,8 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
     gParam.setPrecision(inv_param->cuda_prec, true);
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     //
-    gaugeSmeared = new cudaGaugeField(gParam);
-    
+    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGauge);//new cudaGaugeField(gParam);
+    //
     cudaGaugeField *two_link_ext = createExtendedGauge(*gaugePrecise, R, profileGauge);//aux field
 
     computeTwoLink(*gaugeSmeared, *two_link_ext);

@@ -145,7 +145,7 @@ static void llfat_test(int argc, char **argv)
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
 
-  loadGaugeQuda(milk_sitelink, &qudaGaugeParam);
+  loadGaugeQuda(milc_sitelink, &qudaGaugeParam);
 
   void* twolink_ptr = twolink;
   {
