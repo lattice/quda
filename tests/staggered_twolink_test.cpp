@@ -147,17 +147,16 @@ static void llfat_test(int argc, char **argv)
 
   loadGaugeQuda(milk_sitelink, &qudaGaugeParam);
 
-//NB1 ::
   void* twolink_ptr = twolink;
   {
     printfQuda("Tuning...\n");
-    computeTwoLinkQuda(twolink_ptr, &qudaGaugeParam);
+    computeTwoLinkQuda(twolink_ptr, nullptr, &qudaGaugeParam);
   }
 
   printfQuda("Running %d iterations of computation\n", niter);
   gettimeofday(&t0, NULL);
   for (int i=0; i<niter; i++)
-    computeTwoLinkQuda(twolink_ptr, &qudaGaugeParam);
+    computeTwoLinkQuda(twolink_ptr, nullptr, &qudaGaugeParam);
   gettimeofday(&t1, NULL);
 
   double secs = TDIFF(t0,t1);
