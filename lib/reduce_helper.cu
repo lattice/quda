@@ -22,7 +22,7 @@ namespace quda
     void *get_device_buffer() { return d_reduce; }
     void *get_mapped_buffer() { return hd_reduce; }
     void *get_host_buffer() { return h_reduce; }
-    count_t *get_count() { return reduce_count; }
+    template <> count_t *get_count() { return reduce_count; }
     qudaEvent_t &get_event() { return reduceEnd; }
 
     size_t buffer_size()
@@ -74,19 +74,14 @@ namespace quda
 
       // these arrays are actually oversized currently (only needs to be device_reduce_t x 3)
 
-      // if the device supports host-mapped memory then use a host-mapped array for the reduction
       if (!h_reduce) {
         h_reduce = (device_reduce_t *)mapped_malloc(bytes);
         hd_reduce = (device_reduce_t *)get_mapped_device_pointer(h_reduce); // set the matching device pointer
 
-#ifdef HETEROGENEOUS_ATOMIC
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
-        auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);               // FIXME
+        auto *atomic_buf = reinterpret_cast<system_atomic_t *>(h_reduce);
         for (size_t i = 0; i < n_reduce; i++) new (atomic_buf + i) system_atomic_t {0}; // placement new constructor
-#else
-        memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
-#endif
       }
 
       if (!reduce_count) {
