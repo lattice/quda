@@ -69,7 +69,7 @@ namespace quda {
         double diagonal = 0.0;
         // only use the result from node 0 (site 0) for multi-node determinism
         if (comm_rank() == 0) diagonal = *diagonal_h / 2; // factor of two for native normalization
-        comm_broadcast(&diagonal, sizeof(double));
+        if (!activeTuning()) comm_broadcast(&diagonal, sizeof(double));
         out.Diagonal(diagonal);
       }
     }
