@@ -15,6 +15,15 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
+int getLinkPadding_(const int dim[4])
+{
+  int padding = std::max(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
+  padding = std::max(padding, dim[0]*dim[1]*dim[3]/2);
+  padding = std::max(padding, dim[0]*dim[1]*dim[2]/2);
+  return padding;
+}
+
+
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static void llfat_test(int argc, char **argv)
@@ -47,7 +56,7 @@ static void llfat_test(int argc, char **argv)
   qudaGaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   qudaGaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  qudaGaugeParam.ga_pad = 0;
+  qudaGaugeParam.ga_pad = getLinkPadding_(qudaGaugeParam.X);
 
 //NB1 ::
   void *twolink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
@@ -136,19 +145,19 @@ static void llfat_test(int argc, char **argv)
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
 
-   loadGaugeQuda((void *)sitelink, &gauge_param);
+  loadGaugeQuda(milk_sitelink, &qudaGaugeParam);
 
 //NB1 ::
   void* twolink_ptr = twolink;
   {
     printfQuda("Tuning...\n");
-    computeTwoLinkQuda(twolink_ptr, milc_sitelink, &qudaGaugeParam);
+    computeTwoLinkQuda(twolink_ptr, &qudaGaugeParam);
   }
 
   printfQuda("Running %d iterations of computation\n", niter);
   gettimeofday(&t0, NULL);
   for (int i=0; i<niter; i++)
-    computeTwoLinkQuda(twolink_ptr, milc_sitelink, &qudaGaugeParam);
+    computeTwoLinkQuda(twolink_ptr, &qudaGaugeParam);
   gettimeofday(&t1, NULL);
 
   double secs = TDIFF(t0,t1);

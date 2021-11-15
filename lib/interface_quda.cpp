@@ -4206,33 +4206,22 @@ void computeKSLinkQuda(void *fatlink, void *longlink, void *ulink, void *inlink,
   profileFatLink.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
+void computeTwoLinkQuda(void *twolink, QudaGaugeParam *param)
 {
   profileGaussianSmear.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
 
   checkGaugeParam(param);
 
-  GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
+  GaugeFieldParam gParam(*param, nullptr, QUDA_GENERAL_LINKS);
   gParam.gauge     = twolink;
   cpuGaugeField cpuTwoLink(gParam);  // create the host twolink
   gParam.link_type = param->type;
-  gParam.gauge     = inlink;
-  cpuGaugeField cpuInLink(gParam);    // create the host sitelink
 
   // create the device fields
-  gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(param->cuda_prec, true);
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaGaugeField *cudaInLink = new cudaGaugeField(gParam);
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
-
-  cudaInLink->loadCPUField(cpuInLink, profileGaussianSmear);
   
-  cudaGaugeField *cudaInLinkEx = createExtendedGauge(*cudaInLink, R, profileGaussianSmear);
-  
-  profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
+  cudaGaugeField *cudaInLinkEx = createExtendedGauge(*gaugePrecise, R, profileGaussianSmear);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -4245,7 +4234,7 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   cudaGaugeField *gtmp = new cudaGaugeField(gParam);
 
   if(gaugeSmeared != nullptr) delete gaugeSmeared;
-  gaugeSmeared         = createExtendedGauge(*cudaInLink, R, profileGauge);
+  gaugeSmeared         = createExtendedGauge(*gtmp, R, profileGauge);
   
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -4255,7 +4244,7 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
   copyExtendedGauge(*gtmp, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
   //
-  gtmp->saveCPUField(cpuLongLink, profileGaussianSmear);
+  gtmp->saveCPUField(cpuTwoLink, profileGaussianSmear);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
   
@@ -4266,7 +4255,6 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
 
-  delete cudaInLink;
   delete cudaInLinkEx;
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
