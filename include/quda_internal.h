@@ -1,13 +1,8 @@
 #pragma once
 
-#include <quda_define.h>
+#include <quda_arch.h>
 #include <quda_api.h>
 #include <quda_target.h>
-
-#if defined(QUDA_TARGET_CUDA)
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
 
 #include <string>
 #include <complex>

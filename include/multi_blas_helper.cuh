@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <register_traits.h>
 #include <blas_helper.cuh>
+#include <reduce_helper.h>
 #include <kernel_helper.h>
 #include <target_device.h>
 
