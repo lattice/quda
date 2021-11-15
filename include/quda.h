@@ -1251,34 +1251,34 @@ extern "C" {
   void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
-   * Compute the gauge force and update the mometum field
+   * Compute the gauge force and update the momentum field
    *
-   * @param mom The momentum field to be updated
-   * @param sitelink The gauge field from which we compute the force
-   * @param input_path_buf[dim][num_paths][path_length]
-   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
-   * @param loop_coeff Coefficients of the different loops in the Symanzik action
-   * @param num_paths How many contributions from path_length different "staples"
-   * @param max_length The maximum number of non-zero of links in any path in the action
-   * @param dt The integration step size (for MILC this is dt*beta/3)
-   * @param param The parameters of the external fields and the computation settings
+   * @param[in,out] mom The momentum field to be updated
+   * @param[in] sitelink The gauge field from which we compute the force
+   * @param[in] input_path_buf[dim][num_paths][path_length]
+   * @param[in] path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] num_paths How many contributions from path_length different "staples"
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] dt The integration step size (for MILC this is dt*beta/3)
+   * @param[in] param The parameters of the external fields and the computation settings
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    double* loop_coeff, int num_paths, int max_length, double dt,
 			    QudaGaugeParam* qudaGaugeParam);
 
   /**
-   * Compute the product of gauge along a path and add to/overwrite the output field
+   * Compute the product of gauge links along a path and add to/overwrite the output field
    *
-   * @param out The output field to be updated
-   * @param sitelink The gauge field from which we compute the products of gauge links
-   * @param input_path_buf[dim][num_paths][path_length]
-   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
-   * @param loop_coeff Coefficients of the different loops in the Symanzik action
-   * @param num_paths How many contributions from path_length different "staples"
-   * @param max_length The maximum number of non-zero of links in any path in the action
-   * @param dt The integration step size (for MILC this is dt*beta/3)
-   * @param param The parameters of the external fields and the computation settings
+   * @param[in,out] out The output field to be updated
+   * @param[in] sitelink The gauge field from which we compute the products of gauge links
+   * @param[in] input_path_buf[dim][num_paths][path_length]
+   * @param[in] path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] num_paths How many contributions from path_length different "staples"
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] dt The integration step size (for MILC this is dt*beta/3)
+   * @param[in] param The parameters of the external fields and the computation settings
    */
   int computeGaugePathQuda(void* out, void* sitelink,  int*** input_path_buf, int* path_length,
 			    double* loop_coeff, int num_paths, int max_length, double dt,
