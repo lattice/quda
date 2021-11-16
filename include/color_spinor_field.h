@@ -332,14 +332,10 @@ namespace quda {
   class ColorSpinorField : public LatticeField {
 
   private:
-    void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-                QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder,
-                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity);
+    void create(const ColorSpinorParam &param);
     void destroy();
 
   protected:
-    void create2(const QudaFieldCreate);
-    void destroy2();
     bool init;
     bool alloc; // whether we allocated memory
     bool reference; // whether the field is a reference or not

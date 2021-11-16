@@ -85,7 +85,7 @@ namespace quda {
   {
     auto &location = std::get<2>(pack);
     dstFloat *Dst = static_cast<dstFloat*>(std::get<3>(pack));
-    srcFloat *Src = static_cast<srcFloat*>(std::get<4>(pack));
+    srcFloat *Src = const_cast<srcFloat*>(static_cast<const srcFloat*>(std::get<4>(pack)));
 
     if (dst.Ndim() != src.Ndim())
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
