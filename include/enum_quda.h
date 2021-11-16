@@ -1,7 +1,6 @@
 #pragma once
 
-#include <limits.h>
-#define QUDA_INVALID_ENUM INT_MIN
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #ifdef __cplusplus
 extern "C" {
