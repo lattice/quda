@@ -222,7 +222,7 @@ namespace quda {
 
     if (reliable) {
       y.resize(num_offset);
-      for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
+      for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(csParam);
     }
 
     csParam.setPrecision(param.precision_sloppy);
@@ -232,7 +232,8 @@ namespace quda {
       r_sloppy = r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(*r, csParam);
+      csParam.field = r;
+      r_sloppy = new cudaColorSpinorField(csParam);
     }
   
     if (param.precision_sloppy == x[0]->Precision() ||
@@ -244,27 +245,27 @@ namespace quda {
     } else {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       for (int i=0; i<num_offset; i++)
-	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
+	x_sloppy[i] = new cudaColorSpinorField(csParam);
     }
   
     p.resize(num_offset);
     for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    auto* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
+    auto* Ap = new cudaColorSpinorField(csParam);
   
-    cudaColorSpinorField tmp1(*Ap, csParam);
+    cudaColorSpinorField tmp1(csParam);
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
     cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
-      new cudaColorSpinorField(*Ap, csParam) : &tmp1;
+      new cudaColorSpinorField(csParam) : &tmp1;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     // additional high-precision temporary if Wilson and mixed-precision
     csParam.setPrecision(param.precision);
     cudaColorSpinorField *tmp3_p =
       (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-      new cudaColorSpinorField(*r, csParam) : &tmp1;
+      new cudaColorSpinorField(csParam) : &tmp1;
     cudaColorSpinorField &tmp3 = *tmp3_p;
 
     profile.TPSTOP(QUDA_PROFILE_INIT);

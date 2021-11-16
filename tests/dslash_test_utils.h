@@ -226,6 +226,7 @@ struct DslashTestWrapper {
       csParam.x[0] /= 2;
     }
 
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = inv_param.gamma_basis;
@@ -286,6 +287,7 @@ struct DslashTestWrapper {
     }
 
     if (!transfer) {
+      csParam.location = QUDA_CUDA_FIELD_LOCATION;
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       csParam.pad = inv_param.sp_pad;
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);

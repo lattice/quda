@@ -194,6 +194,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qu
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
   csParam.v = in;
   csParam.nColor = 3;
   csParam.nSpin = 4;

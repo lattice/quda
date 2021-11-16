@@ -8,37 +8,7 @@
 
 namespace quda {
 
-  cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param)
-  {
-    create2(param.create);
-
-    if (param.create == QUDA_NULL_FIELD_CREATE || param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      // do nothing
-    } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
-      zero();
-    } else {
-      errorQuda("Creation type %d not supported", param.create);
-    }
-  }
-
-  cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : ColorSpinorField(src)
-  {
-    create2(QUDA_COPY_FIELD_CREATE);
-    memcpy(v,src.v,bytes);
-  }
-
-  cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src)
-  {
-    create2(QUDA_COPY_FIELD_CREATE);
-    if (typeid(src) == typeid(cpuColorSpinorField)) {
-      memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
-    } else if (typeid(src) == typeid(cudaColorSpinorField)) {
-      copy(*this);
-    } else {
-      errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
-    }
-  }
-
+#if 0
   /*
     This is special case constructor used to create parity subset references with in a full field
    */
@@ -62,7 +32,6 @@ namespace quda {
 
     create2(param.create);
   }
-
-  cpuColorSpinorField::~cpuColorSpinorField() { destroy2(); }
+#endif
 
 } // namespace quda

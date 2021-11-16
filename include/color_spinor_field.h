@@ -72,53 +72,52 @@ namespace quda {
   */
   struct CompositeColorSpinorFieldDescriptor {
 
-     bool is_composite; //set to 'false' for a regular spinor field
-     bool is_component; //set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
+    bool is_composite; //set to 'false' for a regular spinor field
+    bool is_component; //set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
 
-     int  dim;//individual component has dim = 0
-     int  id;
+    int dim; //individual component has dim = 0
+    int id;
 
-     size_t volume;       // volume of a single eigenvector
-     size_t volumeCB;     // CB volume of a single eigenvector
-     size_t stride;       // stride of a single eigenvector
-     size_t real_length;  // physical length of a single eigenvector
-     size_t length;       // length including pads (but not ghost zones)
+    size_t volume;       // volume of a single eigenvector
+    size_t volumeCB;     // CB volume of a single eigenvector
+    size_t stride;       // stride of a single eigenvector
+    size_t real_length;  // physical length of a single eigenvector
+    size_t length;       // length including pads (but not ghost zones)
 
-     size_t bytes;      // size in bytes of spinor field
-     size_t norm_bytes; // makes no sense but let's keep it...
+    size_t bytes;      // size in bytes of spinor field
+    size_t norm_bytes; // makes no sense but let's keep it...
 
-     CompositeColorSpinorFieldDescriptor()
-     : is_composite(false), is_component(false), dim(0), id(0), volume(0), volumeCB(0),
-       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)  {};
+    CompositeColorSpinorFieldDescriptor() :
+      is_composite(false),
+      is_component(false),
+      dim(0),
+      id(0),
+      volume(0),
+      volumeCB(0),
+      stride(0),
+      real_length(0),
+      length(0),
+      bytes(0),
+      norm_bytes(0) {}
 
-     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0)
-     : is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0),
-       stride(0), real_length(0), length(0), bytes(0), norm_bytes(0)
+    CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
+      is_composite(is_composite),
+      is_component(is_component),
+      dim(dim),
+      id(id),
+      volume(0),
+      volumeCB(0),
+      stride(0),
+      real_length(0),
+      length(0),
+      bytes(0),
+      norm_bytes(0)
      {
-        if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
-        else if(is_composite && dim == 0) is_composite = false;
+       if (is_composite && is_component) errorQuda("Composite type is not implemented");
+       else if (is_composite && dim == 0) is_composite = false;
      }
 
-     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr)
-     {
-       is_composite = descr.is_composite;
-       is_component = descr.is_component;
-
-       if(is_composite && is_component) errorQuda("\nComposite type is not implemented.\n");
-
-       dim = descr.dim;
-       id  = descr.id;
-
-       volume   = descr.volume;
-       volumeCB = descr.volumeCB;
-       stride   = descr.stride;       // stride of a single eigenvector
-       real_length = descr.real_length;  // physical length of a single eigenvector
-       length      = descr.length;       // length including pads (but not ghost zones)
-
-       bytes = descr.bytes;      // size in bytes of spinor field
-       norm_bytes = descr.norm_bytes; // makes no sense but let's keep it...
-     }
-
+     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
   };
 
   class ColorSpinorParam : public LatticeFieldParam {
@@ -146,6 +145,7 @@ namespace quda {
      * even or odd parity. */
     QudaParity suggested_parity;
 
+    ColorSpinorField *field;
     void *v; // pointer to field
     void *norm;
 
@@ -325,13 +325,7 @@ namespace quda {
       if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
 
-    virtual ~ColorSpinorParam() {
-    }
-
   };
-
-  class cpuColorSpinorField;
-  class cudaColorSpinorField;
 
   struct DslashConstant;
 
@@ -402,6 +396,7 @@ namespace quda {
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
     QudaFieldOrder fieldOrder;
+    QudaFieldLocation location;
     QudaGammaBasis gammaBasis;
 
     // in the case of full fields, these are references to the even / odd sublattices
@@ -420,8 +415,6 @@ namespace quda {
     */
     void createGhostZone(int nFace, bool spin_project=true) const;
 
-    // resets the above attributes based on contents of param
-    void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
@@ -441,7 +434,7 @@ namespace quda {
 
     //ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
-    ColorSpinorField(const ColorSpinorParam &);
+    ColorSpinorField(const ColorSpinorParam &, QudaFieldLocation);
 
     virtual ~ColorSpinorField();
 
@@ -675,6 +668,11 @@ namespace quda {
       */
     bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
 
+    /**
+       @return The location of the field
+    */
+    QudaFieldLocation Location() const { return location; }
+
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
 
@@ -762,7 +760,6 @@ namespace quda {
     void OffsetIndex(int &i, int *y) const;
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
-    static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -876,11 +873,9 @@ namespace quda {
   class cudaColorSpinorField : public ColorSpinorField {
 
   public:
-    cudaColorSpinorField(const cudaColorSpinorField&);
-    cudaColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
-    cudaColorSpinorField(const ColorSpinorField&);
-    cudaColorSpinorField(const ColorSpinorParam&);
-    virtual ~cudaColorSpinorField();
+    cudaColorSpinorField(const cudaColorSpinorField &src) : ColorSpinorField(src) { }
+    cudaColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src) { }
+    cudaColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param, QUDA_CUDA_FIELD_LOCATION) { }
 
     cudaColorSpinorField& operator=(const cudaColorSpinorField &src) {
       return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
@@ -896,11 +891,9 @@ namespace quda {
   class cpuColorSpinorField : public ColorSpinorField {
 
   public:
-    cpuColorSpinorField(const cpuColorSpinorField&);
-    cpuColorSpinorField(const ColorSpinorField&);
-    cpuColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
-    cpuColorSpinorField(const ColorSpinorParam&);
-    virtual ~cpuColorSpinorField();
+    cpuColorSpinorField(const cpuColorSpinorField &src) : ColorSpinorField(src) { }
+    cpuColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src) { }
+    cpuColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param, QUDA_CPU_FIELD_LOCATION) { }
 
     cpuColorSpinorField& operator=(const cpuColorSpinorField &src) {
       return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));

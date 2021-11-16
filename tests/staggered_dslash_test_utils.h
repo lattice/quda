@@ -293,6 +293,7 @@ struct StaggeredDslashTestWrapper {
     csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.pc_type = QUDA_4D_PC;
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
 
     spinor = new cpuColorSpinorField(csParam);
     spinorOut = new cpuColorSpinorField(csParam);
@@ -314,6 +315,7 @@ struct StaggeredDslashTestWrapper {
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
     csParam.setPrecision(inv_param.cuda_prec);
+    csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
     cudaSpinor = new cudaColorSpinorField(csParam);
     cudaSpinorOut = new cudaColorSpinorField(csParam);

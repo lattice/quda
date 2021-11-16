@@ -229,6 +229,7 @@ void initFields(prec_pair_t prec_pair)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.pc_type = QUDA_4D_PC;
+  param.location = QUDA_CPU_FIELD_LOCATION;
 
   vH = new cpuColorSpinorField(param);
   wH = new cpuColorSpinorField(param);
@@ -265,6 +266,7 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec_other = prec_pair.second;
 
   param.setPrecision(prec, prec, true);
+  param.location = QUDA_CUDA_FIELD_LOCATION;
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
   xD = new cudaColorSpinorField(param);
