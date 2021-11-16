@@ -4216,6 +4216,7 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
   GaugeFieldParam gParam(*param, inlink, QUDA_GENERAL_LINKS);
   gParam.gauge     = twolink;
   cpuGaugeField cpuTwoLink(gParam);  // create the host twolink
+  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   cudaGaugeField *cudaInLinkEx = nullptr;
 
@@ -4237,13 +4238,11 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     //
     profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
     delete cudaInLink;
-    profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
+    profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
 
   } else {
     cudaInLinkEx = createExtendedGauge(*gaugePrecise, R, profileGaussianSmear);
   }
-  
-  profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -5565,15 +5564,6 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
-    
-    //int R_[4] = {2,2,2,2};    
-    GaugeFieldParam gParam(*gaugePrecise);
-    //
-    gParam.create        = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type     = QUDA_GENERAL_LINKS;
-    gParam.reconstruct   = QUDA_RECONSTRUCT_NO;
-    gParam.setPrecision(inv_param->cuda_prec, true);
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     //
     gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGauge);//new cudaGaugeField(gParam);
     //
@@ -5592,7 +5582,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const int *X = gaugeSmeared->X();
+  const int *X = gaugePrecise->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   
