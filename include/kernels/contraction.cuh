@@ -11,8 +11,8 @@ namespace quda
 {
   static constexpr int max_contract_results = 16; // sized for nSpin**2 = 16
   
-  using contract_array           = vector_type<double2, max_contract_results>;
-  using staggered_contract_array = vector_type<double2, 1>;
+  using contract_array           = array<double2, max_contract_results>;
+  using staggered_contract_array = array<double2, 1>;
 
   template <typename real, int nSpin = 4> class DRGammaMatrix {
   public:

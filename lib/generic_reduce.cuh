@@ -4,7 +4,7 @@
 template <typename reduce_t, typename Float, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 auto genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r)
 {
-  using vec = vector_type<complex<Float>, 1>;
+  using vec = array<complex<Float>, 1>;
   reduce_t sum;
   ::quda::zero(sum);
 
