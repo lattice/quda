@@ -518,6 +518,26 @@ typedef enum QudaStaggeredPhase_s {
   QUDA_STAGGERED_PHASE_INVALID = QUDA_INVALID_ENUM
 } QudaStaggeredPhase;
 
+typedef enum QudaSpinTasteGamma_s {
+  QUDA_SPIN_TASTE_G1   = 0,
+  QUDA_SPIN_TASTE_GX   = 1,
+  QUDA_SPIN_TASTE_GY   = 2,
+  QUDA_SPIN_TASTE_GZ   = 4,
+  QUDA_SPIN_TASTE_GT   = 8,
+  QUDA_SPIN_TASTE_G5   = 15,
+  QUDA_SPIN_TASTE_GYGZ = 6,
+  QUDA_SPIN_TASTE_GZGX = 5,
+  QUDA_SPIN_TASTE_GXGY = 3,
+  QUDA_SPIN_TASTE_GXGT = 9,
+  QUDA_SPIN_TASTE_GYGT = 10,
+  QUDA_SPIN_TASTE_GZGT = 12,
+  QUDA_SPIN_TASTE_G5GX = 14,
+  QUDA_SPIN_TASTE_G5GY = 13,
+  QUDA_SPIN_TASTE_G5GZ = 11,
+  QUDA_SPIN_TASTE_G5GT = 7,
+  QUDA_SPIN_TASTE_INVALID = QUDA_INVALID_ENUM
+} QudaSpinTasteGamma;
+
 typedef enum QudaContractType_s {
   QUDA_CONTRACT_TYPE_OPEN,       // Open spin elementals, no summation
   QUDA_CONTRACT_TYPE_OPEN_SUM_T, // Open spin elementals, spatially summed over tdim

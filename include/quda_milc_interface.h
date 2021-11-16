@@ -228,16 +228,55 @@ extern "C" {
 
 
   /**
+   * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param links              Gauge field on the host
+   * @param src                Input spinor field
+   * @param dst                Output spinor field
+   * @param dir                Direction of application of the spin-taste operator 
+   * @param sym                Kind of spin-taste operator (1 forward, 2 backward, 3 symmetric)
+   */
+  void qudaShift (int external_precision,
+		  int quda_precision,
+		  const void* const links,
+		  void* source,
+		  void* solution,
+		  int dir,
+		  int sym);
+
+  /**
+   * Apply the forward/backward/symmetric shift for the spin-taste opeartor. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param links              Gauge field on the host
+   * @param src                Input spinor field
+   * @param dst                Output spinor field
+   * @param spin               Spin gamma structure using MILC numbering
+   * @param taste              Taste gamma structure using MILC numbering
+   */
+  void qudaSpinTaste (int external_precision,
+                      int quda_precision,
+                      const void *const links,
+                      void* src,
+                      void* dst,
+                      int spin,
+                      int taste);
+  /**
    * Apply the improved staggered operator to a field. All fields
    * passed and returned are host (CPU) field in MILC order.
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param inv_args Struct setting some solver metadata
-   * @param milc_fatlink Fat-link field on the host
-   * @param milc_longlink Long-link field on the host
-   * @param source Right-hand side source field
-   * @param solution Solution spinor field
+   * @param quda_precision     Precision for QUDA to use (2 - double, 1 - single)
+   * @param inv_args           Struct setting some solver metadata
+   * @param milc_fatlink       Fat-link field on the host
+   * @param milc_longlink      Long-link field on the host
+   * @param source             Right-hand side source field
+   * @param solution           Solution spinor field
    */
   void qudaDslash(int external_precision,
 		  int quda_precision,

@@ -14,10 +14,10 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor_, QudaReconstructType reconstruct_, int nDim>
+  template <typename Float, int nColor_, int nSpin_, QudaReconstructType reconstruct_, int nDim>
   struct CovDevArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 4;
+    static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
@@ -130,7 +130,7 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, 4>;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true;

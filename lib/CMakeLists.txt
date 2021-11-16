@@ -56,7 +56,7 @@ set (QUDA_OBJS
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
-  contract.cu comm_common.cpp communicator_stack.cpp
+  contract.cu spin_taste.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
   extract_gauge_ghost_extended.cu copy_color_spinor.cpp spinor_noise.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
