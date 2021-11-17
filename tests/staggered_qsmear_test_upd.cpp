@@ -28,13 +28,12 @@ static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static void twolink_test(int argc, char **argv)
 {
-  QudaGaugeParam qudaGaugeParam;
-
   initQuda(device_ordinal);
 
   cpu_prec = prec;
   host_gauge_data_type_size = cpu_prec;
-  qudaGaugeParam = newQudaGaugeParam();
+  QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
+  QudaInvertParam inv_param     = newQudaInvertParam();
 
   qudaGaugeParam.anisotropy = 1.0;
 
@@ -126,23 +125,75 @@ static void twolink_test(int argc, char **argv)
              src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
     }//dir
   }//i
+  
+  ColorSpinorParam cs_param;
+
+  cs_param.nColor = 3;
+  cs_param.nSpin  = 1;
+  cs_param.nDim   = 4;
+  
+  for(int i = 0; i < 4; i++) cs_param.x[i] = X[i];
+  
+  cs_param.x[4] = 1;
+  cs_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  cs_param.setPrecision(test_prec);
+  cs_param.pad = 0;
+  cs_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  cs_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  cs_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless for staggered, but required by the code.
+  cs_param.create = QUDA_ZERO_FIELD_CREATE;
+  cs_param.location = QUDA_CPU_FIELD_LOCATION;
+  cs_param.pc_type = QUDA_4D_PC;
+
+  int my_spinor_site_size = 3; //
+
+  size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t spinor_field_floats = V * my_spinor_site_size * 2; // 
+  void *buff  = malloc(spinor_field_floats * data_size);
+
+  // spinor set to random values
+  if (test_prec == QUDA_SINGLE_PRECISION) {
+    for (size_t i = 0; i < spinor_field_floats; i++) {
+      ((float *)buff)[i]  = 2.*(rand() / (float)RAND_MAX) - 1.;
+    }
+  } else {
+    for (size_t i = 0; i < spinor_field_floats; i++) {
+      ((double *)buff)[i] = 2.*(rand() / (double)RAND_MAX) - 1.;
+    }
+  }
+
+  // array of spinor field for each source spin and color
+  void* spinor;
+  size_t off=0; 
+  const int nspinors = 1;
+  for(int s=0; s<nsponors; ++s, off += spinor_field_floats * data_size) {
+    spinor[s] = (void*)((uintptr_t)buff  + off);
+  }
 
   //only record the last call's performance
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
 
   loadGaugeQuda(milc_sitelink, &qudaGaugeParam);
+  
+  // smearing parameters
+  double omega = 2.0;
+  int n_steps  = 50;
+  double smear_coeff = -1.0 * omega * omega / ( 4*Nsteps );
+  
+  const int compute_2link = 0;
+  const int t0            = 0;// not used yet
 
   void* twolink_ptr = twolink;
   {
     printfQuda("Tuning...\n");
-    computeTwoLinkQuda(twolink_ptr, nullptr, &qudaGaugeParam);
+    performTwoLinkGaussianSmearNStep(spinor, &inv_param, n_steps, smear_coeff, compute_2link, t0); 
   }
 
   printfQuda("Running %d iterations of computation\n", niter);
   gettimeofday(&t0, NULL);
   for (int i=0; i<niter; i++)
-    computeTwoLinkQuda(twolink_ptr, nullptr, &qudaGaugeParam);
+    performTwoLinkGaussianSmearNStep(spinor, &inv_param, n_steps, smear_coeff, compute_2link, t0); 
   gettimeofday(&t1, NULL);
 
   double secs = TDIFF(t0,t1);
@@ -155,7 +206,7 @@ static void twolink_test(int argc, char **argv)
   if (verify_results){
     int R[4] = {2,2,2,2};
     exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
-    computeTwoLinkCPU(two_reflink, sitelink_ex, qudaGaugeParam.cpu_prec);
+    //computeTwoLinkCPU(two_reflink, sitelink_ex, qudaGaugeParam.cpu_prec);
 
   }//verify_results
  
