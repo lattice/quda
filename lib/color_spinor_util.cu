@@ -201,9 +201,10 @@ namespace quda {
     }
   }
 
-  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c)
+  void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c)
   {
-    using pack_t = std::tuple<cpuColorSpinorField&, QudaSourceType, int, int, int>;
+    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
+    using pack_t = std::tuple<ColorSpinorField&, QudaSourceType, int, int, int>;
     pack_t pack(a, sourceType, x, s, c);
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericSource<double>(pack);
@@ -272,7 +273,7 @@ namespace quda {
   }
 
   template <typename oFloat, typename iFloat, QudaFieldOrder order>
-  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+  int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.Ncolor() == 3) {
       constexpr int Nc = 3;
@@ -313,7 +314,7 @@ namespace quda {
 
 
   template <typename oFloat, typename iFloat>
-  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+  int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && b.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       ret = genericCompare<oFloat,iFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, b, tol);
@@ -325,7 +326,7 @@ namespace quda {
 
 
   template <typename oFloat>
-  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+  int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol) {
     int ret = 0;
     if (b.Precision() == QUDA_DOUBLE_PRECISION) {
       ret = genericCompare<oFloat,double>(a, b, tol);
@@ -338,7 +339,8 @@ namespace quda {
   }
 
 
-  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+  int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol) {
+    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
     int ret = 0;
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       ret = genericCompare<double>(a, b, tol);
@@ -368,7 +370,7 @@ namespace quda {
   }
 
   // print out the vector at volume point x
-  template <typename Float, QudaFieldOrder order> void genericPrintVector(const cpuColorSpinorField &a, unsigned int x)
+  template <typename Float, QudaFieldOrder order> void genericPrintVector(const ColorSpinorField &a, unsigned int x)
   {
     if (a.Ncolor() == 3 && a.Nspin() == 1)  {
       FieldOrderCB<Float,1,3,1,order> A(a);
@@ -418,7 +420,7 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   }
 
   // print out the vector at volume point x
-  template <typename Float> void genericPrintVector(const cpuColorSpinorField &a, unsigned int x)
+  template <typename Float> void genericPrintVector(const ColorSpinorField &a, unsigned int x)
   {
     if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       genericPrintVector<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a,x);
@@ -428,8 +430,9 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   }
 
   // print out the vector at volume point x
-  void genericPrintVector(const cpuColorSpinorField &a, unsigned int x)
+  void genericPrintVector(const ColorSpinorField &a, unsigned int x)
   {
+    if (a.Location() == QUDA_CUDA_FIELD_LOCATION) errorQuda("device field not implemented");
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericPrintVector<double>(a,x);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {

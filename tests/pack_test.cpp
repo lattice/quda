@@ -18,7 +18,7 @@ cudaColorSpinorField *cudaSpinor;
 
 void *qdpCpuGauge_p[4];
 void *cpsCpuGauge_p;
-cpuColorSpinorField *spinor, *spinor2;
+ColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
 
@@ -66,9 +66,10 @@ void init() {
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new cpuColorSpinorField(csParam);
-  spinor2 = new cpuColorSpinorField(csParam);
+  spinor = new ColorSpinorField(csParam);
+  spinor2 = new ColorSpinorField(csParam);
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -79,6 +80,7 @@ void init() {
   csParam.setPrecision(prec, prec, true);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
+  csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   cudaSpinor = new cudaColorSpinorField(csParam);
 }
@@ -164,7 +166,7 @@ void packTest()
 
   printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
 
-  cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
+  ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }
 
 int main(int argc, char **argv) {

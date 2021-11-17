@@ -69,7 +69,7 @@ static const double projector[8][4][4][2] = {
 
 // todo pass projector
 template <typename Float>
-void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
+void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn) {
   for (int i=0; i<4*3*2; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
@@ -114,7 +114,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
   for (int i = 0; i < Vh; i++) {
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
-      sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
+      const sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
 
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
@@ -152,7 +152,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
 
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink_mg4dir(i, dir, oddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
 
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
@@ -210,7 +210,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qu
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.pc_type = QUDA_4D_PC;
 
-  cpuColorSpinorField inField(csParam);
+  ColorSpinorField inField(csParam);
 
   {  // Now do the exchange
     QudaParity otherParity = QUDA_INVALID_PARITY;

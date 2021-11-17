@@ -2242,9 +2242,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), true);
 
-  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) :
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  ColorSpinorField *in_h = new ColorSpinorField(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaParam.field = in_h;
@@ -2286,10 +2284,6 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
-
-  /*for (int i=0; i<in_h->Volume(); i++) {
-    ((cpuColorSpinorField*)out_h)->PrintVector(i);
-    }*/
 
   delete out_h;
   delete in_h;
@@ -3431,12 +3425,13 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
 
     // Split input fermion field
     quda::ColorSpinorParam cpu_cs_param_split(*_h_x[0]);
+    cpu_cs_param_split.location = QUDA_CPU_FIELD_LOCATION;
     for (int d = 0; d < CommKey::n_dim; d++) { cpu_cs_param_split.x[d] *= split_key[d]; }
     std::vector<quda::ColorSpinorField *> _collect_b(param->num_src_per_sub_partition, nullptr);
     std::vector<quda::ColorSpinorField *> _collect_x(param->num_src_per_sub_partition, nullptr);
     for (int n = 0; n < param->num_src_per_sub_partition; n++) {
-      _collect_b[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
-      _collect_x[n] = new quda::cpuColorSpinorField(cpu_cs_param_split);
+      _collect_b[n] = new quda::ColorSpinorField(cpu_cs_param_split);
+      _collect_x[n] = new quda::ColorSpinorField(cpu_cs_param_split);
       auto first = _h_b.begin() + n * num_sub_partition;
       auto last = _h_b.begin() + (n + 1) * num_sub_partition;
       std::vector<ColorSpinorField *> _v_b(first, last);
@@ -4607,6 +4602,7 @@ void computeHISQForceQuda(void* const milc_momentum,
     cudaColorSpinorField cudaQuark(qParam);
 
     // create the host quark field
+    qParam.location = QUDA_CPU_FIELD_LOCATION;
     qParam.create = QUDA_REFERENCE_FIELD_CREATE;
     qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
     qParam.v = fermion[0];
@@ -4620,7 +4616,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         // Wrap the MILC quark field
         profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
         qParam.v = fermion[i];
-        cpuColorSpinorField cpuQuark(qParam); // create host quark field
+        ColorSpinorField cpuQuark(qParam); // create host quark field
         profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
@@ -4644,7 +4640,7 @@ void computeHISQForceQuda(void* const milc_momentum,
         // Wrap the MILC quark field
         profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
         qParam.v = fermion[i + num_terms - num_naik_terms];
-        cpuColorSpinorField cpuQuark(qParam); // create host quark field
+        ColorSpinorField cpuQuark(qParam); // create host quark field
         profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
 
         profileHISQForce.TPSTART(QUDA_PROFILE_H2D);
@@ -4805,6 +4801,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   cudaColorSpinorField tmp(qParam);
 
   // create the host quark field
+  qParam.location = QUDA_CPU_FIELD_LOCATION;
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
   qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // need expose this to interface
@@ -4846,7 +4843,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
       profileCloverForce.TPSTOP(QUDA_PROFILE_COMPUTE);
       profileCloverForce.TPSTART(QUDA_PROFILE_INIT);
       qParam.v = h_x[i];
-      cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
+      ColorSpinorField cpuQuarkX(qParam); // create host quark field
       profileCloverForce.TPSTOP(QUDA_PROFILE_INIT);
 
       profileCloverForce.TPSTART(QUDA_PROFILE_H2D);

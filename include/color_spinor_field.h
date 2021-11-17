@@ -430,7 +430,7 @@ namespace quda {
 
     //ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
-    ColorSpinorField(const ColorSpinorParam &, QudaFieldLocation);
+    ColorSpinorField(const ColorSpinorParam &);
 
     virtual ~ColorSpinorField();
 
@@ -871,7 +871,7 @@ namespace quda {
   public:
     cudaColorSpinorField(const cudaColorSpinorField &src) : ColorSpinorField(src) { }
     cudaColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src) { }
-    cudaColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param, QUDA_CUDA_FIELD_LOCATION) { }
+    cudaColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param) { }
 
     cudaColorSpinorField& operator=(const cudaColorSpinorField &src) {
       return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
@@ -883,28 +883,12 @@ namespace quda {
     cudaColorSpinorField& Component(const int idx) const;
   };
 
-  // CPU implementation
-  class cpuColorSpinorField : public ColorSpinorField {
-
-  public:
-    cpuColorSpinorField(const cpuColorSpinorField &src) : ColorSpinorField(src) { }
-    cpuColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src) { }
-    cpuColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param, QUDA_CPU_FIELD_LOCATION) { }
-
-    cpuColorSpinorField& operator=(const cpuColorSpinorField &src) {
-      return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));
-    }
-    cpuColorSpinorField& operator=(const ColorSpinorField &src) {
-      return reinterpret_cast<cpuColorSpinorField&>(ColorSpinorField::operator=(src));
-    }
-  };
-
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
                               QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr,
                               void * dstNorm = nullptr, const void* srcNorm = nullptr);
 
-  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
-  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
+  void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+  int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);
 
   /**
     @brief This function is used for copying from a source colorspinor field to a destination field
@@ -916,7 +900,7 @@ namespace quda {
   */
   void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
 
-  void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
+  void genericPrintVector(const ColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
   /**

@@ -45,9 +45,9 @@ ColorSpinorField *xoD, *yoD, *zoD, *woD, *voD;
 ColorSpinorField *xmoD, *ymoD, *zmoD;
 
 // these are pointers to the host multi-fields that have "this precision"
-std::vector<cpuColorSpinorField *> xmH;
-std::vector<cpuColorSpinorField *> ymH;
-std::vector<cpuColorSpinorField *> zmH;
+std::vector<ColorSpinorField *> xmH;
+std::vector<ColorSpinorField *> ymH;
+std::vector<ColorSpinorField *> zmH;
 int Nspin;
 int Ncolor;
 
@@ -231,11 +231,11 @@ void initFields(prec_pair_t prec_pair)
   param.pc_type = QUDA_4D_PC;
   param.location = QUDA_CPU_FIELD_LOCATION;
 
-  vH = new cpuColorSpinorField(param);
-  wH = new cpuColorSpinorField(param);
-  xH = new cpuColorSpinorField(param);
-  yH = new cpuColorSpinorField(param);
-  zH = new cpuColorSpinorField(param);
+  vH = new ColorSpinorField(param);
+  wH = new ColorSpinorField(param);
+  xH = new ColorSpinorField(param);
+  yH = new ColorSpinorField(param);
+  zH = new ColorSpinorField(param);
 
   // all host fields are double precision, so the "other" fields just alias the regular fields
   xoH = xH;
@@ -243,19 +243,19 @@ void initFields(prec_pair_t prec_pair)
   zoH = zH;
 
   xmH.reserve(Nsrc);
-  for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new ColorSpinorField(param));
   ymH.reserve(Msrc);
-  for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new ColorSpinorField(param));
   zmH.reserve(Nsrc);
-  for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new ColorSpinorField(param));
 
-  static_cast<cpuColorSpinorField *>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  for (int i = 0; i < Nsrc; i++) { static_cast<cpuColorSpinorField *>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
-  for (int i = 0; i < Msrc; i++) { static_cast<cpuColorSpinorField *>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  static_cast<ColorSpinorField *>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<ColorSpinorField *>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<ColorSpinorField *>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<ColorSpinorField *>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<ColorSpinorField *>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  for (int i = 0; i < Nsrc; i++) { static_cast<ColorSpinorField *>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  for (int i = 0; i < Msrc; i++) { static_cast<ColorSpinorField *>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   // Now set the parameters for the cuda fields
   // param.pad = xdim*ydim*zdim/2;
 

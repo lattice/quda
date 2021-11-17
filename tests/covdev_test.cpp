@@ -27,7 +27,7 @@ QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = nullptr;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
+ColorSpinorField *spinor, *spinorOut, *spinorRef;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
 
 cudaColorSpinorField* tmp;
@@ -76,10 +76,11 @@ void init(int argc, char **argv)
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
   csParam.create = QUDA_ZERO_FIELD_CREATE;    
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new cpuColorSpinorField(csParam);
-  spinorOut = new cpuColorSpinorField(csParam);
-  spinorRef = new cpuColorSpinorField(csParam);
+  spinor = new ColorSpinorField(csParam);
+  spinorOut = new ColorSpinorField(csParam);
+  spinorRef = new ColorSpinorField(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
@@ -107,6 +108,7 @@ void init(int argc, char **argv)
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.pad = inv_param.sp_pad;
   csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   printfQuda("Creating cudaSpinor\n");
   cudaSpinor = new cudaColorSpinorField(csParam);
@@ -165,7 +167,7 @@ void covdevRef(int mu)
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
 #ifdef MULTI_GPU
-  mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
+  mat_mg4dir(*spinorRef, links, ghostLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
   mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #endif    
@@ -174,7 +176,7 @@ void covdevRef(int mu)
 
 TEST(dslash, verify)
 {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
 		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";

@@ -66,12 +66,10 @@ void initFields(QudaPrecision prec)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.location = QUDA_CPU_FIELD_LOCATION;
 
-  xH = new cpuColorSpinorField(param);
-  yH = new cpuColorSpinorField(param);
-
-  //static_cast<cpuColorSpinorField*>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  //static_cast<cpuColorSpinorField*>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH = new ColorSpinorField(param);
+  yH = new ColorSpinorField(param);
 
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;

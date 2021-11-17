@@ -13,7 +13,7 @@ namespace quda {
     field.fill(*this);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param, QudaFieldLocation location_) :
+  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) :
     LatticeField(param),
     init(false),
     alloc(false),
@@ -33,7 +33,7 @@ namespace quda {
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
-    if (param.location != location_) errorQuda("location bork %d != %d", param.location, location_);
+    if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Location not set");
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -917,19 +917,7 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param)
-  {
-    ColorSpinorField *field = nullptr;
-    if (param.location == QUDA_CPU_FIELD_LOCATION) {
-      field = new cpuColorSpinorField(param);
-    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
-      field = new cudaColorSpinorField(param);
-    } else {
-      errorQuda("Invalid field location %d", param.location);
-    }
-
-    return field;
-  }
+  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
 
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
@@ -1003,16 +991,7 @@ namespace quda {
     coarseParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
       (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
-    ColorSpinorField *coarse = NULL;
-    if (new_location == QUDA_CPU_FIELD_LOCATION) {
-      coarse = new cpuColorSpinorField(coarseParam);
-    } else if (new_location== QUDA_CUDA_FIELD_LOCATION) {
-      coarse = new cudaColorSpinorField(coarseParam);
-    } else {
-      errorQuda("Invalid field location %d", new_location);
-    }
-
-    return coarse;
+    return new ColorSpinorField(coarseParam);
   }
 
   ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec,
@@ -1044,15 +1023,7 @@ namespace quda {
     fineParam.mem_type = (new_mem_type != QUDA_MEMORY_INVALID) ? new_mem_type :
       (new_location == QUDA_CUDA_FIELD_LOCATION ? QUDA_MEMORY_DEVICE : QUDA_MEMORY_PINNED);
 
-    ColorSpinorField *fine = NULL;
-    if (new_location == QUDA_CPU_FIELD_LOCATION) {
-      fine = new cpuColorSpinorField(fineParam);
-    } else if (new_location == QUDA_CUDA_FIELD_LOCATION) {
-      fine = new cudaColorSpinorField(fineParam);
-    } else {
-      errorQuda("Invalid field location %d", new_location);
-    }
-    return fine;
+    return new ColorSpinorField(fineParam);
   }
 
   // legacy CPU static ghost destructor
@@ -1737,7 +1708,7 @@ namespace quda {
   void ColorSpinorField::Source(QudaSourceType source_type, unsigned int x, int s, int c)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
-      genericSource(*reinterpret_cast<cpuColorSpinorField*>(this), source_type, x, s, c);
+      genericSource(*this, source_type, x, s, c);
     } else {
       ColorSpinorParam param(*this);
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -1750,7 +1721,7 @@ namespace quda {
       // since CPU fields cannot be low precision, use single precision instead
       if (precision < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION, false);
 
-      cpuColorSpinorField tmp(param);
+      ColorSpinorField tmp(param);
       tmp.Source(source_type, x, s, c);
       *this = tmp;
     }
