@@ -3,11 +3,12 @@
 #include <quda_api.h>
 #include <quda_target.h>
 #include <float_vector.h>
-//#include <cub_helper.cuh>
 #include <target_device.h>
 #include <reducer.h>
 #include <kernel_helper.h>
-#include <atomic.cuh>
+#include <atomic_helper.h>
+#include <group_reduce.h>
+#include <type_traits>
 
 #ifdef QUAD_SUM
 using device_reduce_t = doubledouble;
@@ -25,20 +26,6 @@ using count_t = int;
 
 namespace quda
 {
-
-  namespace reducer
-  {
-    /** returns the reduce buffer size allocated */
-    size_t buffer_size();
-
-    void *get_device_buffer();
-    void *get_mapped_buffer();
-    void *get_host_buffer();
-    count_t *get_count();
-    qudaEvent_t &get_event();
-  } // namespace reducer
-
-  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
 
   /**
      @brief The initialization value we used to check for completion
@@ -103,7 +90,7 @@ namespace quda
       partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
       result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
       result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
-      count {reducer::get_count()},
+      count {reducer::get_count<count_t>()},
       consumed(false)
     {
       // check reduction buffers are large enough if requested
@@ -267,6 +254,7 @@ namespace quda
 
 #else
 
+#if 0
   inline float toGroupReduceType(const float in) {
     return in;
   }
@@ -283,6 +271,7 @@ namespace quda
   inline sycl::double4 toGroupReduceType(const vec4<double> in) {
     return sycl::double4{in.x, in.y, in.z, in.w};
   }
+#if 0
   inline double toGroupReduceType(const quda::vector_type<double, 1> in) {
     return in[0];
   }
@@ -335,6 +324,7 @@ namespace quda
     //return sycl::vec{a,b,c,d};
     return reinterpret_cast<const sycl::vec<double,16>*>(&in);
   }
+#endif
 
   template<typename T> inline T fromGroupReduceType(float in) {
     return T{in};
@@ -384,7 +374,9 @@ namespace quda
     sycl::vec<double,16> x[2] = {t0,t1};
     agg = *reinterpret_cast<T*>(x);
   }
+#endif
 
+#if 0
   template <typename T, typename U, int N>
   void blockReduceSum(sycl::group<3> &grp, T &agg,
 		      const vector_type<quda::complex<U>, N> &in)
@@ -400,7 +392,9 @@ namespace quda
     //auto t = sycl::ONEAPI::reduce(grp, in, sycl::ONEAPI::plus<>());
     //agg = fromGroupReduceType<T>(t);
   }
+#endif
 
+#if 0
   template <typename T, typename U>
   void blockReduceSum(T &agg, const U &in)
   {
@@ -447,6 +441,63 @@ namespace quda
       blockReduceSum(grp, agg, inX);
     }
   }
+#endif
+
+  template <typename T, typename U>
+  void
+  blockReduceNoSum(sycl::group<3> &grp, T &agg, const T &in, const quda::minimum<U> &r)
+  {
+    blockReduceMin(grp, agg, in);
+  }
+
+  template <typename T, typename U>
+  void
+  blockReduceNoSum(sycl::group<3> &grp, T &agg, const T &in, const quda::maximum<U> &r)
+  {
+    blockReduceMax(grp, agg, in);
+  }
+
+  template <typename T, typename R>
+  inline std::enable_if_t<!R::do_sum,void>
+  blockReduce(sycl::group<3> &grp, T &agg, const T &in, const R &r)
+  {
+    blockReduceNoSum(grp, agg, in, typename R::reducer_t());
+  }
+
+  template <typename T, typename R>
+  inline std::enable_if_t<R::do_sum,void>
+  blockReduce(sycl::group<3> &grp, T &agg, const T &in, const R &r)
+  {
+    blockReduceSum(grp, agg, in);
+  }
+
+
+#if 0
+  template <typename T, typename R>
+  inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::minimum<T>>,void>
+  blockReduce(sycl::group<3> &grp, T &agg, const T &in, const R &r)
+  {
+    blockReduceMin(grp, agg, in);
+  }
+
+  template <typename T, typename R, typename U>
+  inline std::enable_if_t<std::is_same_v<typename R::reducer_t,quda::maximum<U>>,void>
+  blockReduce(sycl::group<3> &grp, T &agg, const T &in, const R &r)
+  {
+    blockReduceMax(grp, agg, in);
+  }
+#endif
+
+#if 0
+  template <typename T, bool doSum, typename R>
+  inline void blockReduce(sycl::group<3> &grp, T &agg, const T &in, const R &r)
+  {
+    //static const __SYCL_CONSTANT_AS char format[] = "Warning: unknown block reducer\n";
+    //static const char format[] = "Warning: unknown block reducer\n";
+    //sycl::ext::oneapi::experimental::printf(format);
+    agg = in;
+  }
+#endif
 
   //template <typename T, typename U>
   //void blockReduce(sycl::group<3> grp, T agg, T in, quda::blas::MultiReduce_<U,U> r)
@@ -478,7 +529,7 @@ namespace quda
       T aggregate;
       //T tin = in;
       blockReduce(grp, aggregate, in, r);
-      //blockReduce(grp, aggregate, in, r);
+      //blockReduce<T,Reducer::do_sum,Reducer>(grp, aggregate, in, r);
 
       auto llid = ndi.get_local_linear_id();
       auto grpRg = ndi.get_group_range(0);
@@ -511,6 +562,7 @@ namespace quda
 	  i += nloc;
 	}
 	blockReduce(grp, sum, sum, r);
+	//blockReduce<T,Reducer::do_sum,Reducer>(grp, sum, sum, r);
 
 	// write out the final reduced value
 	if (llid == 0) {

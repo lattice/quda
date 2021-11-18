@@ -184,30 +184,4 @@ namespace quda {
 
   }
 
-  /**
-     @brief This is a convenience wrapper that allows us to perform
-     reductions at the warp or sub-warp level
-  */
-  template <typename T, int width> struct WarpReduce
-  {
-    //static_assert(width <= device::warp_size(), "WarpReduce logical width must not be greater than the warp size");
-    //using warp_reduce_t = cub::WarpReduce<T, width>;
-
-    __device__ __host__ inline WarpReduce() {}
-
-    template <bool is_device, typename dummy = void> struct sum { T operator()(const T &value) { return value; } };
-
-    template <typename dummy> struct sum<true, dummy> {
-      __device__ inline T operator()(const T &value) {
-        //typename warp_reduce_t::TempStorage dummy_storage;
-        //warp_reduce_t warp_reduce(dummy_storage);
-        //return warp_reduce.Sum(value);
-	//printf("ERROR: WarpReduce not implemented!\n");
-	return value;
-      }
-    };
-
-    __device__ __host__ inline T Sum(const T &value) { return target::dispatch<sum>(value); }
-  };
-
 }

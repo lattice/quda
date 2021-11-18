@@ -223,10 +223,12 @@ template <typename T> inline void atomic_fetch_add(T *addr, T val)
   atomicAdd(addr, val);
 }
 
+#if 0
 template <typename T, int n> void atomic_fetch_add(vector_type<T, n> *addr, vector_type<T, n> val)
 {
   for (int i = 0; i < n; i++) atomic_fetch_add(&(*addr)[i], val[i]);
 }
+#endif
 
 /**
    @brief atomic_fetch_max function that does an atomic max.

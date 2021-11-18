@@ -86,11 +86,9 @@ namespace quda {
     __device__ __host__ reduce_t init() const{ return reduce_t{0.0, 0.0}; }
   };
 
-  //template <typename Arg> struct MomUpdate : maximum<vector_type<double, 2>> {
-  //using reduce_t = vector_type<double, 2>;
-  //using maximum<reduce_t>::operator();
-  template <typename Arg> struct MomUpdate {
+  template <typename Arg> struct MomUpdate : maximum<array<double, 2>> {
     using reduce_t = array<double, 2>;
+    using maximum<reduce_t>::operator();
     const Arg &arg;
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }

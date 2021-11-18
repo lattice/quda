@@ -2,6 +2,14 @@
 
 #include <CL/sycl.hpp>
 #include <cstddef>
+#include <sycl/ext/oneapi/experimental/builtins.hpp>
+
+#ifdef __SYCL_DEVICE_ONLY__
+#define __SYCL_CONSTANT_AS __attribute__((opencl_constant))
+#else
+#define __SYCL_CONSTANT_AS
+#endif
+
 
 using cudaStream_t = int;
 

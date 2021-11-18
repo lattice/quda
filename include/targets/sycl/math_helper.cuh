@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <array.h>
 
 namespace quda {
 
@@ -12,7 +13,7 @@ namespace quda {
    *
    */
   template<typename T>
-  inline __host__ __device__ T round(T a)
+  inline T round(T a)
   {
     return sycl::round(a);
   }
@@ -26,9 +27,19 @@ namespace quda {
    *
    */
   template<typename T>
-  inline __host__ __device__ T max(T a, T b)
+  inline T max(T a, T b)
   {
     return sycl::max(a, b);
+  }
+
+  template<typename T, int N>
+  inline array<T,N> max(const array<T,N> &a, const array<T,N> &b)
+  {
+    array<T,N> result;
+    for(int i=0; i<N; i++) {
+      result[i] = sycl::max(a[i], b[i]);
+    }
+    return result;
   }
 
   /**

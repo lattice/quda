@@ -186,7 +186,7 @@ namespace quda
 #if 0
   template <typename T, int n>
   struct thread_array {
-    SharedMemoryCache<vector_type<T, n>, 1, 1, false, false> device_array;
+    SharedMemoryCache<array<T, n>, 1, 1, false, false> device_array;
     int offset;
     vector_type<T, n> host_array;
     vector_type<T, n> &array;
@@ -206,18 +206,18 @@ namespace quda
 #else
   template <typename T, int n>
   struct thread_array {
-    //SharedMemoryCache<vector_type<T, n>, 1, 1, false, false> device_array;
-    //int offset;
-    vector_type<T, n> host_array;
-    //vector_type<T, n> &array;
-    thread_array() //:
-      //offset(target::local_linear_id()),
-      //array(*(device_array.data()+offset))
+    array<T, n> array_;
+    constexpr thread_array()
     {
-      //array = vector_type<T, n>(); // call default constructor
+      array_ = array<T, n>(); // call default constructor
     }
-    T& operator[](int i) { return host_array[i]; }
-    const T& operator[](int i) const { return host_array[i]; }
+    template <typename ...Ts>
+    constexpr thread_array(T first, const Ts... other)
+    {
+      array_ = array<T, n>{first, other...};
+    }
+    T& operator[](int i) { return array_[i]; }
+    const T& operator[](int i) const { return array_[i]; }
   };
 #endif
 
