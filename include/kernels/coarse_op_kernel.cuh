@@ -48,6 +48,8 @@ namespace quda {
     static constexpr bool from_coarse = from_coarse_; /** Whether the fine grid is itself a coarse grid */
     static constexpr bool is_mma_compatible = coarseGauge::is_mma_compatible; /** Whether tensor-core acceleration is applicable */
 
+    static constexpr bool from_kd_op = fineSpin == 1 && fineSpinorV::nSpin != fineSpinorAV::nSpin; /** Whether we're coarsening the KD operator or not */
+
     coarseGauge Y;           /** Computed coarse link field */
     coarseGauge X;           /** Computed coarse clover field */
 
@@ -347,7 +349,7 @@ namespace quda {
 
     if ( isHalo(coord, arg.dim, nFace, arg) ) {
 
-      int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.x_size, arg.dim, nFace);
+      int ghost_idx = (nFace == 1) ? ghostFaceIndex<1>(coord, arg.x_size, arg.dim, 1) : ghostFaceIndexStaggered<1>(coord, arg.x_size, arg.dim, 3);
       auto W = make_tile_B<complex, true>(tile);
 
       // non-KD op path

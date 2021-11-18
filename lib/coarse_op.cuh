@@ -795,7 +795,7 @@ namespace quda {
 	else if (dir == QUDA_FORWARDS) strcat(Aux,",dir=fwd");
         else if (dir == QUDA_IN_PLACE) strcat(Aux,",dir=clover");
 
-        if ((type == COMPUTE_UV || type == COMPUTE_LV) && dir != QUDA_IN_PLACE) {
+        if (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV) {
           strcat(Aux, ",nFace=");
           char nfc[2];
           u32toa(nfc, nFace);
