@@ -59,10 +59,10 @@ struct DslashTestWrapper {
   std::vector<quda::ColorSpinorField *> vp_spinorRef;
 
   // CUDA color spinor fields
-  quda::cudaColorSpinorField *cudaSpinor = nullptr;
-  quda::cudaColorSpinorField *cudaSpinorOut = nullptr;
-  quda::cudaColorSpinorField *tmp1 = nullptr;
-  quda::cudaColorSpinorField *tmp2 = nullptr;
+  quda::ColorSpinorField *cudaSpinor = nullptr;
+  quda::ColorSpinorField *cudaSpinorOut = nullptr;
+  quda::ColorSpinorField *tmp1 = nullptr;
+  quda::ColorSpinorField *tmp2 = nullptr;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -300,18 +300,18 @@ struct DslashTestWrapper {
       }
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
-      cudaSpinor = new cudaColorSpinorField(csParam);
+      cudaSpinor = new ColorSpinorField(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
-      cudaSpinorOut = new cudaColorSpinorField(csParam);
+      cudaSpinorOut = new ColorSpinorField(csParam);
 
-      tmp1 = new cudaColorSpinorField(csParam);
+      tmp1 = new ColorSpinorField(csParam);
 
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
         csParam.x[0] /= 2;
       }
 
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      tmp2 = new cudaColorSpinorField(csParam);
+      tmp2 = new ColorSpinorField(csParam);
 
       printfQuda("Sending spinor field to GPU\n");
       *cudaSpinor = *spinor;

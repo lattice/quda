@@ -16,7 +16,7 @@ namespace quda {
 
   template<typename T>
     static void applyT(T d_out[], const T d_in[], const T gamma[], const T rho[], int N)
-    { 
+    {
       if(N <= 0) return;
       for(int i=0; i<N; ++i){
         d_out[i] = d_in[i]/gamma[i];
@@ -37,7 +37,7 @@ namespace quda {
     static void applyB(T d_out[], const T d_in[], int N)
     {
       d_out[0] = static_cast<T>(0);
-      for(int i=1; i<N; ++i) d_out[i] = d_in[i-1]; 
+      for(int i=1; i<N; ++i) d_out[i] = d_in[i-1];
       return;
     }
 
@@ -58,7 +58,7 @@ namespace quda {
     {
       // s is the number of steps
       // The input and output vectors are of dimension 2*s + 1
-      const int dim = 2*s + 1;    
+      const int dim = 2*s + 1;
 
       zero(d_out, dim);
       if(k) applyT(d_out, d_in, gamma_kprev, rho_kprev, s); // compute the upper half of the vector
@@ -96,9 +96,9 @@ namespace quda {
 
   }
 
-  void MPCG::computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec)
+  void MPCG::computeMatrixPowers(ColorSpinorField out[], ColorSpinorField &in, int nvec)
   {
-    cudaColorSpinorField temp(in);
+    ColorSpinorField temp(in);
     out[0] = in;
     for(int i=1; i<nvec; ++i){
       mat(out[i], out[i-1], temp);
@@ -106,9 +106,9 @@ namespace quda {
     return;
   }
 
-  void MPCG::computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps)
+  void MPCG::computeMatrixPowers(std::vector<ColorSpinorField>& out, std::vector<ColorSpinorField>& in, int nsteps)
   {
-    cudaColorSpinorField temp(in[0]);
+    ColorSpinorField temp(in[0]);
 
     for(int i=0; i<=nsteps; ++i) out[i] = in[i];
 
@@ -119,16 +119,16 @@ namespace quda {
   }
 
 #ifdef SSTEP
-  static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v, double* mu){
+  static void computeGramMatrix(double** G, std::vector<ColorSpinorField>& v, double* mu){
 
     const int dim = v.size();
     const int nsteps = (dim-1)/2;
 
     {
-      std::vector<cudaColorSpinorField*> vp1; vp1.reserve((nsteps+1)*nsteps);
-      std::vector<cudaColorSpinorField*> vp2; vp2.reserve((nsteps+1)*nsteps);
+      std::vector<ColorSpinorField*> vp1; vp1.reserve((nsteps+1)*nsteps);
+      std::vector<ColorSpinorField*> vp2; vp2.reserve((nsteps+1)*nsteps);
       double g[(nsteps+1)*nsteps];
-    
+
       for(int i=0; i<nsteps; ++i){
         for(int j=nsteps; j<dim; j++){
           vp1.push_back(&v[i]);
@@ -148,8 +148,8 @@ namespace quda {
     const int num = dim-nsteps;
     const int offset = nsteps;
     double d[2*nsteps+1];
-    std::vector<cudaColorSpinorField*> vp1; vp1.reserve(2*nsteps+1);
-    std::vector<cudaColorSpinorField*> vp2; vp2.reserve(2*nsteps+1);
+    std::vector<ColorSpinorField*> vp1; vp1.reserve(2*nsteps+1);
+    std::vector<ColorSpinorField*> vp2; vp2.reserve(2*nsteps+1);
     for(int i=0; i<=nsteps; ++i){
       vp1.push_back(&v[0+offset]);
       vp2.push_back(&v[i+offset]);
@@ -160,7 +160,7 @@ namespace quda {
     }
 
 
-    blas::reDotProduct(d,vp1,vp2); 
+    blas::reDotProduct(d,vp1,vp2);
 
     for(int i=0; i<num; ++i){
       for(int j=0; j<=i; ++j){
@@ -170,14 +170,14 @@ namespace quda {
     for(int i=0; i<nsteps; ++i){
       G[i][i] = mu[i];
     }
-  } 
+  }
 
-          
+
   static void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
 
     result = 0.0;
     const int nsteps = (dim-1)/2;
-    
+
     for(int i=nsteps; i<dim; ++i){
       for(int j=nsteps; j<dim; ++j){
         result += u[i]*v[j]*G[i][j];
@@ -190,9 +190,6 @@ namespace quda {
       }
       result += u[i]*v[i]*G[i][i];
     }
-
-
-    return;
   }
 #endif // SSTEP
 
@@ -201,7 +198,7 @@ namespace quda {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");
 #else
-    // Check to see that we're not trying to invert on a zero-field source    
+    // Check to see that we're not trying to invert on a zero-field source
     const double b2 = blas::norm2(b);
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -212,21 +209,19 @@ namespace quda {
       return;
     }
 
-
-    cudaColorSpinorField temp(b); // temporary field
+    ColorSpinorField temp(b); // temporary field
 
     // Use ColorSpinorParam to create zerod fields
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField x_prev(x,csParam);
-    cudaColorSpinorField x_new(x,csParam);
-
+    ColorSpinorField x_prev(x,csParam);
+    ColorSpinorField x_new(x,csParam);
 
     const int s = 2;
 
     // create the residual array and the matrix powers array
-    std::vector<cudaColorSpinorField> R(s+1,cudaColorSpinorField(b,csParam));
-    std::vector<cudaColorSpinorField> V(2*s+1,cudaColorSpinorField(b,csParam));
+    std::vector<ColorSpinorField> R(s+1, ColorSpinorField(b,csParam));
+    std::vector<ColorSpinorField> V(2*s+1, ColorSpinorField(b,csParam));
 
     // Set up the first residual
     for(int i=0; i<s; ++i) blas::zero(R[i]);
@@ -246,18 +241,17 @@ namespace quda {
     double* g_p1 = new double[2*s+1];
     double* g_p2 = new double[2*s+1];
     double** G  = new double*[2*s+1];
-    for(int i=0; i<(2*s+1); ++i){
+    for (int i=0; i<(2*s+1); ++i) {
       G[i] = new double[2*s+1];
-    } 
-
+    }
 
     // Matrix powers kernel
-    // The first s vectors hold the previous s residuals 
+    // The first s vectors hold the previous s residuals
     // v[s] holds current residual
     // v[s+1] holds A r
     // v[s+2] holds A^(2)r
     // v[2*s] holds A^(s)r
-    cudaColorSpinorField w(b);
+    ColorSpinorField w(b);
 
     double rAr;
 
@@ -266,41 +260,38 @@ namespace quda {
     //    double rho_prev = 0.0;
     double rho[s];
     double mu[s];
-    double gamma[s];   
+    double gamma[s];
     double rho_kprev[s];
     double gamma_kprev[s];
 
-    zero(mu,s); 
+    zero(mu,s);
 
     for(int i=0; i<(2*s+1); ++i){
-      zero(G[i], (2*s+1)); 
+      zero(G[i], (2*s+1));
     }
-
 
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
-      computeMatrixPowers(V, R, s); 
+      computeMatrixPowers(V, R, s);
       computeGramMatrix(G,V, mu);
-    
+
       R[0] = R[s];
 
       int j = 0;
-      while(!convergence(r2,0.0,stop,0.0) && j<s){ 
+      while(!convergence(r2,0.0,stop,0.0) && j<s){
         const int prev_idx = j ? j-1 : s-1;
-        cudaColorSpinorField& R_prev = R[prev_idx];
+        ColorSpinorField& R_prev = R[prev_idx];
         double& mu_prev    = mu[prev_idx];
         double& rho_prev   = rho[prev_idx];
         double& gamma_prev = gamma[prev_idx];
 
-
-
-        if(j == 0){ 
+        if(j == 0){
           zero(d, 2*s+1); d[s+1] = 1.0;
           w = V[s+1];
           zero(g, 2*s+1); g[s] = 1.0;
         }else{
-          if(j==1){ 
+          if(j==1){
             zero(d_p2, 2*s+1);
             if(k > 0){
               d_p2[s-2] = (1 - rho_kprev[s-1])/(rho_kprev[s-1]*gamma_kprev[s-1]);
@@ -312,13 +303,13 @@ namespace quda {
           }
           // compute g coeffs
           for(int i=0; i<(2*s+1); ++i){
-            g[i] = rho[j-1]*g_p1[i] - rho[j-1]*gamma[j-1]*d_p1[i] 
+            g[i] = rho[j-1]*g_p1[i] - rho[j-1]*gamma[j-1]*d_p1[i]
                  + (1 - rho[j-1])*g_p2[i];
           }
-       
-          // compute d coeffs 
+
+          // compute d coeffs
           computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_kprev, rho_kprev);
-	  blas::zero(w); 
+	  blas::zero(w);
           for(int i=0; i<(2*s+1); ++i){
             if(d[i] != 0.) blas::axpy(d[i], V[i], w);
           }
@@ -329,7 +320,7 @@ namespace quda {
 
         mu[j] = r2;
         gamma[j] = r2/rAr;
-        rho[j] = (it==0) ? 1.0 : 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));  
+        rho[j] = (it==0) ? 1.0 : 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));
 
         R[j+1] = R_prev;
 	blas::ax((1.0 - rho[j]), R[j+1]);
@@ -341,16 +332,13 @@ namespace quda {
 	blas::axpy(rho[j], x, x_new);
 	blas::axpy(gamma[j]*rho[j], R[j], x_new);
 
-
-
         // copy d to d_p1
-        if(j>0){ 
+        if(j>0){
           for(int i=0; i<(2*s+1); ++i) d_p2[i] = d_p1[i];
           for(int i=0; i<(2*s+1); ++i) g_p2[i] = g_p1[i];
         }
         for(int i=0; i<(2*s+1); ++i) d_p1[i] = d[i];
         for(int i=0; i<(2*s+1); ++i) g_p1[i] = g[i];
-    
 
         PrintStats("MPCG", it, r2, b2, 0.0);
         it++;
@@ -360,8 +348,6 @@ namespace quda {
         ++j;
       } // loop over j
 
-
-
       for(int i=0; i<s; ++i){
         rho_kprev[i] = rho[i];
         gamma_kprev[i] = gamma[i];
@@ -369,10 +355,8 @@ namespace quda {
       k++;
     }
 
-
     mat(R[0], x_prev, temp);
     param.true_res = sqrt(blas::xmyNorm(b, R[0]) / b2);
-
 
     PrintSummary("MPCG", it, r2, b2, stop, param.tol_hq);
 
@@ -389,7 +373,6 @@ namespace quda {
     }
     delete G;
 #endif // sstep
-    return;
   }
 
 } // namespace quda

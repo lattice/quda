@@ -61,9 +61,9 @@ struct StaggeredDslashTestWrapper {
   ColorSpinorField *spinorOut = nullptr;
   ColorSpinorField *spinorRef = nullptr;
   ColorSpinorField *tmpCpu = nullptr;
-  cudaColorSpinorField *cudaSpinor = nullptr;
-  cudaColorSpinorField *cudaSpinorOut = nullptr;
-  cudaColorSpinorField *tmp = nullptr;
+  ColorSpinorField *cudaSpinor = nullptr;
+  ColorSpinorField *cudaSpinorOut = nullptr;
+  ColorSpinorField *tmp = nullptr;
 
   std::vector<ColorSpinorField *> vp_spinor;
   std::vector<ColorSpinorField *> vp_spinor_out;
@@ -315,10 +315,10 @@ struct StaggeredDslashTestWrapper {
     csParam.setPrecision(inv_param.cuda_prec);
     csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-    cudaSpinor = new cudaColorSpinorField(csParam);
-    cudaSpinorOut = new cudaColorSpinorField(csParam);
+    cudaSpinor = new ColorSpinorField(csParam);
+    cudaSpinorOut = new ColorSpinorField(csParam);
     *cudaSpinor = *spinor;
-    tmp = new cudaColorSpinorField(csParam);
+    tmp = new ColorSpinorField(csParam);
 
     bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
     // because both call the same "Dslash" directly.

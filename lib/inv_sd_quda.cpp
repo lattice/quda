@@ -35,10 +35,10 @@ namespace quda {
   {
     commGlobalReductionPush(param.global_reduction);
 
-    if(!init){
-      r = new cudaColorSpinorField(b);
-      Ar = new cudaColorSpinorField(b);
-      y = new cudaColorSpinorField(b);
+    if (!init) {
+      r = new ColorSpinorField(b);
+      Ar = new ColorSpinorField(b);
+      y = new ColorSpinorField(b);
       init = true;
     }
 
@@ -50,8 +50,7 @@ namespace quda {
     double3 rAr;
 
     int k=0;
-    while(k < param.maxiter-1){
-
+    while(k < param.maxiter-1) {
       mat(*Ar, *r, *y);
       rAr = cDotProductNormA(*r, *Ar);
       alpha = rAr.z/rAr.x;
@@ -65,7 +64,6 @@ namespace quda {
 
       ++k;
     }
-
 
     rAr = cDotProductNormA(*r, *Ar);
     alpha = rAr.z/rAr.x;
@@ -85,7 +83,6 @@ namespace quda {
     } // >= QUDA_DEBUG_VERBOSITY
 
     commGlobalReductionPop();
-    return;
   }
 
 } // namespace quda

@@ -21,8 +21,8 @@ namespace quda {
   }
 
 
-  void MPBiCGstab::computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps){
-    cudaColorSpinorField temp(p);
+  void MPBiCGstab::computeMatrixPowers(std::vector<ColorSpinorField>& pr, ColorSpinorField& p, ColorSpinorField& r, int nsteps){
+    ColorSpinorField temp(p);
     pr[0] = p;
     for(int i=1; i<=(2*nsteps); ++i){
       mat(pr[i], pr[i-1], temp);
@@ -57,7 +57,7 @@ namespace quda {
     }
 
 
-  static void computeGramMatrix(Complex** G, std::vector<cudaColorSpinorField>& v){
+  static void computeGramMatrix(Complex** G, std::vector<ColorSpinorField>& v){
 
     const int dim = v.size();
 
@@ -69,7 +69,7 @@ namespace quda {
     return;
   }
 
-  static void computeGramVector(Complex* g, cudaColorSpinorField& r0, std::vector<cudaColorSpinorField>& pr){
+  static void computeGramVector(Complex* g, ColorSpinorField& r0, std::vector<ColorSpinorField>& pr){
 
     const int dim = pr.size();
 
@@ -146,27 +146,20 @@ namespace quda {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    cudaColorSpinorField temp(b, csParam);
-
-    cudaColorSpinorField r(b);
-
-
+    ColorSpinorField temp(b, csParam);
+    ColorSpinorField r(b);
 
     mat(r, x, temp);  // r = Ax
     double r2 = blas::xmyNorm(b,r); // r = b - Ax
 
-
-
-    cudaColorSpinorField r0(r);
-    cudaColorSpinorField p(r);
-    cudaColorSpinorField Ap(r);
-
+    ColorSpinorField r0(r);
+    ColorSpinorField p(r);
+    ColorSpinorField Ap(r);
 
     const int s = 3;
 
     // Vector of matrix powers
-    std::vector<cudaColorSpinorField> PR(4*s+2,cudaColorSpinorField(b,csParam));
-
+    std::vector<ColorSpinorField> PR(4*s+2, ColorSpinorField(b,csParam));
 
     Complex r0r;
     Complex alpha;

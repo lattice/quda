@@ -278,8 +278,8 @@ namespace quda {
     }
 
     // normally used to create cuda param from a cpu param
-    ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
-                     QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
+  ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
+                     QudaFieldLocation location) :
       LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
       location(location),
       nColor(cpuParam.nColor),
@@ -289,7 +289,7 @@ namespace quda {
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
       fieldOrder(QUDA_INVALID_FIELD_ORDER),
       gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
-      create(QUDA_COPY_FIELD_CREATE),
+      create(QUDA_NULL_FIELD_CREATE),
       pc_type(cpuParam.pc_type),
       suggested_parity(cpuParam.suggested_parity),
       v(0),
@@ -755,7 +755,7 @@ namespace quda {
      */
     void OffsetIndex(int &i, int *y) const;
 
-    static ColorSpinorField* Create(const ColorSpinorParam &param);
+    static ColorSpinorField* Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -865,24 +865,6 @@ namespace quda {
     friend class ColorSpinorParam;
   };
 
-  // CUDA implementation
-  class cudaColorSpinorField : public ColorSpinorField {
-
-  public:
-    cudaColorSpinorField(const cudaColorSpinorField &src) : ColorSpinorField(src) { }
-    cudaColorSpinorField(const ColorSpinorField &src) : ColorSpinorField(src) { }
-    cudaColorSpinorField(const ColorSpinorParam &param) : ColorSpinorField(param) { }
-
-    cudaColorSpinorField& operator=(const cudaColorSpinorField &src) {
-      return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
-    }
-    cudaColorSpinorField& operator=(const ColorSpinorField &src) {
-      return reinterpret_cast<cudaColorSpinorField&>(ColorSpinorField::operator=(src));
-    }
-
-    cudaColorSpinorField& Component(const int idx) const;
-  };
-
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
                               QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr,
                               void * dstNorm = nullptr, const void* srcNorm = nullptr);
@@ -901,7 +883,7 @@ namespace quda {
   void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
 
   void genericPrintVector(const ColorSpinorField &a, unsigned int x);
-  void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
+  void genericCudaPrintVector(const ColorSpinorField &a, unsigned x);
 
   /**
      @brief Generic ghost packing routine

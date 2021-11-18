@@ -14,7 +14,7 @@
 using namespace quda;
 
 QudaGaugeParam param;
-cudaColorSpinorField *cudaSpinor;
+ColorSpinorField *cudaSpinor;
 
 void *qdpCpuGauge_p[4];
 void *cpsCpuGauge_p;
@@ -82,7 +82,7 @@ void init() {
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
   csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-  cudaSpinor = new cudaColorSpinorField(csParam);
+  cudaSpinor = new ColorSpinorField(csParam);
 }
 
 void end() {

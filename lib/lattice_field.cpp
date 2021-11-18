@@ -577,7 +577,7 @@ namespace quda {
   void LatticeField::write(char *) { errorQuda("Not implemented"); }
 
   int LatticeField::Nvec() const {
-    if (typeid(*this) == typeid(const cudaColorSpinorField)) {
+    if (typeid(*this) == typeid(const ColorSpinorField)) {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());

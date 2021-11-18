@@ -79,8 +79,8 @@ void initFields(QudaPrecision prec)
   param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
-  xD = new cudaColorSpinorField(param);
-  yD = new cudaColorSpinorField(param);
+  xD = new ColorSpinorField(param);
+  yD = new ColorSpinorField(param);
 
   //*xD = *xH;
   //*yD = *yH;

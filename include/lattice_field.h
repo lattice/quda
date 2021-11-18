@@ -23,7 +23,6 @@ namespace quda {
   class LatticeField;
 
   class ColorSpinorField;
-  class cudaColorSpinorField;
   
   class EigValueSet;
   class cudaEigValueSet;

@@ -122,17 +122,17 @@ namespace quda
       }
     }
 
-    cudaColorSpinorField *minvrPre = NULL;
-    cudaColorSpinorField *rPre = NULL;
-    cudaColorSpinorField *minvr = NULL;
-    cudaColorSpinorField *minvrSloppy = NULL;
-    cudaColorSpinorField *p = NULL;
+    ColorSpinorField *minvrPre = NULL;
+    ColorSpinorField *rPre = NULL;
+    ColorSpinorField *minvr = NULL;
+    ColorSpinorField *minvrSloppy = NULL;
+    ColorSpinorField *p = NULL;
 
     ColorSpinorParam csParam(b);
-    cudaColorSpinorField r(b);
-    if (K) minvr = new cudaColorSpinorField(b);
+    ColorSpinorField r(b);
+    if (K) minvr = new ColorSpinorField(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(csParam);
+    ColorSpinorField y(csParam);
 
     csParam.setPrecision(param.precision_sloppy);
 
@@ -176,29 +176,29 @@ namespace quda
       r2 = blas::xmyNorm(b, r);
     }
 
-    cudaColorSpinorField Ap(csParam);
+    ColorSpinorField Ap(csParam);
 
-    cudaColorSpinorField *r_sloppy;
+    ColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
       minvrSloppy = minvr;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.field = &r;
-      r_sloppy = new cudaColorSpinorField(csParam);
+      r_sloppy = new ColorSpinorField(csParam);
       if (K) {
         csParam.field = minvr;
-        minvrSloppy = new cudaColorSpinorField(csParam);
+        minvrSloppy = new ColorSpinorField(csParam);
       }
     }
 
-    cudaColorSpinorField *x_sloppy;
+    ColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-      x_sloppy = &static_cast<cudaColorSpinorField &>(x);
+      x_sloppy = &x;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.field = &x;
-      x_sloppy = new cudaColorSpinorField(csParam);
+      x_sloppy = new ColorSpinorField(csParam);
     }
 
     ColorSpinorField &xSloppy = *x_sloppy;
@@ -213,14 +213,14 @@ namespace quda
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.setPrecision(Kparam.precision);
       csParam.field = r_sloppy;
-      rPre = new cudaColorSpinorField(csParam);
+      rPre = new ColorSpinorField(csParam);
       // Create minvrPre
-      minvrPre = new cudaColorSpinorField(*rPre);
+      minvrPre = new ColorSpinorField(*rPre);
       (*K)(*minvrPre, *rPre);
       *minvrSloppy = *minvrPre;
-      p = new cudaColorSpinorField(*minvrSloppy);
+      p = new ColorSpinorField(*minvrSloppy);
     } else {
-      p = new cudaColorSpinorField(rSloppy);
+      p = new ColorSpinorField(rSloppy);
     }
 
     profile.TPSTOP(QUDA_PROFILE_INIT);

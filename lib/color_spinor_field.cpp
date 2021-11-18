@@ -212,7 +212,7 @@ namespace quda {
         param.component_id = cid;
         param.v = static_cast<void*>(static_cast<char*>(v) + cid * bytes / composite_descr.dim);
         param.norm = static_cast<void*>(static_cast<char*>(norm) + cid * norm_bytes / composite_descr.dim);
-        components.push_back(ColorSpinorField::Create(param));
+        components.push_back(new ColorSpinorField(param));
       }
     }
 
@@ -227,10 +227,10 @@ namespace quda {
       param.composite_dim = 0;
       param.is_component  = composite_descr.is_component;
       param.component_id  = composite_descr.id;
-      even = ColorSpinorField::Create(param);
+      even = new ColorSpinorField(param);
       param.v = static_cast<char*>(v) + bytes / 2;
       param.norm = static_cast<char*>(norm) + norm_bytes / 2;
-      odd = ColorSpinorField::Create(param);
+      odd = new ColorSpinorField(param);
     }
 
     if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE) {
@@ -917,8 +917,6 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
-  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
-
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
     if (param_.Precision() > precision)  errorQuda("Cannot create an alias to source with lower precision than the alias");
@@ -937,7 +935,7 @@ namespace quda {
       param.norm = Norm() ? Norm() : static_cast<char *>(V()) + norm_offset;
     }
 
-    auto alias = ColorSpinorField::Create(param);
+    auto alias = new ColorSpinorField(param);
 
     if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
     if (alias->Precision() < QUDA_SINGLE_PRECISION) {
@@ -1475,7 +1473,7 @@ namespace quda {
       }
 
       if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
-      reinterpret_cast<cudaColorSpinorField&>(const_cast<ColorSpinorField&>(*this)).createComms(nFace, false);
+      const_cast<ColorSpinorField&>(*this).createComms(nFace, false);
 
       // first set default values to device if needed
       MemoryLocation pack_destination[2*QUDA_MAX_DIM], halo_location[2*QUDA_MAX_DIM];

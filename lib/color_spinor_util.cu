@@ -446,9 +446,8 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   // the above host print function.
 
   template <typename StoreType, int Ns, int Nc, QudaFieldOrder FieldOrder>
-  void genericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
+  void genericCudaPrintVector(const ColorSpinorField &field, unsigned int i)
   {
-
     typedef colorspinor::AccessorCB<StoreType, Ns, Nc, 1, FieldOrder> AccessorType;
 
     AccessorType A(field);
@@ -494,7 +493,7 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   }
 
   template <typename Float, int Ns, int Nc>
-  void genericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
+  void genericCudaPrintVector(const ColorSpinorField &field, unsigned int i)
   {
     switch (field.FieldOrder()) {
     case QUDA_FLOAT_FIELD_ORDER: genericCudaPrintVector<Float, Ns, Nc, QUDA_FLOAT_FIELD_ORDER>(field, i); break;
@@ -512,7 +511,7 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   }
 
   template <typename Float> struct GenericCudaPrintVector {
-    GenericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
+    GenericCudaPrintVector(const ColorSpinorField &field, unsigned int i)
     {
       if (field.Ncolor() == 3 && field.Nspin() == 4) {
         genericCudaPrintVector<Float, 4, 3>(field, i);
@@ -536,8 +535,9 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
     }
   };
 
-  void genericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
+  void genericCudaPrintVector(const ColorSpinorField &field, unsigned int i)
   {
+    if (field.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("host field not implemented");
     instantiatePrecision<GenericCudaPrintVector>(field, i);
   }
 

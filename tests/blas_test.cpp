@@ -267,18 +267,18 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.location = QUDA_CUDA_FIELD_LOCATION;
-  vD = new cudaColorSpinorField(param);
-  wD = new cudaColorSpinorField(param);
-  xD = new cudaColorSpinorField(param);
-  yD = new cudaColorSpinorField(param);
-  zD = new cudaColorSpinorField(param);
+  vD = new ColorSpinorField(param);
+  wD = new ColorSpinorField(param);
+  xD = new ColorSpinorField(param);
+  yD = new ColorSpinorField(param);
+  zD = new ColorSpinorField(param);
 
   param.setPrecision(prec_other, prec_other, true);
-  voD = new cudaColorSpinorField(param);
-  woD = new cudaColorSpinorField(param);
-  xoD = new cudaColorSpinorField(param);
-  yoD = new cudaColorSpinorField(param);
-  zoD = new cudaColorSpinorField(param);
+  voD = new ColorSpinorField(param);
+  woD = new ColorSpinorField(param);
+  xoD = new ColorSpinorField(param);
+  yoD = new ColorSpinorField(param);
+  zoD = new ColorSpinorField(param);
 
   // create composite fields
   param.is_composite = true;
@@ -286,23 +286,23 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.composite_dim = Nsrc;
-  xmD = new cudaColorSpinorField(param);
+  xmD = new ColorSpinorField(param);
 
   param.composite_dim = Msrc;
-  ymD = new cudaColorSpinorField(param);
+  ymD = new ColorSpinorField(param);
 
   param.composite_dim = Nsrc;
-  zmD = new cudaColorSpinorField(param);
+  zmD = new ColorSpinorField(param);
 
   param.setPrecision(prec_other, prec_other, true);
   param.composite_dim = Nsrc;
-  xmoD = new cudaColorSpinorField(param);
+  xmoD = new ColorSpinorField(param);
 
   param.composite_dim = Msrc;
-  ymoD = new cudaColorSpinorField(param);
+  ymoD = new ColorSpinorField(param);
 
   param.composite_dim = Nsrc;
-  zmoD = new cudaColorSpinorField(param);
+  zmoD = new ColorSpinorField(param);
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));

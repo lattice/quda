@@ -28,9 +28,9 @@ QudaInvertParam inv_param;
 cpuGaugeField *cpuLink = nullptr;
 
 ColorSpinorField *spinor, *spinorOut, *spinorRef;
-cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
+ColorSpinorField *cudaSpinor, *cudaSpinorOut;
 
-cudaColorSpinorField* tmp;
+ColorSpinorField* tmp;
 
 void *links[4];
 
@@ -111,10 +111,10 @@ void init(int argc, char **argv)
   csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   printfQuda("Creating cudaSpinor\n");
-  cudaSpinor = new cudaColorSpinorField(csParam);
+  cudaSpinor = new ColorSpinorField(csParam);
 
   printfQuda("Creating cudaSpinorOut\n");
-  cudaSpinorOut = new cudaColorSpinorField(csParam);
+  cudaSpinorOut = new ColorSpinorField(csParam);
 
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
@@ -124,7 +124,7 @@ void init(int argc, char **argv)
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tmp = new cudaColorSpinorField(csParam);
+  tmp = new ColorSpinorField(csParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
