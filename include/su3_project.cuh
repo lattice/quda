@@ -103,13 +103,10 @@ namespace quda {
     Float mod = pow(norm(det), negative_sixth);
     Float angle = arg(det);
 
-    complex<Float> cTemp;
-    //
-    // On HIP &cTemp.y may be a weird type (some typename  Accessor<Weirdness>::Address)
-    // So the static cast needs to trip the inplicit conversion.
-    quda::sincos(negative_third * angle, static_cast<Float*>(&cTemp.y), static_cast<Float*>(&cTemp.x));
+    Float re, im;
+    quda::sincos(negative_third * angle, &im, &re);
 
-    in = (mod*cTemp)*out;
+    in = complex<Float>(mod * re, mod * im) * out;
   }
 
   

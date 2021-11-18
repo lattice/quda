@@ -69,8 +69,8 @@ namespace quda {
         }
         else hipGetLastError();
       }
-    }
-  }
+    } // namespace hip
+  } // namespace target
 
   using namespace target::hip;
   

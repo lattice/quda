@@ -1,7 +1,7 @@
 #pragma once
 
 #include <target_device.h>
-#include <float_vector.h>
+#include <array.h>
 
 /**
    @file shared_memory_cache_helper.cuh
@@ -225,20 +225,27 @@ namespace quda
 
   template <typename T, int n>
   struct thread_array {
-    SharedMemoryCache<vector_type<T, n>, 1, 1, false, false> device_array;
+    SharedMemoryCache<array<T, n>, 1, 1, false, false> device_array;
     int offset;
-    vector_type<T, n> host_array;
-    vector_type<T, n> &array;
+    array<T, n> host_array;
+    array<T, n> &array_;
 
     __device__ __host__ constexpr thread_array() :
       offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
-      array(target::is_device() ? *(device_array.data() + offset) : host_array)
+      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
     {
-      array = vector_type<T, n>(); // call default constructor
+      array_ = array<T, n>(); // call default constructor
     }
 
-    __device__ __host__ T& operator[](int i) { return array[i]; }
-    __device__ __host__ const T& operator[](int i) const { return array[i]; }
+    template <typename ...Ts> __device__ __host__ constexpr thread_array(T first, const Ts... other) :
+      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
+      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
+    {
+      array_ = array<T, n>{first, other...};
+    }
+
+    __device__ __host__ T& operator[](int i) { return array_[i]; }
+    __device__ __host__ const T& operator[](int i) const { return array_[i]; }
   };
 
 } // namespace quda

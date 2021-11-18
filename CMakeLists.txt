@@ -36,7 +36,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(cmake/CPM.cmake)
 
 find_package(Git)
-find_package(PythonInterp)
 
 # By default we will build DEVEL. The different build types will pass different
 # flags to the compiler which may be strict or permissive on warnings, or
@@ -87,7 +86,7 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA") 
+if( ${CHECK_TARGET_TYPE} STREQUAL "CUDA")
   set(QUDA_TARGET_CUDA ON)
   set(QUDA_TARGET_LIBRARY quda_cuda_target)
 endif()
@@ -149,7 +148,7 @@ if(GIT_FOUND)
       COMMAND wc -l
       OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} describe --long --dirty
+      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always  --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
@@ -169,9 +168,26 @@ message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
 message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "QUDA target: ${QUDA_TARGET_TYPE}")
-####################################################################################
-# END 1. Basic setup for cmake
-####################################################################################
+
+# ######################################################################################################################
+# QUDA OPTIONS likely to be changed by users
+# ######################################################################################################################
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH sm_70)
+endif()
+if(NOT QUDA_GPU_ARCH)
+  message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
+endif()
+
+set(QUDA_GPU_ARCH
+    ${QUDA_DEFAULT_GPU_ARCH}
+    CACHE STRING "set the GPU architecture (sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
+set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
+set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
+mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -298,11 +314,7 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-# QIO legacy support
-option(QUDA_DOWNLOAD_QIO_LEGACY "download qio2-5-0 branch of QIO instead of extended (API compatible) branch" OFF)
-
 # NVTX options
-option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
 option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 
 # features in development
@@ -340,8 +352,6 @@ mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
-
-mark_as_advanced(QUDA_DOWNLOAD_QIO_LEGACY)
 
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
 mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
@@ -515,9 +525,15 @@ set(CMAKE_CUDA_FLAGS_DEBUG
     message(FATAL_ERROR "GFX arch values are inappropriate for QUDA builds")
   endif()
 
-  set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
   string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+  if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
+    set(QUDA_GPU_ARCH_SUFFIX real)
+  endif()
+  if(QUDA_GPU_ARCH_SUFFIX)
+    set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+  else()
+    set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+  endif()
   set(COMP_CAP "${COMP_CAP}0")
   
   enable_language(CUDA)
@@ -525,14 +541,14 @@ set(CMAKE_CUDA_FLAGS_DEBUG
   message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
   
   # CUDA Wrapper for finding libs etc
-  find_package(CUDAToolkit)
-  
-  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+  find_package(CUDAToolkit REQUIRED)
+
+  if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC" OR CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
     set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
     message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
   endif()
   include(CMakeDependentOption)
-  CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+  CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)  
 
   #########################################
   # HIP TARGET
@@ -552,12 +568,8 @@ else()
   message(ERROR "Unknown QUDA_TARGET")
 endif()
 
-
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
 if( QUDA_TARGET_CUDA )
@@ -583,13 +595,14 @@ endif()
 add_library(Eigen INTERFACE IMPORTED)
 # set(CPM_USE_LOCAL_PACKAGES TRUE)
 if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.3.9)
+  set(QUDA_EIGEN_VERSION "3.4.0" CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
+  mark_as_advanced(QUDA_EIGEN_VERSION)
   CPMAddPackage(
     NAME Eigen
-    VERSION ${EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.bz2
+    VERSION ${QUDA_EIGEN_VERSION}
+    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
     DOWNLOAD_ONLY YES 
-  )
+    )
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
 else()
   # fall back to using find_package
@@ -692,7 +705,7 @@ endif()
 ####################################
 # USQCD 
 ####################################
-# We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not wotrk if not set on the initial run
+# We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/usqcd CACHE PATH "..." FORCE)
 endif()
@@ -701,24 +714,20 @@ endif()
 # QMP
 ####################################
 if(QUDA_QMP)
-  #message(STATUS "Looking for QMP")
-  find_package(QMP QUIET) 
-  #if( QMP_FOUND ) 
-  #  message(STATUS "Found QMP")
-  #else()
-  #  message(STATUS "QMP not found")
-  #endif()
-#TODO: Think about logic here 
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+  if(QUDA_DOWNLOAD_USQCD)
+    set(QUDA_QMP_TAG "3010fef" CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
+    mark_as_advanced(QUDA_QMP_TAG)  
     CPMAddPackage(
       NAME QMP
       GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG 9b0f958
+      GIT_TAG ${QUDA_QMP_TAG}
       OPTIONS
       "QMP_MPI ON"
-      "QMP_TESTING" "OFF"
-      "QMP_BUILD_DOCS" "OFF"
+      "QMP_TESTING OFF"
+      "QMP_BUILD_DOCS OFF"
     )
+  else()
+    find_package(QMP REQUIRED) 
   endif()
 endif()
 
@@ -729,25 +738,21 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
- # message(STATUS "Looking for QIO")
-  find_package(QIO QUIET)
-  # if( QIO_FOUND )
-    # message(STATUS "QIO Found")
-  # else() 
-    # message(STATUS "QIO Not Found")
-  #endif()
-#TODO: Think about logic here 
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+  if(QUDA_DOWNLOAD_USQCD)
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
       GITHUB_REPOSITORY usqcd-software/qio
-      GIT_TAG 0627f013
+      GIT_TAG ${QUDA_QIO_TAG}
       OPTIONS 
         "QIO_ENABLE_PARALLEL_BUILD ON"
         "QIO_ENABLE_QMP_ROUTE OFF" 
         "QIO_ENABLE_OUTPUT_BUFFERING ON" 
         "QIO_DML_BUF_BYTES 33554432"
     )
+  else()
+    find_package(QIO REQUIRED)
   endif()
 endif()
 
@@ -756,7 +761,7 @@ endif()
 ####################################
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
   endif()
   find_package(QDPXX REQUIRED)
   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
@@ -862,7 +867,7 @@ if(QUDA_OPENBLAS)
 
   if(QUDA_DOWNLOAD_OPENBLAS)
   #TODO: switch to CPM
-  include(GNUInstallDirs)
+    include(GNUInstallDirs)
     ExternalProject_Add(
       OPENBLAS
       GIT_REPOSITORY https://github.com/xianyi/OpenBLAS.git
@@ -897,7 +902,7 @@ if(QUDA_BACKWARDS)
   FetchContent_Declare(
     backward-cpp
     GIT_REPOSITORY https://github.com/bombela/backward-cpp.git
-    GIT_TAG v1.5
+    GIT_TAG v1.6
     GIT_SHALLOW ON)
   FetchContent_GetProperties(backward-cpp)
   if(NOT backward-cpp_POPULATED)

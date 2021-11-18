@@ -14,7 +14,9 @@ namespace quda
 {
 
   namespace mobius_tensor_core {
+
 #ifdef QUDA_MMA_AVAILABLE
+
     template <class store_t, int nColor, QudaReconstructType recon> class FusedDslash : public TunableGridStrideKernel2D
     {
       ColorSpinorField &out;
@@ -98,12 +100,12 @@ namespace quda
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
-            return (a_size * 2 + b_size) * sizeof(half) + 128;
+            return (a_size * 2 + b_size) * sizeof(half);
           } else {
-            return (a_size + b_size) * sizeof(half) + 128;
+            return (a_size + b_size) * sizeof(half);
           }
         } else {
-          return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
+          return (a_size > b_size ? a_size : b_size) * sizeof(half);
         }
       }
 
@@ -245,6 +247,9 @@ namespace quda
       void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
     };
 
+#endif // QUDA_MMA_AVAILABLE
+
+#if defined(GPU_DOMAIN_WALL_DIRAC) && defined(QUDA_MMA_AVAILABLE)
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)

@@ -191,6 +191,6 @@ namespace quda
        {
           return streams[stream.idx];
        }
-     }
-   }
+     } // namespace hip
+   } // namespace target
 } // namespace quda

@@ -5,9 +5,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-// Define MMA availability
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-#define QUDA_MMA_AVAILABLE	1
+#if __COMPUTE_CAPABILITY__ >= 700
+#define QUDA_MMA_AVAILABLE 1
 #endif
 
 #elif defined(QUDA_TARGET_HIP)

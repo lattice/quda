@@ -1,10 +1,6 @@
 # cmake-format: off
 
-# QUDA_HASH for tunecache
-if(NOT GITVERSION)
-  set(GITVERSION ${PROJECT_VERSION})
-endif()
-
+#
 ### HACK FOR NOW
 #
 if( QUDA_TARGET_CUDA )
@@ -12,6 +8,7 @@ if( QUDA_TARGET_CUDA )
 else()
   set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH})
 endif(QUDA_TARGET_CUDA)
+set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -107,6 +104,13 @@ set(QUDA_DSLASH_OBJS
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
+  dslash_domain_wall_4d_m5inv.cu
+  dslash_domain_wall_4d_m5pre.cu
+  dslash_domain_wall_4d_m5pre_m5inv.cu
+  dslash_domain_wall_4d_m5inv_m5pre.cu
+  dslash_domain_wall_4d_m5inv_m5inv.cu
+  dslash_domain_wall_4d_m5mob.cu
+  dslash_domain_wall_4d_m5pre_m5mob.cu
   dslash_pack2.cu laplace.cu covDev.cu)
 
 if(QUDA_NVSHMEM)
@@ -218,13 +222,12 @@ target_compile_options(
           -Xclang -fcuda-allow-variadic-functions>)
 target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-               -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+               -Wno-deprecated-gpu-targets  --expt-relaxed-constexpr>)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
-                                    -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
-                                    --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+                                    --expt-relaxed-constexpr>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
 if(QUDA_VERBOSE_BUILD)
@@ -250,8 +253,7 @@ target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda SYSTEM PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDAToolkit_INCLUDE_DIRS}>)
-
-target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
+target_link_libraries(quda PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
                                        $<INSTALL_INTERFACE:include/>)
 
@@ -259,7 +261,7 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-target_link_libraries(quda_cpp PRIVATE Eigen)
+target_link_libraries(quda_cpp PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
@@ -328,7 +330,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
                             $<$<CXX_COMPILER_ID:GNU>: -Xcompiler=-Wno-unknown-pragmas>
                             $<$<CONFIG:DEVEL>:-Xptxas -warn-lmem-usage,-warn-spills -lineinfo>
                             $<$<CONFIG:STRICT>: -Werror=all-warnings -lineinfo>
-          $<$<CONFIG:HOSTDEBUG>:-lineinfo>
+                            $<$<CONFIG:HOSTDEBUG>:-lineinfo>
                             $<$<CONFIG:SANITIZE>:-lineinfo>
                             >)
 
@@ -472,13 +474,14 @@ if(QUDA_MPI OR QUDA_QMP)
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
   target_compile_definitions(quda PUBLIC MPI_COMMS)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
 if(QUDA_QMP)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
 if(QUDA_NVSHMEM)
@@ -666,22 +669,8 @@ install(EXPORT QUDATargets
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
-# If the USQCD stack was automatically downloaded, this will copy the usqcd library
-# to the install path
-if(QUDA_DOWNLOAD_USQCD)
-  if(QUDA_QMP OR QUDA_QIO)
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/usqcd DESTINATION ".")
-  endif()
-endif()
-
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
   VERSION ${QUDA_VERSION}
   COMPATIBILITY AnyNewerVersion)
-
-add_custom_target(
-  mpi_nvtx
-  ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Generating mpi_nvtx wrapper")

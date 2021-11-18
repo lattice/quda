@@ -274,33 +274,10 @@ namespace quda
 
     unsigned int max_blocks_per_processor()
     {
-#if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
       if (!max_blocks_per_sm)
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2: return 8; break;
-      case 3: return 16; break;
-      case 5: return 32; break;
-      case 6: return 32; break;
-      case 7: {
-        switch (deviceProp.minor) {
-        case 0: return 32; break;
-        case 2: return 32; break;
-        case 5: return 16; break;
-        default: return 32; break;
-        };
-      } break;
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n", deviceProp.major,
-                    deviceProp.minor);
-        return 32;
-	break;
-      }
-#endif
     }
 
     namespace profile

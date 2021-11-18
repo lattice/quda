@@ -211,7 +211,7 @@ namespace quda {
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 1>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
 #endif
-          default: errorQuda("Color column stride %d not valid", int(tp.aux.x));
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
 #ifndef QUDA_FAST_COMPILE_DSLASH
@@ -221,7 +221,7 @@ namespace quda {
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 2>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          default: errorQuda("Color column stride %d not valid", int(tp.aux.x));
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
         case 4:
@@ -230,12 +230,11 @@ namespace quda {
           case 2: launch_device<CoarseDslash>(tp, stream, Arg<2, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 4: launch_device<CoarseDslash>(tp, stream, Arg<4, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
           case 8: launch_device<CoarseDslash>(tp, stream, Arg<8, 4>(out, inA, inB, Y, X, (Float)kappa, parity)); break;
-          default: errorQuda("Color column stride %d not valid", int(tp.aux.x));
+          default: errorQuda("Color column stride %d not valid", static_cast<int>(tp.aux.x));
           }
           break;
 #endif
-        default:
-          errorQuda("Invalid dimension thread splitting %d", int(tp.aux.y));
+        default: errorQuda("Invalid dimension thread splitting %d", static_cast<int>(tp.aux.y));
         }
       }
     }

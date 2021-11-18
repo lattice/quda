@@ -3,7 +3,6 @@
 #include <gauge_field.h>
 #include <tunable_nd.h>
 
-#include <quda_arch.h>
 #ifdef QUDA_MMA_AVAILABLE
 #include <kernels/coarse_op_preconditioned_mma.cuh>
 #endif
@@ -158,7 +157,7 @@ namespace quda
       return -1;
     }
 
-#endif // MMA AVAILABLE
+#endif // QUDA_MMA_AVAILABLE
 
   } // namespace mma
 

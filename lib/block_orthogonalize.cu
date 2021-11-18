@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <utility>
 
+#include <power_of_two_array.h>
 #include <kernels/block_orthogonalize.cuh>
 #include <tunable_block_reduction.h>
 #include <target_device.h>
@@ -29,13 +30,13 @@ namespace quda {
      */
     static unsigned int block_mapper(unsigned int raw_block)
     {
-      for (unsigned int b=0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
-        errorQuda("Invalid raw block size %d\n", raw_block);
-        return 0;
-      }
+      for (unsigned int b = 0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
+      errorQuda("Invalid raw block size %d\n", raw_block);
+      return 0;
+    }
   };
 
-  constexpr OrthoAggregates::array_type  OrthoAggregates::block;
+  constexpr OrthoAggregates::array_type OrthoAggregates::block;
 
   using namespace quda::colorspinor;
 
@@ -193,7 +194,7 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
-      param.grid = dim3(V.Volume() / (nSpin == 1 ? 2 : active_x_threads), chiral_blocks, 1);
+      param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, chiral_blocks, 1);
       param.aux.x = 1; // swizzle factor
     }
 
