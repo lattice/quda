@@ -328,15 +328,7 @@ struct DslashTestWrapper {
       diracParam.tmp1 = tmp1;
       diracParam.tmp2 = tmp2;
 
-      if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-        dirac_4dpc = new DiracDomainWall4DPC(diracParam);
-        dirac = (Dirac *)dirac_4dpc;
-      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        dirac_mdwf = new DiracMobiusPC(diracParam);
-        dirac = (Dirac *)dirac_mdwf;
-      } else {
-        dirac = Dirac::create(diracParam);
-      }
+      dirac = Dirac::create(diracParam);
 
     } else {
       double cpu_norm = blas::norm2(*spinor);
@@ -984,7 +976,6 @@ struct DslashTestWrapper {
           case dslash_test_type::Mat:
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
-              // MatQuda(spinorOut->V(), spinor->V(), &inv_param);
             } else {
               dirac->M(*cudaSpinorOut, *cudaSpinor);
             }
@@ -993,7 +984,6 @@ struct DslashTestWrapper {
           case dslash_test_type::MatDagMat:
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
-              // MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
             } else {
               dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
             }
