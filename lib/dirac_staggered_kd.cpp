@@ -210,11 +210,9 @@ namespace quda
 
   void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double, double) const
   {
-    errorQuda("Staggered KD operators do not support MG coarsening yet");
-
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
-    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *Xinv, mass, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

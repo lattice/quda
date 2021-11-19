@@ -18,6 +18,7 @@ namespace quda {
     COMPUTE_AV,
     COMPUTE_TMAV,
     COMPUTE_TMCAV,
+    COMPUTE_KV,
     COMPUTE_VUV,
     COMPUTE_VLV,
     COMPUTE_COARSE_CLOVER,
@@ -35,6 +36,7 @@ namespace quda {
   public:
     using Float = typename Arg::Float;
     static constexpr bool from_coarse = Arg::from_coarse;
+    static constexpr bool from_kd_op = Arg::from_kd_op;
     static constexpr int fineSpin = Arg::fineSpin;
     static constexpr int coarseSpin = Arg::coarseSpin;
     static constexpr int fineColor = Arg::fineColor;
@@ -51,8 +53,9 @@ namespace quda {
     int dim;
     QudaDirection dir;
     ComputeType type;
+    bool kd_dagger; /** Whether or not we're applying KD dagger or KD in compute_kv */
     bool compute_max;
-    int nFace;
+    int nFace; /** for staggered vs asqtad UV, VUV */
 
     long long flops() const
     {
@@ -73,6 +76,10 @@ namespace quda {
 	// # Twice chiral blocks * size of chiral block * number of null space vectors
 	flops_ = 4l * arg.fineVolumeCB * 8 * (fineSpin/2) * (fineSpin/2) * (fineSpin/2) * fineColor * fineColor * coarseColor;
 	break;
+      case COMPUTE_KV:
+      // similar to a single KD apply, but there are separate accumulations for even source and odd source
+      flops_ = 2l * arg.fineVolumeCB * fineColor * ( 8ll * fineColor * 8ll - 2ll ) * coarseColor;
+      break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
@@ -122,6 +129,9 @@ namespace quda {
 	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
 #endif
 	break;
+      case COMPUTE_KV:
+        bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.K.Bytes() * coarseColor;
+        break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
         // FIXME: may vary for KD op b/c we need to keep track of from even vs from odd
@@ -165,6 +175,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_KV:
       case COMPUTE_VUV:
       case COMPUTE_VLV:
       case COMPUTE_COARSE_CLOVER:
@@ -207,6 +218,7 @@ namespace quda {
       dim(0),
       dir(QUDA_BACKWARDS),
       type(COMPUTE_INVALID),
+      kd_dagger(false),
       compute_max(false),
       nFace(nFace)
     {
@@ -265,6 +277,17 @@ namespace quda {
         errorQuda("Twisted clover dslash has not been built");
 #endif
 
+      } else if (type == COMPUTE_KV) {
+        if (fineSpin != 1) errorQuda("compute_kv should only be called for a staggered operator");
+        if (!from_kd_op) errorQuda("compute_kv should only be called for a Kahler-Dirac operator");
+        if (from_coarse) errorQuda("compute_kv should only be called from the fine grid");
+
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+        if (compute_max) launch_host<compute_kv>(tp, stream, ArgMax<Arg>(arg));
+        else launch_host<compute_kv>(tp, stream, arg);
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
       } else if (type == COMPUTE_VUV) {
         launch_host<compute_vuv>(tp, stream, arg);
       } else if (type == COMPUTE_VLV) {
@@ -375,6 +398,17 @@ namespace quda {
         errorQuda("Twisted clover dslash has not been built");
 #endif
 
+      } else if (type == COMPUTE_KV) {
+        if (fineSpin != 1) errorQuda("compute_kv should only be called for a staggered operator");
+        if (!from_kd_op) errorQuda("compute_kv should only be called for a Kahler-Dirac operator");
+        if (from_coarse) errorQuda("compute_kv should only be called from the fine grid");
+
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+        if (compute_max) launch_device<compute_kv>(tp, stream, ArgMax<Arg>(arg));
+        else launch_device<compute_kv>(tp, stream, arg);
+#else
+        errorQuda("Staggered dslash has not been built");
+#endif
       } else if (type == COMPUTE_VUV) {
 
         IF_CONSTEXPR (use_mma) {
@@ -545,6 +579,7 @@ namespace quda {
       arg.dim = dim;
       arg.dir = dir;
       if (type == COMPUTE_VUV || type == COMPUTE_VLV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+      arg.kd_dagger = kd_dagger;
 
       if (type == COMPUTE_VUV || type == COMPUTE_VLV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
       Launch<location_template>(arg, tp, type, stream);
@@ -564,6 +599,11 @@ namespace quda {
       if (dir_ != QUDA_BACKWARDS && dir_ != QUDA_FORWARDS && dir_ != QUDA_IN_PLACE) errorQuda("Undefined direction %d", dir_);
       dir = dir_;
     }
+
+    /**
+       Set whether or not we're applying the dagger of the kd inverse (where applicable)
+    */
+    void setKDagger(bool kd_dagger_) { kd_dagger = kd_dagger_; }
 
     /**
        Set which computation we are doing
@@ -595,6 +635,7 @@ namespace quda {
       case COMPUTE_TMAV:
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL: resizeVector(2, coarseColor); break;
+      case COMPUTE_KV: resizeVector(4, coarseColor); break; // y dimension is [chirality (clover), source parity (staggered)] and parity
       default: resizeVector(2, 1); break;
       }
 
@@ -752,6 +793,7 @@ namespace quda {
         strcat(Aux, ",computeAV");
       else if (type == COMPUTE_TMAV)               strcat(Aux,",computeTmAV");
       else if (type == COMPUTE_TMCAV)              strcat(Aux,",computeTmcAV");
+      else if (type == COMPUTE_KV)                 strcat(Aux, ",computeKV");
       else if (type == COMPUTE_VUV) {
         strcat(Aux, ",computeVUV");
         if (use_mma) strcat(Aux, ",MMA");
@@ -802,6 +844,9 @@ namespace quda {
           strcat(Aux, nfc);
         }
 
+        // needed to break the degeneracy from staggered KD and non-KD
+        if (arg.from_kd_op) strcat(Aux, ",fromkd");
+
         if (arg.bidirectional && (type == COMPUTE_VUV || type == COMPUTE_VLV)) strcat(Aux,",bidirectional");
       }
 
@@ -846,6 +891,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_KV:
       case COMPUTE_REVERSE_Y:
 	break;
       default:
@@ -878,6 +924,7 @@ namespace quda {
       case COMPUTE_AV:
       case COMPUTE_TMAV:
       case COMPUTE_TMCAV:
+      case COMPUTE_KV:
       case COMPUTE_REVERSE_Y:
 	break;
       default:
@@ -897,7 +944,8 @@ namespace quda {
      preconditioned clover operator else in general this just aliases V
      @param V[in] Packed null-space vector accessor
      @param G[in] Fine grid link / gauge field accessor
-     @param L[in] Fine grid long link field accessor
+     @param L[in] Fine grid long link / gauge field accessor (aliases G for non-improved staggered)
+     @param K[in] Fine grid KD gauge field accessor (aliases G for non-improved staggered)
      @param C[in] Fine grid clover field accessor, or Xinv accessor for the KD operator
      @param Cinv[in] Fine grid clover inverse field accessor, or Xinv accessor for the KD operator
      @param Y_[out] Coarse link field
@@ -915,7 +963,7 @@ namespace quda {
             int coarseColor, typename avSpinor, typename uvSpinor, typename vSpinor, typename coarseGauge, typename coarseGaugeAtomic,
             typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic, uvSpinor &UV,
-                  avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
+                  avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineGauge &K, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
                   GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
                   const ColorSpinorField &v, double kappa, double mass, double mu,
                   double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
@@ -976,7 +1024,7 @@ namespace quda {
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,avSpinor,uvSpinor,vSpinor,fineClover>;
-    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, V, C, Cinv, kappa, mass,
+    Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, L, K, V, C, Cinv, kappa, mass,
 	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
@@ -1057,6 +1105,28 @@ namespace quda {
 
       y.apply(device::get_default_stream());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("AV2 = %e\n", arg.AV.norm2());
+    }
+
+    // If doing the staggered or ASQTAD KD op we first multiply the null-space vectors by
+    // the dagger of the KD term. This is needed for the coarse link computation
+    if ( dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC ) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KAV\n");
+      y.setKDagger(true);
+      y.setComputeType(COMPUTE_KV);
+
+      if (av.Precision() == QUDA_HALF_PRECISION) {
+        // each component of AV is the product of 8 ("KD" links times near-null component)
+        y.setComputeMax(true);
+        y.apply(device::get_default_stream());
+        y.setComputeMax(false);
+        auto kv_max = *arg.max_h;
+        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("kv_max %e\n", kv_max);
+        av.Scale(kv_max);
+        arg.AV.resetScale(kv_max);
+      }
+
+      y.apply(device::get_default_stream());
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("KV2 = %e\n", arg.AV.norm2());
     }
 
     saveTuneCache();
@@ -1335,6 +1405,7 @@ namespace quda {
     } else if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
       if (arg.mass != static_cast<Float>(0.)) {
         // We can write coarsening the coarse KD op as ( K^dag V) . (V)
+        // ( K^dag V) is already contained in AV
         y.setDimension(-1);
         y.setDirection(QUDA_IN_PLACE);
 
