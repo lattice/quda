@@ -848,7 +848,7 @@ include(CTest)
 
 # add tests, utils, reference, and quda library
 add_subdirectory(lib)
-#add_subdirectory(tests)
+add_subdirectory(tests)
 add_subdirectory(doc)
 
 include(CMakePackageConfigHelpers)
