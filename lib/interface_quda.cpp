@@ -5564,13 +5564,25 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
     if ( gaugeSmeared != nullptr) delete gaugeSmeared;
+    
+    GaugeFieldParam gParam(*gaugePrecise);
     //
-    gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileGauge);//new cudaGaugeField(gParam);
+    gParam.create        = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct   = QUDA_RECONSTRUCT_NO;
+    gParam.setPrecision(inv_param->cuda_prec, true);
+    gParam.link_type     = QUDA_ASQTAD_LONG_LINKS;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    gParam.nFace = 3;
+    gParam.pad = gParam.pad*gParam.nFace;
     //
+    gaugeSmeared = new cudaGaugeField(gParam);
+    
     cudaGaugeField *two_link_ext = createExtendedGauge(*gaugePrecise, R, profileGauge);//aux field
-
+    
     computeTwoLink(*gaugeSmeared, *two_link_ext);
-
+    
+    gaugeSmeared->exchangeGhost();
+    
     delete two_link_ext;   
   }
 
@@ -5582,7 +5594,7 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   
   // Create device side ColorSpinorField vectors and to pass to the
   // compute function.
-  const int *X = gaugePrecise->X();
+  const int *X = gaugeSmeared->X();
   
   inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
   

@@ -107,7 +107,7 @@ namespace quda {
 
           Link temp = Ucd*Ude;
 
-          arg.outA(mu, e_cb, parity) = temp;
+          arg.outA(mu, x_cb, parity) = temp;
         } // loop over mu
       }
     };

@@ -160,7 +160,7 @@ namespace quda
 
       if (mykernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
-        out = x;
+        out = x + out;
       }
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
