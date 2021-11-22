@@ -910,12 +910,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // We must also adjust inv_param->clover_coeff here. If a user has set kappa and
   // Csw, we must populate inv_param->clover_coeff for them as the computeClover
   // routines uses that value
-  inv_param->clover_coeff = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);  
+  inv_param->clover_coeff
+    = (inv_param->clover_coeff == 0.0 ? inv_param->kappa * inv_param->clover_csw : inv_param->clover_coeff);
   clover_param.twist_flavor = twist_flavor;
-  clover_param.mu2 = twist_flavor != QUDA_TWIST_NO ? 
-                       4.*inv_param->kappa*inv_param->kappa*inv_param->mu*inv_param->mu : 0.0;
+  clover_param.mu2
+    = twist_flavor != QUDA_TWIST_NO ? 4. * inv_param->kappa * inv_param->kappa * inv_param->mu * inv_param->mu : 0.0;
   clover_param.epsilon2 = twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
-                            4.*inv_param->kappa*inv_param->kappa*inv_param->epsilon*inv_param->epsilon : 0.0;
+    4. * inv_param->kappa * inv_param->kappa * inv_param->epsilon * inv_param->epsilon :
+    0.0;
   clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
   clover_param.pad = inv_param->cl_pad;
@@ -3453,10 +3455,11 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
         // routines uses that value
         param->clover_coeff = (param->clover_coeff == 0.0 ? param->kappa * param->clover_csw : param->clover_coeff);
         clover_param.twist_flavor = param->twist_flavor;
-        clover_param.mu2 = clover_param.twist_flavor != QUDA_TWIST_NO ? 
-                             4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
-        clover_param.epsilon2 = clover_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? 
-                             4.0 * param->kappa * param->kappa * param->epsilon * param->epsilon : 0.0;
+        clover_param.mu2
+          = clover_param.twist_flavor != QUDA_TWIST_NO ? 4.0 * param->kappa * param->kappa * param->mu * param->mu : 0.0;
+        clover_param.epsilon2 = clover_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ?
+          4.0 * param->kappa * param->kappa * param->epsilon * param->epsilon :
+          0.0;
         clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
         for (int d = 0; d < 4; d++) { clover_param.x[d] = field_dim[d]; }
         clover_param.pad = param->cl_pad;
@@ -4291,8 +4294,8 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   return 0;
 }
 
-int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int* path_length,
-			 double* loop_coeff, int num_paths, int max_length, double eb3, QudaGaugeParam* qudaGaugeParam)
+int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                         int num_paths, int max_length, double eb3, QudaGaugeParam *qudaGaugeParam)
 {
   profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
   profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
@@ -4304,7 +4307,7 @@ int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int*
   gParam.site_size = qudaGaugeParam->site_size;
   cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
 
-  cudaGaugeField* cudaSiteLink = nullptr;
+  cudaGaugeField *cudaSiteLink = nullptr;
 
   if (qudaGaugeParam->use_resident_gauge) {
     if (!gaugePrecise) errorQuda("No resident gauge field to use");
@@ -4327,11 +4330,11 @@ int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int*
   GaugeFieldParam gParamOut(*qudaGaugeParam, out);
   gParamOut.site_offset = qudaGaugeParam->gauge_offset;
   gParamOut.site_size = qudaGaugeParam->site_size;
-  cpuGaugeField* cpuOut = new cpuGaugeField(gParamOut);
+  cpuGaugeField *cpuOut = new cpuGaugeField(gParamOut);
   gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
   gParamOut.reconstruct = qudaGaugeParam->reconstruct;
   gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
-  cudaGaugeField* cudaOut = new cudaGaugeField(gParamOut);
+  cudaGaugeField *cudaOut = new cudaGaugeField(gParamOut);
   profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
   if (!qudaGaugeParam->overwrite_gauge) {
     profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
@@ -4345,7 +4348,7 @@ int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int*
 
   // actually do the computation
   profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
-  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf,  path_length, loop_coeff, num_paths, max_length);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf, path_length, loop_coeff, num_paths, max_length);
   profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
@@ -4372,7 +4375,6 @@ int computeGaugePathQuda(void* out, void* siteLink,  int*** input_path_buf, int*
   profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
   return 0;
 }
-
 
 void momResidentQuda(void *mom, QudaGaugeParam *param)
 {

@@ -68,7 +68,7 @@ namespace quda {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
       if (isNative()) norm_bytes = 2*ALIGNMENT_ADJUST(norm_bytes/2);
     }
-    //for twisted mass only:
+    // for twisted mass only:
     twist_flavor = QUDA_TWIST_NO; // param.twist_flavor;
     mu2 = 0.0; //param.mu2;
     epsilon2 = 0.0; // param.epsilon2
@@ -513,20 +513,20 @@ namespace quda {
   std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param)
   {
     output << static_cast<const LatticeFieldParam&>(param);
-    output << "direct = "           << param.direct << std::endl;
-    output << "inverse = "          << param.inverse << std::endl;
-    output << "clover = "           << param.clover << std::endl;
-    output << "norm = "             << param.norm << std::endl;
-    output << "cloverInv = "        << param.cloverInv << std::endl;
-    output << "invNorm = "          << param.invNorm << std::endl;
-    output << "csw = "              << param.csw << std::endl;
-    output << "coeff = "            << param.coeff << std::endl;
-    output << "twist_flavor = "     << param.twist_flavor << std::endl;
-    output << "mu2 = "              << param.mu2 << std::endl;
-    output << "epsilon2 = "         << param.epsilon2 << std::endl;
-    output << "rho = "              << param.rho << std::endl;
-    output << "order = "            << param.order << std::endl;
-    output << "create = "           << param.create << std::endl;
+    output << "direct = " << param.direct << std::endl;
+    output << "inverse = " << param.inverse << std::endl;
+    output << "clover = " << param.clover << std::endl;
+    output << "norm = " << param.norm << std::endl;
+    output << "cloverInv = " << param.cloverInv << std::endl;
+    output << "invNorm = " << param.invNorm << std::endl;
+    output << "csw = " << param.csw << std::endl;
+    output << "coeff = " << param.coeff << std::endl;
+    output << "twist_flavor = " << param.twist_flavor << std::endl;
+    output << "mu2 = " << param.mu2 << std::endl;
+    output << "epsilon2 = " << param.epsilon2 << std::endl;
+    output << "rho = " << param.rho << std::endl;
+    output << "order = " << param.order << std::endl;
+    output << "create = " << param.create << std::endl;
     return output;  // for multiple << operators.
   }
 

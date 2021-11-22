@@ -78,7 +78,7 @@ extern "C" {
     int overlap; /**< Width of overlapping domains */
 
     int overwrite_gauge; /**< When computing gauge, should we overwrite it or accumulate to it */
-    int overwrite_mom; /**< When computing momentum, should we overwrite it or accumulate to it */
+    int overwrite_mom;   /**< When computing momentum, should we overwrite it or accumulate to it */
 
     int use_resident_gauge;  /**< Use the resident gauge field as input */
     int use_resident_mom;    /**< Use the resident momentum field as input*/
@@ -130,7 +130,7 @@ extern "C" {
     double mq3;
 
     double mu;    /**< Twisted mass parameter */
-    double tm_rho; /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
+    double tm_rho;  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
@@ -1263,9 +1263,8 @@ extern "C" {
    * @param[in] dt The integration step size (for MILC this is dt*beta/3)
    * @param[in] param The parameters of the external fields and the computation settings
    */
-  int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
-			    double* loop_coeff, int num_paths, int max_length, double dt,
-			    QudaGaugeParam* qudaGaugeParam);
+  int computeGaugeForceQuda(void *mom, void *sitelink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                            int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
 
   /**
    * Compute the product of gauge links along a path and add to/overwrite the output field
@@ -1280,9 +1279,8 @@ extern "C" {
    * @param[in] dt The integration step size (for MILC this is dt*beta/3)
    * @param[in] param The parameters of the external fields and the computation settings
    */
-  int computeGaugePathQuda(void* out, void* sitelink,  int*** input_path_buf, int* path_length,
-			    double* loop_coeff, int num_paths, int max_length, double dt,
-			    QudaGaugeParam* qudaGaugeParam);
+  int computeGaugePathQuda(void *out, void *sitelink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                           int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field

@@ -7,20 +7,12 @@
 namespace quda {
 
   DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim) :
-    DiracWilson(param, nDim),
-    mu(param.mu),
-    epsilon(param.epsilon),
-    tm_rho(param.tm_rho),
-    clover(param.clover)
+    DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), tm_rho(param.tm_rho), clover(param.clover)
   {
   }
 
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) :
-    DiracWilson(dirac),
-    mu(dirac.mu),
-    epsilon(dirac.epsilon),
-    tm_rho(dirac.tm_rho),
-    clover(dirac.clover)
+    DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), tm_rho(dirac.tm_rho), clover(dirac.clover)
   {
   }
 
@@ -41,13 +33,15 @@ namespace quda {
   {
     Dirac::checkParitySpinor(out, in);
 
-    if( out.TwistFlavor() == QUDA_TWIST_SINGLET ){
+    if (out.TwistFlavor() == QUDA_TWIST_SINGLET) {
       if (out.Volume() != clover->VolumeCB())
-        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
+                  clover->VolumeCB());
     } else {
-      // 
-      if (out.Volume()/2 != clover->VolumeCB())
-        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover->VolumeCB());
+      //
+      if (out.Volume() / 2 != clover->VolumeCB())
+        errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(),
+                  clover->VolumeCB());
     }
   }
 
@@ -57,8 +51,10 @@ namespace quda {
     checkParitySpinor(out, in);
     ApplyTwistClover(out, in, *clover, kappa, mu, epsilon, parity, dagger, twistType);
 
-    if (twistType == QUDA_TWIST_GAMMA5_INVERSE) flops += (504ll + 504ll + 48ll)*in.Volume();
-    else flops += (504ll + 48ll)*in.Volume();
+    if (twistType == QUDA_TWIST_GAMMA5_INVERSE)
+      flops += (504ll + 504ll + 48ll) * in.Volume();
+    else
+      flops += (504ll + 48ll) * in.Volume();
   }
 
 
@@ -87,9 +83,9 @@ namespace quda {
       flops += (1320ll + 48ll + 504ll) * in.Volume();
 
     } else {
-      // k * D * in + (A + i*2*mu*kappa*gamma_5 * tau_3 - 2 * kappa * epsilon * tau_1 ) * x  
-      ApplyNdegTwistedClover(
-          out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
+      // k * D * in + (A + i*2*mu*kappa*gamma_5 * tau_3 - 2 * kappa * epsilon * tau_1 ) * x
+      ApplyNdegTwistedClover(out, in, *gauge, *clover, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger,
+                             commDim, profile);
       // wilson + chiral twist + flavour twist + clover
       flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
     }
@@ -106,7 +102,7 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
     }
 
-    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // (-kappa * D + A + i*2*mu*kappa*gamma_5 ) * in
       ApplyTwistedClover(out, in, *gauge, *clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim,
                          profile);
@@ -233,15 +229,15 @@ namespace quda {
       WilsonDslash(out, *tmp2, parity);
       deleteTmp(&tmp2, reset);
     } else {
-      if (in.TwistFlavor() == QUDA_TWIST_SINGLET){
-        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in,
-                                         parity, dagger, commDim, profile);
+      if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
+        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, false, in, parity, dagger,
+                                         commDim, profile);
         flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, 1.0, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
                                              false, in, parity, dagger, commDim, profile);
         flops += (1320ll + 48ll + 48ll + 504ll) * in.Volume();
-      } 
+      }
     }
   }
 
@@ -264,8 +260,8 @@ namespace quda {
       deleteTmp(&tmp2, reset);
     } else {
       if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity,
-                                         dagger, commDim, profile);
+        ApplyTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, true, x, parity, dagger,
+                                         commDim, profile);
         flops += (1320ll + 48ll + 504ll) * in.Volume();
       } else {
         ApplyNdegTwistedCloverPreconditioned(out, in, *gauge, *clover, k, -2.0 * kappa * mu, 2.0 * kappa * epsilon,
@@ -346,7 +342,6 @@ namespace quda {
       errorQuda("MatPCType %d not valid for DiracTwistedCloverPC", matpcType);
     }
 
-
     if (symmetric) TwistCloverInv(*src, *tmp1, odd_bit ? QUDA_ODD_PARITY : QUDA_EVEN_PARITY);
 
     // here we use final solution to store parity solution and parity source
@@ -367,7 +362,7 @@ namespace quda {
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // x_o = A_oo^-1 (b_o + k D_oe x_e)
       WilsonDslashXpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Odd(), kappa);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD ||   matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+    } else if (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // x_e = A_ee^-1 (b_e + k D_eo x_o)
       WilsonDslashXpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Even(), kappa);
     } else {

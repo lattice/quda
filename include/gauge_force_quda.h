@@ -28,8 +28,8 @@ namespace quda {
      @param[in] num_paths Numer of paths
      @param[in] max_length Maximum length of each path
    */
-  void gaugePath(GaugeField& out, const GaugeField& u, double coeff, int ***input_path,
-		  int *length, double *path_coeff, int num_paths, int max_length);
+  void gaugePath(GaugeField &out, const GaugeField &u, double coeff, int ***input_path, int *length, double *path_coeff,
+                 int num_paths, int max_length);
 } // namespace quda
 
 

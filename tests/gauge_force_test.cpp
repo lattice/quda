@@ -239,7 +239,7 @@ static double force_deviation;
 
 // The same function is used to test computePath.
 // If compute_force is false then a path is computed
-void gauge_force_test(bool compute_force=true)
+void gauge_force_test(bool compute_force = true)
 {
   int max_length = 6;
 
@@ -306,7 +306,7 @@ void gauge_force_test(bool compute_force=true)
   auto Mom_qdp = new quda::cpuGaugeField(param);
 
   // initialize some data in cpuMom
-  if(compute_force) {
+  if (compute_force) {
     createMomCPU(Mom_ref_milc->Gauge_p(), gauge_param.cpu_prec);
     if (gauge_order == QUDA_MILC_GAUGE_ORDER) Mom_milc->copy(*Mom_ref_milc);
     if (gauge_order == QUDA_QDP_GAUGE_ORDER) Mom_qdp->copy(*Mom_ref_milc);
@@ -325,12 +325,13 @@ void gauge_force_test(bool compute_force=true)
   }
 
   if (getTuning() == QUDA_TUNE_YES) {
-    if(compute_force)
-      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    if (compute_force)
+      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
+                            &gauge_param);
     else
       computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
   }
-    
+
   struct timeval t0, t1;
   double total_time = 0.0;
   // Multiple execution to exclude warmup time in the first run
@@ -339,10 +340,11 @@ void gauge_force_test(bool compute_force=true)
   for (int i = 0; i < niter; i++) {
     Mom_->copy(*Mom_ref_milc); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
-    if(compute_force)
-      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
+    if (compute_force)
+      computeGaugeForceQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3,
+                            &gauge_param);
     else
-      computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);      
+      computeGaugePathQuda(mom, sitelink, input_path_buf, length, loop_coeff_d, num_paths, max_length, eb3, &gauge_param);
     gettimeofday(&t1, NULL);
     total_time += t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   }
@@ -352,24 +354,23 @@ void gauge_force_test(bool compute_force=true)
   int flops = 153004;
 
   void *refmom = Mom_ref_milc->Gauge_p();
-  int * check_out = compute_force ? &force_check : &path_check;
+  int *check_out = compute_force ? &force_check : &path_check;
   if (verify_results) {
     gauge_force_reference(refmom, eb3, (void **)U_qdp->Gauge_p(), gauge_param.cpu_prec, input_path_buf, length,
                           loop_coeff, num_paths, compute_force);
     *check_out = compare_floats(Mom_milc->Gauge_p(), refmom, 4 * V * mom_site_size, getTolerance(cuda_prec),
                                 gauge_param.cpu_prec);
-    if(compute_force)
-      strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
+    if (compute_force) strong_check_mom(Mom_milc->Gauge_p(), refmom, 4 * V, gauge_param.cpu_prec);
   }
 
-  if(compute_force) {
+  if (compute_force) {
     printfQuda("\nComputing momentum action\n");
     auto action_quda = momActionQuda(mom, &gauge_param);
     auto action_ref = mom_action(refmom, gauge_param.cpu_prec, 4 * V);
     force_deviation = std::abs(action_quda - action_ref) / std::abs(action_ref);
     printfQuda("QUDA action = %e, reference = %e relative deviation = %e\n", action_quda, action_ref, force_deviation);
   }
-  
+
   double perf = 1.0*niter*flops*V/(total_time*1e+9);
   printfQuda("total time = %.2f ms\n", total_time * 1e+3);
   printfQuda("overall performance : %.2f GFLOPS\n",perf);
@@ -388,7 +389,10 @@ void gauge_force_test(bool compute_force=true)
 
 TEST(force, verify) { ASSERT_EQ(force_check, 1) << "CPU and QUDA force implementations do not agree"; }
 
-TEST(action, verify) { ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree"; }
+TEST(action, verify)
+{
+  ASSERT_LE(force_deviation, getTolerance(cuda_prec)) << "CPU and QUDA momentum action implementations do not agree";
+}
 
 TEST(path, verify) { ASSERT_EQ(path_check, 1) << "CPU and QUDA path implementations do not agree"; }
 

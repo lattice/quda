@@ -122,7 +122,7 @@ namespace quda {
 
     double csw;
     double coeff;
-    double mu2; // chiral twisted mass squared
+    double mu2;      // chiral twisted mass squared
     double epsilon2; // flavour twisted mass squared
     double rho;
     QudaTwistFlavorType twist_flavor;

@@ -166,10 +166,11 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
                                void *clover_inv)
 {
 
-  int vol = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);
-  
+  int vol
+    = (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ? V : Vh);
+
   if (multishift > 1) {
-    
+
     // ONLY WILSON/CLOVER/TWISTED TYPES
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       errorQuda("Mass normalization %s not implemented", get_mass_normalization_str(inv_param.mass_normalization));
@@ -194,12 +195,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         }
       } else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          tmc_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv,
-                         inv_param.kappa, inv_param.mu, inv_param.epsilon,
-                         inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv,
-                         inv_param.kappa, inv_param.mu, inv_param.epsilon,
-                         inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+                         inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+                         inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
         } else {
           tmc_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
@@ -221,7 +220,8 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         exit(-1);
       }
 
-      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, vol * spinor_site_size * inv_param.Ls,
+           inv_param.cpu_prec);
       mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
       double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
       double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
@@ -250,8 +250,8 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
           tmc_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
                   inv_param.cpu_prec, gauge_param);
         } else {
-          tmc_ndeg_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu,
-                       inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0,
+                       inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
@@ -265,10 +265,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         ax(0.5 / inv_param.kappa, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
       }
 
-    } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION ){
+    } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
       void *spinorTmp = malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
       ax(0, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
-      
+
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
           tm_mat(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
@@ -288,10 +288,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
           tmc_mat(spinorCheck, gauge, clover, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 1,
                   inv_param.cpu_prec, gauge_param);
         } else {
-          tmc_ndeg_mat(spinorTmp, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu,
-                       inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);
-          tmc_ndeg_mat(spinorCheck, gauge, clover, spinorTmp, inv_param.kappa, inv_param.mu,
-                       inv_param.epsilon, 1, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_mat(spinorTmp, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0,
+                       inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_mat(spinorCheck, gauge, clover, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon, 1,
+                       inv_param.cpu_prec, gauge_param);
         }
       } else if (dslash_type == QUDA_WILSON_DSLASH) {
         wil_mat(spinorTmp, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
@@ -302,9 +302,10 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       } else {
         errorQuda("Unsupported dslash_type=%s", get_dslash_str(dslash_type));
       }
-       
+
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        ax(0.25 / (inv_param.kappa*inv_param.kappa), spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+        ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, vol * spinor_site_size * inv_param.Ls,
+           inv_param.cpu_prec);
       }
       free(spinorTmp);
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
@@ -336,7 +337,8 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+        ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, vol * spinor_site_size * inv_param.Ls,
+           inv_param.cpu_prec);
       }
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {

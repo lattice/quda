@@ -382,12 +382,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
-  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH){
-    P(tm_rho, INVALID_DOUBLE);
-  }
-  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET){
-    P(epsilon, INVALID_DOUBLE);
-  }
+  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
+  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
 #endif
 
   P(tol, INVALID_DOUBLE);

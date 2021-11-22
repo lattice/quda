@@ -229,8 +229,8 @@ template <typename su3_matrix, typename Float> static void add_su3(su3_matrix *a
 {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      b->e[i][j].real += eb3*a->e[i][j].real;
-      b->e[i][j].imag += eb3*a->e[i][j].imag;
+      b->e[i][j].real += eb3 * a->e[i][j].real;
+      b->e[i][j].imag += eb3 * a->e[i][j].imag;
     }
   }
 }
@@ -348,7 +348,8 @@ static void update_mom(anti_hermitmat *momentum, int dir, su3_matrix **sitelink,
 }
 
 template <typename su3_matrix, typename Float>
-static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3, const lattice_t &lat)
+static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_matrix *staple, Float eb3,
+                         const lattice_t &lat)
 {
   for (size_t i = 0; i < lat.volume; i++) {
     su3_matrix tmat;
@@ -367,7 +368,8 @@ static void update_gauge(su3_matrix *gauge, int dir, su3_matrix **sitelink, su3_
  *
  */
 void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelink, void **sitelink_ex,
-                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths, const lattice_t &lat, bool compute_force)
+                               QudaPrecision prec, int **path_dir, int *length, void *loop_coeff, int num_paths,
+                               const lattice_t &lat, bool compute_force)
 {
   size_t size = V * 2 * lat.n_color * lat.n_color * prec;
   void *staple = safe_malloc(size);
@@ -396,7 +398,7 @@ void gauge_force_reference_dir(void *refMom, int dir, double eb3, void **sitelin
       update_gauge((dsu3_matrix *)refMom, dir, (dsu3_matrix **)sitelink, (dsu3_matrix *)staple, (double)eb3, lat);
     } else {
       update_gauge((fsu3_matrix *)refMom, dir, (fsu3_matrix **)sitelink, (fsu3_matrix *)staple, (float)eb3, lat);
-    }    
+    }
   }
   host_free(staple);
 }
@@ -416,8 +418,8 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
   lattice_t lat(*qdp_ex);
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length, loop_coeff,
-                              num_paths, lat, compute_force);
+    gauge_force_reference_dir(refMom, dir, eb3, sitelink, (void **)qdp_ex->Gauge_p(), prec, path_dir[dir], length,
+                              loop_coeff, num_paths, lat, compute_force);
   }
 
   delete qdp_ex;

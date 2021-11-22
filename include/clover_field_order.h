@@ -566,9 +566,9 @@ namespace quda {
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
         }
 
-	QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
-	real Mu2() const { return mu2; }
-	real Epsilon2() const { return epsilon2; }
+        QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
+        real Mu2() const { return mu2; }
+        real Epsilon2() const { return epsilon2; }
 
         /**
            @brief This accessor routine returns a const clover_wrapper to this object,
@@ -711,15 +711,15 @@ namespace quda {
     */
       template <typename Float, int length = 72> struct QDPOrder {
 
-      typedef typename mapper<Float>::type RegType;
-      Float *clover;
-      const int volumeCB;
-      const int stride;
-      const int offset;
-      
-      const QudaTwistFlavorType twist_flavor;
-      const Float mu2;
-      const Float epsilon2;
+        typedef typename mapper<Float>::type RegType;
+        Float *clover;
+        const int volumeCB;
+        const int stride;
+        const int offset;
+
+        const QudaTwistFlavorType twist_flavor;
+        const Float mu2;
+        const Float epsilon2;
 
         QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()),
@@ -735,11 +735,11 @@ namespace quda {
           this->clover = clover_ ? clover_ : (Float *)(clover.V(inverse));
         }
 
-      QudaTwistFlavorType TwistFlavor()	const	{return twist_flavor;}
-      Float Mu2()	const	{ return mu2; }
-      Float Epsilon2() const { return epsilon2; }
+        QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
+        Float Mu2() const { return mu2; }
+        Float Epsilon2() const { return epsilon2; }
 
-	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
           Float v_[length];
           block_load<Float, length>(v_, &clover[parity * offset + x * length]);
@@ -766,10 +766,9 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-	const QudaTwistFlavorType twist_flavor;
-	const Float mu2;
-      const Float epsilon2;
-
+        const QudaTwistFlavorType twist_flavor;
+        const Float mu2;
+        const Float epsilon2;
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()),
@@ -785,11 +784,11 @@ namespace quda {
           diag = clover_ ? ((Float **)clover_)[1] : ((Float **)clover.V(inverse))[1];
         }
 
-      QudaTwistFlavorType  TwistFlavor()	const	{return twist_flavor;}
-      Float Mu2()	const	{return mu2;}
-      Float Epsilon2() const {return epsilon2;}
+        QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
+        Float Mu2() const { return mu2; }
+        Float Epsilon2() const { return epsilon2; }
 
-	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+        __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
 	    // set diagonal elements
@@ -842,9 +841,9 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-	const QudaTwistFlavorType twist_flavor;
-	const Float mu2;
-  const Float epsilon2;
+        const QudaTwistFlavorType twist_flavor;
+        const Float mu2;
+        const Float epsilon2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()),
@@ -860,11 +859,11 @@ namespace quda {
           this->clover[1] = (Float *)((char *)this->clover[0] + clover.Bytes() / 2);
         }
 
-	QudaTwistFlavorType  TwistFlavor()	const	{return twist_flavor;}
-	Float Mu2()	const	{return mu2;}
-  Float Epsilon2() const {return epsilon2;}
+        QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
+        Float Mu2()	const	{return mu2;}
+        Float Epsilon2() const { return epsilon2; }
 
-	/**
+        /**
 	   @param v The output clover matrix in QUDA order
 	   @param x The checkerboarded lattice site
 	   @param parity The parity of the lattice site
