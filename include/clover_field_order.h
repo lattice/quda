@@ -574,7 +574,9 @@ namespace quda {
         static_assert(!enable_reconstruct || (enable_reconstruct && Nc == 3), "Reconstruct requires Nc=3");
         reconstruct_t<real, block, enable_reconstruct> recon;
         static constexpr int compressed_block = reconstruct_t<real, block, enable_reconstruct>::compressed_block_size();
-        static constexpr int Nrem = compressed_block % N;
+        static constexpr int M = (compressed_block + N - 1) / N; /** number of short vectors per chiral block we need to read */
+        static constexpr int M_offset = compressed_block / N;    /** the block offset that contains the second chiral block */
+        static constexpr int M_rem = compressed_block % N;       /** the remainder of the chiral block not divisible by N */
         Float *clover;
         norm_type nrm;
         norm_type nrm_inv;
@@ -634,83 +636,6 @@ namespace quda {
         }
 
         /**
-	   @brief Load accessor for a single chiral block
-	   @param[out] v Vector of loaded elements
-	   @param[in] x Checkerboarded site index
-	   @param[in] parity Field parity
-	   @param[in] chirality Chiral block index
-	 */
-        __device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
-        {
-          constexpr int M = (compressed_block + N - 1) / N; // number of short vectors per chiral block
-          constexpr int M_offset = compressed_block / N;    // number of short vectors per chiral block
-
-          array<real, M * N> tmp;
-          array<real, compressed_block> tmp2;
-
-#pragma unroll
-	  for (int i=0; i<M; i++) {
-            // first load from memory
-            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M_offset + i));
-
-            // second do scalar copy converting into register type
-#pragma unroll
-            for (int j = 0; j < N; j++) { copy_and_scale(tmp[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
-          }
-
-#pragma unroll
-          for (int i = 0; i < compressed_block; i++) tmp2[i] = tmp[i + chirality * compressed_block % N];
-
-          recon.unpack(v, tmp2);
-
-          if (add_rho) {
-#pragma unroll
-            for (int i = 0; i < 6; i++) v[i] += rho;
-          }
-        }
-
-        /**
-           @brief Store accessor for a single chiral block
-           @param[out] v Vector of elements to be stored
-           @param[in] x Checkerboarded site index
-           @param[in] parity Field parity
-           @param[in] chirality Chiral block index
-         */
-        __device__ __host__ inline void save(const real v[block], int x, int parity, int chirality) const
-        {
-          constexpr int M = (compressed_block + N - 1) / N; // number of short vectors per chiral block
-          constexpr int M_offset = compressed_block / N;    // number of short vectors per chiral block
-
-          array<real, compressed_block> tmp;
-          recon.pack(tmp, v);
-#pragma unroll
-          for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? tmp[i] * nrm_inv : tmp[i];
-
-#pragma unroll
-          for (int i = 0; i < M_offset; i++) {
-            Vector vecTmp;
-            // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < N; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * Nrem + i * N + j]);
-            // second do vectorized copy into memory
-            vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
-          }
-
-          if (Nrem) {
-            typename VectorType<Float, std::max(Nrem, 1)>::type vecTmp;
-            // first do scalar copy converting into storage type
-#pragma unroll
-            for (int j = 0; j < Nrem; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
-
-            char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);
-            ptr += (stride * (M_offset * N) + chirality * Nrem) * sizeof(Float);
-            vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
-          }
-        }
-
-        /**
            @brief Load accessor for a single compressed chiral block
            @param[out] v Vector of loaded elements
            @param[in] x Checkerboarded site index
@@ -719,10 +644,8 @@ namespace quda {
          */
         __device__ __host__ inline void raw_load(real v[compressed_block], int x, int parity, int chirality) const
         {
-          constexpr int M = (compressed_block + N - 1) / N; // number of short vectors per chiral block
-          constexpr int M_offset = compressed_block / N;    // number of short vectors per chiral block
-
-          array<real, M * N> tmp;
+          // the chiral block size may not be exactly divisible by N, in which case we need to over-size the read 
+          array<real, M * N> tmp;             // array storing the elements read in
 
 #pragma unroll
           for (int i = 0; i < M; i++) {
@@ -745,6 +668,25 @@ namespace quda {
         }
 
         /**
+	   @brief Load accessor for a single chiral block
+	   @param[out] v Vector of loaded elements
+	   @param[in] x Checkerboarded site index
+	   @param[in] parity Field parity
+	   @param[in] chirality Chiral block index
+	 */
+        __device__ __host__ inline void load(real v[block], int x, int parity, int chirality) const
+        {
+          array<real, compressed_block> tmp;
+          raw_load(tmp.data, x, parity, chirality);
+          recon.unpack(v, tmp);
+
+          if (add_rho) {
+#pragma unroll
+            for (int i = 0; i < 6; i++) v[i] += rho;
+          }
+        }
+
+        /**
            @brief Store accessor for a single chiral block
            @param[out] v Vector of elements to be stored
            @param[in] x Checkerboarded site index
@@ -753,9 +695,9 @@ namespace quda {
          */
         __device__ __host__ inline void raw_save(const real v[compressed_block], int x, int parity, int chirality) const
         {
-          constexpr int M = (compressed_block + N - 1) / N; // number of short vectors per chiral block
-          constexpr int M_offset = compressed_block / N;    // number of short vectors per chiral block
-
+          // the chiral block size may not be exactly divisible by N,
+          // in which case we write the divisble part first and then
+          // deal with the remainder afterwards
           array<real, compressed_block> tmp;
 #pragma unroll
           for (int i = 0; i < compressed_block; i++) tmp[i] = isFixed<Float>::value ? v[i] * nrm_inv : v[i];
@@ -766,20 +708,20 @@ namespace quda {
             // first do scalar copy converting into storage type
 #pragma unroll
             for (int j = 0; j < N; j++)
-              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * Nrem + i * N + j]);
+              copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
             vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
 
-          if (Nrem) {
-            typename VectorType<Float, std::max(Nrem, 1)>::type vecTmp;
+          if (M_rem) {
+            typename VectorType<Float, std::max(M_rem, 1)>::type vecTmp;
             // first do scalar copy converting into storage type
 #pragma unroll
-            for (int j = 0; j < Nrem; j++)
+            for (int j = 0; j < M_rem; j++)
               copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
 
             char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);
-            ptr += (stride * (M_offset * N) + chirality * Nrem) * sizeof(Float);
+            ptr += (stride * (M_offset * N) + chirality * M_rem) * sizeof(Float);
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
           }
         }
@@ -788,6 +730,20 @@ namespace quda {
         {
 #pragma unroll
           for (int ch = 0; ch < 2; ch++) raw_save(v + ch * compressed_block, x, parity, ch);
+        }
+
+        /**
+           @brief Store accessor for a single chiral block
+           @param[out] v Vector of elements to be stored
+           @param[in] x Checkerboarded site index
+           @param[in] parity Field parity
+           @param[in] chirality Chiral block index
+         */
+        __device__ __host__ inline void save(const real v[block], int x, int parity, int chirality) const
+        {
+          array<real, compressed_block> tmp;
+          recon.pack(tmp, v);
+          raw_save(tmp.data, x, parity, chirality);
         }
 
         /**
