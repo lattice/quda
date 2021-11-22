@@ -366,7 +366,7 @@ endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC
-                                         GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
+                                         GPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
 
 

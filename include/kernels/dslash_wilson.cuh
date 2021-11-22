@@ -141,7 +141,7 @@ namespace quda
 
     // out(x) = M*in = (-D + m) * in(x-mu)
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -150,7 +150,7 @@ namespace quda
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       
-      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, Arg::nDim == 5 ? s : 0, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -158,7 +158,6 @@ namespace quda
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-
         Vector x = arg.x(xs, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

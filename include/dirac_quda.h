@@ -1132,6 +1132,17 @@ public:
 
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
 
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
+                          const ColorSpinorField &x, double k) const;
+
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
         const ColorSpinorField &x, const double &k) const;
