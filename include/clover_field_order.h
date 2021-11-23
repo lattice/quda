@@ -420,7 +420,7 @@ namespace quda {
         return ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
       }
 
-      constexpr Float scale() const { return static_cast<Float>(1.0); } // normalization of native storage
+      constexpr Float scale() const { return static_cast<Float>(1.0); }
     };
 
     /**
