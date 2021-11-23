@@ -124,7 +124,7 @@ namespace quda
     instantiate<NdegTwistedCloverPreconditionedApply>(out, in, U, A, a, b, c, xpay, x, parity, dagger, comm_override, profile);
   }
 #else
-  void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, const CloverField &,
+  void ApplyNdegTwistedCloverPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
                                             double, double, double, bool, const ColorSpinorField &, int, bool,
                                             const int *, TimeProfile &)
   {
