@@ -77,7 +77,7 @@ See also "Known Issues" below.
 It is recommended to build QUDA in a separate directory from the
 source directory.  For instructions on how to build QUDA using cmake
 see this page
-https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note
+https://github.com/lattice/quda/wiki/QUDA-Build-With-CMake. Note
 that this requires cmake version 3.15 or later. You can obtain cmake
 from https://cmake.org/download/. On Linux the binary tar.gz archives
 unpack into a cmake directory and usually run fine from that

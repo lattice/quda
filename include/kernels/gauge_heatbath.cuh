@@ -1,7 +1,7 @@
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
-#include <atomic.cuh>
+#include <atomic_helper.h>
 #include <random_helper.h>
 #include <kernel.h>
 
