@@ -4,6 +4,7 @@
 #include <fast_intdiv.h>
 #include <array.h>
 #include <block_reduction_kernel.h>
+#include <kernel.h>
 
 namespace quda {
 

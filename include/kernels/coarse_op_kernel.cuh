@@ -129,7 +129,7 @@ namespace quda {
     using uvTileType = TileSize<fineColor, coarseColor, fineColor, tile_height_uv, tile_width_uv, 1>;              /** tile type used for computeUV */
     uvTileType uvTile;                                                                                             /** tile instance used for computeUV */
 
-    // tile used for computeVUV - for fine grids best to use 4, else use max of 3
+    // tile used for computeVUV - for fine Wilson grids best to use 4, else use max of 3
     static constexpr int tile_height_vuv = (coarseColor % 4 == 0 && fineSpin == 4) ? 4 : coarseColor % 3 == 0 ? 3 : 2; /** tile height used for computeVUV */
     static constexpr int tile_width_vuv = coarseColor % 2 == 0 ? 2 : 1;                                                /** tile width used for computeVUV */
     using vuvTileType = TileSize<coarseColor, coarseColor, fineColor, tile_height_vuv, tile_width_vuv, 1>;             /** tile type used for computeVUV */
