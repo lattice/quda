@@ -10,7 +10,7 @@
 namespace quda
 {
 
-  using spinor_array = vector_type<double2, 16>;
+  using spinor_array = VectorType<double2, 16>;
   
   template <typename real> class DRGammaMatrix {
   public:
