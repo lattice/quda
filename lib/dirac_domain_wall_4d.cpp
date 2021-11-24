@@ -35,7 +35,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, 0.0, nullptr, nullptr, 0.0, dagger, DSLASH5_DWF);
+    ApplyDslash5(out, in, in, mass, 0.0, nullptr, nullptr, 0.0, dagger, Dslash5Type::DSLASH5_DWF);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -63,7 +63,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, DSLASH5_DWF);
+    ApplyDslash5(out, in, x, mass, 0.0, nullptr, nullptr, k, dagger, Dslash5Type::DSLASH5_DWF);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -77,7 +77,7 @@ namespace quda {
 
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1320LL * (long long)in.Volume();
-    ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, DSLASH5_DWF);
+    ApplyDslash5(out, in, out, mass, 0.0, nullptr, nullptr, 1.0, dagger, Dslash5Type::DSLASH5_DWF);
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
@@ -134,7 +134,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, M5_INV_DWF);
+    ApplyDslash5(out, in, in, mass, m5, nullptr, nullptr, 0.0, dagger, Dslash5Type::M5_INV_DWF);
 
     long long Ls = in.X(4);
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
@@ -147,7 +147,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, M5_INV_DWF);
+    ApplyDslash5(out, in, x, mass, m5, nullptr, nullptr, b, dagger, Dslash5Type::M5_INV_DWF);
 
     long long Ls = in.X(4);
     flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);

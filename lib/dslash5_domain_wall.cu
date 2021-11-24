@@ -30,19 +30,19 @@ namespace quda
 
       long long flops_ = 0;
       switch (type) {
-      case DSLASH5_DWF: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
-      case DSLASH5_MOBIUS_PRE:
+      case Dslash5Type::DSLASH5_DWF: flops_ = n * (8ll * bulk + 10ll * wall + (xpay ? 4ll * in.Volume() : 0)); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE:
         flops_ = n * (8ll * bulk + 10ll * wall + 14ll * in.Volume() + (xpay ? 8ll * in.Volume() : 0));
         break;
-      case DSLASH5_MOBIUS:
+      case Dslash5Type::DSLASH5_MOBIUS:
         flops_ = n * (8ll * bulk + 10ll * wall + 8ll * in.Volume() + (xpay ? 8ll * in.Volume() : 0));
         break;
-      case M5_INV_DWF:
-      case M5_INV_MOBIUS: // FIXME flops
+      case Dslash5Type::M5_INV_DWF:
+      case Dslash5Type::M5_INV_MOBIUS: // FIXME flops
         flops_ = ((2 + 8 * n) * Ls + (xpay ? 4ll : 0)) * in.Volume();
         break;
-      case M5_INV_ZMOBIUS: flops_ = ((12 + 16 * n) * Ls + (xpay ? 8ll : 0)) * in.Volume(); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      case Dslash5Type::M5_INV_ZMOBIUS: flops_ = ((12 + 16 * n) * Ls + (xpay ? 8ll : 0)) * in.Volume(); break;
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
 
       return flops_;
@@ -52,13 +52,13 @@ namespace quda
     {
       long long Ls = in.X(4);
       switch (type) {
-      case DSLASH5_DWF: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case DSLASH5_MOBIUS_PRE: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case DSLASH5_MOBIUS: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case M5_INV_DWF: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case M5_INV_MOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      case M5_INV_ZMOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      case Dslash5Type::DSLASH5_DWF: return out.Bytes() + 2 * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::DSLASH5_MOBIUS: return out.Bytes() + 3 * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::M5_INV_DWF: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::M5_INV_MOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
+      case Dslash5Type::M5_INV_ZMOBIUS: return out.Bytes() + Ls * in.Bytes() + (xpay ? x.Bytes() : 0);
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
       return 0ll;
     }
@@ -68,9 +68,11 @@ namespace quda
     int blockMin() const { return 4; }
     unsigned int sharedBytesPerThread() const
     {
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         // spin components in shared depend on inversion algorithm
-        int nSpin = var_inverse() ? in.Nspin() / 2 : in.Nspin();
+        int nSpin = mobius_m5::var_inverse() ? mobius_m5::use_half_vector() ? in.Nspin() / 2 : in.Nspin() : in.Nspin();
         return 2 * nSpin * nColor * sizeof(typename mapper<Float>::type);
       } else {
         return 0;
@@ -80,7 +82,9 @@ namespace quda
     // overloaded to return max dynamic shared memory if doing shared-memory inverse
     unsigned int maxSharedBytesPerBlock() const
     {
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         return maxDynamicSharedBytesPerBlock();
       } else {
         return TunableKernel3D::maxSharedBytesPerBlock();
@@ -103,20 +107,22 @@ namespace quda
       xpay(a == 0.0 ? false : true),
       type(type)
     {
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         TunableKernel2D_base<false>::resizeStep(in.X(4)); // Ls must be contained in the block
       }
 
       if (dagger) strcat(aux, ",Dagger");
       if (xpay) strcat(aux, ",xpay");
       switch (type) {
-      case DSLASH5_DWF: strcat(aux, ",DSLASH5_DWF"); break;
-      case DSLASH5_MOBIUS_PRE: strcat(aux, ",DSLASH5_MOBIUS_PRE"); break;
-      case DSLASH5_MOBIUS: strcat(aux, ",DSLASH5_MOBIUS"); break;
-      case M5_INV_DWF: strcat(aux, ",M5_INV_DWF"); break;
-      case M5_INV_MOBIUS: strcat(aux, ",M5_INV_MOBIUS"); break;
-      case M5_INV_ZMOBIUS: strcat(aux, ",M5_INV_ZMOBIUS"); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      case Dslash5Type::DSLASH5_DWF: strcat(aux, ",Dslash5Type::DSLASH5_DWF"); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: strcat(aux, ",Dslash5Type::DSLASH5_MOBIUS_PRE"); break;
+      case Dslash5Type::DSLASH5_MOBIUS: strcat(aux, ",Dslash5Type::DSLASH5_MOBIUS"); break;
+      case Dslash5Type::M5_INV_DWF: strcat(aux, ",Dslash5Type::M5_INV_DWF"); break;
+      case Dslash5Type::M5_INV_MOBIUS: strcat(aux, ",Dslash5Type::M5_INV_MOBIUS"); break;
+      case Dslash5Type::M5_INV_ZMOBIUS: strcat(aux, ",Dslash5Type::M5_INV_ZMOBIUS"); break;
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
 
       apply(device::get_default_stream());
@@ -141,18 +147,20 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      if (shared() && (type == M5_INV_DWF || type == M5_INV_MOBIUS || type == M5_INV_ZMOBIUS)) {
+      if (mobius_m5::shared()
+          && (type == Dslash5Type::M5_INV_DWF || type == Dslash5Type::M5_INV_MOBIUS
+              || type == Dslash5Type::M5_INV_ZMOBIUS)) {
         tp.set_max_shared_bytes = true; // if inverse kernel uses shared memory then maximize total shared memory pool
       }
 
       switch (type) {
-      case DSLASH5_DWF:        Launch<DSLASH5_DWF,dslash5>(tp, stream); break;
-      case DSLASH5_MOBIUS_PRE: Launch<DSLASH5_MOBIUS_PRE, dslash5>(tp, stream); break;
-      case DSLASH5_MOBIUS:     Launch<DSLASH5_MOBIUS, dslash5>(tp, stream); break;
-      case M5_INV_DWF:         Launch<M5_INV_DWF, dslash5inv>(tp, stream); break;
-      case M5_INV_MOBIUS:      Launch<M5_INV_MOBIUS, dslash5inv>(tp, stream); break;
-      case M5_INV_ZMOBIUS:     Launch<M5_INV_ZMOBIUS, dslash5inv>(tp, stream); break;
-      default: errorQuda("Unexpected Dslash5Type %d", type);
+      case Dslash5Type::DSLASH5_DWF: Launch<Dslash5Type::DSLASH5_DWF, dslash5>(tp, stream); break;
+      case Dslash5Type::DSLASH5_MOBIUS_PRE: Launch<Dslash5Type::DSLASH5_MOBIUS_PRE, dslash5>(tp, stream); break;
+      case Dslash5Type::DSLASH5_MOBIUS: Launch<Dslash5Type::DSLASH5_MOBIUS, dslash5>(tp, stream); break;
+      case Dslash5Type::M5_INV_DWF: Launch<Dslash5Type::M5_INV_DWF, dslash5inv>(tp, stream); break;
+      case Dslash5Type::M5_INV_MOBIUS: Launch<Dslash5Type::M5_INV_MOBIUS, dslash5inv>(tp, stream); break;
+      case Dslash5Type::M5_INV_ZMOBIUS: Launch<Dslash5Type::M5_INV_ZMOBIUS, dslash5inv>(tp, stream); break;
+      default: errorQuda("Unexpected Dslash5Type %d", static_cast<int>(type));
       }
     }
   };
