@@ -257,6 +257,8 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(int nFace) const
   {
+    createGhostZone(nFace, false);
+
     int spinor_size = 2*nSpin*nColor*precision;
     bool resize = false;
 
@@ -307,7 +309,7 @@ namespace quda {
   }
 
   void cpuColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *,
-					  const MemoryLocation *, bool, bool, QudaPrecision) const
+                                          const MemoryLocation *, bool, bool, QudaPrecision) const
   {
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer(nFace);

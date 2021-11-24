@@ -146,7 +146,6 @@ namespace quda
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
-      policy.apply(device::get_default_stream());
     }
   };
 
@@ -157,9 +156,7 @@ namespace quda
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    pushKernelPackT(true); // non-spin projection requires kernel packing
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-    popKernelPackT();
   }
 #else
   void ApplyCovDev(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, int, int,

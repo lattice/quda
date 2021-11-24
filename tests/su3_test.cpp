@@ -15,6 +15,8 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -59,7 +61,6 @@ void display_test_info()
   return;
 }
 
-
 int main(int argc, char **argv)
 {
 
@@ -78,19 +79,18 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
-    link_recon_sloppy = link_recon;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device_ordinal);
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
-  void *qDensity = malloc(array_size);
+  void *qDensity = safe_malloc(array_size);
   // start the timer
   double time0 = -((double)clock());
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -143,7 +143,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
 
-  free(qDensity);
+  // release memory
+  host_free(qDensity);
 
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
@@ -209,14 +210,13 @@ int main(int argc, char **argv)
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
+  for (int dir = 0; dir < 4; dir++) {
+    host_free(gauge[dir]);
+    host_free(new_gauge[dir]);
+  }
+
   freeGaugeQuda();
   endQuda();
-
-  // release memory
-  for (int dir = 0; dir < 4; dir++) {
-    free(gauge[dir]);
-    free(new_gauge[dir]);
-  }
 
   finalizeComms();
   return 0;

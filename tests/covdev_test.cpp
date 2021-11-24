@@ -89,16 +89,11 @@ void init(int argc, char **argv)
 
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
-  for (int dir = 0; dir < 4; dir++) {
-    links[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    if (links[dir] == NULL) {
-      errorQuda("ERROR: malloc failed for gauge links");
-    }  
-  }
+  for (int dir = 0; dir < 4; dir++) { links[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size); }
   constructHostGaugeField(links, gauge_param, argc, argv);
 
   // cpuLink is only used for ghost allocation
-  GaugeFieldParam cpuParam(links, gauge_param);
+  GaugeFieldParam cpuParam(gauge_param, links);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLink   = new cpuGaugeField(cpuParam);
   ghostLink = cpuLink->Ghost();
@@ -139,9 +134,7 @@ void init(int argc, char **argv)
 
 void end(void) 
 {
-  for (int dir = 0; dir < 4; dir++) {
-    free(links[dir]);
-  }
+  for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
   delete dirac;
   delete cudaSpinor;

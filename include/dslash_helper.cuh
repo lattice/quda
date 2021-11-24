@@ -5,6 +5,16 @@
 #include <register_traits.h>
 #include <index_helper.cuh>
 #include <shmem_helper.cuh>
+#include <fast_intdiv.h>
+#include <dslash_quda.h>
+
+#if defined(_NVHPC_CUDA)
+#include <constant_kernel_arg.h>
+constexpr bool use_kernel_arg = false;
+#else
+constexpr bool use_kernel_arg = true;
+#endif
+
 #include <kernel.h>
 
 namespace quda
@@ -246,8 +256,6 @@ namespace quda
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
 
-    real t_proj_scale; // factor to correct for T-dimensional spin projection
-
     DslashConstant dc;      // pre-computed dslash constants for optimized indexing
     KernelType kernel_type; // interior, exterior_t, etc.
     bool remote_write;      // used by the autotuner to switch on/off remote writing vs using copy engines
@@ -365,7 +373,6 @@ namespace quda
         pack_threads = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          if (i == 3 && !getKernelPackT()) continue;
           pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
           dim_map[d++] = i;
         }
@@ -377,7 +384,6 @@ namespace quda
         int d = 0;
         for (int i = 0; i < 4; i++) {
           if (!commDim[i]) continue;
-          if (i == 3 && !getKernelPackT()) continue;
           dim_map[d++] = i;
         }
         pack_threads = 0;
@@ -622,7 +628,7 @@ namespace quda
   template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D_,
             template <bool dagger, QudaPCType pc, typename Arg> class P_, int nParity_, bool dagger_, bool xpay_,
             KernelType kernel_type_, typename Arg_>
-  struct dslash_functor_arg : kernel_param<> {
+  struct dslash_functor_arg : kernel_param<use_kernel_arg> {
     using Arg = Arg_;
     using D = D_<nParity_, dagger_, xpay_, kernel_type_, Arg>;
     template <QudaPCType pc> using P = P_<dagger_, pc, Arg>;
@@ -658,7 +664,8 @@ namespace quda
       // for full fields set parity from z thread index else use arg setting
       if (nParity == 1) parity = arg.parity;
 
-      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) && target::block_idx().x < (unsigned)arg.pack_blocks) {
+      if ((kernel_type == INTERIOR_KERNEL || kernel_type == UBER_KERNEL) &&
+          target::block_idx().x < static_cast<unsigned int>(arg.pack_blocks)) {
         // first few blocks do packing kernel
         typename Arg::template P<dslash.pc_type()> packer;
         packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
@@ -670,8 +677,8 @@ namespace quda
       } else if (arg.shmem > 0
                  && ((kernel_type == EXTERIOR_KERNEL_ALL && arg.exterior_blocks == 0)
                      || (kernel_type == UBER_KERNEL && arg.exterior_blocks > 0
-                         && target::block_idx.x >= (target::grid_dim().x - arg.exterior_blocks)))) {
-        shmem_exterior<kernel_typen, Parity>(dslash, arg, s);
+                         && target::block_idx().x >= (target::grid_dim().x - arg.exterior_blocks)))) {
+        shmem_exterior<kernel_type, nParity>(dslash, arg, s);
 #endif
       } else {
         const int dslash_block_offset

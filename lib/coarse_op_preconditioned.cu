@@ -6,11 +6,17 @@
 #include <kernels/coarse_op_preconditioned.cuh>
 #include <coarse_op_preconditioned_mma_launch.h>
 
+#if __cplusplus >= 201703L
+#define IF_CONSTEXPR if constexpr
+#else
+#define IF_CONSTEXPR if
+#endif
+
 namespace quda
 {
 
-  template <QudaFieldLocation location, typename Float_, typename PreconditionedGauge,
-            typename Gauge, typename GaugeInv, int n, int M, int N, bool compute_max>
+  template <QudaFieldLocation location_template, typename Float_, typename PreconditionedGauge,
+            typename Gauge, typename GaugeInv, int n, int M, int N, bool compute_max, bool use_mma>
   class CalculateYhat : public TunableKernel3D {
     using Float = Float_;
     using Arg = CalculateYhatArg<Float, PreconditionedGauge, Gauge, GaugeInv, n, M, N, compute_max>;
@@ -18,7 +24,6 @@ namespace quda
     GaugeField &Yhat;
     const GaugeField &Y;
     const GaugeField &Xinv;
-    bool use_mma;
 
     long long flops() const { return Y.Volume() * 8 * n * n * (8 * n - 2); } // 8 from dir, 8 from complexity,
     long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + !Arg::compute_max * 8*arg.Yhat.Bytes()) * n; }
@@ -29,39 +34,44 @@ namespace quda
     int blockMin() const { return 8; }
     int blockStep() const { return 8; }
     unsigned int maxBlockSize(const TuneParam &) const { return 8u; }
+    bool tuneAuxDim() const { return use_mma; } // tune aux if doing mma
 
   public:
-    CalculateYhat(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv, bool use_mma) :
+    CalculateYhat(GaugeField &Yhat, const GaugeField &Y, const GaugeField &Xinv) :
       TunableKernel3D(Y, 2 * arg.tile.M_tiles, 4 * arg.tile.N_tiles),
       arg(Yhat, Y, Xinv),
       Yhat(Yhat),
       Y(Y),
-      Xinv(Xinv),
-      use_mma(use_mma)
+      Xinv(Xinv)
     {
-      arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-        arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
-        strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
+      if (Arg::compute_max) {
+        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+        if (location == QUDA_CUDA_FIELD_LOCATION) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+        arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
       }
-      arg.max = location == QUDA_CUDA_FIELD_LOCATION ? arg.max_d : arg.max_h;
+
+      if (location == QUDA_CUDA_FIELD_LOCATION) strcat(aux, Y.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       strcat(aux, comm_dim_partitioned_string());
       if (use_mma && location == QUDA_CUDA_FIELD_LOCATION) { strcat(aux, ",mma"); }
       if (Arg::compute_max) strcat(aux, ",compute_max");
 
       apply(device::get_default_stream());
 
-      double max_h_double = *arg.max_h;
-      comm_allreduce_max(&max_h_double);
-      *arg.max_h = static_cast<Float>(max_h_double);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
-      Yhat.Scale(*arg.max_h);
+      if (Arg::compute_max) {
+        double max_h_double = *arg.max_h;
+        comm_allreduce_max(&max_h_double);
+        *arg.max_h = static_cast<Float>(max_h_double);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
+        Yhat.Scale(*arg.max_h);
+      }
     }
 
     ~CalculateYhat()
     {
-      if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
-      pool_pinned_free(arg.max_h);
+      if (Arg::compute_max) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) pool_device_free(arg.max_d);
+        pool_pinned_free(arg.max_h);
+      }
     }
 
     void apply(const qudaStream_t &stream)
@@ -71,8 +81,12 @@ namespace quda
         qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
       }
 
-      if (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
-      else launch<ComputeYhat, true>(tp, stream, arg);
+      IF_CONSTEXPR (location_template == QUDA_CUDA_FIELD_LOCATION) {
+        IF_CONSTEXPR (use_mma) mma::launch_yhat_kernel(tp, stream, arg, *this);
+        else launch_device<ComputeYhat>(tp, stream, arg);
+      } else {
+        launch_host<ComputeYhat>(tp, stream, arg);
+      }
 
       if (location == QUDA_CUDA_FIELD_LOCATION && Arg::compute_max && !activeTuning()) { // only do copy once tuning is done
         qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
@@ -82,7 +96,7 @@ namespace quda
 
     bool advanceSharedBytes(TuneParam &) const { return false; }
 
-    bool advanceTuneParam(TuneParam &param) const
+    bool advanceAux(TuneParam &param) const
     {
       if (use_mma) {
         constexpr bool query_max = true;
@@ -93,11 +107,32 @@ namespace quda
         }
         return false;
       } else {
+        return false;
+      }
+    }
+
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      if (!use_mma) {
         if (location == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
           return TunableKernel3D::advanceTuneParam(param);
         else
           return false;
+      } else {
+        return false;
       }
+    }
+
+    void initTuneParam(TuneParam &param) const
+    {
+      TunableKernel3D::initTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
+    }
+
+    void defaultTuneParam(TuneParam &param) const
+    {
+      TunableKernel3D::defaultTuneParam(param);
+      param.aux = make_int4(0, 0, 0, 0);
     }
   };
 
@@ -196,11 +231,11 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv_aos->norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true>
-            (*Yhat_aos, *Y_aos, *Xinv_aos, use_mma);
+          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, true, true>
+            (*Yhat_aos, *Y_aos, *Xinv_aos);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false>
-          (*Yhat_aos, *Y_aos, *Xinv_aos, use_mma);
+        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarseInv, N, 4, 2, false, true>
+          (*Yhat_aos, *Y_aos, *Xinv_aos);
 
         if (&Y != Y_aos) { delete Y_aos; }
 
@@ -219,11 +254,11 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Xinv = %e\n", Xinv.norm2(0));
 
         if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
-          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true>
-            (Yhat, Y, Xinv, use_mma);
+          CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, true, false>
+            (Yhat, Y, Xinv);
         }
-        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false>
-          (Yhat, Y, Xinv, use_mma);
+        CalculateYhat<location, Float, gPreconditionedCoarse, gCoarse, gCoarse, N, 4, 2, false, false>
+          (Yhat, Y, Xinv);
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)

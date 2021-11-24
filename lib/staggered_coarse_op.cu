@@ -13,35 +13,6 @@
 
 namespace quda {
 
-  /**
-     @brief dummyClover is a helper function to allow us to create an
-     empty clover object - this allows us to use the the externally
-     linked reduction kernels when we do have a clover field. Taken from
-     coarsecoarse_op.cu.
-   */
-  inline std::unique_ptr<cudaCloverField> dummyClover()
-  {
-    CloverFieldParam cf_param;
-    cf_param.nDim = 4;
-    cf_param.pad = 0;
-    cf_param.setPrecision(QUDA_SINGLE_PRECISION);
-
-    for (int i = 0; i < cf_param.nDim; i++) cf_param.x[i] = 0;
-
-    cf_param.direct = true;
-    cf_param.inverse = true;
-    cf_param.clover = nullptr;
-    cf_param.norm = 0;
-    cf_param.cloverInv = nullptr;
-    cf_param.invNorm = 0;
-    cf_param.create = QUDA_NULL_FIELD_CREATE;
-    cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-
-    // create a dummy cudaCloverField if one is not defined
-    cf_param.order = QUDA_INVALID_CLOVER_ORDER;
-    return std::make_unique<cudaCloverField>(cf_param);
-  }
-
   template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   class CalculateStaggeredY : public TunableKernel3D {
 
@@ -299,7 +270,7 @@ namespace quda {
       // the repeated xinvAccessor is intentional
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor, xinvAccessor, xinvAccessor,
-        Y, X, *Yatomic, *Xatomic, *uv, *av, v, g, *dummyClover(), kappa, mass, mu_dummy,
+        Y, X, *Yatomic, *Xatomic, *uv, *av, v, kappa, mass, mu_dummy,
         mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
     } else {
 
@@ -332,7 +303,7 @@ namespace quda {
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
-        xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v, g, *dummyClover(),
+        xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
         kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
     }

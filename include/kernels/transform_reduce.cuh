@@ -1,7 +1,8 @@
 #pragma once
 
-#include <reduction_kernel.h>
 #include <limits>
+#include <algorithm>
+#include <reduction_kernel.h>
 
 namespace quda {
 
@@ -17,7 +18,7 @@ namespace quda {
     reducer r;
 
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init_value, reducer r) :
-      ReduceArg<reduce_t>(v.size()),
+      ReduceArg<reduce_t>(dim3(n_items, v.size(), 1), v.size()),
       n_items(n_items),
       n_batch(v.size()),
       init_value(init_value),
@@ -28,8 +29,7 @@ namespace quda {
       if (n_items > std::numeric_limits<count_t>::max())
         errorQuda("Requested size %lu greater than max supported %lu",
                   (uint64_t)n_items, (uint64_t)std::numeric_limits<count_t>::max());
-      this->threads = dim3(n_items, n_batch, 1);
-      memcpy(this->v, v.data(), v.size() * sizeof(T*));
+      std::copy(v.begin(), v.end(), this->v);
     }
 
     __device__ __host__ reduce_t init() const { return init_value; }

@@ -15,8 +15,7 @@ namespace quda {
   using namespace blas;
 
   SD::SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, mat, mat, mat, param, profile),
-    init(false)
+    Solver(mat, mat, mat, mat, param, profile), init(false)
   {
 
   }
@@ -34,7 +33,7 @@ namespace quda {
 
   void SD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    commGlobalReductionSet(param.global_reduction);
+    commGlobalReductionPush(param.global_reduction);
 
     if(!init){
       r = new cudaColorSpinorField(b);
@@ -85,7 +84,7 @@ namespace quda {
       printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
     } // >= QUDA_DEBUG_VERBOSITY
 
-    commGlobalReductionSet(true);
+    commGlobalReductionPop();
     return;
   }
 

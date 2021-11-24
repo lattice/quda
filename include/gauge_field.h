@@ -132,7 +132,7 @@ namespace quda {
     {
     }
 
-    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+    GaugeFieldParam(const QudaGaugeParam &param, void *h_gauge = nullptr, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
       location(QUDA_CPU_FIELD_LOCATION),
       nColor(3),

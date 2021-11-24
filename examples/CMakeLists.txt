@@ -92,7 +92,7 @@ elseif(USE_MPI)
 endif()
 
 # Create includes
-set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_BUILD_HOME}/include/externals ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 # Set install path
 include(GNUInstallDirs)

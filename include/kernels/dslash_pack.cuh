@@ -10,8 +10,6 @@ namespace quda
 {
   int *getPackComms();
 
-  static int commDim[QUDA_MAX_DIM];
-
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true,
             bool dagger_ = false, int twist_ = 0, QudaPCType pc_type_ = QUDA_4D_PC>
   struct PackArg : kernel_param<> {
@@ -49,9 +47,7 @@ namespace quda
 
     int_fastdiv blocks_per_dir;
     int dim_map[4];
-    int active_dims;
 
-    int_fastdiv swizzle;
     int sites_per_block;
 
     char *packBuffer[4 * QUDA_MAX_DIM];
@@ -75,7 +71,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a,
-            double b, double c, unsigned int block, unsigned int grid, unsigned int swizzle,
+            double b, double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
@@ -91,7 +87,8 @@ namespace quda
       twist_b(b),
       twist_c(c),
       work_items(work_items),
-      swizzle(swizzle),
+      threadDimMapLower{ },
+      threadDimMapUpper{ },
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,
@@ -114,8 +111,6 @@ namespace quda
       int d = 0;
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
-        threadDimMapLower[i] = 0;
-        threadDimMapUpper[i] = 0;
         if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
@@ -123,8 +118,7 @@ namespace quda
 
         dim_map[d++] = i;
       }
-      active_dims = d;
-      blocks_per_dir = grid / (2 * active_dims);
+      blocks_per_dir = grid / (2 * d);
     }
   };
 
@@ -153,10 +147,6 @@ namespace quda
     const int face_num = (ghost_idx >= face_size) ? 1 : 0;
     ghost_idx -= face_num * face_size;
 
-    // remove const to ensure we have non-const Ghost member
-    typedef typename std::remove_const<decltype(arg.in_pack)>::type T;
-    T &in = const_cast<T &>(arg.in_pack);
-
     if (face_num == 0) { // backwards
 
       int idx = indexFromFaceIndex<nDim, pc, dim, nFace, 0>(ghost_idx, parity, arg);
@@ -172,9 +162,9 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     } else { // forwards
 
@@ -191,9 +181,9 @@ namespace quda
           f = arg.twist_a * (f - arg.twist_b * f.igamma(4) + arg.twist_c * f1);
       }
       if (arg.spin_project) {
-        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
+        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f.project(dim, proj_dir);
       } else {
-        in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+        arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
       }
     }
   }
@@ -214,18 +204,14 @@ namespace quda
     const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;
     ghost_idx -= face_num * nFace * arg.dc.ghostFaceCB[dim];
 
-    // remove const to ensure we have non-const Ghost member
-    typedef typename std::remove_const<decltype(arg.in_pack)>::type T;
-    T &in = const_cast<T &>(arg.in_pack);
-
     if (face_num == 0) { // backwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 0>(ghost_idx, parity, arg);
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      arg.in_pack.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     } else { // forwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 1>(ghost_idx, parity, arg);
       Vector f = arg.in_pack(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      arg.in_pack.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
     }
   }
 
@@ -363,8 +349,8 @@ namespace quda
           // is we are in the uber kernel signal here
           if (!arg.packkernel) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_inter[shmemidx].store(0); // this could probably be relaxed
         }
@@ -374,7 +360,8 @@ namespace quda
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0 && target::block_idx().x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-          nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, getNeighborRank(2 * dim + dir, arg));
+          nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                             getNeighborRank(2 * dim + dir, arg));
       }
     }
 
@@ -391,8 +378,8 @@ namespace quda
         if (amLast) {
           if (arg.shmem & 8) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_intra[shmemidx].store(0); // this could probably be relaxed
         }

@@ -53,20 +53,30 @@ namespace quda
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
-  static long total_bytes[N_ALLOC_TYPE] = {0};
-  static long max_total_bytes[N_ALLOC_TYPE] = {0};
-  static long total_host_bytes, max_total_host_bytes;
-  static long total_pinned_bytes, max_total_pinned_bytes;
+  static size_t total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t max_total_bytes[N_ALLOC_TYPE] = {0};
+  static size_t total_host_bytes, max_total_host_bytes;
+  static size_t total_pinned_bytes, max_total_pinned_bytes;
 
-  long device_allocated_peak() { return max_total_bytes[DEVICE]; }
+  size_t device_allocated() { return total_bytes[DEVICE]; }
 
-  long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+  size_t pinned_allocated() { return total_bytes[PINNED]; }
 
-  long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+  size_t mapped_allocated() { return total_bytes[MAPPED]; }
 
-  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+  size_t managed_allocated() { return total_bytes[MANAGED]; }
 
-  long host_allocated_peak() { return max_total_bytes[HOST]; }
+  size_t host_allocated() { return total_bytes[HOST]; }
+
+  size_t device_allocated_peak() { return max_total_bytes[DEVICE]; }
+
+  size_t pinned_allocated_peak() { return max_total_bytes[PINNED]; }
+
+  size_t mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  size_t managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+
+  size_t host_allocated_peak() { return max_total_bytes[HOST]; }
 
   static void print_trace(void)
   {
@@ -168,8 +178,7 @@ namespace quda
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
 
-        if (!device::managed_memory_supported())
-          warningQuda("Target device does not report supporting managed memory");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;
@@ -371,7 +380,7 @@ namespace quda
     }
     track_malloc(SHMEM, a, ptr);
 #ifdef HOST_DEBUG
-    qudaMemset(ptr, 0xff, size);
+    cudaMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -521,12 +530,12 @@ namespace quda
 
   void printPeakMemUsage()
   {
-    printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
-    printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
-    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
-    printfQuda("Shmem memory used = %.1f MB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
-    printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1 << 20));
-    printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1 << 20));
+    printfQuda("Device memory used = %.1f MiB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
+    printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
+    printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
+    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
+    printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
 
   void assertAllMemFree()
@@ -584,8 +593,7 @@ namespace quda
   {
     auto error = cudaHostRegister(ptr, bytes, cudaHostRegisterDefault);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostRegister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
     }
   }
 
@@ -593,8 +601,7 @@ namespace quda
   {
     auto error = cudaHostUnregister(ptr);
     if (error != cudaSuccess) {
-      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()",
-                cudaGetErrorString(error), file, line, func);
+      errorQuda("cudaHostUnregister failed with error %s (%s:%d in %s()", cudaGetErrorString(error), file, line, func);
     }
   }
 

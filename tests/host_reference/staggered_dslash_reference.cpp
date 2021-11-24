@@ -38,9 +38,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
                               gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor,
                               sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
 #else
-void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **,
-                              gFloat **, sFloat *spinorField, sFloat **,
-                              sFloat **, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
+void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **, gFloat **, sFloat *spinorField,
+                              sFloat **, sFloat **, int oddBit, int daggerBit, int nSrc, QudaDslashType dslash_type)
 #endif
 {
   for (int i = 0; i < Vh * stag_spinor_site_size * nSrc; i++) res[i] = 0.0;
@@ -62,8 +61,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
 #ifdef MULTI_GPU
     ghostFatlinkEven[dir] = ghostFatlink[dir];
     ghostFatlinkOdd[dir] = ghostFatlink[dir] + (faceVolume[dir] / 2) * gauge_site_size;
-    ghostLonglinkEven[dir] = ghostLonglink[dir];
-    ghostLonglinkOdd[dir] = ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size;
+    ghostLonglinkEven[dir] = ghostLonglink ? ghostLonglink[dir] : nullptr;
+    ghostLonglinkOdd[dir] = ghostLonglink ? ghostLonglink[dir] + 3 * (faceVolume[dir] / 2) * gauge_site_size : nullptr;
 #endif
   }
 

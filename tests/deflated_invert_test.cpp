@@ -130,7 +130,7 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -141,18 +141,16 @@ int main(int argc, char **argv)
   void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    clover = safe_malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = safe_malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
-  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-
-  void *spinorOut = NULL;
-  spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorIn = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorCheck = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorOut = safe_malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -202,16 +200,16 @@ int main(int argc, char **argv)
     } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
       dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
       }
       mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param,
               inv_param.mass, inv_param.b_5, inv_param.c_5);
-      free(kappa_b);
-      free(kappa_c);
+      host_free(kappa_b);
+      host_free(kappa_c);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
@@ -245,16 +243,16 @@ int main(int argc, char **argv)
       dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param,
                   inv_param.mass);
     } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-      double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-      double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_b = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
+      double _Complex *kappa_c = (double _Complex *)safe_malloc(Lsdim * sizeof(double _Complex));
       for (int xs = 0; xs < Lsdim; xs++) {
         kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
         kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
       }
       mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec,
                 gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
-      free(kappa_b);
-      free(kappa_c);
+      host_free(kappa_b);
+      host_free(kappa_c);
     } else {
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
@@ -290,18 +288,22 @@ int main(int argc, char **argv)
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    if (clover) host_free(clover);
+    if (clover_inv) host_free(clover_inv);
+  }
+
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
+
+  host_free(spinorIn);
+  host_free(spinorCheck);
+  host_free(spinorOut);
+
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    if (clover) free(clover);
-    if (clover_inv) free(clover_inv);
-  }
-
-  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
 
   return 0;
 }
