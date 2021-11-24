@@ -1,5 +1,5 @@
 #include <gauge_field_order.h>
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 #include <mdw_dslash5_tensor_core.cuh>
 #endif
 #include <kernel.h>
@@ -10,7 +10,7 @@ namespace quda {
   namespace mobius_tensor_core
   {
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 
     constexpr int sm_m_pad_size(int m)
     {
@@ -445,7 +445,7 @@ namespace quda {
       }
     };
     
-#endif // #if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#endif // QUDA_MMA_AVAILABLE
   }
 
 }

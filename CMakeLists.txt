@@ -151,6 +151,10 @@ message(STATUS "SU(N): ${QUDA_N_COLORS}")
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
   
+set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
+set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
+mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
+
 # build options
 option(QUDA_DIRAC_DEFAULT_OFF "default value for QUDA_DIRAC_<TYPE> setting" $ENV{QUDA_DIRAC_DEFAULT_OFF})
 mark_as_advanced(QUDA_DIRAC_DEFAULT_OFF)
@@ -462,8 +466,16 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
 
 # This is needed now GPU ARCH
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
-set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
-set(COMP_CAP "${COMP_CAP}0")
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
+  set(QUDA_GPU_ARCH_SUFFIX real)
+endif()
+if(QUDA_GPU_ARCH_SUFFIX)
+  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
+else()
+  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+endif()
+set(COMP_CAP ${COMP_CAP}0)
 
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
@@ -473,18 +485,15 @@ message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 find_package(CUDAToolkit REQUIRED)
 
 
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC" OR CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
   message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 include(CMakeDependentOption)
-CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
 endif()
 
 if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
@@ -652,7 +661,7 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO

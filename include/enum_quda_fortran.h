@@ -12,8 +12,7 @@
 #   gfortran).
 #*/
 
-#/* can't include limits.h in a Fortran program */
-#define QUDA_INVALID_ENUM (-2147483647 - 1) 
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #define QudaLinkType integer(4)
 

@@ -3,7 +3,7 @@
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
-set(GITVERSION "${PROJECT_VERSION}-${QUDA_GPU_ARCH} ${GITVERSION}")
+set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -206,13 +206,12 @@ target_compile_options(
           -Xclang -fcuda-allow-variadic-functions>)
 target_compile_options(
   quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:-Wno-unknown-cuda-version> $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:
-               -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+               -Wno-deprecated-gpu-targets  --expt-relaxed-constexpr>)
 
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -ftz=true -prec-div=false -prec-sqrt=false>)
 target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Wno-deprecated-gpu-targets
-                                    -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
-target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}
-                                    --cuda-gpu-arch=${QUDA_GPU_ARCH}>)
+                                    --expt-relaxed-constexpr>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 target_link_options(quda PUBLIC $<$<CUDA_COMPILER_ID:Clang>: --cuda-path=${CUDAToolkit_TARGET_DIR}>)
 
 if(QUDA_VERBOSE_BUILD)
@@ -460,6 +459,7 @@ endif()
 if(QUDA_QMP)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
 if(QUDA_NVSHMEM)

@@ -5,7 +5,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#if __COMPUTE_CAPABILITY__ >= 700
 #define QUDA_MMA_AVAILABLE 1
 #endif
 
