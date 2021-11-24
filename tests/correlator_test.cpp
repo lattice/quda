@@ -238,20 +238,20 @@ void invert_and_contract(void **prop_array_ptr_1, void **prop_array_ptr_2,
 
       //TODO convert back to 4D
       //TODO what is the difference between inv_param4d and inv_param5d?
-//      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-//        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
-//      }
-
+      //      if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+      //        make4DChiralProp(prop_array_ptr_2[i], invert_output, *inv_param5D, inv_param, gauge_param.X);
+      //      }
+      
       //! Gaussian smear the sink.
       performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
-
+    
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source_pos, momentum.begin());
-
-    //! Print and save correlators for this source
-    if (comm_rank() == 0) print_correlators(correlation_function_sum, corr_param, n);
+    
+    // Print and save correlators for this source
+    if (comm_rank() == 0 && verbosity == QUDA_DEBUG_VERBOSE) print_correlators(correlation_function_sum, corr_param, n);
     save_correlators_to_file(correlation_function_sum, corr_param, n);
   }
 }
