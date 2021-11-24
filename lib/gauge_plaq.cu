@@ -24,7 +24,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugePlaqArg<Float, nColor, recon> arg(u);
       launch<Plaquette>(plq, tp, stream, arg);
-      for (int i = 0; i < 2; i++) plq[i] /= nColor*nColor*2*arg.threads.x*comm_size();
+      for (int i = 0; i < 2; i++) plq[i] /= 3.0*nColor*2*arg.threads.x*comm_size();
     }
     
     long long flops() const

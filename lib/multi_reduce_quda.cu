@@ -133,7 +133,7 @@ namespace quda {
           if (b.data) { set_param<multi_1d>(arg, 'b', b); }
           if (c.data) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          // we intentional do not do a global reduction in the launch, and defer until the entire "tile" is complete
+          // we intentionally do not do a global reduction in the launch, and defer until the entire "tile" is complete
           launch<MultiReduce_, host_reduce_t, comm_reduce_null<host_reduce_t>>(result_, tp, stream, arg);
 
           // need to transpose for same order with vector thread reduction
