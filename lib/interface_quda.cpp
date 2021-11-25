@@ -5419,7 +5419,7 @@ void copyExtendedResidentGaugeQuda(void *resident_gauge)
   static_cast<GaugeField *>(resident_gauge)->copy(*extendedGaugeResident);
 }
 
- 
+/* 
 void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double omega)
 {
   profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5494,7 +5494,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
+*/
 
 void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 {

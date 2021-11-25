@@ -82,7 +82,7 @@ namespace quda
   {
     // In case we are deflating an operator, save the tunechache from the inverter
     saveTuneCache();
-
+    
     // Override any user input for block size.
     block_size = 1;
 
@@ -104,7 +104,7 @@ namespace quda
     // Check for an initial guess. If none present, populate with rands, then
     // orthonormalise
     prepareInitialGuess3D(kSpace, ortho_dim_size);
-        
+    
     // Increase the size of kSpace passed to the function, will be trimmed to
     // original size before exit.
     prepareKrylovSpace(kSpace, evals);
@@ -117,7 +117,9 @@ namespace quda
     double epsilon = setEpsilon(kSpace[0]->Precision());
     
     // Print Eigensolver params
+    ////printfQuda("Flag 1\n");
     printEigensolverSetup();
+    ////printfQuda("Flag 2\n");
     //---------------------------------------------------------------------------
 
     // Begin TRLM Eigensolver computation
@@ -128,8 +130,13 @@ namespace quda
     while (restart_iter < max_restarts && !converged) {
 
       // Get min step
+
       int step_min = getArrayMinMax3D(num_locked_3D, n_kr, true);
-      for (int step = step_min; step < n_kr; step++) lanczosStep3D(kSpace, step);
+      for (int step = step_min; step < n_kr; step++) {
+	//printfQuda("Pre Step\n\n\n");
+	lanczosStep3D(kSpace, step);
+	//printfQuda("\n\nPost Step\n");
+      }
       iter += (n_kr - step_min);
       
       // The eigenvalues are returned in the alpha array
@@ -138,45 +145,51 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated.
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	for (int i = num_locked_3D[t]; i < n_kr; i++) {
-	  if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(!converged_3D[t]) { 
+	  for (int i = num_locked_3D[t]; i < n_kr; i++) {
+	    if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
+	  }
 	}
       }
       
       // Locking check
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	iter_locked_3D[t] = 0;
-	for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
-	  if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	      printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]],
-			 epsilon * mat_norm_3D[t]);
-	    iter_locked_3D[t] = i;	    
-	  } else {
-	    // Unlikely to find new locked pairs	    
-	    break;
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(!converged_3D[t]) { 
+	  iter_locked_3D[t] = 0;
+	  for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
+	    if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
+	      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+		printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]],
+			   epsilon * mat_norm_3D[t]);
+	      iter_locked_3D[t] = i;	    
+	    } else {
+	      // Unlikely to find new locked pairs	    
+	      break;
+	    }
 	  }
 	}
       }
 
       // Convergence check
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	iter_converged_3D[t] = iter_locked_3D[t];
-	for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
-	  if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	      printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
-	    iter_converged = i;
-	  } else {
-	    // Unlikely to find new converged pairs
-	    break;
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(!converged_3D[t]) { 
+	  iter_converged_3D[t] = iter_locked_3D[t];
+	  for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
+	    if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
+	      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+		printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
+	      iter_converged = i;
+	    } else {
+	      // Unlikely to find new converged pairs
+	      break;
+	    }
 	  }
 	}
       }
 
-      for (int t = 0; t < ortho_dim_size  && !converged_3D[t]; t++) {
-	iter_keep_3D[t] = std::min(iter_converged_3D[t] + (n_kr - num_converged_3D[t]) / 2, n_kr - num_locked_3D[t] - 12);
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(!converged_3D[t]) iter_keep_3D[t] = std::min(iter_converged_3D[t] + (n_kr - num_converged_3D[t]) / 2, n_kr - num_locked_3D[t] - 12);
       }
       
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -184,22 +197,24 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       int t_offset = ortho_dim_size * comm_coord(3);      
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
-	num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
-	num_locked_3D[t] += iter_locked_3D[t];
-
-	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
-	  printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t_offset + t, restart_iter + 1);
-	  printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
-	  printf("iter Keep[%d] = %d\n", t_offset + t, iter_keep_3D[t]);
-	  printf("iter Lock[%d] = %d\n", t_offset + t, iter_locked_3D[t]);
-	  printf("num_converged[%d] = %d\n", t_offset + t, num_converged_3D[t]);
-	  printf("num_keep[%d] = %d\n", t_offset + t, num_keep_3D[t]);
-	  printf("num_locked[%d] = %d\n", t_offset + t, num_locked_3D[t]);
-	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-	    for (int i = 0; i < n_kr; i++) {
-	      printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, alpha_3D[t][i], i, residua_3D[t][i]);
+      for (int t = 0; t < ortho_dim_size; t++) {
+	if(!converged_3D[t]) { 
+	  num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
+	  num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
+	  num_locked_3D[t] += iter_locked_3D[t];
+	  
+	  if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+	    printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t_offset + t, restart_iter + 1);
+	    printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
+	    printf("iter Keep[%d] = %d\n", t_offset + t, iter_keep_3D[t]);
+	    printf("iter Lock[%d] = %d\n", t_offset + t, iter_locked_3D[t]);
+	    printf("num_converged[%d] = %d\n", t_offset + t, num_converged_3D[t]);
+	    printf("num_keep[%d] = %d\n", t_offset + t, num_keep_3D[t]);
+	    printf("num_locked[%d] = %d\n", t_offset + t, num_locked_3D[t]);
+	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+	      for (int i = 0; i < n_kr; i++) {
+		printf("Ritz[%d][%d] = %.16e residual[%d] = %.16e\n", t_offset + t, i, alpha_3D[t][i], i, residua_3D[t][i]);
+	      }
 	    }
 	  }
 	}
@@ -245,9 +260,11 @@ namespace quda
                    restart_iter, iter);
 
         // Dump all Ritz values and residua if using Chebyshev
-	for (int t = 0; t < ortho_dim_size; t++) {
-	  for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
-	    printfQuda("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, alpha_3D[t][i], 0.0, residua_3D[t][i]);
+	if(eig_param->use_poly_acc) {
+	  for (int t = 0; t < ortho_dim_size; t++) {
+	    for (int i = 0; i < n_conv; i++) {
+	      printfQuda("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, alpha_3D[t][i], 0.0, residua_3D[t][i]);
+	    }
 	  }
 	}
       }
@@ -311,8 +328,16 @@ namespace quda
 	blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *workspace[0]);
       }
     }
-        
+
+    //printfQuda("Flag LS3D pre\n");
+
+    // This will be a blocked operator with no
+    // connections in the ortho_dim (usually t)
+    // hence the 3D sections of each vector
+    // will be independent.
     chebyOp(mat, *r[0], *workspace[0]);
+
+    //printfQuda("Flag LS3D 0\n");
     
     // a_j[t] = v_j^dag[t] * r[t]    
     blas3d::reDotProduct(alpha_j, *workspace[0], *r[0]);
@@ -320,6 +345,8 @@ namespace quda
       // Only active problem data is recorded
       if(active_3D[t]) alpha_3D[t][j] = alpha_j[t];
     }
+
+    //printfQuda("Flag LS3D 1\n");
     
     // r[t] = r[t] - a_j[t] * v_j[t]
     for(int t=0; t<ortho_dim_size; t++) {
@@ -327,73 +354,93 @@ namespace quda
     }
     blas3d::axpby(alpha_j, *workspace[0], unit, *r[0]);
 
+    //printfQuda("Flag LS3D 2\n");
+    
     // r[t] = r[t] - b_{j-1}[t] * v_{j-1}[t]
     // We do this problem by problem so that we can use the multiblas axpy
-    // on 3D arrays. Only orthogonalise active problems    
-    for(int t=0; t<ortho_dim_size && active_3D[t]; t++) {
-      int start = (j > num_keep_3D[t]) ? j - 1 : 0;    
-      if (j - start > 0) {
-
-	// Ensure we have enough 3D vectors
-	if((int)vecs_t.size() < j - start) {
-	  vecs_t.reserve(j - start);
-	  for (int i = (int)vecs_t.size(); i < j - start; i++) {
-	    vecs_t.push_back(ColorSpinorField::Create(csParamClone));
+    // on 3D arrays. Only orthogonalise active problems
+    
+    for(int t=0; t<ortho_dim_size; t++) {
+      if(active_3D[t]) {
+	int start = (j > num_keep_3D[t]) ? j - 1 : 0;    
+	if (j - start > 0) {
+	  
+	  // Ensure we have enough 3D vectors
+	  if((int)vecs_t.size() < j - start) {
+	    vecs_t.reserve(j - start);
+	    for (int i = (int)vecs_t.size(); i < j - start; i++) {
+	      vecs_t.push_back(ColorSpinorField::Create(csParamClone));
+	    }
 	  }
+	  
+	  // Copy the 3D data into the 3D vectors, create beta array, and create
+	  // pointers to the 3D vectors
+	  std::vector<ColorSpinorField *> vecs_t_ptr;
+	  std::vector<double> beta_t;
+	  vecs_t_ptr.reserve(j - start);
+	  beta_t.reserve(j - start);
+	  // Copy residual
+	  blas3d::copy(t, blas3d::COPY_TO_3D, *r_t[0], *r[0]);
+	  // Copy vectors
+	  for (int i = start; i < j; i++) {
+	    blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i - start], *v[i]);
+	    vecs_t_ptr.push_back(vecs_t[i - start]);
+	    beta_t.push_back(-beta_3D[t][i]);
+	  }
+	  
+	  // r[t] = r[t] - beta[t]{j-1} * v[t]{j-1}
+	  blas::axpy(beta_t.data(), vecs_t_ptr, r_t);
+	  
+	  // Save Lanczos step tuning
+	  saveTuneCache();
+	  
+	  // Copy residual back to 4D vector
+	  blas3d::copy(t, blas3d::COPY_FROM_3D, *r_t[0], *r[0]);
 	}
-	
-	// Copy the 3D data into the 3D vectors, create beta array, and create
-	// pointers to the 3D vectors
-	std::vector<ColorSpinorField *> vecs_t_ptr;
-	std::vector<double> beta_t;
-	vecs_t_ptr.reserve(j - start);
-	beta_t.reserve(j - start);
-	// Copy residual
-	blas3d::copy(t, blas3d::COPY_TO_3D, *r_t[0], *r[0]);
-	// Copy vectors
-	for (int i = start; i < j; i++) {
-	  blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i - start], *v[i]);
-	  vecs_t_ptr.push_back(vecs_t[i - start]);
-	  beta_t.push_back(-beta_3D[t][i]);
-	}
-
-	// r[t] = r[t] - beta[t]{j-1} * v[t]{j-1}
-	blas::axpy(beta_t.data(), vecs_t_ptr, r_t);
-
-	// Save Lanczos step tuning
-	saveTuneCache();
-
-	// Copy residual back to 4D vector
-	blas3d::copy(t, blas3d::COPY_FROM_3D, *r_t[0], *r[0]);
       }
     }
+    
+    //printfQuda("Flag LS3D 3\n");
     
     // Orthogonalise r against the Krylov space
     for (int k = 0; k < 1; k++) blockOrthogonalize3D(v, r, j + 1);
 
+    //printfQuda("Flag LS3D 3.1\n");
+    
     // b_j[t] = ||r[t]||
     blas3d::reDotProduct(beta_j, *r[0], *r[0]);
     for(int t=0; t<ortho_dim_size; t++) beta_j[t] = sqrt(beta_j[t]);
+
+    //printfQuda("Flag LS3D 3.2\n");
     
     // Prepare next step.
     // v_{j+1}[t] = r[t] / b_{j}[t]
     blas::zero(*workspace[0]);    
-    for(int t=0; t<ortho_dim_size && active_3D[t]; t++) {
-      beta_3D[t][j] = beta_j[t];
-      beta_j[t] = 1.0/beta_j[t];
+    for(int t=0; t<ortho_dim_size; t++) {
+      if(active_3D[t]) {
+	beta_3D[t][j] = beta_j[t];
+	beta_j[t] = 1.0/beta_j[t];
+      }
     }
 
+    //printfQuda("Flag LS3D 3.3\n");
     blas3d::axpby(beta_j, *r[0], unit, *workspace[0]);
+    //printfQuda("Flag LS3D 3.4\n");
     
     // Copy data from workspace into the relevant 3D slice of the kSpace
-    for(int t=0; t<ortho_dim_size && active_3D[t]; t++) {
-      blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *workspace[0]);
-      blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *v[j+1]);
+    for(int t=0; t<ortho_dim_size; t++) {
+      if(active_3D[t]) {
+	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *workspace[0]);
+	blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *v[j+1]);
+      }
     }
+
+    //printfQuda("Flag LS3D 3.5\n");
     
     delete workspace[0];
     delete r_t[0];
     for(unsigned int i=0; i<vecs_t.size(); i++) delete vecs_t[i];
+    //printfQuda("Flag LS3D 4\n");
     
     // Save Lanczos step tuning
     saveTuneCache();
@@ -520,70 +567,72 @@ namespace quda
     std::vector<ColorSpinorField *> vecs_t;
     std::vector<ColorSpinorField *> kSpace_t;
 
-    for(int t=0; t<ortho_dim_size && !converged_3D[t]; t++) {
-      int dim = n_kr - num_locked_3D[t];
-      int keep = iter_keep_3D[t];
-      
-      ritz_mat_keep[t] = (double *)safe_malloc((dim * keep) * sizeof(double));
-      for (int j = 0; j < dim; j++) {
-	for (int i = 0; i < keep; i++) { ritz_mat_keep[t][j * keep + i] = ritz_mat_3D[t][i * dim + j]; }
-      }
-
-      // Pointers to the relevant vectors
-      std::vector<ColorSpinorField *> vecs_ptr;
-      
-      // Alias the vectors we wish to keep.
-      vecs_ptr.reserve(dim);
-      for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[num_locked_3D[t] + j]);
-    
-      // multiBLAS axpy. Create 3D vectors so that we may perform all t independent
-      // vector rotations.
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-
-      vecs_t.reserve(dim);
-      kSpace_t.reserve(keep);
-      
-      ColorSpinorParam csParamClone(*kSpace[0]);
-      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-      csParamClone.change_dim(ortho_dim, 1);
-
-      // Create 3D arrays
-      for(int i=vecs_t.size(); i<dim; i++) vecs_t.push_back(ColorSpinorField::Create(csParamClone));    
-      for(int i=kSpace_t.size(); i<keep; i++) kSpace_t.push_back(ColorSpinorField::Create(csParamClone));
-    
-      // Copy to data to 3D array, zero out workspace, make pointers
-      std::vector<ColorSpinorField *> vecs_t_ptr;
-      std::vector<ColorSpinorField *> kSpace_t_ptr;
-      for(int i=0; i<dim; i++) {
-	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i], *vecs_ptr[i]);
-	vecs_t_ptr.push_back(vecs_t[i]);
-      }
-      for(int i=0; i<keep; i++) {
-	blas::zero(*kSpace_t[i]);
-	kSpace_t_ptr.push_back(kSpace_t[i]);
-      }
-      
-      // Compute the axpy      
-      blas::axpy(ritz_mat_keep[t], vecs_t_ptr, kSpace_t_ptr);
-
-      // Save rotation tuning
-      saveTuneCache();      
-      
-      // Copy back to the 4D workspace array
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      
-      // Copy compressed Krylov
-      for (int i = 0; i < keep; i++) {
-	blas3d::copy(t, blas3d::COPY_FROM_3D, *kSpace_t[i], *kSpace[num_locked_3D[t] + i]);
-      }
+    for(int t=0; t<ortho_dim_size; t++) {
+      if(active_3D[t]) {
+	int dim = n_kr - num_locked_3D[t];
+	int keep = iter_keep_3D[t];
 	
-      // Update residual vector
-      blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *kSpace[n_kr]);
-      blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *kSpace[num_locked_3D[t] + keep]);
-            
-      // Update sub arrow matrix
-      for (int i = 0; i < keep; i++) beta_3D[t][i + num_locked_3D[t]] = beta_3D[t][n_kr - 1] * ritz_mat_3D[t][dim * (i + 1) - 1];
-      host_free(ritz_mat_keep[t]);
+	ritz_mat_keep[t] = (double *)safe_malloc((dim * keep) * sizeof(double));
+	for (int j = 0; j < dim; j++) {
+	  for (int i = 0; i < keep; i++) { ritz_mat_keep[t][j * keep + i] = ritz_mat_3D[t][i * dim + j]; }
+	}
+	
+	// Pointers to the relevant vectors
+	std::vector<ColorSpinorField *> vecs_ptr;
+	
+	// Alias the vectors we wish to keep.
+	vecs_ptr.reserve(dim);
+	for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[num_locked_3D[t] + j]);
+	
+	// multiBLAS axpy. Create 3D vectors so that we may perform all t independent
+	// vector rotations.
+	profile.TPSTART(QUDA_PROFILE_COMPUTE);
+	
+	vecs_t.reserve(dim);
+	kSpace_t.reserve(keep);
+	
+	ColorSpinorParam csParamClone(*kSpace[0]);
+	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+	csParamClone.change_dim(ortho_dim, 1);
+	
+	// Create 3D arrays
+	for(int i=vecs_t.size(); i<dim; i++) vecs_t.push_back(ColorSpinorField::Create(csParamClone));    
+	for(int i=kSpace_t.size(); i<keep; i++) kSpace_t.push_back(ColorSpinorField::Create(csParamClone));
+	
+	// Copy to data to 3D array, zero out workspace, make pointers
+	std::vector<ColorSpinorField *> vecs_t_ptr;
+	std::vector<ColorSpinorField *> kSpace_t_ptr;
+	for(int i=0; i<dim; i++) {
+	  blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[i], *vecs_ptr[i]);
+	  vecs_t_ptr.push_back(vecs_t[i]);
+	}
+	for(int i=0; i<keep; i++) {
+	  blas::zero(*kSpace_t[i]);
+	  kSpace_t_ptr.push_back(kSpace_t[i]);
+	}
+	
+	// Compute the axpy      
+	blas::axpy(ritz_mat_keep[t], vecs_t_ptr, kSpace_t_ptr);
+	
+	// Save rotation tuning
+	saveTuneCache();      
+	
+	// Copy back to the 4D workspace array
+	profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	
+	// Copy compressed Krylov
+	for (int i = 0; i < keep; i++) {
+	  blas3d::copy(t, blas3d::COPY_FROM_3D, *kSpace_t[i], *kSpace[num_locked_3D[t] + i]);
+	}
+	
+	// Update residual vector
+	blas3d::copy(t, blas3d::COPY_TO_3D, *vecs_t[0], *kSpace[n_kr]);
+	blas3d::copy(t, blas3d::COPY_FROM_3D, *vecs_t[0], *kSpace[num_locked_3D[t] + keep]);
+	
+	// Update sub arrow matrix
+	for (int i = 0; i < keep; i++) beta_3D[t][i + num_locked_3D[t]] = beta_3D[t][n_kr - 1] * ritz_mat_3D[t][dim * (i + 1) - 1];
+	host_free(ritz_mat_keep[t]);
+      }
     }
     
     // Delete all 3D vectors
@@ -597,21 +646,31 @@ namespace quda
   void TRLM3D::blockOrthogonalize3D(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
   {
     int vec_size = j;
-    std::vector<Complex> s_t(ortho_dim_size, 0.0);
-    std::vector<Complex> unit(ortho_dim_size, 1.0);
+    
     for (int i = 0; i < vec_size; i++) {
+
+      Complex unit(1.0,0.0);
+      std::vector<Complex> s_t(ortho_dim_size, 0.0);
+      std::vector<double> r_t(ortho_dim_size, 0.0);
+      std::vector<Complex> unit_new(ortho_dim_size, unit);
+      
       std::vector<ColorSpinorField *> vec_ptr;
       vec_ptr.push_back(vecs[i]);
-      
+
       // Block dot products stored in s_t.
+      //printfQuda("*vec_ptr[%d] = %e *rvecs[%d] = %e\n", i, blas::norm2(*vec_ptr[0]), i, blas::norm2(*rvecs[0]));
       blas3d::cDotProduct(s_t, *vec_ptr[0], *rvecs[0]);
+      blas3d::reDotProduct(r_t, *vec_ptr[0], *rvecs[0]);
       for(int t=0; t<ortho_dim_size; t++) {
 	s_t[t] *= active_3D[t] ? -1.0 : 0.0;
+	//printfQuda("Ortho active at %d = %s: S = (%e,%e)\n", t, active_3D[t] ? "T" : "F", s_t[t].real(), s_t[t].imag());
+	//printfQuda("Ortho active at %d = %s: R =  %e\n", t, active_3D[t] ? "T" : "F", r_t[t]);
       }
       
       // Block orthogonalise
-      blas3d::caxpby(s_t, *vec_ptr[0], unit, *rvecs[0]);      
+      blas3d::caxpby(s_t, *vec_ptr[0], unit_new, *rvecs[0]);
     }
+    
     // Save orthonormalisation tuning
     saveTuneCache();      
   }
@@ -672,17 +731,18 @@ namespace quda
       all_results[comm_coord(ortho_dim) * ortho_dim_size + t] = inner_products[t];
     }
     
-    comm_allreduce_array((double *)all_results.data(), comm_dim(ortho_dim) * ortho_dim_size);
+    comm_allreduce_array((double *)all_results.data(), comm_coord(ortho_dim) * ortho_dim_size);
     
     int spatial_comm_vol = 1;
-    for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      
+    for(int i=0; i<4; i++)
+      if(i != ortho_dim) spatial_comm_vol *= comm_dim(i);
+    
+    if (getVerbosity() >= QUDA_VERBOSE) {      
       for(int t=0; t<ortho_dim_size * comm_dim(ortho_dim); t++) {
 	// scale out the redundant summations
 	all_results[t] /= spatial_comm_vol;
 	
-	printfQuda("Chebyshev max at slice %d = %e\n", t, all_results[t]);
+	printf("Chebyshev max at slice %d = %e\n", t, all_results[t]);
 	if(all_results[t] > result) result = all_results[t];
       }
     }
@@ -753,7 +813,8 @@ namespace quda
       comm_allreduce_array((double *)&resid_t_all[0], t_size * size);
 
       int spatial_comm_vol = 1;
-      for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
+      for(int i=0; i<4; i++)
+	if(i != ortho_dim) spatial_comm_vol *= comm_dim(i); 
       
       for(int t=0; t<t_size; t++)
 	for (int i = 0; i < size; i++) {
@@ -814,12 +875,15 @@ namespace quda
     int ret_val = limit;
     int spatial_comm_vol = 1;
     int t_size = comm_dim(ortho_dim) * ortho_dim_size;
-    for(int i=0; i<4 && i != ortho_dim; i++) spatial_comm_vol *= comm_dim(i); 
+    for(int i=0; i<4; i++)
+      if(i != ortho_dim) spatial_comm_vol *= comm_dim(i); 
     
     std::vector<double> all_array(t_size, 0);
     for(int t=0; t<ortho_dim_size; t++) all_array[comm_coord(ortho_dim) * ortho_dim_size + t] = array[t];
     
+    //printfQuda("Flag cara 1\n");
     comm_allreduce_array((double *)all_array.data(), t_size);
+    //printfQuda("Flag cara 2\n");
     
     for(int t=0; t<t_size; t++) {
       // scale out the redundant summations
@@ -827,6 +891,7 @@ namespace quda
       if(all_array[t] < ret_val &&  min) ret_val = all_array[t];
       if(all_array[t] > ret_val && !min) ret_val = all_array[t];
     }
+    //printfQuda("Flag cara 3\n");
     return ret_val;
   }
   

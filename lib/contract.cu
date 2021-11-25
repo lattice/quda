@@ -79,8 +79,6 @@ namespace quda {
 	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].imag(result_local[2*i+1]);
 	}
       }
-
-      
     }
     
     long long flops() const
