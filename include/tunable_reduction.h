@@ -210,6 +210,10 @@ namespace quda
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, "fast_compile,");
+#endif
+      if (commAsyncReduction()) strcat(aux, "async,");
     }
 
     virtual bool advanceBlockDim(TuneParam &param) const

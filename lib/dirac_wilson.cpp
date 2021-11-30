@@ -88,7 +88,7 @@ namespace quda {
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    cudaCloverField *c = NULL;
+    CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
