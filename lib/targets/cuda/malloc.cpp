@@ -189,7 +189,7 @@ namespace quda
 
   bool use_qdp_managed()
   {
-#ifdef QDP_USE_CUDA_MANAGED_MEMORY
+#if defined(QDP_USE_CUDA_MANAGED_MEMORY) || defined(QDP_ENABLE_MANAGED_MEMORY)
     return true;
 #else
     return false;
