@@ -405,11 +405,16 @@ namespace quda {
 #else
         errorQuda("Staggered dslash has not been built");
 #endif
-      } else if (type == COMPUTE_VUV) {
+      } else if (type == COMPUTE_VUV || type == COMPUTE_VLV) {
+
+        if (type == COMPUTE_VLV && fineSpin != 1)
+          errorQuda("compute_vlv should only be called for a staggered operator");
 
         IF_CONSTEXPR (use_mma) {
 
-          mma::launch_compute_vuv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);
+          if (type == COMPUTE_VUV)
+            mma::launch_compute_vuv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);
+
 
         } else {
 
@@ -446,7 +451,14 @@ namespace quda {
           // this will ensure we pass the generic kernel bounds check
           arg.threads.x = tp.grid.x * tp.block.x;
           resizeVector(tp.grid.y * tp.block.y, tp.grid.z * tp.block.z);
-          launch_device<compute_vuv>(tp, stream, arg);
+          if (type == COMPUTE_VUV)
+            launch_device<compute_vuv>(tp, stream, arg);
+#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
+          else if (type == COMPUTE_VLV)
+            launch_device<compute_vlv>(tp, stream, arg);
+#else
+          else errorQuda("Staggered dslash has not been built");
+#endif
           arg.threads.x = minThreads();
           resizeVector((arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
 
@@ -463,65 +475,6 @@ namespace quda {
           }
 
         } // if use_mma
-
-      } else if (type == COMPUTE_VLV) {
-
-        if (fineSpin != 1) errorQuda("compute_vlv should only be called for a staggered operator");
-
-        // FIXME: there's a lot of boilerplate copy+paste with COMPUTE_VUV, we should more cleanly unify these with a utility function
-#if defined(GPU_STAGGERED_DIRAC) && defined(STAGGEREDCOARSE)
-
-        // need to resize the grid since we don't tune over the entire coarseColor dimension
-        // factor of two comes from parity onto different blocks (e.g. in the grid)
-        tp.grid.y = (2 * arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
-        tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
-
-        arg.shared_atomic = tp.aux.y;
-        arg.parity_flip = tp.aux.z;
-
-        if (arg.shared_atomic) {
-          // check we have a valid problem size for shared atomics
-          // constraint is due to how shared memory initialization and global store are done
-          int block_size = arg.fineVolumeCB / arg.coarseVolumeCB;
-          if (block_size / 2 < Arg::coarseSpin * Arg::coarseSpin)
-            errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
-
-          arg.aggregates_per_block = tp.aux.x;
-          tp.block.x *= tp.aux.x;
-          tp.grid.x /= tp.aux.x;
-        }
-
-        if (arg.coarse_color_wave) {
-          // swap x and y grids
-          std::swap(tp.grid.y, tp.grid.x);
-          // augment x grid with coarseColor row grid (z grid)
-          arg.grid_z = tp.grid.z;
-          arg.coarse_color_grid_z = arg.vuvTile.M_tiles * tp.grid.z;
-          tp.grid.x *= tp.grid.z;
-          tp.grid.z = 1;
-        }
-
-        // this will ensure we pass the generic kernel bounds check
-        arg.threads.x = tp.grid.x * tp.block.x;
-        resizeVector(tp.grid.y * tp.block.y, tp.grid.z * tp.block.z);
-        launch_device<compute_vlv>(tp, stream, arg);
-        arg.threads.x = minThreads();
-        resizeVector((arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
-
-        if (arg.coarse_color_wave) {
-          // revert the grids
-          tp.grid.z = arg.grid_z;
-          tp.grid.x /= tp.grid.z;
-          std::swap(tp.grid.x,tp.grid.y);
-        }
-
-        if (arg.shared_atomic) {
-          tp.block.x /= tp.aux.x;
-          tp.grid.x *= tp.aux.x;
-        }
-#else
-        errorQuda("Staggered dslash has not been built");
-#endif
 
       } else if (type == COMPUTE_COARSE_CLOVER) {
 
