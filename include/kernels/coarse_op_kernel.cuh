@@ -704,16 +704,16 @@ namespace quda {
 
 #pragma unroll
       for (int i = 0; i < N; i++) {
-        int s_i = 2 * ch + i / Arg::fineColor;
+        int s_i = i / Arg::fineColor;
         int c_i = i % Arg::fineColor;
 #pragma unroll
         for (int j = 0; j <= i; j++) {
-          int s_j = 2 * ch + j / Arg::fineColor;
+          int s_j = j / Arg::fineColor;
           int c_j = j % Arg::fineColor;
 #ifndef DYNAMIC_CLOVER
-          A(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
+          A(i, j) = arg.Cinv(parity, x_cb, ch, s_i, s_j, c_i, c_j);
 #else
-          A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
+          A(i, j) = arg.C(parity, x_cb, ch, s_i, s_j, c_i, c_j);
 #endif
         }
       }
@@ -729,8 +729,8 @@ namespace quda {
       auto AV = A * V;
 #else
       // solve for the matrix
-      linalg::Cholesky<HMatrix, real, N> cholesky(A);
-      auto AV = cholesky.backward(cholesky.forward(V));
+      linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+      auto AV = cholesky.solve(V);
 #endif
 
       if (!Arg::compute_max) {
@@ -823,13 +823,13 @@ namespace quda {
 
 #pragma unroll
       for (int i = 0; i < N; i++) {
-        int s_i = 2 * ch + i / Arg::fineColor;
+        int s_i = i / Arg::fineColor;
         int c_i = i % Arg::fineColor;
 #pragma unroll
         for (int j = 0; j <= i; j++) {
-          int s_j = 2 * ch + j / Arg::fineColor;
+          int s_j = j / Arg::fineColor;
           int c_j = j % Arg::fineColor;
-          A(i, j) = arg.C(0, parity, x_cb, s_i, s_j, c_i, c_j);
+          A(i, j) = arg.C(parity, x_cb, ch, s_i, s_j, c_i, c_j);
         }
       }
 
@@ -853,18 +853,18 @@ namespace quda {
       // Then we calculate AV = Cinv UV, so  [AV = (C^2 + mu^2)^{-1} (Clover -/+ i mu)·Vector]
       // for in twisted-clover fermions, Cinv keeps (C^2 + mu^2)^{-1}
 
-      if (!dynamic_clover_inverse()) {
+      if (!clover::dynamic_inverse()) {
         // load in the clover inverse matrix
         HMatrix<real, N> Ainv;
 #pragma unroll
         for (int i = 0; i < N; i++) {
-          int s_i = 2 * ch + i / Arg::fineColor;
+          int s_i = i / Arg::fineColor;
           int c_i = i % Arg::fineColor;
 #pragma unroll
           for (int j = 0; j <= i; j++) {
-            int s_j = 2 * ch + j / Arg::fineColor;
+            int s_j = j / Arg::fineColor;
             int c_j = j % Arg::fineColor;
-            Ainv(i, j) = arg.Cinv(0, parity, x_cb, s_i, s_j, c_i, c_j);
+            Ainv(i, j) = arg.Cinv(parity, x_cb, ch, s_i, s_j, c_i, c_j);
           }
         }
         auto AV = Ainv * UV;
@@ -892,8 +892,8 @@ namespace quda {
         A = A.square();
         A += arg.mu * arg.mu;
 
-        linalg::Cholesky<HMatrix, real, N> cholesky(A);
-        const auto AV = cholesky.backward(cholesky.forward(UV));
+        linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
+        const auto AV = cholesky.solve(UV);
 
         if (!Arg::compute_max) {
 #pragma unroll
@@ -1731,34 +1731,40 @@ namespace quda {
 
       coord[0] /= 2;
 
-      complex<real> X[Arg::coarseSpin*Arg::coarseSpin];
+      complex<real> X[Arg::coarseSpin * Arg::coarseSpin];
       for (int i = 0; i < Arg::coarseSpin * Arg::coarseSpin; i++) X[i] = 0.0;
 
       // If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
 #pragma unroll
-      for (int s = 0; s < Arg::fineSpin; s++) { // Loop over fine spin row
-        const int s_c = arg.spin_map(s,parity);
-        // On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
-        // in the same chiral block.
+      for (int chi = 0; chi < 2; chi++) {
+
 #pragma unroll
-        for (int s_col = s_c * arg.spin_bs; s_col < (s_c+1) * arg.spin_bs; s_col++) { // Loop over fine spin column
+        for (int s_row = 0; s_row < Arg::fineSpin / 2; s_row++) { // Loop over fine spin row within a chiral block
+          const int s_c = arg.spin_map(chi * Arg::fineSpin / 2 + s_row, parity);
+          // On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+          // in the same chiral block.
 #pragma unroll
-          for (int ic = 0; ic < Arg::fineColor; ic++) { // Sum over fine color row
-            complex<real> CV = 0.0;
+          for (int s_col = 0; s_col < Arg::fineSpin / 2; s_col++) { // Loop over fine spin column within a chiral block
 #pragma unroll
-            for (int jc = 0; jc < Arg::fineColor; jc++) {  // Sum over fine color column
-              CV = cmac(arg.C(0, parity, x_cb, s, s_col, ic, jc), arg.V(parity, x_cb, s_col, jc, c_col), CV);
-            } // Fine color column
-            X[s_c*Arg::coarseSpin + s_c] = cmac(conj(arg.V(parity, x_cb, s, ic, c_row)), CV, X[s_c*Arg::coarseSpin + s_c]);
-          }  // Fine color row
-        }  // Fine spin column
-      } // Fine spin
+            for (int ic = 0; ic < Arg::fineColor; ic++) { // Sum over fine color row
+              complex<real> CV = 0.0;
+#pragma unroll
+              for (int jc = 0; jc < Arg::fineColor; jc++) {  // Sum over fine color column
+                CV = cmac(arg.C(parity, x_cb, chi, s_row, s_col, ic, jc), arg.V(parity, x_cb, chi * Arg::fineSpin / 2 + s_col, jc, c_col), CV);
+              } // Fine color column
+              X[s_c * Arg::coarseSpin + s_c] =
+                cmac(conj(arg.V(parity, x_cb, chi * Arg::fineSpin / 2 + s_row, ic, c_row)), CV, X[s_c*Arg::coarseSpin + s_c]);
+            }  // Fine color row
+          }  // Fine spin column
+        } // Fine spin
+
+      }
 
 #pragma unroll
       for (int si = 0; si < Arg::coarseSpin; si++) {
 #pragma unroll
         for (int sj = 0; sj < Arg::coarseSpin; sj++) {
-          arg.X_atomic.atomicAdd(0,coarse_parity,coarse_x_cb,si,sj, c_row, c_col, X[si*Arg::coarseSpin+sj]);
+          arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, si, sj, c_row, c_col, X[si*Arg::coarseSpin+sj]);
         }
       }
     }

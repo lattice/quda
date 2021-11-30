@@ -123,11 +123,7 @@ namespace quda {
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-#ifdef DYNAMIC_CLOVER
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor; // A single clover field
-#else
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
-#endif
+	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_KV:
         bytes_ = arg.AV.Bytes() + arg.V.Bytes() + arg.K.Bytes() * coarseColor;
@@ -144,22 +140,22 @@ namespace quda {
           break;
         }
       case COMPUTE_COARSE_CLOVER:
-	bytes_ = 2*arg.X.Bytes() + 2*arg.C.Bytes() + arg.V.Bytes(); // 2 from parity
+	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * arg.V.Bytes(); // 2 from parity
 	break;
       case COMPUTE_REVERSE_Y:
-	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
-	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 4 * 2 * 2 * arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+	bytes_ = 2 * 2 * arg.X.Bytes(); // 2 from i/o, 2 from parity
 	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
-	bytes_ = 2*2*arg.X.Bytes()/(coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
+	bytes_ = 2 * 2 * arg.X.Bytes() / (coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
 	break;
       case COMPUTE_CONVERT:
-	bytes_ = dim == 4 ? 2*(arg.X.Bytes() + arg.X_atomic.Bytes()) : 2*(arg.Y.Bytes() + arg.Y_atomic.Bytes());
+	bytes_ = dim == 4 ? 2 * (arg.X.Bytes() + arg.X_atomic.Bytes()) : 2 * (arg.Y.Bytes() + arg.Y_atomic.Bytes());
 	break;
       case COMPUTE_RESCALE:
-	bytes_ = 2*2*arg.Y.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 2 * 2 * arg.Y.Bytes(); // 2 from i/o, 2 from parity
 	break;
       default:
 	errorQuda("Undefined compute type %d", type);
@@ -811,9 +807,7 @@ namespace quda {
 
       if (compute_max) strcat(Aux, ",compute_max");
 
-#ifdef DYNAMIC_CLOVER
-      if (type == COMPUTE_AV || type == COMPUTE_TMCAV) strcat(Aux, ",Dynamic");
-#endif
+      if ((type == COMPUTE_AV || type == COMPUTE_TMCAV) && clover::dynamic_inverse()) strcat(Aux, ",Dynamic");
       if (!use_mma && (type == COMPUTE_UV || type == COMPUTE_LV || type == COMPUTE_VUV || type == COMPUTE_VLV)) {
         strcat(Aux, ",tile_size=");
         char tile[16];
