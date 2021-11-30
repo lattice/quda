@@ -101,6 +101,7 @@ namespace quda {
       strcat(aux, label);
       strcat(aux, ",nFace=");
       u32toa(label, nFace);
+      strcat(aux, label);
       strcat(aux, ",spins_per_thread=");
       u32toa(label, spins_per_thread(a));
       strcat(aux, label);
