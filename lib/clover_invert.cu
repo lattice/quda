@@ -16,11 +16,9 @@ namespace quda {
       clover(clover),
       compute_tr_log(compute_tr_log)
     {
-      writeAuxString("trlog=%s,twist=%s",
-                     compute_tr_log ? "true" : "false",
-                     (clover.TwistFlavor() == QUDA_TWIST_SINGLET || 
-                      clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) ? "true" : "false");
-
+      strcat(aux, compute_tr_log ? ",trlog=true" : "trlog=false");
+      strcat(aux, clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ?
+             ",twist=true" : ",twisted=false");
       apply(device::get_default_stream());
 
       if (compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
@@ -44,13 +42,15 @@ namespace quda {
     
     long long flops() const { return 0; }
     long long bytes() const { return 2 * clover.Bytes(); }
-    void preTune() { if (clover.V(true) == clover.V(false)) clover.backup(); }
-    void postTune() { if (clover.V(true) == clover.V(false)) clover.restore(); }
+    void preTune() { if (clover::dynamic_inverse()) clover.backup(); }
+    void postTune() { if (clover::dynamic_inverse()) clover.restore(); }
   };
 
 #ifdef GPU_CLOVER_DIRAC
   void cloverInvert(CloverField &clover, bool computeTraceLog)
   {
+    if (clover.Reconstruct()) errorQuda("Cannot store the inverse with a reconstruct field");
+    if (clover.Precision() < QUDA_SINGLE_PRECISION) errorQuda("Cannot use fixed-point precision here");
     instantiate<CloverInvert>(clover, computeTraceLog);
   }
 #else

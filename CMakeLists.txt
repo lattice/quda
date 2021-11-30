@@ -163,8 +163,6 @@ option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
-# Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
@@ -240,6 +238,9 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
+option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
+
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
 set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
 
@@ -292,6 +293,7 @@ mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
+mark_as_advanced(QUDA_CLOVER_RECONSTRUCT)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -470,6 +472,10 @@ CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic su
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
+endif()
+
+if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
 endif()
 
 if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))

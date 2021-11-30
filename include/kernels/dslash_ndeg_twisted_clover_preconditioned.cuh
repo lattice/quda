@@ -12,7 +12,7 @@ namespace quda
     struct NdegTwistedCloverPreconditionedArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_inverse();
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
     
     typedef typename mapper<Float>::type real;
     typedef typename clover_mapper<Float, length>::type C;

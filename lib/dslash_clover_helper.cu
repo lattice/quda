@@ -113,7 +113,7 @@ namespace quda {
     long long flops() const { return (inverse ? 1056ll : 552ll) * in.Volume(); }
     long long bytes() const {
       long long rtn = out.Bytes() + in.Bytes() + clover.Bytes() / (3 - in.SiteSubset());
-      if (twist == QUDA_TWIST_GAMMA5_INVERSE && !dynamic_clover_inverse())
+      if (twist == QUDA_TWIST_GAMMA5_INVERSE && !clover::dynamic_inverse())
 	rtn += clover.Bytes() / (3 - in.SiteSubset());
       return rtn;
     }
