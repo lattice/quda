@@ -31,6 +31,7 @@ namespace quda {
     switch (u.Order()) {
     case QUDA_FLOAT2_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_FLOAT2_CLOVER_ORDER>(u, inverse, type); break;
     case QUDA_FLOAT4_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_FLOAT4_CLOVER_ORDER>(u, inverse, type); break;
+    case QUDA_PACKED_CLOVER_ORDER: norm_ = norm<real,Nc,QUDA_PACKED_CLOVER_ORDER>(u, inverse, type); break;
     default: errorQuda("Clover field %d order not supported", u.Order());
     }
     return norm_;
@@ -49,6 +50,7 @@ namespace quda {
 #ifdef GPU_CLOVER_DIRAC
   double _norm(const CloverField &u, bool inverse, norm_type_ type)
   {
+    if (!u.V(inverse)) errorQuda("reqeusted clover is_inverse=%d, but not allocated", inverse);
     double nrm = 0.0;
     switch(u.Precision()) {
     case QUDA_DOUBLE_PRECISION: nrm = _norm<double>(u, inverse, type); break;
