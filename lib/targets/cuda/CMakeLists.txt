@@ -20,7 +20,8 @@ set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_60 sm_70 sm_80)
 set(QUDA_GPU_ARCH_SUFFIX "" CACHE STRING "set the GPU architecture suffix (virtual, real). Leave empty for no suffix.")
 set_property(CACHE QUDA_GPU_ARCH_SUFFIX PROPERTY STRINGS "real" "virtual" " ")
 mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
-
+# we don't yet use CMAKE_CUDA_ARCHITECTURES as primary way to set GPU architecture so marking it advanced to avoid confusion
+mark_as_advanced(CMAKE_CUDA_ARCHITECTURES) 
 
 ####
 # CUDA specific QUDA options options
@@ -172,19 +173,21 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "RELEASE")
   set(QUDA_GPU_ARCH_SUFFIX real)
 endif()
 if(QUDA_GPU_ARCH_SUFFIX)
-  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}")
- else()
-  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP})
+  set(CMAKE_CUDA_ARCHITECTURES "${COMP_CAP}-${QUDA_GPU_ARCH_SUFFIX}" PARENT_SCOPE)
+else()
+  set(CMAKE_CUDA_ARCHITECTURES ${COMP_CAP} PARENT_SCOPE)
 endif()
 set(COMP_CAP ${COMP_CAP}0)
 set_target_properties(quda PROPERTIES CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
-
 set(COMP_CAP "${COMP_CAP}0" PARENT_SCOPE)
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
+
+
+## additonal sources
 target_sources(quda_cpp PRIVATE quda_api.cpp device.cpp malloc.cpp blas_lapack_cublas.cpp comm_target.cpp)
 
 if(QUDA_JITIFY)
@@ -263,7 +266,7 @@ target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,Clang>:
 # version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
 target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
 if(CUDAToolkit_FOUND)
-target_link_libraries(quda INTERFACE CUDA::cudart_static)
+  target_link_libraries(quda INTERFACE CUDA::cudart_static)
 endif()
 
 # nvshmem enabled parts need SEPARABLE_COMPILATION ...

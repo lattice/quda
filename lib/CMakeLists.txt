@@ -183,7 +183,6 @@ endif()
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
 
 
-
 include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
@@ -223,35 +222,6 @@ target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
 endif()
-
-# propagate CXX flags to CUDA host compiler
-#TODO: Do we still need that? 
-# if(${QUDA_PROPAGATE_CXX_FLAGS})
-
-#   # Pick the right set of flags Apparently I cannot do this with generator expressions
-#   if(CMAKE_BUILD_TYPE STREQUAL "DEVEL")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEVEL}")
-#   elseif(CMAKE_BUILD_TYPE STREQUAL "STRICT")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_STRICT}")
-#   elseif(CMAKE_BUILD_TYPE STREQUAL "RELEASE")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
-#   elseif(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_DEBUG}")
-#   elseif(CMAKE_BUILD_TYPE STREQUAL "HOSTDEBUG")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_HOSTDEBUG}")
-#   elseif(CMAKE_BUILD_TYPE STREQUAL "SANITIZE")
-#     set(PROPAGATED_FLAGS "${CMAKE_CXX_FLAGS_SANITIZE}")
-#   endif()
-
-#   # Turne the flags into a CMAKE list
-#   string(REPLACE " " ";" PROPAGATED_FLAG_LIST ${PROPAGATED_FLAGS})
-
-#   foreach(FLAG ${PROPAGATED_FLAG_LIST})
-#     target_compile_options(quda PRIVATE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>: -Xcompiler=${FLAG}>)
-#   endforeach()
-# endif()
-
-
 
 # some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
