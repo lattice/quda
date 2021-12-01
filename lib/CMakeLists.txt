@@ -86,24 +86,33 @@ set (QUDA_OBJS
 # cmake-format: on
 
 # current workaround for nvshmem
-set(QUDA_DSLASH_OBJS 
-  dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_wilson_clover_preconditioned.cu 
-  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
-  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
-  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-  dslash_wilson_clover_hasenbusch_twist.cu
-  dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
-  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  dslash_domain_wall_4d_m5inv.cu
-  dslash_domain_wall_4d_m5pre.cu
-  dslash_domain_wall_4d_m5pre_m5inv.cu
-  dslash_domain_wall_4d_m5inv_m5pre.cu
-  dslash_domain_wall_4d_m5inv_m5inv.cu
-  dslash_domain_wall_4d_m5mob.cu
-  dslash_domain_wall_4d_m5pre_m5mob.cu
-  dslash_pack2.cu laplace.cu covDev.cu)
+set(QUDA_DSLASH_OBJS
+    dslash_staggered.cu
+    dslash_improved_staggered.cu
+    dslash_wilson.cu
+    dslash_wilson_clover.cu
+    dslash5_domain_wall.cu
+    dslash_wilson_clover_preconditioned.cu
+    dslash_twisted_mass.cu
+    dslash_twisted_mass_preconditioned.cu
+    dslash_ndeg_twisted_mass.cu
+    dslash_ndeg_twisted_mass_preconditioned.cu
+    dslash_twisted_clover.cu
+    dslash_twisted_clover_preconditioned.cu
+    dslash_wilson_clover_hasenbusch_twist.cu
+    dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
+    dslash_domain_wall_4d.cu
+    dslash_domain_wall_5d.cu
+    dslash_domain_wall_4d_m5inv.cu
+    dslash_domain_wall_4d_m5pre.cu
+    dslash_domain_wall_4d_m5pre_m5inv.cu
+    dslash_domain_wall_4d_m5inv_m5pre.cu
+    dslash_domain_wall_4d_m5inv_m5inv.cu
+    dslash_domain_wall_4d_m5mob.cu
+    dslash_domain_wall_4d_m5pre_m5mob.cu
+    dslash_pack2.cu
+    laplace.cu
+    covDev.cu)
 
 if(QUDA_NVSHMEM)
   list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
@@ -149,7 +158,11 @@ endif()
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 
 # add comms and QIO
-target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,communicator_qmp.cpp,communicator_single.cpp>>)
+target_sources(
+  quda_cpp
+  PRIVATE
+    $<IF:$<BOOL:${QUDA_MPI}>,communicator_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,communicator_qmp.cpp,communicator_single.cpp>>
+)
 
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
@@ -157,11 +170,11 @@ if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
   add_library(quda SHARED)
 else()
-  add_library(quda STATIC )
+  add_library(quda STATIC)
 endif()
 add_library(QUDA::quda ALIAS quda)
 
-#TODO: temporary workaround
+# TODO: temporary workaround
 if(QUDA_NVSHMEM)
   add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
 endif()
@@ -178,20 +191,18 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   set(QUDA_TARGET_HIP ON)
 endif()
 
-
 # make one library
-target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>> ${QUDA_CU_OBJS})
-
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>
+                            ${QUDA_CU_OBJS})
 
 include(CheckLinkerFlag)
 check_linker_flag(CXX "-Wl,--compress-debug-sections=zlib" QUDA_LINKER_COMPRESS)
 target_link_options(quda PRIVATE $<$<CONFIG:DEVEL>:$<${QUDA_LINKER_COMPRESS}:-Wl,--compress-debug-sections=zlib>>)
 
-
 # set up QUDA compile options
 target_compile_definitions(
-  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG>
-               $<$<CONFIG:DEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+  quda PRIVATE $<$<CONFIG:DEVEL>:DEVEL> $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG> $<$<CONFIG:DEBUG>:HOST_DEBUG>
+               $<$<CONFIG:DEBUG>:DEVICE_DEBUG> $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
@@ -207,10 +218,6 @@ target_link_libraries(quda_cpp PRIVATE $<BUILD_INTERFACE:Eigen>)
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
-
-
-
-
 
 add_subdirectory(targets/generic)
 target_include_directories(quda PRIVATE ../include/targets/generic)
@@ -402,7 +409,7 @@ endif()
 
 if(QUDA_OPENBLAS)
   target_compile_definitions(quda PRIVATE OPENBLAS_LIB)
-  
+
   if(QUDA_DOWNLOAD_OPENBLAS)
     target_link_libraries(quda PUBLIC openblas)
     target_link_libraries(quda_cpp PUBLIC openblas)
@@ -437,7 +444,10 @@ if(QUDA_BACKWARDS)
     SOURCE comm_common.cpp
     APPEND
     PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
-  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  set_property(
+    SOURCE comm_common.cpp
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
@@ -456,7 +466,7 @@ add_custom_command(
   PRE_LINK
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
-set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON )
+set_target_properties(quda PROPERTIES INSTALL_RPATH_USE_LINK_PATH ON)
 
 install(
   TARGETS quda
@@ -464,12 +474,14 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin
-  INCLUDES DESTINATION include)
+  INCLUDES
+  DESTINATION include)
 
-install(EXPORT QUDATargets
-	FILE QUDATargets.cmake
-	NAMESPACE QUDA::
-	DESTINATION lib/cmake/QUDA)
+install(
+  EXPORT QUDATargets
+  FILE QUDATargets.cmake
+  NAMESPACE QUDA::
+  DESTINATION lib/cmake/QUDA)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 

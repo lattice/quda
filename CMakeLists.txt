@@ -30,13 +30,7 @@ else()
   set(DEFBUILD "DEVEL")
 endif()
 
-set(VALID_BUILD_TYPES
-    DEVEL
-    RELEASE
-    STRICT
-    DEBUG
-    HOSTDEBUG
-    SANITIZE)
+set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG SANITIZE)
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
     CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
@@ -69,7 +63,6 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
-
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} show
@@ -80,18 +73,21 @@ if(GIT_FOUND)
     execute_process(
       COMMAND ${GIT_EXECUTABLE} describe --abbrev=0
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITTAG
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but
     # that might not always be available
     execute_process(
       COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       COMMAND wc -l
-      OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITCOUNT
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always  --long --dirty
+      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_VARIABLE GITVERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
 endif(GIT_FOUND)
 
@@ -175,7 +171,6 @@ set(QUDA_OPENBLAS_HOME
     ""
     CACHE PATH "path to OpenBLAS")
 
-
 # ######################################################################################################################
 # QUDA ADVANCED OPTIONS that usually should not be changed by users
 # ######################################################################################################################
@@ -219,8 +214,6 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
-
-
 # features in development
 option(QUDA_SSTEP "build s-step linear solvers" OFF)
 option(QUDA_MULTIGRID "build multigrid solvers" OFF)
@@ -230,8 +223,6 @@ option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
 option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
 option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
 option(QUDA_DOWNLOAD_OPENBLAS "Download OpenBLAS software as requested by QUDA_OPENBLAS" OFF)
-
-
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -254,15 +245,12 @@ mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
 
-
 mark_as_advanced(QUDA_INTERFACE_ALL)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
 mark_as_advanced(QUDA_BLOCKSOLVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
-
-
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
@@ -275,9 +263,7 @@ if(QUDA_MPI AND QUDA_QMP)
 endif()
 
 if(QUDA_NVSHMEM AND NOT (QUDA_QMP OR QUDA_MPI))
-message(
-  SEND_ERROR
-    "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
+  message(SEND_ERROR "Specifying QUDA_NVSHMEM requires either QUDA_QMP or QUDA_MPI.")
 endif()
 
 # COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -361,27 +347,32 @@ if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
 endif()
 
-#####################################################################
+# ######################################################################################################################
 # Handle dependencies
-#####################################################################
+# ######################################################################################################################
 if(QUDA_BUILD_SHAREDLIB)
   set(BUILD_SHARED_LIBS ON)
 endif()
 
-####################################
+# ######################################################################################################################
 # Eigen
-####################################
+# ######################################################################################################################
 add_library(Eigen INTERFACE IMPORTED)
 # set(CPM_USE_LOCAL_PACKAGES TRUE)
 if(QUDA_DOWNLOAD_EIGEN)
-  set(QUDA_EIGEN_VERSION "3.4.0" CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
+  set(QUDA_EIGEN_VERSION
+      "3.4.0"
+      CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
-  CPMAddPackage(
-    NAME Eigen
-    VERSION ${QUDA_EIGEN_VERSION}
-    URL https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
-    DOWNLOAD_ONLY YES 
-    )
+  cpmaddpackage(
+    NAME
+    Eigen
+    VERSION
+    ${QUDA_EIGEN_VERSION}
+    URL
+    https://gitlab.com/libeigen/eigen/-/archive/${QUDA_EIGEN_VERSION}/eigen-${QUDA_EIGEN_VERSION}.tar.bz2
+    DOWNLOAD_ONLY
+    YES)
   target_include_directories(Eigen SYSTEM INTERFACE ${Eigen_SOURCE_DIR})
 else()
   # fall back to using find_package
@@ -395,9 +386,9 @@ else()
   target_include_directories(Eigen SYSTEM INTERFACE ${EIGEN_INCLUDE_DIRS})
 endif()
 
-####################################
+# ######################################################################################################################
 # MPI
-####################################
+# ######################################################################################################################
 # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
 if(QUDA_ARPACK OR QUDA_OPENBLAS)
   enable_language(Fortran)
@@ -430,82 +421,93 @@ if(QUDA_MPI OR QUDA_QMP)
   find_package(MPI REQUIRED)
 endif()
 
-
-####################################
-# USQCD 
-####################################
+# ######################################################################################################################
+# USQCD
+# ######################################################################################################################
 # We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/usqcd CACHE PATH "..." FORCE)
+  set(CMAKE_INSTALL_PREFIX
+      ${CMAKE_BINARY_DIR}/usqcd
+      CACHE PATH "..." FORCE)
 endif()
 
-####################################
+# ######################################################################################################################
 # QMP
-####################################
+# ######################################################################################################################
 if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QMP_TAG "3010fef" CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
-    mark_as_advanced(QUDA_QMP_TAG)  
-    CPMAddPackage(
-      NAME QMP
-      GITHUB_REPOSITORY usqcd-software/qmp
-      GIT_TAG ${QUDA_QMP_TAG}
+    set(QUDA_QMP_TAG
+        "3010fef"
+        CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
+    mark_as_advanced(QUDA_QMP_TAG)
+    cpmaddpackage(
+      NAME
+      QMP
+      GITHUB_REPOSITORY
+      usqcd-software/qmp
+      GIT_TAG
+      ${QUDA_QMP_TAG}
       OPTIONS
       "QMP_MPI ON"
       "QMP_TESTING OFF"
-      "QMP_BUILD_DOCS OFF"
-    )
+      "QMP_BUILD_DOCS OFF")
   else()
-    find_package(QMP REQUIRED) 
+    find_package(QMP REQUIRED)
   endif()
 endif()
 
-####################################
+# ######################################################################################################################
 # QIO
-####################################
+# ######################################################################################################################
 if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG
+        "a5c3ae580b846130c06dc060ab822f17d6fe2171"
+        CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
-    CPMAddPackage(
-      NAME QIO
-      GITHUB_REPOSITORY usqcd-software/qio
-      GIT_TAG ${QUDA_QIO_TAG}
-      OPTIONS 
-        "QIO_ENABLE_PARALLEL_BUILD ON"
-        "QIO_ENABLE_QMP_ROUTE OFF" 
-        "QIO_ENABLE_OUTPUT_BUFFERING ON" 
-        "QIO_DML_BUF_BYTES 33554432"
-    )
+    cpmaddpackage(
+      NAME
+      QIO
+      GITHUB_REPOSITORY
+      usqcd-software/qio
+      GIT_TAG
+      ${QUDA_QIO_TAG}
+      OPTIONS
+      "QIO_ENABLE_PARALLEL_BUILD ON"
+      "QIO_ENABLE_QMP_ROUTE OFF"
+      "QIO_ENABLE_OUTPUT_BUFFERING ON"
+      "QIO_DML_BUF_BYTES 33554432")
   else()
     find_package(QIO REQUIRED)
   endif()
 endif()
 
-####################################
+# ######################################################################################################################
 # USQCD QDPJIT
-####################################
+# ######################################################################################################################
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
   endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
-                  OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
-                  OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
+    OUTPUT_VARIABLE QDP_LDFLAGS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
+    OUTPUT_VARIABLE QDP_LIBS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
-
-
-####################################
+# ######################################################################################################################
 # ARPACK
-####################################
+# ######################################################################################################################
 if(QUDA_ARPACK)
   enable_language(Fortran)
 
@@ -516,7 +518,7 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
-  #TODO: switch to CPM
+    # TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       ARPACK-NG
@@ -565,14 +567,14 @@ if(QUDA_ARPACK)
   endif(QUDA_DOWNLOAD_ARPACK)
 endif(QUDA_ARPACK)
 
-####################################
+# ######################################################################################################################
 # OPENBLAS
-####################################
+# ######################################################################################################################
 if(QUDA_OPENBLAS)
   enable_language(Fortran)
 
   if(QUDA_DOWNLOAD_OPENBLAS)
-  #TODO: switch to CPM
+    # TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       OPENBLAS
@@ -580,7 +582,7 @@ if(QUDA_OPENBLAS)
       GIT_TAG v0.3.10
       GIT_SHALLOW YES
       PREFIX openblas
-      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> 
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(OPENBLAS INSTALL_DIR)
     set(QUDA_OPENBLAS_HOME ${INSTALL_DIR})
@@ -588,7 +590,7 @@ if(QUDA_OPENBLAS)
     add_dependencies(openblas OPENBLAS)
     set_target_properties(openblas PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(openblas PROPERTIES IMPORTED_LOCATION
-                                               ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
+                                              ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
   else(QUDA_DOWNLOAD_OPENBLAS)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(OPENBLAS QUIET openblas)
@@ -596,13 +598,13 @@ if(QUDA_OPENBLAS)
       find_library(OPENBLAS openblas PATH ${QUDA_OPENBLAS_HOME})
     else()
       find_library(OPENBLAS ${OPENBLAS_LIBRARIES} PATH ${OPENBLAS_LIBRARY_DIRS})
-    endif()    
+    endif()
   endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
-####################################
+# ######################################################################################################################
 # BACKWARDS
-####################################
+# ######################################################################################################################
 if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
@@ -617,10 +619,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-
-#####################################################################
-# ADVANCED setup 
-#####################################################################
+# ######################################################################################################################
+# ADVANCED setup
+# ######################################################################################################################
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -629,8 +630,6 @@ endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
-
-
 mark_as_advanced(CMAKE_CXX_FLAGS_DEVEL)
 mark_as_advanced(CMAKE_CXX_FLAGS_STRICT)
 mark_as_advanced(CMAKE_CXX_FLAGS_RELEASE)
@@ -657,14 +656,12 @@ add_subdirectory(tests)
 add_subdirectory(doc)
 
 include(CMakePackageConfigHelpers)
-configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake 
-	INSTALL_DESTINATION lib/cmake/QUDA)
+configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
 
 write_basic_package_version_file(
-	QUDAVersion.cmake
-	VERSION ${PACKAGE_VERSION}
-	COMPATIBILITY AnyNewerVersion)
+  QUDAVersion.cmake
+  VERSION ${PACKAGE_VERSION}
+  COMPATIBILITY AnyNewerVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake
-	${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-	DESTINATION lib/cmake/QUDA)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
+        DESTINATION lib/cmake/QUDA)
