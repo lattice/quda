@@ -33,7 +33,6 @@ namespace quda {
     }
 
     unsigned int minThreads() const { return arg.fineVolumeCB; }
-    bool tuneSharedBytes() const { return false; } // FIXME don't tune the grid dimension
 
   public:
     CalculateStaggeredGeometryReorder(Arg &arg, GaugeField &meta, const GaugeField &xInvCoarse) :

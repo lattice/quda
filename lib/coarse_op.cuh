@@ -64,7 +64,7 @@ namespace quda {
       case COMPUTE_UV:
       case COMPUTE_LV:
         // when fine operator is coarse take into account that the link matrix has spin dependence
-        // FIXME: double check this makes sense for long link; might vary for KD op
+        // FIXME: need to verify this for the KD operator
         flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
 	break;
       case COMPUTE_AV:
@@ -83,7 +83,7 @@ namespace quda {
       case COMPUTE_VUV:
       case COMPUTE_VLV:
       // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-      // FIXME: double check this makes sense for long link; might vary for KD op
+      // FIXME: need to verify this for the KD operator
       flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
       case COMPUTE_COARSE_CLOVER:
@@ -964,9 +964,6 @@ namespace quda {
 
     // Figure out nFace
     const int nFace = (dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) ? 3 : 1;
-
-    // BIG FIXME: there's an outstanding tunekey degeneracy issue somewhere if you tune a staggered run then separately a hisq run
-    // exact source of the issue tbd, but it doesn't block forward progress for now
 
     //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
 

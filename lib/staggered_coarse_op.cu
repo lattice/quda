@@ -389,7 +389,6 @@ namespace quda {
 
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
-  // FIXME: the empty GaugeField& is a placeholder for the long links for now
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
   {

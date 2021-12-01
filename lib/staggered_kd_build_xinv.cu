@@ -30,7 +30,6 @@ namespace quda {
     }
 
     unsigned int minThreads() const { return arg.fineVolumeCB; }
-    bool tuneSharedBytes() const { return false; } // FIXME don't tune the grid dimension
 
   public:
     CalculateStaggeredKDBlock(Arg &arg, const GaugeField &meta, GaugeField &X) :
@@ -188,8 +187,6 @@ namespace quda {
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-    // FIXME remove when done
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing X for StaggeredKD...\n");
 
 #if QUDA_PRECISION & 8 && defined(GPU_MULTIGRID_DOUBLE)
     if (X.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -215,7 +212,6 @@ namespace quda {
       errorQuda("Unsupported precision %d", X.Precision());
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing X for StaggeredKD\n");
   }
 #else
   void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
@@ -335,10 +331,11 @@ namespace quda {
     // Step 4: Calculate X from U
     calculateStaggeredKDBlock(X, U, mass);
 
-    // FIXME: expose on command line, though empirically we've seen
-    // this leads to poorer conditioned operator. Might be worth it because
-    // we could apply the dagger approx. operator directly without
-    // building the KD block, though
+    // This should be revisited in the future. Using X^dagger
+    // empirically leads to a less useful preconditioner than X^{-1},
+    // though this was only with limited testing. One benefit of applying
+    // X^dagger instead is we could apply it directly from the gauge links
+    // as opposed to explicitly building it.
     constexpr bool dagger_approximation = false;
 
     if (dagger_approximation) {
