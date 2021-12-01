@@ -183,7 +183,7 @@ set(COMP_CAP "${COMP_CAP}0" PARENT_SCOPE)
 
 # QUDA_HASH for tunecache
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
-set(GITVERSION "${PROJECT_VERSION}-${QUDA_GPU_ARCH} ${GITVERSION}")
+set(GITVERSION "${PROJECT_VERSION}-${GITVERSION}-${QUDA_GPU_ARCH}")
 
 target_sources(quda_cpp PRIVATE quda_api.cpp device.cpp malloc.cpp blas_lapack_cublas.cpp comm_target.cpp)
 

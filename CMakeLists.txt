@@ -136,8 +136,6 @@ option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
-# Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
@@ -203,7 +201,8 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
-
+option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
+option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
 
 # Set CTest options
 option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
@@ -247,6 +246,7 @@ mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
+mark_as_advanced(QUDA_CLOVER_RECONSTRUCT)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -353,6 +353,9 @@ set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
     CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
+if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
+endif()
 
 if(QUDA_OPENMP)
   find_package(OpenMP REQUIRED)
@@ -465,7 +468,7 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
