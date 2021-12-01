@@ -8,12 +8,12 @@ namespace quda
 {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) :
-    DiracImprovedStaggered(param), Xinv(param.xInvKD)
+    DiracImprovedStaggered(param), Xinv(param.xInvKD), parent_dirac(param.dirac)
   {
   }
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracImprovedStaggeredKD &dirac) :
-    DiracImprovedStaggered(dirac), Xinv(dirac.Xinv)
+    DiracImprovedStaggered(dirac), Xinv(dirac.Xinv), parent_dirac(dirac.parent_dirac)
   {
   }
 
@@ -24,6 +24,7 @@ namespace quda
     if (&dirac != this) {
       DiracImprovedStaggered::operator=(dirac);
       Xinv = dirac.Xinv;
+      parent_dirac = dirac.parent_dirac;
     }
     return *this;
   }
@@ -180,11 +181,20 @@ namespace quda
       src = &b;
       sol = &x;
     } else {
+
       // need to modify rhs
       bool reset = newTmp(&tmp1, b);
-
       KahlerDiracInv(*tmp1, b);
-      b = *tmp1;
+
+      // if we're preconditioning the Schur op, we need to rescale by the mass
+      const auto parent_type = parent_dirac->getDiracType();
+      if (parent_type == QUDA_ASQTAD_DIRAC) {
+        b = *tmp1;
+      } else if (parent_type == QUDA_ASQTADPC_DIRAC) {
+        b = *tmp1;
+        blas::ax(0.5 / mass, b);
+      } else
+        errorQuda("Unexpected parent Dirac type %d", parent_type);
 
       deleteTmp(&tmp1, reset);
       sol = &x;
@@ -208,7 +218,7 @@ namespace quda
     bool right_block_precond = false;
 
     if (right_block_precond) {
-      bool reset = newTmp(&tmp1, b.Even());
+      bool reset = newTmp(&tmp1, b);
 
       KahlerDiracInv(*tmp1, x);
       x = *tmp1;

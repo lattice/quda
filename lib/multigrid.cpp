@@ -413,9 +413,10 @@ namespace quda
       diracParamKD.mu = diracSmoother->Mu(); // doesn't matter
       diracParamKD.mu_factor = 1.0;          // doesn't matter
       diracParamKD.dagger = QUDA_DAG_NO;
-      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // I guess we could hack this for left vs right block Jacobi?
+      diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // We can use this to track left vs right block jacobi in the future
       diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
       diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
+      diracParamKD.dirac = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
 
       diracParamKD.tmp1 = tmp_coarse;
       diracParamKD.tmp2 = tmp2_coarse;
