@@ -227,6 +227,18 @@ namespace quda {
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+      } else if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+        copyGaugeEx(out, in, location, (double*)Out, (short*)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+        copyGaugeEx(out, in, location, (double*)Out, (int8_t*)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("Precision %d not instantiated", in.Precision());
       }
@@ -238,6 +250,18 @@ namespace quda {
         copyGaugeEx(out, in, location, (float *)Out, (float *)In);
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+      } else if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+        copyGaugeEx(out, in, location, (float *)Out, (short *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+      } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+        copyGaugeEx(out, in, location, (float *)Out, (int8_t *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
       } else {
         errorQuda("Precision %d not instantiated", in.Precision());
