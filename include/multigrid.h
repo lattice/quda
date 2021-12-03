@@ -444,9 +444,8 @@ namespace quda {
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                const cudaCloverField *clover, double kappa, double mass, double mu, double mu_factor,
-                QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const CloverField *clover,
+                double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Staggered)

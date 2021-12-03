@@ -1,19 +1,21 @@
 #include <clover_field_order.h>
 #include <quda_matrix.h>
 #include <linalg.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
 {
 
-  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
     static constexpr int nColor = 3;
     static constexpr int nSpin = 4;
-    using Clover = typename clover_mapper<store_t>::type;
+    // we must disable clover reconstruction when writing the inverse
+    using Clover = typename clover_mapper<store_t, 72, false, false>::type;
 
     Clover inverse;
     const Clover clover;
@@ -22,7 +24,7 @@ namespace quda
 
     CloverInvertArg(CloverField &field, bool compute_tr_log) :
       ReduceArg<reduce_t>(dim3(field.VolumeCB(), 2, 1)),
-      inverse(field, true),
+      inverse(field, clover::dynamic_inverse() ? false : true), // if dynamic_inverse, then alias to direct term
       clover(field, false),
       compute_tr_log(compute_tr_log),
       mu2(field.Mu2())
@@ -30,11 +32,11 @@ namespace quda
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
 
-    __device__ __host__ auto init() const { return reduce_t(); }
+    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
-  template <typename Arg> struct InvertClover : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct InvertClover : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr InvertClover(const Arg &arg) : arg(arg) {}
@@ -50,6 +52,7 @@ namespace quda
       using Mat = HMatrix<real, N>;
       double trLogA = 0.0;
 
+#pragma unroll
       for (int ch = 0; ch < 2; ch++) {
         Mat A = arg.clover(x_cb, parity, ch);
         A *= static_cast<real>(2.0); // factor of two is inherent to QUDA clover storage
@@ -60,17 +63,17 @@ namespace quda
         }
 
         // compute the Cholesky decomposition
-        linalg::Cholesky<HMatrix, real, N> cholesky(A);
+        linalg::Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A);
 
         // Accumulate trlogA
         if (arg.compute_tr_log)
           for (int j = 0; j < N; j++) trLogA += 2.0 * log(cholesky.D(j));
 
-        Mat Ainv = static_cast<real>(0.5) * cholesky.invert(); // return full inverse
+        Mat Ainv = static_cast<real>(0.5) * cholesky.template invert<Mat>(); // return full inverse
         arg.inverse(x_cb, parity, ch) = Ainv;
       }
 
-      reduce_t result;
+      reduce_t result{0, 0};
       parity ? result[1] = trLogA : result[0] = trLogA;
       return operator()(result, value);
     }

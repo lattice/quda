@@ -145,7 +145,7 @@ QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;

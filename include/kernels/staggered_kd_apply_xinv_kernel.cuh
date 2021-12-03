@@ -3,7 +3,7 @@
 #include <multigrid_helper.cuh>
 #include <index_helper.cuh>
 #include <register_traits.h>
-#include <reduce_helper.h>
+#include <block_reduce_helper.h>
 #include <shared_memory_cache_helper.cuh>
 
 namespace quda {

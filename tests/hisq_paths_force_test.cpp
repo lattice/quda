@@ -292,7 +292,7 @@ static void hisq_force_end()
 
 static int hisq_force_test(void)
 {
-  setVerbosity(QUDA_VERBOSE);
+  setVerbosity(verbosity);
   hisq_force_init();
 
   //float weight = 1.0;
