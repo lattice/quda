@@ -139,8 +139,7 @@ quda::mgarray<int> mg_schwarz_cycle = {};
 bool mg_evolve_thin_updates = false;
 
 // Aggregation type for the top level of staggered
-// FIXME: replace with QUDA_TRANSFER_OPTIMIZED_KD when ready
-QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
+QudaTransferType staggered_transfer_type = QUDA_TRANSFER_OPTIMIZED_KD;
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -860,11 +859,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-setup-type", setup_type, "The type of setup to use for the multigrid (default null)")
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
 
-  // FIXME: default should become kd-optimized
   opgroup
     ->add_option(
       "--mg-staggered-coarsen-type",
-      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse (default), kd-optimized)")
+      staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse, kd-optimized (default))")
     ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
 
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
