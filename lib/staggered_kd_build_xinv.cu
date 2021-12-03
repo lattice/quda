@@ -227,7 +227,7 @@ namespace quda {
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
 
     QudaFieldLocation location = checkLocation(Xinv, gauge);
-    QudaPrecision precision = checkPrecision(Xinv, gauge);
+    checkPrecision(Xinv, gauge);
 
     if (Xinv.Geometry() != QUDA_KDINVERSE_GEOMETRY)
       errorQuda("Unsupported gauge geometry %d , expected %d for Xinv", Xinv.Geometry(), QUDA_KDINVERSE_GEOMETRY);
