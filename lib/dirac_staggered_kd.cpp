@@ -59,63 +59,33 @@ namespace quda
     // ( -D_oe   2m    ) (x_o) = (b_o)
     // ... but under the hood we need to catch the zero mass case.
 
-    // TODO: add left vs right precond
-
     checkFullSpinor(out, in);
 
     bool reset = newTmp(&tmp2, in);
 
-    bool right_block_precond = false;
+    if (dagger == QUDA_DAG_NO) {
 
-    if (right_block_precond) {
-      if (dagger == QUDA_DAG_NO) {
-        // K-D op is right-block preconditioned
-        ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, false);
-        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
-        if (mass == 0.) {
-          ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
-          flops += 570ll * in.Volume();
-        } else {
-          ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
-          flops += 582ll * in.Volume();
-        }
-      } else { // QUDA_DAG_YES
-
-        if (mass == 0.) {
-          ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
-          flops += 570ll * in.Volume();
-        } else {
-          ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-          flops += 582ll * in.Volume();
-        }
-        ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, true);
-        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+      if (mass == 0.) {
+        ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+        flops += 570ll * in.Volume();
+      } else {
+        ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+        flops += 582ll * in.Volume();
       }
-    } else { // left preconditioned
-      if (dagger == QUDA_DAG_NO) {
+      ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, false);
+      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
-        if (mass == 0.) {
-          ApplyStaggered(*tmp2, in, *gauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
-          flops += 570ll * in.Volume();
-        } else {
-          ApplyStaggered(*tmp2, in, *gauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-          flops += 582ll * in.Volume();
-        }
-        ApplyStaggeredKahlerDiracInverse(out, *tmp2, *Xinv, false);
-        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
+    } else { // QUDA_DAG_YES
 
-      } else { // QUDA_DAG_YES
+      ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, true);
+      flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
-        ApplyStaggeredKahlerDiracInverse(*tmp2, in, *Xinv, true);
-        flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
-
-        if (mass == 0.) {
-          ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
-          flops += 570ll * in.Volume();
-        } else {
-          ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
-          flops += 582ll * in.Volume();
-        }
+      if (mass == 0.) {
+        ApplyStaggered(out, *tmp2, *gauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+        flops += 570ll * in.Volume();
+      } else {
+        ApplyStaggered(out, *tmp2, *gauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger, commDim, profile);
+        flops += 582ll * in.Volume();
       }
     }
 
@@ -160,32 +130,24 @@ namespace quda
 
     checkFullSpinor(x, b);
 
-    bool right_block_precond = false;
+    // need to modify rhs
+    bool reset = newTmp(&tmp1, b);
 
-    if (right_block_precond) {
-      // need to modify the solution
-      src = &b;
-      sol = &x;
-    } else {
-      // need to modify rhs
-      bool reset = newTmp(&tmp1, b);
+    KahlerDiracInv(*tmp1, b);
 
-      KahlerDiracInv(*tmp1, b);
+    // if we're preconditioning the Schur op, we need to rescale by the mass
+    const auto parent_type = parent_dirac->getDiracType();
+    if (parent_type == QUDA_STAGGERED_DIRAC) {
+      b = *tmp1;
+    } else if (parent_type == QUDA_STAGGEREDPC_DIRAC) {
+      b = *tmp1;
+      blas::ax(0.5 / mass, b);
+    } else
+      errorQuda("Unexpected parent Dirac type %d", parent_type);
 
-      // if we're preconditioning the Schur op, we need to rescale by the mass
-      const auto parent_type = parent_dirac->getDiracType();
-      if (parent_type == QUDA_STAGGERED_DIRAC) {
-        b = *tmp1;
-      } else if (parent_type == QUDA_STAGGEREDPC_DIRAC) {
-        b = *tmp1;
-        blas::ax(0.5 / mass, b);
-      } else
-        errorQuda("Unexpected parent Dirac type %d", parent_type);
-
-      deleteTmp(&tmp1, reset);
-      sol = &x;
-      src = &b;
-    }
+    deleteTmp(&tmp1, reset);
+    sol = &x;
+    src = &b;
   }
 
   void DiracStaggeredKD::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
@@ -196,21 +158,12 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const
+  void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
-    checkFullSpinor(x, b);
+    // do nothing
 
-    bool right_block_precond = false;
-
-    if (right_block_precond) {
-      bool reset = newTmp(&tmp1, b);
-
-      KahlerDiracInv(*tmp1, x);
-      x = *tmp1;
-
-      deleteTmp(&tmp1, reset);
-    }
-    // nothing required for left block preconditioning
+    // TODO: technically KD is a different type of preconditioning.
+    // Should we support "preparing" and "reconstructing"?
   }
 
   void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
