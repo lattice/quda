@@ -63,9 +63,32 @@ namespace quda {
       switch (type) {
       case COMPUTE_UV:
       case COMPUTE_LV:
-        // when fine operator is coarse take into account that the link matrix has spin dependence
-        // FIXME: need to verify this for the KD operator
-        flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * coarseColor * fineColor * fineColor * (!from_coarse ? 1 : fineSpin);
+        {
+          // fine volume of "fine" link matrices times coarseColor
+          flops_ = 2l * arg.fineVolumeCB * 8 * (fineColor * fineColor * coarseColor);
+
+          // Multiplicative factors as a function of fine operator
+          if (from_coarse) {
+            // when fine operator is coarse take into account that the "fine" link matrix has spin dependence
+            flops_ *= fineSpin * fineSpin;
+          } else if (fineSpin == 4 || (fineSpin == 1 && !from_kd_op)) {
+            // when the fine operator is Wilson-type or a non-KD staggered operator, we need to acount for each near-null vector
+            // having fineSpin spin components.
+            flops_ *= fineSpin;
+          } else if (fineSpin == 1 && from_kd_op) {
+            if (dir == QUDA_FORWARDS) {
+              // only loading from V, so there's only one "spin"
+              flops_ *= Arg::fineSpinorV::nSpin;
+            } else if (dir == QUDA_BACKWARDS) {
+             // loading from AV, so we need to keep track of two spins == coarse chiralities
+              flops_ *= Arg::fineSpinorAV::nSpin;
+            } else {
+              errorQuda("Unexpected direction %d", dir);
+            }
+          } else {
+            errorQuda("Invalid operator combination for COMPUTE_UV/COMPUTE_LV");
+          }
+        }
 	break;
       case COMPUTE_AV:
       case COMPUTE_TMAV:
@@ -82,9 +105,28 @@ namespace quda {
       break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
-      // when the fine operator is truly fine the VUV multiplication is block sparse which halves the number of operations
-      // FIXME: need to verify this for the KD operator
-      flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor / (!from_coarse ? coarseSpin : 1);
+      {
+        // fine volume of contractions over fineColor
+        flops_ = 2l * arg.fineVolumeCB * 8 * (coarseColor * fineColor * coarseColor);
+
+        // Multiplicative factors as a function of the fine operator
+        if (from_coarse) {
+          // when the "fine" operator is a coarse op we're also contracting over fineSpin
+          flops_ *= fineSpin * fineSpin;
+        } else if (fineSpin == 4) {
+          // when the fine operator is Wilson-type, there's still a contraction over fineSpin,
+          // but the VUV multiplication is block sparse which halves the number of operations
+          flops_ *= fineSpin * fineSpin / coarseSpin;
+        } else if (fineSpin == 1 && !from_kd_op) {
+          // trivial contraction over fineSpin
+          flops_ *= fineSpin * fineSpin;
+        } else if (fineSpin == 1 && from_kd_op) {
+          // trivial contraction over fineSpin, times the two source parities baked into in AV (or UAV)
+          flops_ *= fineSpin * fineSpin * 2;
+        } else {
+          errorQuda("Invalid operator combination for COMPUTE_VUV/COMPUTE_VLV");
+        }
+      }
 	break;
       case COMPUTE_COARSE_CLOVER:
 	// when the fine operator is truly fine the clover multiplication is block sparse which halves the number of operations
@@ -108,13 +150,19 @@ namespace quda {
     long long bytes() const
     {
       long long bytes_ = 0;
-      long long link_bytes = 0;
       switch (type) {
       case COMPUTE_UV:
       case COMPUTE_LV:
-        // FIXME: may vary for KD op b/c we need to keep track of from even vs from odd
-        link_bytes = (type == COMPUTE_UV) ? arg.U.Bytes() : arg.L.Bytes();
-	bytes_ = compute_max * arg.UV.Bytes() + arg.V.Bytes() + 2 * link_bytes * coarseColor;
+        {
+          // Loading the fine gauge field coarseColor times
+          bytes_ = 2 * ((type == COMPUTE_UV) ? arg.U.Bytes() : arg.L.Bytes()) * coarseColor;
+
+          // Loading V/AV: this is only relevant for the KD op, otherwise these two have the same size
+          bytes_ += (dir == QUDA_BACKWARDS) ? arg.AV.Bytes() : arg.V.Bytes();
+
+          // Storing to UV: only special for the KD op
+          bytes_ += compute_max * ((from_kd_op && dir == QUDA_FORWARDS) ? (arg.UV.Bytes() / 2) : arg.UV.Bytes());
+        }
 	break;
       case COMPUTE_AV:
 	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor;
@@ -130,7 +178,6 @@ namespace quda {
         break;
       case COMPUTE_VUV:
       case COMPUTE_VLV:
-        // FIXME: may vary for KD op b/c we need to keep track of from even vs from odd
         {
           // formula for shared-atomic variant assuming parity_flip = true
           int writes = 4;

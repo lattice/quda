@@ -155,8 +155,8 @@ namespace quda {
        @param[in] L Accessor to the fine long-link field
        @param[in] K Accessor to the Kahler-Dirac inverse field
        @param[in] V Accessor to the packed nullspace colorspinor field
-       @param[in] C Accessor to the fine clover field, or KD inverse field
-       @param[in] Cinv Accessor to the fine inverse clover field, or KD inverse field
+       @param[in] C Accessor to the fine clover field
+       @param[in] Cinv Accessor to the fine inverse clover field
        @param[in] kappa Kappa parameter from the fine operator
        @param[in] mass Mass parameter from the fine operator
        @param[in] mu Twisted mass parameter from the fine operator
@@ -336,7 +336,6 @@ namespace quda {
   __device__ __host__ inline std::enable_if_t<!Arg::from_coarse && Arg::fineSpin == 1 && !Arg::from_kd_op, typename Arg::Float>
   computeUV(const Arg &arg, const gType& Gacc, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
   {
-    // once we support KD coarsening, where UVspin depends on if we're coarsening the KD op or not
     constexpr int uvSpin = Arg::fineSpinorUV::nSpin;
 
     using real = typename Arg::Float;
@@ -486,12 +485,20 @@ namespace quda {
     }
 
     real uv_max = static_cast<real>(0.0);
-#pragma unroll
-    for (int s = 0; s < uvSpin; s++) {
+    if (arg.dir == QUDA_FORWARDS) {
       IF_CONSTEXPR (Arg::compute_max) {
-        uv_max = fmax(UV[s].abs_max(), uv_max);
+        uv_max = UV[(parity+1)&1].abs_max();
       } else {
-        UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+        UV[(parity+1)&1].saveCS(arg.UV, 0, 0, parity, x_cb, (parity+1)&1, i0, j0);
+      }
+    } else {
+#pragma unroll
+      for (int s = 0; s < uvSpin; s++) {
+        IF_CONSTEXPR (Arg::compute_max) {
+          uv_max = fmax(UV[s].abs_max(), uv_max);
+        } else {
+          UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+        }
       }
     }
 
@@ -1161,7 +1168,7 @@ namespace quda {
 
   /**
      @brief Do a single (AV)^\dagger * UV product, where AV is simply
-     the packed null space vectors.  This is the specialization form
+     the packed null space vectors (V). This is the specialization form
      for fine-grid non KD staggered/asqtad fermions
 
      @param[out] vuv Result array
@@ -1210,11 +1217,9 @@ namespace quda {
 
 
   /**
-     @brief Do a single (AV)^\dagger * UV product, where for
-     preconditioned clover, AV correspond to the KD inverse
-     multiplied by the packed null space vectors, else AV is simply
-     the packed null space vectors.  This is the specialization form
-     for fine-grid KD staggered/asqtad fermions.
+     @brief Do a single (AV)^\dagger * UV product for the KD operator,
+     where AV corresponds to the KD inverse multiplied by the packed null
+     space vectors. This is the specialization for fine-grid KD staggered/asqtad fermions.
 
      @param[out] vuv Result array
      @param[in,out] arg Arg storing the fields and parameters
@@ -1237,7 +1242,7 @@ namespace quda {
       const int s_c_row = arg.spin_map(0, parity);
 
       // for backwards, we're tieing together <V^\dagger A U^\dagger | V>
-      // we need all s_c_row, s_c_col combinations
+      // we need all s_c_col combinations; s_c_row is covered by parity
 #pragma unroll
       for (int s_c_col = 0; s_c_col < Arg::coarseSpin; s_c_col++) {
 #pragma unroll
