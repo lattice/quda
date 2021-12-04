@@ -251,7 +251,7 @@ namespace quda
 
   void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, double mass)
   {
-    if (param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD)
+    if (param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD && param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("Attempting to update fine gauge fields of a \"coarse\" but non-KD operator");
 
     // last nullptr is for the clover field
@@ -383,7 +383,7 @@ namespace quda
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
     // custom setup for the staggered KD ops
-    if (param.level == 0 && param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD) {
+    if (param.level == 0 && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
       auto dirac_type = diracSmoother->getDiracType();
 
       auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
@@ -428,15 +428,25 @@ namespace quda
         diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
         diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
       } else if (dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) {
-        diracParamKD.type = QUDA_ASQTADKD_DIRAC;
+        if (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD) {
+          diracParamKD.type = QUDA_ASQTADKD_DIRAC;
 
-        diracParamKD.fatGauge = fine_gauge;
-        diracParamKD.longGauge = const_cast<cudaGaugeField *>(
-          reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
+          diracParamKD.fatGauge = fine_gauge;
+          diracParamKD.longGauge = const_cast<cudaGaugeField *>(
+            reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getLongLinkField());
 
-        diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
-        diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
-        diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+          diracCoarseResidual = new DiracImprovedStaggeredKD(diracParamKD);
+          diracCoarseSmoother = new DiracImprovedStaggeredKD(diracParamKD);
+          diracCoarseSmootherSloppy = new DiracImprovedStaggeredKD(diracParamKD);
+        } else {
+          // param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG
+          diracParamKD.type = QUDA_STAGGEREDKD_DIRAC;
+
+          diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
+          diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
+          diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
+
+        }
       } else {
         errorQuda("Invalid dirac_type %d", dirac_type);
       }
@@ -923,7 +933,7 @@ namespace quda
     } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
       // If we're doing anything with the asqtad operator, the long links can make verification difficult
 
-      if (param.transfer_type == QUDA_TRANSFER_COARSE_KD) {
+      if (param.transfer_type == QUDA_TRANSFER_COARSE_KD || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
         can_verify = false;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using the naively coarsened KD operator with asqtad long links, skipping verify...\n");
       } else if (param.transfer_type == QUDA_TRANSFER_AGGREGATE || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {

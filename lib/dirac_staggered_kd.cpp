@@ -136,10 +136,11 @@ namespace quda
     KahlerDiracInv(*tmp1, b);
 
     // if we're preconditioning the Schur op, we need to rescale by the mass
+    // parent could be an ASQTAD operator if we've enabled dropping the long links
     const auto parent_type = parent_dirac->getDiracType();
-    if (parent_type == QUDA_STAGGERED_DIRAC) {
+    if (parent_type == QUDA_STAGGERED_DIRAC || parent_type == QUDA_ASQTAD_DIRAC) {
       b = *tmp1;
-    } else if (parent_type == QUDA_STAGGEREDPC_DIRAC) {
+    } else if (parent_type == QUDA_STAGGEREDPC_DIRAC || parent_type == QUDA_ASQTADPC_DIRAC) {
       b = *tmp1;
       blas::ax(0.5 / mass, b);
     } else

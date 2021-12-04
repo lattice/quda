@@ -130,7 +130,7 @@ namespace quda {
   void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
                                       double) const
   {
-    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
     StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);

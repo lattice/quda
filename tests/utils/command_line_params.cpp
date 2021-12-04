@@ -320,7 +320,8 @@ namespace
 
   CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
                                                            {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
-                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD}};
+                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD},
+                                                           {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
