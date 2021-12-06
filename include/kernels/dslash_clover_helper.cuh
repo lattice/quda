@@ -220,7 +220,7 @@ namespace quda {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a2_minus_b2;
-            Cholesky<HMatrix, real, N> cholesky(A2);
+            Cholesky<HMatrix, clover::cholesky_t<real>, N> cholesky(A2);
 #pragma unroll
             for (int flavor = 0; flavor < n_flavor; flavor++)
               out_chi[flavor] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(out_chi[flavor]));
