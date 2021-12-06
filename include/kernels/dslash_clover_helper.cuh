@@ -38,18 +38,19 @@ namespace quda {
     const int volumeCB;   // checkerboarded volume
     real a;
     real b;
-    real c;
+    real a2_minus_b2;
     QudaTwistGamma5Type twist;
 
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real epsilon = 0.0,
-	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
+	      bool dagger = false, QudaTwistGamma5Type twist = QUDA_TWIST_GAMMA5_INVALID) :
+      kernel_param(dim3(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset())),
       out(out), in(in),
       clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
       cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
       nParity(in.SiteSubset()), parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
-      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
+      volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), twist(twist)
     {
       checkPrecision(out, in, clover);
       checkLocation(out, in, clover);
@@ -61,22 +62,21 @@ namespace quda {
           a = -2.0 * kappa * mu;
           b = 1.0 / (1.0 + a*a);
         }
-        c = 0.0;
         if (dagger) a *= -1.0;
       } else if (doublet) {
         if (twist == QUDA_TWIST_GAMMA5_DIRECT){
           a = 2.0 * kappa * mu;
           b = -2.0 * kappa * epsilon;
-          c = 1.0;
         } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
           a = -2.0 * kappa * mu;
           b = 2.0 * kappa * epsilon;
-          c = 1.0 / (1.0 + a*a - b*b);
-          // TODO: test for c <= 0?
         }
         if (dagger) a *= -1.0;
       }
-      this->threads = dim3(doublet ? in.VolumeCB()/2 : in.VolumeCB(), in.SiteSubset(), 1);
+      // factor of 2 comes from clover normalization we need to correct for
+      a *= 0.5;
+      b *= 0.5;
+      a2_minus_b2 = a * a - b * b;
     }
   };
 
@@ -145,18 +145,16 @@ namespace quda {
 
 #pragma unroll
       for (int chirality=0; chirality<2; chirality++) {
-        // factor of 2 comes from clover normalization we need to correct for
-        const complex<real> j(0.0, chirality == 0 ? static_cast<real>(0.5) : -static_cast<real>(0.5));
-
+        const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
         Mat A = arg.clover(x_cb, clover_parity, chirality);
 
         half_fermion in_chi = in.chiral_project(chirality);
-        half_fermion out_chi = A*in_chi + j*arg.a*in_chi;
+        half_fermion out_chi = A*in_chi + a * in_chi;
 
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
-            A2 += arg.a*arg.a*static_cast<real>(0.25);
+            A2 += arg.a * arg.a;
             Cholesky<HMatrix, clover::cholesky_t<store_t>, N> cholesky(A2);
             out_chi = static_cast<real>(0.25)*cholesky.solve(out_chi);
           } else {
@@ -191,51 +189,58 @@ namespace quda {
       using namespace linalg; // for Cholesky
       const int clover_parity = arg.nParity == 2 ? parity : arg.parity;
       const int spinor_parity = arg.nParity == 2 ? parity : 0;
-      fermion in1 = arg.in(x_cb + 0 * arg.volumeCB, spinor_parity);
-      fermion in2 = arg.in(x_cb + 1 * arg.volumeCB, spinor_parity);
-
-      fermion out1;
-      fermion out2;
-
-      in1.toRel(); // change to chiral basis here
-      in2.toRel();
+      constexpr int n_flavor = 2;
+      fermion in[n_flavor];
+      fermion out[n_flavor];
 
 #pragma unroll
-      for (int chirality=0; chirality<2; chirality++) {
-        // factor of 2 comes from clover normalization we need to correct for
-        const complex<real> j(0.0, chirality == 0 ? static_cast<real>(0.5) : -static_cast<real>(0.5));
+      for (int flavor = 0; flavor < n_flavor; flavor++) {
+        in[flavor] = arg.in(x_cb + flavor * arg.volumeCB, spinor_parity);
+        in[flavor].toRel(); // change to chiral basis here
+      }
+
+#pragma unroll
+      for (int chirality = 0; chirality < 2; chirality++) {
+        // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
+        const complex<real> a(0.0, chirality == 0 ? arg.a : -arg.a);
 
         Mat A = arg.clover(x_cb, clover_parity, chirality);
 
-        half_fermion in1_chi = in1.chiral_project(chirality);
-        half_fermion in2_chi = in2.chiral_project(chirality);
+        half_fermion in_chi[n_flavor] = {in[0].chiral_project(chirality), in[1].chiral_project(chirality)};
+        half_fermion out_chi[n_flavor];
 
-        // (C + i mu gamma_5 tau_3 - epsilon tau_1 )  [note: appropriate signs carried in arg.a / arg.b]
-        half_fermion out1_chi = A*in1_chi + j*arg.a*in1_chi + static_cast<real>(0.5)*arg.b*in2_chi;
-        half_fermion out2_chi = A*in2_chi - j*arg.a*in2_chi + static_cast<real>(0.5)*arg.b*in1_chi;
+#pragma unroll
+        for (int flavor = 0; flavor < n_flavor; flavor++) {
+          out_chi[flavor] += A * in_chi[flavor];
+          out_chi[flavor] += (flavor == 0 ? a : -a) * in_chi[flavor];
+          out_chi[flavor] += arg.b * in_chi[1 - flavor];
+        }
 
         if (arg.inverse) {
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
-            A2 += (arg.a*arg.a*static_cast<real>(0.25) - arg.b*arg.b*static_cast<real>(0.25));
+            A2 += arg.a2_minus_b2;
             Cholesky<HMatrix, real, N> cholesky(A2);
-            out1_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out1_chi));
-            out2_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out2_chi));
+#pragma unroll
+            for (int flavor = 0; flavor < n_flavor; flavor++)
+              out_chi[flavor] = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(out_chi[flavor]));
           } else {
             Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
-            out1_chi = static_cast<real>(2.0)*(Ainv*out1_chi);
-            out2_chi = static_cast<real>(2.0)*(Ainv*out2_chi);
+#pragma unroll
+            for (int flavor = 0; flavor < n_flavor; flavor++)
+              out_chi[flavor] = static_cast<real>(2.0) * (Ainv * out_chi[flavor]);
           }
         }
 
-        out1 += (out1_chi).chiral_reconstruct(chirality);
-        out2 += (out2_chi).chiral_reconstruct(chirality);
+#pragma unroll
+        for (int flavor = 0; flavor < n_flavor; flavor++) out[flavor] += (out_chi[flavor]).chiral_reconstruct(chirality);
       }
 
-      out1.toNonRel(); // change basis back
-      out2.toNonRel();
-      arg.out(x_cb + 0 * arg.volumeCB, spinor_parity) = out1;
-      arg.out(x_cb + 1 * arg.volumeCB, spinor_parity) = out2;
+#pragma unroll
+      for (int flavor = 0; flavor < n_flavor; flavor++) {
+        out[flavor].toNonRel(); // change basis back
+        arg.out(x_cb + flavor * arg.volumeCB, spinor_parity) = out[flavor];
+      }
     }
   };
 

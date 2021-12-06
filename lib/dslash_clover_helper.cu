@@ -93,14 +93,14 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (inverse) {
         CloverArg<Float, nColor, true> arg(out, in, clover, parity, kappa, mu, epsilon, dagger, twist);
-        if(in.TwistFlavor() == QUDA_TWIST_SINGLET){
+        if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
           launch<TwistCloverApply>(tp, stream, arg);
         } else {
           launch<NdegTwistCloverApply>(tp, stream, arg);
         }
       } else {
         CloverArg<Float, nColor, false> arg(out, in, clover, parity, kappa, mu, epsilon, dagger, twist);
-        if(in.TwistFlavor() == QUDA_TWIST_SINGLET){
+        if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
           launch<TwistCloverApply>(tp, stream, arg);
         } else {
           launch<NdegTwistCloverApply>(tp, stream, arg);
