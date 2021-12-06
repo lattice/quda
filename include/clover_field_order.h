@@ -63,13 +63,15 @@ namespace quda {
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline void HMatrix<T,N>::operator=(const clover_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity, a.chirality);
+    if (a.chirality == 0) a.field.load(data, a.x_cb, a.parity, 0);
+    else                  a.field.load(data, a.x_cb, a.parity, 1);
   }
 
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline HMatrix<T,N>::HMatrix(const clover_wrapper<T,S> &a) {
-    a.field.load(data, a.x_cb, a.parity, a.chirality);
+    if (a.chirality == 0) a.field.load(data, a.x_cb, a.parity, 0);
+    else                  a.field.load(data, a.x_cb, a.parity, 1);
   }
 
   namespace clover {
