@@ -73,9 +73,7 @@ namespace quda
         Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
         Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
 
-        Vector x;
-        if (flavor == 0) x = x0;
-        else             x = x1;
+        Vector x = flavor == 0 ? x0 : x1;
         x.toRel(); // switch to chiral basis
         
         Vector tmp;
