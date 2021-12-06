@@ -63,7 +63,6 @@ namespace quda {
 
     __device__ __host__ void operator()(int x_cb, int g_f, int parity)
     {
-      using real = typename Arg::real;
       constexpr int nDim = 4;
       int coord[nDim];
       int coord_coarse[nDim];
