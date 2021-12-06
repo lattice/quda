@@ -18,6 +18,8 @@ namespace quda
                    double kappa, double mass, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
                    bool need_bidirectional)
   {
+    constexpr bool staggered_allow_drop_long = false;
+
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
@@ -48,7 +50,7 @@ namespace quda
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor,
+        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor, staggered_allow_drop_long,
         dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
 
     } else {
@@ -83,7 +85,7 @@ namespace quda
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor,
+        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor, staggered_allow_drop_long,
         dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
     }
   }
@@ -95,6 +97,8 @@ namespace quda
                                                    double mass, double mu, double mu_factor, QudaDiracType dirac,
                                                    QudaMatPCType matpc, bool need_bidirectional)
   {
+    constexpr bool staggered_allow_drop_long = false;
+    
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       errorQuda("use_mma not supported on the CPU");
     } else {
@@ -132,7 +136,7 @@ namespace quda
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
         cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_, kappa, mass, mu,
-        mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        mu_factor, staggered_allow_drop_long, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
     }
   }
 

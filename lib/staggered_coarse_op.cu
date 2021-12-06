@@ -197,7 +197,8 @@ namespace quda {
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin, int uvSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X,
-                        const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                        const Transfer &T, const GaugeField &g, const GaugeField &l, const GaugeField &XinvKD,
+                        double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     // Actually create the temporaries like UV, etc.
     auto location = Y.Location();
@@ -274,7 +275,7 @@ namespace quda {
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
         lAccessor, xinvAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
-        kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        kappa, mass, mu_dummy, mu_factor_dummy, allow_drop_long, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
     } else {
 
@@ -308,7 +309,7 @@ namespace quda {
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, avAccessor, vAccessor, gAccessor,
         lAccessor, xinvAccessor, xinvAccessor, xinvAccessor, Y, X, *Yatomic, *Xatomic, *uv, *av, v,
-        kappa, mass, mu_dummy, mu_factor_dummy, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        kappa, mass, mu_dummy, mu_factor_dummy, allow_drop_long, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
         T.coarseToFine(Y.Location()));
     }
 
@@ -324,14 +325,14 @@ namespace quda {
   // template on UV spin, which can be 1 for the non-KD ops but needs to be 2 for the KD op
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (dirac == QUDA_STAGGERED_DIRAC || dirac == QUDA_STAGGEREDPC_DIRAC || dirac == QUDA_ASQTAD_DIRAC || dirac == QUDA_ASQTADPC_DIRAC) {
       // uvSpin == 1
-      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 1>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 1>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC) {
       // uvSpin == 2
-      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 2>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      aggregateStaggeredY<Float, vFloat, fineColor, fineSpin, coarseColor, coarseSpin, 2>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else {
       errorQuda("Unexpected dirac type %d\n", dirac);
     }
@@ -341,7 +342,7 @@ namespace quda {
   // and actual aggregation
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
@@ -352,12 +353,12 @@ namespace quda {
         calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
       else {
         // free field aggregation
-        aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+        aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
       }
     } else if (coarseColor == 64) {
-      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else if (coarseColor == 96) {
-      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else { // note --- may revisit 3 -> 96 in the future
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -366,10 +367,10 @@ namespace quda {
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (T.Vectors().Nspin() == 1) {
-      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,fineColor,1>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else {
       errorQuda("Unsupported number of spins %d\n", T.Vectors(X.Location()).Nspin());
     }
@@ -378,10 +379,10 @@ namespace quda {
   // template on fine colors
   template <typename Float, typename vFloat>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     if (g.Ncolor() == 3 && l.Ncolor() == 3) {
-      calculateStaggeredY<Float,vFloat,3>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+      calculateStaggeredY<Float,vFloat,3>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
     } else {
       errorQuda("Unsupported number of colors %d %d\n", g.Ncolor(), l.Ncolor());
     }
@@ -390,7 +391,7 @@ namespace quda {
 #if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
-                           const GaugeField &XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                           const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     checkPrecision(T.Vectors(X.Location()), X, Y);
 
@@ -399,7 +400,7 @@ namespace quda {
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
       if (T.Vectors(X.Location()).Precision() == QUDA_DOUBLE_PRECISION) {
-        calculateStaggeredY<double,double>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<double,double>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", Y.Precision());
       }
@@ -410,7 +411,7 @@ namespace quda {
 #if QUDA_PRECISION & 4
     if (Y.Precision() == QUDA_SINGLE_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_SINGLE_PRECISION) {
-        calculateStaggeredY<float,float>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<float,float>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
@@ -419,7 +420,7 @@ namespace quda {
 #if QUDA_PRECISION & 2
     if (Y.Precision() == QUDA_HALF_PRECISION) {
       if (T.Vectors(X.Location()).Precision() == QUDA_HALF_PRECISION) {
-        calculateStaggeredY<float,short>(Y, X, T, g, l, XinvKD, mass, dirac, matpc);
+        calculateStaggeredY<float,short>(Y, X, T, g, l, XinvKD, mass, allow_drop_long, dirac, matpc);
       } else {
         errorQuda("Unsupported precision %d\n", T.Vectors(X.Location()).Precision());
       }
@@ -441,7 +442,7 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   // N.B. Assumes Y, X have been allocated.
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField &longGauge,
-                         const GaugeField& XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+                         const GaugeField& XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc)
   {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
@@ -596,7 +597,7 @@ namespace quda {
     const GaugeField& L = need_tmp_L ? *tmp_L : reinterpret_cast<const GaugeField&>(longGauge);
     const GaugeField& Xinv = need_tmp_Xinv ? *tmp_Xinv : reinterpret_cast<const GaugeField&>(XinvKD);
 
-    calculateStaggeredY(Y, X, T, U, L, Xinv, mass, dirac, matpc);
+    calculateStaggeredY(Y, X, T, U, L, Xinv, mass, allow_drop_long, dirac, matpc);
 
   }
 

@@ -934,6 +934,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(allow_drop_long, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_drop_long, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   P(thin_update_only, QUDA_BOOLEAN_FALSE);
 #else
   P(thin_update_only, QUDA_BOOLEAN_INVALID);

@@ -484,6 +484,7 @@ namespace quda
       diracParam.tmp2 = tmp2_coarse;
       diracParam.halo_precision = param.mg_global.precision_null[param.level];
       diracParam.use_mma = param.use_mma;
+      diracParam.allow_drop_long = (param.mg_global.allow_drop_long == QUDA_BOOLEAN_TRUE) ? true : false;
 
       diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
                                             param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);

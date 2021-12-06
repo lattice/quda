@@ -949,6 +949,7 @@ namespace quda {
      @param kappa[in] Kappa parameter
      @param mass[in] mass parameter
      @param mu[in] Twisted-mass parameter
+     @param staggered_allow_drop_long[in] Whether or not we can drop the long links for small aggregation dimensions
      @param matpc[in] The type of preconditioning of the source fine-grid operator
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
@@ -960,7 +961,7 @@ namespace quda {
                   avSpinor &AV, vSpinor &V, fineGauge &G, fineGauge &L, fineGauge &K, fineClover &C, fineClover &Cinv, GaugeField &Y_, GaugeField &X_,
                   GaugeField &Y_atomic_, GaugeField &X_atomic_, ColorSpinorField &uv, ColorSpinorField &av,
                   const ColorSpinorField &v, double kappa, double mass, double mu,
-                  double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
+                  double mu_factor, bool staggered_allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional,
                   const int *fine_to_coarse, const int *coarse_to_fine)
   {
 
@@ -1194,7 +1195,11 @@ namespace quda {
             y.apply(device::get_default_stream());
             saveTuneCache();
 
-          } else if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+          } else if (staggered_allow_drop_long) {
+            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+          } else {
+            errorQuda("Aggregate size geo_bs[%d] == %d is too small for long link coarsening", d, geo_bs[d]);
+          }
         }
 
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
@@ -1298,7 +1303,11 @@ namespace quda {
           y.apply(device::get_default_stream());
           saveTuneCache();
 
-        } else if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+        } else if (staggered_allow_drop_long) {
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Skipping long link coarsening because geo_bs[%d] = %d is too small\n", d, geo_bs[d]);
+        } else {
+          errorQuda("Aggregate size geo_bs[%d] == %d is too small for long link coarsening", d, geo_bs[d]);
+        }
       }
 
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
