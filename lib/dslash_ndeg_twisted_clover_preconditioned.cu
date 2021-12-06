@@ -20,10 +20,9 @@ namespace quda
       using Dslash::arg;
       using Dslash::in;
 
-    protected:
       unsigned int sharedBytesPerThread() const
       {
-        return 2 * in.Ncolor() * 4 * sizeof(typename mapper<typename Arg::Float>::type);
+        return 2 * in.Ncolor() * 2 * sizeof(typename mapper<typename Arg::Float>::type);
       }
       
     public:
