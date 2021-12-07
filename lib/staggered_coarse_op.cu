@@ -433,7 +433,7 @@ namespace quda {
   }
 #else
   void calculateStaggeredY(GaugeField &, GaugeField &, const Transfer &, const GaugeField &, const GaugeField&,
-                           const GaugeField &, double, QudaDiracType, QudaMatPCType)
+                           const GaugeField &, double, bool, QudaDiracType, QudaMatPCType)
   {
     errorQuda("Staggered multigrid has not been built");
   }
