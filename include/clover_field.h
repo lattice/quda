@@ -25,11 +25,20 @@ namespace quda {
 
     /**
        @brief Precision mapper that is used for the Cholesky
-       factorization when inverting the clover matrices
+       factorization when inverting the clover matrices.  If
+       CLOVER_PROMOTE_CHOLESKY is set, then we always use double
+       precision, else we use the same precision as the type.  For
+       fixed-point types we always use single precision regardless.
     */
+#ifdef CLOVER_PROMOTE_CHOLESKY
     template <typename T> struct cholesky_mapper {
       using type = double;
     };
+#else
+    template <typename T> struct cholesky_mapper {
+      using type = T;
+    };
+#endif
     template <> struct cholesky_mapper<short> {
       using type = float;
     };
