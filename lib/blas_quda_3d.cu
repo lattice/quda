@@ -30,17 +30,15 @@ namespace quda {
       {
 	apply(device::get_default_stream());
       }
-      
+
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	
 	copy3dArg<Float, nColor> arg(y, x, t_slice);	
 	switch(type) {
-	case COPY_TO_3D:
-	  launch<copyTo3d>(tp, stream, arg); break;
-	case COPY_FROM_3D:
-	  launch<copyFrom3d>(tp, stream, arg); break;
+	case COPY_TO_3D:   launch<copyTo3d>(tp, stream, arg); break;
+	case COPY_FROM_3D: launch<copyFrom3d>(tp, stream, arg); break;
 	default:
 	  errorQuda("Unknown 3D copy type");
 	}
@@ -110,6 +108,7 @@ namespace quda {
       
       void apply(const qudaStream_t &stream)
       {
+	// Copy real coeffs to the device.
 	size_t data_bytes = x.X()[3] *  x.Precision();
 	void *d_a = pool_device_malloc(data_bytes);
 	void *d_b = pool_device_malloc(data_bytes);
@@ -137,17 +136,11 @@ namespace quda {
     
     //#ifdef GPU_BLAS_3D
     void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y)
-    {
-      
+    {            
+      // Check prec, spins, color, coeffs
       checkPrecision(x, y);
-      
-      // Check spins
       if (x.Nspin() != y.Nspin()) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
-      
-      // Check colors
       if (x.Ncolor() != y.Ncolor()) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
-    
-      // Check coefficients
       if (a.size() != b.size() && a.size() != (unsigned int)x.X()[3]) errorQuda("Unexpected coeff array sizes a=%lu b=%lu, x[3]=%d", a.size(), b.size(), x.X()[3]);
       
       // We must give a Lattice field as the first argument
@@ -184,6 +177,7 @@ namespace quda {
       
       void apply(const qudaStream_t &stream)
       {
+	// Copy complex coeffs to the device.
 	size_t data_bytes = 2 * x.X()[3] *  x.Precision();
 	void *d_a = pool_device_malloc(data_bytes);
 	void *d_b = pool_device_malloc(data_bytes);
@@ -258,14 +252,17 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	
+	reDotProduct3dArg<Float, nColor> arg(x, y);
+	launch<reDotProduct3d>(result, tp, stream, arg);
+
+	/*
 	// Zero out the local results.
 	std::vector<double> result_local(x.X()[3]);
-	if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
+	//if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
 	
 	reDotProduct3dArg<Float, nColor> arg(x, y);
 	launch<reDotProduct3d>(result_local, tp, stream, arg);
-	
+
 	// Copy results back to host array
 	if(!activeTuning()) {
 	  std::vector<double> result_tmp(comm_dim(3) * x.X()[3], 0.0);
@@ -277,11 +274,12 @@ namespace quda {
 	  // into the temporal buckets
 	  comm_allreduce_array((double *)result_tmp.data(), comm_dim(3) * x.X()[3]);
 	  
-	  // Copy back to MPI local arrat for t
+	  // Copy back to MPI local array for t
 	  for(int i=0; i<x.X()[3]; i++) {
 	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
 	}
+	*/
       }
       
       long long flops() const
@@ -345,15 +343,12 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	cDotProduct3dArg<Float, nColor> arg(x, y);
+	launch<cDotProduct3d>(result, tp, stream, arg);
 	
+	/*
 	// Zero out the local results.
 	std::vector<double> result_local(2*x.X()[3]);
-	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[3]; i++) {
-	    result_local[2*i] = 0.0;
-	    result_local[2*i+1] = 0.0;
-	  }
-	}
 	
 	cDotProduct3dArg<Float, nColor> arg(x, y);
 	launch<cDotProduct3d>(result_local, tp, stream, arg);
@@ -375,6 +370,7 @@ namespace quda {
 	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
 	}
+	*/
       }
     
       long long flops() const

@@ -228,7 +228,7 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     reDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double>(x.X()[3]),
+      ReduceArg<double>(dim3(x.X()[3], 1, 1), x.X()[3]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.
@@ -288,7 +288,7 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double2>(x.X()[3]),
+      ReduceArg<double2>(dim3(x.X()[3], 1, 1), x.X()[3]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.

@@ -33,20 +33,20 @@ namespace quda {
     int t_offset;
     int offsets[4];
     
-    dim3 threads;     // number of active threads required
+    //dim3 threads;     // number of active threads required
     int_fastdiv X[4]; // grid dimensions
     
     ContractionSummedArg(const ColorSpinorField &x, const ColorSpinorField &y,
 			 const int source_position_in[4], const int mom_mode_in[4],
 			 const int s1, const int b1) :
-      ReduceArg<spinor_matrix>(x.X()[reduction_dim]),
+      ReduceArg<spinor_matrix>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       s1(s1),
       b1(b1),
-      Gamma(),
+      Gamma()
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
+      //threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
