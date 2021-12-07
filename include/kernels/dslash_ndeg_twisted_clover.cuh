@@ -2,6 +2,7 @@
 
 #include <kernels/dslash_wilson.cuh>
 #include <clover_field_order.h>
+#include <shared_memory_cache_helper.cuh>
 
 namespace quda
 {
@@ -70,10 +71,10 @@ namespace quda
       if (mykernel_type == INTERIOR_KERNEL) {
         // apply the chiral and flavor twists
         // use consistent load order across s to ensure better cache locality
-        Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-        Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+        Vector x = arg.x(my_flavor_idx, my_spinor_parity);
+        SharedMemoryCache<Vector> cache(target::block_dim());
+        cache.save(x);
 
-        Vector x = flavor == 0 ? x0 : x1;
         x.toRel(); // switch to chiral basis
         
         Vector tmp;
@@ -91,7 +92,8 @@ namespace quda
 
         tmp.toNonRel();
         // tmp += (c * tau_1) * x
-        tmp += (flavor == 0 ? arg.c * x1 : arg.c * x0);
+        cache.sync();
+        tmp += arg.c * cache.load_y(1 - flavor);
 
         // add the Wilson part with normalisation
         out = tmp + arg.a * out;

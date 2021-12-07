@@ -20,11 +20,17 @@ namespace quda
       using Dslash = Dslash<nDegTwistedClover, Arg>;
       using Dslash::arg;
       using Dslash::in;
-      
+
+      unsigned int sharedBytesPerThread() const
+      {
+        return 2 * in.Ncolor() * 4 * sizeof(typename mapper<typename Arg::Float>::type);
+      }
+
     public:
     NdegTwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
         {
           TunableKernel3D::resizeVector(2, arg.nParity);
+          TunableKernel3D::resizeStep(2, 1);
         }
       
       void apply(const qudaStream_t &stream)
