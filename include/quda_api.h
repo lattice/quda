@@ -11,11 +11,13 @@
    profile and switch between using the CUDA runtime and driver APIs.
  */
 
-enum qudaMemcpyKind { qudaMemcpyHostToHost,
-	              qudaMemcpyHostToDevice,
-		      qudaMemcpyDeviceToHost,
-		      qudaMemcpyDeviceToDevice,
-		      qudaMemcpyDefault };
+enum qudaMemcpyKind {
+  qudaMemcpyHostToHost,
+  qudaMemcpyHostToDevice,
+  qudaMemcpyDeviceToHost,
+  qudaMemcpyDeviceToDevice,
+  qudaMemcpyDefault
+};
 
 namespace quda
 {
@@ -58,49 +60,8 @@ namespace quda
      @param[in] count Size of transfer
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
-                           const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch in bytes
-     @param[in] src Source pointer
-     @param[in] spitch Source pitch in bytes
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] kind Type of memory copy
-  */
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch in bytes
-     @param[in] src Source pointer
-     @param[in] spitch Source pitch in bytes
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] kind Type of memory copy
-     @param[in] stream Stream to issue copy
-  */
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line);
-
-  /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch in bytes
-     @param[in] src Source pointer
-     @param[in] spitch Source pitch in bytes
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] stream Stream to issue copy
-  */
-  void qudaMemcpy2DP2PAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                             const qudaStream_t &stream, const char *func, const char *file, const char *line);
+  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream, const char *func,
+                           const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemset or driver API equivalent
@@ -166,8 +127,8 @@ namespace quda
   /**
      @brief Return elapsed time in seconds between two events
   */
-  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
-                              const char *func, const char *file, const char *line);
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop, const char *func, const char *file,
+                              const char *line);
 
   /**
      @brief Destroy the event
@@ -227,7 +188,7 @@ namespace quda
      @param[in] symbol Global variable or string symbol to search for
      @return Return device pointer associated with symbol
   */
-  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
+  void *qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
 
   /**
      @brief Get the last error recorded by the target runtime.  By
@@ -257,20 +218,8 @@ namespace quda
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaMemcpyP2PAsync(dst, src, count, stream)                     \
+#define qudaMemcpyP2PAsync(dst, src, count, stream)                                                                    \
   ::quda::qudaMemcpyP2PAsync_(dst, src, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
-  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
-                        __STRINGIFY__(__LINE__))
-
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
-  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
-                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
-
-#define qudaMemcpy2DP2PAsync(dst, dpitch, src, spitch, width, height, stream)                                       \
-  ::quda::qudaMemcpy2DP2PAsync_(dst, dpitch, src, spitch, width, height, stream, __func__,                          \
-                                quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
@@ -289,16 +238,15 @@ namespace quda
   ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__),                    \
                                 __STRINGIFY__(__LINE__))
 
-#define qudaEventCreate()                                               \
-  ::quda::qudaEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaEventCreate() ::quda::qudaEventCreate_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaChronoEventCreate()                                               \
-  ::quda::qudaChronoEventCreate_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaChronoEventCreate()                                                                                        \
+  ::quda::qudaChronoEventCreate_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaEventElapsedTime(start, stop)                               \
+#define qudaEventElapsedTime(start, stop)                                                                              \
   ::quda::qudaEventElapsedTime_(start, stop, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaEventDestroy(event)                                         \
+#define qudaEventDestroy(event)                                                                                        \
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaEventQuery(event)                                                                                          \
@@ -319,5 +267,5 @@ namespace quda
 #define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaGetSymbolAddress(symbol)                                    \
+#define qudaGetSymbolAddress(symbol)                                                                                   \
   ::quda::qudaGetSymbolAddress_(symbol, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

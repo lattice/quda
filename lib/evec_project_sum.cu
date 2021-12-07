@@ -31,23 +31,26 @@ namespace quda {
       const int array_size = x.Nspin() * x.X()[3];
       std::vector<double> result_local(2*array_size);
       
-      // Zero out the local results.
+      EvecProjectionArg<Float, nColor, 3> arg(x, y);
+      launch<EvecProjection, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+
+      // Copy results back to host array
+      /*
       if(!activeTuning()) {
-	for(int i=0; i<array_size; i++) {
-	  result_local[2*i] = 0.0;
-	  result_local[2*i+1] = 0.0;
+	for(int i=0; i<nSpinSq * x.X()[reduction_dim]; i++) {
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].real(result_local[2*i]);
+	  result_global[nSpinSq * x.X()[reduction_dim] * comm_coord(reduction_dim) + i].imag(result_local[2*i+1]);
 	}
       }
+      */
 
-      EvecProjectionArg<Float, nColor, 3> arg(x, y);
-      launch<EvecProjection>(result_local, tp, stream, arg);
-      
       // Copy results back to host array
       if(!activeTuning()) {
 	for(int i=0; i<array_size; i++) {
           result[i] = std::complex<double>(result_local[2*i], result_local[2*i+1]);
 	}
       }
+
     }
     
     long long flops() const

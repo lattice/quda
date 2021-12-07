@@ -147,7 +147,7 @@ int main(int argc, char **argv)
   int n_evals = eig_param.n_conv;
   if(eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= tdim;
   double _Complex *host_evals = (double _Complex *)safe_malloc(n_evals * sizeof(double _Complex));
-
+  
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
   // solve is in the eig_param container. If eig_param.arpack_check == true and

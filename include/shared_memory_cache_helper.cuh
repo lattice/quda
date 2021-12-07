@@ -1,6 +1,7 @@
 #pragma once
 
 #include <target_device.h>
+#include <array.h>
 
 /**
    @file shared_memory_cache_helper.cuh
@@ -42,8 +43,7 @@ namespace quda
       ((max_block_size_x + device::shared_memory_bank_width() - 1) /
        device::shared_memory_bank_width()) * device::shared_memory_bank_width();
 
-    //using atom_t = sizeof(T) % 16 == 0 ? int4 : sizeof(T) % 8 == 0 ? int2 : int;
-    using atom_t = int;
+    using atom_t = std::conditional_t<sizeof(T) % 16 == 0, int4, std::conditional_t<sizeof(T) % 8 == 0, int2, int>>;
     static_assert(sizeof(T) % 4 == 0, "Shared memory cache does not support sub-word size types");
 
     // The number of elements of type atom_t that we break T into for optimal shared-memory access
@@ -72,7 +72,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-        extern __shared__ atom_t cache_[];
+        extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
       }
     };
@@ -218,20 +218,27 @@ namespace quda
 
   template <typename T, int n>
   struct thread_array {
-    SharedMemoryCache<vector_type<T, n>, 1, 1, false, false> device_array;
+    SharedMemoryCache<array<T, n>, 1, 1, false, false> device_array;
     int offset;
-    vector_type<T, n> host_array;
-    vector_type<T, n> &array;
+    array<T, n> host_array;
+    array<T, n> &array_;
 
     __device__ __host__ constexpr thread_array() :
       offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
-      array(target::is_device() ? *(device_array.data() + offset) : host_array)
+      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
     {
-      array = vector_type<T, n>(); // call default constructor
+      array_ = array<T, n>(); // call default constructor
     }
 
-    __device__ __host__ T& operator[](int i) { return array[i]; }
-    __device__ __host__ const T& operator[](int i) const { return array[i]; }
+    template <typename ...Ts> __device__ __host__ constexpr thread_array(T first, const Ts... other) :
+      offset((target::thread_idx().z * target::block_dim().y + target::thread_idx().y) * target::block_dim().x + target::thread_idx().x),
+      array_(target::is_device() ? *(device_array.data() + offset) : host_array)
+    {
+      array_ = array<T, n>{first, other...};
+    }
+
+    __device__ __host__ T& operator[](int i) { return array_[i]; }
+    __device__ __host__ const T& operator[](int i) const { return array_[i]; }
   };
 
 } // namespace quda

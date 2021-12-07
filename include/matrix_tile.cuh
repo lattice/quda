@@ -12,26 +12,11 @@ namespace quda {
   struct MatrixTile {
     using real = typename RealType<T>::type;
     T tile[m*n];
-    inline __device__ __host__ MatrixTile()
-    {
-#pragma unroll
-      for (int i=0; i<m; i++) {
-#pragma unroll
-        for (int j=0; j<n; j++) {
-          tile[i*n+j] = 0.0;
-        }
-      }
-    }
+    constexpr MatrixTile() : tile{0.0} { }
 
-    inline __device__ __host__ const T& operator()(int i, int j) const
-    {
-      return tile[i*n+j];
-    }
+    constexpr const T& operator()(int i, int j) const { return tile[i*n+j]; }
 
-    inline __device__ __host__ T& operator()(int i, int j)
-    {
-      return tile[i*n+j];
-    }
+    constexpr T& operator()(int i, int j) { return tile[i*n+j]; }
 
     template <typename T_> inline __device__ __host__ void operator*=(const T_ &a)
     {
@@ -271,37 +256,37 @@ namespace quda {
   }
 
   /** @brief Helper for creating an A tile (MxK) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_A(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_A(const Tile tile)
   {
     return MatrixTile<T, tile.M, tile.K, ghost>();
   }
 
   /** @brief Helper for creating an A transpose tile (KxM) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_At(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_At(const Tile tile)
   {
     return MatrixTile<T, tile.K, tile.M, ghost>();
   }
 
   /** @brief Helper for creating a B tile (KxN) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_B(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_B(const Tile tile)
   {
     return MatrixTile<T, tile.K, tile.N, ghost>();
   }
 
   /** @brief Helper for creating a B transpose tile (NxK) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_Bt(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_Bt(const Tile tile)
   {
     return MatrixTile<T, tile.N, tile.K, ghost>();
   }
 
   /** @brief Helper for creating a C tile (MxN) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_C(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_C(const Tile tile)
   {
     return MatrixTile<T, tile.M, tile.N, ghost>();
   }
 
   /** @brief Helper for creating a C transpose tile (NxM) */
-  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_Ct(const Tile tile)
+  template <typename T, bool ghost, typename Tile> constexpr auto make_tile_Ct(const Tile tile)
   {
     return MatrixTile<T, tile.N, tile.M, ghost>();
   }

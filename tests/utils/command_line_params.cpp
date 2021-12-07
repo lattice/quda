@@ -107,6 +107,7 @@ quda::mgarray<QudaFieldLocation> setup_location = {};
 quda::mgarray<int> nu_pre = {};
 quda::mgarray<int> nu_post = {};
 quda::mgarray<int> n_block_ortho = {};
+quda::mgarray<bool> block_ortho_two_pass = {};
 quda::mgarray<double> mu_factor = {};
 quda::mgarray<QudaVerbosity> mg_verbosity = {};
 quda::mgarray<QudaInverterType> setup_inv = {};
@@ -147,10 +148,16 @@ QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;
+#endif
+
+#ifdef NVSHMEM_COMMS
+bool use_mobius_fused_kernel = false;
+#else
+bool use_mobius_fused_kernel = true;
 #endif
 
 int n_ev = 8;
@@ -266,7 +273,6 @@ int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 QudaGaugeSmearType gauge_smear_type = QUDA_GAUGE_SMEAR_TYPE_STOUT;
-
 QudaFermionSmearType prop_smear_type = QUDA_FERMION_SMEAR_TYPE_GAUSSIAN;
 
 // contract options
@@ -276,6 +282,7 @@ char correlator_file_affix[256] = "";
 char correlator_save_dir[256] = ".";
 bool open_flavor = false;
 
+// GF Options
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
 int gf_verbosity_interval = 100;
@@ -287,46 +294,10 @@ bool gf_theta_condition = false;
 bool gf_fft_autotune = false;
 
 std::array<int, 4> grid_partition = {1, 1, 1, 1};
-QudaBLASOperation blas_trans_a = QUDA_BLAS_OP_N;
-QudaBLASOperation blas_trans_b = QUDA_BLAS_OP_N;
-QudaBLASDataType blas_data_type = QUDA_BLAS_DATATYPE_C;
-QudaBLASDataOrder blas_data_order = QUDA_BLAS_DATAORDER_COL;
-
-std::array<int, 3> blas_mnk = {64, 64, 64};
-auto &blas_m = blas_mnk[0];
-auto &blas_n = blas_mnk[1];
-auto &blas_k = blas_mnk[2];
-
-std::array<int, 3> blas_leading_dims = {128, 128, 128};
-auto &blas_lda = blas_leading_dims[0];
-auto &blas_ldb = blas_leading_dims[1];
-auto &blas_ldc = blas_leading_dims[2];
-
-std::array<int, 3> blas_offsets = {0, 0, 0};
-auto &blas_a_offset = blas_offsets[0];
-auto &blas_b_offset = blas_offsets[1];
-auto &blas_c_offset = blas_offsets[2];
-
-std::array<int, 3> blas_strides = {1, 1, 1};
-auto &blas_a_stride = blas_strides[0];
-auto &blas_b_stride = blas_strides[1];
-auto &blas_c_stride = blas_strides[2];
-
-std::array<double, 2> blas_alpha_re_im = {1.0, 0.0};
-std::array<double, 2> blas_beta_re_im = {1.0, 0.0};
-int blas_batch = 16;
 
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
-
-  CLI::TransformPairs<QudaBLASDataType> blas_dt_map {
-    {"C", QUDA_BLAS_DATATYPE_C}, {"Z", QUDA_BLAS_DATATYPE_Z}, {"S", QUDA_BLAS_DATATYPE_S}, {"D", QUDA_BLAS_DATATYPE_D}};
-
-  CLI::TransformPairs<QudaBLASDataOrder> blas_data_order_map {{"row", QUDA_BLAS_DATAORDER_ROW},
-                                                              {"col", QUDA_BLAS_DATAORDER_COL}};
-
-  CLI::TransformPairs<QudaBLASOperation> blas_op_map {{"N", QUDA_BLAS_OP_N}, {"T", QUDA_BLAS_OP_T}, {"C", QUDA_BLAS_OP_C}};
 
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"open-sum-t", QUDA_CONTRACT_TYPE_OPEN_SUM_T},
@@ -443,9 +414,6 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
-  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
-                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
-
   CLI::TransformPairs<QudaGaugeSmearType> gauge_smear_type_map {{"ape", QUDA_GAUGE_SMEAR_TYPE_APE},
                                                                 {"stout", QUDA_GAUGE_SMEAR_TYPE_STOUT},
                                                                 {"ovr-imp-stout", QUDA_GAUGE_SMEAR_TYPE_OVR_IMP_STOUT}};
@@ -475,10 +443,14 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-  
-  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0. Will be inferred from clover-csw and kappa. "
-		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
-  
+  quda_app
+    ->add_option("--clover-coeff", clover_coeff,
+                 "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default "
+                 "1.0) and kappa. "
+                 "If the user populates this value with anything other than 0.0, the passed value will override the "
+                 "inferred value)")
+    ->capture_default_str();
+
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
@@ -490,51 +462,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                  "Whether to leave spin elemental open, or use a gamma basis and contract on "
                  "spin (default open)")
     ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-
-  quda_app
-    ->add_option("--blas-data-type", blas_data_type,
-                 "Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")
-    ->transform(CLI::QUDACheckedTransformer(blas_dt_map));
-
-  quda_app
-    ->add_option("--blas-data-order", blas_data_order, "Whether data is in row major or column major order (default row)")
-    ->transform(CLI::QUDACheckedTransformer(blas_data_order_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-a", blas_trans_a,
-      "Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app
-    ->add_option(
-      "--blas-trans-b", blas_trans_b,
-      "Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")
-    ->transform(CLI::QUDACheckedTransformer(blas_op_map));
-
-  quda_app->add_option("--blas-alpha", blas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app->add_option("--blas-beta", blas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")
-    ->expected(2);
-
-  quda_app
-    ->add_option("--blas-mnk", blas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128)")
-    ->expected(3);
-
-  quda_app
-    ->add_option("--blas-leading-dims", blas_leading_dims,
-                 "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128) ")
-    ->expected(3);
-
-  quda_app->add_option("--blas-offsets", blas_offsets, "Set the offsets for matrices A, B, and C (default 0 0 0)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-strides", blas_strides, "Set the strides for matrices A, B, and C (default 1 1 1)")
-    ->expected(3);
-
-  quda_app->add_option("--blas-batch", blas_batch, "Set the number of batches for GEMM (default 16)");
-
 
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device_ordinal, "Set the CUDA device to use (default 0, single GPU only)")
@@ -726,6 +653,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--tgridsize", grid_t, "Set grid size in T dimension (default 1)")->excludes(gridsizeopt);
 
+  quda_app->add_option("--mobius-fused-kernel", use_mobius_fused_kernel, "Use fused kernels for Mobius, default true");
   return quda_app;
 }
 
@@ -942,6 +870,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)");
   quda_app->add_mgoption(opgroup, "--mg-n-block-ortho", n_block_ortho, CLI::PositiveNumber,
                          "The number of times to run Gram-Schmidt during block orthonormalization (default 1)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
+    "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
   quda_app->add_mgoption(opgroup, "--mg-nu-post", nu_post, CLI::PositiveNumber,
                          "The number of post-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nu-pre", nu_pre, CLI::PositiveNumber,
@@ -1035,6 +966,36 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
 }
 
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
+
+  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
+
+  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
+
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
+
+  opgroup->add_option("--su3-wflow-steps", wflow_steps,
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
+
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  ;
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
+}
+
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   // Option group for heatbath related options
@@ -1054,42 +1015,6 @@ void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "Number of warmup steps in heatbath test (default 10)");
   opgroup->add_option("--heatbath-checkpoint", heatbath_checkpoint,
                        "Number of measurement steps in heatbath before checkpointing (default 5)");
-
-}
-
-void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
-{
-  CLI::QUDACheckedTransformer gauge_smear_transform(gauge_smear_type_map);
-  CLI::QUDACheckedTransformer wflow_type_transform(wflow_type_map);
-
-  // Option group for SU(3) related options
-  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  
-  opgroup->add_option("--su3-smear", gauge_smear, "smear the gauge field in the spatial dims prior to inversion (default false)");
-  
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
-
-  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
-                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
-
-  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
-                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
-
-  opgroup->add_option("--su3-smear-steps", gauge_smear_steps, "The number of smearing steps to perform (default 50)");
-
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
-
-  opgroup->add_option("--su3-wflow-steps", wflow_steps,
-                      "The number of steps in the Runge-Kutta integrator (default 100)");
-
-  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
-    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-
-  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of gauge smearing to use (default stout)")
-    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
-
-  opgroup->add_option("--su3-measurement-interval", measurement_interval,
-                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }
 
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)

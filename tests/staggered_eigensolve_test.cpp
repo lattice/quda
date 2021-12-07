@@ -170,6 +170,7 @@ int main(int argc, char **argv)
   case 0: // full parity solution
   case 3: // even
   case 4: // odd
+    
     // This function returns the host_evecs and host_evals pointers, populated with
     // the requested data, at the requested prec. All the information needed to
     // perfom the solve is in the eig_param container.

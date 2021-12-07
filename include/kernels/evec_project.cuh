@@ -10,10 +10,11 @@
 
 namespace quda {
   
-  template <typename Float, int nColor_, int red = 3>
+  template <typename Float, int nColor_, int reduction_dim_ = 3>
   struct EvecProjectionArg : public ReduceArg<spinor_array>
   {
     using real = typename mapper<Float>::type;
+    static constexpr int reduction_dim = reduction_dim_; 
     static constexpr int nColor = nColor_;
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
@@ -30,7 +31,7 @@ namespace quda {
     int_fastdiv X[4]; // grid dimensions
     
     EvecProjectionArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<spinor_array>(x.X()[3]),
+      ReduceArg<spinor_array>(dim3(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim], 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.

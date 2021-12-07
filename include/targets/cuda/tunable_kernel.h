@@ -4,13 +4,22 @@
 #include <target_device.h>
 #include <kernel_helper.h>
 #include <kernel.h>
-#include <quda_cuda_api.h>
 
 #ifdef JITIFY
-#include <jitify_helper2.cuh>
+#include <jitify_helper.h>
 #endif
 
-namespace quda {
+namespace quda
+{
+
+  /**
+     @brief Wrapper around cudaLaunchKernel
+     @param[in] func Device function symbol
+     @param[in] tp TuneParam containing the launch parameters
+     @param[in] arg Host address of argument struct
+     @param[in] stream Stream identifier
+  */
+  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, const qudaStream_t &stream, const void *arg);
 
   class TunableKernel : public Tunable
   {
@@ -23,7 +32,7 @@ namespace quda {
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
 #ifdef JITIFY
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
@@ -35,9 +44,10 @@ namespace quda {
 
     template <template <typename> class Functor, bool grid_stride, typename Arg>
     std::enable_if_t<!device::use_kernel_arg<Arg>(), qudaError_t>
-      launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
+    launch_device(const kernel_t &kernel, const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)
     {
 #ifdef JITIFY
+      // note we do the copy to constant memory after the kernel has been compiled in launch_jitify
       launch_error = launch_jitify<Functor, grid_stride, Arg>(kernel.name, tp, stream, arg);
 #else
       static_assert(sizeof(Arg) <= device::max_constant_size(), "Parameter struct is greater than max constant size");
@@ -58,10 +68,10 @@ namespace quda {
     void launch_cuda(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg) const
     {
       constexpr bool grid_stride = false;
-      const_cast<TunableKernel*>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
+      const_cast<TunableKernel *>(this)->launch_device<Functor, grid_stride>(KERNEL(raw_kernel), tp, stream, arg);
     }
 
-    TunableKernel(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location) { } 
+    TunableKernel(QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) : location(location) { }
 
     virtual bool advanceTuneParam(TuneParam &param) const
     {
@@ -71,4 +81,4 @@ namespace quda {
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
   };
 
-}
+} // namespace quda

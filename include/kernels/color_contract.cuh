@@ -11,7 +11,7 @@
 namespace quda
 {  
   
-  using test_array = vector_type<double2, 1>;  
+  using test_array = array<double2, 1>;  
 
   template <typename Float, int nColor_, int reduction_width_>
   struct MomentumProjectArg : public ReduceArg<test_array>

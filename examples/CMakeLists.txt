@@ -73,11 +73,11 @@ else()
 endif()
 
 if(USE_QIO)
-  find_library(QIO qio ${QUDA_BUILD_HOME}/usqcd/lib)
-  find_library(LIME lime ${QUDA_BUILD_HOME}/usqcd/lib)
+  find_library(QIO qio ${QUDA_BUILD_HOME}/_deps/qio-build/lib)
+  find_library(LIME lime ${QUDA_BUILD_HOME}/_deps/qio-build/other_libs/c-lime/lib)
 endif()
 if(USE_QMP)
-  find_library(QMP qmp ${QUDA_BUILD_HOME}/usqcd/lib)
+  find_library(QMP qmp ${QUDA_BUILD_HOME}/_deps/qmp-build/lib)
 endif()
 
 # Create library dependency
@@ -92,7 +92,7 @@ elseif(USE_MPI)
 endif()
 
 # Create includes
-set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_BUILD_HOME}/include/externals ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 # Set install path
 include(GNUInstallDirs)

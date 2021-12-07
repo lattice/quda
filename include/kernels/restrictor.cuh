@@ -1,7 +1,8 @@
 #include <color_spinor_field_order.h>
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
+#include <array.h>
 #include <block_reduction_kernel.h>
 
 namespace quda {
@@ -95,7 +96,7 @@ namespace quda {
 	for (int j=0; j<Arg::fineColor; j+=color_unroll) {
 #pragma unroll
 	  for (int k=0; k<color_unroll; k++)
-	    partial[k] += conj(arg.V(v_parity, x_cb, s, j+k, i)) * arg.in(spinor_parity, x_cb, s, j+k);
+	    partial[k] = cmac(conj(arg.V(v_parity, x_cb, s, j+k, i)), arg.in(spinor_parity, x_cb, s, j+k), partial[k]);
 	}
 
 #pragma unroll
@@ -107,7 +108,7 @@ namespace quda {
   template <typename Arg> struct Restrictor {
     static constexpr unsigned block_size = Arg::block_size;
     static constexpr int coarse_color_per_thread = coarse_colors_per_thread<Arg::fineColor, Arg::coarseColor>();
-    using vector = vector_type<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
+    using vector = array<complex<typename Arg::real>, Arg::coarseSpin*coarse_color_per_thread>;
     const Arg &arg;
     constexpr Restrictor(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -118,7 +119,7 @@ namespace quda {
       int x_fine_offset = thread.x;
       int coarse_color_thread = block.y * arg.block_dim.y + thread.y;
 
-      vector reduced;
+      vector reduced{0};
       if (x_fine_offset < arg.aggregate_size) {
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
         const int parity_offset = x_fine_offset >= arg.aggregate_size_cb ? 1 : 0;
@@ -133,7 +134,7 @@ namespace quda {
 
         const int coarse_color_block = coarse_color_thread * coarse_color_per_thread;
 
-        vector_type<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp;
+        array<complex<typename Arg::real>, Arg::fineSpin*coarse_color_per_thread> tmp{0};
         rotateCoarseColor(tmp, arg, parity, x_fine_cb, coarse_color_block);
 
         // perform any local spin coarsening
@@ -146,7 +147,7 @@ namespace quda {
         }
       }
 
-      reduced = BlockReduce<vector, block_size, Arg::n_vector_y>(thread.y). template Sum<true>(reduced);
+      reduced = BlockReduce<vector, block_size, 1, Arg::n_vector_y, true>(thread.y). template Sum(reduced);
 
       if (x_fine_offset == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;

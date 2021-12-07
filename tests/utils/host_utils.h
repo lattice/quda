@@ -120,6 +120,7 @@ inline bool isPCSolution(QudaSolutionType solution_type)
 }
 //------------------------------------------------------
 
+// Reports basic statistics of flops and solver iterations
 void performanceStats(std::vector<double> &time, std::vector<double> &gflops, std::vector<int> &iter);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
@@ -217,9 +218,6 @@ void cpu_xpy(QudaPrecision prec, void *x, void *y, int size);
 #ifdef __cplusplus
 }
 #endif
-
-// Use for profiling
-void performanceStats(double *time, double *gflops);
 
 inline QudaPrecision getPrecision(int i)
 {

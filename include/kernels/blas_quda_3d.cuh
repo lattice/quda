@@ -213,7 +213,8 @@ namespace quda {
   template <typename Float, int nColor_> struct reDotProduct3dArg : public ReduceArg<double>
   {
     using real = typename mapper<Float>::type;
-    static constexpr int nColor = nColor_;    
+    static constexpr int reduction_dim = 3; // DMH Template this    
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -223,16 +224,15 @@ namespace quda {
 
     F x;
     F y;
-    dim3 threads;     // number of active threads required  
-    
+    dim3 threads;     // number of active threads required      
     int_fastdiv X[4]; // grid dimensions
     
     reDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double>(x.X()[3]),
+      ReduceArg<double>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[3], x.X()[3])
+      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -273,7 +273,8 @@ namespace quda {
   template <typename Float, int nColor_> struct cDotProduct3dArg : public ReduceArg<double2>
   {
     using real = typename mapper<Float>::type;
-    static constexpr int nColor = nColor_;    
+    static constexpr int reduction_dim = 3; // DMH Template this
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -283,16 +284,15 @@ namespace quda {
 
     F x;
     F y;
-    dim3 threads;     // number of active threads required  
-    
+    dim3 threads;     // number of active threads required    
     int_fastdiv X[4]; // grid dimensions
     
     cDotProduct3dArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-      ReduceArg<double2>(x.X()[3]),
+      ReduceArg<double2>(dim3(x.X()[reduction_dim], 1, 1), x.X()[reduction_dim]),
       x(x),
       y(y),
       // Launch xyz threads per t, t times.
-      threads(x.Volume()/x.X()[3], x.X()[3])
+      threads(x.Volume()/x.X()[reduction_dim], x.X()[reduction_dim])
     {
       for(int i=0; i<4; i++) {
 	X[i] = x.X()[i];
@@ -321,10 +321,10 @@ namespace quda {
      
       Vector x = arg.x(idx_cb, parity);
       Vector y = arg.y(idx_cb, parity);
-      reduce_t sum = {0.0, 0.0};
       
       // Get the inner product
-      complex<real> res = innerProduct(x, y);
+      complex<double> res = innerProduct(x, y);
+      reduce_t sum;
       sum.x = res.real();
       sum.y = res.imag();
       
@@ -332,6 +332,4 @@ namespace quda {
       return plus::operator()(sum, result);
     }
   };
-
-  
 }

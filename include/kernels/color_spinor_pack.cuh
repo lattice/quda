@@ -176,7 +176,7 @@ namespace quda {
      division for the 5-d operators.
   */
   template <typename Arg>
-  __host__ __device__ inline int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
+  constexpr int dimFromFaceIndex(int &face_idx, int tid, const Arg &arg)
   {
     face_idx = tid;
     if (face_idx < arg.threadDimMapUpper[0]) {
@@ -194,7 +194,7 @@ namespace quda {
   }
 
   template <typename Arg>
-  __device__ __host__ inline auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
+  constexpr auto indexFromFaceIndex(int dim, int dir, int ghost_idx, int parity, const Arg &arg)
   {
     if (arg.nFace == 1) {
       return indexFromFaceIndex<Arg::nDim>(dim, dir, ghost_idx, parity, 1, arg.pc_type, arg);

@@ -15,6 +15,8 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");

@@ -10,24 +10,44 @@ namespace quda {
   void assertAllMemFree();
 
   /**
+     @return device memory allocated
+   */
+  size_t device_allocated();
+
+  /**
+     @return pinned memory allocated
+   */
+  size_t pinned_allocated();
+
+  /**
+     @return mapped memory allocated
+   */
+  size_t mapped_allocated();
+
+  /**
+     @return host memory allocated
+   */
+  size_t host_allocated();
+
+  /**
      @return peak device memory allocated
    */
-  long device_allocated_peak();
+  size_t device_allocated_peak();
 
   /**
      @return peak pinned memory allocated
    */
-  long pinned_allocated_peak();
+  size_t pinned_allocated_peak();
 
   /**
      @return peak mapped memory allocated
    */
-  long mapped_allocated_peak();
+  size_t mapped_allocated_peak();
 
   /**
      @return peak host memory allocated
    */
-  long host_allocated_peak();
+  size_t host_allocated_peak();
 
   /**
      @return are we using managed memory for device allocations

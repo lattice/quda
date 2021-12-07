@@ -14,14 +14,16 @@
    instantiation correctly.
  */
 
-namespace quda {
+namespace quda
+{
 
-  namespace device {
-    
+  namespace device
+  {
+
     /**
        @brief The __constant__ buffer used for kernel parameters
     */
-#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE) // what is the equivalent macro for nvc++?
+#if defined(__CUDACC_RDC__) && !defined(QUDA_CONSTANT_DEFINE)
     // rdc is enabled when NVSHMEM is enabled, so we need to make the
     // buffer as extern and define it in one place only
     extern __constant__ char buffer[max_constant_size()];
@@ -33,15 +35,20 @@ namespace quda {
        @brief Helper function that returns kernel argument from
        __constant__ memory.
      */
-    template <typename Arg>
-      constexpr std::enable_if_t<!use_kernel_arg<Arg>(), Arg&> get_arg() { return reinterpret_cast<Arg&>(buffer); }
+    template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), Arg &> get_arg()
+    {
+      return reinterpret_cast<Arg &>(buffer);
+    }
 
     /**
        @brief Helper function that returns a pointer to the
        __constant__ memory buffer.
      */
-    template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), void*> get_constant_buffer() { return qudaGetSymbolAddress(buffer); }
+    template <typename Arg> constexpr std::enable_if_t<!use_kernel_arg<Arg>(), void *> get_constant_buffer()
+    {
+      return qudaGetSymbolAddress(buffer);
+    }
 
-  }
+  } // namespace device
 
-}
+} // namespace quda

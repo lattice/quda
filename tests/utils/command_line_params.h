@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <externals/CLI11.hpp>
+#include <CLI11.hpp>
 #include <quda.h>
 
 // for compatibility while porting - remove later
@@ -365,10 +365,10 @@ extern int mg_levels;
 
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;
-
 extern quda::mgarray<int> nu_pre;
 extern quda::mgarray<int> nu_post;
 extern quda::mgarray<int> n_block_ortho;
+extern quda::mgarray<bool> block_ortho_two_pass;
 extern quda::mgarray<double> mu_factor;
 extern quda::mgarray<QudaVerbosity> mg_verbosity;
 extern quda::mgarray<QudaInverterType> setup_inv;
@@ -405,6 +405,8 @@ extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
+
+extern bool use_mobius_fused_kernel;
 
 extern int n_ev;
 extern int max_search_dim;
@@ -519,6 +521,7 @@ extern int wflow_steps;
 extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
+// GF options
 extern int gf_gauge_dir;
 extern int gf_maxiter;
 extern int gf_verbosity_interval;
@@ -529,6 +532,7 @@ extern double gf_tolerance;
 extern bool gf_theta_condition;
 extern bool gf_fft_autotune;
 
+// contract options
 extern QudaContractType contract_type;
 extern char correlator_save_dir[256];
 extern char correlator_file_affix[256];
@@ -536,16 +540,3 @@ extern std::array<int,4> momentum;
 extern bool open_flavor;
 
 extern std::array<int, 4> grid_partition;
-extern QudaBLASOperation blas_trans_a;
-extern QudaBLASOperation blas_trans_b;
-extern QudaBLASDataType blas_data_type;
-extern QudaBLASDataOrder blas_data_order;
-
-extern std::array<int, 3> blas_mnk;
-extern std::array<int, 3> blas_leading_dims;
-extern std::array<int, 3> blas_offsets;
-extern std::array<int, 3> blas_strides;
-extern std::array<double, 2> blas_alpha_re_im;
-extern std::array<double, 2> blas_beta_re_im;
-extern int blas_batch;
-

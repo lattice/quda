@@ -60,13 +60,23 @@ namespace quda {
         if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
+        char aux2[TuneKey::aux_n];
+        strcpy(aux2, aux);
         strcpy(aux, "policy_kernel,");
-        strcat(aux, x[0]->AuxString());
+        strcat(aux, aux2);
         if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
-        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
+
+        char NXZ_str[16];
+        char NYW_str[16];
+        u32toa(NXZ_str, NXZ);
+        u32toa(NYW_str, NYW);
+        strcat(aux, ",Nxz=");
+        strcat(aux, NXZ_str);
+        strcat(aux, ",Nyw=");
+        strcat(aux, NYW_str);
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
@@ -87,18 +97,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const
-      {
-        char name[TuneKey::name_n];
-        char NXZ_str[8];
-        char NYW_str[8];
-        u32toa(NXZ_str, NXZ);
-        u32toa(NYW_str, NYW);
-        strcpy(name, NXZ_str);
-        strcat(name, NYW_str);
-        strcat(name, typeid(r).name());
-        return TuneKey(vol, name, aux);
-      }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(r).name(), aux); }
 
       template <int NXZ> void compute(const qudaStream_t &stream)
       {
@@ -134,7 +133,8 @@ namespace quda {
           if (b.data) { set_param<multi_1d>(arg, 'b', b); }
           if (c.data) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          launch<MultiReduce_>(result_, tp, stream, arg);
+          // we intentionally do not do a global reduction in the launch, and defer until the entire "tile" is complete
+          launch<MultiReduce_, host_reduce_t, comm_reduce_null<host_reduce_t>>(result_, tp, stream, arg);
 
           // need to transpose for same order with vector thread reduction
           for (int i = 0; i < NXZ; i++) {
@@ -256,7 +256,8 @@ namespace quda {
 
         coeff_array<T> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned)max_n_reduce()) {
+
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned int)max_n_reduce()) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {
@@ -295,7 +296,7 @@ namespace quda {
         }
 
         // we are at the leaf of the binary tree (e.g., we ran the kernel): perform the row-to-column-major transpose here.
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned)max_n_reduce()) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned int)max_n_reduce()) {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++)
@@ -575,7 +576,7 @@ namespace quda {
 
           delete[] result_trans;
         } else {
-          errorQuda("Unexpected transpose parameter %d", tp.aux.x);
+          errorQuda("Unexpected transpose parameter %d", static_cast<int>(tp.aux.x));
         }
       }
 

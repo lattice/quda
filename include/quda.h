@@ -29,7 +29,7 @@ extern "C" {
    * interpretation of the gauge field by various Dirac operators
    */
   typedef struct QudaGaugeParam_s {
-
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     QudaFieldLocation location; /**< The location of the gauge field */
 
     int X[4];             /**< The local space-time dimensions (without checkboarding) */
@@ -89,7 +89,6 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
-
   } QudaGaugeParam;
 
 
@@ -97,6 +96,9 @@ extern "C" {
    * Parameters relating to the solver and the choice of Dirac operator.
    */
   typedef struct QudaInvertParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaFieldLocation input_location; /**< The location of the input field */
     QudaFieldLocation output_location; /**< The location of the output field */
@@ -255,7 +257,7 @@ extern "C" {
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
     double clover_csw;                     /**< Csw coefficient of the clover term */
-    double clover_coeff;                   /**< Overall kappa * Csw coefficient of the clover term */
+    double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
@@ -404,10 +406,15 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Whether to use fused kernels for mobius */
+    QudaBoolean use_mobius_fused_kernel;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     // EIGENSOLVER PARAMS
     //-------------------------------------------------
@@ -501,8 +508,8 @@ extern "C" {
     /** The orthogonal direction in the 3D eigensolver **/
     int ortho_dim;
     
-    /** The size of the orthogonal direction in the 3D eigensolver **/
-    int ortho_dim_size;
+    /** The size of the orthogonal direction in the 3D eigensolver, local **/
+    int ortho_dim_size_local;
     //-------------------------------------------------
 
     // EIG-CG PARAMS
@@ -548,10 +555,12 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
-
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaInvertParam *invert_param;
 
@@ -574,6 +583,9 @@ extern "C" {
 
     /** Number of times to repeat Gram-Schmidt in block orthogonalization */
     int n_block_ortho[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to do passes at block orthogonalize in fixed point for improved accuracy */
+    QudaBoolean block_ortho_two_pass[QUDA_MAX_MG_LEVEL];
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
@@ -736,10 +748,10 @@ extern "C" {
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
-
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
@@ -751,6 +763,7 @@ extern "C" {
   } QudaGaugeObservableParam;
 
   typedef struct QudaBLASParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
@@ -774,7 +787,6 @@ extern "C" {
 
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
-
   } QudaBLASParam;
 
   /*
@@ -1378,7 +1390,7 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+  void computeStaggeredForceQuda(void *mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
                                  QudaInvertParam *invert_param);
 
   /**
@@ -1432,7 +1444,7 @@ extern "C" {
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge);
+  void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
    * Performs Gaussian smearing on a given spinor using the gauge field
@@ -1513,7 +1525,8 @@ extern "C" {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings

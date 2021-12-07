@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <contract_quda.h>
+
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
@@ -17,7 +18,7 @@ namespace quda {
       ColorSpinorField &x;
       const int t_slice;
       const copy3dType type;
-
+      
       unsigned int minThreads() const { return y.VolumeCB(); }
       
     public:
@@ -184,7 +185,7 @@ namespace quda {
       
       void apply(const qudaStream_t &stream)
       {
-	size_t data_bytes = 2 * x.X()[3] *  x.Precision();
+	size_t data_bytes = 2 * x.X()[3] * x.Precision();
 	void *d_a = pool_device_malloc(data_bytes);
 	void *d_b = pool_device_malloc(data_bytes);
 	qudaMemcpy(d_a, a, data_bytes, qudaMemcpyHostToDevice);
@@ -193,8 +194,8 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	launch<caxpby3d>(tp, stream, caxpby3dArg<Float, nColor>((complex<Float>*)d_a, x, (complex<Float>*)d_b, y));
 	
-	pool_device_free(d_b);
 	pool_device_free(d_a);
+	pool_device_free(d_b);
       }
     
       long long flops() const
@@ -242,15 +243,15 @@ namespace quda {
     protected:
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<double> &result;
+      std::vector<double> &result_global;
       
     public:
       reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		     std::vector<double> &result) :
+		     std::vector<double> &result_global) :
 	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result)
+	result_global(result_global)
       {
 	apply(device::get_default_stream());
       }
@@ -259,27 +260,14 @@ namespace quda {
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	
-	// Zero out the local results.
 	std::vector<double> result_local(x.X()[3]);
-	if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
-	
 	reDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<reDotProduct3d>(result_local, tp, stream, arg);
+	launch<reDotProduct3d, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
-	  std::vector<double> result_tmp(comm_dim(3) * x.X()[3], 0.0);
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result_tmp[comm_coord(3) * x.X()[3] + i] = result_local[i];
-	  }
-	  
-	  // MPI all reduce the temp so that all the spatial data is summed
-	  // into the temporal buckets
-	  comm_allreduce_array((double *)result_tmp.data(), comm_dim(3) * x.X()[3]);
-	  
-	  // Copy back to MPI local arrat for t
-	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
+	    result_global[comm_coord(3) * x.X()[3] + i] = result_local[i];
 	  }
 	}
       }
@@ -329,15 +317,15 @@ namespace quda {
     protected:
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<Complex> &result;
+      std::vector<Complex> &result_global;
       
     public:
       cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		    std::vector<Complex> &result) :
+		    std::vector<Complex> &result_global) :
 	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result)
+	result_global(result_global)
       {
 	apply(device::get_default_stream());
       }
@@ -346,37 +334,19 @@ namespace quda {
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	
-	// Zero out the local results.
 	std::vector<double> result_local(2*x.X()[3]);
-	if(!activeTuning()) {
-	  for(int i=0; i<x.X()[3]; i++) {
-	    result_local[2*i] = 0.0;
-	    result_local[2*i+1] = 0.0;
-	  }
-	}
-	
 	cDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<cDotProduct3d>(result_local, tp, stream, arg);
+	launch<cDotProduct3d, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
-	  std::vector<Complex> result_tmp(comm_dim(3) * x.X()[3], 0.0);
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result_tmp[comm_coord(3) * x.X()[3] + i].real(result_local[2*i]);
-	    result_tmp[comm_coord(3) * x.X()[3] + i].imag(result_local[2*i+1]);
-	  }
-	  
-	  // MPI all reduce the temp so that all the spatial data is summed
-	  // into the temporal buckets
-	  comm_allreduce_array((double *)result_tmp.data(), 2 * comm_dim(3) * x.X()[3]);
-	  
-	  // Copy back to MPI local arrat for t
-	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
+	    result_global[comm_coord(3) * x.X()[3] + i].real(result_local[2*i + 0]);
+	    result_global[comm_coord(3) * x.X()[3] + i].imag(result_local[2*i + 1]);
 	  }
 	}
       }
-    
+      
       long long flops() const
       {
 	return ((x.Nspin() * x.Nspin() * x.Ncolor() * 6ll) + (x.Nspin() * x.Nspin() * (x.Nspin() + x.Nspin()*x.Ncolor()))) * x.Volume();

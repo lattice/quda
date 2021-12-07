@@ -20,7 +20,7 @@ namespace quda {
   public:
     ProlongateLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &V,
                      const int *fine_to_coarse, int parity)
-      : TunableKernel3D(in, out.SiteSubset(), fineColor/fine_colors_per_thread), out(out), in(in), V(V),
+      : TunableKernel3D(in, out.SiteSubset(), fineColor/fine_colors_per_thread<fineColor, coarseColor>()), out(out), in(in), V(V),
         fine_to_coarse(fine_to_coarse), parity(parity), location(checkLocation(out, in, V))
     {
       strcat(vol, ",");
