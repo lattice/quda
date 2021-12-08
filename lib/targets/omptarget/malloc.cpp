@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <string>
 #include <map>
+#include <set>
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
@@ -616,15 +617,21 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-    if(alloc[DEVICE].count(const_cast<void*>(ptr)) || alloc[DEVICE_PINNED].count(const_cast<void*>(ptr))){
+    static std::set<void *> other_ptr;  // OMP TARGET TODO: unknown pointers, assume on CPU
+    void *p = const_cast<void*>(ptr);
+    QudaFieldLocation fl = QUDA_INVALID_FIELD_LOCATION;
+    if(alloc[DEVICE].count(p) || alloc[DEVICE_PINNED].count(p)){
       // ompwip("get_pointer_location %p returns QUDA_CUDA_FIELD_LOCATION",ptr);
-      return QUDA_CUDA_FIELD_LOCATION;
-    }else if(alloc[HOST].count(const_cast<void*>(ptr)) || alloc[PINNED].count(const_cast<void*>(ptr)) || alloc[MAPPED].count(const_cast<void*>(ptr))){
+      fl = QUDA_CUDA_FIELD_LOCATION;
+    }else if(alloc[HOST].count(p) || alloc[PINNED].count(p) || alloc[MAPPED].count(p) || other_ptr.count(p)){
       // ompwip("get_pointer_location %p returns QUDA_CPU_FIELD_LOCATION",ptr);
-      return QUDA_CPU_FIELD_LOCATION;
+      fl = QUDA_CPU_FIELD_LOCATION;
+    }else{
+      ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CPU_FIELD_LOCATION",ptr);
+      other_ptr.insert(p);
+      fl = QUDA_CPU_FIELD_LOCATION;
     }
-    ompwip("WARNING: get_pointer_location assumes %p to be QUDA_CPU_FIELD_LOCATION",ptr);
-    return QUDA_CPU_FIELD_LOCATION;
+    return fl;
 /*
     CUpointer_attribute attribute[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
     CUmemorytype mem_type;
