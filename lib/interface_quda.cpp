@@ -2781,16 +2781,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
-  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_b(cpuParam);
 
   cpuParam.v = hp_x;
   cpuParam.location = param->output_location;
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_x(cpuParam);
 
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  cudaParam.field = h_b;
+  cudaParam.field = &h_b;
   ColorSpinorField b(cudaParam);
 
   // now check if we need to invalidate the solutionResident vectors
@@ -2821,7 +2821,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       errorQuda("Initial guess not supported for two-pass solver");
     }
 
-    *x = *h_x; // solution
+    *x = h_x; // solution
   } else { // zero initial guess
     blas::zero(*x);
   }
@@ -2842,10 +2842,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = blas::norm2(*h_b);
+    double nh_b = blas::norm2(h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      double nh_x = blas::norm2(*h_x);
+      double nh_x = blas::norm2(h_x);
       double nx = blas::norm2(*x);
       printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
     }
@@ -3090,7 +3090,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
-    *h_x = *x;
+    h_x = *x;
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
 
@@ -3104,15 +3104,12 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(*h_x);
+    double nh_x = blas::norm2(h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   profileInvert.TPSTART(QUDA_PROFILE_FREE);
-
-  delete h_b;
-  delete h_x;
 
   if (param->use_resident_solution && !param->make_resident_solution) {
     for (auto v: solutionResident) if (v) delete v;
@@ -3648,15 +3645,15 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // then be used as 'instructions' to create the actual
   // ColorSpinorField
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
-  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_b(cpuParam);
 
-  std::vector<ColorSpinorField*> h_x;
+  std::vector<std::unique_ptr<ColorSpinorField>> h_x;
   h_x.resize(param->num_offset);
 
   cpuParam.location = param->output_location;
   for(int i=0; i < param->num_offset; i++) {
     cpuParam.v = hp_x[i];
-    h_x[i] = ColorSpinorField::Create(cpuParam);
+    h_x[i] = std::make_unique<ColorSpinorField>(cpuParam);
   }
 
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
@@ -3665,7 +3662,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   ColorSpinorParam cudaParam(cpuParam, *param, QUDA_CUDA_FIELD_LOCATION);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
-  cudaParam.field = h_b;
+  cudaParam.field = &h_b;
   ColorSpinorField b(cudaParam); // Creates b and downloads h_b to it
 
   profileMulti.TPSTOP(QUDA_PROFILE_H2D);
@@ -3703,7 +3700,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = blas::norm2(*h_b);
+    double nh_b = blas::norm2(h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
@@ -3913,11 +3910,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti.TPSTART(QUDA_PROFILE_FREE);
   for(int i=0; i < param->num_offset; i++){
-    delete h_x[i];
     //if (!param->make_resident_solution) delete x[i];
   }
-
-  delete h_b;
 
   delete [] hp_x;
 
