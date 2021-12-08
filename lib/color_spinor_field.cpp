@@ -727,79 +727,42 @@ namespace quda {
   }
 
   // For kernels with precision conversion built in
-  void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
-    if (a.Length() != b.Length()) {
-      errorQuda("checkSpinor: lengths do not match: %lu %lu", a.Length(), b.Length());
-    }
-
-    if (a.Ncolor() != b.Ncolor()) {
-      errorQuda("checkSpinor: colors do not match: %d %d", a.Ncolor(), b.Ncolor());
-    }
-
-    if (a.Nspin() != b.Nspin()) {
-      errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
-    }
-
-    if (a.Nvec() != b.Nvec()) {
-      errorQuda("checkSpinor: nVec does not match: %d %d", a.Nvec(), b.Nvec());
-    }
-
-    if (a.TwistFlavor() != b.TwistFlavor()) {
-      errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
-    }
+  void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b)
+  {
+    if (a.SiteSubset() != b.SiteSubset()) errorQuda("siteSubsets do not match: %d %d\n", a.SiteSubset(), b.SiteSubset());
+    if (a.VolumeCB() != b.VolumeCB()) errorQuda("lengths do not match: %lu %lu", a.VolumeCB(), b.VolumeCB());
+    if (a.Ncolor() != b.Ncolor()) errorQuda("colors do not match: %d %d", a.Ncolor(), b.Ncolor());
+    if (a.Nspin() != b.Nspin()) errorQuda("spins do not match: %d %d", a.Nspin(), b.Nspin());
+    if (a.Nvec() != b.Nvec()) errorQuda("nVec does not match: %d %d", a.Nvec(), b.Nvec());
+    if (a.TwistFlavor() != b.TwistFlavor()) errorQuda("twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
   }
 
-  const ColorSpinorField& ColorSpinorField::Even() const {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return even subset of %d subset", siteSubset);
-    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field");
+  const ColorSpinorField& ColorSpinorField::Even() const
+  {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)  errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
     return *even;
   }
 
-  const ColorSpinorField& ColorSpinorField::Odd() const {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field");
+  const ColorSpinorField& ColorSpinorField::Odd() const
+  {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
     return *odd;
   }
 
-  ColorSpinorField& ColorSpinorField::Even() {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return even subset of %d subset", siteSubset);
-    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field");
+  ColorSpinorField& ColorSpinorField::Even()
+  {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
     return *even;
   }
 
-  ColorSpinorField& ColorSpinorField::Odd() {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field");
+  ColorSpinorField& ColorSpinorField::Odd()
+  {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)  errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
     return *odd;
-  }
-
-  void* ColorSpinorField::Ghost(const int i) {
-    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost[i];
-  }
-
-  const void* ColorSpinorField::Ghost(const int i) const {
-    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost[i];
-  }
-
-
-  void* ColorSpinorField::GhostNorm(const int i){
-    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm[i];
-  }
-
-  const void* ColorSpinorField::GhostNorm(const int i) const{
-    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm[i];
   }
 
   void* const* ColorSpinorField::Ghost() const {

@@ -689,12 +689,7 @@ namespace quda {
      */
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
-    void* Ghost(const int i);
-    const void* Ghost(const int i) const;
-    void* GhostNorm(const int i);
-    const void* GhostNorm(const int i) const;
     const void* Ghost2() const;
-
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
