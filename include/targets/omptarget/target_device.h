@@ -1,5 +1,17 @@
 #pragma once
 
+#ifndef QUDA_WARP_SIZE
+#define QUDA_WARP_SIZE 16
+#endif
+
+#ifndef QUDA_MAX_BLOCK_SIZE
+#define QUDA_MAX_BLOCK_SIZE 1024
+#endif
+
+#ifndef QUDA_MAX_SHARED_MEMORY_SIZE
+#define QUDA_MAX_SHARED_MEMORY_SIZE 32*1024
+#endif
+
 namespace quda {
 
   namespace target {
@@ -88,7 +100,7 @@ namespace quda {
        @brief Helper function that returns the warp-size of the
        architecture we are running on.
     */
-    constexpr int warp_size() { return 16; }
+    constexpr int warp_size() { return QUDA_WARP_SIZE; }
 
     /**
        @brief Return the thread mask for a converged warp.
@@ -102,7 +114,7 @@ namespace quda {
     template <int block_size_y = 1, int block_size_z = 1>
       constexpr unsigned int max_block_size()
       {
-        return std::max(warp_size(), 512 / (block_size_y * block_size_z));
+        return QUDA_MAX_BLOCK_SIZE / (block_size_y * block_size_z);
       }
 
     /**
@@ -159,7 +171,7 @@ namespace quda {
        @brief Use a compile time fixed size for the shared local memory,
        until we can find a way to set it dynamically.
     */
-    constexpr unsigned int max_shared_memory_size() { return 32*1024; /* Some amount below maximum */ }
+    constexpr unsigned int max_shared_memory_size() { return QUDA_MAX_SHARED_MEMORY_SIZE; }
 
     /**
        @brief Helper function that returns true if we are to pass the

@@ -6,6 +6,24 @@
 // OMP TARGET TODO: most of what follows are guess work.
 // We also don't support streams.
 
+// until we have a way to query device properties correctly
+
+#ifndef QUDA_OMP_MAX_TEAMS
+#define QUDA_OMP_MAX_TEAMS 65536
+#endif
+
+#ifndef QUDA_MAX_THREADS_PER_PROCESSOR
+#define QUDA_MAX_THREADS_PER_PROCESSOR 2048
+#endif
+
+#ifndef QUDA_PROCESSOR_COUNT
+#define QUDA_PROCESSOR_COUNT 64
+#endif
+
+#ifndef QUDA_MAX_BLOCKS_PER_PROCESSOR
+#define QUDA_MAX_BLOCKS_PER_PROCESSOR 32
+#endif
+
 static char ompdevname[] = "OpenMP Target Device";
 static char omphostname[] = "OpenMP Host Device";
 struct DeviceProp{
@@ -35,7 +53,7 @@ static void getDeviceProperties(DeviceProp*p,int dev)
   m = omp_get_max_teams();
   p->max_teams = m;
 */
-  p->max_teams = 65536;
+  p->max_teams = QUDA_OMP_MAX_TEAMS;
 
   #pragma omp target teams device(dev) map(from:m)
   if(omp_get_team_num()==0)
@@ -125,15 +143,15 @@ namespace quda
 
     unsigned int max_threads_per_block() { return deviceProp.max_threads; }
 
-    unsigned int max_threads_per_processor() { return deviceProp.max_threads; }
+    unsigned int max_threads_per_processor() { return QUDA_MAX_THREADS_PER_PROCESSOR; }
 
     unsigned int max_threads_per_block_dim(int i) { return deviceProp.max_threads; }
 
     unsigned int max_grid_size(int i) { return deviceProp.max_teams; }
 
-    unsigned int processor_count() { return deviceProp.num_procs/8; }
+    unsigned int processor_count() { return QUDA_PROCESSOR_COUNT; }
 
-    unsigned int max_blocks_per_processor() { return 32; }
+    unsigned int max_blocks_per_processor() { return QUDA_MAX_BLOCKS_PER_PROCESSOR; }
 
     namespace profile
     {
