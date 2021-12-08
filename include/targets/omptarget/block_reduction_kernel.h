@@ -13,6 +13,22 @@ namespace quda {
      determines if we are swizzling and a parameter "swizzle_factor"
      which is the effective matrix dimension that we are tranposing in
      this mapping.
+
+     Specifically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parameterized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param arg Kernel argument struct
+     @return Swizzled block index
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
@@ -22,7 +38,6 @@ namespace quda {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
-      block_idx = blockIdx.x;
       if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
@@ -40,6 +55,9 @@ namespace quda {
      creates and curries in the block size.  This allows the block
      size to be set statically at launch time in the actual argument
      class that is passed to the kernel.
+
+     @tparam block_size x-dimension block-size
+     @param[in] arg Kernel argument
    */
   template <unsigned int block_size_, typename Arg_> struct BlockKernelArg : Arg_ {
     using Arg = Arg_;
@@ -48,28 +66,49 @@ namespace quda {
   };
 
   /**
-     @brief Generic block kernel.  Here, we split the block and thread
-     indices in the x and y dimension and pass these indices
-     separately to the transform functor.  The x thread dimension is
-     templated, e.g., for efficient reductions, and typically the y
-     thread dimension is a trivial vectorizable dimension.
+     @brief BlockKernel2D_impl is the implementation of the Generic
+     block kernel.  Here, we split the block (CTA) and thread indices
+     in the x and y dimension and pass these indices separately to the
+     transform functor.  The x thread dimension is templated
+     (Arg::block_size), e.g., for efficient reductions, and typically
+     the y thread dimension is a trivial vectorizable dimension.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @param[in] arg Kernel argument
   */
-  template <template <typename> class Transformer, typename Arg>
+  template <template <typename> class Functor, typename Arg>
   __forceinline__ __device__ void BlockKernel2D_impl(const Arg &arg)
   {
     QUDA_RT_CONSTS;
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    auto j = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y * blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
-    Transformer<Arg> t(arg);
+    Functor<Arg> t(arg);
     t(block_idx, thread_idx);
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is passed by value directly to the kernel.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -92,15 +131,30 @@ namespace quda {
       //          "omp reports: teams %d threads %d\n",
       //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
       //          omp_get_num_teams(), omp_get_num_threads());
-      BlockKernel2D_impl<Transformer, Arg>(arg);
+      BlockKernel2D_impl<Functor, Arg>(arg);
     }
     }
     omp_target_free(dparg, omp_get_default_device());
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
+  /**
+     @brief BlockKernel2D is the entry point of the generic block
+     kernel.  This is the specialization where the kernel argument
+     struct is copied to the device prior to kernel launch.  The kernel
+     type will impose launch bounds if requested (Arg::launch_bounds)
+     or if a block_size > 512 is required.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension).  Not supported at present.
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = false>
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -117,7 +171,7 @@ namespace quda {
       //          "omp reports: teams %d threads %d\n",
       //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
       //          omp_get_num_teams(), omp_get_num_threads());
-      BlockKernel2D_impl<Transformer, Arg>(device::get_arg<Arg>());
+      BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
     }
     }
   }

@@ -10,6 +10,10 @@ namespace quda {
      creates and curries in the block size.  This allows the block
      size to be set statically at launch time in the actual argument
      class that is passed to the kernel.
+
+     @tparam block_size_x x-dimension block-size
+     @tparam block_size_y y-dimension block-size
+     @tparam Arg Kernel argument struct
   */
   template <int block_size_x_, int block_size_y_, typename Arg_> struct ReduceKernelArg : Arg_ {
     using Arg = Arg_;
@@ -18,44 +22,19 @@ namespace quda {
     ReduceKernelArg(const Arg &arg) : Arg(arg) { }
   };
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
-  {
-    const dim3
-      blockDim=launch_param.block,
-      gridDim=launch_param.grid,
-      blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
+  /**
+     @brief Reduction2D is the entry point of the generic 2-d
+     reduction kernel.  This is the specialization where the kernel
+     argument struct is passed by value directly to the kernel.
 
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
-    reduce_t value = arg.init();
-    const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
-    {
-      // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-      //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-      //          "omp reports: teams %d threads %d\n",
-      //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-      //          omp_get_num_teams(), omp_get_num_threads());
-      dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-
-      Transformer<Arg> t(arg);
-
-      auto idx = threadIdx.x + blockIdx.x * blockDim.x;
-      auto j = threadIdx.y;
-
-      while (idx < arg.threads.x) {
-        value = t(value, idx, j);
-        if (grid_stride) idx += blockDim.x * gridDim.x; else break;
-      }
-    }
-
-    // perform final inter-block reduction and write out result
-    Transformer<Arg> t(arg);
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
-  }
-
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> Reduction2D(Arg arg)
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -71,14 +50,15 @@ namespace quda {
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
       shared_cache.addr = cache;
-      // Reduction2D_impl<Transformer, Arg, grid_stride>(*dparg);
+      // OMP TARGET TODO: issues with reduction, not performed if not inlined.
+      // Reduction2D_impl<Functor, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
         blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
 
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
+      using reduce_t = typename Functor<Arg>::reduce_t;
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Functor<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Functor<Arg>::init_omp())
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
@@ -89,74 +69,77 @@ namespace quda {
         //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
-        Transformer<Arg> t(*dparg);
+        Functor<Arg> t(*dparg);
 
         auto idx = threadIdx.x + blockIdx.x * blockDim.x;
         auto j = threadIdx.y;
 
-        // if(blockIdx.x==0&&threadIdx.x==0) printf("team %d: thread %d: in value: %g\n", omp_get_team_num(), omp_get_thread_num(), *reinterpret_cast<double *>(&value));
         while (idx < dparg->threads.x) {
           value = t(value, idx, j);
-          // if(blockIdx.x==0&&threadIdx.x==0) printf("team %d: thread %d: idx %d: value: %g\n", omp_get_team_num(), omp_get_thread_num(), idx, *reinterpret_cast<double *>(&value));
-          if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+          if (grid_stride)
+            idx += blockDim.x * gridDim.x;
+          else
+            break;
         }
       }
+
       // perform final inter-block reduction and write out result
-      Transformer<Arg> t(*dparg);
-      // reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value);
-      // ../../reduce_helper.h:/reduce
-      {
-        const auto idx = 0;
-        // In OpenMP, this runs in the main thread of each team, and `in` is already the block reduction value.
-        bool isLastBlockDone;
-        // if (threadIdx.x == 0 && threadIdx.y == 0)
-        { // This is the main thread per team
-          // if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
-          dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      Functor<Arg> t(*dparg);
 
-          // increment global block counter
-          // auto value = atomicInc(&arg.count[idx], gridDim.x);
-          unsigned int cvalue = 0;
-          unsigned int *c = &dparg->count[idx];
-          #pragma omp atomic capture
-          { cvalue = *c; *c = *c + 1; }
-          // { cvalue = dparg->count[idx]; dparg->count[idx] = ((dparg->count[idx] >= gridDim.x) ? 0 : (dparg->count[idx]+1)); }
+      // OMP TARGET TODO: fully inline everything for now
+      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value);
+      int idx = 0;
+      bool isLastBlockDone;
 
-          // determine if last block
-          isLastBlockDone = (cvalue == (gridDim.x - 1));
-        }
-        // finish the reduction if last block
-        if (isLastBlockDone) {
-          reduce_t sum = dparg->init();
-          #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
-          {
-            dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
-            while (i < gridDim.x) {
-              sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += Arg::block_size_x * Arg::block_size_y;
-            }
-          }
+      dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // __threadfence(); // flush result
 
-          // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      // increment global block counter
+      unsigned int cvalue = 0;
+      unsigned int *c = &dparg->count[idx];
+      #pragma omp atomic capture
+      { cvalue = *c; *c = *c + 1; }
 
-          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
-          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
-          // printf("\n");
-          // write out the final reduced value
-          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
-          { // This is the main thread per team
-            dparg->result_d[idx] = sum;
-            dparg->count[idx] = 0; // set to zero for next time
+      // determine if last block
+      isLastBlockDone = (cvalue == (gridDim.x - 1));
+
+      // __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone) {
+        reduce_t sum = dparg->init();
+        #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
+        {
+          dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
+          auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
+          while (i < gridDim.x) {
+            sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
+            i += Arg::block_size_x * Arg::block_size_y;
           }
         }
+
+        // write out the final reduced value
+        dparg->result_d[idx] = sum;
+        dparg->count[idx] = 0; // set to zero for next time
       }
     }
     omp_target_free(dparg, omp_get_default_device());
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
+  /**
+     @brief Reduction2D is the entry point of the generic 2-d
+     reduction kernel.  This is the specialization where the kernel
+     argument struct is copied to the device prior to kernel launch.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> Reduction2D()
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
@@ -165,15 +148,15 @@ namespace quda {
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
       shared_cache.addr = cache;
-      // Reduction2D_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
+      // Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
       Arg *dparg = &device::get_arg<Arg>();
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
         blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
 
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
+      using reduce_t = typename Functor<Arg>::reduce_t;
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Functor<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Functor<Arg>::init_omp())
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
@@ -184,112 +167,75 @@ namespace quda {
         //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
-        Transformer<Arg> t(*dparg);
+        Functor<Arg> t(*dparg);
 
         auto idx = threadIdx.x + blockIdx.x * blockDim.x;
         auto j = threadIdx.y;
 
         while (idx < dparg->threads.x) {
           value = t(value, idx, j);
-          if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+          if (grid_stride)
+            idx += blockDim.x * gridDim.x;
+          else
+            break;
         }
       }
+
       // perform final inter-block reduction and write out result
-      Transformer<Arg> t(*dparg);
+      Functor<Arg> t(*dparg);
+
+      // OMP TARGET TODO: fully inline everything for now
       // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value);
-      // ../../reduce_helper.h:/reduce
-      {
-        const auto idx = 0;
-        // In OpenMP, this runs in the main thread of each team, and `in` is already the block reduction value.
-        bool isLastBlockDone;
-        // if (threadIdx.x == 0 && threadIdx.y == 0)
-        { // This is the main thread per team
-          dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      int idx = 0;
+      bool isLastBlockDone;
 
-          // increment global block counter
-          // auto value = atomicInc(&arg.count[idx], gridDim.x);
-          unsigned int cvalue = 0;
-          unsigned int *c = &dparg->count[idx];
-          #pragma omp atomic capture
-          { cvalue = *c; *c = *c + 1; }
-          // { cvalue = dparg->count[idx]; dparg->count[idx] = ((dparg->count[idx] >= gridDim.x) ? 0 : (dparg->count[idx]+1)); }
+      dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // __threadfence(); // flush result
 
-          // determine if last block
-          isLastBlockDone = (cvalue == (gridDim.x - 1));
-        }
-        // finish the reduction if last block
-        if (isLastBlockDone) {
-          reduce_t sum = dparg->init();
-          #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
-          {
-            dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
-            while (i < gridDim.x) {
-              sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += Arg::block_size_x * Arg::block_size_y;
-            }
-          }
+      // increment global block counter
+      unsigned int cvalue = 0;
+      unsigned int *c = &dparg->count[idx];
+      #pragma omp atomic capture
+      { cvalue = *c; *c = *c + 1; }
 
-          // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      // determine if last block
+      isLastBlockDone = (cvalue == (gridDim.x - 1));
 
-          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
-          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
-          // printf("\n");
-          // write out the final reduced value
-          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
-          { // This is the main thread per team
-            dparg->result_d[idx] = sum;
-            dparg->count[idx] = 0; // set to zero for next time
+      // __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone) {
+        reduce_t sum = dparg->init();
+        #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
+        {
+          dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
+          auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
+          while (i < gridDim.x) {
+            sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
+            i += Arg::block_size_x * Arg::block_size_y;
           }
         }
+
+        // write out the final reduced value
+        dparg->result_d[idx] = sum;
+        dparg->count[idx] = 0; // set to zero for next time
       }
     }
   }
 
+  /**
+     @brief MultiReduction is the entry point of the generic
+     multi-reduction kernel.  This is the specialization where the
+     kernel argument struct is passed by value directly to the kernel.
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-  __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
-  {
-    const dim3
-      blockDim=launch_param.block,
-      gridDim=launch_param.grid,
-      blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
-
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
-    reduce_t value = arg.init();
-    const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
-    #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
-    {
-      // if(omp_get_team_num()==0 && omp_get_thread_num()==0)
-      //   printf("In target: launch_param.grid %d %d %d block %d %d %d\n"
-      //          "omp reports: teams %d threads %d\n",
-      //          launch_param.grid.x, launch_param.grid.y, launch_param.grid.z, launch_param.block.x, launch_param.block.y, launch_param.block.z,
-      //          omp_get_num_teams(), omp_get_num_threads());
-      dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-
-      Transformer<Arg> t(arg);
-
-      auto idx = threadIdx.x + blockIdx.x * blockDim.x;
-      auto j = threadIdx.y + blockIdx.y * blockDim.y;
-      auto k = threadIdx.z;
-
-      if (j < arg.threads.y){
-        while (idx < arg.threads.x) {
-          value = t(value, idx, j, k);
-          if (grid_stride) idx += blockDim.x * gridDim.x; else break;
-        }
-      }
-    }
-    // perform final inter-block reduction and write out result
-    Transformer<Arg> t(arg);
-    auto j = blockIdx.y * blockDim.y;
-    reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
-  }
-
-  /** Workaround compiler limitations.  We have to inline parallel regions with target teams. **/
-
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> MultiReduction(Arg arg)
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
@@ -305,14 +251,14 @@ namespace quda {
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
       shared_cache.addr = cache;
-      // MultiReduction_impl<Transformer, Arg, grid_stride>(*dparg);
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
         blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
+      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
 
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
+      using reduce_t = typename Functor<Arg>::reduce_t;
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Functor<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Functor<Arg>::init_omp())
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
@@ -323,76 +269,79 @@ namespace quda {
         //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
-        Transformer<Arg> t(*dparg);
+        Functor<Arg> t(*dparg);
 
         auto idx = threadIdx.x + blockIdx.x * blockDim.x;
         auto j = threadIdx.y + blockIdx.y * blockDim.y;
         auto k = threadIdx.z;
 
-        if (j < dparg->threads.y){
+        if (j < dparg->threads.y) {
           while (idx < dparg->threads.x) {
             value = t(value, idx, j, k);
-            if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+            if (grid_stride)
+              idx += blockDim.x * gridDim.x;
+            else
+              break;
           }
         }
       }
+
       // perform final inter-block reduction and write out result
-      Transformer<Arg> t(*dparg);
+      Functor<Arg> t(*dparg);
       auto j = blockIdx.y * blockDim.y;
-      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value, j);
-      // ../../reduce_helper.h:/reduce
-      {
-        const auto idx = j;
-        // In OpenMP, this runs in the main thread of each team, and `in` is already the block reduction value.
-        bool isLastBlockDone;
-        // if (threadIdx.x == 0 && threadIdx.y == 0)
-        { // This is the main thread per team
-          // if(blockIdx.x==0) printf("team %d: value: %g\n", omp_get_team_num(), *reinterpret_cast<double *>(&value));
-          dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+      int idx = j;
+      bool isLastBlockDone;
 
-          // increment global block counter
-          // auto value = atomicInc(&arg.count[idx], gridDim.x);
-          unsigned int cvalue = 0;
-          unsigned int *c = &dparg->count[idx];
-          #pragma omp atomic capture
-          { cvalue = *c; *c = *c + 1; }
-          // { cvalue = dparg->count[idx]; dparg->count[idx] = ((dparg->count[idx] >= gridDim.x) ? 0 : (dparg->count[idx]+1)); }
+      dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // __threadfence(); // flush result
 
-          // determine if last block
-          isLastBlockDone = (cvalue == (gridDim.x - 1));
-        }
-        // finish the reduction if last block
-        if (isLastBlockDone) {
-          reduce_t sum = dparg->init();
-          #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
-          {
-            dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
-            while (i < gridDim.x) {
-              sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += Arg::block_size_x * Arg::block_size_y;
-            }
-          }
+      // increment global block counter
+      unsigned int cvalue = 0;
+      unsigned int *c = &dparg->count[idx];
+      #pragma omp atomic capture
+      { cvalue = *c; *c = *c + 1; }
 
-          // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      // determine if last block
+      isLastBlockDone = (cvalue == (gridDim.x - 1));
 
-          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
-          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
-          // printf("\n");
-          // write out the final reduced value
-          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
-          { // This is the main thread per team
-            dparg->result_d[idx] = sum;
-            dparg->count[idx] = 0; // set to zero for next time
+      // __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone) {
+        reduce_t sum = dparg->init();
+        #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
+        {
+          dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
+          auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
+          while (i < gridDim.x) {
+            sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
+            i += Arg::block_size_x * Arg::block_size_y;
           }
         }
+
+        // write out the final reduced value
+        dparg->result_d[idx] = sum;
+        dparg->count[idx] = 0; // set to zero for next time
       }
     }
     omp_target_free(dparg, omp_get_default_device());
   }
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
+  /**
+     @brief MultiReduction is the entry point of the generic
+     multi-reduction kernel.  This is the specialization where the
+     kernel argument struct is passed by value directly to the kernel.
+
+     @tparam Functor Kernel functor that defines the kernel
+     @tparam Arg Kernel argument struct that set any required meta
+     data for the kernel
+     @tparam grid_stride Whether the kernel does multiple computations
+     per thread (in the x dimension)
+     @param[in] arg Kernel argument
+   */
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> MultiReduction()
   {
     const int gd = launch_param.grid.x*launch_param.grid.y*launch_param.grid.z;
     const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
@@ -401,15 +350,15 @@ namespace quda {
     {
       int cache[device::max_shared_memory_size()/sizeof(int)];
       shared_cache.addr = cache;
-      // MultiReduction_impl<Transformer, Arg, grid_stride>(device::get_arg<Arg>());
-      Arg *dparg = &device::get_arg<Arg>();
+      Arg *dparg = device::get_arg<Arg>();
       const dim3
         blockDim=launch_param.block,
         gridDim=launch_param.grid,
         blockIdx(omp_get_team_num()%launch_param.grid.x, (omp_get_team_num()/launch_param.grid.x)%launch_param.grid.y, omp_get_team_num()/(launch_param.grid.x*launch_param.grid.y));
+      const int ld = launch_param.block.x*launch_param.block.y*launch_param.block.z;
 
-      using reduce_t = typename Transformer<Arg>::reduce_t;
-#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Transformer<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Transformer<Arg>::init_omp())
+      using reduce_t = typename Functor<Arg>::reduce_t;
+#pragma omp declare reduction(OMPReduce_ : reduce_t : omp_out=Functor<Arg>::reduce_omp(omp_out,omp_in)) initializer(omp_priv=Functor<Arg>::init_omp())
       reduce_t value = dparg->init();
       #pragma omp parallel num_threads(ld) reduction(OMPReduce_:value)
       {
@@ -420,70 +369,62 @@ namespace quda {
         //          omp_get_num_teams(), omp_get_num_threads());
         dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
 
-        Transformer<Arg> t(*dparg);
+        Functor<Arg> t(*dparg);
 
         auto idx = threadIdx.x + blockIdx.x * blockDim.x;
         auto j = threadIdx.y + blockIdx.y * blockDim.y;
         auto k = threadIdx.z;
 
-        if (j < dparg->threads.y){
+        if (j < dparg->threads.y) {
           while (idx < dparg->threads.x) {
             value = t(value, idx, j, k);
-            if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+            if (grid_stride)
+              idx += blockDim.x * gridDim.x;
+            else
+              break;
           }
         }
       }
+
       // perform final inter-block reduction and write out result
-      Transformer<Arg> t(*dparg);
+      Functor<Arg> t(*dparg);
       auto j = blockIdx.y * blockDim.y;
-      // reduce<Arg::block_size_x, Arg::block_size_y>(*dparg, t, value, j);
-      // ../../reduce_helper.h:/reduce
-      {
-        const auto idx = j;
-        // In OpenMP, this runs in the main thread of each team, and `in` is already the block reduction value.
-        bool isLastBlockDone;
-        // if (threadIdx.x == 0 && threadIdx.y == 0)
-        { // This is the main thread per team
-          dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
+      int idx = j;
+      bool isLastBlockDone;
 
-          // increment global block counter
-          // auto value = atomicInc(&arg.count[idx], gridDim.x);
-          unsigned int cvalue = 0;
-          unsigned int *c = &dparg->count[idx];
-          #pragma omp atomic capture
-          { cvalue = *c; *c = *c + 1; }
-          // { cvalue = dparg->count[idx]; dparg->count[idx] = ((dparg->count[idx] >= gridDim.x) ? 0 : (dparg->count[idx]+1)); }
+      dparg->partial[idx * gridDim.x + blockIdx.x] = value;
+      // __threadfence(); // flush result
 
-          // determine if last block
-          isLastBlockDone = (cvalue == (gridDim.x - 1));
-        }
-        // finish the reduction if last block
-        if (isLastBlockDone) {
-          reduce_t sum = dparg->init();
-          #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
-          {
-            dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
-            auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
-            while (i < gridDim.x) {
-              sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
-              i += Arg::block_size_x * Arg::block_size_y;
-            }
-          }
+      // increment global block counter
+      unsigned int cvalue = 0;
+      unsigned int *c = &dparg->count[idx];
+      #pragma omp atomic capture
+      { cvalue = *c; *c = *c + 1; }
 
-          // sum = (Reducer::do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum, r));
+      // determine if last block
+      isLastBlockDone = (cvalue == (gridDim.x - 1));
 
-          // printf("lastBlock: team %d: idx: %d value: ", omp_get_team_num(), idx);
-          // for(int l=0;l<sizeof(sum)/sizeof(double);++l) printf(" %.16g", reinterpret_cast<double *>(&sum)[l]);
-          // printf("\n");
-          // write out the final reduced value
-          // if (threadIdx.y * Arg::block_size_x + threadIdx.x == 0)
-          { // This is the main thread per team
-            dparg->result_d[idx] = sum;
-            dparg->count[idx] = 0; // set to zero for next time
+      // __syncthreads();
+
+      // finish the reduction if last block
+      if (isLastBlockDone) {
+        reduce_t sum = dparg->init();
+        #pragma omp parallel num_threads(ld) reduction(OMPReduce_:sum)
+        {
+          dim3 threadIdx(omp_get_thread_num()%launch_param.block.x, (omp_get_thread_num()/launch_param.block.x)%launch_param.block.y, omp_get_thread_num()/(launch_param.block.x*launch_param.block.y));
+          auto i = threadIdx.y * Arg::block_size_x + threadIdx.x;
+          while (i < gridDim.x) {
+            sum = t(sum, const_cast<reduce_t &>(static_cast<volatile reduce_t *>(dparg->partial)[idx * gridDim.x + i]));
+            i += Arg::block_size_x * Arg::block_size_y;
           }
         }
+
+        // write out the final reduced value
+        dparg->result_d[idx] = sum;
+        dparg->count[idx] = 0; // set to zero for next time
       }
     }
   }
 
-}
+} // namespace quda

@@ -65,6 +65,19 @@ namespace quda {
     return v;
   }
 
+  template <> __device__ __host__ inline array<double,1> zero<array<double,1>>() { return zero<double,1>(); }
+  template <> __device__ __host__ inline array<double,2> zero<array<double,2>>() { return zero<double,2>(); }
+  template <> __device__ __host__ inline array<double,3> zero<array<double,3>>() { return zero<double,3>(); }
+  template <> __device__ __host__ inline array<double,4> zero<array<double,4>>() { return zero<double,4>(); }
+  template <> __device__ __host__ inline array<double,8> zero<array<double,8>>() { return zero<double,8>(); }
+  template <> __device__ __host__ inline array<double,16> zero<array<double,16>>() { return zero<double,16>(); }
+  template <> __device__ __host__ inline array<double2,1> zero<array<double2,1>>() { return zero<double2,1>(); }
+  template <> __device__ __host__ inline array<double2,2> zero<array<double2,2>>() { return zero<double2,2>(); }
+  template <> __device__ __host__ inline array<double2,3> zero<array<double2,3>>() { return zero<double2,3>(); }
+  template <> __device__ __host__ inline array<double2,4> zero<array<double2,4>>() { return zero<double2,4>(); }
+  template <> __device__ __host__ inline array<double2,8> zero<array<double2,8>>() { return zero<double2,8>(); }
+  template <> __device__ __host__ inline array<double2,16> zero<array<double2,16>>() { return zero<double2,16>(); }
+
   template <typename T> struct RealType {
   };
   template <> struct RealType<double> {

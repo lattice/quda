@@ -3,6 +3,7 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
+#include "float_vector.h"
 
 /**
    @file reducer.h

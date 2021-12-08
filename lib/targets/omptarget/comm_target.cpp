@@ -1,6 +1,5 @@
 #include <comm_quda.h>
 #include <quda_api.h>
-#include <quda_cuda_api.h>
 #include <algorithm>
 #include <shmem_helper.cuh>
 

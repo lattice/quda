@@ -159,7 +159,7 @@ namespace quda {
        @brief Use a compile time fixed size for the shared local memory,
        until we can find a way to set it dynamically.
     */
-    constexpr unsigned int max_shared_memory_size() { return 48*1024; /* Some amount below maximum */ }
+    constexpr unsigned int max_shared_memory_size() { return 32*1024; /* Some amount below maximum */ }
 
     /**
        @brief Helper function that returns true if we are to pass the
