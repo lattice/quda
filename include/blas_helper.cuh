@@ -144,7 +144,7 @@ namespace quda
         norm(static_cast<norm_t *>(const_cast<ColorSpinorField &>(x).Norm())),
         stride(x.Stride()),
         cb_offset(x.Bytes() / (2 * sizeof(store_t) * N)),
-        cb_norm_offset(x.NormBytes() / (2 * sizeof(norm_t)))
+        cb_norm_offset(x.Bytes() / (2 * sizeof(norm_t)))
       {}
     };
 

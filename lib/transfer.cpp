@@ -165,10 +165,6 @@ namespace quda {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
-
-      // These never get accessed, `nullptr` on its own leads to an error in texture binding
-      param.v = (void *)std::numeric_limits<uint64_t>::max();
-      param.norm = (void *)std::numeric_limits<uint64_t>::max();
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {

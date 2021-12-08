@@ -81,11 +81,8 @@ namespace quda {
     size_t volume;       // volume of a single eigenvector
     size_t volumeCB;     // CB volume of a single eigenvector
     size_t stride;       // stride of a single eigenvector
-    size_t real_length;  // physical length of a single eigenvector
     size_t length;       // length including pads (but not ghost zones)
-
     size_t bytes;      // size in bytes of spinor field
-    size_t norm_bytes; // makes no sense but let's keep it...
 
     CompositeColorSpinorFieldDescriptor() :
       is_composite(false),
@@ -95,10 +92,8 @@ namespace quda {
       volume(0),
       volumeCB(0),
       stride(0),
-      real_length(0),
       length(0),
-      bytes(0),
-      norm_bytes(0) {}
+      bytes(0) {}
 
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
       is_composite(is_composite),
@@ -108,10 +103,8 @@ namespace quda {
       volume(0),
       volumeCB(0),
       stride(0),
-      real_length(0),
       length(0),
-      bytes(0),
-      norm_bytes(0)
+      bytes(0)
      {
        if (is_composite && is_component) errorQuda("Composite type is not implemented");
        else if (is_composite && dim == 0) is_composite = false;
@@ -147,7 +140,7 @@ namespace quda {
 
     ColorSpinorField *field;
     void *v; // pointer to field
-    void *norm;
+    size_t norm_offset;
 
     //! for deflation solvers:
     bool is_composite;
@@ -320,7 +313,7 @@ namespace quda {
       printfQuda("pc_type = %d\n", pc_type);
       printfQuda("suggested_parity = %d\n", suggested_parity);
       printfQuda("v = %lx\n", (unsigned long)v);
-      printfQuda("norm = %lx\n", (unsigned long)norm);
+      printfQuda("norm_offset = %lu\n", (unsigned long)norm_offset);
       //! for deflation etc.
       if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
@@ -365,14 +358,11 @@ namespace quda {
      * even or odd parity. */
     QudaParity suggested_parity;
 
-    size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
 
     void *v; // the field elements
-    void *norm; // the normalization field
-
     void *v_h; // the field elements
-    void *norm_h; // the normalization field
+    size_t norm_offset; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
 
@@ -387,7 +377,6 @@ namespace quda {
     mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
     size_t bytes; // size in bytes of spinor field
-    size_t norm_bytes; // size in bytes of norm field
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -454,24 +443,23 @@ namespace quda {
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
-    size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
     size_t Stride() const { return stride; }
     size_t Volume() const { return volume; }
     size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
-    size_t NormBytes() const { return norm_bytes; }
-    size_t TotalBytes() const { return bytes + norm_bytes; }
+    size_t TotalBytes() const { return bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
     size_t GhostFaceBytes(int i) const { return ghost_face_bytes[i]; }
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    void* V() {return v;}
-    const void* V() const {return v;}
-    void* Norm(){return norm;}
-    const void* Norm() const {return norm;}
+    void* V() { return v; }
+    const void* V() const { return v; }
+    void* Norm() { return static_cast<char*>(v) + norm_offset; }
+    const void* Norm() const { return static_cast<char*>(v) + norm_offset; }
+    size_t NormOffset() const { return norm_offset; }
 
     /**
        @brief Returns the full lattice dimension regardless if this
@@ -678,10 +666,8 @@ namespace quda {
     int ComponentVolumeCB() const { return composite_descr.volumeCB; }
     int ComponentStride() const { return composite_descr.stride; }
     size_t ComponentLength() const { return composite_descr.length; }
-    size_t ComponentRealLength() const { return composite_descr.real_length; }
 
     size_t ComponentBytes() const { return composite_descr.bytes; }
-    size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
     QudaPCType PCType() const { return pc_type; }
     QudaParity SuggestedParity() const { return suggested_parity; }
@@ -819,7 +805,7 @@ namespace quda {
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
-      the spinor, the norm field (as appropriate), to the CPU or the GPU
+      the spinor, to the CPU or the GPU
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
@@ -866,8 +852,7 @@ namespace quda {
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-                              QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr,
-                              void * dstNorm = nullptr, const void* srcNorm = nullptr);
+                              QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr);
 
   void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);

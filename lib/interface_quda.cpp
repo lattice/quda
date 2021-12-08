@@ -2473,10 +2473,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-
-    // These never get accessed, `nullptr` on its own leads to an error in texture binding
-    csParam.v = (void *)std::numeric_limits<uint64_t>::max();
-    csParam.norm = (void *)std::numeric_limits<uint64_t>::max();
   }
 
   for (int i = 0; i < mg_param.n_vec[0]; i++) { B[i] = ColorSpinorField::Create(csParam); }

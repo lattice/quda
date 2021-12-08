@@ -4,8 +4,7 @@
 namespace quda
 {
 
-  using copy_pack
-    = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *, void *, const void *>;
+  using copy_pack = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *>;
   void copyGenericColorSpinorDD(const copy_pack &pack);
   void copyGenericColorSpinorDS(const copy_pack &pack);
   void copyGenericColorSpinorDH(const copy_pack &pack);
@@ -41,7 +40,7 @@ namespace quda
   void copyGenericColorSpinorMGQQ(const copy_pack &pack);
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location, void *Dst,
-                              const void *Src, void *dstNorm, const void *srcNorm)
+                              const void *Src)
   {
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Destination %d and source %d site subsets not equal", dst.SiteSubset(), src.SiteSubset());
@@ -49,7 +48,7 @@ namespace quda
     if (dst.Ncolor() != src.Ncolor())
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
-    copy_pack pack(dst, src, location, Dst, Src, dstNorm, srcNorm);
+    copy_pack pack(dst, src, location, Dst, Src);
     if (dst.Ncolor() == 3) {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {

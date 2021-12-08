@@ -19,14 +19,13 @@ namespace quda {
     alloc(false),
     reference(false),
     ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(0),
-    norm(0),
+    v(nullptr),
+    norm_offset(0),
     ghost(),
     ghostNorm(),
     ghostFace(),
     dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
     bytes(0),
-    norm_bytes(0),
     location(param.location),
     even(0),
     odd(0),
@@ -38,7 +37,7 @@ namespace quda {
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = param.v;
-      norm = param.norm;
+      norm_offset = param.norm_offset;
       reference = true;
     }
 
@@ -62,14 +61,13 @@ namespace quda {
     alloc(false),
     reference(false),
     ghost_precision_allocated(QUDA_INVALID_PRECISION),
-    v(0),
-    norm(0),
+    v(nullptr),
+    norm_offset(0),
     ghost(),
     ghostNorm(),
     ghostFace(),
     dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
     bytes(0),
-    norm_bytes(0),
     location(field.Location()),
     even(0),
     odd(0),
@@ -119,27 +117,15 @@ namespace quda {
      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);
 
     pad = param.pad;
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      stride = volume/2 + pad; // padding is based on half volume
-      length = 2*stride*nColor*nSpin*2;
-    } else {
-      stride = volume + pad;
-      length = stride*nColor*nSpin*2;
-    }
+    stride = volumeCB + pad; // padding is based on half volume
+    norm_offset = stride * nColor * nSpin * 2 * precision;
+    length = siteSubset * stride * nColor * nSpin * 2;
 
-    real_length = volume*nColor*nSpin*2; // physical length
+    bytes = length * precision; // includes pads and ghost zones
+    if (precision < QUDA_SINGLE_PRECISION) bytes += siteSubset * volumeCB * sizeof(float);
 
-    bytes = (size_t)length * precision; // includes pads and ghost zones
     if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
       bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
-
-    if (precision < QUDA_SINGLE_PRECISION) {
-      norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET ? 2*stride : stride) * sizeof(float);
-      if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
-        norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
-    } else {
-      norm_bytes = 0;
-    }
 
     init = true;
 
@@ -151,27 +137,21 @@ namespace quda {
       composite_descr.volumeCB = volumeCB;
       composite_descr.stride = stride;
       composite_descr.length = length;
-      composite_descr.real_length = real_length;
       composite_descr.bytes       = bytes;
-      composite_descr.norm_bytes  = norm_bytes;
 
       volume *= composite_descr.dim;
       volumeCB *= composite_descr.dim;
       stride *= composite_descr.dim;
       length *= composite_descr.dim;
-      real_length *= composite_descr.dim;
 
       bytes *= composite_descr.dim;
-      norm_bytes *= composite_descr.dim;
     } else if (composite_descr.is_component) {
       composite_descr.dim         = 0;
       composite_descr.volume      = 0;
       composite_descr.volumeCB    = 0;
       composite_descr.stride      = 0;
       composite_descr.length      = 0;
-      composite_descr.real_length = 0;
       composite_descr.bytes       = 0;
-      composite_descr.norm_bytes  = 0;
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) errorQuda("Subset not implemented");
@@ -183,15 +163,10 @@ namespace quda {
         switch(mem_type) {
         case QUDA_MEMORY_DEVICE:
           v = pool_device_malloc(bytes);
-          if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) norm = pool_device_malloc(norm_bytes);
           break;
         case QUDA_MEMORY_MAPPED:
           v_h = mapped_malloc(bytes);
           v = get_mapped_device_pointer(v_h);
-          if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-            norm_h = mapped_malloc(norm_bytes);
-            norm = get_mapped_device_pointer(norm_h); // set the matching device pointer
-          }
           break;
         default: errorQuda("Unsupported memory type %d", mem_type);
         }
@@ -211,7 +186,6 @@ namespace quda {
       for (int cid = 0; cid < composite_descr.dim; cid++) {
         param.component_id = cid;
         param.v = static_cast<void*>(static_cast<char*>(v) + cid * bytes / composite_descr.dim);
-        param.norm = static_cast<void*>(static_cast<char*>(norm) + cid * norm_bytes / composite_descr.dim);
         components.push_back(new ColorSpinorField(param));
       }
     }
@@ -229,10 +203,10 @@ namespace quda {
       param.component_id  = composite_descr.id;
       even = new ColorSpinorField(param);
       param.v = static_cast<char*>(v) + bytes / 2;
-      param.norm = static_cast<char*>(norm) + norm_bytes / 2;
       odd = new ColorSpinorField(param);
     }
 
+#if 0
     if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE) {
       if (!(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite)) {
         zeroPad();
@@ -243,6 +217,7 @@ namespace quda {
         }
       }
     }
+#endif
 
     setTuningString();
   }
@@ -252,16 +227,13 @@ namespace quda {
     if (alloc) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         host_free(v);
-        if (norm_bytes) host_free(norm);
       } else { // device field
         switch(mem_type) {
         case QUDA_MEMORY_DEVICE:
           pool_device_free(v);
-          if (norm_bytes) pool_device_free(norm);
           break;
         case QUDA_MEMORY_MAPPED:
           host_free(v_h);
-          if (norm_bytes) host_free(norm_h);
           break;
         default: errorQuda("Unsupported memory type %d", mem_type);
         }
@@ -310,6 +282,7 @@ namespace quda {
 
   void ColorSpinorField::zeroPad()
   {
+#if 0
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     if (!isNative()) errorQuda("Field order %d, precision %d not supported", fieldOrder, precision);
 
@@ -355,6 +328,7 @@ namespace quda {
                         subset_bytes - (size_t)stride * sizeof(float), device::get_default_stream());
       }
     }
+#endif
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
@@ -462,10 +436,8 @@ namespace quda {
   {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemsetAsync(v, 0, bytes, device::get_default_stream());
-      if (norm_bytes) qudaMemsetAsync(norm, 0, norm_bytes, device::get_default_stream());
     } else {
       memset(v, '\0', bytes);
-      if (norm_bytes) memset(norm, 0, norm_bytes);
     }
   }
 
@@ -506,11 +478,10 @@ namespace quda {
     } else if (Location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) { // H2D
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on host
-        void *buffer = pool_pinned_malloc(bytes + norm_bytes);
-        memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
-        copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0, static_cast<char*>(buffer)+bytes, 0);
+        void *buffer = pool_pinned_malloc(bytes);
+        memset(buffer, 0, bytes); // FIXME (temporary?) bug fix for padding
+        copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, buffer, 0);
         qudaMemcpy(v, buffer, bytes, qudaMemcpyDefault);
-        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyDefault);
         pool_pinned_free(buffer);
 
       } else { // reorder on device
@@ -520,23 +491,19 @@ namespace quda {
           void *src_d = get_mapped_device_pointer(src.V());
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
         } else {
-          void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
+          void *Src=nullptr, *buffer=nullptr;
           if (!zeroCopy) {
-            buffer = pool_device_malloc(src.Bytes()+src.NormBytes());
+            buffer = pool_device_malloc(src.Bytes());
             Src = buffer;
-            srcNorm = static_cast<char*>(Src) + src.Bytes();
             qudaMemcpy(Src, src.V(), src.Bytes(), qudaMemcpyDefault);
-            qudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), qudaMemcpyDefault);
           } else {
-            buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
+            buffer = pool_pinned_malloc(src.Bytes());
             memcpy(buffer, src.V(), src.Bytes());
-            memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
             Src = get_mapped_device_pointer(buffer);
-            srcNorm = static_cast<char*>(Src) + src.Bytes();
           }
 
           qudaMemsetAsync(v, 0, bytes, device::get_default_stream()); // FIXME (temporary?) bug fix for padding
-          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
+          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src);
 
           if (zeroCopy) pool_pinned_free(buffer);
           else pool_device_free(buffer);
@@ -547,10 +514,9 @@ namespace quda {
     } else if (Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) { //D2H
 
       if (reorder_location() == QUDA_CPU_FIELD_LOCATION) { // reorder on the host
-        void *buffer = pool_pinned_malloc(bytes+norm_bytes);
+        void *buffer = pool_pinned_malloc(bytes);
         qudaMemcpy(buffer, v, bytes, qudaMemcpyDefault);
-        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDefault);
-        copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer, 0, static_cast<char*>(buffer)+bytes);
+        copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 0, buffer);
         pool_pinned_free(buffer);
 
       } else { // reorder on the device
@@ -560,26 +526,22 @@ namespace quda {
           void *dest_d = get_mapped_device_pointer(v);
           copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dest_d, src.V());
         } else {
-          void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
+          void *dst = nullptr, *buffer = nullptr;
           if (!zeroCopy) {
-            buffer = pool_device_malloc(bytes + norm_bytes);
+            buffer = pool_device_malloc(bytes);
             dst = buffer;
-            dstNorm = static_cast<char*>(dst) + Bytes();
           } else {
-            buffer = pool_pinned_malloc(bytes + norm_bytes);
+            buffer = pool_pinned_malloc(bytes);
             dst = get_mapped_device_pointer(buffer);
-            dstNorm = static_cast<char*>(dst) + bytes;
           }
 
-          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dst, 0, dstNorm, 0);
+          copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, dst, 0);
 
           if (!zeroCopy) {
             qudaMemcpy(v, dst, Bytes(), qudaMemcpyDefault);
-            qudaMemcpy(norm, dstNorm, NormBytes(), qudaMemcpyDefault);
           } else {
             qudaDeviceSynchronize();
             memcpy(v, buffer, bytes);
-            memcpy(norm, static_cast<char*>(buffer) + bytes, norm_bytes);
           }
 
           if (zeroCopy) pool_pinned_free(buffer);
@@ -596,7 +558,6 @@ namespace quda {
   {
     param.field = const_cast<ColorSpinorField*>(this);
     param.v = v;
-    param.norm = norm;
 
     param.location = location;
     param.nColor = nColor;
@@ -919,35 +880,12 @@ namespace quda {
 
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
-    if (param_.Precision() > precision)  errorQuda("Cannot create an alias to source with lower precision than the alias");
+    if (param_.Precision() > precision) errorQuda("Cannot create an alias to source with lower precision than the alias");
     ColorSpinorParam param(param_);
     param.create = QUDA_REFERENCE_FIELD_CREATE;
     param.v = V();
 
-    // if norm field in the source exists, use it, else use the second
-    // half of main field for norm storage, ensuring that the start of
-    // the norm field is on an alignment boundary if we're using an
-    // internal field
-    if (param.Precision() < QUDA_SINGLE_PRECISION) {
-      auto norm_offset = (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) ?
-        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2 * ALIGNMENT_ADJUST(Bytes() / 4) : ALIGNMENT_ADJUST(Bytes() / 2) :
-        0;
-      param.norm = Norm() ? Norm() : static_cast<char *>(V()) + norm_offset;
-    }
-
-    auto alias = new ColorSpinorField(param);
-
-    if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
-    if (alias->Precision() < QUDA_SINGLE_PRECISION) {
-      // check that norm does not overlap with body
-      if (static_cast<char *>(alias->V()) + alias->Bytes() > alias->Norm())
-        errorQuda("Overlap between alias body and norm");
-      // check that norm does fall off the end
-      if (static_cast<char *>(alias->Norm()) + alias->NormBytes() > static_cast<char *>(V()) + Bytes())
-        errorQuda("Norm is not contained in the srouce field");
-    }
-
-    return alias;
+    return new ColorSpinorField(param);
   }
 
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
@@ -1627,16 +1565,8 @@ namespace quda {
     backup_h = new char[bytes];
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemcpy(backup_h, v, bytes, qudaMemcpyDefault);
-      if (norm_bytes) {
-        backup_norm_h = new char[norm_bytes];
-        qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDefault);
-      }
     } else {
       memcpy(backup_h, v, bytes);
-      if (norm_bytes) {
-        backup_norm_h = new char[norm_bytes];
-        memcpy(backup_norm_h, norm, norm_bytes);
-      }
     }
 
     backed_up = true;
@@ -1649,17 +1579,9 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemcpy(v, backup_h, bytes, qudaMemcpyDefault);
       delete []backup_h;
-      if (norm_bytes) {
-        qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyDefault);
-        delete []backup_norm_h;
-      }
     } else {
       memcpy(v, backup_h, bytes);
       delete []backup_h;
-      if (norm_bytes) {
-        memcpy(norm, backup_norm_h, norm_bytes);
-        delete []backup_norm_h;
-      }
     }
 
     backed_up = false;
@@ -1669,12 +1591,8 @@ namespace quda {
   {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemcpy(buffer, v, bytes, qudaMemcpyDeviceToHost);
-      if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes, qudaMemcpyDeviceToHost);
-      }
     } else {
       std::memcpy(buffer, v, bytes);
-      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(static_cast<char *>(buffer) + bytes, norm, norm_bytes); }
     }
   }
 
@@ -1682,12 +1600,8 @@ namespace quda {
   {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       qudaMemcpy(v, buffer, bytes, qudaMemcpyHostToDevice);
-      if (precision < QUDA_SINGLE_PRECISION) {
-        qudaMemcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes, qudaMemcpyHostToDevice);
-      }
     } else {
       std::memcpy(v, buffer, bytes);
-      if (precision < QUDA_SINGLE_PRECISION) { std::memcpy(norm, static_cast<char *>(buffer) + bytes, norm_bytes); }
     }
   }
 
@@ -1695,11 +1609,7 @@ namespace quda {
   {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       // conditionals based on destructor
-      if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE) {
-        qudaMemPrefetchAsync(v, bytes, mem_space, stream);
-        if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0)
-          qudaMemPrefetchAsync(norm, norm_bytes, mem_space, stream);
-      }
+      if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE) qudaMemPrefetchAsync(v, bytes, mem_space, stream);
     }
   }
 
@@ -1741,7 +1651,6 @@ namespace quda {
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
     out << "location = " << a.Location() << std::endl;
     out << "v = " << a.v << std::endl;
-    out << "norm = " << a.norm << std::endl;
     out << "alloc = " << a.alloc << std::endl;
     out << "reference = " << a.reference << std::endl;
     out << "init = " << a.init << std::endl;
@@ -1757,10 +1666,8 @@ namespace quda {
     out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "pad = " << a.pad << std::endl;
     out << "stride = " << a.stride << std::endl;
-    out << "real_length = " << a.real_length << std::endl;
     out << "length = " << a.length << std::endl;
     out << "bytes = " << a.bytes << std::endl;
-    out << "norm_bytes = " << a.norm_bytes << std::endl;
     out << "siteSubset = " << a.siteSubset << std::endl;
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;

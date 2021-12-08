@@ -670,7 +670,7 @@ namespace quda {
         if (block_float) {
           // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
           norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
-          norm_offset = field.NormBytes() / (2 * sizeof(norm_t));
+          norm_offset = field.Bytes() / (2 * sizeof(norm_t));
         }
       }
 
@@ -958,11 +958,12 @@ namespace quda {
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
 
-      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0) :
-        field(field_ ? field_ : (Float *)a.V()),
-        norm(norm_ ? norm_ : (norm_type *)a.Norm()),
+      FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *buffer = 0, Float **ghost_ = 0) :
+        field(buffer ? buffer : (Float *)a.V()),
+        norm(buffer ? reinterpret_cast<norm_type*>(reinterpret_cast<char*>(buffer) + a.NormOffset()) :
+             const_cast<norm_type*>(reinterpret_cast<const norm_type*>(a.Norm()))),
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
-        norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
+        norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
         volumeCB(a.VolumeCB()),
         stride(a.Stride()),
         nParity(a.SiteSubset()),
@@ -1148,7 +1149,7 @@ namespace quda {
   {
     return nParity * volumeCB * (Nc * Ns * 2 * sizeof(Float) + (isFixed<Float>::value ? sizeof(norm_type) : 0));
   }
-    };
+  };
 
     template <typename Float, int Ns, int Nc>
       struct SpaceColorSpinorOrder {

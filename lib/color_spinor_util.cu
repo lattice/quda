@@ -448,6 +448,7 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   template <typename StoreType, int Ns, int Nc, QudaFieldOrder FieldOrder>
   void genericCudaPrintVector(const ColorSpinorField &field, unsigned int i)
   {
+#warning "fix or delete"
     typedef colorspinor::AccessorCB<StoreType, Ns, Nc, 1, FieldOrder> AccessorType;
 
     AccessorType A(field);
