@@ -1508,17 +1508,17 @@ QUDA_UNROLL
   };
 
 #ifdef FLOAT8
-#define N8 8
+#define FLOATN 8
 #else
-#define N8 4
+#define FLOATN 4
 #endif
 
   // half precision
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, false, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, FLOATN, false, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<short, 4, Nc, N8, true, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<short, 4, Nc, FLOATN, true, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<short, 2, Nc, false, huge_alloc> {
     typedef colorspinor::FloatNOrder<short, 2, Nc, 2, false, huge_alloc> type;
@@ -1529,10 +1529,10 @@ QUDA_UNROLL
 
   // quarter precision
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, false, huge_alloc> {
-    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, false, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, FLOATN, false, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 4, Nc, true, huge_alloc> {
-    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, N8, true, huge_alloc> type;
+    typedef colorspinor::FloatNOrder<int8_t, 4, Nc, FLOATN, true, huge_alloc> type;
   };
   template <int Nc, bool huge_alloc> struct colorspinor_mapper<int8_t, 2, Nc, false, huge_alloc> {
     typedef colorspinor::FloatNOrder<int8_t, 2, Nc, 2, false, huge_alloc> type;
@@ -1541,7 +1541,7 @@ QUDA_UNROLL
     typedef colorspinor::FloatNOrder<int8_t, 1, Nc, 2, false, huge_alloc> type;
   };
 
-#undef N8
+#undef FLOATN
 
   template<typename T, QudaFieldOrder order, int Ns, int Nc> struct colorspinor_order_mapper { };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type; };

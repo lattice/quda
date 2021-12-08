@@ -17,12 +17,13 @@ namespace quda {
   */
   template <typename Float, int nColor_, bool inverse_ = true>
   struct CloverArg : kernel_param<> {
+    using store_t = Float;
     using real = typename mapper<Float>::type;
     static constexpr int nSpin = 4;
     static constexpr int nColor = nColor_;
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
     static constexpr bool inverse = inverse_;
-    static constexpr bool dynamic_clover = dynamic_clover_inverse();
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
 
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;
@@ -43,8 +44,9 @@ namespace quda {
     CloverArg(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 	      int parity, real kappa=0.0, real mu=0.0, real /*epsilon*/ = 0.0,
 	      bool dagger = false, QudaTwistGamma5Type twist=QUDA_TWIST_GAMMA5_INVALID) :
-      out(out), in(in), clover(clover, twist == QUDA_TWIST_GAMMA5_INVALID ? inverse : false),
-      cloverInv(clover, (twist != QUDA_TWIST_GAMMA5_INVALID && !dynamic_clover) ? true : false),
+      out(out), in(in),
+      clover(clover, inverse && !dynamic_clover && twist == QUDA_TWIST_GAMMA5_INVALID), // only inverse if non-twisted clover and !dynamic
+      cloverInv(clover, !dynamic_clover), // only inverse if !dynamic
       nParity(in.SiteSubset()), parity(parity),
       doublet(in.TwistFlavor() == QUDA_TWIST_DEG_DOUBLET || in.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET),
       volumeCB(doublet ? in.VolumeCB()/2 : in.VolumeCB()), a(0.0), b(0.0), c(0.0), twist(twist)
@@ -70,6 +72,7 @@ namespace quda {
 
   template <typename Arg> struct CloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
+    using store_t = typename Arg::store_t;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
@@ -92,9 +95,9 @@ QUDA_UNROLL
         HMatrix<real, N> A = arg.clover(x_cb, clover_parity, chirality);
         half_fermion chi = in.chiral_project(chirality);
 
-        if (arg.dynamic_clover) {
-          Cholesky<HMatrix, real, N> cholesky(A);
-          chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
+        if (arg.dynamic_clover && arg.inverse) {
+          Cholesky<HMatrix, clover::cholesky_t<store_t>, N> cholesky(A);
+          chi = static_cast<real>(0.25) * cholesky.solve(chi);
         } else {
           chi = A * chi;
         }
@@ -111,6 +114,7 @@ QUDA_UNROLL
   // else apply (Clover + i*a*gamma_5)/(Clover^2 + a^2) to the input spinor
   template <typename Arg> struct TwistCloverApply {
     static constexpr int N = Arg::nColor * Arg::nSpin / 2;
+    using store_t = typename Arg::store_t;
     using real = typename Arg::real;
     using fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin>;
     using half_fermion = ColorSpinor<typename Arg::real, Arg::nColor, Arg::nSpin / 2>;
@@ -143,8 +147,8 @@ QUDA_UNROLL
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
             A2 += arg.a*arg.a*static_cast<real>(0.25);
-            Cholesky<HMatrix, real, N> cholesky(A2);
-            out_chi = static_cast<real>(0.25)*cholesky.backward(cholesky.forward(out_chi));
+            Cholesky<HMatrix, clover::cholesky_t<store_t>, N> cholesky(A2);
+            out_chi = static_cast<real>(0.25)*cholesky.solve(out_chi);
           } else {
             Mat Ainv = arg.cloverInv(x_cb, clover_parity, chirality);
             out_chi = static_cast<real>(2.0)*(Ainv*out_chi);

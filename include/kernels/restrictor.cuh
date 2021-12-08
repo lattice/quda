@@ -147,7 +147,7 @@ QUDA_UNROLL
         }
       }
 
-      reduced = BlockReduce<vector, block_size, 1, Arg::n_vector_y, true>(thread.y). template Sum(reduced);
+      reduced = BlockReduce<vector, block_size, 1, Arg::n_vector_y, true>(thread.y).Sum(reduced);
 
       if (x_fine_offset == 0) {
         const int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;

@@ -2350,9 +2350,9 @@ QUDA_UNROLL
   };
 
 #ifdef FLOAT8
-#define N8 8
+#define FLOATN 8
 #else
-#define N8 4
+#define FLOATN 4
 #endif
 
   // half precision
@@ -2374,11 +2374,11 @@ QUDA_UNROLL
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -2400,12 +2400,14 @@ QUDA_UNROLL
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<int8_t, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<int8_t, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<int8_t, N, FLOATN, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
+
+#undef FLOATN
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
             QudaGhostExchange ghostExchange, bool use_inphase>

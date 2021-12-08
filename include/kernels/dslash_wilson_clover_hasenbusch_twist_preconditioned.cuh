@@ -11,7 +11,7 @@ namespace quda
   struct WilsonCloverHasenbuschTwistPCArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_inverse();
+    static constexpr bool dynamic_clover = clover::dynamic_inverse();
     static constexpr bool clov_inv = clov_inv_;
 
     typedef typename clover_mapper<Float, length>::type C;
@@ -89,8 +89,8 @@ QUDA_UNROLL
             HalfVector chi = out.chiral_project(chirality);
 
             if (arg.dynamic_clover) {
-              Cholesky<HMatrix, real, Arg::nColor * Arg::nSpin / 2> cholesky(A_inv);
-              chi = static_cast<real>(0.25) * cholesky.backward(cholesky.forward(chi));
+              Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A_inv);
+              chi = static_cast<real>(0.25) * cholesky.solve(chi);
             } else {
               chi = A_inv * chi;
             }

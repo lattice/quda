@@ -1,7 +1,6 @@
 #pragma once
 
-#include <limits.h>
-#define QUDA_INVALID_ENUM INT_MIN
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #ifdef __cplusplus
 extern "C" {
@@ -254,6 +253,7 @@ typedef enum QudaCloverFieldOrder_s {
   QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
   QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
   QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
+  QUDA_FLOAT8_CLOVER_ORDER = 8, // even-odd float8 ordering
   QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
   QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
   QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
