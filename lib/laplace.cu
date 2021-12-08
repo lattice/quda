@@ -166,7 +166,7 @@ namespace quda
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, const_cast<const ColorSpinorField *>(in), in.VolumeCB(),
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
         errorQuda("nSpin=%d Laplace operator required staggered dslash and laplace to be enabled", in.Nspin());
@@ -178,7 +178,7 @@ namespace quda
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, const_cast<const ColorSpinorField *>(in), in.VolumeCB(),
+        dslash::DslashPolicyTune<decltype(laplace)> policy(laplace, in, in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
         errorQuda("nSpin=%d Laplace operator required wilson dslash and laplace to be enabled", in.Nspin());

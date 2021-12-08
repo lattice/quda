@@ -122,11 +122,11 @@ namespace quda
       }
     }
 
-    ColorSpinorField *minvrPre = NULL;
-    ColorSpinorField *rPre = NULL;
-    ColorSpinorField *minvr = NULL;
-    ColorSpinorField *minvrSloppy = NULL;
-    ColorSpinorField *p = NULL;
+    ColorSpinorField *minvrPre = nullptr;
+    ColorSpinorField *rPre = nullptr;
+    ColorSpinorField *minvr = nullptr;
+    ColorSpinorField *minvrSloppy = nullptr;
+    ColorSpinorField *p = nullptr;
 
     ColorSpinorParam csParam(b);
     ColorSpinorField r(b);
