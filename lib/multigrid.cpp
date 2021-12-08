@@ -251,13 +251,27 @@ namespace quda
 
   void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, double mass)
   {
+    if (param.level != 0)
+      errorQuda("The staggered KD operator can only be updated from level 0");
+
     if (param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD && param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("Attempting to update fine gauge fields of a \"coarse\" but non-KD operator");
 
-    // last nullptr is for the clover field
-    diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-    diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
-    diracCoarseSmootherSloppy->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+    // Need to be careful here: if we're preconditioning an ASQTAD op with
+    // a StaggeredKD op, we need to pass the StaggeredKD op the fat links
+    auto dirac_type = diracSmoother->getDiracType();
+
+    if ((dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) && param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      // last nullptr is for the clover field
+      diracCoarseResidual->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmoother->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+    } else {
+      // last nullptr is for the clover field
+      diracCoarseResidual->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmoother->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+      diracCoarseSmootherSloppy->updateFields(gauge_in, fat_gauge_in, long_gauge_in, nullptr);
+    }
 
     diracCoarseResidual->setMass(mass);
     diracCoarseSmoother->setMass(mass);
