@@ -2,6 +2,9 @@
 # CUDA specific part of CMakeLists
 
 find_package(CUDAToolkit REQUIRED)
+include(CheckLanguage)
+check_language(CUDA)
+
 # add target specific files / options
 include(CMakeDependentOption)
 
@@ -27,51 +30,6 @@ mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 # confusion
 mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
 
-# ######################################################################################################################
-# CUDA specific QUDA options options
-option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
-option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
-option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
-option(QUDA_JITIFY "build QUDA using Jitify" OFF)
-option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
-set(QUDA_NVSHMEM
-    OFF
-    CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
-set(QUDA_NVSHMEM_HOME
-    $ENV{NVSHMEM_HOME}
-    CACHE PATH "path to NVSHMEM")
-set(QUDA_GDRCOPY_HOME
-    "/usr/local/gdrcopy"
-    CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
-# NVTX options
-option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
-
-if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
-  set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
-  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
-endif()
-cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
-                       "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
-
-if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
-endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
-endif()
-mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
-set(QUDA_HETEROGENEOUS_ATOMIC
-    ${QUDA_HETEROGENEOUS_ATOMIC}
-    PARENT_SCOPE)
-mark_as_advanced(QUDA_JITIFY)
-
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
-mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
-mark_as_advanced(QUDA_GDRCOPY_HOME)
-mark_as_advanced(QUDA_NVML)
-mark_as_advanced(QUDA_NUMA_NVML)
-mark_as_advanced(QUDA_VERBOSE_BUILD)
-mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 # ######################################################################################################################
 # define CUDA flags
@@ -81,21 +39,6 @@ set(CMAKE_CUDA_HOST_COMPILER
 set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
-
-include(CheckLanguage)
-check_language(CUDA)
-
-# TODO: Do we stil use that?
-if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
-  set(QUDA_CUDA_BUILD_TYPE "NVCC")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
-  set(QUDA_CUDA_BUILD_TYPE "Clang")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
-  set(QUDA_CUDA_BUILD_TYPE "NVHPC")
-  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
-endif()
 
 set(CMAKE_CUDA_FLAGS_DEVEL
     "-g -O3 "
@@ -125,6 +68,65 @@ mark_as_advanced(CMAKE_CUDA_FLAGS_SANITIZE)
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
+# TODO: Do we stil use that?
+if(${CMAKE_CUDA_COMPILER} MATCHES "nvcc")
+  set(QUDA_CUDA_BUILD_TYPE "NVCC")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+elseif(${CMAKE_CUDA_COMPILER} MATCHES "clang")
+  set(QUDA_CUDA_BUILD_TYPE "Clang")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
+  set(QUDA_CUDA_BUILD_TYPE "NVHPC")
+  message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
+endif()
+
+
+
+# ######################################################################################################################
+# CUDA specific QUDA options options
+option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
+option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
+option(QUDA_VERBOSE_BUILD "display kernel register usage" OFF)
+option(QUDA_JITIFY "build QUDA using Jitify" OFF)
+option(QUDA_DOWNLOAD_NVSHMEM "Download NVSHMEM" OFF)
+set(QUDA_NVSHMEM
+    OFF
+    CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
+set(QUDA_NVSHMEM_HOME
+    $ENV{NVSHMEM_HOME}
+    CACHE PATH "path to NVSHMEM")
+set(QUDA_GDRCOPY_HOME
+    "/usr/local/gdrcopy"
+    CACHE STRING "path to gdrcopy used when QUDA_DOWNLOAD_NVSHMEM is enabled")
+# NVTX options
+option(QUDA_INTERFACE_NVTX "add NVTX markup to interface calls" OFF)
+
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+  set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
+  message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
+endif()
+cmake_dependent_option(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support ?" ON
+                       "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+
+if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
+endif()
+if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
+  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
+endif()
+mark_as_advanced(QUDA_HETEROGENEOUS_ATOMIC)
+set(QUDA_HETEROGENEOUS_ATOMIC
+    ${QUDA_HETEROGENEOUS_ATOMIC}
+    PARENT_SCOPE)
+mark_as_advanced(QUDA_JITIFY)
+
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM)
+mark_as_advanced(QUDA_DOWNLOAD_NVSHMEM_TAR)
+mark_as_advanced(QUDA_GDRCOPY_HOME)
+mark_as_advanced(QUDA_NVML)
+mark_as_advanced(QUDA_NUMA_NVML)
+mark_as_advanced(QUDA_VERBOSE_BUILD)
+mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 # ######################################################################################################################
 # CUDA specific variables
@@ -364,7 +366,7 @@ if(QUDA_JITIFY)
   target_include_directories(quda PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
   configure_file(${CMAKE_SOURCE_DIR}/include/targets/cuda/jitify_options.hpp.in
-                 ${${CMAKE_BINARY_DIR}}/include/targets/cuda/jitify_options.hpp)
+                 ${CMAKE_BINARY_DIR}/include/targets/cuda/jitify_options.hpp)
   install(FILES "${CMAKE_BINARY_DIR}/include/targets/cuda/jitify_options.hpp" DESTINATION include/)
 endif()
 
