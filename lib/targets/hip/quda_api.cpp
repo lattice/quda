@@ -365,6 +365,12 @@ namespace quda {
                              const char *file, const char *line)
    {
      hipEvent_t &hip_event = reinterpret_cast<hipEvent_t&>(quda_event.event);
+
+		 hipError_t hiperr = hipErrorNotReady; // A random not hipSuccess initialization
+		 do {
+			 	hiperr = hipEventQuery(hip_event);
+     } while( hiperr != hipSuccess );
+ 	
      PROFILE(hipError_t error = hipStreamWaitEvent(device::get_cuda_stream(stream), hip_event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
      set_runtime_error(error, __func__, func, file, line);
    }
