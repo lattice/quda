@@ -114,9 +114,6 @@ namespace quda {
       return device::max_threads_per_block() / (param.block.y * param.block.z);
     }
 
-#ifdef QUDA_BACKEND_OMPTARGET
-    virtual unsigned int maxGridSize() const { return device::processor_count(); }
-#else
     /**
        @brief Return the maximum grid size in the x dimension explored
        by the autotuner.  This defaults to twice the number of
@@ -125,7 +122,6 @@ namespace quda {
        will find this through increased block size.
      */
     virtual unsigned int maxGridSize() const { return 2 * device::processor_count(); }
-#endif
 
     /**
        @brief Return the minimum grid size in the x dimension explored
