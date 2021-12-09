@@ -264,7 +264,7 @@ namespace quda {
       const int stride;
       const int offset_cb;
       AccessorCB(const ColorSpinorField &field) :
-        stride(field.Stride()),
+        stride(field.VolumeCB()),
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
@@ -313,7 +313,7 @@ namespace quda {
       const int stride;
       const int offset_cb;
       AccessorCB(const ColorSpinorField &field) :
-        stride(field.Stride()),
+        stride(field.VolumeCB()),
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
@@ -361,7 +361,7 @@ namespace quda {
       const int stride;
       const int offset_cb;
       AccessorCB(const ColorSpinorField &field) :
-        stride(field.Stride()),
+        stride(field.VolumeCB()),
         offset_cb((field.Bytes() >> 1) / sizeof(complex<Float>))
       {
       }
@@ -951,7 +951,6 @@ namespace quda {
       const AllocInt norm_offset;
       int volumeCB;
       int faceVolumeCB[4];
-      int stride;
       mutable Float *ghost[8];
       mutable norm_type *ghost_norm[8];
       int nParity;
@@ -965,7 +964,6 @@ namespace quda {
         offset(a.Bytes() / (2 * sizeof(Float) * N)),
         norm_offset(a.Bytes() / (2 * sizeof(norm_type))),
         volumeCB(a.VolumeCB()),
-        stride(a.Stride()),
         nParity(a.SiteSubset()),
         backup_h(nullptr),
         bytes(a.Bytes())
@@ -995,7 +993,7 @@ namespace quda {
 #pragma unroll
     for (int i=0; i<M; i++) {
       // first load from memory
-      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + stride * i);
+      Vector vecTmp = vector_load<Vector>(field, parity * offset + x + volumeCB * i);
       // now copy into output and scale
 #pragma unroll
       for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
@@ -1037,7 +1035,7 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
       // second do vectorized copy into memory
-      vector_store(field, parity * offset + x + stride * i, vecTmp);
+      vector_store(field, parity * offset + x + volumeCB * i, vecTmp);
     }
   }
 
@@ -1162,16 +1160,13 @@ namespace quda {
       Float *ghost[8];
       int volumeCB;
       int faceVolumeCB[4];
-      int stride;
       int nParity;
       SpaceColorSpinorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
-        stride(a.Stride()),
         nParity(a.SiteSubset())
       {
-        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
         for (int i = 0; i < 4; i++) {
           ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
@@ -1249,16 +1244,13 @@ namespace quda {
       Float *ghost[8];
       int volumeCB;
       int faceVolumeCB[4];
-      int stride;
       int nParity;
       SpaceSpinorColorOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, float * = 0, Float **ghost_ = 0) :
         field(field_ ? field_ : (Float *)a.V()),
         offset(a.Bytes() / (2 * sizeof(Float))),
         volumeCB(a.VolumeCB()),
-        stride(a.Stride()),
         nParity(a.SiteSubset())
       {
-        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
         for (int i = 0; i < 4; i++) {
           ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
@@ -1328,7 +1320,6 @@ namespace quda {
       int volumeCB;
       int exVolumeCB;
       int faceVolumeCB[4];
-      int stride;
       int nParity;
       int dim[4];   // full field dimensions
       int exDim[4]; // full field dimensions
@@ -1337,12 +1328,10 @@ namespace quda {
         field(field_ ? field_ : (Float *)a.V()),
         volumeCB(a.VolumeCB()),
         exVolumeCB(1),
-        stride(a.Stride()),
         nParity(a.SiteSubset()),
         dim {a.X(0), a.X(1), a.X(2), a.X(3)},
         exDim {a.X(0), a.X(1), a.X(2) + 4, a.X(3)}
       {
-        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
         for (int i = 0; i < 4; i++) {
           ghost[2 * i] = ghost_ ? ghost_[2 * i] : 0;
           ghost[2 * i + 1] = ghost_ ? ghost_[2 * i + 1] : 0;
@@ -1429,13 +1418,10 @@ namespace quda {
       using complex = complex<real>;
       Float *field;
       int volumeCB;
-      int stride;
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int = 1, Float *field_ = 0, float * = 0) :
-        field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
-      {
-        if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
-      }
+        field(field_ ? field_ : (Float *)a.V()), volumeCB(a.VolumeCB()), nParity(a.SiteSubset())
+      { }
 
   __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
   {

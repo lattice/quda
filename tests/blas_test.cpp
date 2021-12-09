@@ -205,7 +205,6 @@ void initFields(prec_pair_t prec_pair)
   param.nColor = Ncolor;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
-  param.pad = 0;  // padding must be zero for cpu fields
 
   switch (solve_type) {
   case QUDA_DIRECT_PC_SOLVE:
@@ -257,7 +256,6 @@ void initFields(prec_pair_t prec_pair)
   for (int i = 0; i < Nsrc; i++) { static_cast<ColorSpinorField *>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   for (int i = 0; i < Msrc; i++) { static_cast<ColorSpinorField *>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   // Now set the parameters for the cuda fields
-  // param.pad = xdim*ydim*zdim/2;
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;

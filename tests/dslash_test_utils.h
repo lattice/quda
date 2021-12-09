@@ -289,7 +289,6 @@ struct DslashTestWrapper {
     if (!transfer) {
       csParam.location = QUDA_CUDA_FIELD_LOCATION;
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      csParam.pad = inv_param.sp_pad;
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {

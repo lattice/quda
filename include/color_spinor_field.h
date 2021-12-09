@@ -80,8 +80,7 @@ namespace quda {
 
     size_t volume;       // volume of a single eigenvector
     size_t volumeCB;     // CB volume of a single eigenvector
-    size_t stride;       // stride of a single eigenvector
-    size_t length;       // length including pads (but not ghost zones)
+    size_t length;       // length (excluding norm))
     size_t bytes;      // size in bytes of spinor field
 
     CompositeColorSpinorFieldDescriptor() :
@@ -91,7 +90,6 @@ namespace quda {
       id(0),
       volume(0),
       volumeCB(0),
-      stride(0),
       length(0),
       bytes(0) {}
 
@@ -102,7 +100,6 @@ namespace quda {
       id(id),
       volume(0),
       volumeCB(0),
-      stride(0),
       length(0),
       bytes(0)
      {
@@ -304,7 +301,6 @@ namespace quda {
       for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
       printfQuda("ghost_precision = %d\n", ghost_precision);
-      printfQuda("pad = %d\n", pad);
       printfQuda("siteSubset = %d\n", siteSubset);
       printfQuda("siteOrder = %d\n", siteOrder);
       printfQuda("fieldOrder = %d\n", fieldOrder);
@@ -345,8 +341,6 @@ namespace quda {
 
     size_t volume;
     size_t volumeCB;
-    size_t pad;
-    size_t stride;
 
     QudaTwistFlavorType twistFlavor;
 
@@ -358,7 +352,7 @@ namespace quda {
      * even or odd parity. */
     QudaParity suggested_parity;
 
-    size_t length; // length including pads, but not ghost zone - used for BLAS
+    size_t length; // length including pads, but not norm zone
 
     void *v; // the field elements
     void *v_h; // the field elements
@@ -377,6 +371,7 @@ namespace quda {
     mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
     size_t bytes; // size in bytes of spinor field
+    size_t bytes_raw; // actual data size neglecting alignment
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
@@ -444,10 +439,8 @@ namespace quda {
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
     size_t Length() const { return length; }
-    size_t Stride() const { return stride; }
     size_t Volume() const { return volume; }
     size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
-    int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t TotalBytes() const { return bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
@@ -664,7 +657,6 @@ namespace quda {
     int ComponentId() const { return composite_descr.id; }
     int ComponentVolume() const { return composite_descr.volume; }
     int ComponentVolumeCB() const { return composite_descr.volumeCB; }
-    int ComponentStride() const { return composite_descr.stride; }
     size_t ComponentLength() const { return composite_descr.length; }
 
     size_t ComponentBytes() const { return composite_descr.bytes; }

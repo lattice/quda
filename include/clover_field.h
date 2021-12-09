@@ -163,7 +163,6 @@ namespace quda {
       location(QUDA_INVALID_FIELD_LOCATION)
     {
       siteSubset = QUDA_FULL_SITE_SUBSET;
-      pad = inv_param.cl_pad;
       for (int i = 0; i < nDim; i++) this->x[i] = x[i];
     }
 

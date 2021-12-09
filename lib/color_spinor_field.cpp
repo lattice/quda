@@ -26,6 +26,7 @@ namespace quda {
     ghostFace(),
     dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
     bytes(0),
+    bytes_raw(0),
     location(param.location),
     even(0),
     odd(0),
@@ -68,6 +69,7 @@ namespace quda {
     ghostFace(),
     dslash_constant(static_cast<DslashConstant *>(safe_malloc(sizeof(DslashConstant)))),
     bytes(0),
+    bytes_raw(0),
     location(field.Location()),
     even(0),
     odd(0),
@@ -110,46 +112,42 @@ namespace quda {
     // Copy all data in X
     for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = param.x[d];
     volume = 1;
-    for (int d=0; d<nDim; d++) volume *= x[d];
+    for (int d = 0; d < nDim; d++) volume *= x[d];
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-   if ((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) //two flavors
-     errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);
+    if ((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) //two flavors
+      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);
 
-    pad = param.pad;
-    stride = volumeCB + pad; // padding is based on half volume
-    norm_offset = stride * nColor * nSpin * 2 * precision;
-    length = siteSubset * stride * nColor * nSpin * 2;
+    if (param.pad != 0) errorQuda("Padding must be zero");
+    length = siteSubset * volumeCB * nColor * nSpin * 2;
+    bytes_raw = length * precision;
+    if (precision < QUDA_SINGLE_PRECISION) bytes_raw += siteSubset * volumeCB * sizeof(float);
 
-    bytes = length * precision; // includes pads and ghost zones
-    if (precision < QUDA_SINGLE_PRECISION) bytes += siteSubset * volumeCB * sizeof(float);
+    norm_offset = volumeCB * nColor * nSpin * 2 * precision; // this is the offset in bytes to start of the norm components
 
-    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER)
-      bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    // alignment must be done on parity boundaries
+    if (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) bytes = siteSubset * ALIGNMENT_ADJUST(bytes_raw / siteSubset);
+    else bytes = bytes_raw;
 
     init = true;
 
     //! stuff for deflated solvers (eigenvector sets):
     if (composite_descr.is_composite) {
       if (composite_descr.is_component) errorQuda("Composite type is not implemented");
-
-      composite_descr.volume   = volume;
+      composite_descr.volume = volume;
       composite_descr.volumeCB = volumeCB;
-      composite_descr.stride = stride;
       composite_descr.length = length;
-      composite_descr.bytes       = bytes;
+      composite_descr.bytes = bytes;
 
       volume *= composite_descr.dim;
       volumeCB *= composite_descr.dim;
-      stride *= composite_descr.dim;
       length *= composite_descr.dim;
-
+      bytes_raw *= composite_descr.dim;
       bytes *= composite_descr.dim;
     } else if (composite_descr.is_component) {
       composite_descr.dim         = 0;
       composite_descr.volume      = 0;
       composite_descr.volumeCB    = 0;
-      composite_descr.stride      = 0;
       composite_descr.length      = 0;
       composite_descr.bytes       = 0;
     }
@@ -206,7 +204,6 @@ namespace quda {
       odd = new ColorSpinorField(param);
     }
 
-#if 0
     if (isNative() && param.create != QUDA_REFERENCE_FIELD_CREATE) {
       if (!(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite)) {
         zeroPad();
@@ -217,9 +214,23 @@ namespace quda {
         }
       }
     }
-#endif
 
     setTuningString();
+  }
+
+  void ColorSpinorField::zeroPad()
+  {
+    // zero the region added for alignment reasons
+    if (bytes != bytes_raw) {
+      size_t subset_bytes = bytes / siteSubset;
+      size_t subset_bytes_raw = bytes_raw / siteSubset;
+      for (int subset = 0; subset < siteSubset; subset++) {
+        if (location == QUDA_CUDA_FIELD_LOCATION)
+          qudaMemsetAsync(static_cast<char *>(v) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw, device::get_default_stream());
+        else
+          memset(static_cast<char *>(v) + subset_bytes_raw + subset_bytes * subset, 0, subset_bytes - subset_bytes_raw);
+      }
+    }
   }
 
   void ColorSpinorField::destroy()
@@ -269,8 +280,8 @@ namespace quda {
     {
       constexpr int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
-                           stride, precision, fieldOrder, nSpin, nColor);
+      int check = snprintf(aux_string, aux_string_n, "vol=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume,
+                           precision, fieldOrder, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
         strcpy(aux_tmp, aux_string);
@@ -278,57 +289,6 @@ namespace quda {
         if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       }
     }
-  }
-
-  void ColorSpinorField::zeroPad()
-  {
-#if 0
-    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
-    if (!isNative()) errorQuda("Field order %d, precision %d not supported", fieldOrder, precision);
-
-    size_t pad_bytes = (stride - volumeCB) * precision * fieldOrder;
-    int Npad = nColor * nSpin * 2 / fieldOrder;
-
-    if (composite_descr.is_composite && !composite_descr.is_component) {//we consider the whole eigenvector set:
-      Npad      *= composite_descr.dim;
-      pad_bytes /= composite_descr.dim;
-    }
-
-    size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
-    char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
-    if (pad_bytes)
-      for (int subset=0; subset<siteSubset; subset++) {
-        qudaMemset2DAsync(dst + subset * bytes / siteSubset, pitch, 0, pad_bytes, Npad, device::get_default_stream());
-      }
-
-    if (norm_bytes > 0) { // zero initialize the norm pad
-      size_t pad_bytes = (stride - volumeCB) * sizeof(float);
-      if (pad_bytes)
-        for (int subset=0; subset<siteSubset; subset++) {
-          qudaMemsetAsync((char *)norm + volumeCB * sizeof(float), 0, (stride - volumeCB) * sizeof(float),
-                          device::get_default_stream());
-        }
-    }
-
-    // zero the region added for alignment reasons
-    if (bytes != (size_t)length*precision) {
-      size_t subset_bytes = bytes/siteSubset;
-      size_t subset_length = length/siteSubset;
-      for (int subset=0; subset < siteSubset; subset++) {
-        qudaMemsetAsync((char *)v + subset_length * precision + subset_bytes * subset, 0,
-                        subset_bytes - subset_length * precision, device::get_default_stream());
-      }
-    }
-
-    // zero the region added for alignment reasons (norm)
-    if (norm_bytes && norm_bytes != siteSubset*stride*sizeof(float)) {
-      size_t subset_bytes = norm_bytes/siteSubset;
-      for (int subset=0; subset < siteSubset; subset++) {
-        qudaMemsetAsync((char *)norm + (size_t)stride * sizeof(float) + subset_bytes * subset, 0,
-                        subset_bytes - (size_t)stride * sizeof(float), device::get_default_stream());
-      }
-    }
-#endif
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
@@ -574,7 +534,6 @@ namespace quda {
     param.component_id  = 0;
 
     memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
-    param.pad = pad;
     param.siteSubset = siteSubset;
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
@@ -1627,8 +1586,6 @@ namespace quda {
     out << "suggested_parity = " << a.suggested_parity << std::endl;
     out << "precision = " << a.precision << std::endl;
     out << "ghost_precision = " << a.ghost_precision << std::endl;
-    out << "pad = " << a.pad << std::endl;
-    out << "stride = " << a.stride << std::endl;
     out << "length = " << a.length << std::endl;
     out << "bytes = " << a.bytes << std::endl;
     out << "siteSubset = " << a.siteSubset << std::endl;
@@ -1636,11 +1593,10 @@ namespace quda {
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
     out << "Is composite = " << a.composite_descr.is_composite << std::endl;
-    if(a.composite_descr.is_composite)
+    if (a.composite_descr.is_composite)
     {
       out << "Composite Dim = " << a.composite_descr.dim << std::endl;
       out << "Composite Volume = " << a.composite_descr.volume << std::endl;
-      out << "Composite Stride = " << a.composite_descr.stride << std::endl;
       out << "Composite Length = " << a.composite_descr.length << std::endl;
     }
     out << "Is component = " << a.composite_descr.is_component << std::endl;
