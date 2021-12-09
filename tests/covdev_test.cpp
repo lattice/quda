@@ -27,8 +27,8 @@ QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = nullptr;
 
-ColorSpinorField *spinor, *spinorOut, *spinorRef;
-ColorSpinorField *cudaSpinor, *cudaSpinorOut;
+std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
+std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
 
 ColorSpinorField* tmp;
 
@@ -78,9 +78,9 @@ void init(int argc, char **argv)
   csParam.create = QUDA_ZERO_FIELD_CREATE;    
   csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new ColorSpinorField(csParam);
-  spinorOut = new ColorSpinorField(csParam);
-  spinorRef = new ColorSpinorField(csParam);
+  spinor = std::make_unique<ColorSpinorField>(csParam);
+  spinorOut = std::make_unique<ColorSpinorField>(csParam);
+  spinorRef = std::make_unique<ColorSpinorField>(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
@@ -111,10 +111,10 @@ void init(int argc, char **argv)
   csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   printfQuda("Creating cudaSpinor\n");
-  cudaSpinor = new ColorSpinorField(csParam);
+  cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Creating cudaSpinorOut\n");
-  cudaSpinorOut = new ColorSpinorField(csParam);
+  cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
@@ -124,12 +124,12 @@ void init(int argc, char **argv)
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tmp = new ColorSpinorField(csParam);
+  tmp = std::make_unique<ColorSpinorField>(csParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
 
-  diracParam.tmp1 = tmp;
+  diracParam.tmp1 = tmp.get();
 
   dirac = new GaugeCovDev(diracParam);
 }
@@ -139,12 +139,12 @@ void end(void)
   for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
   delete dirac;
-  delete cudaSpinor;
-  delete cudaSpinorOut;
-  delete tmp;
-  delete spinor;
-  delete spinorOut;
-  delete spinorRef;
+  cudaSpinor.reset();
+  cudaSpinorOut.reset();
+  tmp.reset();
+  spinor.reset();
+  spinorOut.reset();
+  spinorRef.reset();
 
   if (cpuLink) delete cpuLink;
 

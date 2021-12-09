@@ -57,13 +57,13 @@ struct StaggeredDslashTestWrapper {
   cpuGaugeField *cpuFat = nullptr;
   cpuGaugeField *cpuLong = nullptr;
 
-  ColorSpinorField *spinor = nullptr;
-  ColorSpinorField *spinorOut = nullptr;
-  ColorSpinorField *spinorRef = nullptr;
-  ColorSpinorField *tmpCpu = nullptr;
-  ColorSpinorField *cudaSpinor = nullptr;
-  ColorSpinorField *cudaSpinorOut = nullptr;
-  ColorSpinorField *tmp = nullptr;
+  std::unique_ptr<ColorSpinorField> spinor;
+  std::unique_ptr<ColorSpinorField> spinorOut;
+  std::unique_ptr<ColorSpinorField> spinorRef;
+  std::unique_ptr<ColorSpinorField> tmpCpu;
+  std::unique_ptr<ColorSpinorField> cudaSpinor;
+  std::unique_ptr<ColorSpinorField> cudaSpinorOut;
+  std::unique_ptr<ColorSpinorField> tmp;
 
   std::vector<ColorSpinorField *> vp_spinor;
   std::vector<ColorSpinorField *> vp_spinor_out;
@@ -293,10 +293,10 @@ struct StaggeredDslashTestWrapper {
     csParam.pc_type = QUDA_4D_PC;
     csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-    spinor = new ColorSpinorField(csParam);
-    spinorOut = new ColorSpinorField(csParam);
-    spinorRef = new ColorSpinorField(csParam);
-    tmpCpu = new ColorSpinorField(csParam);
+    spinor = std::make_unique<ColorSpinorField>(csParam);
+    spinorOut = std::make_unique<ColorSpinorField>(csParam);
+    spinorRef = std::make_unique<ColorSpinorField>(csParam);
+    tmpCpu = std::make_unique<ColorSpinorField>(csParam);
 
     spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -315,16 +315,16 @@ struct StaggeredDslashTestWrapper {
     csParam.setPrecision(inv_param.cuda_prec);
     csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-    cudaSpinor = new ColorSpinorField(csParam);
-    cudaSpinorOut = new ColorSpinorField(csParam);
+    cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
+    cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
     *cudaSpinor = *spinor;
-    tmp = new ColorSpinorField(csParam);
+    tmp = std::make_unique<ColorSpinorField>(csParam);
 
     bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
     // because both call the same "Dslash" directly.
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.tmp1 = tmp;
+    diracParam.tmp1 = tmp.get();
     dirac = Dirac::create(diracParam);
 
     for (int dir = 0; dir < 4; dir++) {
@@ -353,35 +353,13 @@ struct StaggeredDslashTestWrapper {
       delete dirac;
       dirac = nullptr;
     }
-    if (cudaSpinor != nullptr) {
-      delete cudaSpinor;
-      cudaSpinor = nullptr;
-    }
-    if (cudaSpinorOut != nullptr) {
-      delete cudaSpinorOut;
-      cudaSpinorOut = nullptr;
-    }
-    if (tmp != nullptr) {
-      delete tmp;
-      tmp = nullptr;
-    }
-
-    if (spinor != nullptr) {
-      delete spinor;
-      spinor = nullptr;
-    }
-    if (spinorOut != nullptr) {
-      delete spinorOut;
-      spinorOut = nullptr;
-    }
-    if (spinorRef != nullptr) {
-      delete spinorRef;
-      spinorRef = nullptr;
-    }
-    if (tmpCpu != nullptr) {
-      delete tmpCpu;
-      tmpCpu = nullptr;
-    }
+    cudaSpinor.reset();
+    cudaSpinorOut.reset();
+    tmp.reset();
+    spinor.reset();
+    spinorOut.reset();
+    spinorRef.reset();
+    tmpCpu.reset();
 
     if (test_split_grid) {
       for (auto p : vp_spinor) { delete p; }
