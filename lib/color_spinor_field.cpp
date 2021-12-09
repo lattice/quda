@@ -28,8 +28,8 @@ namespace quda {
     bytes(0),
     bytes_raw(0),
     location(param.location),
-    even(0),
-    odd(0),
+    even(nullptr),
+    odd(nullptr),
     composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
     components(0)
   {
@@ -71,8 +71,8 @@ namespace quda {
     bytes(0),
     bytes_raw(0),
     location(field.Location()),
-    even(0),
-    odd(0),
+    even(nullptr),
+    odd(nullptr),
     composite_descr(field.composite_descr),
     components(0)
   {
@@ -249,6 +249,7 @@ namespace quda {
         default: errorQuda("Unsupported memory type %d", mem_type);
         }
       }
+      alloc = false;
 
       if (composite_descr.is_composite) {
         CompositeColorSpinorField::iterator vec;
