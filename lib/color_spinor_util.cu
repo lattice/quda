@@ -1,4 +1,5 @@
 #include <tuple>
+#include <memory>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
@@ -216,13 +217,14 @@ namespace quda {
   }
 
   template <class U, class V>
-  int compareSpinor(const U &u, const V &v, const int tol) {
+  int compareSpinor(const U &u, const V &v, const int tol)
+  {
     int fail_check = 16*tol;
-    int *fail = new int[fail_check];
+    std::vector<int> fail(fail_check);
     for (int f=0; f<fail_check; f++) fail[f] = 0;
 
     int N = 2*u.Nspin()*u.Ncolor();
-    int *iter = new int[N];
+    std::vector<int> iter(N);
     for (int i=0; i<N; i++) iter[i] = 0;
 
     for (int parity=0; parity<v.Nparity(); parity++) {
@@ -265,9 +267,6 @@ namespace quda {
       printfQuda("%e Failures: %d / %lu  = %e\n", pow(10.0,-(f+1)/(double)tol),
 		 fail[f], total, fail[f] / (double)total);
     }
-
-    delete []iter;
-    delete []fail;
 
     return accuracy_level;
   }
@@ -352,7 +351,6 @@ namespace quda {
     return ret;
   }
 
-
   template <class Order>
   void print_vector(const Order &o, int parity, unsigned int x_cb)
   {
@@ -396,16 +394,12 @@ namespace quda {
 
   template <typename Float> void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb)
   {
-    if (a.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      genericPrintVector<Float, QUDA_FLOAT2_FIELD_ORDER>(a, parity, x_cb);
-    } else if (a.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-      genericPrintVector<Float, QUDA_FLOAT4_FIELD_ORDER>(a, parity, x_cb);
-    } else if (a.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) {
-      genericPrintVector<Float, QUDA_FLOAT8_FIELD_ORDER>(a, parity, x_cb);
-    } else if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      genericPrintVector<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, parity, x_cb);
-    } else {
-      errorQuda("Unsupported field order %d", a.FieldOrder());
+    switch (a.FieldOrder()) {
+    case QUDA_FLOAT2_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT2_FIELD_ORDER>(a, parity, x_cb); break;
+    case QUDA_FLOAT4_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT4_FIELD_ORDER>(a, parity, x_cb); break;
+    case QUDA_FLOAT8_FIELD_ORDER: genericPrintVector<Float, QUDA_FLOAT8_FIELD_ORDER>(a, parity, x_cb); break;
+    case QUDA_SPACE_SPIN_COLOR_FIELD_ORDER: genericPrintVector<Float, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, parity, x_cb); break;
+    default: errorQuda("Unsupported field order %d", a.FieldOrder());
     }
   }
 
@@ -418,21 +412,16 @@ namespace quda {
     param.create = QUDA_COPY_FIELD_CREATE;
     // if field is a pinned device field then we need to clone it on the host
     bool host_clone = (a.Location() == QUDA_CUDA_FIELD_LOCATION && a.MemType() == QUDA_MEMORY_DEVICE && !use_managed_memory()) ? true : false;
-    const ColorSpinorField *a_ = !host_clone ? &a : new ColorSpinorField(param);
+    std::unique_ptr<ColorSpinorField> clone_a = !host_clone ? nullptr : std::make_unique<ColorSpinorField>(param);
+    const ColorSpinorField &a_ = !host_clone ? a : *clone_a.get();
 
-    if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      genericPrintVector<double>(*a_, parity, x_cb);
-    } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      genericPrintVector<float>(*a_, parity, x_cb);
-    } else if (a.Precision() == QUDA_HALF_PRECISION) {
-      genericPrintVector<short>(*a_, parity, x_cb);
-    } else if (a.Precision() == QUDA_QUARTER_PRECISION) {
-      genericPrintVector<int8_t>(*a_, parity, x_cb);
-    } else {
-      errorQuda("Precision %d not implemented", a.Precision());
+    switch (a.Precision()) {
+    case QUDA_DOUBLE_PRECISION:  genericPrintVector<double>(a_, parity, x_cb); break;
+    case QUDA_SINGLE_PRECISION:  genericPrintVector<float>(a_, parity, x_cb); break;
+    case QUDA_HALF_PRECISION:    genericPrintVector<short>(a_, parity, x_cb); break;
+    case QUDA_QUARTER_PRECISION: genericPrintVector<int8_t>(a_, parity, x_cb); break;
+    default: errorQuda("Precision %d not implemented", a.Precision());
     }
-
-    if (a_ != &a) delete a_;
   }
 
 } // namespace quda
