@@ -311,6 +311,10 @@ module quda_fortran
 
      ! Whether to use the platform native or generic BLAS / LAPACK */
      QudaBoolean :: native_blas_lapack;
+
+     ! Whether to use the fused kernels for Mobius/DWF-4D dslash
+     QudaBoolean :: use_mobius_fused_kernel
+
   end type quda_invert_param
 
 end module quda_fortran

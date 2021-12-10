@@ -1422,7 +1422,7 @@ static const char* jitsafe_header_limits_h = R"(
 #if defined _WIN32 || defined _WIN64
  #define __WORDSIZE 32
 #else
- #if defined __x86_64__ && !defined __ILP32__
+ #if defined(__LP64__) || (defined __x86_64__ && !defined __ILP32__)
   #define __WORDSIZE 64
  #else
   #define __WORDSIZE 32
@@ -1438,26 +1438,26 @@ enum {
   CHAR_MIN = _JITIFY_CHAR_IS_UNSIGNED ? 0 : SCHAR_MIN,
   CHAR_MAX = _JITIFY_CHAR_IS_UNSIGNED ? UCHAR_MAX : SCHAR_MAX,
 };
-#define SHRT_MIN    (-32768)
-#define SHRT_MAX    32767
-#define USHRT_MAX   65535
+#define SHRT_MIN    (-SHRT_MAX - 1)
+#define SHRT_MAX    0x7fff
+#define USHRT_MAX   0xffff
 #define INT_MIN     (-INT_MAX - 1)
-#define INT_MAX     2147483647
-#define UINT_MAX    4294967295U
+#define INT_MAX     0x7fffffff
+#define UINT_MAX    0xffffffff
 #if __WORDSIZE == 64
- # define LONG_MAX  9223372036854775807L
+ # define LONG_MAX  LLONG_MAX
 #else
- # define LONG_MAX  2147483647L
+ # define LONG_MAX  UINT_MAX
 #endif
-#define LONG_MIN    (-LONG_MAX - 1L)
+#define LONG_MIN    (-LONG_MAX - 1)
 #if __WORDSIZE == 64
- #define ULONG_MAX  18446744073709551615UL
+ #define ULONG_MAX  ULLONG_MAX
 #else
- #define ULONG_MAX  4294967295UL
+ #define ULONG_MAX  UINT_MAX
 #endif
-#define LLONG_MAX  9223372036854775807LL
-#define LLONG_MIN  (-LLONG_MAX - 1LL)
-#define ULLONG_MAX 18446744073709551615ULL
+#define LLONG_MAX  0x7fffffffffffffff
+#define LLONG_MIN  (-LLONG_MAX - 1)
+#define ULLONG_MAX 0xffffffffffffffff
 )";
 
 static const char* jitsafe_header_iterator = R"(

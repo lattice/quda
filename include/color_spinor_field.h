@@ -44,8 +44,6 @@ namespace quda {
 
   enum MemoryLocation { Device = 1, Host = 2, Remote = 4, Shmem = 8 };
 
-  struct FullClover;
-
   /**
      @brief Helper function for getting the implied spinor parity from a matrix preconditioning type.
      @param[in] matpc_type The matrix preconditioning type

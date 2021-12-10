@@ -24,6 +24,7 @@
 #include <complex>
 #include <sstream>
 #include <cstdint>
+#include <type_traits>
 
 namespace quda {
   namespace gauge {

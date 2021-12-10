@@ -138,7 +138,7 @@ namespace quda {
                    device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
             break;
 #endif
-          default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+          default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
           }
 
           tp.block.x /= tp.aux.x; // restore block size

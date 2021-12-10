@@ -42,7 +42,7 @@ namespace quda {
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
-    cudaCloverField *clover;
+    CloverField *clover;
     cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
@@ -62,6 +62,8 @@ namespace quda {
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool use_mma;            // whether to use tensor cores where applicable
 
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
+
     // Default constructor
     DiracParam() :
       type(QUDA_INVALID_DIRAC),
@@ -78,10 +80,15 @@ namespace quda {
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false),
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
-      use_mma(true)
+#ifdef QUDA_MMA_AVAILABLE
+      use_mma(true),
 #else
-      use_mma(false)
+      use_mma(false),
+#endif
+#ifdef NVSHMEM_COMMS
+      use_mobius_fused_kernel(false)
+#else
+      use_mobius_fused_kernel(true)
 #endif
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
@@ -106,6 +113,7 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
       printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
     }
   };
 
@@ -157,6 +165,8 @@ namespace quda {
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
 
     mutable int commDim[QUDA_MAX_DIM]; // whether do comms or not
+
+    bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
     mutable TimeProfile profile;
 
@@ -354,7 +364,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
     {
       gauge = gauge_in;
     }
@@ -462,7 +472,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField *clover;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -498,7 +508,7 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -610,7 +620,7 @@ namespace quda {
     // Inherit these so I will comment them out
     /*
   protected:
-    cudaCloverField *clover;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
     */
@@ -791,9 +801,8 @@ public:
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-		 ColorSpinorField &x, ColorSpinorField &b,
-		 const QudaSolutionType) const;
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 		     const QudaSolutionType) const;
 
@@ -861,6 +870,19 @@ public:
 
     void M5inv(ColorSpinorField &out, const ColorSpinorField &in) const;
     void M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, const double &k) const;
+
+    void Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a) const;
+    void Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &a, ColorSpinorField &y) const;
 
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1036,7 +1058,7 @@ public:
   protected:
     double mu;
     double epsilon;
-    cudaCloverField *clover;
+    CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
@@ -1075,7 +1097,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *clover_in)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *clover_in)
     {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
@@ -1303,7 +1325,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in);
+                              CloverField *clover_in);
 
     /**
      * @brief Create the coarse staggered KD operator.
@@ -1391,8 +1413,7 @@ public:
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, CloverField *)
     {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
@@ -1506,7 +1527,7 @@ public:
      *  @param clover_in Updated clover field
      */
     virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
-                              cudaCloverField *clover_in);
+                              CloverField *clover_in);
 
     /**
      * @brief Create the coarse improved staggered KD operator.
@@ -1685,7 +1706,7 @@ public:
 
     virtual QudaDiracType getDiracType() const { return QUDA_COARSE_DIRAC; }
 
-    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, cudaCloverField *)
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
     {
       Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
       warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");

@@ -1,5 +1,6 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <array.h>
 #include <kernel.h>
 #include <reduction_kernel.h>
 
@@ -56,9 +57,9 @@ namespace quda {
   };
 
   template<typename Float_, int nColor_, QudaReconstructType recon_>
-  struct UpdateMomArg : ReduceArg<vector_type<double, 2>>
+  struct UpdateMomArg : ReduceArg<array<double, 2>>
   {
-    using reduce_t = vector_type<double, 2>;
+    using reduce_t = array<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -82,11 +83,11 @@ namespace quda {
       }
     }
 
-    __device__ __host__ reduce_t init() const{ return reduce_t(); }
+    __device__ __host__ reduce_t init() const{ return reduce_t{0.0, 0.0}; }
   };
 
   template <typename Arg> struct MomUpdate {
-    using reduce_t = vector_type<double, 2>;
+    using reduce_t = array<double, 2>;
     const Arg &arg;
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -124,7 +125,7 @@ namespace quda {
         makeAntiHerm(f);
 
         // compute force norms
-        norm = operator()(reduce_t(f.L1(), f.L2()), norm);
+        norm = operator()(reduce_t{f.L1(), f.L2()}, norm);
 
         m = m + arg.coeff * f;
 
