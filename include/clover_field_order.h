@@ -594,8 +594,8 @@ namespace quda {
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
           recon(clover.Diagonal()),
-          nrm(clover.max_element(is_inverse) / 2), // factor of two in normalization
-          nrm_inv(fixedMaxValue<Float>::value / nrm),
+          nrm(clover.max_element(is_inverse) / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1))), // factor of two in normalization
+          nrm_inv(1.0 / nrm),
           is_inverse(is_inverse),
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
           volumeCB(clover.VolumeCB()),

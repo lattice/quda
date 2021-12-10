@@ -212,7 +212,7 @@ namespace quda
         norm_t scale = 0.0;
 #pragma unroll
         for (int i = 0; i < n; i++) scale = fmaxf(max_[i], scale);
-        data.norm[x + parity * data.cb_norm_offset] = scale;
+        data.norm[x + parity * data.cb_norm_offset] = scale * fixedInvMaxValue<store_t>::value;
 
         return fdividef(fixedMaxValue<store_t>::value, scale);
       }

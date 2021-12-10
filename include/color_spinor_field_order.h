@@ -1024,7 +1024,7 @@ namespace quda {
       norm_type scale = 0.0;
 #pragma unroll
       for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
-      norm[x+parity*norm_offset] = scale;
+      norm[x+parity*norm_offset] = scale * fixedInvMaxValue<Float>::value;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
@@ -1094,7 +1094,7 @@ namespace quda {
       norm_type scale = 0.0;
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
-      ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
+      ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale * fixedInvMaxValue<Float>::value;
 
       real scale_inv = fdividef(fixedMaxValue<Float>::value, scale);
 #pragma unroll
