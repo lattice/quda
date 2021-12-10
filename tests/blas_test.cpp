@@ -30,19 +30,20 @@ using namespace quda;
 */
 
 // these are pointers to the host fields
-ColorSpinorField *xH, *yH, *zH, *wH, *vH, *xoH, *yoH, *zoH;
+std::unique_ptr<ColorSpinorField> xH, yH, zH, wH, vH;
+ColorSpinorField *xoH, *yoH, *zoH;
 
 // these are pointers to the device fields that have "this precision"
-ColorSpinorField *xD, *yD, *zD, *wD, *vD;
+std::unique_ptr<ColorSpinorField> xD, yD, zD, wD, vD;
 
 // these are pointers to the device multi-fields that have "this precision"
-ColorSpinorField *xmD, *ymD, *zmD;
+std::unique_ptr<ColorSpinorField> xmD, ymD, zmD;
 
 // these are pointers to the device fields that have "this precision"
-ColorSpinorField *xoD, *yoD, *zoD, *woD, *voD;
+std::unique_ptr<ColorSpinorField> xoD, yoD, zoD, woD, voD;
 
 // these are pointers to the device multi-fields that have "other precision"
-ColorSpinorField *xmoD, *ymoD, *zmoD;
+std::unique_ptr<ColorSpinorField> xmoD, ymoD, zmoD;
 
 // these are pointers to the host multi-fields that have "this precision"
 std::vector<ColorSpinorField *> xmH;
@@ -230,16 +231,16 @@ void initFields(prec_pair_t prec_pair)
   param.pc_type = QUDA_4D_PC;
   param.location = QUDA_CPU_FIELD_LOCATION;
 
-  vH = new ColorSpinorField(param);
-  wH = new ColorSpinorField(param);
-  xH = new ColorSpinorField(param);
-  yH = new ColorSpinorField(param);
-  zH = new ColorSpinorField(param);
+  vH = std::make_unique<ColorSpinorField>(param);
+  wH = std::make_unique<ColorSpinorField>(param);
+  xH = std::make_unique<ColorSpinorField>(param);
+  yH = std::make_unique<ColorSpinorField>(param);
+  zH = std::make_unique<ColorSpinorField>(param);
 
   // all host fields are double precision, so the "other" fields just alias the regular fields
-  xoH = xH;
-  yoH = yH;
-  zoH = zH;
+  xoH = xH.get();
+  yoH = yH.get();
+  zoH = zH.get();
 
   xmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new ColorSpinorField(param));
@@ -248,13 +249,13 @@ void initFields(prec_pair_t prec_pair)
   zmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new ColorSpinorField(param));
 
-  static_cast<ColorSpinorField *>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<ColorSpinorField *>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<ColorSpinorField *>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<ColorSpinorField *>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<ColorSpinorField *>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  for (int i = 0; i < Nsrc; i++) { static_cast<ColorSpinorField *>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
-  for (int i = 0; i < Msrc; i++) { static_cast<ColorSpinorField *>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  for (int i = 0; i < Nsrc; i++) { xmH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  for (int i = 0; i < Msrc; i++) { ymH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   // Now set the parameters for the cuda fields
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
@@ -265,18 +266,18 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.location = QUDA_CUDA_FIELD_LOCATION;
-  vD = new ColorSpinorField(param);
-  wD = new ColorSpinorField(param);
-  xD = new ColorSpinorField(param);
-  yD = new ColorSpinorField(param);
-  zD = new ColorSpinorField(param);
+  vD = std::make_unique<ColorSpinorField>(param);
+  wD = std::make_unique<ColorSpinorField>(param);
+  xD = std::make_unique<ColorSpinorField>(param);
+  yD = std::make_unique<ColorSpinorField>(param);
+  zD = std::make_unique<ColorSpinorField>(param);
 
   param.setPrecision(prec_other, prec_other, true);
-  voD = new ColorSpinorField(param);
-  woD = new ColorSpinorField(param);
-  xoD = new ColorSpinorField(param);
-  yoD = new ColorSpinorField(param);
-  zoD = new ColorSpinorField(param);
+  voD = std::make_unique<ColorSpinorField>(param);
+  woD = std::make_unique<ColorSpinorField>(param);
+  xoD = std::make_unique<ColorSpinorField>(param);
+  yoD = std::make_unique<ColorSpinorField>(param);
+  zoD = std::make_unique<ColorSpinorField>(param);
 
   // create composite fields
   param.is_composite = true;
@@ -284,23 +285,23 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.composite_dim = Nsrc;
-  xmD = new ColorSpinorField(param);
+  xmD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Msrc;
-  ymD = new ColorSpinorField(param);
+  ymD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Nsrc;
-  zmD = new ColorSpinorField(param);
+  zmD = std::make_unique<ColorSpinorField>(param);
 
   param.setPrecision(prec_other, prec_other, true);
   param.composite_dim = Nsrc;
-  xmoD = new ColorSpinorField(param);
+  xmoD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Msrc;
-  ymoD = new ColorSpinorField(param);
+  ymoD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Nsrc;
-  zmoD = new ColorSpinorField(param);
+  zmoD = std::make_unique<ColorSpinorField>(param);
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -317,29 +318,29 @@ void initFields(prec_pair_t prec_pair)
 void freeFields()
 {
   // release memory
-  delete vD;
-  delete wD;
-  delete xD;
-  delete yD;
-  delete zD;
-  delete voD;
-  delete woD;
-  delete xoD;
-  delete yoD;
-  delete zoD;
-  delete xmD;
-  delete ymD;
-  delete zmD;
-  delete xmoD;
-  delete ymoD;
-  delete zmoD;
+  vD.reset();
+  wD.reset();
+  xD.reset();
+  yD.reset();
+  zD.reset();
+  voD.reset();
+  woD.reset();
+  xoD.reset();
+  yoD.reset();
+  zoD.reset();
+  xmD.reset();
+  ymD.reset();
+  zmD.reset();
+  xmoD.reset();
+  ymoD.reset();
+  zmoD.reset();
 
   // release memory
-  delete vH;
-  delete wH;
-  delete xH;
-  delete yH;
-  delete zH;
+  vH.reset();
+  wH.reset();
+  xH.reset();
+  yH.reset();
+  zH.reset();
   for (int i = 0; i < Nsrc; i++) delete xmH[i];
   for (int i = 0; i < Msrc; i++) delete ymH[i];
   for (int i = 0; i < Nsrc; i++) delete zmH[i];

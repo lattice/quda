@@ -49,20 +49,20 @@ struct DslashTime {
 struct DslashTestWrapper {
 
   // CPU color spinor fields
-  quda::ColorSpinorField *spinor = nullptr;
-  quda::ColorSpinorField *spinorOut = nullptr;
-  quda::ColorSpinorField *spinorRef = nullptr;
-  quda::ColorSpinorField *spinorTmp = nullptr;
+  std::unique_ptr<ColorSpinorField> spinor = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorOut = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorRef = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorTmp = nullptr;
   // For split grid
   std::vector<quda::ColorSpinorField *> vp_spinor;
   std::vector<quda::ColorSpinorField *> vp_spinorOut;
   std::vector<quda::ColorSpinorField *> vp_spinorRef;
 
   // CUDA color spinor fields
-  quda::ColorSpinorField *cudaSpinor = nullptr;
-  quda::ColorSpinorField *cudaSpinorOut = nullptr;
-  quda::ColorSpinorField *tmp1 = nullptr;
-  quda::ColorSpinorField *tmp2 = nullptr;
+  std::unique_ptr<ColorSpinorField> cudaSpinor = nullptr;
+  std::unique_ptr<ColorSpinorField> cudaSpinorOut = nullptr;
+  std::unique_ptr<ColorSpinorField> tmp1 = nullptr;
+  std::unique_ptr<ColorSpinorField> tmp2 = nullptr;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -232,10 +232,10 @@ struct DslashTestWrapper {
     csParam.gammaBasis = inv_param.gamma_basis;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    spinor = new ColorSpinorField(csParam);
-    spinorOut = new ColorSpinorField(csParam);
-    spinorRef = new ColorSpinorField(csParam);
-    spinorTmp = new ColorSpinorField(csParam);
+    spinor =    std::make_unique<ColorSpinorField>(csParam);
+    spinorOut = std::make_unique<ColorSpinorField>(csParam);
+    spinorRef = std::make_unique<ColorSpinorField>(csParam);
+    spinorTmp = std::make_unique<ColorSpinorField>(csParam);
 
     spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -299,18 +299,18 @@ struct DslashTestWrapper {
       }
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
-      cudaSpinor = new ColorSpinorField(csParam);
+      cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
-      cudaSpinorOut = new ColorSpinorField(csParam);
+      cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
-      tmp1 = new ColorSpinorField(csParam);
+      tmp1 = std::make_unique<ColorSpinorField>(csParam);
 
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
         csParam.x[0] /= 2;
       }
 
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      tmp2 = new ColorSpinorField(csParam);
+      tmp2 = std::make_unique<ColorSpinorField>(csParam);
 
       printfQuda("Sending spinor field to GPU\n");
       *cudaSpinor = *spinor;
@@ -324,8 +324,8 @@ struct DslashTestWrapper {
       DiracParam diracParam;
       setDiracParam(diracParam, &inv_param, pc);
 
-      diracParam.tmp1 = tmp1;
-      diracParam.tmp2 = tmp2;
+      diracParam.tmp1 = tmp1.get();
+      diracParam.tmp2 = tmp2.get();
 
       dirac = Dirac::create(diracParam);
 
@@ -342,17 +342,18 @@ struct DslashTestWrapper {
         delete dirac;
         dirac = nullptr;
       }
-      delete cudaSpinor;
-      delete cudaSpinorOut;
-      delete tmp1;
-      delete tmp2;
+
     }
 
     // release memory
-    delete spinor;
-    delete spinorOut;
-    delete spinorRef;
-    delete spinorTmp;
+    cudaSpinor.reset();
+    cudaSpinorOut.reset();
+    tmp1.reset();
+    tmp2.reset();
+    spinor.reset();
+    spinorOut.reset();
+    spinorRef.reset();
+    spinorTmp.reset();
 
     for (auto p : vp_spinor) { delete p; }
     for (auto p : vp_spinorOut) { delete p; }
