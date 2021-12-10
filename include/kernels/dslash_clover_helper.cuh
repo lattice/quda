@@ -211,7 +211,7 @@ namespace quda {
 
 #pragma unroll
         for (int flavor = 0; flavor < n_flavor; flavor++) {
-          out_chi[flavor] += A * in_chi[flavor];
+          out_chi[flavor] = A * in_chi[flavor];
           out_chi[flavor] += (flavor == 0 ? a : -a) * in_chi[flavor];
           out_chi[flavor] += arg.b * in_chi[1 - flavor];
         }

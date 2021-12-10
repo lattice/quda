@@ -6,7 +6,7 @@ namespace quda {
   /**
      @brief Compute the gauge-force contribution to the momentum
      @param[out] mom Momentum field
-     @param[in] u Gauge field (extended when running no multiple GPUs)
+     @param[in] u Gauge field (extended when running on multiple GPUs)
      @param[in] coeff Step-size coefficient
      @param[in] input_path Host-array holding all path contributions for the gauge action
      @param[in] length Host array holding the length of all paths
@@ -20,7 +20,7 @@ namespace quda {
   /**
      @brief Compute the product of gauge-links along the given path
      @param[out] out Gauge field which the result is added to
-     @param[in] u Gauge field (extended when running no multiple GPUs)
+     @param[in] u Gauge field (extended when running on multiple GPUs)
      @param[in] coeff Global coefficient for the result
      @param[in] input_path Host-array holding all path contributions
      @param[in] length Host array holding the length of all paths
