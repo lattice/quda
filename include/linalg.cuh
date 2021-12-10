@@ -157,14 +157,14 @@ QUDA_UNROLL
       {
         // copy source vector into factorization precision
 	ColorSpinor<T,1,N> b_;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < N; i++) b_(i) = b(i);
 
         auto x_ = backward(forward(b_));
 
         // copy solution vector into desired precision
         Vector x;
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < N; i++) x(i) = x_(i);
 
         return x;

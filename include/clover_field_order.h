@@ -141,13 +141,13 @@ namespace quda {
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < compressed_block_size(); i++) out[unpack_idx(i)] = in[i];
 
           // first reconstruct second set of diagonal elements before we reconstruct the first set
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < 3; i++) out[i + 3] = diagonal - out[i];
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < 3; i++) out[i + 0] = diagonal + out[i];
 
         out[30] = -out[6];
@@ -160,10 +160,10 @@ namespace quda {
 
       template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < compressed_block_size(); i++) out[i] = in[unpack_idx(i)];
           // remove diagonal constant
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < 3; i++) out[i] -= diagonal;
         out[3] = 0.0; // intentionally zero this so that it can't contribute to the max element
       }
@@ -182,13 +182,13 @@ namespace quda {
 
       template <typename T1, typename T2> __device__ __host__ inline void unpack(T1 &out, const T2 &in) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < block; i++) out[i] = in[i];
       }
 
       template <typename T1, typename T2> __device__ __host__ inline void pack(T1 &out, const T2 &in) const
       {
-#pragma unroll
+QUDA_UNROLL
         for (int i = 0; i < block; i++) out[i] = in[i];
       }
     };
@@ -828,14 +828,14 @@ QUDA_UNROLL
 	  // factor of 0.5 comes from basis change
           Float v_[length];
           block_load<Float, length>(v_, &clover[parity * offset + x * length]);
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < length; i++) v[i] = 0.5 * v_[i];
         }
 
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           Float v_[length];
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < length; i++) v_[i] = 2.0 * v[i];
           block_store<Float, length>(&clover[parity * offset + x * length], v_);
         }
@@ -871,16 +871,16 @@ QUDA_UNROLL
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 6; i++) {
               v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
             }
 
             // the off diagonal elements
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 30; i++) {
               int z = i%2;
 	      int off = i/2;
@@ -893,16 +893,16 @@ QUDA_UNROLL
         __device__ __host__ inline void save(const RegType v[length], int x, int parity) const
         {
           // the factor of 2.0 comes from undoing the basis change
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++) {
             // set diagonal elements
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 6; i++) {
               diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
             }
 
             // the off diagonal elements
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < 30; i++) {
               int z = i%2;
 	      int off = i/2;
@@ -958,18 +958,18 @@ QUDA_UNROLL
 
           // flip the sign of the imaginary components
           int sign[36];
-#pragma unroll
+QUDA_UNROLL
           for (int i = 0; i < 6; i++) sign[i] = 1;
-#pragma unroll
+QUDA_UNROLL
           for (int i = 6; i < 36; i += 2) {
             if ( (i >= 10 && i<= 15) || (i >= 18 && i <= 29) )  { sign[i] = -1; sign[i+1] = -1; }
 	    else { sign[i] = 1; sign[i+1] = -1; }
           }
 
           const int M = length / 2;
-#pragma unroll
+QUDA_UNROLL
           for (int chirality = 0; chirality < 2; chirality++)
-#pragma unroll
+QUDA_UNROLL
             for (int i = 0; i < M; i++)
               v[chirality * M + i] = sign[i] * clover[parity][x * length + chirality * M + bq[i]];
         }

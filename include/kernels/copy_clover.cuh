@@ -73,7 +73,7 @@ QUDA_UNROLL
       typename mapper<typename Arg::store_out_t>::type out[length];
       typename mapper<typename Arg::store_in_t>::type in[length];
       arg.in.raw_load(in, x_cb, parity);
-#pragma unroll
+QUDA_UNROLL
       for (int i=0; i<length; i++) out[i] = in[i];
 
       arg.out.raw_save(out, x_cb, parity);
