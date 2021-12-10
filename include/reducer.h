@@ -66,7 +66,7 @@ namespace quda
   template <typename T> struct plus {
     static constexpr bool do_sum = true;
     __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     static inline T reduce_omp(T a, T b) { return a + b; }
     static inline T init_omp() { return ::quda::zero<T>(); }
 #endif
@@ -78,7 +78,7 @@ namespace quda
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
     __device__ __host__ inline T operator()(T a, T b) const { return a > b ? a : b; }
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     static inline T reduce_omp(T a, T b) { return a > b ? a : b; }
     static inline T init_omp() { return ::quda::zero<T>(); }  // FIXME wrong for negative values.
 #endif
@@ -90,7 +90,7 @@ namespace quda
   template <typename T> struct minimum {
     static constexpr bool do_sum = false;
     __device__ __host__ inline T operator()(T a, T b) const { return a < b ? a : b; }
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     static inline T reduce_omp(T a, T b) { return a < b ? a : b; }
     static inline T init_omp() { return ::quda::zero<T>(); }  // FIXME wrong for positive values.
 #endif

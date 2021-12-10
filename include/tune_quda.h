@@ -74,7 +74,7 @@ namespace quda {
       if (tuneGridDim()) {
         const int step = gridStep();
         param.grid.x += step;
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
         /* Makes sure the runtime allows us to set the parameters. */
         bool failed = false;
         {

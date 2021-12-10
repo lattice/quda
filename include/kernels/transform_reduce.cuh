@@ -45,7 +45,7 @@ namespace quda {
 
     static constexpr bool do_sum = Arg::reducer::do_sum;
 
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     static reduce_t reduce_omp(reduce_t a, reduce_t b) { return Arg::reducer::reduce_omp(a, b); }
     static reduce_t init_omp() { return Arg::reducer::init_omp(); }
 #endif

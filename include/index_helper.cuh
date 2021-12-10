@@ -1,7 +1,7 @@
 #pragma once
 
 #include <enum_quda.h>
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
 #include <omp.h>
 #endif
 

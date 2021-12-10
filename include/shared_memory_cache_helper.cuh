@@ -72,7 +72,7 @@ namespace quda
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-#ifndef QUDA_BACKEND_OMPTARGET
+#ifndef QUDA_TARGET_OMPTARGET
         extern __shared__ int cache_[];
         return reinterpret_cast<atom_t*>(cache_);
 #else
@@ -88,7 +88,7 @@ namespace quda
     template <typename dummy> struct cache_static<true, dummy> {
       __device__ inline atom_t* operator()()
       {
-#ifndef QUDA_BACKEND_OMPTARGET
+#ifndef QUDA_TARGET_OMPTARGET
         static __shared__ atom_t cache_[n_element * block_size_x * block_size_y * block_size_z];
         return reinterpret_cast<atom_t*>(cache_);
 #else

@@ -12,3 +12,7 @@
 #elif defined(QUDA_TARGET_HIP)
 #include <hip/hip_runtime.h>
 #endif
+
+#elif defined(QUDA_TARGET_OMPTARGET)
+#include <omp.h>
+#endif

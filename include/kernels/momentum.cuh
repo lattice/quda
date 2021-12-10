@@ -94,7 +94,7 @@ namespace quda {
 
     static constexpr bool do_sum = false;
 
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     static reduce_t reduce_omp(const reduce_t &a, const reduce_t &b)
     {
       auto c = a;

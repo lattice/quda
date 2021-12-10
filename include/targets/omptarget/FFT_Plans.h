@@ -13,7 +13,7 @@ using FFTPlanHandle = cufftHandle;
 
 #ifndef GPU_GAUGE_ALG
 */
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
 #define CUFFT_SAFE_CALL(call)
 
 inline void ApplyFFT(FFTPlanHandle &, float2 *, float2 *, int)

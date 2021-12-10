@@ -1,7 +1,7 @@
 #ifndef _BLAS_MAGMA_H
 #define _BLAS_MAGMA_H
 
-#ifndef QUDA_BACKEND_OMPTARGET
+#ifndef QUDA_TARGET_OMPTARGET
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <string>

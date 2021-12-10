@@ -67,7 +67,8 @@
  */
 #cmakedefine QUDA_TARGET_CUDA
 #cmakedefine QUDA_TARGET_HIP
+#cmakedefine QUDA_TARGET_OMPTARGET
 
-#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
+#if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP) && !defined(QUDA_TARGET_OMPTARGET)
 #error "No QUDA_TARGET selected"
 #endif

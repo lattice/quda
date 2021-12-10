@@ -185,7 +185,7 @@ namespace quda {
   void gaugeFixingFFT(GaugeField& data, int Nsteps, int verbose_interval,
                       double alpha0, int autotune, double tolerance, int stopWtheta)
   {
-#ifdef QUDA_BACKEND_OMPTARGET
+#ifdef QUDA_TARGET_OMPTARGET
     ompwip("unimplemented");
 #else
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
