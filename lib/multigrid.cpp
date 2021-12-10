@@ -930,15 +930,18 @@ namespace quda
 #if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
       setOutputPrefix("");
 
-      for (unsigned int i=0; i<comm_size(); i++) { // this ensures that we print each rank in order
-        if (i==comm_rank()) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("emulated\n");
-          for (int x=0; x<x_coarse->Volume(); x++) x_coarse->PrintVector(x);
-
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("actual\n");
-          for (int x=0; x<r_coarse->Volume(); x++) r_coarse->PrintVector(x);
-        }
+      for (unsigned int rank = 0; rank < comm_size(); rank++) { // this ensures that we print each rank in order
         comm_barrier();
+        printfQuda("\nemulated\n");
+        comm_barrier();
+        for (int parity = 0; parity < 2; parity++)
+          for (unsigned int x_cb = 0; x_cb < x_coarse->VolumeCB(); x_cb++) x_coarse->PrintVector(parity, x_cb, rank);
+
+        comm_barrier();
+        printfQuda("\nactual\n");
+        comm_barrier();
+        for (int parity = 0; parity < 2; parity++)
+          for (unsigned int x_cb = 0; x_cb < r_coarse->VolumeCB(); x_cb++) r_coarse->PrintVector(parity, x_cb, rank);
       }
       setOutputPrefix(prefix);
 #endif

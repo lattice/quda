@@ -808,18 +808,13 @@ namespace quda {
     void Source(QudaSourceType sourceType, unsigned int x = 0, int s = 0, int c = 0);
 
     /**
-       @brief Print the site vector
-       @param[in] x local site index (full index)
-    */
-    void PrintVector(unsigned int x) const;
-
-    /**
-     * @brief Thin wrapper around PrintVector that takes in a checkerboard index and
-     * a parity instead of a full index
-     * @param[in] x_cb checkerboard index
-     * @param[in] parity site parity
+     * @brief Print the site vector
+     * @param[in] a The field we are printing from
+     * @param[in] parity Parity index
+     * @param[in] x_cb Checkerboard space-time index
+     * @param[in] rank The rank we are requesting from (default is rank = 0)
      */
-    void PrintVector(unsigned int x_cb, unsigned int parity) const { PrintVector(2 * x_cb + parity); }
+    void PrintVector(int parity, unsigned int x_cb, int rank = 0) const;
 
     /**
        @brief Perform a component by component comparison of two
@@ -854,8 +849,14 @@ namespace quda {
   */
   void copyFieldOffset(ColorSpinorField &out, const ColorSpinorField &in, CommKey offset, QudaPCType pc_type);
 
-  void genericPrintVector(const ColorSpinorField &a, unsigned int x);
-  void genericCudaPrintVector(const ColorSpinorField &a, unsigned x);
+  /**
+     @brief Print the value of the field at the requested coordinates
+     @param[in] a The field we are printing from
+     @param[in] parity Parity index
+     @param[in] x_cb Checkerboard space-time index
+     @param[in] rank The rank we are requesting from (default is rank = 0)
+  */
+  void genericPrintVector(const ColorSpinorField &a, int parity, unsigned int x_cb, int rank = 0);
 
   /**
      @brief Generic ghost packing routine

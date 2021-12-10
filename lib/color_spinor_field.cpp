@@ -1557,11 +1557,7 @@ namespace quda {
     }
   }
 
-  void ColorSpinorField::PrintVector(unsigned int x) const
-  {
-    if (Location() == QUDA_CPU_FIELD_LOCATION) genericPrintVector(*this, x);
-    else genericCudaPrintVector(*this, x);
-  }
+  void ColorSpinorField::PrintVector(int parity, unsigned int x_cb, int rank) const { genericPrintVector(*this, parity, x_cb, rank); }
 
   int ColorSpinorField::Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int tol)
   {

@@ -414,9 +414,12 @@ namespace quda {
     };
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool fixed_point() { return false; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int8_t>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<double, int>() { return true; }
     template <> __host__ __device__ inline constexpr bool fixed_point<float, int8_t>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,short>() { return true; }
-    template<> __host__ __device__ inline constexpr bool fixed_point<float,int>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, short>() { return true; }
+    template <> __host__ __device__ inline constexpr bool fixed_point<float, int>() { return true; }
 
     template <typename Float, typename storeFloat> __host__ __device__ inline constexpr bool match() { return false; }
     template <> __host__ __device__ inline constexpr bool match<int8_t, int8_t>() { return true; }
@@ -668,7 +671,6 @@ namespace quda {
 #endif
 
         if (block_float) {
-          // only if we have block_float format do we set these (only block_orthogonalize.cu at present)
           norm = static_cast<norm_t *>(const_cast<void *>(field.Norm()));
           norm_offset = field.Bytes() / (2 * sizeof(norm_t));
         }
@@ -690,15 +692,16 @@ namespace quda {
       }
 #endif
 
-      void resetScale(Float max) {
-        if (fixed) {
+      void resetScale(Float max)
+      {
+        if ((block_float || block_float_ghost) && max != static_cast<Float>(1.0))
+          errorQuda("Block-float accessor requires max=1.0 not max=%e\n", max);
+        if (fixed && !block_float) {
           scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
           scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
         }
 #ifndef DISABLE_GHOST
-        if (ghost_fixed) {
-          if (block_float_ghost && max != static_cast<Float>(1.0))
-              errorQuda("Block-float accessor requires max=1.0 not max=%e\n", max);
+        if (ghost_fixed && !block_float_ghost) {
           ghost_scale = static_cast<Float>(std::numeric_limits<ghostFloat>::max() / max);
           ghost_scale_inv = static_cast<Float>(max / std::numeric_limits<ghostFloat>::max());
         }
@@ -744,7 +747,7 @@ namespace quda {
        * @param x 1-d checkerboard site index
        * @param s spin index
        * @param c color index
-       * @param v vector number
+       * @param n vector number
        */
       __device__ __host__ inline auto operator()(int parity, int x_cb, int s, int c, int n = 0) const
       {
