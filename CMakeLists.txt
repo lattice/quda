@@ -30,7 +30,13 @@ else()
   set(DEFBUILD "DEVEL")
 endif()
 
-set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG SANITIZE)
+set(VALID_BUILD_TYPES
+    DEVEL
+    RELEASE
+    STRICT
+    DEBUG
+    HOSTDEBUG
+    SANITIZE)
 set(CMAKE_BUILD_TYPE
     "${DEFBUILD}"
     CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
@@ -84,7 +90,7 @@ if(GIT_FOUND)
       OUTPUT_VARIABLE GITCOUNT
       OUTPUT_STRIP_TRAILING_WHITESPACE)
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always --long --dirty
+      COMMAND ${GIT_EXECUTABLE} describe --match 1 --always  --long --dirty
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       OUTPUT_VARIABLE GITVERSION
       OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -364,7 +370,7 @@ if(QUDA_DOWNLOAD_EIGEN)
       "3.4.0"
       CACHE STRING "Eigen use for QUDA_DOWNLOAD_EIGEN")
   mark_as_advanced(QUDA_EIGEN_VERSION)
-  cpmaddpackage(
+  CPMAddPackage(
     NAME
     Eigen
     VERSION
@@ -422,7 +428,7 @@ if(QUDA_MPI OR QUDA_QMP)
 endif()
 
 # ######################################################################################################################
-# USQCD
+# USQCD 
 # ######################################################################################################################
 # We might only want to do that if using QUDA_DOWNLOAD_USQCD, but this does not work if not set on the initial run
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -439,8 +445,8 @@ if(QUDA_QMP)
     set(QUDA_QMP_TAG
         "3010fef"
         CACHE STRING "Git tag to use for QMP when using QUDA_DOWNLOAD_USQCD")
-    mark_as_advanced(QUDA_QMP_TAG)
-    cpmaddpackage(
+    mark_as_advanced(QUDA_QMP_TAG)  
+    CPMAddPackage(
       NAME
       QMP
       GITHUB_REPOSITORY
@@ -452,7 +458,7 @@ if(QUDA_QMP)
       "QMP_TESTING OFF"
       "QMP_BUILD_DOCS OFF")
   else()
-    find_package(QMP REQUIRED)
+    find_package(QMP REQUIRED) 
   endif()
 endif()
 
@@ -468,17 +474,17 @@ if(QUDA_QIO)
         "a5c3ae580b846130c06dc060ab822f17d6fe2171"
         CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
-    cpmaddpackage(
+    CPMAddPackage(
       NAME
       QIO
       GITHUB_REPOSITORY
       usqcd-software/qio
       GIT_TAG
       ${QUDA_QIO_TAG}
-      OPTIONS
-      "QIO_ENABLE_PARALLEL_BUILD ON"
-      "QIO_ENABLE_QMP_ROUTE OFF"
-      "QIO_ENABLE_OUTPUT_BUFFERING ON"
+      OPTIONS 
+        "QIO_ENABLE_PARALLEL_BUILD ON"
+        "QIO_ENABLE_QMP_ROUTE OFF" 
+        "QIO_ENABLE_OUTPUT_BUFFERING ON" 
       "QIO_DML_BUF_BYTES 33554432")
   else()
     find_package(QIO REQUIRED)
@@ -486,26 +492,20 @@ if(QUDA_QIO)
 endif()
 
 # ######################################################################################################################
-# USQCD QDPJIT
+ # USQCD QDPJIT
 # ######################################################################################################################
-if(QUDA_QDPJIT)
-  if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
-  endif()
-  execute_process(
-    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
-    OUTPUT_VARIABLE QDP_LDFLAGS
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(
-    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
-    OUTPUT_VARIABLE QDP_LIBS
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
-  find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
-  find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
+ if(QUDA_QDPJIT)
+   if(NOT QUDA_QMP)
+     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+   endif()
+   find_package(QDPXX REQUIRED)
+   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
+     message(FATAL_ERROR "Found QDPXX but it is not QDP-JIT. Please specify with QDPXX_DIR pointing to the right path or add to the CMAKE_PREFIX_PATH")
+   endif()
+   set(QUDA_INTERFACE_QDPJIT ON)
+ endif()
 
-# ######################################################################################################################
+####################################
 # ARPACK
 # ######################################################################################################################
 if(QUDA_ARPACK)
@@ -518,7 +518,7 @@ if(QUDA_ARPACK)
   endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
-    # TODO: switch to CPM
+  #TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       ARPACK-NG
@@ -574,7 +574,7 @@ if(QUDA_OPENBLAS)
   enable_language(Fortran)
 
   if(QUDA_DOWNLOAD_OPENBLAS)
-    # TODO: switch to CPM
+  #TODO: switch to CPM
     include(GNUInstallDirs)
     ExternalProject_Add(
       OPENBLAS
@@ -582,7 +582,7 @@ if(QUDA_OPENBLAS)
       GIT_TAG v0.3.10
       GIT_SHALLOW YES
       PREFIX openblas
-      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> 
       CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(OPENBLAS INSTALL_DIR)
     set(QUDA_OPENBLAS_HOME ${INSTALL_DIR})
@@ -590,7 +590,7 @@ if(QUDA_OPENBLAS)
     add_dependencies(openblas OPENBLAS)
     set_target_properties(openblas PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(openblas PROPERTIES IMPORTED_LOCATION
-                                              ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
+                                               ${QUDA_OPENBLAS_HOME}/${CMAKE_INSTALL_LIBDIR}/libopenblas.a)
   else(QUDA_DOWNLOAD_OPENBLAS)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(OPENBLAS QUIET openblas)
@@ -598,7 +598,7 @@ if(QUDA_OPENBLAS)
       find_library(OPENBLAS openblas PATH ${QUDA_OPENBLAS_HOME})
     else()
       find_library(OPENBLAS ${OPENBLAS_LIBRARIES} PATH ${OPENBLAS_LIBRARY_DIRS})
-    endif()
+    endif()    
   endif(QUDA_DOWNLOAD_OPENBLAS)
 endif(QUDA_OPENBLAS)
 
@@ -620,7 +620,7 @@ if(QUDA_BACKWARDS)
 endif()
 
 # ######################################################################################################################
-# ADVANCED setup
+# ADVANCED setup 
 # ######################################################################################################################
 
 # this allows simplified running of clang-tidy
@@ -659,9 +659,9 @@ include(CMakePackageConfigHelpers)
 configure_package_config_file(QUDAConfig.cmake.in QUDAConfig.cmake INSTALL_DESTINATION lib/cmake/QUDA)
 
 write_basic_package_version_file(
-  QUDAVersion.cmake
-  VERSION ${PACKAGE_VERSION}
-  COMPATIBILITY AnyNewerVersion)
+	QUDAVersion.cmake
+	VERSION ${PACKAGE_VERSION}
+	COMPATIBILITY AnyNewerVersion)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
-        DESTINATION lib/cmake/QUDA)
+	DESTINATION lib/cmake/QUDA)
