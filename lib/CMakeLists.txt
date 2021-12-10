@@ -114,10 +114,6 @@ set(QUDA_DSLASH_OBJS
     laplace.cu
     covDev.cu)
 
-if(QUDA_NVSHMEM)
-  list(APPEND QUDA_DSLASH_OBJS dslash_constant_arg.cu)
-endif()
-
 if(NOT QUDA_NVSHMEM)
   list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
 endif()
@@ -174,16 +170,10 @@ else()
 endif()
 add_library(QUDA::quda ALIAS quda)
 
-# TODO: temporary workaround
-if(QUDA_NVSHMEM)
-  add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
-endif()
 
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  add_subdirectory(targets/cuda)
-  enable_language(CUDA) # this seems to be needed here ... mayeb we can get rid of that somehow
-  set(QUDA_TARGET_CUDA ON)
+  include(targets/cuda/target_cuda.cmake)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_subdirectory(targets/hip)
