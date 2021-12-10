@@ -170,7 +170,6 @@ else()
 endif()
 add_library(QUDA::quda ALIAS quda)
 
-
 # add target specific files
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   include(targets/cuda/target_cuda.cmake)
@@ -358,9 +357,10 @@ if(QUDA_QIO)
 endif()
 
 if(QUDA_QDPJIT)
-   target_compile_definitions(quda PRIVATE USE_QDPJIT)
-   # this avoids issues when qdpjit is build as a static library we should eventually switch to target_link_libraries(quda PRIVATE QDPXX::qdp)	
-   target_include_directories(quda PRIVATE $<TARGET_PROPERTY:QDPXX::qdp,INTERFACE_INCLUDE_DIRECTORIES>)
+  target_compile_definitions(quda PRIVATE USE_QDPJIT)
+  # this avoids issues when qdpjit is build as a static library we should eventually switch to
+  # target_link_libraries(quda PRIVATE QDPXX::qdp)
+  target_include_directories(quda PRIVATE $<TARGET_PROPERTY:QDPXX::qdp,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
 if(QUDA_ARPACK)

@@ -9,7 +9,6 @@ find_package(CUDAToolkit REQUIRED)
 include(CheckLanguage)
 check_language(CUDA)
 
-
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -32,7 +31,6 @@ mark_as_advanced(QUDA_GPU_ARCH_SUFFIX)
 # we don't yet use CMAKE_CUDA_ARCHITECTURES as primary way to set GPU architecture so marking it advanced to avoid
 # confusion
 mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
-
 
 # ######################################################################################################################
 # define CUDA flags
@@ -83,10 +81,8 @@ elseif(${CMAKE_CUDA_COMPILER_ID} MATCHES "NVHPC")
   message(STATUS "CUDA Build Type: ${QUDA_CUDA_BUILD_TYPE}")
 endif()
 
-
 # ######################################################################################################################
 # CUDA specific QUDA options options
-# add target specific files / options
 include(CMakeDependentOption)
 
 option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
@@ -378,7 +374,5 @@ endif(QUDA_NUMA_NVML)
 if(QUDA_NVML)
   target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
 endif()
-
-
 
 add_subdirectory(targets/cuda)
