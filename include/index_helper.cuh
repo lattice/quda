@@ -1,9 +1,6 @@
 #pragma once
 
 #include <enum_quda.h>
-#ifdef QUDA_TARGET_OMPTARGET
-#include <omp.h>
-#endif
 
 namespace quda {
   /**

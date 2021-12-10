@@ -1,4 +1,3 @@
-#include <omp.h>
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <target_device.h>
