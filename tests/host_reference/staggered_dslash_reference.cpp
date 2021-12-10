@@ -127,8 +127,8 @@ void staggeredDslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, 
 }
 
 void staggeredDslash(ColorSpinorField &out, void **fatlink, void **longlink, void **ghost_fatlink,
-                     void **ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit, QudaPrecision sPrecision,
-                     QudaPrecision gPrecision, QudaDslashType dslash_type)
+                     void **ghost_longlink, const ColorSpinorField &in, int oddBit, int daggerBit,
+                     QudaPrecision sPrecision, QudaPrecision gPrecision, QudaDslashType dslash_type)
 {
   const int nSrc = in.X(4);
 

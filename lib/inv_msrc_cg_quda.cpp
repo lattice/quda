@@ -23,10 +23,8 @@ namespace quda {
 
   }
 
-  void MultiSrcCG::operator()(std::vector<ColorSpinorField*> out, std::vector<ColorSpinorField*> in)
+  void MultiSrcCG::operator()(std::vector<ColorSpinorField *> out, std::vector<ColorSpinorField *> in)
   {
-
-
 
 #if 0
 

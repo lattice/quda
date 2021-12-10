@@ -58,34 +58,24 @@ namespace quda {
     double p2 = norm2(p);
     double stop = stopping(param.tol, b2, param.residual_type);
     int k=0;
-    while (!convergence(r2, 0.0, stop, 0.0) && k<param.maxiter) {
+    while (!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
 
       PrintStats("SimpleBiCGstab", k, r2, b2, 0.0);
 
-      mat(Ap,p,temp);
+      mat(Ap, p, temp);
       mat(A2p,Ap,temp);
-      mat(Ar,r,temp);
-
+      mat(Ar, r, temp);
 
       r0r   = cDotProductCuda(r0,r);
-      alpha = r0r/cDotProductCuda(r0,Ap);
+      alpha = r0r / cDotProductCuda(r0, Ap);
 
+      Complex omega_num = cDotProductCuda(r, Ar) - alpha * cDotProductCuda(r, A2p)
+        - conj(alpha) * cDotProductCuda(Ap, Ar) + conj(alpha) * alpha * cDotProductCuda(Ap, A2p);
 
-      Complex omega_num    =  cDotProductCuda(r,Ar)
-                           -  alpha*cDotProductCuda(r,A2p)
-                           -  conj(alpha)*cDotProductCuda(Ap,Ar)
-                           +  conj(alpha)*alpha*cDotProductCuda(Ap,A2p);
-
-
-      Complex omega_denom  = cDotProductCuda(Ar,Ar)
-                           - alpha*cDotProductCuda(Ar,A2p)
-                           - conj(alpha)*cDotProductCuda(A2p,Ar)
-                           + conj(alpha)*alpha*cDotProductCuda(A2p,A2p);
-
+      Complex omega_denom = cDotProductCuda(Ar, Ar) - alpha * cDotProductCuda(Ar, A2p)
+        - conj(alpha) * cDotProductCuda(A2p, Ar) + conj(alpha) * alpha * cDotProductCuda(A2p, A2p);
 
       omega = omega_num/omega_denom;
-
-
 
       // x ---> x + alpha p + omega s
       caxpyCuda(alpha,p,x);
@@ -101,11 +91,10 @@ namespace quda {
 
       beta = (cDotProductCuda(r0,r_new)/r0r)*(alpha/omega);
 
-
       // p = r_new + beta p - omega*beta Ap
       p_new = r_new;
       caxpyCuda(beta, p, p_new);
-      caxpyCuda(-beta*omega, Ap, p_new);
+      caxpyCuda(-beta * omega, Ap, p_new);
 
       p = p_new;
       r = r_new;
@@ -113,7 +102,6 @@ namespace quda {
       p2 = norm2(p);
       k++;
     }
-
 
     if(k == param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);

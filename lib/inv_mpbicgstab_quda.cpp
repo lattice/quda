@@ -20,8 +20,9 @@ namespace quda {
   MPBiCGstab::~MPBiCGstab() {
   }
 
-
-  void MPBiCGstab::computeMatrixPowers(std::vector<ColorSpinorField>& pr, ColorSpinorField& p, ColorSpinorField& r, int nsteps){
+  void MPBiCGstab::computeMatrixPowers(std::vector<ColorSpinorField> &pr, ColorSpinorField &p, ColorSpinorField &r,
+                                       int nsteps)
+  {
     ColorSpinorField temp(p);
     pr[0] = p;
     for(int i=1; i<=(2*nsteps); ++i){
@@ -56,27 +57,24 @@ namespace quda {
       for(int i=0; i<N; ++i) d[i] = static_cast<T>(0);
     }
 
+    static void computeGramMatrix(Complex **G, std::vector<ColorSpinorField> &v)
+    {
 
-  static void computeGramMatrix(Complex** G, std::vector<ColorSpinorField>& v){
+      const int dim = v.size();
 
-    const int dim = v.size();
-
-    for(int i=0; i<dim; ++i){
-      for(int j=0; j<dim; ++j){
-        G[i][j] = blas::cDotProduct(v[i],v[j]);
+      for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) { G[i][j] = blas::cDotProduct(v[i], v[j]); }
       }
+      return;
     }
-    return;
-  }
 
-  static void computeGramVector(Complex* g, ColorSpinorField& r0, std::vector<ColorSpinorField>& pr){
+    static void computeGramVector(Complex *g, ColorSpinorField &r0, std::vector<ColorSpinorField> &pr)
+    {
 
-    const int dim = pr.size();
+      const int dim = pr.size();
 
-    for(int i=0; i<dim; ++i){
-      g[i] = blas::cDotProduct(r0,pr[i]);
+      for (int i = 0; i < dim; ++i) { g[i] = blas::cDotProduct(r0, pr[i]); }
     }
-  }
 
 /*
   // Here, B is an (s+1)x(s+1) matrix with 1s on the subdiagonal
@@ -159,7 +157,7 @@ namespace quda {
     const int s = 3;
 
     // Vector of matrix powers
-    std::vector<ColorSpinorField> PR(4*s+2, ColorSpinorField(b,csParam));
+    std::vector<ColorSpinorField> PR(4 * s + 2, ColorSpinorField(b, csParam));
 
     Complex r0r;
     Complex alpha;

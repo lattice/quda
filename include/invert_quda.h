@@ -778,7 +778,7 @@ namespace quda {
   class MPCG : public Solver {
     private:
       void computeMatrixPowers(ColorSpinorField out[], ColorSpinorField &in, int nvec);
-      void computeMatrixPowers(std::vector<ColorSpinorField>& out, std::vector<ColorSpinorField>& in, int nsteps);
+      void computeMatrixPowers(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, int nsteps);
 
     public:
       MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
@@ -842,7 +842,7 @@ namespace quda {
   class MPBiCGstab : public Solver {
 
   private:
-    void computeMatrixPowers(std::vector<ColorSpinorField>& pr, ColorSpinorField& p, ColorSpinorField& r, int nsteps);
+    void computeMatrixPowers(std::vector<ColorSpinorField> &pr, ColorSpinorField &p, ColorSpinorField &r, int nsteps);
 
   public:
     MPBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);

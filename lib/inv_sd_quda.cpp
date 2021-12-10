@@ -50,7 +50,7 @@ namespace quda {
     double3 rAr;
 
     int k=0;
-    while(k < param.maxiter-1) {
+    while (k < param.maxiter - 1) {
       mat(*Ar, *r, *y);
       rAr = cDotProductNormA(*r, *Ar);
       alpha = rAr.z/rAr.x;

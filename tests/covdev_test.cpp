@@ -30,7 +30,7 @@ cpuGaugeField *cpuLink = nullptr;
 std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
 std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
 
-ColorSpinorField* tmp;
+ColorSpinorField *tmp;
 
 void *links[4];
 
@@ -75,7 +75,7 @@ void init(int argc, char **argv)
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
-  csParam.create = QUDA_ZERO_FIELD_CREATE;    
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
   csParam.location = QUDA_CPU_FIELD_LOCATION;
 
   spinor = std::make_unique<ColorSpinorField>(csParam);

@@ -118,7 +118,7 @@ namespace quda {
       {
         ColorSpinorParam csParam(r);
         csParam.create = QUDA_ZERO_FIELD_CREATE;
-        r_0 = new ColorSpinorField(csParam);//remember to delete this pointer.
+        r_0 = new ColorSpinorField(csParam); // remember to delete this pointer.
         *r_0 = r;
       }
     } else {

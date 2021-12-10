@@ -7,7 +7,8 @@
 
 #include <comm_key.h>
 
-namespace quda {
+namespace quda
+{
 
   namespace colorspinor
   {
@@ -61,7 +62,7 @@ namespace quda {
   }
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
-  typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
+  typedef std::vector<ColorSpinorField *> CompositeColorSpinorField;
 
   /**
      Any spinor object can be qualified in the following categories:
@@ -72,52 +73,43 @@ namespace quda {
   */
   struct CompositeColorSpinorFieldDescriptor {
 
-    bool is_composite; //set to 'false' for a regular spinor field
-    bool is_component; //set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
+    bool is_composite; // set to 'false' for a regular spinor field
+    bool is_component; // set to 'true' if we want to work with an individual component (otherwise will work with the whole set)
 
-    int dim; //individual component has dim = 0
+    int dim; // individual component has dim = 0
     int id;
 
-    size_t volume;       // volume of a single eigenvector
-    size_t volumeCB;     // CB volume of a single eigenvector
-    size_t length;       // length (excluding norm))
-    size_t bytes;      // size in bytes of spinor field
+    size_t volume;   // volume of a single eigenvector
+    size_t volumeCB; // CB volume of a single eigenvector
+    size_t length;   // length (excluding norm))
+    size_t bytes;    // size in bytes of spinor field
 
     CompositeColorSpinorFieldDescriptor() :
-      is_composite(false),
-      is_component(false),
-      dim(0),
-      id(0),
-      volume(0),
-      volumeCB(0),
-      length(0),
-      bytes(0) {}
+      is_composite(false), is_component(false), dim(0), id(0), volume(0), volumeCB(0), length(0), bytes(0)
+    {
+    }
 
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
-      is_composite(is_composite),
-      is_component(is_component),
-      dim(dim),
-      id(id),
-      volume(0),
-      volumeCB(0),
-      length(0),
-      bytes(0)
-     {
-       if (is_composite && is_component) errorQuda("Composite type is not implemented");
-       else if (is_composite && dim == 0) is_composite = false;
-     }
+      is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0), length(0), bytes(0)
+    {
+      if (is_composite && is_component)
+        errorQuda("Composite type is not implemented");
+      else if (is_composite && dim == 0)
+        is_composite = false;
+    }
 
-     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
+    CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
   };
 
-  class ColorSpinorParam : public LatticeFieldParam {
+  class ColorSpinorParam : public LatticeFieldParam
+  {
 
   public:
     QudaFieldLocation location; // where are we storing the field (CUDA or CPU)?
 
     int nColor; // Number of colors of the field
-    int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
-    int nVec;  // number of packed vectors (for multigrid transfer operator)
+    int nSpin;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
+    int nVec;   // number of packed vectors (for multigrid transfer operator)
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
 
@@ -141,9 +133,9 @@ namespace quda {
 
     //! for deflation solvers:
     bool is_composite;
-    int composite_dim;    //e.g., number of eigenvectors in the set
+    int composite_dim; // e.g., number of eigenvectors in the set
     bool is_component;
-    int component_id;          //eigenvector index
+    int component_id; // eigenvector index
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -193,29 +185,29 @@ namespace quda {
       ;
     }
 
-      // used to create cpu params
+    // used to create cpu params
 
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
-        QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
-        LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
-        location(location),
-        nColor(3),
-        nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
-                  || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
-                1 :
-                4),
-        nVec(1),
-        twistFlavor(inv_param.twist_flavor),
-        siteOrder(QUDA_INVALID_SITE_ORDER),
-        fieldOrder(QUDA_INVALID_FIELD_ORDER),
-        gammaBasis(inv_param.gamma_basis),
-        create(QUDA_REFERENCE_FIELD_CREATE),
-        pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
-        v(V),
-        is_composite(false),
-        composite_dim(0),
-        is_component(false),
-        component_id(0)
+                     QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
+      LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
+      location(location),
+      nColor(3),
+      nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
+             || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
+              1 :
+              4),
+      nVec(1),
+      twistFlavor(inv_param.twist_flavor),
+      siteOrder(QUDA_INVALID_SITE_ORDER),
+      fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      gammaBasis(inv_param.gamma_basis),
+      create(QUDA_REFERENCE_FIELD_CREATE),
+      pc_type(inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ? QUDA_5D_PC : QUDA_4D_PC),
+      v(V),
+      is_composite(false),
+      composite_dim(0),
+      is_component(false),
+      component_id(0)
     {
 
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -268,8 +260,7 @@ namespace quda {
     }
 
     // normally used to create cuda param from a cpu param
-  ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
-                     QudaFieldLocation location) :
+    ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param, QudaFieldLocation location) :
       LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
       location(location),
       nColor(cpuParam.nColor),
@@ -293,12 +284,13 @@ namespace quda {
       for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
     }
 
-    void print() {
+    void print()
+    {
       printfQuda("nColor = %d\n", nColor);
       printfQuda("nSpin = %d\n", nSpin);
       printfQuda("twistFlavor = %d\n", twistFlavor);
       printfQuda("nDim = %d\n", nDim);
-      for (int d=0; d<nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
+      for (int d = 0; d < nDim; d++) printfQuda("x[%d] = %d\n", d, x[d]);
       printfQuda("precision = %d\n", precision);
       printfQuda("ghost_precision = %d\n", ghost_precision);
       printfQuda("siteSubset = %d\n", siteSubset);
@@ -311,14 +303,14 @@ namespace quda {
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm_offset = %lu\n", (unsigned long)norm_offset);
       //! for deflation etc.
-      if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
+      if (is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
-
   };
 
   struct DslashConstant;
 
-  class ColorSpinorField : public LatticeField {
+  class ColorSpinorField : public LatticeField
+  {
 
   private:
     void create(const ColorSpinorParam &param);
@@ -326,7 +318,7 @@ namespace quda {
 
   protected:
     bool init;
-    bool alloc; // whether we allocated memory
+    bool alloc;     // whether we allocated memory
     bool reference; // whether the field is a reference or not
 
     /** Used to keep local track of allocated ghost_precision in createGhostZone */
@@ -354,23 +346,23 @@ namespace quda {
 
     size_t length; // length including pads, but not norm zone
 
-    void *v; // the field elements
-    void *v_h; // the field elements
+    void *v;            // the field elements
+    void *v_h;          // the field elements
     size_t norm_offset; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
 
-    void* ghost[2][QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
-    void* ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
+    void *ghost[2][QUDA_MAX_DIM];     // pointers to the ghost regions - NULL by default
+    void *ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
     mutable int ghostFace[QUDA_MAX_DIM];   // the size of each face
     mutable int ghostFaceCB[QUDA_MAX_DIM]; // the size of each checkboarded face
 
-    mutable void *ghost_buf[2*QUDA_MAX_DIM]; // wrapper that points to current ghost zone
+    mutable void *ghost_buf[2 * QUDA_MAX_DIM]; // wrapper that points to current ghost zone
 
     mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
-    size_t bytes; // size in bytes of spinor field
+    size_t bytes;     // size in bytes of spinor field
     size_t bytes_raw; // actual data size neglecting alignment
 
     QudaSiteSubset siteSubset;
@@ -384,7 +376,7 @@ namespace quda {
     ColorSpinorField *odd;
 
     //! used for deflation eigenvector sets etc.:
-    CompositeColorSpinorFieldDescriptor composite_descr;//containes info about the set
+    CompositeColorSpinorFieldDescriptor composite_descr; // containes info about the set
     //
     CompositeColorSpinorField components;
 
@@ -393,7 +385,7 @@ namespace quda {
        @param[in] nFace The depth of the halo
        @param[in] spin_project Whether we are spin projecting
     */
-    void createGhostZone(int nFace, bool spin_project=true) const;
+    void createGhostZone(int nFace, bool spin_project = true) const;
 
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
@@ -404,21 +396,21 @@ namespace quda {
     void setTuningString();
 
   public:
-    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory
-    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory
-    static void* fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
-    static void* backGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
+    static void *fwdGhostFaceBuffer[QUDA_MAX_DIM];      // cpu memory
+    static void *backGhostFaceBuffer[QUDA_MAX_DIM];     // cpu memory
+    static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM];  // cpu memory
+    static void *backGhostFaceSendBuffer[QUDA_MAX_DIM]; // cpu memory
     static int initGhostFaceBuffer;
     static size_t ghostFaceBytes[QUDA_MAX_DIM];
     static void freeGhostBuffer(void);
 
-    //ColorSpinorField();
+    // ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
     ColorSpinorField(const ColorSpinorParam &);
 
     virtual ~ColorSpinorField();
 
-    ColorSpinorField& operator=(const ColorSpinorField &);
+    ColorSpinorField &operator=(const ColorSpinorField &);
 
     void copy(const ColorSpinorField &);
 
@@ -436,7 +428,7 @@ namespace quda {
     int Nvec() const { return nVec; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
-    const int* X() const { return x; }
+    const int *X() const { return x; }
     int X(int d) const { return x[d]; }
     size_t Length() const { return length; }
     size_t Volume() const { return volume; }
@@ -448,10 +440,10 @@ namespace quda {
     size_t GhostNormBytes() const { return ghost_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-    void* V() { return v; }
-    const void* V() const { return v; }
-    void* Norm() { return static_cast<char*>(v) + norm_offset; }
-    const void* Norm() const { return static_cast<char*>(v) + norm_offset; }
+    void *V() { return v; }
+    const void *V() const { return v; }
+    void *Norm() { return static_cast<char *>(v) + norm_offset; }
+    const void *Norm() const { return static_cast<char *>(v) + norm_offset; }
     size_t NormOffset() const { return norm_offset; }
 
     /**
@@ -472,14 +464,14 @@ namespace quda {
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
-    void allocateGhostBuffer(int nFace, bool spin_project=true) const;
+    void allocateGhostBuffer(int nFace, bool spin_project = true) const;
 
     /**
        @brief Create the communication handlers and buffers
        @param[in] nFace Depth of each halo
        @param[in] spin_project Whether the halos are spin projected (Wilson-type fermions only)
     */
-    void createComms(int nFace, bool spin_project=true);
+    void createComms(int nFace, bool spin_project = true);
 
     /**
        @brief Packs the ColorSpinorField's ghost zone
@@ -618,7 +610,7 @@ namespace quda {
        @param sendbuf Packed buffer from which we're sending
        @param nFace Number of layers we are exchanging
      */
-    void exchange(void **ghost, void **sendbuf, int nFace=1) const;
+    void exchange(void **ghost, void **sendbuf, int nFace = 1) const;
 
     /**
        This is a unified ghost exchange function for doing a complete
@@ -634,9 +626,9 @@ namespace quda {
        @param[in] gdr_recv Are we using GDR for receiving
        @param[in] ghost_precision The precision used for the ghost exchange
      */
-    void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination=nullptr,
-                       const MemoryLocation *halo_location=nullptr, bool gdr_send=false, bool gdr_recv=false,
-                       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
+    void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination = nullptr,
+                       const MemoryLocation *halo_location = nullptr, bool gdr_send = false, bool gdr_recv = false,
+                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION) const;
 
     /**
       This function returns true if the field is stored in an internal
@@ -681,37 +673,37 @@ namespace quda {
      */
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
-    const void* Ghost2() const;
+    const void *Ghost2() const;
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */
-    void* const* Ghost() const;
+    void *const *Ghost() const;
 
     /**
        @brief Get the dslash_constant structure from this field
     */
     const DslashConstant &getDslashConstant() const { return *dslash_constant; }
 
-    const ColorSpinorField& Even() const;
-    const ColorSpinorField& Odd() const;
+    const ColorSpinorField &Even() const;
+    const ColorSpinorField &Odd() const;
 
-    ColorSpinorField& Even();
-    ColorSpinorField& Odd();
+    ColorSpinorField &Even();
+    ColorSpinorField &Odd();
 
-    CompositeColorSpinorField& Components(){ return components; };
+    CompositeColorSpinorField &Components() { return components; };
 
-    ColorSpinorField& Component(int idx)
+    ColorSpinorField &Component(int idx)
     {
       if (!IsComposite()) errorQuda("Not composite field");
       if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
     }
 
-    const ColorSpinorField& Component(int idx) const
+    const ColorSpinorField &Component(int idx) const
     {
       if (!IsComposite()) errorQuda("Not composite field");
       if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField*>(components[idx]));
+      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
     }
 
     /**
@@ -728,7 +720,7 @@ namespace quda {
      */
     void OffsetIndex(int &i, int *y) const;
 
-    static ColorSpinorField* Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
+    static ColorSpinorField *Create(const ColorSpinorParam &param) { return new ColorSpinorField(param); }
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -749,10 +741,10 @@ namespace quda {
        @param[in] location Optionally set the location of the coarse field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
-    ColorSpinorField* CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
-                                   QudaPrecision precision=QUDA_INVALID_PRECISION,
-				   QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
-                                   QudaMemoryType mem_Type=QUDA_MEMORY_INVALID);
+    ColorSpinorField *CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
+                                   QudaPrecision precision = QUDA_INVALID_PRECISION,
+                                   QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION,
+                                   QudaMemoryType mem_Type = QUDA_MEMORY_INVALID);
 
     /**
        @brief Create a fine color-spinor field, using this field to set the meta data
@@ -763,10 +755,10 @@ namespace quda {
        @param[in] location Optionally set the location of the fine field
        @param[in] mem_type Optionally set the memory type used (e.g., can override with mapped memory)
     */
-    ColorSpinorField* CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
-                                 QudaPrecision precision=QUDA_INVALID_PRECISION,
-				 QudaFieldLocation location=QUDA_INVALID_FIELD_LOCATION,
-                                 QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
+    ColorSpinorField *CreateFine(const int *geoblockSize, int spinBlockSize, int Nvec,
+                                 QudaPrecision precision = QUDA_INVALID_PRECISION,
+                                 QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION,
+                                 QudaMemoryType mem_type = QUDA_MEMORY_INVALID);
 
     /**
        @brief Backs up the ColorSpinorField
@@ -829,12 +821,12 @@ namespace quda {
      */
     static int Compare(const ColorSpinorField &a, const ColorSpinorField &b, const int resolution = 1);
 
-    friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
+    friend std::ostream &operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
 
-  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
-                              QudaFieldLocation location, void *Dst = nullptr, const void *Src = nullptr);
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, QudaFieldLocation location,
+                              void *Dst = nullptr, const void *Src = nullptr);
 
   void genericSource(ColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const ColorSpinorField &a, const ColorSpinorField &b, int tol);
@@ -867,8 +859,8 @@ namespace quda {
      @param[in] dagger Is for a dagger operator (presently ignored)
      @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
   */
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
-			int nFace, int dagger, MemoryLocation *destination=nullptr);
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
+                        MemoryLocation *destination = nullptr);
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)
@@ -881,7 +873,7 @@ namespace quda {
      @param randstates Random state
      @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
-  void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type);
+  void spinorNoise(ColorSpinorField &src, RNG &randstates, QudaNoiseType type);
 
   /**
      @brief Generate a random noise spinor.  This variant just
@@ -899,8 +891,8 @@ namespace quda {
      @param[in] b Input field
      @return If PCType is unique return this
    */
-  inline QudaPCType PCType_(
-      const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b)
+  inline QudaPCType PCType_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                            const ColorSpinorField &b)
   {
     QudaPCType type = QUDA_PC_INVALID;
     if (a.PCType() == b.PCType())
@@ -919,7 +911,7 @@ namespace quda {
    */
   template <typename... Args>
   inline QudaPCType PCType_(const char *func, const char *file, int line, const ColorSpinorField &a,
-      const ColorSpinorField &b, const Args &... args)
+                            const ColorSpinorField &b, const Args &...args)
   {
     return static_cast<QudaPCType>(PCType_(func, file, line, a, b) & PCType_(func, file, line, a, args...));
   }
@@ -952,7 +944,7 @@ namespace quda {
    */
   template <typename... Args>
   inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
-                               const ColorSpinorField &b, const Args &... args)
+                               const ColorSpinorField &b, const Args &...args)
   {
     return static_cast<QudaFieldOrder>(Order_(func, file, line, a, b) & Order_(func, file, line, a, args...));
   }
@@ -984,7 +976,7 @@ namespace quda {
    */
   template <typename... Args>
   inline int Length_(const char *func, const char *file, int line, const ColorSpinorField &a, const ColorSpinorField &b,
-                     const Args &... args)
+                     const Args &...args)
   {
     return static_cast<int>(Length_(func, file, line, a, b) & Length_(func, file, line, a, args...));
   }

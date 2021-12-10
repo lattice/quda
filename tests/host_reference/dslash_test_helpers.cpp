@@ -114,7 +114,8 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   popVerbosity();
 }
 
-void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, dslash_test_type test_type)
+void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity,
+                            dslash_test_type test_type)
 {
   if (inv_param->dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH)
     errorQuda("This type of dslashQuda operator is defined for QUDA_MOBIUS_DWF_EOFA_DSLASH ONLY");
@@ -132,7 +133,8 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   ColorSpinorField in(cudaParam);
   in = in_h;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(in_h), blas::norm2(in));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(in_h), blas::norm2(in));
 
   ColorSpinorField out(cudaParam);
 
@@ -158,6 +160,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   ColorSpinorField out_h(cpuParam);
   out_h = out;
 
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(out_h), blas::norm2(out));
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+    printfQuda("In CPU %16.12e CUDA %12.12e\n", blas::norm2(out_h), blas::norm2(out));
   popVerbosity();
 }

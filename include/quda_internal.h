@@ -41,7 +41,7 @@
                             strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 
 #define ALIGN_REQ 128 // Align on 128-byte boundaries
-#define ALIGNMENT_ADJUST(n) ( ((n + ALIGN_REQ - 1) / ALIGN_REQ) * ALIGN_REQ)
+#define ALIGNMENT_ADJUST(n) (((n + ALIGN_REQ - 1) / ALIGN_REQ) * ALIGN_REQ)
 
 #include <quda.h>
 #include <util_quda.h>

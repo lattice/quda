@@ -129,7 +129,7 @@ CloverField *cloverEigensolver = nullptr;
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
-std::vector<ColorSpinorField*> solutionResident;
+std::vector<ColorSpinorField *> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
@@ -1951,7 +1951,6 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
@@ -2793,7 +2792,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool invalidate = false;
   if (param->use_resident_solution == 1) {
     for (auto v : solutionResident)
-      if (b.Precision() != v->Precision() || b.SiteSubset() != v->SiteSubset()) { invalidate = true; break; }
+      if (b.Precision() != v->Precision() || b.SiteSubset() != v->SiteSubset()) {
+        invalidate = true;
+        break;
+      }
 
     if (invalidate) {
       for (auto v : solutionResident) if (v) delete v;
@@ -2849,7 +2851,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), b);
+    blas::ax(1.0 / sqrt(nb), b);
     blas::ax(1.0/sqrt(nb), *x);
   }
 
@@ -3701,9 +3703,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // rescale the source vector to help prevent the onset of underflow
-  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), b);
-  }
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { blas::ax(1.0 / sqrt(nb), b); }
 
   // backup shifts
   double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
@@ -3827,8 +3827,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
-	  blas::copy(tmp, b);
-	  mre(*x[i], tmp, z, q);
+          blas::copy(tmp, b);
+          mre(*x[i], tmp, z, q);
 
 	  for(int j=0; j < nRefine; j++) {
 	    delete q[j];
@@ -3876,7 +3876,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (param->compute_action) {
     Complex action(0);
-    for (int i=0; i<param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, *x[i]);
+    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, *x[i]);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }

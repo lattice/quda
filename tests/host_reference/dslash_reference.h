@@ -51,8 +51,8 @@ static inline void negx(Float *x, int len) {
   for (int i=0; i<len; i++) x[i] = -x[i];
 }
 
-template <typename sFloat, typename gFloat>
-static inline void dot(sFloat* res, const gFloat* a, const sFloat* b) {
+template <typename sFloat, typename gFloat> static inline void dot(sFloat *res, const gFloat *a, const sFloat *b)
+{
   res[0] = res[1] = 0;
   for (int m = 0; m < 3; m++) {
     sFloat a_re = a[2*m+0];
@@ -64,8 +64,8 @@ static inline void dot(sFloat* res, const gFloat* a, const sFloat* b) {
   }
 }
 
-template <typename Float>
-static inline void su3Transpose(Float *res, const Float *mat) {
+template <typename Float> static inline void su3Transpose(Float *res, const Float *mat)
+{
   for (int m = 0; m < 3; m++) {
     for (int n = 0; n < 3; n++) {
       res[m*(3*2) + n*(2) + 0] = + mat[n*(3*2) + m*(2) + 0];
@@ -74,14 +74,14 @@ static inline void su3Transpose(Float *res, const Float *mat) {
   }
 }
 
-
-template <typename sFloat, typename gFloat>
-static inline void su3Mul(sFloat *res, const gFloat *mat, const sFloat *vec) {
+template <typename sFloat, typename gFloat> static inline void su3Mul(sFloat *res, const gFloat *mat, const sFloat *vec)
+{
   for (int n = 0; n < 3; n++) dot(&res[n*(2)], &mat[n*(3*2)], vec);
 }
 
 template <typename sFloat, typename gFloat>
-static inline void su3Tmul(sFloat *res, const gFloat *mat, const sFloat *vec) {
+static inline void su3Tmul(sFloat *res, const gFloat *mat, const sFloat *vec)
+{
   gFloat matT[3*3*2];
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
@@ -306,8 +306,9 @@ static inline Float *gaugeLink_mg4dir(int i, int dir, int oddBit, Float **gaugeE
 }
 
 template <typename Float>
-static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, const Float *spinorField, Float **fwd_nbr_spinor,
-                                                 Float **back_nbr_spinor, int neighbor_distance, int nFace, int site_size = 24)
+static inline const Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, const Float *spinorField,
+                                                 Float **fwd_nbr_spinor, Float **back_nbr_spinor, int neighbor_distance,
+                                                 int nFace, int site_size = 24)
 {
   int j;
   int nb = neighbor_distance;

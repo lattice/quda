@@ -68,8 +68,8 @@ static const double projector[8][4][4][2] = {
 
 
 // todo pass projector
-template <typename Float>
-void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn) {
+template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
+{
   for (int i=0; i<4*3*2; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
@@ -86,7 +86,6 @@ void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinor
     }
   }
 }
-
 
 //
 // dslashReference()

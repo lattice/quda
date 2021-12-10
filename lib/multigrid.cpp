@@ -1023,7 +1023,7 @@ namespace quda
         // staggered preconditioned op.
         diracResidual->M(tmp2, tmp1);
       }
-      Complex dot = cDotProduct(tmp1,tmp2);
+      Complex dot = cDotProduct(tmp1, tmp2);
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 						     real(dot), imag(dot), deviation);
@@ -1390,8 +1390,8 @@ namespace quda
       // launch solver for each source
       for (int i=0; i<(int)B.size(); i++) {
         if (param.mg_global.setup_type == QUDA_TEST_VECTOR_SETUP) { // DDalphaAMG test vector idea
-          b = *B[i];  // inverting against the vector
-          zero(x);    // with zero initial guess
+          b = *B[i];                                                // inverting against the vector
+          zero(x);                                                  // with zero initial guess
         } else {
           x = *B[i];
           zero(b);

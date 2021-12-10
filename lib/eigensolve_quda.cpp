@@ -918,9 +918,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(new ColorSpinorField(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
@@ -1062,9 +1060,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(new ColorSpinorField(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
