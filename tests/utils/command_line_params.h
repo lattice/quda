@@ -258,6 +258,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_contraction_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_slaph_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {

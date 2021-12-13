@@ -1097,3 +1097,8 @@ void add_comms_option_group(std::shared_ptr<QUDAApp> quda_app)
     = quda_app->add_option_group("Communication", "Options controlling communication (split grid) parameteres");
   opgroup->add_option("--grid-partition", grid_partition, "Set the grid partition (default 1 1 1 1)")->expected(4);
 }
+
+
+void add_slaph_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+}
