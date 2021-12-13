@@ -247,7 +247,9 @@ class QUDAApp : public CLI::App
   }
 };
 
+// forward declations of the functions
 std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
+void add_laph_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);

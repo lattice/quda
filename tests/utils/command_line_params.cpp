@@ -656,6 +656,14 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   return quda_app;
 }
 
+
+
+void add_laph_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  // define the C++ code 
+}
+
+
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
