@@ -133,7 +133,7 @@ mark_as_advanced(QUDA_MDW_FUSED_LS_LIST)
 message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
 configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
 
-set(QUDA_MDW_FUSED_ALLOWED_LS_LIST 4 8 12 16 20 24)
+set(QUDA_MDW_FUSED_ALLOWED_LS_LIST 4 8 12 16 20)
 if(QUDA_DIRAC_DOMAIN_WALL)
   string(REPLACE "," ";" QUDA_MDW_FUSED_LS_LIST_SEMICOLON "${QUDA_MDW_FUSED_LS_LIST}")
   foreach(QUDA_MDW_FUSED_LS ${QUDA_MDW_FUSED_LS_LIST_SEMICOLON})
