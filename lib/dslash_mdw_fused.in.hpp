@@ -45,6 +45,7 @@ namespace quda
       }
     }
 
+#if defined(GPU_DOMAIN_WALL_DIRAC) && defined(QUDA_MMA_AVAILABLE)
     void inline apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
                                    ColorSpinorField &y, const ColorSpinorField &x, double m_f, double m_5,
                                    const Complex *b_5, const Complex *c_5, bool dagger, int parity, int shift[4],
@@ -55,6 +56,15 @@ namespace quda
       // clang-format on
       apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type, int_list);
     }
+#else
+    void inline apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                   ColorSpinorField &, const ColorSpinorField &, double, double,
+                                   const Complex *, const Complex *, bool, int, int[4],
+                                   int[4], MdwfFusedDslashType)
+    {
+      errorQuda("Domain wall dslash with tensor cores has not been built");
+    }
+#endif
 
   } // namespace mobius_tensor_core
 } // namespace quda
