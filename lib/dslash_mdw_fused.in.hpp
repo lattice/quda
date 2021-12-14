@@ -51,7 +51,7 @@ namespace quda
                                    int halo_shift[4], MdwfFusedDslashType type)
     {
       // clang-format off
-      IntList<@QUDA_MDW_FUSED_LS_LIST_COMMA@> int_list;
+      IntList<@QUDA_MDW_FUSED_LS_LIST@> int_list;
       // clang-format on
       apply_fused_dslash_list(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type, int_list);
     }

@@ -128,6 +128,7 @@ endforeach(item ${QUDA_OBJS})
 list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 
 set(QUDA_MDW_FUSED_LS_LIST "4,8,12,16,20,24" CACHE STRING "The list of Ls the get compiled")
+mark_as_advanced(QUDA_MDW_FUSED_LS_LIST)
 
 message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
 configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
