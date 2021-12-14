@@ -38,10 +38,7 @@ namespace quda {
       meta(meta),
       X(X)
     {
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux,",computeStaggeredKDBlock");
-      strcat(aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && X.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
-             meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
       strcat(aux,"coarse_vol=");
       strcat(aux,X.VolString());
     }
@@ -49,18 +46,7 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        launch_host<ComputeStaggeredVUV>(tp, stream, arg);
-      } else {
-        launch_device<ComputeStaggeredVUV>(tp, stream, arg);
-      }
-    }
-
-    bool advanceTuneParam(TuneParam &param) const {
-      // only do autotuning if we have device fields
-      if (X.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
-      else return false;
+      launch<ComputeStaggeredVUV>(tp, stream, arg);
     }
   };
 
@@ -76,15 +62,8 @@ namespace quda {
   template<typename Float, int fineColor, int coarseSpin, int coarseColor, typename xGauge, typename fineGauge>
   void calculateStaggeredKDBlock(xGauge &X, fineGauge &G, GaugeField &X_, const GaugeField &G_, double mass)
   {
-    // sanity checks
-    if (fineColor != 3)
-      errorQuda("Input gauge field should have nColor=3, not nColor=%d\n", fineColor);
-
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
-
-    if (fineColor * 16 != coarseColor*coarseSpin)
-      errorQuda("Fine nColor=%d is not consistent with KD dof %d", fineColor, coarseColor*coarseSpin);
 
     int x_size[QUDA_MAX_DIM] = { };
     int xc_size[QUDA_MAX_DIM] = { };
@@ -111,7 +90,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
 
     if (xGauge::fixedPoint()) {
-      arg.X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
+      X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
       X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
     }
 
@@ -367,6 +346,8 @@ namespace quda {
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
     ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);    
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
 
   }
 

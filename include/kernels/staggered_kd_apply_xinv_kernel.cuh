@@ -24,12 +24,12 @@ namespace quda {
 
     static constexpr bool dagger = dagger_;
 
-    F out;               // output vector field
-    const F in;          // input vector field
-    const X xInv;        // Kahler-Dirac inverse gauge field
-    int_fastdiv X0h;     // One-half of X dimension length
-    int_fastdiv dim[4];  // full lattice dimensions
-    const int volumeCB;  // checkerboarded volume
+    F out;               /** output vector field */
+    const F in;          /** input vector field */
+    const X xInv;        /** Kahler-Dirac inverse gauge field */
+    int_fastdiv X0h;     /** One-half of X dimension length */
+    int_fastdiv dim[4];  /** full lattice dimensions */
+    const int volumeCB;  /* checkerboarded volume */
 
     StaggeredKDBlockArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &xInv) :
       kernel_param(dim3(in.VolumeCB(), 2, 1)),

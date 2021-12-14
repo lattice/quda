@@ -5,29 +5,32 @@
 
 namespace quda {
 
-  template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_, bool dagger_approximation_,
-            typename fineGauge, typename coarseGauge>
+  template <typename Float, int fineColor_, QudaGaugeFieldOrder fineOrder, QudaGaugeFieldOrder coarseOrder, bool dagger_approximation_>
   struct CalculateStaggeredGeometryReorderArg : kernel_param<> {
 
-    using real = Float_;
-    static constexpr int coarseSpin = coarseSpin_;
-    static_assert(coarseSpin == 2, "Only coarseSpin == 2 is supported");
+    using real = typename mapper<Float>::type;
+
+    static constexpr int nDim = 4;
     static constexpr int fineColor = fineColor_;
-    static constexpr int coarseColor = coarseColor_;
-    static_assert(8 * fineColor == coarseColor, "requires 8 * fineColor == coarseColor");
+    static constexpr int coarseSpin = 2;
+    static constexpr int coarseColor = 24;
 
     static constexpr bool dagger_approximation = dagger_approximation_;
 
-    static constexpr int kdBlockSize = 16;
+    static constexpr int kdBlockSize = QUDA_KDINVERSE_GEOMETRY;
     static_assert(kdBlockSize == QUDA_KDINVERSE_GEOMETRY, "KD block size must match geometry");
     static constexpr int kdBlockSizeCB = kdBlockSize / 2;
 
-    fineGauge fineXinv;           /** Kahler-Dirac fine inverse field in KD geometry */
+    static_assert(fineColor * kdBlockSize == coarseColor * coarseSpin, "KD fine gauge field and coarse xInv is inconsistent");
 
-    const coarseGauge coarseXinv;       /** Computed Kahler-Dirac inverse field */
+    using G = typename gauge::FieldOrder<real,fineColor,1,fineOrder,true,Float>;
+    using X = typename gauge::FieldOrder<real, coarseColor * coarseSpin, coarseSpin, coarseOrder, true, Float>;
 
-    int_fastdiv x_size[QUDA_MAX_DIM];   /** Dimensions of fine grid */
-    int xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
+    G fineXinv;           /** Kahler-Dirac fine inverse field in KD geometry */
+    const X coarseXinv;       /** Computed Kahler-Dirac inverse field */
+
+    int_fastdiv x_size[nDim];   /** Dimensions of fine grid */
+    int xc_size[nDim];  /** Dimensions of coarse grid */
 
     const spin_mapper<1,coarseSpin> spin_map; /** Helper that maps fine spin to coarse spin */
 
@@ -38,18 +41,26 @@ namespace quda {
 
     static constexpr int coarse_color = coarseColor;
 
-    CalculateStaggeredGeometryReorderArg(fineGauge &fineXinv, const coarseGauge &coarseXinv,  const int *x_size_, const int *xc_size_, const real scale) :
+    CalculateStaggeredGeometryReorderArg(GaugeField& fineXinv, const GaugeField& coarseXinv, const real scale) :
       kernel_param(dim3(fineXinv.VolumeCB(), kdBlockSize, 2)),
       fineXinv(fineXinv),
       coarseXinv(coarseXinv),
       spin_map(),
       fineVolumeCB(fineXinv.VolumeCB()),
       coarseVolumeCB(coarseXinv.VolumeCB()),
-      scale(scale)
+      scale(static_cast<real>(scale))
     {
-      for (int i=0; i<QUDA_MAX_DIM; i++) {
-        x_size[i] = x_size_[i];
-        xc_size[i] = xc_size_[i];
+      if (coarseXinv.Ndim() != nDim)
+        errorQuda("Number of dimensions %d is not supported", coarseXinv.Ndim());
+      if (coarseXinv.Ncolor() != coarseColor * coarseSpin)
+        errorQuda("Unsupported coarse color %d", coarseSpin * coarseXinv.Ncolor());
+      for (int i=0; i<nDim; i++) {
+        x_size[i] = fineXinv.X()[i];
+        xc_size[i] = coarseXinv.X()[i];
+        // check that local volumes are consistent
+        if (2 * xc_size[i] != x_size[i]) {
+          errorQuda("Inconsistent fine dimension %d and coarse KD dimension %d", static_cast<int>(x_size[i]), xc_size[i]);
+        }
       }
     }
 
