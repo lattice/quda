@@ -463,13 +463,13 @@ namespace quda {
      @param longGauge[in] Long link field in case of HISQ operator
      @param XinvKD[in] Inverse Kahler-Dirac block
      @param mass[in] Mass parameter
-     @param allow_drop_long[in] Whether or not we can drop the long links for small aggregation dimensions
+     @param allow_truncation[in] Whether or not we can drop the long links for small aggregation dimensions
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField& longGauge,
-                         const GaugeField &XinvKD, double mass, bool allow_drop_long, QudaDiracType dirac, QudaMatPCType matpc);
+                         const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)

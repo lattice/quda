@@ -733,8 +733,8 @@ extern "C" {
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
-    /** Whether or not to allow dropping long links in small aggregation dimensions */
-    QudaBoolean allow_drop_long;
+    /** Whether or not to let MG coarsening drop improvements, for ex dropping long links in small aggregation dimensions */
+    QudaBoolean allow_truncation;
 
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;

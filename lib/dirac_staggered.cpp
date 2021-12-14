@@ -134,9 +134,9 @@ namespace quda {
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
     // Irrelevant for naive staggered operator
-    constexpr bool allow_drop_long = false;
+    constexpr bool allow_truncation = false;
 
-    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_drop_long, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
@@ -286,9 +286,9 @@ namespace quda {
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
     // Irrelevant for naive staggered operator
-    constexpr bool allow_drop_long = false;
+    constexpr bool allow_truncation = false;
 
-    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_drop_long, QUDA_STAGGEREDPC_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGEREDPC_DIRAC, QUDA_MATPC_INVALID);
   }
 
 

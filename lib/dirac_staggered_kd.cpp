@@ -177,9 +177,9 @@ namespace quda
       errorQuda("Staggered KD operators only support aggregation coarsening");
 
     // Irrelivant for naive staggered
-    constexpr bool allow_drop_long = false;
+    constexpr bool allow_truncation = false;
 
-    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *Xinv, mass, allow_drop_long, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *Xinv, mass, allow_truncation, QUDA_STAGGEREDKD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

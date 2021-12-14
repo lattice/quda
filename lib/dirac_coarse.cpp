@@ -13,7 +13,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
-    allow_drop_long(param.allow_drop_long),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(nullptr),
     X_h(nullptr),
@@ -45,7 +45,7 @@ namespace quda {
     transfer(nullptr),
     dirac(nullptr),
     need_bidirectional(false),
-    allow_drop_long(param.allow_drop_long),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(Y_h),
     X_h(X_h),
@@ -73,7 +73,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
-    allow_drop_long(param.allow_drop_long),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
@@ -199,7 +199,7 @@ namespace quda {
 
     if (!gpu_setup) {
 
-      dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor(), AllowDropLong());
+      dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
       // save the intermediate tunecache after the UV and VUV tune
       saveTuneCache();
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
@@ -229,7 +229,7 @@ namespace quda {
         GaugeField *Y_order = cudaGaugeField::Create(Y_param);
         GaugeField *X_order = cudaGaugeField::Create(X_param);
 
-        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowDropLong());
+        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();
@@ -257,7 +257,7 @@ namespace quda {
         delete X_order;
 
       } else {
-        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowDropLong());
+        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();

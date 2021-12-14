@@ -131,12 +131,12 @@ namespace quda {
   }
 
   void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
-                                              double, double, bool allow_drop_long) const
+                                              double, double, bool allow_truncation) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
 
-    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_drop_long, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_truncation, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
@@ -287,12 +287,12 @@ namespace quda {
   }
 
   void DiracImprovedStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
-                                              double, double, bool allow_drop_long) const
+                                              double, double, bool allow_truncation) const
   {
     if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
 
-    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_drop_long, QUDA_ASQTADPC_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_truncation, QUDA_ASQTADPC_DIRAC, QUDA_MATPC_INVALID);
   }
 
 } // namespace quda

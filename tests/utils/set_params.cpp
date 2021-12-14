@@ -570,8 +570,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
-  mg_param.allow_drop_long = mg_allow_drop_long ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  // whether or not to let MG coarsening drop improvements
+  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
@@ -994,7 +995,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
-  mg_param.allow_drop_long = mg_allow_drop_long ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
