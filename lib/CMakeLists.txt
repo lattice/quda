@@ -127,17 +127,16 @@ endforeach(item ${QUDA_OBJS})
 
 list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 
-set(QUDA_MDW_FUSED_LS_LIST 4 8 12 16 20 24 CACHE STRING "The list of Ls the get compiled")
+set(QUDA_MDW_FUSED_LS_LIST "4,8,12,16,20,24" CACHE STRING "The list of Ls the get compiled")
 
-foreach(QUDA_MDW_FUSED_LS ${QUDA_MDW_FUSED_LS_LIST})
-  message("${QUDA_MDW_FUSED_LS}")
-  configure_file(dslash_mdw_fused.cu.in "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
+message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
+configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
+
+string(REPLACE "," ";" QUDA_MDW_FUSED_LS_LIST_SEMICOLON "${QUDA_MDW_FUSED_LS_LIST}")
+foreach(QUDA_MDW_FUSED_LS ${QUDA_MDW_FUSED_LS_LIST_SEMICOLON})
+  configure_file(dslash_mdw_fused.in.cu "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
   list(APPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
 endforeach()
-
-string(REPLACE ";" "," QUDA_MDW_FUSED_LS_LIST_COMMA "${QUDA_MDW_FUSED_LS_LIST}")
-message("QUDA_MDW_FUSED_LS_LIST_COMMA: ${QUDA_MDW_FUSED_LS_LIST_COMMA}")
-configure_file(dslash_mdw_fused.hpp.in dslash_mdw_fused.hpp @ONLY)
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
