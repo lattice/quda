@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD), parent_dirac(param.dirac) { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD), parent_dirac_type(param.dirac == nullptr ? QUDA_INVALID_DIRAC : param.dirac->getDiracType()) { }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv), parent_dirac(dirac.parent_dirac) { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv), parent_dirac_type(dirac.parent_dirac_type) { }
 
   DiracStaggeredKD::~DiracStaggeredKD() { }
 
@@ -18,7 +18,7 @@ namespace quda
     if (&dirac != this) {
       DiracStaggered::operator=(dirac);
       Xinv = dirac.Xinv;
-      parent_dirac = dirac.parent_dirac;
+      parent_dirac_type = dirac.parent_dirac_type;
     }
     return *this;
   }
@@ -137,14 +137,13 @@ namespace quda
 
     // if we're preconditioning the Schur op, we need to rescale by the mass
     // parent could be an ASQTAD operator if we've enabled dropping the long links
-    const auto parent_type = parent_dirac->getDiracType();
-    if (parent_type == QUDA_STAGGERED_DIRAC || parent_type == QUDA_ASQTAD_DIRAC) {
+    if (parent_dirac_type == QUDA_STAGGERED_DIRAC || parent_dirac_type == QUDA_ASQTAD_DIRAC) {
       b = *tmp1;
-    } else if (parent_type == QUDA_STAGGEREDPC_DIRAC || parent_type == QUDA_ASQTADPC_DIRAC) {
+    } else if (parent_dirac_type == QUDA_STAGGEREDPC_DIRAC || parent_dirac_type == QUDA_ASQTADPC_DIRAC) {
       b = *tmp1;
       blas::ax(0.5 / mass, b);
     } else
-      errorQuda("Unexpected parent Dirac type %d", parent_type);
+      errorQuda("Unexpected parent Dirac type %d", parent_dirac_type);
 
     deleteTmp(&tmp1, reset);
     sol = &x;

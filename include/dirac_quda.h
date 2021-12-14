@@ -1315,7 +1315,7 @@ public:
 
   protected:
     mutable GaugeField* Xinv; /** inverse Kahler-Dirac matrix */
-    const Dirac *parent_dirac; /** Parent Dirac operator, needed to determine if parent is pc'd or not */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1544,7 +1544,7 @@ public:
 
   protected:
     mutable GaugeField* Xinv; /** inverse Kahler-Dirac matrix */
-    const Dirac *parent_dirac; /** Parent Dirac operator, needed to determine if parent is pc'd or not */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);
