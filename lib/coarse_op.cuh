@@ -395,7 +395,7 @@ namespace quda {
 
       if (type == COMPUTE_UV) {
 
-        IF_CONSTEXPR (use_mma) {
+        if constexpr (use_mma) {
           if (compute_max) mma::launch_compute_uv_kernel(tp, ArgMax<Arg>(arg), arg.fineVolumeCB, stream, *this);
           else mma::launch_compute_uv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);
         } else {
@@ -457,7 +457,7 @@ namespace quda {
         if (type == COMPUTE_VLV && fineSpin != 1)
           errorQuda("compute_vlv should only be called for a staggered operator");
 
-        IF_CONSTEXPR (use_mma) {
+        if constexpr (use_mma) {
 
           if (type == COMPUTE_VUV)
             mma::launch_compute_vuv_kernel(tp, arg, arg.fineVolumeCB, stream, *this);

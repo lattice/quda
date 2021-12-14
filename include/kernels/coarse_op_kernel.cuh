@@ -11,12 +11,6 @@
 #include <target_device.h>
 #include <kernel.h>
 
-#if __cplusplus >= 201703L
-#define IF_CONSTEXPR if constexpr
-#else
-#define IF_CONSTEXPR if
-#endif
-
 namespace quda {
 
   /** This is the storage type used when computing the coarse link
@@ -308,7 +302,7 @@ namespace quda {
     real uv_max = static_cast<real>(0.0);
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
-      IF_CONSTEXPR (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
@@ -380,7 +374,7 @@ namespace quda {
     real uv_max = static_cast<real>(0.0);
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
-      IF_CONSTEXPR (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
@@ -486,7 +480,7 @@ namespace quda {
 
     real uv_max = static_cast<real>(0.0);
     if (arg.dir == QUDA_FORWARDS) {
-      IF_CONSTEXPR (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         uv_max = UV[(parity+1)&1].abs_max();
       } else {
         UV[(parity+1)&1].saveCS(arg.UV, 0, 0, parity, x_cb, (parity+1)&1, i0, j0);
@@ -494,7 +488,7 @@ namespace quda {
     } else {
 #pragma unroll
       for (int s = 0; s < uvSpin; s++) {
-        IF_CONSTEXPR (Arg::compute_max) {
+        if constexpr (Arg::compute_max) {
           uv_max = fmax(UV[s].abs_max(), uv_max);
         } else {
           UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
@@ -598,7 +592,7 @@ namespace quda {
     real uv_max = static_cast<real>(0.0);
 #pragma unroll
     for (int s = 0; s < uvSpin; s++) {
-      IF_CONSTEXPR (Arg::compute_max) {
+      if constexpr (Arg::compute_max) {
         uv_max = fmax(UV[s].abs_max(), uv_max);
       } else {
         UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
