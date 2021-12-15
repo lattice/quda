@@ -352,8 +352,7 @@ namespace quda
 
       if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
         // create comms buffers - need to do this before we grab the dslash constants
-        ColorSpinorField *in_ = const_cast<ColorSpinorField *>(&in);
-        static_cast<cudaColorSpinorField *>(in_)->createComms(nFace, spin_project);
+        const_cast<ColorSpinorField &>(in).createComms(nFace, spin_project);
       }
       dc = in.getDslashConstant();
       for (int dim = 0; dim < 4; dim++) {

@@ -209,9 +209,6 @@ module quda_fortran
 
      QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
 
-     integer(4) :: sp_pad
-     integer(4) :: cl_pad
-
      integer(4) :: iter
      real(8) :: gflops
      real(8) :: secs

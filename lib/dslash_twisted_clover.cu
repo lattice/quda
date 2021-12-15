@@ -72,9 +72,7 @@ namespace quda
       WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
       TwistedClover<decltype(arg)> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(
-        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

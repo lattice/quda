@@ -374,8 +374,8 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
   }
 }
 
-void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorField *ref, quda::ColorSpinorField *in,
-                              quda::ColorSpinorField *out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
+void verifyStaggeredInversion(quda::ColorSpinorField &tmp, quda::ColorSpinorField &ref, quda::ColorSpinorField &in,
+                              quda::ColorSpinorField &out, double mass, void *qdp_fatlink[], void *qdp_longlink[],
                               void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param,
                               QudaInvertParam &inv_param, int shift)
 {
@@ -389,18 +389,16 @@ void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorFiel
     // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
     // have the minus sign. Passing in QUDA_DAG_YES solves this
     // discrepancy.
-    staggeredDslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Even()), qdp_fatlink, qdp_longlink,
-                    ghost_fatlink, ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Odd()),
-                    QUDA_EVEN_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-    staggeredDslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Odd()), qdp_fatlink, qdp_longlink,
-                    ghost_fatlink, ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Even()),
-                    QUDA_ODD_PARITY, QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    staggeredDslash(ref.Even(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Odd(), QUDA_EVEN_PARITY,
+                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    staggeredDslash(ref.Odd(), qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out.Even(), QUDA_ODD_PARITY,
+                    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
 
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      xpay(out->V(), kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
-      ax(0.5 / kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+      xpay(out.V(), kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref.V(), ref.Length(), gauge_param.cpu_prec);
     } else {
-      axpy(2 * mass, out->V(), ref->V(), ref->Length(), gauge_param.cpu_prec);
+      axpy(2 * mass, out.V(), ref.V(), ref.Length(), gauge_param.cpu_prec);
     }
     break;
 
@@ -422,10 +420,10 @@ void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorFiel
     len = Vh;
   }
 
-  mxpy(in->V(), ref->V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double nrm2 = norm_2(ref->V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double src2 = norm_2(in->V(), len * stag_spinor_site_size, inv_param.cpu_prec);
-  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(*out, *ref).z);
+  mxpy(in.V(), ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in.V(), len * stag_spinor_site_size, inv_param.cpu_prec);
+  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(out, ref).z);
   double l2r = sqrt(nrm2 / src2);
 
   if (multishift == 1) {

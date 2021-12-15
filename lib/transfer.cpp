@@ -165,17 +165,13 @@ namespace quda {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
-
-      // These never get accessed, `nullptr` on its own leads to an error in texture binding
-      param.v = (void *)std::numeric_limits<uint64_t>::max();
-      param.norm = (void *)std::numeric_limits<uint64_t>::max();
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      V_d = ColorSpinorField::Create(param);
+      V_d = new ColorSpinorField(param);
       enable_gpu = true;
     } else {
-      V_h = ColorSpinorField::Create(param);
+      V_h = new ColorSpinorField(param);
       enable_cpu = true;
     }
     postTrace();
@@ -198,10 +194,10 @@ namespace quda {
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       if (fine_tmp_d && coarse_tmp_d) return;
-      fine_tmp_d = ColorSpinorField::Create(param);
+      fine_tmp_d = new ColorSpinorField(param);
       coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
     } else {
-      fine_tmp_h = ColorSpinorField::Create(param);
+      fine_tmp_h = new ColorSpinorField(param);
       coarse_tmp_h = fine_tmp_h->CreateCoarse(geo_bs, spin_bs, Nvec);
     }
     postTrace();

@@ -27,10 +27,10 @@ QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = nullptr;
 
-cpuColorSpinorField *spinor, *spinorOut, *spinorRef;
-cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
+std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
+std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
 
-cudaColorSpinorField* tmp;
+ColorSpinorField *tmp;
 
 void *links[4];
 
@@ -75,11 +75,12 @@ void init(int argc, char **argv)
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
-  csParam.create = QUDA_ZERO_FIELD_CREATE;    
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new cpuColorSpinorField(csParam);
-  spinorOut = new cpuColorSpinorField(csParam);
-  spinorRef = new cpuColorSpinorField(csParam);
+  spinor = std::make_unique<ColorSpinorField>(csParam);
+  spinorOut = std::make_unique<ColorSpinorField>(csParam);
+  spinorRef = std::make_unique<ColorSpinorField>(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
@@ -107,12 +108,13 @@ void init(int argc, char **argv)
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.pad = inv_param.sp_pad;
   csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+  csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
   printfQuda("Creating cudaSpinor\n");
-  cudaSpinor = new cudaColorSpinorField(csParam);
+  cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Creating cudaSpinorOut\n");
-  cudaSpinorOut = new cudaColorSpinorField(csParam);
+  cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
   printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
@@ -122,12 +124,12 @@ void init(int argc, char **argv)
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tmp = new cudaColorSpinorField(csParam);
+  tmp = std::make_unique<ColorSpinorField>(csParam);
 
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
 
-  diracParam.tmp1 = tmp;
+  diracParam.tmp1 = tmp.get();
 
   dirac = new GaugeCovDev(diracParam);
 }
@@ -137,12 +139,12 @@ void end(void)
   for (int dir = 0; dir < 4; dir++) { host_free(links[dir]); }
 
   delete dirac;
-  delete cudaSpinor;
-  delete cudaSpinorOut;
-  delete tmp;
-  delete spinor;
-  delete spinorOut;
-  delete spinorRef;
+  cudaSpinor.reset();
+  cudaSpinorOut.reset();
+  tmp.reset();
+  spinor.reset();
+  spinorOut.reset();
+  spinorRef.reset();
 
   if (cpuLink) delete cpuLink;
 
@@ -165,7 +167,7 @@ void covdevRef(int mu)
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
 #ifdef MULTI_GPU
-  mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
+  mat_mg4dir(*spinorRef, links, ghostLink, *spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
   mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #endif    
@@ -174,7 +176,7 @@ void covdevRef(int mu)
 
 TEST(dslash, verify)
 {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
 		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";

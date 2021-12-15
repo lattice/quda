@@ -118,7 +118,7 @@ namespace quda
       ColorSpinorParam param_v(v);
       param_v.fieldOrder = csOrder;
       param_v.setPrecision(v.Precision());
-      cudaColorSpinorField v_(param_v);
+      ColorSpinorField v_(param_v);
       v_.copy(v);
 
       V vAccessor(v_);
@@ -135,7 +135,7 @@ namespace quda
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
         yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<cudaColorSpinorField &>(v_), v_, kappa, mass, mu,
+        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v_), v_, kappa, mass, mu,
         mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
     }
   }
