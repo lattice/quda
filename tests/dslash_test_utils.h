@@ -49,20 +49,20 @@ struct DslashTime {
 struct DslashTestWrapper {
 
   // CPU color spinor fields
-  quda::cpuColorSpinorField *spinor = nullptr;
-  quda::cpuColorSpinorField *spinorOut = nullptr;
-  quda::cpuColorSpinorField *spinorRef = nullptr;
-  quda::cpuColorSpinorField *spinorTmp = nullptr;
+  std::unique_ptr<ColorSpinorField> spinor = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorOut = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorRef = nullptr;
+  std::unique_ptr<ColorSpinorField> spinorTmp = nullptr;
   // For split grid
-  std::vector<quda::cpuColorSpinorField *> vp_spinor;
-  std::vector<quda::cpuColorSpinorField *> vp_spinorOut;
-  std::vector<quda::cpuColorSpinorField *> vp_spinorRef;
+  std::vector<quda::ColorSpinorField *> vp_spinor;
+  std::vector<quda::ColorSpinorField *> vp_spinorOut;
+  std::vector<quda::ColorSpinorField *> vp_spinorRef;
 
   // CUDA color spinor fields
-  quda::cudaColorSpinorField *cudaSpinor = nullptr;
-  quda::cudaColorSpinorField *cudaSpinorOut = nullptr;
-  quda::cudaColorSpinorField *tmp1 = nullptr;
-  quda::cudaColorSpinorField *tmp2 = nullptr;
+  std::unique_ptr<ColorSpinorField> cudaSpinor = nullptr;
+  std::unique_ptr<ColorSpinorField> cudaSpinorOut = nullptr;
+  std::unique_ptr<ColorSpinorField> tmp1 = nullptr;
+  std::unique_ptr<ColorSpinorField> tmp2 = nullptr;
 
   // Dirac pointers
   quda::Dirac *dirac = nullptr;
@@ -226,15 +226,16 @@ struct DslashTestWrapper {
       csParam.x[0] /= 2;
     }
 
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
     csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     csParam.gammaBasis = inv_param.gamma_basis;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    spinor = new cpuColorSpinorField(csParam);
-    spinorOut = new cpuColorSpinorField(csParam);
-    spinorRef = new cpuColorSpinorField(csParam);
-    spinorTmp = new cpuColorSpinorField(csParam);
+    spinor = std::make_unique<ColorSpinorField>(csParam);
+    spinorOut = std::make_unique<ColorSpinorField>(csParam);
+    spinorRef = std::make_unique<ColorSpinorField>(csParam);
+    spinorTmp = std::make_unique<ColorSpinorField>(csParam);
 
     spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -247,9 +248,9 @@ struct DslashTestWrapper {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
       for (int n = 0; n < num_src; n++) {
-        vp_spinor.push_back(new cpuColorSpinorField(csParam));
-        vp_spinorOut.push_back(new cpuColorSpinorField(csParam));
-        vp_spinorRef.push_back(new cpuColorSpinorField(csParam));
+        vp_spinor.push_back(new ColorSpinorField(csParam));
+        vp_spinorOut.push_back(new ColorSpinorField(csParam));
+        vp_spinorRef.push_back(new ColorSpinorField(csParam));
       }
     }
 
@@ -286,8 +287,8 @@ struct DslashTestWrapper {
     }
 
     if (!transfer) {
+      csParam.location = QUDA_CUDA_FIELD_LOCATION;
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      csParam.pad = inv_param.sp_pad;
       csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
@@ -298,18 +299,18 @@ struct DslashTestWrapper {
       }
 
       printfQuda("Creating cudaSpinor with nParity = %d\n", csParam.siteSubset);
-      cudaSpinor = new cudaColorSpinorField(csParam);
+      cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
       printfQuda("Creating cudaSpinorOut with nParity = %d\n", csParam.siteSubset);
-      cudaSpinorOut = new cudaColorSpinorField(csParam);
+      cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
 
-      tmp1 = new cudaColorSpinorField(csParam);
+      tmp1 = std::make_unique<ColorSpinorField>(csParam);
 
       if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
         csParam.x[0] /= 2;
       }
 
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      tmp2 = new cudaColorSpinorField(csParam);
+      tmp2 = std::make_unique<ColorSpinorField>(csParam);
 
       printfQuda("Sending spinor field to GPU\n");
       *cudaSpinor = *spinor;
@@ -323,18 +324,10 @@ struct DslashTestWrapper {
       DiracParam diracParam;
       setDiracParam(diracParam, &inv_param, pc);
 
-      diracParam.tmp1 = tmp1;
-      diracParam.tmp2 = tmp2;
+      diracParam.tmp1 = tmp1.get();
+      diracParam.tmp2 = tmp2.get();
 
-      if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-        dirac_4dpc = new DiracDomainWall4DPC(diracParam);
-        dirac = (Dirac *)dirac_4dpc;
-      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        dirac_mdwf = new DiracMobiusPC(diracParam);
-        dirac = (Dirac *)dirac_mdwf;
-      } else {
-        dirac = Dirac::create(diracParam);
-      }
+      dirac = Dirac::create(diracParam);
 
     } else {
       double cpu_norm = blas::norm2(*spinor);
@@ -349,17 +342,17 @@ struct DslashTestWrapper {
         delete dirac;
         dirac = nullptr;
       }
-      delete cudaSpinor;
-      delete cudaSpinorOut;
-      delete tmp1;
-      delete tmp2;
     }
 
     // release memory
-    delete spinor;
-    delete spinorOut;
-    delete spinorRef;
-    delete spinorTmp;
+    cudaSpinor.reset();
+    cudaSpinorOut.reset();
+    tmp1.reset();
+    tmp2.reset();
+    spinor.reset();
+    spinorOut.reset();
+    spinorRef.reset();
+    spinorTmp.reset();
 
     for (auto p : vp_spinor) { delete p; }
     for (auto p : vp_spinorOut) { delete p; }
@@ -949,7 +942,6 @@ struct DslashTestWrapper {
           case dslash_test_type::Mat:
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
-              // MatQuda(spinorOut->V(), spinor->V(), &inv_param);
             } else {
               dirac->M(*cudaSpinorOut, *cudaSpinor);
             }
@@ -958,7 +950,6 @@ struct DslashTestWrapper {
           case dslash_test_type::MatDagMat:
             if (transfer) {
               errorQuda("(transfer == true) version NOT yet available!\n");
-              // MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
             } else {
               dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
             }
@@ -1076,8 +1067,7 @@ struct DslashTestWrapper {
         double norm2_cpu = blas::norm2(*spinorRef);
         double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
         printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-        deviation
-          = std::max(deviation, std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+        deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
       }
     } else {
       double norm2_cpu = blas::norm2(*spinorRef);
@@ -1088,7 +1078,7 @@ struct DslashTestWrapper {
       } else {
         printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
       }
-      deviation = std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+      deviation = std::pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
     }
     return deviation;
   }

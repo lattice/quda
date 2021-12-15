@@ -81,9 +81,7 @@ namespace quda
       WilsonCloverHasenbuschTwistArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwist<decltype(arg)> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

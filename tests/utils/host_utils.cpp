@@ -254,7 +254,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
   if (isPCSolution(sol_type)) param.x[0] /= 2;
-  quda::cpuColorSpinorField spinor_in(param);
+  quda::ColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 

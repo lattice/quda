@@ -662,21 +662,18 @@ if(QUDA_QIO)
 endif()
 
 ####################################
-# USQCD QDPJIT
-####################################
-if(QUDA_QDPJIT)
-  if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
-  endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
-                  OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
-                  OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
-  find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
-  find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
-
+ # USQCD QDPJIT
+ ####################################
+ if(QUDA_QDPJIT)
+   if(NOT QUDA_QMP)
+     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+   endif()
+   find_package(QDPXX REQUIRED)
+   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
+     message(FATAL_ERROR "Found QDPXX but it is not QDP-JIT. Please specify with QDPXX_DIR pointing to the right path or add to the CMAKE_PREFIX_PATH")
+   endif()
+   set(QUDA_INTERFACE_QDPJIT ON)
+ endif()
 ####################################
 # MAGMA
 ####################################

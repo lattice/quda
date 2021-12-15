@@ -30,7 +30,6 @@ namespace quda {
   {
     precision = a.Precision();
     nDim = a.Ndim();
-    pad = a.Pad();
     siteSubset = QUDA_FULL_SITE_SUBSET;
     for (int dir = 0; dir < nDim; ++dir) x[dir] = a.X()[dir];
   }
@@ -58,7 +57,6 @@ namespace quda {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
     if (!isNative() && precision < QUDA_SINGLE_PRECISION)
       errorQuda("Fixed-point precision only supported on native field");
-    if (!isNative() && param.pad != 0) errorQuda("pad must be zero");
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
     if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE)
@@ -137,8 +135,7 @@ namespace quda {
   {
     LatticeField::setTuningString();
     int aux_string_n = TuneKey::aux_n / 2;
-    int check
-      = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Nc=%d", volume, stride, precision, nColor);
+    int check = snprintf(aux_string, aux_string_n, "vol=%lu,precision=%d,Nc=%d", volume, precision, nColor);
     if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
   }
 
@@ -364,7 +361,6 @@ namespace quda {
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.setPrecision(a.Precision());
-    spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
     spinor_param.fieldOrder = a.Precision() == QUDA_DOUBLE_PRECISION ?

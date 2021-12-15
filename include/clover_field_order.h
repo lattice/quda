@@ -306,7 +306,7 @@ namespace quda {
       reconstruct_t<Float, N * N, clover::reconstruct()> recon;
       FloatNAccessor(const CloverField &A, bool inverse = false) :
         a(static_cast<Float *>(const_cast<void *>(A.V(inverse)))),
-        stride(A.Stride()),
+        stride(A.VolumeCB()),
         offset_cb(A.Bytes() / (2 * sizeof(Float))),
         compressed_block_size(A.compressed_block_size()),
         recon(A.Diagonal())
@@ -586,7 +586,6 @@ namespace quda {
         const bool is_inverse;
         const AllocInt offset; // offset can be 32-bit or 64-bit
         const int volumeCB;
-	const int stride;
 
         const QudaTwistFlavorType twist_flavor;
         const real mu2;
@@ -598,12 +597,12 @@ namespace quda {
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = nullptr) :
           recon(clover.Diagonal()),
-          nrm(clover.max_element(is_inverse) / 2), // factor of two in normalization
-          nrm_inv(fixedMaxValue<Float>::value / nrm),
+          nrm(clover.max_element(is_inverse)
+              / (2 * (isFixed<Float>::value ? fixedMaxValue<Float>::value : 1))), // factor of two in normalization
+          nrm_inv(1.0 / nrm),
           is_inverse(is_inverse),
           offset(clover.Bytes() / (2 * sizeof(Float) * N)),
           volumeCB(clover.VolumeCB()),
-          stride(clover.Stride()),
           twist_flavor(clover.TwistFlavor()),
           mu2(clover.Mu2()),
           epsilon2(clover.Epsilon2()),
@@ -655,7 +654,7 @@ namespace quda {
 #pragma unroll
           for (int i = 0; i < M; i++) {
             // first load from memory
-            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M_offset + i));
+            Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + volumeCB * (chirality * M_offset + i));
 
             // second do scalar copy converting into register type
 #pragma unroll
@@ -715,7 +714,7 @@ namespace quda {
             for (int j = 0; j < N; j++)
               copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[chirality * M_rem + i * N + j]);
             // second do vectorized copy into memory
-            vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
+            vector_store(clover, parity * offset + x + volumeCB * (chirality * M + i), vecTmp);
           }
 
           if (M_rem) {
@@ -726,7 +725,7 @@ namespace quda {
               copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[(1 - chirality) * M_offset * N + j]);
 
             char *ptr = reinterpret_cast<char *>(reinterpret_cast<Vector *>(clover) + parity * offset + x);
-            ptr += (stride * (M_offset * N) + chirality * M_rem) * sizeof(Float);
+            ptr += (volumeCB * (M_offset * N) + chirality * M_rem) * sizeof(Float);
             vector_store(ptr, 0, vecTmp); // second do vectorized copy into memory
           }
         }
@@ -807,7 +806,6 @@ namespace quda {
         typedef typename mapper<Float>::type RegType;
         Float *clover;
         const int volumeCB;
-        const int stride;
         const int offset;
 
         const QudaTwistFlavorType twist_flavor;
@@ -816,7 +814,6 @@ namespace quda {
 
         QDPOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()),
-          stride(volumeCB),
           offset(clover.Bytes() / (2 * sizeof(Float))),
           twist_flavor(clover.TwistFlavor()),
           mu2(clover.Mu2()),
@@ -860,14 +857,12 @@ namespace quda {
         Float *diag;    /**< Pointers to the off-diagonal terms (two parities) */
         Float *offdiag; /**< Pointers to the diagonal terms (two parities) */
         const int volumeCB;
-        const int stride;
         const QudaTwistFlavorType twist_flavor;
         const Float mu2;
         const Float epsilon2;
 
         QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.VolumeCB()),
-          stride(volumeCB),
           twist_flavor(clover.TwistFlavor()),
           mu2(clover.Mu2()),
           epsilon2(clover.Epsilon2())
@@ -940,14 +935,12 @@ namespace quda {
         typedef typename mapper<Float>::type RegType;
         Float *clover[2];
         const int volumeCB;
-        const int stride;
         const QudaTwistFlavorType twist_flavor;
         const Float mu2;
         const Float epsilon2;
 
         BQCDOrder(const CloverField &clover, bool inverse, Float *clover_ = nullptr, void * = nullptr) :
           volumeCB(clover.Stride()),
-          stride(volumeCB),
           twist_flavor(clover.TwistFlavor()),
           mu2(clover.Mu2()),
           epsilon2(clover.Epsilon2())

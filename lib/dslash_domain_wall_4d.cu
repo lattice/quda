@@ -47,9 +47,7 @@ namespace quda
                                                       comm_override);
       DomainWall4D<decltype(arg)> dwf(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(dwf)> policy(
-        dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
     }
   };
 

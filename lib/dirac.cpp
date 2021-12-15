@@ -74,10 +74,7 @@ namespace quda {
     if (*tmp) return false;
     ColorSpinorParam param(a);
     param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
-
-    if (typeid(a) == typeid(cudaColorSpinorField)) *tmp = new cudaColorSpinorField(a, param);
-    else *tmp = new cpuColorSpinorField(param);
-
+    *tmp = ColorSpinorField::Create(param);
     return true;
   }
 
@@ -119,8 +116,8 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
-    if (!static_cast<const cudaColorSpinorField&>(in).isNative()) errorQuda("Input field is not in native order");
-    if (!static_cast<const cudaColorSpinorField&>(out).isNative()) errorQuda("Output field is not in native order");
+    if (!in.isNative()) errorQuda("Input field is not in native order");
+    if (!out.isNative()) errorQuda("Output field is not in native order");
 
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||

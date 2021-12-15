@@ -272,9 +272,6 @@ extern "C" {
 
     QudaVerbosity verbosity;               /**< The verbosity setting to use in the solver */
 
-    int sp_pad;                            /**< The padding to use for the fermion fields */
-    int cl_pad;                            /**< The padding to use for the clover fields */
-
     int iter;                              /**< The number of iterations performed by the solver */
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
