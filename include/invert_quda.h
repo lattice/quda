@@ -760,8 +760,8 @@ namespace quda {
 
   class MPCG : public Solver {
     private:
-      void computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec);
-      void computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps);
+      void computeMatrixPowers(ColorSpinorField out[], ColorSpinorField &in, int nvec);
+      void computeMatrixPowers(std::vector<ColorSpinorField> &out, std::vector<ColorSpinorField> &in, int nsteps);
 
     public:
       MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
@@ -810,7 +810,7 @@ namespace quda {
   private:
 
     // pointers to fields to avoid multiple creation overhead
-    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
 
   public:
@@ -825,7 +825,7 @@ namespace quda {
   class MPBiCGstab : public Solver {
 
   private:
-    void computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps);
+    void computeMatrixPowers(std::vector<ColorSpinorField> &pr, ColorSpinorField &p, ColorSpinorField &r, int nsteps);
 
   public:
     MPBiCGstab(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
@@ -1130,9 +1130,9 @@ public:
   // Steepest descent solver used as a preconditioner
   class SD : public Solver {
     private:
-      cudaColorSpinorField *Ar;
-      cudaColorSpinorField *r;
-      cudaColorSpinorField *y;
+      ColorSpinorField *Ar;
+      ColorSpinorField *r;
+      ColorSpinorField *y;
       bool init;
 
     public:
@@ -1148,8 +1148,8 @@ public:
   class XSD : public Solver
   {
   private:
-    cudaColorSpinorField *xx;
-    cudaColorSpinorField *bx;
+    ColorSpinorField *xx;
+    ColorSpinorField *bx;
     SD *sd; // extended sd is implemented using standard sd
     bool init;
     int R[4];

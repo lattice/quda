@@ -1017,7 +1017,38 @@ namespace quda {
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
 
-      return 0;
+    if (!init) {
+      eigcg_args = new EigCGArgs(param.m, param.n_ev); // need only deflation meta structure
+
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.field = &b;
+      rp = ColorSpinorField::Create(csParam);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp = ColorSpinorField::Create(csParam);
+
+      Ap = ColorSpinorField::Create(csParam);
+      p  = ColorSpinorField::Create(csParam);
+
+      tmpp = ColorSpinorField::Create(csParam);
+
+      Az = ColorSpinorField::Create(csParam);
+
+      if (K && param.precision_precondition != param.precision_sloppy) {
+        csParam.setPrecision(param.precision_precondition);
+        p_pre = ColorSpinorField::Create(csParam);
+        r_pre = ColorSpinorField::Create(csParam);
+      } 
+
+      //Create a search vector set:
+      csParam.setPrecision(param.precision_ritz);//eigCG internal search space precision may not coincide with the solver precision!
+      csParam.is_composite  = true;
+      csParam.composite_dim = param.m;
+
+      Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+
+      eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
+
+      init = true;
     }
 
     double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;

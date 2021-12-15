@@ -217,7 +217,7 @@ namespace quda {
         deflate_compute = false;
       } else {
         // Computing the deflation space, rather than transferring, so we create space.
-        for (int i = 0; i < param.eig_param.n_conv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
+        for (int i = 0; i < param.eig_param.n_conv; i++) evecs.push_back(new ColorSpinorField(csParam));
 
         evals.resize(param.eig_param.n_conv);
         for (int i = 0; i < param.eig_param.n_conv; i++) evals[i] = 0.0;
@@ -352,7 +352,7 @@ namespace quda {
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_eigensolver, QUDA_INVALID_PRECISION, true);
     for (int i = param.eig_param.n_conv; i < 2 * param.eig_param.n_conv; i++) {
-      evecs.push_back(ColorSpinorField::Create(csParam));
+      evecs.push_back(new ColorSpinorField(csParam));
     }
   }
 

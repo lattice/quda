@@ -182,7 +182,7 @@ namespace quda
   template <typename T1, typename T2, typename T3>
   constexpr std::enable_if_t<isFixed<T2>::value, void> copy_and_scale(T1 &a, const T2 &b, const T3 &c)
   {
-    a = i2f(b) * fixedInvMaxValue<T2>::value * c;
+    a = i2f(b) * c;
   }
 
 } // namespace quda
