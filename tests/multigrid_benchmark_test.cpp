@@ -20,8 +20,8 @@ extern void usage(char** );
 
 using namespace quda;
 
-ColorSpinorField *xH, *yH;
-ColorSpinorField *xD, *yD;
+std::unique_ptr<ColorSpinorField> xH, yH;
+std::unique_ptr<ColorSpinorField> xD, yD;
 
 cpuGaugeField *Y_h, *X_h, *Xinv_h, *Yhat_h;
 cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
@@ -66,12 +66,10 @@ void initFields(QudaPrecision prec)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
+  param.location = QUDA_CPU_FIELD_LOCATION;
 
-  xH = new cpuColorSpinorField(param);
-  yH = new cpuColorSpinorField(param);
-
-  //static_cast<cpuColorSpinorField*>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  //static_cast<cpuColorSpinorField*>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH = std::make_unique<ColorSpinorField>(param);
+  yH = std::make_unique<ColorSpinorField>(param);
 
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;
@@ -81,8 +79,8 @@ void initFields(QudaPrecision prec)
   param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
-  xD = new cudaColorSpinorField(param);
-  yD = new cudaColorSpinorField(param);
+  xD = std::make_unique<ColorSpinorField>(param);
+  yD = std::make_unique<ColorSpinorField>(param);
 
   //*xD = *xH;
   //*yD = *yH;
@@ -145,11 +143,10 @@ void initFields(QudaPrecision prec)
 
 void freeFields()
 {
-  delete xD;
-  delete yD;
-
-  delete xH;
-  delete yH;
+  xD.reset();
+  yD.reset();
+  xH.reset();
+  yH.reset();
 
   delete Y_h;
   delete X_h;

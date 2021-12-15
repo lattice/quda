@@ -94,9 +94,9 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      xp = ColorSpinorField::Create(x, csParam);
+      xp = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(x, csParam);
+      yp = ColorSpinorField::Create(csParam);
       init = true;
     }
 
@@ -381,8 +381,10 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      for (auto &pi : p)
-        pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
+      for (auto &pi : p) {
+        csParam.field = p_init ? p_init : &rSloppy;
+        pi = ColorSpinorField::Create(csParam);
+      }
     } else {
       for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }

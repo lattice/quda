@@ -104,8 +104,8 @@ namespace quda
     {
 
       ColorSpinorParam csParam(in);
-      cudaColorSpinorField tmp1(csParam);
-      cudaColorSpinorField tmp2(csParam);
+      ColorSpinorField tmp1(csParam);
+      ColorSpinorField tmp2(csParam);
 
       apply(base, tmp1, in);
       ref(tmp2, tmp1);
@@ -161,15 +161,15 @@ namespace quda
         csParam.create = QUDA_NULL_FIELD_CREATE;
         csParam.setPrecision(prec_precondition);
 
-        forward_tmp = new cudaColorSpinorField(csParam);
-        backward_tmp = new cudaColorSpinorField(csParam);
+        forward_tmp = new ColorSpinorField(csParam);
+        backward_tmp = new ColorSpinorField(csParam);
 
         return;
       }
 
       ColorSpinorParam csParam(in);
-      cudaColorSpinorField null_x(csParam);
-      cudaColorSpinorField null_b(csParam);
+      ColorSpinorField null_x(csParam);
+      ColorSpinorField null_b(csParam);
 
       RNG rng(null_b, 1234);
 
@@ -178,7 +178,7 @@ namespace quda
 
       std::vector<ColorSpinorField *> B(16);
       csParam.setPrecision(prec_precondition);
-      for (auto &pB : B) { pB = new cudaColorSpinorField(csParam); }
+      for (auto &pB : B) { pB = new ColorSpinorField(csParam); }
 
       null.solve_and_collect(null_x, null_b, B, null_miniter, null_tol);
       for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
@@ -187,11 +187,11 @@ namespace quda
 
       commGlobalReductionPush(false);
 
-      cudaColorSpinorField chi(csParam);
-      cudaColorSpinorField tmp(csParam);
-      cudaColorSpinorField theta(csParam);
-      cudaColorSpinorField lambda(csParam);
-      cudaColorSpinorField Mchi(csParam);
+      ColorSpinorField chi(csParam);
+      ColorSpinorField tmp(csParam);
+      ColorSpinorField theta(csParam);
+      ColorSpinorField lambda(csParam);
+      ColorSpinorField Mchi(csParam);
 
       double residual = 0.0;
       int count = 0;
@@ -205,14 +205,14 @@ namespace quda
       csParam.x[4] = Ls_base;
       csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-      cudaColorSpinorField ATchi(csParam);
-      cudaColorSpinorField ATphi(csParam);
-      cudaColorSpinorField ADphi(csParam);
+      ColorSpinorField ATchi(csParam);
+      ColorSpinorField ATphi(csParam);
+      ColorSpinorField ADphi(csParam);
 
-      cudaColorSpinorField ATMchi(csParam);
+      ColorSpinorField ATMchi(csParam);
 
-      forward_tmp = new cudaColorSpinorField(csParam);
-      backward_tmp = new cudaColorSpinorField(csParam);
+      forward_tmp = new ColorSpinorField(csParam);
+      backward_tmp = new ColorSpinorField(csParam);
 
       fill_random(host_param);
 

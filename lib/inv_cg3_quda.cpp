@@ -73,9 +73,9 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      xp = ColorSpinorField::Create(x, csParam);
+      xp = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(x, csParam);
+      yp = ColorSpinorField::Create(csParam);
       init = true;
     }
 

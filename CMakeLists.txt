@@ -162,8 +162,6 @@ option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
-# Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
@@ -239,6 +237,9 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
+option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
+
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
 set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
 
@@ -291,6 +292,7 @@ mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
+mark_as_advanced(QUDA_CLOVER_RECONSTRUCT)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -460,18 +462,19 @@ message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
 find_package(CUDAToolkit REQUIRED)
 
 
-if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.0" AND CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA")
+if(CMAKE_CUDA_COMPILER_ID MATCHES "NVIDIA" OR CMAKE_CUDA_COMPILER_ID MATCHES "NVHPC" OR CMAKE_CUDA_COMPILER_ID MATCHES "Clang")
   set(QUDA_HETEROGENEOUS_ATOMIC_SUPPORT ON)
   message(STATUS "Heterogeneous atomics supported: ${QUDA_HETEROGENEOUS_ATOMIC_SUPPORT}")
 endif()
 include(CMakeDependentOption)
-CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support (CUDA >= 11.0)?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
+CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic support?" ON "QUDA_HETEROGENEOUS_ATOMIC_SUPPORT" OFF)
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
 endif()
-if(QUDA_HETEROGENEOUS_ATOMIC AND QUDA_JITIFY)
-  message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON does not support JITIFY)")
+
+if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
 endif()
 
 if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
@@ -639,7 +642,7 @@ if(QUDA_QIO)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
   if(QUDA_DOWNLOAD_USQCD)
-    set(QUDA_QIO_TAG "0627f013" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
+    set(QUDA_QIO_TAG "a5c3ae580b846130c06dc060ab822f17d6fe2171" CACHE STRING "Git tag to use for QIO when using QUDA_DOWNLOAD_USQCD")
     mark_as_advanced(QUDA_QIO_TAG)
     CPMAddPackage(
       NAME QIO
@@ -657,21 +660,18 @@ if(QUDA_QIO)
 endif()
 
 ####################################
-# USQCD QDPJIT
-####################################
-if(QUDA_QDPJIT)
-  if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
-  endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
-                  OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
-                  OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
-  find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
-  find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
-
+ # USQCD QDPJIT
+ ####################################
+ if(QUDA_QDPJIT)
+   if(NOT QUDA_QMP)
+     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+   endif()
+   find_package(QDPXX REQUIRED)
+   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
+     message(FATAL_ERROR "Found QDPXX but it is not QDP-JIT. Please specify with QDPXX_DIR pointing to the right path or add to the CMAKE_PREFIX_PATH")
+   endif()
+   set(QUDA_INTERFACE_QDPJIT ON)
+ endif()
 ####################################
 # MAGMA
 ####################################

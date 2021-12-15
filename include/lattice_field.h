@@ -23,8 +23,6 @@ namespace quda {
   class LatticeField;
 
   class ColorSpinorField;
-  class cudaColorSpinorField;
-  class cpuColorSpinorField;
   
   class EigValueSet;
   class cudaEigValueSet;
@@ -39,8 +37,6 @@ namespace quda {
   class cudaGaugeField;
 
   class CloverField;
-  class cudaCloverField;
-  class cpuCloverField;
 
   enum class QudaOffsetCopyMode { COLLECT, DISPERSE };
 
@@ -626,7 +622,7 @@ namespace quda {
     /**
        @return The location of the field
     */
-    QudaFieldLocation Location() const;
+    virtual QudaFieldLocation Location() const;
 
     /**
        @return The total storage allocated
