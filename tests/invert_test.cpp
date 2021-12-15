@@ -161,7 +161,6 @@ int main(int argc, char **argv)
   setWilsonGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
-  QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   QudaEigParam eig_param = newQudaEigParam();
 
@@ -170,7 +169,7 @@ int main(int argc, char **argv)
     setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
     // Set sub structures
-    mg_param.invert_param = &mg_inv_param;
+    mg_param.invert_param = &inv_param;
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
         mg_eig_param[i] = newQudaEigParam();
