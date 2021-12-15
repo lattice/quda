@@ -41,7 +41,7 @@ namespace quda {
 
     static constexpr int coarse_color = coarseColor;
 
-    CalculateStaggeredGeometryReorderArg(GaugeField& fineXinv, const GaugeField& coarseXinv, const real scale) :
+    CalculateStaggeredGeometryReorderArg(GaugeField& fineXinv, const GaugeField& coarseXinv, const double scale) :
       kernel_param(dim3(fineXinv.VolumeCB(), kdBlockSize, 2)),
       fineXinv(fineXinv),
       coarseXinv(coarseXinv),

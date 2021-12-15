@@ -3,6 +3,7 @@
 #include <transfer.h>
 #include <gauge_field.h>
 #include <tunable_nd.h>
+#include <instantiate.h>
 
 // For naive Kahler-Dirac coarsening
 #include <kernels/staggered_coarse_op_kernel.cuh>
@@ -15,185 +16,88 @@
 
 namespace quda {
 
-  template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineColor>
   class CalculateStaggeredY : public TunableKernel3D {
 
-    Arg &arg;
-    const GaugeField &meta;
-    GaugeField &Y;
-    GaugeField &X;
+    GaugeField& Y;
+    GaugeField& X;
+    const GaugeField& g;
+    double mass;
 
-    long long flops() const { return arg.coarseVolumeCB*coarseSpin*coarseColor; }
+    const int nDim = 4;
+
+    long long flops() const {
+      // no work, just a permutation
+      return 0ll;
+    }
 
     long long bytes() const
     {
       // 2 from forwards / backwards contributions, Y and X are sparse - only needs to write non-zero elements, 2nd term is mass term
-      return meta.Bytes() + (2 * meta.Bytes() * Y.Precision()) / meta.Precision() + 2 * 2 * coarseSpin * coarseColor * arg.coarseVolumeCB * X.Precision();
+      return g.Bytes() + (2 * g.Bytes() * Y.Precision()) / g.Precision() + X.Volume() * X.Ncolor() * X.Precision();
     }
 
-    unsigned int minThreads() const { return arg.fineVolumeCB; }
-    bool tuneSharedBytes() const { return false; } // don't tune the grid dimension
+    unsigned int minThreads() const { return g.VolumeCB(); }
 
   public:
-    CalculateStaggeredY(Arg &arg, const GaugeField &meta, GaugeField &Y, GaugeField &X) :
-      TunableKernel3D(meta, fineColor*fineColor, 2),
-      arg(arg),
-      meta(meta),
+    CalculateStaggeredY(GaugeField &Y, GaugeField &X, const GaugeField &g, const double mass) :
+      TunableKernel3D(g, fineColor*fineColor, 2),
       Y(Y),
-      X(X)
+      X(X),
+      g(g),
+      mass(mass)
     {
+      checkPrecision(Y, X);
+      checkLocation(Y, X, g);
+      if (g.Geometry() != QUDA_VECTOR_GEOMETRY)
+        errorQuda("Unsupported geometry %d", g.Geometry());
+      if (g.Ndim() != nDim)
+        errorQuda("Number of dimensions %d is not supported", g.Ndim());
+      if (X.Geometry() != QUDA_SCALAR_GEOMETRY)
+        errorQuda("Unsupported geometry %d", X.Geometry());
+      if (Y.Geometry() != QUDA_COARSE_GEOMETRY)
+        errorQuda("Unsupported geometry %d", Y.Geometry());
+
       strcat(aux,comm_dim_partitioned_string());
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
       strcat(aux,",computeStaggeredVUV");
-      strcat(aux, (meta.Location()==QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_MAPPED) ? ",GPU-mapped," :
-             meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU-device," : ",CPU,");
-      strcat(aux,"coarse_vol=");
-      strcat(aux,X.VolString());
+
+      // reset scales as appropriate
+      if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
+        double max_scale = g.abs_max();
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
+        X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
+        Y.Scale(max_scale);
+      }
+
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing VUV by permutation\n");
+
+      apply(device::get_default_stream());
+
+        if (getVerbosity() >= QUDA_VERBOSE) {
+        for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y.norm2( 4+d ));
+        for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", d, Y.norm2( d ));
+      }
+
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+      // We're building both X and Y
+      constexpr bool kd_build_x = false;
+      if (X.Location() == QUDA_CPU_FIELD_LOCATION) {
+        constexpr QudaGaugeFieldOrder order = QUDA_QDP_GAUGE_ORDER;
+        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(Y, X, g, mass);
         launch_host<ComputeStaggeredVUV>(tp, stream, arg);
-      } else {
+      } else if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        constexpr QudaGaugeFieldOrder order = QUDA_FLOAT2_GAUGE_ORDER;
+        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(Y, X, g, mass);
         launch_device<ComputeStaggeredVUV>(tp, stream, arg);
       }
     }
 
-    bool advanceTuneParam(TuneParam &param) const {
-      // only do autotuning if we have device fields
-      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE) return Tunable::advanceTuneParam(param);
-      else return false;
-    }
   };
-
-  /**
-     @brief Calculate the coarse-link field, including the coarse clover field.
-
-     @param Y[out] Coarse (fat-)link field accessor
-     @param X[out] Coarse clover field accessor
-     @param G[in] Fine grid link / gauge field accessor
-     @param Y_[out] Coarse link field
-     @param X_[out] Coarse clover field
-     @param X_[out] Coarse clover inverese field (used as temporary here)
-     @param v[in] Packed null-space vectors
-     @param G_[in] Fine gauge field
-     @param mass[in] Kappa parameter
-     @param matpc[in] The type of preconditioning of the source fine-grid operator
-   */
-  template<typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
-	   typename coarseGauge, typename fineGauge>
-  void calculateStaggeredY(coarseGauge &Y, coarseGauge &X, fineGauge &G, GaugeField &Y_, GaugeField &X_,
-                           const GaugeField &G_, double mass, QudaDiracType dirac, QudaMatPCType matpc)
-  {
-    // sanity checks
-    if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
-      errorQuda("Unsupported coarsening of matpc = %d", matpc);
-
-    // This is the last time we use fineSpin, since this file only coarsens
-    // staggered-type ops, not wilson-type AND coarse-type.
-    if (fineSpin != 1)
-      errorQuda("Input Dirac operator %d should have nSpin=1, not nSpin=%d\n", dirac, fineSpin);
-    if (fineColor != 3)
-      errorQuda("Input Dirac operator %d should have nColor=3, not nColor=%d\n", dirac, fineColor);
-
-    if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
-    const int nDim = 4;
-
-    int x_size[QUDA_MAX_DIM] = { };
-    for (int i=0; i<4; i++) x_size[i] = G_.X()[i];
-    x_size[4] = 1;
-
-    int xc_size[QUDA_MAX_DIM] = { };
-    for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
-    xc_size[4] = 1;
-
-    int geo_bs[QUDA_MAX_DIM] = { };
-    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
-
-    // Calculate VUV in one pass (due to KD-transform) for each dimension,
-    // accumulating directly into the coarse gauge field Y
-
-    using Arg = CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,fineGauge>;
-    Arg arg(Y, X, G, mass, x_size, xc_size, geo_bs);
-    CalculateStaggeredY<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, Y_, X_);
-
-    QudaFieldLocation location = checkLocation(Y_, X_, G_);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-
-    // We know exactly what the scale should be: the max of all of the (fat) links.
-    double max_scale = G_.abs_max();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
-
-    if (coarseGauge::fixedPoint()) {
-      arg.Y.resetScale(max_scale);
-      arg.X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
-      Y_.Scale(max_scale);
-      X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
-    }
-
-    // We can technically do a uni-directional build, but becauase
-    // the coarse link builds are just permutations plus lots of zeros,
-    // it's faster to skip the flip!
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing VUV\n");
-    y.apply(device::get_default_stream());
-
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
-      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", d, Y_.norm2( d ));
-    }
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
-  }
-
-  template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g,
-                           double mass, QudaDiracType dirac, QudaMatPCType matpc)
-  {
-    QudaFieldLocation location = Y.Location();
-
-    if (location == QUDA_CPU_FIELD_LOCATION) {
-
-      constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
-
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-
-      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
-      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
-
-      gFine gAccessor(const_cast<GaugeField&>(g));
-      gCoarse yAccessor(const_cast<GaugeField&>(Y));
-      gCoarse xAccessor(const_cast<GaugeField&>(X));
-
-      calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-        (yAccessor, xAccessor, gAccessor, Y, X, g, mass, dirac, matpc);
-    } else {
-
-      constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
-
-      if (T.Vectors(Y.Location()).FieldOrder() != csOrder)
-        errorQuda("Unsupported field order %d\n", T.Vectors(Y.Location()).FieldOrder());
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-
-      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
-      using gCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
-
-      gFine gAccessor(const_cast<GaugeField&>(g));
-      gCoarse yAccessor(const_cast<GaugeField&>(Y));
-      gCoarse xAccessor(const_cast<GaugeField&>(X));
-
-      calculateStaggeredY<Float,fineSpin,fineColor,coarseSpin,coarseColor>
-        (yAccessor, xAccessor, gAccessor, Y, X, g, mass, dirac, matpc);
-    }
-
-  }
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin, int uvSpin>
   void aggregateStaggeredY(GaugeField &Y, GaugeField &X,
@@ -349,8 +253,9 @@ namespace quda {
 
     if (coarseColor == 24) {
       if (T.getTransferType() == QUDA_TRANSFER_COARSE_KD)
-        // the permutation routines don't need Yatomic, Xatomic, uv, av, l
-        calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, mass, dirac, matpc);
+        // The permutation routines need minimal machinery, inputs, trim down appropriately
+        // see staggered_kd_build_xinv.cu for reference
+        CalculateStaggeredY<vFloat,fineColor>(Y, X, g, mass);
       else {
         // free field aggregation
         aggregateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
@@ -381,10 +286,10 @@ namespace quda {
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    if (g.Ncolor() == 3 && l.Ncolor() == 3) {
+    if (g.Ncolor() == 3 && l.Ncolor() == 3 && XinvKD.Ncolor() == 3) {
       calculateStaggeredY<Float,vFloat,3>(Y, X, T, g, l, XinvKD, mass, allow_truncation, dirac, matpc);
     } else {
-      errorQuda("Unsupported number of colors %d %d\n", g.Ncolor(), l.Ncolor());
+      errorQuda("Unsupported number of colors %d %d %d\n", g.Ncolor(), l.Ncolor(), XinvKD.Ncolor());
     }
   }
 
@@ -393,8 +298,6 @@ namespace quda {
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &g, const GaugeField &l,
                            const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    checkPrecision(T.Vectors(X.Location()), X, Y);
-
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -439,12 +342,24 @@ namespace quda {
   }
 #endif
 
-  //Calculates the coarse color matrix and puts the result in Y.
-  // N.B. Assumes Y, X have been allocated.
+  /**
+     @brief Calculates the coarse color matrix and puts the result in X, Y. Assumes Y, X have been allocated.
+
+     @param Y[out] Coarse gauge links Y
+     @param X[out] Coarse clover X
+     @param T[in] Multigrid transfer object
+     @param gauge[in] fine gauge field (fat links for asqtad)
+     @param longGauge[in] long links (alias gauge field for non-improved operator)
+     @param XinvKD[in] Kahler-Dirac inverse (alias gauge field for non-KD operator)
+     @param mass[in] Mass of staggered fermion
+     @param allow_truncation[in] Whether or not we let MG truncate long links for small aggregation lengths (less than 3)
+     @param dirac[in] fine Dirac operator type
+     @param matpc[in] preconditioning type
+   */
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField &longGauge,
                          const GaugeField& XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc)
   {
-    QudaPrecision precision = Y.Precision();
+    QudaPrecision precision = checkPrecision(T.Vectors(X.Location()), X, Y);
     QudaFieldLocation location = checkLocation(Y, X);
 
     // sanity check long link coarsening

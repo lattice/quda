@@ -2,22 +2,25 @@
 #include <blas_quda.h>
 #include <blas_lapack.h>
 #include <tunable_nd.h>
+#include <instantiate.h>
 
 #include <staggered_kd_build_xinv.h>
 #include <kernels/staggered_coarse_op_kernel.cuh>
 
 namespace quda {
 
-  template <typename Float, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineColor>
   class CalculateStaggeredKDBlock : public TunableKernel3D {
 
-    Arg &arg;
-    const GaugeField &meta;
     GaugeField &X;
+    const GaugeField &g;
+    double mass;
+
+    const int nDim = 4;
 
     long long flops() const {
-      // only real work is multiplying the mass by two
-      return arg.coarseVolumeCB*coarseSpin*coarseColor;
+      // no work, just a permutation
+      return 0ll;
     }
 
     long long bytes() const
@@ -26,171 +29,71 @@ namespace quda {
       //    half of the gauge field needs to be loaded.
       // 2. Storing X, extra factor of two b/c it stores forwards and backwards.
       // 3. Storing mass contribution
-      return meta.Bytes() / 2 + (meta.Bytes() * X.Precision()) / meta.Precision() + 2 * coarseSpin * coarseColor * arg.coarseVolumeCB * X.Precision();
+      return g.Bytes() / 2 + (g.Bytes() * X.Precision()) / g.Precision() + X.Ncolor() * X.Volume() * X.Precision();
     }
 
-    unsigned int minThreads() const { return arg.fineVolumeCB; }
+    unsigned int minThreads() const { return g.VolumeCB(); }
 
   public:
-    CalculateStaggeredKDBlock(Arg &arg, const GaugeField &meta, GaugeField &X) :
-      TunableKernel3D(meta, fineColor*fineColor, 2),
-      arg(arg),
-      meta(meta),
-      X(X)
+    CalculateStaggeredKDBlock(const GaugeField &g, GaugeField &X, double mass) :
+      TunableKernel3D(g, fineColor*fineColor, 2),
+      X(X),
+      g(g),
+      mass(mass)
     {
+      checkPrecision(X, g);
+      checkLocation(X, g);
+      if (g.Geometry() != QUDA_VECTOR_GEOMETRY)
+        errorQuda("Unsupported geometry %d", g.Geometry());
+      if (g.Ndim() != 4)
+        errorQuda("Number of dimensions %d is not supported", g.Ndim());
+      if (X.Geometry() != QUDA_SCALAR_GEOMETRY)
+        errorQuda("Unsupported geometry %d", X.Geometry());
+
       strcat(aux,",computeStaggeredKDBlock");
-      strcat(aux,"coarse_vol=");
-      strcat(aux,X.VolString());
+
+      // reset scales as appropriate
+      if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
+        double max_scale = g.abs_max();
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
+        X.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass);
+      }
+
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<ComputeStaggeredVUV>(tp, stream, arg);
+      // We're only building X; we specify this because we're reusing the
+      // code that builds both X and Y for the "coarse" KD operator
+      constexpr bool kd_build_x = true;
+      if (X.Location() == QUDA_CPU_FIELD_LOCATION) {
+        constexpr QudaGaugeFieldOrder order = QUDA_QDP_GAUGE_ORDER;
+        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
+        launch_host<ComputeStaggeredVUV>(tp, stream, arg);
+      } else if (X.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        constexpr QudaGaugeFieldOrder order = QUDA_FLOAT2_GAUGE_ORDER;
+        CalculateStaggeredYArg<Float,fineColor,order,kd_build_x> arg(X, X, g, mass);
+        launch_device<ComputeStaggeredVUV>(tp, stream, arg);
+      }
     }
   };
 
-  /**
-     @brief Calculate the staggered Kahler-Dirac block (coarse clover)
 
-     @param X[out] KD block (coarse clover field) accessor
-     @param G[in] Fine grid link / gauge field accessor
-     @param X_[out] KD block (coarse clover field)
-     @param G_[in] Fine gauge field
-     @param mass[in] mass
-   */
-  template<typename Float, int fineColor, int coarseSpin, int coarseColor, typename xGauge, typename fineGauge>
-  void calculateStaggeredKDBlock(xGauge &X, fineGauge &G, GaugeField &X_, const GaugeField &G_, double mass)
-  {
-    if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
-    const int nDim = 4;
-
-    int x_size[QUDA_MAX_DIM] = { };
-    int xc_size[QUDA_MAX_DIM] = { };
-    for (int i = 0; i < nDim; i++) {
-      x_size[i] = G_.X()[i];
-      xc_size[i] = X_.X()[i];
-      // check that local volumes are consistent
-      if (2 * xc_size[i] != x_size[i]) {
-        errorQuda("Inconsistent fine dimension %d and coarse KD dimension %d", x_size[i], xc_size[i]);
-      }
-    }
-    x_size[4] = xc_size[4] = 1;
-
-    // Calculate X (KD block), which is really just a permutation of the gauge fields w/in a KD block
-    using Arg = CalculateStaggeredYArg<Float, coarseSpin, fineColor, coarseColor, xGauge, fineGauge, true>;
-    Arg arg(X, X, G, mass, x_size, xc_size);
-    CalculateStaggeredKDBlock<Float, fineColor, coarseSpin, coarseColor, Arg> y(arg, G_, X_);
-
-    QudaFieldLocation location = checkLocation(X_, G_);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Calculating the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-
-    // We know exactly what the scale should be: the max of all of the (fat) links.
-    double max_scale = G_.abs_max();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
-
-    if (xGauge::fixedPoint()) {
-      X.resetScale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
-      X_.Scale(max_scale > 2.0*mass ? max_scale : 2.0*mass); // To be safe
-    }
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing KD block\n");
-    y.apply(device::get_default_stream());
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
-  }
-
-  template <typename Float, typename vFloat, int fineColor, int coarseColor, int coarseSpin>
-  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
-  {
-
-    QudaFieldLocation location = X.Location();
-
-    if (location == QUDA_CPU_FIELD_LOCATION) {
-
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_QDP_GAUGE_ORDER;
-
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-
-      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder>;
-      using xCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
-
-      gFine gAccessor(const_cast<GaugeField&>(g));
-      xCoarse xAccessor(const_cast<GaugeField&>(X));
-
-      calculateStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(xAccessor, gAccessor, X, g, mass);
-
-    } else {
-
-      constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
-
-      if (g.FieldOrder() != gOrder) errorQuda("Unsupported field order %d\n", g.FieldOrder());
-
-      using gFine = typename gauge::FieldOrder<Float,fineColor,1,gOrder,true,Float>;
-      using xCoarse = typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder,true,vFloat>;
-
-      gFine gAccessor(const_cast<GaugeField&>(g));
-      xCoarse xAccessor(const_cast<GaugeField&>(X));
-
-      calculateStaggeredKDBlock<Float,fineColor,coarseSpin,coarseColor>(xAccessor, gAccessor, X, g, mass);
-    }
-
-  }
-
-  // template on the number of KD (coarse) degrees of freedom
-  template <typename Float, typename vFloat, int fineColor>
-  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField& g, const double mass)
-  {
-    constexpr int coarseSpin = 2;
-    const int coarseColor = X.Ncolor() / coarseSpin;
-
-    if (coarseColor == 24) { // half the dof w/in a KD-block
-      calculateStaggeredKDBlock<Float,vFloat,fineColor,24,coarseSpin>(X, g, mass);
-    } else {
-      errorQuda("Unsupported number of Kahler-Dirac dof %d\n", X.Ncolor());
-    }
-  }
-
-  // template on fine colors
-  template <typename Float, typename vFloat>
-  void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
-  {
-    if (g.Ncolor() == 3) {
-      calculateStaggeredKDBlock<Float,vFloat,3>(X, g, mass);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
-    }
-  }
-
-  //Does the heavy lifting of building X
 #if defined(GPU_STAGGERED_DIRAC) && defined(GPU_MULTIGRID)
+  /**
+     @brief Build the Kahler-Dirac term from the fine gauge fields
+
+     @param X[out] supersite-local Kahler-Dirac term
+     @param g[in] fine gauge field (fat links for asqtad)
+     @param mass[in] Mass of staggered fermion (used for dagger approximation only)
+   */
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
-
-#if QUDA_PRECISION & 8 && defined(GPU_MULTIGRID_DOUBLE)
-    if (X.Precision() == QUDA_DOUBLE_PRECISION) {
-      calculateStaggeredKDBlock<double,double>(X, g, mass);
-    } else
-#endif
-#if QUDA_PRECISION & 4
-    if (X.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateStaggeredKDBlock<float,float>(X, g, mass);
-    } else
-#endif
-#if QUDA_PRECISION & 2
-    if (X.Precision() == QUDA_HALF_PRECISION) {
-      calculateStaggeredKDBlock<float,short>(X, g, mass);
-    } else
-#endif
-//#if QUDA_PRECISION & 1
-//    if (X.Precision() == QUDA_QUARTER_PRECISION) {
-//      calculateStaggeredKDBlock<float,int8_t>(X, g, mass);
-//    } else
-//#endif
-    {
-      errorQuda("Unsupported precision %d", X.Precision());
-    }
-
+    // Instantiate based on precision, number of colors
+    // need to swizzle `g` to the first argument to get the right fine nColor
+    instantiate<CalculateStaggeredKDBlock>(g, X, mass);
   }
 #else
   void calculateStaggeredKDBlock(GaugeField &, const GaugeField &, const double)
@@ -199,7 +102,13 @@ namespace quda {
   }
 #endif
 
-  // Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated
+  /**
+     @brief Calculates the inverse KD block and puts the result in Xinv. Assumes Xinv has been allocated.
+
+     @param Xinv[out] KD inverse fine gauge in KD geometry
+     @param gauge[in] fine gauge field (fat links for asqtad)
+     @param mass[in] Mass of staggered fermion
+   */
   void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)
   {
     using namespace blas_lapack;
@@ -308,7 +217,13 @@ namespace quda {
     GaugeField& X = *tmp_X;
 
     // Step 4: Calculate X from U
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing the KD block on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+
     calculateStaggeredKDBlock(X, U, mass);
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+
+    // Step 5: Calculate Xinv
 
     // This should be revisited in the future. Using X^dagger
     // empirically leads to a less useful preconditioner than X^{-1},
