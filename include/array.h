@@ -30,4 +30,19 @@ namespace quda
     return output;
   }
 
+  /**
+   * @brief Maximum of two arrays
+   * @param a first array
+   * @param b second array
+   */
+  template<typename T, int N>
+  __host__ __device__ inline array<T,N> max(const array<T,N> &a, const array<T,N> &b)
+  {
+    array<T,N> result;
+    for(int i=0; i<N; i++) {
+      result[i] = a[i] > b[i] ? a[i] : b[i];
+    }
+    return result;
+  }
+
 } // namespace quda
