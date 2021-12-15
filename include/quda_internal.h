@@ -41,8 +41,9 @@
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 :                                                               \
                             strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 
-#define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
-#define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
+#define ALIGN_REQ 128 // Align on 128-byte boundaries
+#define ALIGNMENT_ADJUST(n) (((n + ALIGN_REQ - 1) / ALIGN_REQ) * ALIGN_REQ)
+
 #include <quda.h>
 #include <util_quda.h>
 #include <malloc_quda.h>

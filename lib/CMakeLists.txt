@@ -38,8 +38,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  gauge_covdev.cpp 
-  cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
+  gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
@@ -480,18 +479,9 @@ if(QUDA_QIO)
 endif()
 
 if(QUDA_QDPJIT)
-  target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QDPJITHOME}/include>)
-  target_link_libraries(
-    quda
-    INTERFACE ${QDP_LDFLAGS}
-              ${QDP_LIB}
-              ${QDP_LIBS}
-              ${QIO_LIB}
-              ${LIME_LIB}
-              ${QUDA_QMP_LDFLAGS}
-              ${QMP_LIB}
-              MPI::MPI_CXX)
+   target_compile_definitions(quda PRIVATE USE_QDPJIT)
+   # this avoids issues when qdpjit is build as a static library we should eventually switch to target_link_libraries(quda PRIVATE QDPXX::qdp)	
+   target_include_directories(quda PRIVATE $<TARGET_PROPERTY:QDPXX::qdp,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
 if(QUDA_ARPACK)
