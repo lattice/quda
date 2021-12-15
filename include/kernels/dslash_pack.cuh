@@ -78,7 +78,7 @@ namespace quda
             int) :
 #endif
       kernel_param(dim3(block * grid, in.getDslashConstant().Ls, in.SiteSubset())),
-      in_pack(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
+      in_pack(in, nFace, nullptr, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       parity(parity),
       nParity(in.SiteSubset()),

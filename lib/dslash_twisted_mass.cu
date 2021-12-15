@@ -57,9 +57,7 @@ namespace quda
       TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
       TwistedMass<decltype(arg)> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(
-        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

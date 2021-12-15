@@ -19,18 +19,17 @@ namespace quda {
   struct CopyColorSpinorArg : kernel_param<> {
     using Basis = Basis_<nSpin_, nColor_>;
     using realOut = typename mapper<FloatOut>::type;
-    using realIn = typename mapper<FloatIn>::type;
+    using realIn = typename mapper<std::remove_const_t<FloatIn>>::type;
     static constexpr int nSpin = nSpin_;
     static constexpr int nColor = nColor_;
     Out out;
     const In in;
     const int outParity;
     const int inParity;
-    CopyColorSpinorArg(ColorSpinorField &out, const ColorSpinorField &in,
-                       FloatOut* Out_, FloatIn *In_, float *outNorm, float *inNorm) :
+    CopyColorSpinorArg(ColorSpinorField &out, const ColorSpinorField &in, FloatOut* Out_, const FloatIn *In_) :
       kernel_param(dim3(in.VolumeCB(), in.SiteSubset(), 1)),
-      out(out, 1, Out_, outNorm),
-      in(in, 1, In_, inNorm),
+      out(out, 1, Out_),
+      in(in, 1, const_cast<FloatIn*>(In_)),
       outParity(out.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0),
       inParity(in.SiteOrder()==QUDA_ODD_EVEN_SITE_ORDER ? 1 : 0)
     { }
