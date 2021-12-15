@@ -6,12 +6,9 @@ StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
 
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *recon_str[] = {"r18", "r13", "r9"};
-
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
-  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  auto prec = getPrecision(precision);
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
@@ -183,7 +180,7 @@ int main(int argc, char **argv)
    const int part = ::testing::get<2>(param.param);
    std::stringstream ss;
    // ss << get_dslash_str(dslash_type) << "_";
-   ss << prec_str[prec];
+   ss << get_prec_str(getPrecision(prec));
    ss << "_r" << recon;
    ss << "_partition" << part;
    return ss.str();
