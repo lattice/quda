@@ -1,9 +1,10 @@
 #pragma once
 
 #include <color_spinor_field.h>
-#include <reduce_helper.h>
 #include <load_store.h>
 #include <convert.h>
+#include <float_vector.h>
+#include <array.h>
 
 //#define QUAD_SUM
 #ifdef QUAD_SUM
@@ -65,33 +66,39 @@ namespace quda
 
   // Vector types used for AoS load-store on CPU
   template <> struct VectorType<double, 24> {
-    using type = vector_type<double, 24>;
+    using type = array<double, 24>;
   };
   template <> struct VectorType<float, 24> {
-    using type = vector_type<float, 24>;
+    using type = array<float, 24>;
   };
   template <> struct VectorType<short, 24> {
-    using type = vector_type<short, 24>;
+    using type = array<short, 24>;
   };
   template <> struct VectorType<int8_t, 24> {
-    using type = vector_type<int8_t, 24>;
+    using type = array<int8_t, 24>;
   };
   template <> struct VectorType<double, 6> {
-    using type = vector_type<double, 6>;
+    using type = array<double, 6>;
   };
   template <> struct VectorType<float, 6> {
-    using type = vector_type<float, 6>;
+    using type = array<float, 6>;
   };
   template <> struct VectorType<short, 6> {
-    using type = vector_type<short, 6>;
+    using type = array<short, 6>;
   };
   template <> struct VectorType<int8_t, 6> {
-    using type = vector_type<int8_t, 6>;
+    using type = array<int8_t, 6>;
   };
 
   namespace blas
   {
 
+    /**
+       Helper struct that contains the meta data required for
+       read and writing to a spinor field in the BLAS kernels.
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector
+    */
     template <typename store_t, int N, bool is_fixed> struct data_t {
       store_t *spinor;
       int stride;
@@ -109,6 +116,14 @@ namespace quda
       {}
     };
 
+    /**
+       Helper struct that contains the meta data required for read and
+       writing to a spinor field in the BLAS kernels.  This is a
+       specialized variant for fixed-point fields where need to store
+       the meta data for the norm field.
+       @tparam store_t Type used to store field in memory
+       @tparam N Length of vector
+    */
     template <typename store_t, int N> struct data_t<store_t, N, true> {
       using norm_t = float;
       store_t *spinor;
@@ -134,8 +149,9 @@ namespace quda
     };
 
     /**
+       Specialized accessor struct for the BLAS kernels.
        @tparam store_t Type used to store field in memory
-       @tparam N Length of vector of RegType elements that this Spinor represents
+       @tparam N Length of vector
     */
     template <typename store_t, int N> struct Spinor {
       using Vector = typename VectorType<store_t, N>::type;
@@ -146,23 +162,48 @@ namespace quda
 
       Spinor(const ColorSpinorField &x) : data(x) {}
 
+      /**
+         @brief Dummy implementation of load_norm for non-fixed-point fields
+         @tparam is_fixed Whether fixed point
+      */
       template <bool is_fixed>
       __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> load_norm(const int, const int = 0) const { return 1.0; }
 
+      /**
+         @brief Implementation of load_norm for fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @param[in] i checkerboard site index
+         @param[in] parity site parity
+      */
       template <bool is_fixed>
-      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> load_norm(const int i, const int parity = 0) const
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> load_norm(const int x, const int parity = 0) const
       {
-        return data.norm[data.cb_norm_offset * parity + i];
+        return data.norm[data.cb_norm_offset * parity + x];
       }
 
+      /**
+         @brief Dummy implementation of store_norm for non fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+      */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &, int, int) const
+      __device__ __host__ inline std::enable_if_t<!is_fixed, norm_t> store_norm(const array<complex<real>, n> &, int, int) const
       {
         return 1.0;
       }
 
+      /**
+         @brief Implementation of store_norm for fixed-point fields
+         @tparam is_fixed Whether fixed point
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v elements we wish to find the max abs of for storing
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
       template <bool is_fixed, typename real, int n>
-      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const vector_type<complex<real>, n> &v, int x, int parity) const
+      __device__ __host__ inline std::enable_if_t<is_fixed, norm_t> store_norm(const array<complex<real>, n> &v, int x, int parity) const
       {
         norm_t max_[n];
         // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
@@ -176,13 +217,21 @@ namespace quda
         return fdividef(fixedMaxValue<store_t>::value, scale);
       }
 
+      /**
+         @brief Load spinor function
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v output vector now loaded
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
       template <typename real, int n>
-      __device__ __host__ inline void load(vector_type<complex<real>, n> &v, int x, int parity = 0) const
+      __device__ __host__ inline void load(array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
         float nrm = load_norm<isFixed<store_t>::value>(x, parity);
 
-        vector_type<real, len> v_;
+        array<real, len> v_;
 
         constexpr int M = len / N;
 #pragma unroll
@@ -197,11 +246,19 @@ namespace quda
         for (int i = 0; i < n; i++) { v[i] = complex<real>(v_[2 * i + 0], v_[2 * i + 1]); }
       }
 
+      /**
+         @brief Save spinor function
+         @tparam real Precision of vector we wish to store from
+         @tparam n Complex vector length
+         @param[in] v input vector we wish to store
+         @param[in] x checkerboard site index
+         @param[in] parity site parity
+      */
       template <typename real, int n>
-      __device__ __host__ inline void save(const vector_type<complex<real>, n> &v, int x, int parity = 0) const
+      __device__ __host__ inline void save(const array<complex<real>, n> &v, int x, int parity = 0) const
       {
         constexpr int len = 2 * n; // real-valued length
-        vector_type<real, len> v_;
+        array<real, len> v_;
 
         if (isFixed<store_t>::value) {
           real scale_inv = store_norm<isFixed<store_t>::value, real, n>(v, x, parity);
@@ -231,8 +288,15 @@ namespace quda
       }
     };
 
-    // n_vector defines the granularity of load/store, e.g., sets the
-    // size of vector we load from memory
+    /**
+       n_vector defines the granularity of load/store, e.g., sets the
+       size of vector we load from memory
+       @tparam store_t Field storage precision
+       @tparam GPU Whether this is GPU (or CPU)?
+       @tparam nSpin Number of spino components
+       @tparam site_unroll Whether we enforce all site components must
+       be unrolled onto the same thread (required for fixed-point precision)
+    */
     template <typename store_t, bool GPU, int nSpin, bool site_unroll> constexpr int n_vector() { return 0; }
 
     // native ordering

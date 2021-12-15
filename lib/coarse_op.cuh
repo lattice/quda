@@ -5,12 +5,6 @@
 #include <coarse_op_mma_launch.h>
 #include <tunable_nd.h>
 
-#if __cplusplus >= 201703L
-#define IF_CONSTEXPR if constexpr
-#else
-#define IF_CONSTEXPR if
-#endif
-
 namespace quda {
 
   // For coarsening un-preconditioned operators we use uni-directional
@@ -111,11 +105,7 @@ namespace quda {
 	bytes_ = arg.AV.Bytes() + arg.V.Bytes();
 	break;
       case COMPUTE_TMCAV:
-#ifdef DYNAMIC_CLOVER
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 2*arg.C.Bytes()*coarseColor; // A single clover field
-#else
-	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + 4*arg.C.Bytes()*coarseColor; // Both clover and its inverse
-#endif
+	bytes_ = compute_max * arg.AV.Bytes() + arg.V.Bytes() + (2 + 2 * !clover::dynamic_inverse()) * arg.C.Bytes()*coarseColor;
 	break;
       case COMPUTE_VUV:
         {
@@ -127,22 +117,22 @@ namespace quda {
           break;
         }
       case COMPUTE_COARSE_CLOVER:
-	bytes_ = 2*arg.X.Bytes() + 2*arg.C.Bytes() + arg.V.Bytes(); // 2 from parity
+	bytes_ = 2 * arg.X.Bytes() + 2 * arg.C.Bytes() + (1 + coarseColor) * arg.V.Bytes(); // 2 from parity
 	break;
       case COMPUTE_REVERSE_Y:
-	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
-	bytes_ = 2*2*arg.X.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 4 * 2 * 2 * arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
+	bytes_ = 2 * 2 * arg.X.Bytes(); // 2 from i/o, 2 from parity
 	break;
       case COMPUTE_DIAGONAL:
       case COMPUTE_STAGGEREDMASS:
       case COMPUTE_TMDIAGONAL:
-	bytes_ = 2*2*arg.X.Bytes()/(coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
+	bytes_ = 2 * 2 * arg.X.Bytes() / (coarseSpin*coarseColor); // 2 from i/o, 2 from parity, division because of diagonal
 	break;
       case COMPUTE_CONVERT:
-	bytes_ = dim == 4 ? 2*(arg.X.Bytes() + arg.X_atomic.Bytes()) : 2*(arg.Y.Bytes() + arg.Y_atomic.Bytes());
+	bytes_ = dim == 4 ? 2 * (arg.X.Bytes() + arg.X_atomic.Bytes()) : 2 * (arg.Y.Bytes() + arg.Y_atomic.Bytes());
 	break;
       case COMPUTE_RESCALE:
-	bytes_ = 2*2*arg.Y.Bytes(); // 2 from i/o, 2 from parity
+	bytes_ = 2 * 2 * arg.Y.Bytes(); // 2 from i/o, 2 from parity
 	break;
       default:
 	errorQuda("Undefined compute type %d", type);
@@ -180,7 +170,7 @@ namespace quda {
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if (/*arg.shared_atomic && */type == COMPUTE_VUV)
+      if (type == COMPUTE_VUV)
         return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableKernel3D::sharedBytesPerBlock(param);
     }
@@ -222,7 +212,7 @@ namespace quda {
 
 #if defined(GPU_CLOVER_DIRAC) && defined(WILSONCOARSE)
         if (compute_max) launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
-        else launch_host<compute_av>(tp, stream, ArgMax<Arg>(arg));
+        else launch_host<compute_av>(tp, stream, arg);
 #else
         errorQuda("Clover dslash has not been built");
 #endif
@@ -421,7 +411,7 @@ namespace quda {
         errorQuda("add_coarse_staggered_mass not enabled for non-staggered coarsenings");
 #endif
       } else if (type == COMPUTE_TMDIAGONAL) {
-#if defined(WILSONCOARSE)
+#if defined(WILSONCOARSE) || defined(COARSECOARSE)
         launch_device<add_coarse_tm>(tp, stream, arg);
 #else
         errorQuda("add_coarse_tm not enabled for non-wilson coarsenings");
@@ -666,9 +656,7 @@ namespace quda {
 
       if (compute_max) strcat(Aux, ",compute_max");
 
-#ifdef DYNAMIC_CLOVER
-      if (type == COMPUTE_AV || type == COMPUTE_TMCAV) strcat(Aux, ",Dynamic");
-#endif
+      if ((type == COMPUTE_AV || type == COMPUTE_TMCAV) && clover::dynamic_inverse()) strcat(Aux, ",Dynamic");
       if (!use_mma && (type == COMPUTE_UV || type == COMPUTE_VUV)) {
         strcat(Aux, ",tile_size=");
         char tile[16];
@@ -836,8 +824,6 @@ namespace quda {
     for (int i=0; i<4; i++) xc_size[i] = X_.X()[i];
     xc_size[4] = 1;
 
-    int geo_bs[QUDA_MAX_DIM] = { };
-    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
     // If doing a preconditioned operator with a clover term then we
@@ -854,7 +840,7 @@ namespace quda {
 
     using Arg = CalculateYArg<from_coarse, Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover>;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa, mass,
-	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
+	    mu, mu_factor, x_size, xc_size, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
     arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
     arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 

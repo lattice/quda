@@ -67,10 +67,8 @@ public:
     if (skip()) GTEST_SKIP();
 
     int partition = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++) {
-      if (partition & (1 << j)) {
-        commDimPartitionedSet(j);
-      }
+    for (int j = 0; j < 4; j++) {
+      if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
     updateR();
 

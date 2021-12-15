@@ -48,7 +48,6 @@ namespace quda
     int_fastdiv blocks_per_dir;
     int dim_map[4];
 
-    int_fastdiv swizzle;
     int sites_per_block;
 
     char *packBuffer[4 * QUDA_MAX_DIM];
@@ -72,7 +71,7 @@ namespace quda
     static constexpr int shmem = 0;
 #endif
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, int parity, int work_items, double a,
-            double b, double c, unsigned int block, unsigned int grid, unsigned int swizzle,
+            double b, double c, unsigned int block, unsigned int grid,
 #ifdef NVSHMEM_COMMS
             int shmem_) :
 #else
@@ -90,7 +89,6 @@ namespace quda
       work_items(work_items),
       threadDimMapLower{ },
       threadDimMapUpper{ },
-      swizzle(swizzle),
       sites_per_block((work_items + grid - 1) / grid)
 #ifdef NVSHMEM_COMMS
       ,
@@ -351,8 +349,8 @@ namespace quda
           // is we are in the uber kernel signal here
           if (!arg.packkernel) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_inter[shmemidx].store(0); // this could probably be relaxed
         }
@@ -362,7 +360,8 @@ namespace quda
     if (!intranode && !arg.packkernel && (!(arg.shmem & 2))) {
       if (target::thread_idx().x == 0 && target::thread_idx().y == 0 && target::thread_idx().z == 0 && target::block_idx().x % arg.blocks_per_dir == 0) {
         if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-          nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, getNeighborRank(2 * dim + dir, arg));
+          nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                             getNeighborRank(2 * dim + dir, arg));
       }
     }
 
@@ -379,8 +378,8 @@ namespace quda
         if (amLast) {
           if (arg.shmem & 8) {
             if (!(getNeighborRank(2 * dim + dir, arg) < 0))
-              nvshmemx_uint64_signal(arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
-                                     getNeighborRank(2 * dim + dir, arg));
+              nvshmemx_signal_op(arg.sync_arr + 2 * dim + (1 - dir), arg.counter, NVSHMEM_SIGNAL_SET,
+                                 getNeighborRank(2 * dim + dir, arg));
           }
           arg.retcount_intra[shmemidx].store(0); // this could probably be relaxed
         }

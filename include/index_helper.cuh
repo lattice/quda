@@ -86,6 +86,30 @@ namespace quda {
   }
 
   /**
+     @brief Compute the checkerboard 1-d index from the 4-d coordinate x[] + nFace in the mu direction
+
+     @return 1-d checkboard index
+     @param[in] x Grid coordinates
+     @param[in] X Grid dimensions
+     @param[in] dim Dimension of the shift
+     @param[in] nFace Depth of the halo
+  */
+  template <typename I, typename Coord>
+  __device__ __host__ inline auto linkIndexHop(const Coord &x, const I X[4], const int mu, int nFace)
+  {
+    int y[4];
+#pragma unroll
+    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
+    switch (mu) {
+    case 0: y[0] = (y[0] + nFace + X[0]) % X[0]; break;
+    case 1: y[1] = (y[1] + nFace + X[1]) % X[1]; break;
+    case 2: y[2] = (y[2] + nFace + X[2]) % X[2]; break;
+    case 3: y[3] = (y[3] + nFace + X[3]) % X[3]; break;
+    }
+    return (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
+  }
+
+  /**
      Compute the checkerboard 1-d index from the 4-d coordinate x[] -1 in the mu direction
 
      @return 1-d checkerboard index
@@ -858,50 +882,6 @@ namespace quda {
       return 3;
     }
   }
-
-  /**
-     @brief Swizzler for reordering the (x) thread block indices - use on
-     conjunction with swizzle-factor autotuning to find the optimum
-     swizzle factor.  Specifically, the thread block id is remapped by
-     transposing its coordinates: if the original order can be
-     parametrized by
-
-     blockIdx.x = j * swizzle + i,
-
-     then the new order is
-
-     block_idx = i * (gridDim.x / swizzle) + j
-
-     We need to factor out any remainder and leave this in original
-     ordering.
-
-     @param[in] swizzle Swizzle factor to be applied
-     @return Swizzled block index
-  */
-  //#define SWIZZLE
-#ifdef SWIZZLE
-  template <typename T> __device__ inline int block_idx(const T &swizzle)
-  {
-    // the portion of the grid that is exactly divisible by the number of SMs
-    const int gridp = gridDim.x - gridDim.x % swizzle;
-
-    int block_idx = blockIdx.x;
-    if (blockIdx.x < gridp) {
-      // this is the portion of the block that we are going to transpose
-      const int i = blockIdx.x % swizzle;
-      const int j = blockIdx.x / swizzle;
-
-      // transpose the coordinates
-      block_idx = i * (gridp / swizzle) + j;
-    }
-    return block_idx;
-  }
-#else
-  template <typename T> __device__ inline int block_idx(const T &)
-  {
-    return blockIdx.x;
-  }
-#endif
 
   /**
      @brief Compute the staggered phase factor at unit shift from the

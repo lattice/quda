@@ -127,6 +127,10 @@ double blasGEMMEigenVerify(void *A_data, void *B_data, void *C_data_copy, void *
 
   complex<double> alpha = blas_param->alpha;
   complex<double> beta = blas_param->beta;
+  if (blas_param->data_type == QUDA_BLAS_DATATYPE_S || blas_param->data_type == QUDA_BLAS_DATATYPE_D) {
+    alpha.imag(0.0);
+    beta.imag(0.0);
+  }
 
   // Eigen objects to store data
   MatrixXcd A = MatrixXd::Zero(m, k);

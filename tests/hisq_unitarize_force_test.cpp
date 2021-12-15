@@ -27,14 +27,6 @@ cpuGaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
 
-// extern bool verify_results;
-double accuracy = 1e-5;
-int ODD_BIT = 1;
-
-QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
-
-void setPrecision(QudaPrecision precision) { link_prec = precision; }
-
 // Create a field of links that are not su3_matrices
 void createNoisyLinkCPU(void** field, QudaPrecision prec, int seed)
 {
@@ -66,7 +58,7 @@ static void hisq_force_init()
   setDims(gaugeParam.X);
 
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gaugeParam.cuda_prec = link_prec;
+  gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   GaugeFieldParam gParam(gaugeParam);
@@ -116,6 +108,7 @@ static void hisq_force_end()
 
 TEST(hisq_force_unitarize, verify)
 {
+  setVerbosity(verbosity);
   hisq_force_init();
 
   double unitarize_eps = 1e-5;
@@ -146,7 +139,8 @@ TEST(hisq_force_unitarize, verify)
   printfQuda("Comparing CPU and GPU results\n");
   int res[4];
 
-  for (int dir=0; dir<4; ++dir) {
+  double accuracy = prec == QUDA_DOUBLE_PRECISION ? 1e-10 : 1e-5;
+  for (int dir = 0; dir < 4; ++dir) {
     res[dir] = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
                               cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 
@@ -156,9 +150,7 @@ TEST(hisq_force_unitarize, verify)
 
   hisq_force_end();
 
-  for (int dir=0; dir<4; ++dir) {
-    ASSERT_EQ(res[dir], 1) << "Dir:" << dir;
-  }
+  for (int dir = 0; dir < 4; ++dir) { ASSERT_EQ(res[dir], 1) << "Dir:" << dir; }
 }
 
 static void display_test_info()
@@ -166,10 +158,8 @@ static void display_test_info()
   printfQuda("running the following fermion force computation test:\n");
     
   printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)         T_dimension\n");
-  printfQuda("%s                       %s                         %d/%d/%d                  %d \n", 
-	 get_prec_str(link_prec),
-	 get_recon_str(link_recon), 
-	 xdim, ydim, zdim, tdim);
+  printfQuda("%s                       %s                         %d/%d/%d                  %d \n", get_prec_str(prec),
+             get_recon_str(link_recon), xdim, ydim, zdim, tdim);
 }
 
 int main(int argc, char **argv)
@@ -186,8 +176,6 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
   initQuda(device_ordinal);
-
-  setPrecision(prec);
 
   display_test_info();
 

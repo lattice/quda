@@ -9,8 +9,7 @@
 #   gfortran).
 #*/
 
-#/* can't include limits.h in a Fortran program */
-#define QUDA_INVALID_ENUM (-2147483647 - 1) 
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #define QudaLinkType integer(4)
 
@@ -105,32 +104,31 @@
 #define QUDA_MR_INVERTER 3
 #define QUDA_MPBICGSTAB_INVERTER 4
 #define QUDA_SD_INVERTER 5
-#define QUDA_XSD_INVERTER 6
-#define QUDA_PCG_INVERTER 7
-#define QUDA_MPCG_INVERTER 8
-#define QUDA_EIGCG_INVERTER 9
-#define QUDA_INC_EIGCG_INVERTER 10
-#define QUDA_GMRESDR_INVERTER 11
-#define QUDA_GMRESDR_PROJ_INVERTER 12
-#define QUDA_GMRESDR_SH_INVERTER 13
-#define QUDA_FGMRESDR_INVERTER 14
-#define QUDA_MG_INVERTER 15
-#define QUDA_BICGSTABL_INVERTER 16
-#define QUDA_CGNE_INVERTER 17 
-#define QUDA_CGNR_INVERTER 18
-#define QUDA_CG3_INVERTER 19
-#define QUDA_CG3NE_INVERTER 20
-#define QUDA_CG3NR_INVERTER 21
-#define QUDA_CA_CG_INVERTER 22
-#define QUDA_CA_CGNE_INVERTER 23
-#define QUDA_CA_CGNR_INVERTER 24
-#define QUDA_CA_GCR_INVERTER 25
+#define QUDA_PCG_INVERTER 6
+#define QUDA_MPCG_INVERTER 7
+#define QUDA_EIGCG_INVERTER 8
+#define QUDA_INC_EIGCG_INVERTER 9
+#define QUDA_GMRESDR_INVERTER 10
+#define QUDA_GMRESDR_PROJ_INVERTER 11
+#define QUDA_GMRESDR_SH_INVERTER 12
+#define QUDA_FGMRESDR_INVERTER 13
+#define QUDA_MG_INVERTER 14
+#define QUDA_BICGSTABL_INVERTER 15
+#define QUDA_CGNE_INVERTER 16
+#define QUDA_CGNR_INVERTER 17
+#define QUDA_CG3_INVERTER 18
+#define QUDA_CG3NE_INVERTER 19
+#define QUDA_CG3NR_INVERTER 20
+#define QUDA_CA_CG_INVERTER 21
+#define QUDA_CA_CGNE_INVERTER 22
+#define QUDA_CA_CGNR_INVERTER 23
+#define QUDA_CA_GCR_INVERTER 24
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
 #define QUDA_EIG_BLK_IR_LANCZOS 1 // Block Thick Restarted Lanczos Solver
-#define QUDA_EIG_IR_ARNOLDI 2     // Implicitly restarted Arnoldi solver
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver
 #define QUDA_EIG_BLK_IR_ARNOLDI 3 // Block Implicitly restarted Arnoldi solver (not yet implemented)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
@@ -238,9 +236,10 @@
 #define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
-#define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
-#define QUDA_QDPJIT_CLOVER_ORDER 6 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
+#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float8 ordering
+#define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
+#define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)

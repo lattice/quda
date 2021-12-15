@@ -29,15 +29,26 @@
 #undef QUDA_HETEROGENEOUS_ATOMIC
 #endif
 
-#cmakedefine QUDA_DYNAMIC_CLOVER
-#ifdef QUDA_DYNAMIC_CLOVER
+#cmakedefine QUDA_CLOVER_DYNAMIC
+#ifdef QUDA_CLOVER_DYNAMIC
 /**
  * @def   DYNAMIC_CLOVER
  * @brief This macro sets whether we are compiling QUDA with dynamic
  * clover inversion support enabled or not
  */
 #define DYNAMIC_CLOVER
-#undef QUDA_DYNAMIC_CLOVER
+#undef QUDA_CLOVER_DYNAMIC
+#endif
+
+#cmakedefine QUDA_CLOVER_RECONSTRUCT
+#ifdef QUDA_CLOVER_RECONSTRUCT
+/**
+ * @def   RECONSTRUCT_CLOVER
+ * @brief This macro sets whether we are compiling QUDA with
+ * compressed clover storage or not
+ */
+#define RECONSTRUCT_CLOVER
+#undef QUDA_CLOVER_RECONSTRUCT
 #endif
 
 #cmakedefine QUDA_FLOAT8
@@ -56,10 +67,6 @@
  */
 #cmakedefine QUDA_TARGET_CUDA
 #cmakedefine QUDA_TARGET_HIP
-
-#if defined(QUDA_TARGET_CUDA) && defined(QUDA_TARGET_HIP)
-#error "Cannot define both QUDA_TARGET_CUDA and QUDA_TARGET_HIP at the same time"
-#endif
 
 #if !defined(QUDA_TARGET_CUDA) && !defined(QUDA_TARGET_HIP)
 #error "No QUDA_TARGET selected"

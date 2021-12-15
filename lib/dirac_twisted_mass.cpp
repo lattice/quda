@@ -123,14 +123,14 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					double kappa, double, double mu, double mu_factor) const
+  void DiracTwistedMass::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                        double mu, double mu_factor) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
     double a = 2.0 * kappa * mu;
-    cudaCloverField *c = NULL;
+    CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, mu_factor, QUDA_TWISTED_MASS_DIRAC, QUDA_MATPC_INVALID);
   }
 
@@ -373,14 +373,14 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-					  double kappa, double, double mu, double mu_factor) const
+  void DiracTwistedMassPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double,
+                                          double mu, double mu_factor) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
     double a = -2.0 * kappa * mu;
-    cudaCloverField *c = NULL;
+    CloverField *c = nullptr;
     CoarseOp(Y, X, T, *gauge, c, kappa, mass, a, -mu_factor, QUDA_TWISTED_MASSPC_DIRAC, matpcType);
   }
 } // namespace quda

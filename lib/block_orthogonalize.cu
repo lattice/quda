@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <utility>
 
+#include <power_of_two_array.h>
 #include <kernels/block_orthogonalize.cuh>
 #include <tunable_block_reduction.h>
 
@@ -15,27 +16,24 @@ namespace quda {
     // up to a whole power of two.  So for example, 2x2x2x2 and
     // 3x3x3x1 aggregation would both use the same block size 32
 #ifndef QUDA_FAST_COMPILE_REDUCE
-    static constexpr std::array<unsigned int, 6> block = {32, 64, 128, 256, 512, 1024};
+    using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
-    static constexpr std::array<unsigned int, 1> block = {1024};
+    using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
 #endif
+    static constexpr array_type block = array_type();
 
     /**
        @brief Return the first power of two block that is larger than the required size
     */
     static unsigned int block_mapper(unsigned int raw_block)
     {
-      for (auto block_ : block) if (raw_block <= block_) return block_;
+      for (unsigned int b = 0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];
       errorQuda("Invalid raw block size %d\n", raw_block);
       return 0;
     }
   };
 
-#ifndef QUDA_FAST_COMPILE_REDUCE
-  constexpr std::array<unsigned int, 6> OrthoAggregates::block;
-#else
-  constexpr std::array<unsigned int, 1> OrthoAggregates::block;
-#endif
+  constexpr OrthoAggregates::array_type OrthoAggregates::block;
 
   using namespace quda::colorspinor;
 
@@ -44,8 +42,10 @@ namespace quda {
   template<> struct BOrder<float, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #ifdef FLOAT8
   template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
+  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT8_FIELD_ORDER; };
 #else
   template<> struct BOrder<short, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
+  template<> struct BOrder<int8_t, 4, 3> { static constexpr QudaFieldOrder order = QUDA_FLOAT4_FIELD_ORDER; };
 #endif
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize, int nColor_, int coarseSpin, int nVec>
@@ -120,8 +120,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void CPU(const TuneParam &tp, const qudaStream_t &stream,
-             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_host_(const TuneParam &tp, const qudaStream_t &stream,
+                     const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
       Arg<false, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       launch_host<BlockOrtho_, OrthoAggregates>(tp, stream, arg);
@@ -129,8 +129,8 @@ namespace quda {
     }
 
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const qudaStream_t &stream,
-             const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
+    void launch_device_(const TuneParam &tp, const qudaStream_t &stream,
+                        const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>)
     {
       Arg<true, Rotator, Vector> arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle_factor = tp.aux.x;
@@ -146,7 +146,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,bFloat,bFloat,disable_ghost> Vector;
-          CPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_host_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order %d", V.FieldOrder());
         }
@@ -154,7 +154,7 @@ namespace quda {
         if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && B[0]->FieldOrder() == BOrder<bFloat,nSpin,nColor>::order) {
           typedef FieldOrderCB<real,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER,vFloat,vFloat,disable_ghost> Rotator;
           typedef FieldOrderCB<real,nSpin,nColor,1,BOrder<bFloat,nSpin,nColor>::order,bFloat,bFloat,disable_ghost,isFixed<bFloat>::value> Vector;
-          GPU<Rotator,Vector>(tp, stream, B, std::make_index_sequence<nVec>());
+          launch_device_<Rotator, Vector>(tp, stream, B, std::make_index_sequence<nVec>());
         } else {
           errorQuda("Unsupported field order V=%d B=%d", V.FieldOrder(), B[0]->FieldOrder());
         }
@@ -191,7 +191,7 @@ namespace quda {
       TunableBlock2D::initTuneParam(param);
       int active_x_threads = (aggregate_size / 2) * (nSpin == 1 ? 1 : V.SiteSubset());
       param.block = dim3(OrthoAggregates::block_mapper(active_x_threads), 1, 1);
-      param.grid = dim3(V.Volume() / (nSpin == 1 ? 2 : active_x_threads), chiral_blocks, 1);
+      param.grid = dim3((nSpin == 1 ? V.VolumeCB() : V.Volume()) / active_x_threads, chiral_blocks, 1);
       param.aux.x = 1; // swizzle factor
     }
 

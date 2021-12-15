@@ -1,16 +1,19 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda {
 
-  template <typename Float, int nColor_, QudaReconstructType recon_, int type_>
-  struct KernelArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  enum struct compute_type { determinant, trace };
+
+  template <typename Float, int nColor_, QudaReconstructType recon_, compute_type type_>
+  struct KernelArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
-    static constexpr int type = type_;
+    static constexpr compute_type type = type_;
     using real = typename mapper<Float>::type;
     using Gauge = typename gauge_mapper<real, recon>::type;
     int X[4]; // grid dimensions
@@ -18,21 +21,20 @@ namespace quda {
     Gauge u;
 
     KernelArg(const GaugeField &u) :
-      ReduceArg<reduce_t>(),
+      ReduceArg<reduce_t>(dim3(u.LocalVolumeCB(), 2, 1)),
       u(u)
     {
-      this->threads = dim3(u.LocalVolumeCB(), 2, 1);
       for (int dir=0; dir<4; ++dir) {
         border[dir] = u.R()[dir];
         X[dir] = u.X()[dir] - border[dir]*2;
       }
     }
 
-    __device__ __host__ auto init() const { return reduce_t(); }
+    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
-  template <typename Arg> struct DetTrace : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct DetTrace : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr DetTrace(const Arg &arg) : arg(arg) {}
@@ -55,8 +57,8 @@ namespace quda {
 #pragma unroll
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
-        auto local = Arg::type == 0 ? getDeterminant(U) : getTrace(U);
-        value = plus::operator()(value, reduce_t(local.real(), local.imag()));
+        auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
+        value = plus::operator()(value, reduce_t{local.real(), local.imag()});
       }
 
       return value;

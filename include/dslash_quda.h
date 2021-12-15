@@ -12,7 +12,8 @@
 #include <cuda/atomic>
 #endif
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Constants used by dslash and packing kernels
@@ -34,7 +35,7 @@ namespace quda {
     int_fastdiv face_XYZ[4];
     int_fastdiv face_XYZT[4];
 
-    int ghostFace[QUDA_MAX_DIM+1];
+    int ghostFace[QUDA_MAX_DIM + 1];
     int ghostFaceCB[QUDA_MAX_DIM + 1];
 
     int X2X1;
@@ -578,6 +579,40 @@ namespace quda {
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
+  void ApplyDomainWall4DM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5invM5inv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
+
+  void ApplyDomainWall4DM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                              double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                              ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                              TimeProfile &profile);
+
+  void ApplyDomainWall4DM5preM5mob(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                   double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x,
+                                   ColorSpinorField &y, int parity, bool dagger, const int *comm_override, double m_f,
+                                   TimeProfile &profile);
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
@@ -598,14 +633,6 @@ namespace quda {
 
   void ApplyDslash5Mma(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                     double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
-
-  // Tensor core functions for Mobius DWF
-  namespace mobius_tensor_core
-  {
-    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type);
-  }
 
   // The EOFA stuff
   namespace mobius_eofa
@@ -767,4 +794,4 @@ namespace quda {
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
 
-}
+} // namespace quda

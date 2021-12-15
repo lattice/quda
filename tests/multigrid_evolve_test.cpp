@@ -464,7 +464,7 @@ int main(int argc, char **argv)
     if (clover_inv) host_free(clover_inv);
   }
 
-  for (int dir = 0; dir<4; dir++) host_free(gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(gauge[dir]);
 
   host_free(spinorIn);
   host_free(spinorCheck);

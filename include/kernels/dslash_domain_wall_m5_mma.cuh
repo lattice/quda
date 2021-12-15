@@ -85,7 +85,7 @@ namespace quda {
       constexpr int Ls = Arg::Ls;
       const int parity = arg.nParity == 2 ? arg.parity : 0;
 
-      TensorCoreSharedMemory<real> shared_memory_data;
+      SharedMemoryCache<real> shared_memory_data;
 
       constexpr int m = 4 * Ls;
       constexpr int n = 6 * Arg::block_dim_x;
@@ -97,7 +97,7 @@ namespace quda {
       constexpr int smem_ld_b = n + Mma::t_pad;
       constexpr int smem_ld_c = n + Mma::acc_pad;
 
-      real *smem_a = shared_memory_data;
+      real *smem_a = shared_memory_data.data();
       real *smem_b = Arg::reload ? smem_a + smem_ld_a * k : smem_a;
       real *smem_c = smem_b + smem_ld_b * k;
 

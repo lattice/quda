@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <shmem_helper.cuh>
 
-#define CHECK_CUDA_ERROR(func)                                          \
-  quda::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
+#define CHECK_CUDA_ERROR(func)                                                                                         \
+  quda::target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
 {
@@ -19,10 +19,12 @@ bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
 
 int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
 {
-  int accessRank[2] = { };
+  int accessRank[2] = {};
   if (comm_peer2peer_possible(local_gpuid, neighbor_gpuid)) {
-    CHECK_CUDA_ERROR(cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, local_gpuid, neighbor_gpuid));
-    CHECK_CUDA_ERROR(cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, local_gpuid));
+    CHECK_CUDA_ERROR(
+      cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, local_gpuid, neighbor_gpuid));
+    CHECK_CUDA_ERROR(
+      cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, local_gpuid));
   }
 
   // return the slowest direction of access (lower is faster)
@@ -35,21 +37,20 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
   cudaIpcMemHandle_t remote_handle[2][QUDA_MAX_DIM];
 
 #ifndef NVSHMEM_COMMS
-  for (int dim=0; dim<4; ++dim) {
-    if (comm_dim(dim)==1) continue;
-    for (int dir=0; dir<2; ++dir) {
-      MsgHandle* sendHandle = nullptr;
-      MsgHandle* receiveHandle = nullptr;
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; ++dir) {
+      MsgHandle *sendHandle = nullptr;
+      MsgHandle *receiveHandle = nullptr;
       int disp = (dir == 1) ? +1 : -1;
 
       // first set up receive
-      if (comm_peer2peer_enabled(1-dir,dim)) {
-        receiveHandle = comm_declare_receive_relative(&remote_handle[1-dir][dim],
-                                                      dim, -disp, sizeof(remote_handle));
+      if (comm_peer2peer_enabled(1 - dir, dim)) {
+        receiveHandle = comm_declare_receive_relative(&remote_handle[1 - dir][dim], dim, -disp, sizeof(remote_handle));
       }
       // now send
       cudaIpcMemHandle_t local_handle;
-      if (comm_peer2peer_enabled(dir,dim)) {
+      if (comm_peer2peer_enabled(dir, dim)) {
         CHECK_CUDA_ERROR(cudaIpcGetMemHandle(&local_handle, local));
         sendHandle = comm_declare_send_relative(&local_handle, dim, disp, sizeof(local_handle));
       }
@@ -66,13 +67,13 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 #endif
 
   // open the remote memory handles and set the send ghost pointers
-  for (int dim=0; dim<4; ++dim) {
+  for (int dim = 0; dim < 4; ++dim) {
 #ifndef NVSHMEM_COMMS
     // TODO: We maybe can force loopback comms to use the IB path here
-    if (comm_dim(dim)==1) continue;
+    if (comm_dim(dim) == 1) continue;
 #endif
     // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
-    const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+    const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
     for (int dir = 0; dir < num_dir; dir++) {
       remote[dim][dir] = nullptr;
 #ifndef NVSHMEM_COMMS
@@ -89,17 +90,17 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 #ifndef NVSHMEM_COMMS
 void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
 {
-  for (int dim=0; dim<4; ++dim) {
+  for (int dim = 0; dim < 4; ++dim) {
 
-    if (comm_dim(dim)==1) continue;
-    const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+    if (comm_dim(dim) == 1) continue;
+    const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0, dim) && comm_peer2peer_enabled(1, dim)) ? 1 : 2;
 
-    if (comm_peer2peer_enabled(1,dim)) {
+    if (comm_peer2peer_enabled(1, dim)) {
       // only close this handle if it doesn't alias the back ghost
       if (num_dir == 2 && remote[dim][1]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][1]));
     }
 
-    if (comm_peer2peer_enabled(0,dim)) {
+    if (comm_peer2peer_enabled(0, dim)) {
       if (remote[dim][0]) CHECK_CUDA_ERROR(cudaIpcCloseMemHandle(remote[dim][0]));
     }
   } // iterate over dim
@@ -113,26 +114,26 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
   // handles for obtained events
   cudaIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
 
-  for (int dim=0; dim<4; ++dim) {
-    if (comm_dim(dim)==1) continue;
-    for (int dir=0; dir<2; ++dir) {
-      MsgHandle* sendHandle = nullptr;
-      MsgHandle* receiveHandle = nullptr;
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; ++dir) {
+      MsgHandle *sendHandle = nullptr;
+      MsgHandle *receiveHandle = nullptr;
       int disp = (dir == 1) ? +1 : -1;
 
       // first set up receive
-      if (comm_peer2peer_enabled(1-dir,dim)) {
-        receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1-dir][dim], dim, -disp,
-                                                      sizeof(ipcRemoteEventHandle[1-dir][dim]));
+      if (comm_peer2peer_enabled(1 - dir, dim)) {
+        receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1 - dir][dim], dim, -disp,
+                                                      sizeof(ipcRemoteEventHandle[1 - dir][dim]));
       }
 
       cudaIpcEventHandle_t handle;
 
       // now send
-      if (comm_peer2peer_enabled(dir,dim)) {
+      if (comm_peer2peer_enabled(dir, dim)) {
         cudaEvent_t event;
         CHECK_CUDA_ERROR(cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess));
-        local[dir][dim].event = reinterpret_cast<void*>(event);
+        local[dir][dim].event = reinterpret_cast<void *>(event);
         CHECK_CUDA_ERROR(cudaIpcGetEventHandle(&handle, event));
         sendHandle = comm_declare_send_relative(&handle, dim, disp, sizeof(handle));
       }
@@ -148,24 +149,24 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
     }
   }
 
-  for (int dim=0; dim<4; ++dim) {
-    if (comm_dim(dim)==1) continue;
-    for (int dir=0; dir<2; ++dir) {
-      if (!comm_peer2peer_enabled(dir,dim)) continue;
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; ++dir) {
+      if (!comm_peer2peer_enabled(dir, dim)) continue;
       cudaEvent_t event;
       CHECK_CUDA_ERROR(cudaIpcOpenEventHandle(&event, ipcRemoteEventHandle[dir][dim]));
-      remote[dir][dim].event = reinterpret_cast<void*>(event);
+      remote[dir][dim].event = reinterpret_cast<void *>(event);
     }
   }
 }
 
-void comm_destroy_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+void comm_destroy_neighbor_event(qudaEvent_t[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
 {
-  for (int dim=0; dim<4; ++dim) {
-    if (comm_dim(dim)==1) continue;
-    for (int dir = 0; dir <2; dir++) {
-      cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(local[dir][dim].event);
+  for (int dim = 0; dim < 4; ++dim) {
+    if (comm_dim(dim) == 1) continue;
+    for (int dir = 0; dir < 2; dir++) {
+      cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(local[dir][dim].event);
       if (comm_peer2peer_enabled(dir, dim)) CHECK_CUDA_ERROR(cudaEventDestroy(event));
-    } 
+    }
   } // iterate over dim
 }

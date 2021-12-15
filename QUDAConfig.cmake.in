@@ -1,0 +1,41 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+set(QUDA_QMP @QUDA_QMP@)
+set(QUDA_MPI @QUDA_MPI@)
+set(QUDA_QIO @QUDA_QIO@)
+set(QUDA_MAGMA @QUDA_MAGMA@)
+set(QUDA_OPENMP @QUDA_OPENMP@)
+
+if( QUDA_QMP AND QUDA_MPI )
+  message(FATAL_ERROR "Cannot have both QMP and MPI configured")  
+endif()
+
+
+if( QUDA_QMP )
+	find_dependency(QMP REQUIRED)
+endif()
+
+if( QUDA_MPI )
+  find_dependency(MPI REQUIRED)
+endif()
+
+if( QUDA_QIO )
+	find_dependency(QIO REQUIRED)
+endif()
+
+if( QUDA_OPENMP )
+	find_dependency(OpenMP REQUIRED)
+endif()
+
+if( QUDA_MAGMA )
+  find_dependency(MAGMA REQUIRED)
+endif()
+
+enable_language(CUDA)
+find_package(CUDAToolkit REQUIRED)
+
+include(${CMAKE_CURRENT_LIST_DIR}/QUDATargets.cmake)
+
+

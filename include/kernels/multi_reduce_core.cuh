@@ -4,6 +4,7 @@
 #include <reduce_helper.h>
 #include <blas_helper.cuh>
 #include <multi_blas_helper.cuh>
+#include <array.h>
 #include <reduction_kernel.h>
 
 namespace quda
@@ -13,23 +14,25 @@ namespace quda
   {
 
     /**
-       @brief Parameter struct for generic multi-blas kernel.
-       @tparam NXZ is dimension of input vectors: X,Z,V
+       @brief Parameter struct for generic multi-reduce blas kernel.
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam NXZ_ the dimension of input vectors: X,Z
        @tparam store_t Default store type for the fields
        @tparam N Default field vector i/o length
        @tparam y_store_t Store type for the y fields
-       @tparam N Y-field vector i/o length
-       @tparam Reducer Functor used to operate on data
+       @tparam Ny Y-field vector i/o length
+       @tparam Reducer_ Functor used to operate on data
     */
     template <typename real_, int n_, int NXZ_, typename store_t, int N, typename y_store_t, int Ny, typename Reducer_>
     struct MultiReduceArg :
-      public ReduceArg<vector_type<typename Reducer_::reduce_t, NXZ_>>,
+      public ReduceArg<array<typename Reducer_::reduce_t, NXZ_>>,
       SpinorXZ<NXZ_, store_t, N, Reducer_::use_z>,
       SpinorYW<max_YW_size<NXZ_, store_t, y_store_t, Reducer_>(), store_t, N, y_store_t, Ny, Reducer_::use_w>
     {
       using real = real_;
       using Reducer = Reducer_;
-      using reduce_t = vector_type<typename Reducer_::reduce_t, NXZ_>;
+      using reduce_t = array<typename Reducer_::reduce_t, NXZ_>;
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
@@ -43,13 +46,12 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(NYW),
+        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
         nParity(nParity)
       {
-        this->threads = dim3(length, NYW, 1);
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
@@ -76,9 +78,9 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = vector_type<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<array<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
+      using reduce_t = array<typename Arg::Reducer::reduce_t, Arg::NXZ>;
       using plus<reduce_t>::operator();
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}

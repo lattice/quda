@@ -7,11 +7,11 @@
 namespace quda
 {
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD) {}
+  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD) { }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv) {}
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv) { }
 
-  DiracStaggeredKD::~DiracStaggeredKD() {}
+  DiracStaggeredKD::~DiracStaggeredKD() { }
 
   DiracStaggeredKD &DiracStaggeredKD::operator=(const DiracStaggeredKD &dirac)
   {
@@ -188,8 +188,7 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b,
-                                              const QudaSolutionType) const
+  void DiracStaggeredKD::reconstructSpecialMG(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const
   {
     // do nothing
 
@@ -211,8 +210,7 @@ namespace quda
     // nothing required for left block preconditioning
   }
 
-  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *,
-                                      cudaGaugeField *, cudaCloverField *)
+  void DiracStaggeredKD::updateFields(cudaGaugeField *gauge_in, cudaGaugeField *, cudaGaugeField *, CloverField *)
   {
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
 
@@ -220,8 +218,7 @@ namespace quda
     BuildStaggeredKahlerDiracInverse(*Xinv, *gauge, mass);
   }
 
-  void DiracStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double,
-                                        double, double) const
+  void DiracStaggeredKD::createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double) const
   {
     errorQuda("Staggered KD operators do not support MG coarsening yet");
 

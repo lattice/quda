@@ -8,47 +8,92 @@ namespace quda {
 
   template <typename OutOrder, typename InOrder, typename FloatOut, typename FloatIn>
   class CopyClover : TunableKernel2D {
-    CopyCloverArg<FloatOut, FloatIn, OutOrder, InOrder> arg;
+    using Arg = CopyCloverArg<FloatOut, FloatIn, OutOrder, InOrder>;
+    using real = typename mapper<FloatOut>::type;
+    bool compute_diagonal;
+    real *diagonal_d;
+    real *diagonal_h;
     CloverField &out;
     const CloverField &in;
-
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0 ;}
-
-    unsigned int minThreads() const { return arg.threads.x; }
+    bool inverse;
+    FloatOut *Out;
+    const FloatIn *In;
+    unsigned int minThreads() const { return in.VolumeCB(); }
 
   public:
     CopyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-               void *Out, void *In, float *outNorm, float *inNorm) :
+               void *Out, const void *In) :
       TunableKernel2D(in, 2, location),
-      arg(OutOrder(out, inverse, (FloatOut*)Out, outNorm), InOrder(in, inverse, (FloatIn*)In, inNorm), in),
+      compute_diagonal(out.Reconstruct() && !in.Reconstruct()), // if writing to a compressed field, we need to compute the diagonal
+      diagonal_d(compute_diagonal ? static_cast<real*>(pool_device_malloc(sizeof(real))) : nullptr),
+      diagonal_h(compute_diagonal ? static_cast<real*>(pool_pinned_malloc(sizeof(real))) : nullptr),
       out(out),
-      in(in)
+      in(in),
+      inverse(inverse),
+      Out(static_cast<FloatOut*>(Out)),
+      In(static_cast<const FloatIn*>(In))
     {
+      if (compute_diagonal) {
+        char aux2[TuneKey::aux_n];
+        strcpy(aux2, aux);
+        strcat(aux,",compute_diagonal");
+        apply(device::get_default_stream());
+        strcpy(aux, aux2);
+        compute_diagonal = false;
+      }
+
       apply(device::get_default_stream());
+    }
+
+    virtual ~CopyClover()
+    {
+      if (diagonal_h) pool_pinned_free(diagonal_h);
+      if (diagonal_d) pool_device_free(diagonal_d);
     }
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<CloverCopy>(tp, stream, arg);
+
+      auto diagonal = location == QUDA_CUDA_FIELD_LOCATION ? diagonal_d : diagonal_h;
+      if constexpr (OutOrder::enable_reconstruct && InOrder::enable_reconstruct) {
+        launch<CompressedCloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+      } else {
+        launch<CloverCopy, true>(tp, stream, Arg(out, in, inverse, Out, In, compute_diagonal, diagonal));
+      }
+
+      if (compute_diagonal) {
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
+          qudaMemcpyAsync(diagonal_h, diagonal_d, sizeof(real), qudaMemcpyDeviceToHost, stream);
+          qudaDeviceSynchronize();
+        }
+        double diagonal = 0.0;
+        // only use the result from node 0 (site 0) for multi-node determinism
+        if (comm_rank() == 0) diagonal = *diagonal_h / 2; // factor of two for native normalization
+        if (!activeTuning()) comm_broadcast(&diagonal, sizeof(double));
+        out.Diagonal(diagonal);
+      }
     }
 
-    long long flops() const { return 0; } 
-    long long bytes() const { return out.Bytes() + in.Bytes(); }
+    long long bytes() const { return (out.Bytes() + in.Bytes()) / (compute_diagonal ? in.Volume() : 1); }
   };
 
   template <typename InOrder, typename FloatOut, typename FloatIn>
   void copyClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-                  void *Out, void *In, float *outNorm, float *inNorm)
+                  void *Out, const void *In)
   {
     if (out.isNative()) {
-      typedef typename clover_mapper<FloatOut>::type C;
-      CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      if (out.Reconstruct()) {
+        using C = typename clover_mapper<FloatOut, 72, false, true>::type;
+        CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+      } else {
+        using C = typename clover_mapper<FloatOut, 72, false, false>::type;
+        CopyClover<C, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+      }
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
-      CopyClover<QDPOrder<FloatOut>, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      CopyClover<QDPOrder<FloatOut>, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
     } else if (out.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
 #ifdef BUILD_QDPJIT_INTERFACE
-      CopyClover<QDPJITOrder<FloatOut>, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      CopyClover<QDPJITOrder<FloatOut>, InOrder, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -60,23 +105,28 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn> struct CloverCopyOut {
-    CloverCopyOut(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location, 
-                  void *Out, void *In, float *outNorm, float *inNorm)
+    CloverCopyOut(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
+                  void *Out, const void *In)
     {
       if (in.isNative()) {
-        typedef typename clover_mapper<FloatIn>::type C;
-        copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        if (in.Reconstruct()) {
+          using C = typename clover_mapper<FloatIn, 72, false, true>::type;
+          copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+        } else {
+          using C = typename clover_mapper<FloatIn, 72, false, false>::type;
+          copyClover<C, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
+        }
       } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
-        copyClover<QDPOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        copyClover<QDPOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
       } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
 #ifdef BUILD_QDPJIT_INTERFACE
-        copyClover<QDPJITOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        copyClover<QDPJITOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
 #else
         errorQuda("QDPJIT interface has not been built\n");
 #endif
       } else if (in.Order() == QUDA_BQCD_CLOVER_ORDER) {
 #ifdef BUILD_BQCD_INTERFACE
-        copyClover<BQCDOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+        copyClover<BQCDOrder<FloatIn>, FloatOut, FloatIn>(out, in, inverse, location, Out, In);
 #else
         errorQuda("BQCD interface has not been built\n");
 #endif
@@ -87,29 +137,23 @@ namespace quda {
   };
 
   template <typename FloatIn> struct CloverCopyIn {
-    CloverCopyIn(const CloverField &in, CloverField &out, bool inverse, QudaFieldLocation location, 
-                 void *Out, void *In, float *outNorm, float *inNorm)
+    CloverCopyIn(const CloverField &in, CloverField &out, bool inverse, QudaFieldLocation location,
+                 void *Out, const void *In)
     {
       // swizzle in/out back to instantiate out precision
-      instantiatePrecision2<CloverCopyOut, FloatIn>(out, in, inverse, location, Out, In, outNorm, inNorm);
+      instantiatePrecision2<CloverCopyOut, FloatIn>(out, in, inverse, location, Out, In);
     }
   };
 
 #ifdef GPU_CLOVER_DIRAC
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-                         void *Out, void *In, void *outNorm, void *inNorm)
+                         void *Out, const void *In)
   {
-    if (out.Precision() < QUDA_SINGLE_PRECISION && out.Order() > 4) 
-      errorQuda("Fixed-point precision not supported for order %d", out.Order());
-    if (in.Precision() < QUDA_SINGLE_PRECISION && in.Order() > 4) 
-      errorQuda("Fixed-point precision not supported for order %d", in.Order());
-
     // swizzle in/out since we first want to instantiate precision
-    instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In,
-                                       reinterpret_cast<float*>(outNorm), reinterpret_cast<float*>(inNorm));
+    instantiatePrecision<CloverCopyIn>(in, out, inverse, location, Out, In);
   }
 #else
-  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, void *, void *, void *)
+  void copyGenericClover(CloverField &, const CloverField &, bool, QudaFieldLocation, void *, const void *)
   {
     errorQuda("Clover has not been built");
   }

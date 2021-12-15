@@ -63,11 +63,22 @@ namespace quda {
         }
         max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        strcpy(aux, x[0]->AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y[0]->AuxString());
         }
+        char NXZ_str[16];
+        char NYW_str[16];
+        u32toa(NXZ_str, NXZ);
+        u32toa(NYW_str, NYW);
+        strcat(aux, ",Nxz=");
+        strcat(aux, NXZ_str);
+        strcat(aux, ",Nyw=");
+        strcat(aux, NYW_str);
+
+#ifdef QUDA_FAST_COMPILE_REDUCE
+        strcat(aux, ",fast_compile");
+#endif
 
         apply(device::get_default_stream());
 
@@ -75,18 +86,7 @@ namespace quda {
         blas::flops += flops();
       }
 
-      TuneKey tuneKey() const
-      {
-        char name[TuneKey::name_n];
-        char NXZ_str[8];
-        char NYW_str[8];
-        u32toa(NXZ_str, NXZ);
-        u32toa(NYW_str, NYW);
-        strcpy(name, NXZ_str);
-        strcat(name, NYW_str);
-        strcat(name, typeid(f).name());
-        return TuneKey(vol, name, aux);
-      }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(f).name(), aux); }
 
       template <typename Arg> void Launch(const TuneParam &tp, const qudaStream_t &stream, Arg &&arg)
       {
@@ -138,7 +138,7 @@ namespace quda {
                    device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
             break;
 #endif
-          default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+          default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
           }
 
           tp.block.x /= tp.aux.x; // restore block size

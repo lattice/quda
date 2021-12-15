@@ -203,7 +203,8 @@ namespace quda {
 
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c)
   {
-    std::tuple<cpuColorSpinorField&, QudaSourceType, int, int, int> pack(a, sourceType, x, s, c);
+    using pack_t = std::tuple<cpuColorSpinorField&, QudaSourceType, int, int, int>;
+    pack_t pack(a, sourceType, x, s, c);
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericSource<double>(pack);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {

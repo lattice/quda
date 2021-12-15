@@ -3,6 +3,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <kernel.h>
 #include <reduction_kernel.h>
 #include <gauge_fix_ovr_hit_devf.cuh>
@@ -13,8 +14,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityOVRArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugeFixQualityOVRArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -26,23 +27,23 @@ namespace quda {
     reduce_t result;
 
     GaugeFixQualityOVRArg(const GaugeField &data) :
-      ReduceArg<reduce_t>(1, true), // reset = true
-      data(data)
+      ReduceArg<reduce_t>(dim3(data.LocalVolumeCB(), 2, 1), 1, true), // reset = true
+      data(data),
+      result{0, 0}
     {
-      this->threads = dim3(data.LocalVolumeCB(), 2, 1);
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
         border[dir] = data.R()[dir];
       }
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction(){ return result[0]; }
     double getTheta(){ return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityOVR : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct FixQualityOVR : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -53,7 +54,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data{0, 0};
       using Link = Matrix<complex<typename Arg::real>, 3>;
 
       int X[4];

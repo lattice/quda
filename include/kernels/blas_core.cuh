@@ -1,7 +1,8 @@
 #pragma once
 
-#include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include <reducer.h>
+#include <array.h>
 #include <kernel.h>
 
 namespace quda
@@ -12,7 +13,13 @@ namespace quda
 
     /**
        Parameter struct for generic blas kernel
-       @tparam n real numbers per thread
+       @tparam real_ The precision of the calculation
+       @tparam n_ The number of real elements per thread
+       @tparam store_t Default store type for the fields
+       @tparam N Default field vector i/o length
+       @tparam y_store_t Store type for the y fields
+       @tparam Ny Y-field vector i/o length
+       @tparam Functor_ Functor used to operate on data
     */
     template <typename real_, int n_, typename store_t, int N, typename y_store_t, int Ny, typename Functor>
     struct BlasArg : kernel_param<> {
@@ -53,7 +60,7 @@ namespace quda
 
       __device__ __host__ inline void operator()(int i, int parity) const
       {
-        using vec = vector_type<complex<typename Arg::real>, Arg::n/2>;
+        using vec = array<complex<typename Arg::real>, Arg::n/2>;
 
         arg.f.init();
 
