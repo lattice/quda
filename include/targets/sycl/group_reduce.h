@@ -1,6 +1,6 @@
 #pragma once
 
-#include <quda_target.h>
+#include <quda_sycl_api.h>
 
 template <typename T>
 inline void blockReduceSum(sycl::group<3> grp, T &out, T in)

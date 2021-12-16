@@ -3,6 +3,8 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
+#include <array.h>
+#include <math_helper.cuh>
 
 /**
    @file reducer.h
@@ -76,6 +78,7 @@ namespace quda
     using reducer_t = maximum<T>;
     //__device__ __host__ inline T operator()(T a, T b) const { return a > b ? a : b; }
     __device__ __host__ inline T operator()(T a, T b) const { return quda::max(a,b); }
+    //__device__ __host__ inline T operator()(T a, T b) const { return max(a,b); }
   };
 
   /**

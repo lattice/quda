@@ -1,7 +1,7 @@
 #pragma once
 
 #include <quda_api.h>
-#include <quda_target.h>
+#include <quda_sycl_api.h>
 #include <float_vector.h>
 #include <target_device.h>
 #include <reducer.h>

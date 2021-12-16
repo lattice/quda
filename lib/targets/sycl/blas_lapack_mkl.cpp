@@ -1,6 +1,8 @@
 #include <complex.h>
 #include <blas_lapack.h>
 #include <timer.h>
+#include <quda_sycl_api.h>
+
 #ifdef NATIVE_LAPACK_LIB
 #include <oneapi/mkl.hpp>
 #include <malloc_quda.h>

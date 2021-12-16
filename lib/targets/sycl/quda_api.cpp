@@ -4,6 +4,7 @@
 #include <quda_internal.h>
 #include <timer.h>
 #include <device.h>
+#include <quda_sycl_api.h>
 
 // if this macro is defined then we profile the CUDA API calls
 //#define API_PROFILE

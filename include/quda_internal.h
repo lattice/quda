@@ -2,7 +2,6 @@
 
 #include <quda_arch.h>
 #include <quda_api.h>
-#include <quda_target.h>
 
 #include <string>
 #include <complex>
@@ -48,7 +47,6 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 #include <object.h>
-#include <quda_target.h>
 #include <device.h>
 
 namespace quda {

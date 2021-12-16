@@ -4,6 +4,7 @@
 #include <kernel_helper.h>
 #include <target_device.h>
 #include <utility>
+#include <quda_sycl_api.h>
 
 namespace quda {
 

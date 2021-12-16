@@ -6,6 +6,7 @@
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
 #include <device.h>
+#include <quda_sycl_api.h>
 
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"

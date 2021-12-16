@@ -2,6 +2,7 @@
 #include <quda_define.h>
 
 #if defined(QUDA_TARGET_CUDA)
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -10,5 +11,11 @@
 #endif
 
 #elif defined(QUDA_TARGET_HIP)
+
 #include <hip/hip_runtime.h>
-#endif
+
+#elif defined(QUDA_TARGET_SYCL)
+
+#include <targets/sycl/quda_sycl.h>
+
+#endif // defined(QUDA_TARGET_CUDA)
