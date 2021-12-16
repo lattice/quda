@@ -210,27 +210,33 @@ namespace quda {
       return new DiracImprovedStaggeredKD(param);
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1)
-        return new DiracTwistedClover(param, 4);
-      else
-        return new DiracTwistedClover(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedClover(param, 4);
+      case 2: return new DiracTwistedClover(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1)
-        return new DiracTwistedCloverPC(param, 4);
-      else
-        return new DiracTwistedCloverPC(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedCloverPC(param, 4);
+      case 2: return new DiracTwistedCloverPC(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
-        if (param.Ls == 1) return new DiracTwistedMass(param, 4);
-        else return new DiracTwistedMass(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedMass(param, 4);
+      case 2: return new DiracTwistedMass(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
-      if (param.Ls == 1)
-        return new DiracTwistedMassPC(param, 4);
-      else
-        return new DiracTwistedMassPC(param, 5);
+      switch (param.Ls) {
+      case 1: return new DiracTwistedMassPC(param, 4);
+      case 2: return new DiracTwistedMassPC(param, 5);
+      default: errorQuda("Unexpected Ls = %d", param.Ls);
+      }
     } else if (param.type == QUDA_COARSE_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCoarse operator\n");
       return new DiracCoarse(param);
