@@ -247,9 +247,6 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.verbosity = verbosity;
 
   inv_param.extlib_type = solver_ext_lib;
@@ -335,9 +332,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -606,9 +600,6 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
@@ -771,9 +762,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 void setContractInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
@@ -845,9 +833,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   // these can be set individually
   for (int i = 0; i < inv_param.num_offset; i++) {
@@ -943,8 +928,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
@@ -959,9 +942,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -1187,9 +1167,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 void setDeflatedInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
