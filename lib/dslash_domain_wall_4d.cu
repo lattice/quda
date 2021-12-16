@@ -53,7 +53,7 @@ namespace quda
 
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-#ifdef GPU_DOMAIN_WALL_DIRAC
+#if defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_NDEG_TWISTED_CLOVER_DIRAC)
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile)

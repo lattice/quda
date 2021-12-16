@@ -48,6 +48,8 @@ namespace quda {
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
+    double tm_rho;  // "rho"-type Hasenbusch mass used for twisted clover (like regular rho but
+                    // applied like a twisted mass and ignored in the inverse)
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
@@ -76,6 +78,7 @@ namespace quda {
       mu(0.0),
       mu_factor(0.0),
       epsilon(0.0),
+      tm_rho(0.0),
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
@@ -106,6 +109,7 @@ namespace quda {
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
+      printfQuda("tm_rho = %g\n", tm_rho);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
@@ -1058,6 +1062,7 @@ public:
   protected:
     double mu;
     double epsilon;
+    double tm_rho;
     CloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void twistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1148,6 +1153,17 @@ public:
     DiracTwistedCloverPC& operator=(const DiracTwistedCloverPC &dirac);
 
     void TwistCloverInv(ColorSpinorField &out, const ColorSpinorField &in, const int parity) const;
+
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslash(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity) const;
+
+    /**
+       @brief Convenience wrapper for single/doublet
+     */
+    void WilsonDslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
+                          const ColorSpinorField &x, double k) const;
 
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,

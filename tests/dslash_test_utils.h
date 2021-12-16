@@ -474,16 +474,8 @@ struct DslashTestWrapper {
           tm_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                     parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         else {
-          int tm_offset = 12 * spinorRef->Volume();
-
-          void *ref1 = spinorRef->V();
-          void *ref2 = (char *)ref1 + tm_offset * cpu_prec;
-
-          void *flv1 = spinor->V();
-          void *flv2 = (char *)flv1 + tm_offset * cpu_prec;
-
-          tm_ndeg_dslash(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, parity,
-                         dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);
+          tm_ndeg_dslash(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
+                         parity, dagger, inv_param.matpc_type, inv_param.cpu_prec, gauge_param);
         }
         break;
       case dslash_test_type::MatPC:
@@ -491,15 +483,7 @@ struct DslashTestWrapper {
           tm_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                    inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         else {
-          int tm_offset = 12 * spinorRef->Volume();
-
-          void *ref1 = spinorRef->V();
-          void *ref2 = (char *)ref1 + tm_offset * cpu_prec;
-
-          void *flv1 = spinor->V();
-          void *flv2 = (char *)flv1 + tm_offset * cpu_prec;
-
-          tm_ndeg_matpc(ref1, ref2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         }
         break;
@@ -508,16 +492,8 @@ struct DslashTestWrapper {
           tm_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor, dagger,
                  inv_param.cpu_prec, gauge_param);
         else {
-          int tm_offset = 12 * spinorRef->Volume();
-
-          void *evenOut = spinorRef->V();
-          void *oddOut = (char *)evenOut + tm_offset * cpu_prec;
-
-          void *evenIn = spinor->V();
-          void *oddIn = (char *)evenIn + tm_offset * cpu_prec;
-
-          tm_ndeg_mat(evenOut, oddOut, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon,
-                      dagger, inv_param.cpu_prec, gauge_param);
+          tm_ndeg_mat(spinorRef->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
+                      inv_param.cpu_prec, gauge_param);
         }
         break;
       case dslash_test_type::MatPCDagMatPC:
@@ -527,20 +503,9 @@ struct DslashTestWrapper {
           tm_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                    inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
         } else {
-          int tm_offset = 12 * spinorRef->Volume();
-
-          void *ref1 = spinorRef->V();
-          void *ref2 = (char *)ref1 + tm_offset * cpu_prec;
-
-          void *flv1 = spinor->V();
-          void *flv2 = (char *)flv1 + tm_offset * cpu_prec;
-
-          void *tmp1 = spinorTmp->V();
-          void *tmp2 = (char *)tmp1 + tm_offset * cpu_prec;
-
-          tm_ndeg_matpc(tmp1, tmp2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
-          tm_ndeg_matpc(ref1, ref2, hostGauge, tmp1, tmp2, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                         inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
         }
         break;
@@ -551,20 +516,9 @@ struct DslashTestWrapper {
           tm_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
                  not_dagger, inv_param.cpu_prec, gauge_param);
         } else {
-          int tm_offset = 12 * spinorRef->Volume();
-
-          void *evenOut = spinorRef->V();
-          void *oddOut = (char *)evenOut + tm_offset * cpu_prec;
-
-          void *evenIn = spinor->V();
-          void *oddIn = (char *)evenIn + tm_offset * cpu_prec;
-
-          void *evenTmp = spinorTmp->V();
-          void *oddTmp = (char *)evenTmp + tm_offset * cpu_prec;
-
-          tm_ndeg_mat(evenTmp, oddTmp, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon,
-                      dagger, inv_param.cpu_prec, gauge_param);
-          tm_ndeg_mat(evenOut, oddOut, hostGauge, evenTmp, oddTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon,
+          tm_ndeg_mat(spinorTmp->V(), hostGauge, spinor->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger,
+                      inv_param.cpu_prec, gauge_param);
+          tm_ndeg_mat(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.kappa, inv_param.mu, inv_param.epsilon,
                       not_dagger, inv_param.cpu_prec, gauge_param);
         }
         break;
@@ -577,21 +531,25 @@ struct DslashTestWrapper {
           tmc_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu,
                      inv_param.twist_flavor, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         else
-          errorQuda("Not supported\n");
+          tmc_ndeg_dslash(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                          inv_param.mu, inv_param.epsilon, parity, inv_param.matpc_type, dagger, inv_param.cpu_prec,
+                          gauge_param);
         break;
       case dslash_test_type::MatPC:
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
           tmc_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         else
-          errorQuda("Not supported\n");
+          tmc_ndeg_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                         inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
         break;
       case dslash_test_type::Mat:
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
           tmc_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
                   inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
         else
-          errorQuda("Not supported\n");
+          tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                       inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);
         break;
       case dslash_test_type::MatPCDagMatPC:
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
@@ -599,8 +557,13 @@ struct DslashTestWrapper {
                     inv_param.twist_flavor, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
           tmc_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv, inv_param.kappa, inv_param.mu,
                     inv_param.twist_flavor, inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
-        } else
-          errorQuda("Not supported\n");
+        } else {
+          tmc_ndeg_matpc(spinorTmp->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                         inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv, inv_param.kappa,
+                         inv_param.mu, inv_param.epsilon, inv_param.matpc_type, not_dagger, inv_param.cpu_prec,
+                         gauge_param);
+        }
         break;
       case dslash_test_type::MatDagMat:
         if (inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
@@ -608,8 +571,12 @@ struct DslashTestWrapper {
                   inv_param.twist_flavor, dagger, inv_param.cpu_prec, gauge_param);
           tmc_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu,
                   inv_param.twist_flavor, not_dagger, inv_param.cpu_prec, gauge_param);
-        } else
-          errorQuda("Not supported\n");
+        } else {
+          tmc_ndeg_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                       inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);
+          tmc_ndeg_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu,
+                       inv_param.epsilon, not_dagger, inv_param.cpu_prec, gauge_param);
+        }
         break;
       default: printfQuda("Test type not defined\n"); exit(-1);
       }
