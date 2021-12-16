@@ -14,11 +14,11 @@
 using namespace quda;
 
 QudaGaugeParam param;
-cudaColorSpinorField *cudaSpinor;
+std::unique_ptr<ColorSpinorField> cudaSpinor;
 
 void *qdpCpuGauge_p[4];
 void *cpsCpuGauge_p;
-cpuColorSpinorField *spinor, *spinor2;
+std::unique_ptr<ColorSpinorField> spinor, spinor2;
 
 ColorSpinorParam csParam;
 
@@ -66,9 +66,10 @@ void init() {
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-  spinor = new cpuColorSpinorField(csParam);
-  spinor2 = new cpuColorSpinorField(csParam);
+  spinor = std::make_unique<ColorSpinorField>(csParam);
+  spinor2 = std::make_unique<ColorSpinorField>(csParam);
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -78,16 +79,16 @@ void init() {
 
   csParam.setPrecision(prec, prec, true);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  csParam.pad = param.X[0] * param.X[1] * param.X[2];
+  csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-  cudaSpinor = new cudaColorSpinorField(csParam);
+  cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
 }
 
 void end() {
   // release memory
-  delete cudaSpinor;
-  delete spinor2;
-  delete spinor;
+  cudaSpinor.reset();
+  spinor2.reset();
+  spinor.reset();
 
   for (int dir = 0; dir < 4; dir++) host_free(qdpCpuGauge_p[dir]);
   host_free(cpsCpuGauge_p);
@@ -164,7 +165,7 @@ void packTest()
 
   printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
 
-  cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
+  ColorSpinorField::Compare(*spinor, *spinor2, 1);
 }
 
 int main(int argc, char **argv) {

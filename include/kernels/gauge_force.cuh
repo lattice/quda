@@ -14,48 +14,58 @@ namespace quda {
     int *input_path[4];
     const int *length;
     const double *path_coeff;
+    int *buffer;
     int count;
 
-    paths(void *buffer, size_t bytes, int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
+    paths(int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
       num_paths(num_paths),
       max_length(max_length),
       count(0)
     {
-      void *path_h = safe_malloc(bytes);
+      // create path struct in a single allocation
+      size_t bytes = 4 * num_paths * max_length * sizeof(int) + num_paths * sizeof(int);
+      int pad = ((sizeof(double) - bytes % sizeof(double)) % sizeof(double))/sizeof(int);
+      bytes += pad*sizeof(int) + num_paths*sizeof(double);
+
+      buffer = static_cast<int*>(pool_device_malloc(bytes));
+      int *path_h = static_cast<int*>(safe_malloc(bytes));
       memset(path_h, 0, bytes);
 
-      int *input_path_h = (int*)path_h;
       for (int dir=0; dir<4; dir++) {
         // flatten the input_path array for copying to the device
         for (int i=0; i < num_paths; i++) {
           for (int j=0; j < length_h[i]; j++) {
-            input_path_h[dir*num_paths*max_length + i*max_length + j] = input_path[dir][i][j];
+            path_h[dir*num_paths*max_length + i*max_length + j] = input_path[dir][i][j];
             if (dir==0) count++;
           }
         }
       }
 
       // length array
-      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int), length_h, num_paths*sizeof(int));
+      memcpy(path_h + 4 * num_paths * max_length, length_h, num_paths*sizeof(int));
 
       // path_coeff array
-      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int), path_coeff_h, num_paths*sizeof(double));
+      memcpy(path_h + 4 * num_paths * max_length + num_paths + pad, path_coeff_h, num_paths*sizeof(double));
 
       qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
 
       // finally set the pointers to the correct offsets in the buffer
-      // FIXME we should clean up this pointer and casting mess
-      for (int d=0; d < 4; d++) this->input_path[d] = (int*)((char*)buffer + d*num_paths*max_length*sizeof(int));
-      length = (int*)((char*)buffer + 4*num_paths*max_length*sizeof(int));
-      path_coeff = (double*)((char*)buffer + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int));
+      for (int d=0; d < 4; d++) this->input_path[d] = buffer + d*num_paths*max_length;
+      length = buffer + 4*num_paths*max_length;
+      path_coeff = reinterpret_cast<double*>(buffer + 4 * num_paths * max_length + num_paths + pad);
+    }
+    void free() {
+      pool_device_free(buffer);
     }
   };
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m>
+
+  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m, bool force_>
   struct GaugeForceArg : kernel_param<> {
     using Float = Float_;
     static constexpr int nColor = nColor_;
+    static constexpr bool compute_force = force_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     typedef typename gauge_mapper<Float,recon_u>::type Gauge;
     typedef typename gauge_mapper<Float,recon_m>::type Mom;
@@ -101,7 +111,7 @@ namespace quda {
     //linkA: current matrix
     //linkB: the loaded matrix in this round
     Link linkA, linkB, staple;
-    thread_array<int, 4> dx;
+    thread_array<int, 4> dx{0};
 
     for (int i=0; i<arg.p.num_paths; i++) {
       real coeff = arg.p.path_coeff[i];
@@ -154,8 +164,13 @@ namespace quda {
 
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
-    mom = mom - arg.epsilon * linkA;
-    makeAntiHerm(mom);
+    if(arg.compute_force) {
+      mom = mom - arg.epsilon * linkA;
+      makeAntiHerm(mom);
+    }
+    else {
+      mom = mom + arg.epsilon * linkA;
+    }
     arg.mom(dir, idx, parity) = mom;
   }
 

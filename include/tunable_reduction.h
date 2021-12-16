@@ -2,18 +2,23 @@
 
 #include <tunable_kernel.h>
 #include <lattice_field.h>
+#include <register_traits.h>
 #include <reduction_kernel.h>
 #include <reduction_kernel_host.h>
 
 namespace quda
 {
 
-  /** Dummy comm reducer where no inter-process reduction is done */
+  /**
+     Dummy comm reducer where no inter-process reduction is done
+  */
   template <typename T> struct comm_reduce_null {
     void operator()(std::vector<T> &) { }
   };
 
-  /** comm reducer for doing summation inter-process reduction */
+  /**
+     comm reducer for doing summation inter-process reduction
+  */
   template <typename T> struct comm_reduce_sum {
     // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
     void operator()(std::vector<T> &v)
@@ -22,7 +27,9 @@ namespace quda
     }
   };
 
-  /** comm reducer for doing max inter-process reduction */
+  /**
+     comm reducer for doing max inter-process reduction
+  */
   template <typename T> struct comm_reduce_max {
     // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
     void operator()(std::vector<T> &v)
@@ -31,7 +38,9 @@ namespace quda
     }
   };
 
-  /** comm reducer for doing min inter-process reduction */
+  /**
+     comm reducer for doing min inter-process reduction
+  */
   template <typename T> struct comm_reduce_min {
     // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
     void operator()(std::vector<T> &v)
@@ -200,6 +209,10 @@ namespace quda
     {
       u64toa(vol, n_items);
       strcpy(aux, compile_type_str(location));
+#ifdef QUDA_FAST_COMPILE_REDUCE
+      strcat(aux, "fast_compile,");
+#endif
+      if (commAsyncReduction()) strcat(aux, "async,");
     }
 
     virtual bool advanceBlockDim(TuneParam &param) const

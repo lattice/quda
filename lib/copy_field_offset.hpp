@@ -25,13 +25,13 @@ namespace quda
     CopyFieldOffset(Arg &arg, const Field &meta) : TunableKernel3D(meta, arg.Ls, arg.nParity), arg(arg), meta(meta)
     {
       char tmp[TuneKey::aux_n];
-      strcpy(tmp, aux);
-      writeAuxString("%s,(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d", tmp,
-                     static_cast<int>(arg.dim_in[0]), static_cast<int>(arg.dim_in[1]), static_cast<int>(arg.dim_in[2]),
-                     static_cast<int>(arg.dim_in[3]), static_cast<int>(arg.dim_out[0]), static_cast<int>(arg.dim_out[1]),
-                     static_cast<int>(arg.dim_out[2]), static_cast<int>(arg.dim_out[3]), arg.Ls, arg.nParity,
-                     arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0], arg.offset[1],
-                     arg.offset[2], arg.offset[3]);
+      sprintf(tmp, ",(%d,%d,%d,%d)->(%d,%d,%d,%d),Ls=%d,nParity=%d,%s,offset=%d%d%d%d", static_cast<int>(arg.dim_in[0]),
+              static_cast<int>(arg.dim_in[1]), static_cast<int>(arg.dim_in[2]), static_cast<int>(arg.dim_in[3]),
+              static_cast<int>(arg.dim_out[0]), static_cast<int>(arg.dim_out[1]), static_cast<int>(arg.dim_out[2]),
+              static_cast<int>(arg.dim_out[3]), arg.Ls, arg.nParity,
+              arg.mode == QudaOffsetCopyMode::COLLECT ? "COLLECT" : "DISPERSE", arg.offset[0], arg.offset[1],
+              arg.offset[2], arg.offset[3]);
+      strcat(aux, tmp);
       apply(device::get_default_stream());
     }
 

@@ -5,23 +5,11 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test SYSTEM PUBLIC  googletest/include googletest)
 target_include_directories(quda_test SYSTEM PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-target_include_directories(quda_test SYSTEM PUBLIC ${EIGEN_INCLUDE_DIRS})
-target_link_libraries(quda_test PUBLIC quda)
-target_compile_options(quda_test PUBLIC -fPIC)
+target_link_libraries(quda_test PUBLIC Eigen)
+target_link_libraries(quda_test PUBLIC QUDA::quda)
+set_target_properties(quda_test PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
-
-if(QUDA_QIO
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QIO_FOUND)
-  add_dependencies(quda_test QIO)
-endif()
-
-if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QMP_FOUND)
-  add_dependencies(quda_test QMP)
-endif()
 
 if(QUDA_NVSHMEM AND QUDA_DOWNLOAD_NVSHMEM)
   add_dependencies(quda_test NVSHMEM)
@@ -30,23 +18,9 @@ endif()
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
-  # adding the linker language here as a workaround -- was not needed for cmake 3.16
-  set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
-  endif()
-
-  if(QUDA_QIO
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QIO_FOUND)
-    add_dependencies(${mytarget} QIO)
-  endif()
-
-  if(QUDA_QMP
-     AND QUDA_DOWNLOAD_USQCD
-     AND NOT QMP_FOUND)
-    add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
 
@@ -76,6 +50,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
+   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_executable(dslash_test dslash_test.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
@@ -137,6 +112,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
+   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cpp)
@@ -264,6 +240,7 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
+   OR QUDA_DIRAC_NDEG_TWISTED_CLOVER
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
@@ -482,11 +459,15 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
   if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-    set(DIRAC_NAME twisted-mass)
+    # the ndeg-twisted-mas operator does not fit the pattern used for most other operators
+    # since it is defined via 'dslash-type = twisted-mass` and 'flavor = nondeg-doublet'
+    # as a result, we set DIRAC_NAME and then manually specify 'twisted-mass' and 'nondeg-doublet'
+    # below
+    set(DIRAC_NAME ndeg-twisted-mass)
     # symmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type ${DIRAC_NAME}
+                     --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
@@ -500,7 +481,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     # asymmetric preconditioning
     add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                     --dslash-type ${DIRAC_NAME}
+                     --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
@@ -555,6 +536,55 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
             --dslash-type ${DIRAC_NAME}
+            --test 0
+            --dim 20 20 20 20
+            --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json
+            --gtest_filter=*benchmark/*n0)
+    set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES DISABLED ${QUDA_CTEST_DISABLE_BENCHMARKS})  
+    if(polenv)
+      set_tests_properties(benchmark_dslash_${DIRAC_NAME}-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+  endif()
+  
+  if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+    # the ndeg-twisted-clover operator does not fit the pattern used for most other operators
+    # since it is defined via 'dslash-type = twisted-clover` and 'flavor = nondeg-doublet'
+    # as a result, we set DIRAC_NAME and then manually specify 'twisted-clover' and 'nondeg-doublet'
+    # below
+    set(DIRAC_NAME ndeg-twisted-clover)
+    # symmetric preconditioning
+    add_test(NAME dslash_ndeg-twisted-clover-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type twisted-clover
+                     --flavor nondeg-doublet
+                     --test MatPCDagMatPC
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_ndeg-twisted-clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_ndeg-twisted-clover-sym-policy${pol2}
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    # asymmetric preconditioning
+    add_test(NAME dslash_ndeg-twisted-clover-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type twisted-clover
+                     --flavor nondeg-doublet
+                     --test MatPCDagMatPC
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_ndeg-twisted-clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_ndeg-twisted-clover-asym-policy${pol2}
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+    
+    add_test(NAME benchmark_dslash_${DIRAC_NAME}-policy${pol2}
+    COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+            --dslash-type twisted-clover
+            --flavor nondeg-doublet
             --test 0
             --dim 20 20 20 20
             --gtest_output=json:dslash_${DIRAC_NAME}_benchmark_pol${pol2}.json

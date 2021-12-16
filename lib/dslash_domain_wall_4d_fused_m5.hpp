@@ -143,9 +143,8 @@ namespace quda
       Arg arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, y, parity, dagger, comm_override, m_f);
       DomainWall4DFusedM5<Arg> dwf(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(dwf)> policy(
-        dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf, in, in.getDslashConstant().volume_4d_cb,
+                                                     in.getDslashConstant().ghostFaceCB, profile);
 #endif
     }
   };
