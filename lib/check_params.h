@@ -1065,17 +1065,6 @@ void printQudaGaugeFixParam(QudaGaugeFixParam *param)
   P(struct_size, (size_t)INVALID_INT);
 #endif
 
-#ifdef INIT_PARAM
-  P(gauge_dir, 4);
-  P(maxiter, 10000);
-  P(verbosity_interval, 100);
-  P(reunit_interval, 10);
-  P(ovr_relaxation_boost, 0.0);
-  P(fft_alpha, 0.0);
-  P(tolerance, 0.0);
-  P(fft_autotune, QUDA_BOOLEAN_FALSE);
-  P(theta_condition, QUDA_BOOLEAN_FALSE);
-#else
   P(gauge_dir, INVALID_INT);
   P(maxiter, INVALID_INT);
   P(verbosity_interval, INVALID_INT);
@@ -1083,10 +1072,12 @@ void printQudaGaugeFixParam(QudaGaugeFixParam *param)
   P(ovr_relaxation_boost, INVALID_DOUBLE);
   P(fft_alpha, INVALID_DOUBLE);
   P(tolerance, INVALID_DOUBLE);
+
+#ifndef CHECK_PARAM
   P(fft_autotune, QUDA_BOOLEAN_FALSE);
   P(theta_condition, QUDA_BOOLEAN_FALSE);
 #endif
-
+  
 #ifdef INIT_PARAM
   return ret;
 #endif
