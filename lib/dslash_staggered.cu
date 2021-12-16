@@ -60,9 +60,7 @@ namespace quda
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(
-          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
 #else
         errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif
@@ -75,9 +73,7 @@ namespace quda
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(
-          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
 #else
         errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif
