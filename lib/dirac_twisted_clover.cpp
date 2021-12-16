@@ -99,7 +99,7 @@ namespace quda {
       errorQuda("Twist flavors %d %d don't match", in.TwistFlavor(), out.TwistFlavor());
 
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID) {
-      errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
+      errorQuda("Twist flavor not set %d", in.TwistFlavor());
     }
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
@@ -196,6 +196,7 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       DiracWilson::DslashXpay(out, in, parity, in, 0.0);
     } else {
+      // we need an Ls=plain 2 Wilson dslash, which is exactly what the 4-d preconditioned DWF operator is
       ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim, profile);
     }
   }
@@ -206,6 +207,7 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       DiracWilson::DslashXpay(out, in, parity, x, k);
     } else {
+      // we need an Ls=plain 2 Wilson dslash, which is exactly what the 4-d preconditioned DWF operator is
       ApplyDomainWall4D(out, in, *gauge, k, 0.0, nullptr, nullptr, x, parity, dagger, commDim, profile);
     }
   }

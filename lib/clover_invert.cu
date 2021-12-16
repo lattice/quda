@@ -18,7 +18,7 @@ namespace quda {
     {
       strcat(aux, compute_tr_log ? ",trlog=true" : "trlog=false");
       strcat(aux, clover.TwistFlavor() == QUDA_TWIST_SINGLET || clover.TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET ?
-             ",twist=true" : ",twisted=false");
+             ",twist=true" : ",twist=false");
       apply(device::get_default_stream());
 
       if (compute_tr_log && (std::isnan(clover.TrLog()[0]) || std::isnan(clover.TrLog()[1]))) {
