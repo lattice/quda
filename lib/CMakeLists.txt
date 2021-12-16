@@ -84,7 +84,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
-  dslash_mdw_fused.cu dslash5_mobius_eofa.cu
+  dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
@@ -126,6 +126,25 @@ foreach(item ${QUDA_OBJS})
 endforeach(item ${QUDA_OBJS})
 
 list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+
+set(QUDA_MDW_FUSED_LS_LIST "4,8,12,16,20" CACHE STRING "The list of Ls that get compiled")
+mark_as_advanced(QUDA_MDW_FUSED_LS_LIST)
+
+message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
+configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
+
+set(QUDA_MDW_FUSED_ALLOWED_LS_LIST 4 8 12 16 20)
+if(QUDA_DIRAC_DOMAIN_WALL)
+  string(REPLACE "," ";" QUDA_MDW_FUSED_LS_LIST_SEMICOLON "${QUDA_MDW_FUSED_LS_LIST}")
+  foreach(QUDA_MDW_FUSED_LS ${QUDA_MDW_FUSED_LS_LIST_SEMICOLON})
+    if(NOT ${QUDA_MDW_FUSED_LS} IN_LIST QUDA_MDW_FUSED_ALLOWED_LS_LIST)
+      string(REPLACE ";" "," QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA "${QUDA_MDW_FUSED_ALLOWED_LS_LIST}")
+      message(FATAL_ERROR "'${QUDA_MDW_FUSED_LS}' is not a valid Ls: allowed ones are '${QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA}'")
+    endif()
+    configure_file(dslash_mdw_fused.in.cu "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
+    list(APPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
+  endforeach()
+endif()
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
