@@ -266,7 +266,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       }
 
     } else if (inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-      void *spinorTmp = malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+      void *spinorTmp = safe_malloc(vol * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
       ax(0, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -307,7 +307,7 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
         ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, vol * spinor_site_size * inv_param.Ls,
            inv_param.cpu_prec);
       }
-      free(spinorTmp);
+      host_free(spinorTmp);
     } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {

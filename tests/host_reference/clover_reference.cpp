@@ -248,8 +248,8 @@ void ndegTwistCloverGamma5(void *out1, void *out2, void *in1, void *in2, void *c
                            const double kappa, const double mu, const double epsilon, const int parity,
                            QudaTwistGamma5Type twist, QudaPrecision precision)
 {
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   double a = 0.0, b = 0.0;
 
@@ -269,8 +269,8 @@ void ndegTwistCloverGamma5(void *out1, void *out2, void *in1, void *in2, void *c
     axpy(b, in2, out1, Vh * spinor_site_size, precision);
     axpy(b, in1, out2, Vh * spinor_site_size, precision);
   } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
-    void *tmptmp1 = malloc(Vh * spinor_site_size * precision);
-    void *tmptmp2 = malloc(Vh * spinor_site_size * precision);
+    void *tmptmp1 = safe_malloc(Vh * spinor_site_size * precision);
+    void *tmptmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
     a = -2.0 * kappa * mu;
     b = 2.0 * kappa * epsilon;
@@ -291,15 +291,15 @@ void ndegTwistCloverGamma5(void *out1, void *out2, void *in1, void *in2, void *c
     apply_clover(out1, cInv, tmptmp1, parity, precision);
     apply_clover(out2, cInv, tmptmp2, parity, precision);
 
-    free(tmptmp1);
-    free(tmptmp2);
+    host_free(tmptmp1);
+    host_free(tmptmp2);
   } else {
     printf("Twist type %d not defined\n", twist);
     exit(0);
   }
 
-  free(tmp2);
-  free(tmp1);
+  host_free(tmp2);
+  host_free(tmp1);
 }
 
 void tmc_dslash(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu, QudaTwistFlavorType flavor,
@@ -428,11 +428,11 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
   void *outOdd1 = (char *)outEven2 + precision * Vh * spinor_site_size;
   void *outOdd2 = (char *)outOdd1 + precision * Vh * spinor_site_size;
 
-  void *tmpEven1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpEven2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpEven1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpEven2 = safe_malloc(Vh * spinor_site_size * precision);
 
-  void *tmpOdd1 = malloc(Vh * spinor_site_size * precision);
-  void *tmpOdd2 = malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmpOdd2 = safe_malloc(Vh * spinor_site_size * precision);
 
   // full dslash operator:
   wil_dslash(outOdd1, gauge, inEven1, 1, daggerBit, precision, gauge_param);
@@ -454,11 +454,11 @@ void tmc_ndeg_mat(void *out, void **gauge, void *clover, void *in, double kappa,
   xpay(tmpEven1, -kappa, outEven1, Vh * spinor_site_size, precision);
   xpay(tmpEven2, -kappa, outEven2, Vh * spinor_site_size, precision);
 
-  free(tmpOdd1);
-  free(tmpOdd2);
+  host_free(tmpOdd1);
+  host_free(tmpOdd2);
   //
-  free(tmpEven1);
-  free(tmpEven2);
+  host_free(tmpEven1);
+  host_free(tmpEven2);
 }
 
 // daggerBit && (QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -487,21 +487,21 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv
   void *out1 = out;
   void *out2 = (char *)out1 + precision * Vh * spinor_site_size;
 
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   if (daggerBit) {
     ndegTwistCloverGamma5(tmp1, tmp2, in1, in2, clover, cInv, daggerBit, kappa, mu, epsilon, 1 - oddBit,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
     if (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      void *tmptmp1 = malloc(Vh * spinor_site_size * precision);
-      void *tmptmp2 = malloc(Vh * spinor_site_size * precision);
+      void *tmptmp1 = safe_malloc(Vh * spinor_site_size * precision);
+      void *tmptmp2 = safe_malloc(Vh * spinor_site_size * precision);
       wil_dslash(tmptmp1, gauge, tmp1, oddBit, daggerBit, precision, gauge_param);
       wil_dslash(tmptmp2, gauge, tmp2, oddBit, daggerBit, precision, gauge_param);
       ndegTwistCloverGamma5(out1, out2, tmptmp1, tmptmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
                             QUDA_TWIST_GAMMA5_INVERSE, precision);
-      free(tmptmp1);
-      free(tmptmp2);
+      host_free(tmptmp1);
+      host_free(tmptmp2);
     } else {
       wil_dslash(out1, gauge, tmp1, oddBit, daggerBit, precision, gauge_param);
       wil_dslash(out2, gauge, tmp2, oddBit, daggerBit, precision, gauge_param);
@@ -512,8 +512,8 @@ void tmc_ndeg_dslash(void *out, void **gauge, void *in, void *clover, void *cInv
     ndegTwistCloverGamma5(out1, out2, tmp1, tmp2, clover, cInv, daggerBit, kappa, mu, epsilon, oddBit,
                           QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
-  free(tmp1);
-  free(tmp2);
+  host_free(tmp1);
+  host_free(tmp2);
 }
 
 // Apply the even-odd preconditioned non-degenerate twisted clover Dirac operator
@@ -529,10 +529,10 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv,
   void *out1 = out;
   void *out2 = (char *)out1 + precision * Vh * spinor_site_size;
 
-  void *tmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmp2 = malloc(Vh * spinor_site_size * precision);
-  void *tmptmp1 = malloc(Vh * spinor_site_size * precision);
-  void *tmptmp2 = malloc(Vh * spinor_site_size * precision);
+  void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmptmp1 = safe_malloc(Vh * spinor_site_size * precision);
+  void *tmptmp2 = safe_malloc(Vh * spinor_site_size * precision);
 
   switch (matpc_type) {
   case QUDA_MATPC_EVEN_EVEN:
@@ -606,10 +606,10 @@ void tmc_ndeg_matpc(void *out, void **gauge, void *in, void *clover, void *cInv,
   default: errorQuda("Unsupported matpc=%d", matpc_type);
   }
 
-  free(tmp2);
-  free(tmp1);
-  free(tmptmp1);
-  free(tmptmp2);
+  host_free(tmp2);
+  host_free(tmp1);
+  host_free(tmptmp1);
+  host_free(tmptmp2);
 }
 
 // Apply the full twisted-clover operator
