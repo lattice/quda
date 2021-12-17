@@ -223,12 +223,17 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingOVR(GaugeField &data, const int steps, const int verbose_interval,
-                      const double relax_boost, const double tolerance,
-                      const int reunit_interval, const QudaBoolean theta_condition)
+  void gaugeFixingOVR(GaugeField &data, QudaGaugeFixParam &fix_param)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
+    double relax_boost = fix_param.ovr_relaxation_boost;
+    double tolerance = fix_param.tolerance;
+    QudaBoolean theta_condition = fix_param.theta_condition;
+    int steps = fix_param.maxiter;
+    int reunit_interval = fix_param.reunit_interval;
+    int verbose_interval = fix_param.verbosity_interval;
+    
     profileInternalGaugeFixOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     double flop = 0;
     double byte = 0;
@@ -470,17 +475,16 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
-  GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int steps, const int verbose_interval,
-                 const double relax_boost, const double tolerance, const int reunit_interval, const QudaBoolean theta_condition)
+  GaugeFixingOVR(GaugeField& data, QudaGaugeFixParam &fix_param)
     {
-      if (gauge_dir == 4) {
-	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 4>(data, steps, verbose_interval, relax_boost, tolerance, reunit_interval, theta_condition);
-      } else if (gauge_dir == 3) {
-	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 3>(data, steps, verbose_interval, relax_boost, tolerance, reunit_interval, theta_condition);
+      if (fix_param.gauge_dir == 4) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with Overrelaxation\n");
+        gaugeFixingOVR<Float, recon, 4>(data, fix_param);
+      } else if (fix_param.gauge_dir == 3) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with Overrelaxation\n");
+        gaugeFixingOVR<Float, recon, 3>(data, fix_param);
       } else {
-        errorQuda("Unexpected gauge_dir = %d", gauge_dir);
+        errorQuda("Unexpected gauge_dir = %d", fix_param.gauge_dir);
       }
     }
   };
@@ -488,22 +492,15 @@ namespace quda {
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] steps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by steps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
+   * @param[in] fix_param Parameter struct defining the gauge fixing
    */
 #ifdef GPU_GAUGE_ALG
-  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int steps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const QudaBoolean theta_condition)
+  void gaugeFixingOVR(GaugeField& data, QudaGaugeFixParam &fix_param)
   {
-    instantiate<GaugeFixingOVR>(data, gauge_dir, steps, verbose_interval, relax_boost, tolerance, reunit_interval, theta_condition);
+    instantiate<GaugeFixingOVR>(data, fix_param);
   }
 #else
-  void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const QudaBoolean)
+  void gaugeFixingOVR(GaugeField&, QudaGaugeFixParam &)
   {
     errorQuda("Gauge fixing has not been built");
   }

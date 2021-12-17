@@ -113,37 +113,16 @@ namespace quda
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] steps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this
-   * value is zero then the method stops when iteration reachs the
-   * maximum number of steps defined by steps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
+   * @param[in] fix_param Parameter struct that defines the gauge fixing
    */
-  void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int steps, const int verbose_interval,
-                      const double relax_boost, const double tolerance, const int reunit_interval,
-                      const QudaBoolean theta_condition);
-
+  void gaugeFixingOVR(GaugeField &data, QudaGaugeFixParam &fix_param);
+  
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] steps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune, QUDA_BOOLEAN_TRUE to autotune the method, i.e., if the fix quality inverts its tendency we
-   * decrease the alpha value
-   * @param[in] tolerance, torelance value to stop the method, if this
-   * value is zero then the method stops when iteration reachs the
-   * maximum number of steps defined by steps
-   * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
+   * @param[in] fix_param Parameter struct that defines the gauge fixing
    */
-  void gaugeFixingFFT(GaugeField &data, const int gauge_dir, const int steps, const int verbose_interval,
-                      const double alpha, const QudaBoolean autotune, const double tolerance,
-                      const QudaBoolean theta_condition);
+  void gaugeFixingFFT(GaugeField &data, QudaGaugeFixParam &fix_param);
 
   /**
      @brief Compute the Fmunu tensor

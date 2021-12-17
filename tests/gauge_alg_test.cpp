@@ -11,7 +11,6 @@
 #include <command_line_params.h>
 #include <misc.h>
 #include <timer.h>
-
 #include <gauge_tools.h>
 #include <tune_quda.h>
 
@@ -39,27 +38,6 @@ bool gauge_load;
 bool gauge_store;
 void *host_gauge[4];
 
-void display_test_info()
-{
-  printfQuda("running the following test:\n");
-
-  switch (test_type) {
-  case 0: printfQuda("\n Google testing\n"); break;
-  case 1: printfQuda("\nOVR gauge fix\n"); break;
-  case 2: printfQuda("\nFFT gauge fix\n"); break;
-  default: errorQuda("Undefined test type %d given", test_type);
-  }
-
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
-             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
-             tdim, Lsdim);
-
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-}
-
 // Define the command line options and option group for this test
 int gf_gauge_dir = 4;
 int gf_maxiter = 10000;
@@ -71,6 +49,26 @@ int gf_reunit_interval = 10;
 double gf_tolerance = 1e-6;
 bool gf_theta_condition = false;
 QudaGaugeFixType gf_fix_type = QUDA_GAUGEFIX_TYPE_OVR;
+
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+
+  switch (test_type) {
+  case 0: printfQuda("\n Google testing\n"); break;
+  case 1: printfQuda("\n%s %s gauge fix\n", get_gaugefix_str(gf_fix_type), gf_gauge_dir == 4 ? "Landau" : "Coulomb"); break;
+  default: errorQuda("Undefined test type %d given", test_type);
+  }
+  
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+}
 
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
@@ -370,8 +368,14 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   if (execute) {
     printfQuda("Landau gauge fixing with overrelaxation\n");
-    //gaugeFixingOVR(*U, 4, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
-    //gf_theta_condition);
+    // Set gauge fixing params from the command line
+    // and adjust for this test type
+    fix_param = newQudaGaugeFixParam();
+    setGaugeFixParam(fix_param);
+    fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
+    fix_param.gauge_dir = 4;
+    
+    gaugeFixingOVR(*U, fix_param);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
     printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -384,8 +388,14 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   if (execute) {
     printfQuda("Coulomb gauge fixing with overrelaxation\n");
-    //gaugeFixingOVR(*U, 3, gf_maxiter, gf_verbosity_interval, gf_ovr_relaxation_boost, gf_tolerance, gf_reunit_interval,
-    //gf_theta_condition);
+    // Use gauge fixing params from the command line
+    // and adjust for this test type
+    fix_param = newQudaGaugeFixParam();
+    setGaugeFixParam(fix_param);
+    fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
+    fix_param.gauge_dir = 3;
+
+    gaugeFixingOVR(*U, fix_param);
     auto plaq_gf = plaquette(*U);
     printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
     printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -399,8 +409,14 @@ TEST_F(GaugeAlgTest, Landau_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Landau gauge fixing with steepest descent method with FFT\n");
-      //gaugeFixingFFT(*U, 4, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-      //gf_theta_condition);
+      // Set gauge fixing params from the command line
+      // and adjust for this test type
+      fix_param = newQudaGaugeFixParam();
+      setGaugeFixParam(fix_param);
+      fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
+      fix_param.gauge_dir = 4;
+    
+      gaugeFixingFFT(*U, fix_param);
       auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -415,8 +431,14 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Coulomb gauge fixing with steepest descent method with FFT\n");
-      //gaugeFixingFFT(*U, 3, gf_maxiter, gf_verbosity_interval, gf_fft_alpha, gf_fft_autotune, gf_tolerance,
-      //gf_theta_condition);
+      // Set gauge fixing params from the command line
+      // and adjust for this test type
+      fix_param = newQudaGaugeFixParam();
+      setGaugeFixParam(fix_param);
+      fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
+      fix_param.gauge_dir = 3;
+
+      gaugeFixingFFT(*U, fix_param);
       auto plaq_gf = plaquette(*U);
       printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
@@ -439,7 +461,6 @@ int main(int argc, char **argv)
   test_type = 0;
   CLI::TransformPairs<int> test_type_map {{"Google", 0}, {"OVR", 1}, {"FFT", 2}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -448,23 +469,23 @@ int main(int argc, char **argv)
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-  
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setVerbosity(QUDA_VERBOSE);
   setQudaPrecisions();
   setWilsonGaugeParam(gauge_param);
   setDims(gauge_param.X);
-
-  //if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  //if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-
+  // call srand() with a rank-dependent seed
+  initRand();
+  // initialize the QUDA library
+  initQuda(device_ordinal);
+  
   display_test_info();
-
-  gauge_load = strcmp(latfile, "");
-  gauge_store = strcmp(gauge_outfile, "");
 
   // If we are passing a gauge field to the test, we must allocate host memory.
   // If no gauge is passed, we generate a quenched field on the device.
+  gauge_load = strcmp(latfile, "");
+  gauge_store = strcmp(gauge_outfile, "");
+
   if (gauge_load) {
     printfQuda("Loading gauge field from host\n");
     for (int dir = 0; dir < 4; dir++) {
@@ -472,12 +493,6 @@ int main(int argc, char **argv)
     }
     constructHostGaugeField(host_gauge, gauge_param, argc, argv);
   }
-
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  // initialize the QUDA library
-  initQuda(device_ordinal);
 
   // initalize google test, includes command line options
   ::testing::InitGoogleTest(&argc, argv);

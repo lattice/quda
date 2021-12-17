@@ -268,7 +268,7 @@ void printQudaCloverParam(QudaInvertParam *param)
 
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
-    errorQuda("Unexpected QudaInvertParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+    errorQuda("Unexpected QudaCloverParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif

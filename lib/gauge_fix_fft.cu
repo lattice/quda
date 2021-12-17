@@ -182,11 +182,17 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingFFT(GaugeField& data, int steps, int verbose_interval,
-                      double alpha0, QudaBoolean autotune, double tolerance, QudaBoolean theta_condition)
+  void gaugeFixingFFT(GaugeField& data, QudaGaugeFixParam &fix_param)
   {
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
-
+    
+    QudaBoolean autotune = fix_param.fft_autotune;
+    double alpha0 = fix_param.fft_alpha;
+    double tolerance = fix_param.tolerance;
+    QudaBoolean theta_condition = fix_param.theta_condition;
+    int steps = fix_param.maxiter;
+    int verbose_interval = fix_param.verbosity_interval;
+    
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -364,15 +370,16 @@ namespace quda {
   }
 
   template<typename Float, int nColors, QudaReconstructType recon> struct GaugeFixingFFT {
-    GaugeFixingFFT(GaugeField& data, int gauge_dir, int steps, int verbose_interval,
-                   double alpha, QudaBoolean autotune, double tolerance, QudaBoolean theta_condition)
+    GaugeFixingFFT(GaugeField& data, QudaGaugeFixParam &fix_param)
     {
-      if (gauge_dir != 3) {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 4>(data, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
+      if (fix_param.gauge_dir == 4) {
+	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with FFTs\n");
+        gaugeFixingFFT<Float, recon, 4>(data, fix_param);
+      } else if (fix_param.gauge_dir == 3) {
+	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs\n");
+        gaugeFixingFFT<Float, recon, 3>(data, fix_param);	
       } else {
-	if (getVerbosity() > QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with FFTs...\n");
-        gaugeFixingFFT<Float, recon, 3>(data, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
+	errorQuda("Unexpected gauge_dir = %d", fix_param.gauge_dir); 
       }
     }
   };
@@ -380,23 +387,16 @@ namespace quda {
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] steps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune QUDA_BOOLEAN_TRUE to autotune the method, i.e., if the fix quality inverts its tendency we decrease the alpha value.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by steps
-   * @param[in] theta_condition, QUDA_BOOLEAN_FALSE for MILC criterion and QUDA_BOOLEAN_TRUE to use the theta value
+   * @param[in] fix_param Parameter struct defining the gauge fixing
    */
 #if defined(GPU_GAUGE_ALG)
-  void gaugeFixingFFT(GaugeField& data, const int gauge_dir, const int steps, const int verbose_interval, const double alpha,
-                      const QudaBoolean autotune, const double tolerance, const QudaBoolean theta_condition)
+  void gaugeFixingFFT(GaugeField& data, QudaGaugeFixParam &fix_param)
   {
     if (comm_partitioned()) errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!");
-    instantiate<GaugeFixingFFT, ReconstructNo12>(data, gauge_dir, steps, verbose_interval, alpha, autotune, tolerance, theta_condition);
+    instantiate<GaugeFixingFFT, ReconstructNo12>(data, fix_param);
   }
 #else
-  void gaugeFixingFFT(GaugeField&, const int, const int, const int, const double, const QudaBoolean, const double, const QudaBoolean)
+  void gaugeFixingFFT(GaugeField&, QudaGaugeFixParam &)
   {
     errorQuda("Gauge fixing has bot been built");
   }
