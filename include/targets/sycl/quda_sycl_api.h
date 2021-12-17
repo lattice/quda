@@ -17,6 +17,7 @@ namespace quda
   }
 }
 
+#if 0
 ///// MATH
 
 #include <math_helper.cuh>
@@ -31,4 +32,4 @@ namespace quda
 //}
 
 inline float fdividef(float a, float b) { return quda::fdividef(a,b); }
-
+#endif

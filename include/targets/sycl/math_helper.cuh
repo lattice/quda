@@ -136,19 +136,27 @@ namespace quda {
 #endif
   }
 
-  template <typename real> inline real fdivide(real a, real b)
-  {
-    return a / b;
-  }
-
-  inline float fdividef(float a, float b)
-  {
-    return a / b;
-  }
-
-  inline float fmaxf(float a, float b)
-  {
-    return sycl::max(a,b);
-  }
+  /**
+     @brief Optimized division routine on the device
+  */
+  inline float fdividef(float a, float b) { return a/b; }
 
 }
+
+
+#if 0
+template <typename real> inline real fdivide(real a, real b)
+{
+  return a / b;
+}
+
+inline float fdividef(float a, float b)
+{
+  return a / b;
+}
+
+inline float fmaxf(float a, float b)
+{
+  return sycl::max(a,b);
+}
+#endif

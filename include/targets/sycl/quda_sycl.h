@@ -140,4 +140,3 @@ inline void __syncthreads(void)
 #define blockIdx getBlockIdx()
 #define blockDim getBlockDim()
 #define threadIdx getThreadIdx()
-
