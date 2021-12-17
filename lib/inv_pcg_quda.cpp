@@ -79,11 +79,17 @@ namespace quda
     }
   }
 
+  PreconCG::PreconCG(const DiracMatrix &mat, Solver& K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(&K), Kparam(param)
+  { }
+
   PreconCG::~PreconCG()
   {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    if (K) delete K;
+    if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
+
     destroyDeflationSpace();
 
     profile.TPSTOP(QUDA_PROFILE_FREE);

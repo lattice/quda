@@ -96,7 +96,14 @@ namespace quda {
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");
-      solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
+      if (param.preconditioner) {
+        Solver *mg = param.mg_instance ? static_cast<MG*>(param.preconditioner) : static_cast<multigrid_solver*>(param.preconditioner)->mg;
+        // FIXME dirty hack to ensure that preconditioner precision set in interface isn't used in the outer GCR-MG solver
+        if (!param.mg_instance) param.precision_precondition = param.precision_sloppy;
+        solver = new PreconCG(mat, *(mg), matSloppy, matPrecon, matEig, param, profile);
+      } else {
+        solver = new PreconCG(mat, matSloppy, matPrecon, matEig, param, profile);
+      }
       break;
     case QUDA_MPCG_INVERTER:
       report("MPCG");

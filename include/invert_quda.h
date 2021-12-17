@@ -798,6 +798,19 @@ namespace quda {
       PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
+     /**
+     * @brief Preconditioned CG supporting a pre-existing preconditioner K.
+     * @param mat mat Fine (outer) Dirac matrix
+     * @param K Preconditioner
+     * @param matSloppy Sloppy precision Dirac matrix
+     * @param matPrecon Preconditioner precision Dirac matrix
+     * @param matEig Deflation precision Dirac matrix
+     * @param param Solver parameters
+     * @param profile Timing profile
+     */
+      PreconCG(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+              const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
+
       virtual ~PreconCG();
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
