@@ -31,17 +31,26 @@ namespace quda
   }
 
   /**
-   * @brief Maximum of two arrays
+   * @brief Element-wise maximum of two arrays
    * @param a first array
    * @param b second array
    */
-  template<typename T, int N>
-  __host__ __device__ inline array<T,N> max(const array<T,N> &a, const array<T,N> &b)
+  template <typename T, int N> __host__ __device__ inline array<T, N> max(const array<T, N> &a, const array<T, N> &b)
   {
-    array<T,N> result;
-    for(int i=0; i<N; i++) {
-      result[i] = a[i] > b[i] ? a[i] : b[i];
-    }
+    array<T, N> result;
+    for (int i = 0; i < N; i++) { result[i] = a[i] > b[i] ? a[i] : b[i]; }
+    return result;
+  }
+
+  /**
+   * @brief Element-wise minimum of two arrays
+   * @param a first array
+   * @param b second array
+   */
+  template <typename T, int N> __host__ __device__ inline array<T, N> min(const array<T, N> &a, const array<T, N> &b)
+  {
+    array<T, N> result;
+    for (int i = 0; i < N; i++) { result[i] = a[i] < b[i] ? a[i] : b[i]; }
     return result;
   }
 

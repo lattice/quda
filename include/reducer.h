@@ -76,7 +76,7 @@ namespace quda
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
     using reducer_t = maximum<T>;
-    __device__ __host__ inline T operator()(T a, T b) const { return quda::max(a,b); }
+    __device__ __host__ inline T operator()(T a, T b) const { return quda::max(a, b); }
   };
 
   /**
@@ -85,7 +85,7 @@ namespace quda
   template <typename T> struct minimum {
     static constexpr bool do_sum = false;
     using reducer_t = minimum<T>;
-    __device__ __host__ inline T operator()(T a, T b) const { return a < b ? a : b; }
+    __device__ __host__ inline T operator()(T a, T b) const { return quda::min(a, b); }
   };
 
   /**

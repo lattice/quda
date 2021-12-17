@@ -14,6 +14,14 @@ namespace quda {
   inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
 
   /**
+   * @brief Minimum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template<typename T>
+  inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
+
+  /**
    * @brief Combined sin and cos calculation in QUDA NAMESPACE
    * @param a the angle
    * @param s pointer to the storage for the result of the sin
