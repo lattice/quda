@@ -44,7 +44,7 @@ namespace quda {
   {
     Solver *solver = nullptr;
 
-    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
+    if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER && param.inv_type != QUDA_PCG_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
 
     if (param.preconditioner && param.inv_type_precondition != QUDA_MG_INVERTER)

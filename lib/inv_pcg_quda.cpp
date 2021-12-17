@@ -23,7 +23,7 @@ namespace quda
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
-      = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
+      = (outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER) ? outer.precision_sloppy : outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -82,7 +82,9 @@ namespace quda
   PreconCG::PreconCG(const DiracMatrix &mat, Solver& K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(&K), Kparam(param)
-  { }
+  {
+    fillInnerSolverParam(Kparam, param);
+  }
 
   PreconCG::~PreconCG()
   {
@@ -387,6 +389,7 @@ namespace quda
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matEig.flops()) * 1e-9;
+    if (K) gflops += K->flops()*1e-9;
     param.gflops = gflops;
     param.iter += k;
 

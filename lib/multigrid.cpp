@@ -346,6 +346,7 @@ namespace quda
 
     param_presmooth->Nkrylov = param_presmooth->maxiter;
     param_presmooth->pipeline = param_presmooth->maxiter;
+    //if (param_presmooth->inv_type == QUDA_CA_CG_INVERTER) param_presmooth->ca_basis = QUDA_CHEBYSHEV_BASIS;
     param_presmooth->tol = param.smoother_tol;
     param_presmooth->global_reduction = param.global_reduction;
 
