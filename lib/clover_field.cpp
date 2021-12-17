@@ -20,8 +20,9 @@ namespace quda {
     cloverInv(nullptr),
     csw(a.Csw()),
     coeff(a.Coeff()),
-    twisted(a.Twisted()),
+    twist_flavor(a.TwistFlavor()),
     mu2(a.Mu2()),
+    epsilon2(a.Epsilon2()),
     rho(a.Rho()),
     order(a.Order()),
     create(QUDA_NULL_FIELD_CREATE),
@@ -45,7 +46,7 @@ namespace quda {
     max {0, 0},
     csw(param.csw),
     coeff(param.coeff),
-    twisted(param.twisted),
+    twist_flavor(param.twist_flavor),
     mu2(param.mu2),
     rho(param.rho),
     order(param.order),
@@ -69,6 +70,11 @@ namespace quda {
 
     bytes = length * precision;
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
+
+    // for twisted mass only:
+    twist_flavor = param.twist_flavor;
+    mu2 = param.mu2;
+    epsilon2 = param.epsilon2;
 
     setTuningString();
 
@@ -335,11 +341,12 @@ namespace quda {
     output << "cloverInv = " << param.cloverInv << std::endl;
     output << "csw = "       << param.csw << std::endl;
     output << "coeff = " << param.coeff << std::endl;
-    output << "twisted = "   << param.twisted << std::endl;
-    output << "mu2 = "       << param.mu2 << std::endl;
-    output << "rho = "       << param.rho << std::endl;
-    output << "order = "     << param.order << std::endl;
-    output << "create = "    << param.create << std::endl;
+    output << "twist_flavor = " << param.twist_flavor << std::endl;
+    output << "mu2 = " << param.mu2 << std::endl;
+    output << "epsilon2 = " << param.epsilon2 << std::endl;
+    output << "rho = " << param.rho << std::endl;
+    output << "order = " << param.order << std::endl;
+    output << "create = " << param.create << std::endl;
     return output;  // for multiple << operators.
   }
 
