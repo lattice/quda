@@ -481,29 +481,28 @@ struct StaggeredDslashTestWrapper {
 
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
-        double spinor_ref_norm2 = blas::norm2(*spinorRef);
-        double spinor_out_norm2 = blas::norm2(*vp_spinor_out[n]);
+        double spinor_ref_norm = sqrt(blas::norm2(*spinorRef));
+        double spinor_out_norm = sqrt(blas::norm2(*vp_spinor_out[n]));
 
         bool failed = false;
         // Catching nans is weird.
-        if (std::isnan(spinor_ref_norm2)) { failed = true; }
-        if (std::isnan(spinor_out_norm2)) { failed = true; }
+        if (std::isnan(spinor_ref_norm)) { failed = true; }
+        if (std::isnan(spinor_out_norm)) { failed = true; }
 
-        printfQuda("Results: CPU=%f, CPU-CUDA=%f\n", spinor_ref_norm2, spinor_out_norm2);
+	printfQuda("Results: CPU = %f, QUDA = %f, (CPU-QUDA)/CPU = %e\n", spinor_ref_norm, spinor_out_norm, 1.0-spinor_out_norm/spinor_ref_norm);
         deviation = std::max(deviation, pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
     } else {
-      double spinor_ref_norm2 = blas::norm2(*spinorRef);
-      double spinor_out_norm2 = blas::norm2(*spinorOut);
+      double spinor_ref_norm = sqrt(blas::norm2(*spinorRef));
+      double spinor_out_norm = sqrt(blas::norm2(*spinorOut));
 
       bool failed = false;
       // Catching nans is weird.
-      if (std::isnan(spinor_ref_norm2)) { failed = true; }
-      if (std::isnan(spinor_out_norm2)) { failed = true; }
+      if (std::isnan(spinor_ref_norm)) { failed = true; }
+      if (std::isnan(spinor_out_norm)) { failed = true; }
 
-      double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU=%f, CUDA=%f, (CPU-CUDA)/CPU=%e\n", spinor_ref_norm2, cuda_spinor_out_norm2, 1.0-cuda_spinor_out_norm2/spinor_ref_norm2);
+      printfQuda("Results: CPU = %f, QUDA = %f, (CPU-QUDA)/CPU = %e\n", spinor_ref_norm, spinor_out_norm, 1.0-spinor_out_norm/spinor_ref_norm);
       deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
       if (failed) { deviation = 1.0; }
     }

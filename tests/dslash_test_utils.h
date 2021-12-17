@@ -1097,20 +1097,15 @@ struct DslashTestWrapper {
     double deviation;
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
-        double norm2_cpu = blas::norm2(*spinorRef);
-        double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
-        printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
+        double norm_cpu = sqrt(blas::norm2(*spinorRef));
+        double norm_cpu_quda = sqrt(blas::norm2(*vp_spinorOut[n]));
+        printfQuda("Results: CPU = %f, QUDA = %f, (CPU-QUDA)/CPU = %e\n", norm_cpu, norm_cpu_quda, 1.0-norm_cpu_quda/norm_cpu);
         deviation = std::max(deviation, std::pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
       }
     } else {
-      double norm2_cpu = blas::norm2(*spinorRef);
-      double norm2_cpu_cuda = blas::norm2(*spinorOut);
-      if (!transfer) {
-        double norm2_cuda = blas::norm2(*cudaSpinorOut);
-        printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-      } else {
-        printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-      }
+      double norm_cpu = sqrt(blas::norm2(*spinorRef));
+      double norm_cpu_quda = sqrt(blas::norm2(*spinorOut));
+      printfQuda("Results: CPU = %f, QUDA = %f, (CPU-QUDA)/CPU = %e\n", norm_cpu, norm_cpu_quda, 1.0-norm_cpu_quda/norm_cpu);
       deviation = std::pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
     }
     return deviation;
