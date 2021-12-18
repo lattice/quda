@@ -32,19 +32,6 @@ namespace quda {
       for (int i = 0; i < size; i++) { data[i] = 0; }
       }
 
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>(const ColorSpinor<Float, Nc, Ns> &a) {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-      }
-
-      __device__ __host__ inline ColorSpinor<Float, Nc, Ns>& operator=(const ColorSpinor<Float, Nc, Ns> &a) {
-	if (this != &a) {
-#pragma unroll
-          for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-        }
-	return *this;
-      }
-
       __device__ __host__ inline ColorSpinor<Float, Nc, Ns> operator-() const
       {
         ColorSpinor<Float, Nc, Ns> a;
@@ -144,19 +131,6 @@ namespace quda {
 #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
       }
-
-    __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
-#pragma unroll
-      for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-    }
-
-    __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator=(const ColorSpinor<Float, Nc, 4> &a) {
-      if (this != &a) {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-      }
-      return *this;
-    }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>& operator+=(const ColorSpinor<Float, Nc, 4> &a) {
 #pragma unroll
@@ -679,20 +653,6 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>() {
 #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
-    }
-
-    __device__ __host__ inline ColorSpinor<Float, Nc, 2>(const ColorSpinor<Float, Nc, 2> &a) {
-#pragma unroll
-      for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-    }
-
-
-    __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator=(const ColorSpinor<Float, Nc, 2> &a) {
-      if (this != &a) {
-#pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-      }
-      return *this;
     }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 2>& operator+=(const ColorSpinor<Float, Nc, 2> &a) {
