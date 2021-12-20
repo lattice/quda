@@ -21,7 +21,7 @@ namespace quda
 
     using transfer_float = float;
 
-    static constexpr madwf_ml::transfer_5D_type transfer_type = madwf_ml::transfer_5D_type::Spin;
+    static constexpr madwf_ml::transfer_5D_t transfer_t = madwf_ml::transfer_5D_t::Spin;
 
     // The parameters to be trained.
     using device_container = device_vector<transfer_float>;
@@ -92,9 +92,9 @@ namespace quda
 
     template <class Base> void apply(Base &base, ColorSpinorField &out, const ColorSpinorField &in)
     {
-      madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, in, device_param, false);
+      madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, in, device_param, false);
       base(*backward_tmp, *forward_tmp);
-      madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(out, *backward_tmp, device_param, true);
+      madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(out, *backward_tmp, device_param, true);
 
       blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
     }
@@ -120,7 +120,7 @@ namespace quda
     void train(const Ref &ref, Base &base, Null &null, const ColorSpinorField &in)
     {
 
-      constexpr int complex_matrix_size = static_cast<int>(transfer_type); // spin by spin
+      constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
       int Ls = in.X(4);
       int param_size = Ls * Ls_base * complex_matrix_size * 2;
@@ -240,19 +240,19 @@ namespace quda
         for (const auto &phi : B) {
           chi2 += cost(ref, base, chi, *phi);
           // ATx(ATphi, *phi, T);
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
           base(ATphi, *forward_tmp);
 
           ref(Mchi, chi);
 
           // ATx(ATMchi, Mchi, T);
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, Mchi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, Mchi, device_param, false);
           base(ATMchi, *forward_tmp);
 
           // d1 = A * T * phi -x- M * chi
-          madwf_ml::tensor_5d_hh<transfer_float, transfer_type>(ATphi, Mchi, d1);
+          madwf_ml::tensor_5d_hh<transfer_float, transfer_t>(ATphi, Mchi, d1);
           // d2 = A * T * M * phi -x- phi
-          madwf_ml::tensor_5d_hh<transfer_float, transfer_type>(ATMchi, *phi, d2);
+          madwf_ml::tensor_5d_hh<transfer_float, transfer_t>(ATMchi, *phi, d2);
 
           axpby(D, 2.0f, d1, 2.0f, d2);
           if (tune_suppressor) {
@@ -273,18 +273,18 @@ namespace quda
           chi2 += ind_chi2;
 
           // ATx(ATphi, *phi, T);
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, device_param, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
           base(ATphi, *forward_tmp);
 
           // D' * A * T * phi
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(theta, ATphi, P, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(theta, ATphi, P, true);
 
           // ATx(ADphi, *phi, P);
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(*forward_tmp, *phi, P, false);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, P, false);
           base(ADphi, *forward_tmp);
 
           // T' * A * D * phi
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(tmp, ADphi, device_param, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(tmp, ADphi, device_param, true);
           // theta
           blas::axpy(1.0, theta, tmp);
           if (tune_suppressor) {
@@ -294,7 +294,7 @@ namespace quda
           ref(theta, tmp);
 
           // lambda = D' * A * D * phi
-          madwf_ml::transfer_5d_hh<transfer_float, transfer_type>(tmp, ADphi, P, true);
+          madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(tmp, ADphi, P, true);
 
           ref(lambda, tmp);
 

@@ -21,10 +21,10 @@ namespace quda
 
     template <class real> using SpinMatrix = Matrix<complex<real>, spin_dim>;
 
-    template <class real, transfer_5D_type transfer_type> struct transfer_5D_mapper {
+    template <class real, transfer_5D_t transfer_t> struct transfer_5D_mapper {
     };
 
-    template <class real> struct transfer_5D_mapper<real, transfer_5D_type::Spin> {
+    template <class real> struct transfer_5D_mapper<real, transfer_5D_t::Spin> {
       using type = SpinMatrix<real>;
     };
 
@@ -51,12 +51,12 @@ namespace quda
       return out;
     }
 
-    template <class storage_type, class matrix_type_, bool dagger_> struct Transfer5DArg : kernel_param<> {
+    template <class storage_t, class matrix_t_, bool dagger_> struct Transfer5DArg : kernel_param<> {
 
-      using F = typename colorspinor_mapper<storage_type, 4, 3>::type;
-      using real = typename mapper<storage_type>::type;
+      using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
+      using real = typename mapper<storage_t>::type;
       using Vector = ColorSpinor<real, 3, 4>;
-      using matrix_type = matrix_type_;
+      using matrix_t = matrix_t_;
 
       static constexpr bool dagger = dagger_;
 
@@ -68,11 +68,11 @@ namespace quda
 
       const int volume_4d_cb;
 
-      const matrix_type *wm_p;
+      const matrix_t *wm_p;
 
       const int nParity;
 
-      Transfer5DArg(ColorSpinorField &out, const ColorSpinorField &in, const matrix_type *wm_p) :
+      Transfer5DArg(ColorSpinorField &out, const ColorSpinorField &in, const matrix_t *wm_p) :
         kernel_param(dim3(out.VolumeCB() / out.X(4), out.X(4), out.SiteSubset())),
         out(out),
         in(in),
@@ -116,16 +116,16 @@ namespace quda
 
         using real = typename Arg::real;
         using Vector = typename Arg::Vector;
-        using matrix_type = typename Arg::matrix_type;
+        using matrix_t = typename Arg::matrix_t;
 
         const int Ls_in = arg.Ls_in;
         const int Ls_out = arg.Ls_out;
         const int volume_4d_cb = arg.volume_4d_cb;
-        const matrix_type *wm_p = arg.wm_p;
+        const matrix_t *wm_p = arg.wm_p;
 
         int thread_idx = target::thread_idx().y * target::block_dim().x + target::thread_idx().x;
         SharedMemoryCache<real> cache;
-        while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_type) / sizeof(real))) {
+        while (thread_idx < static_cast<int>(Ls_out * Ls_in * sizeof(matrix_t) / sizeof(real))) {
           cache.data()[thread_idx] = reinterpret_cast<const real *>(wm_p)[thread_idx];
           thread_idx += target::block_dim().y * target::block_dim().x;
         }
@@ -140,7 +140,7 @@ namespace quda
         for (int t = 0; t < Ls_in; t++) {
           Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
           int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
-          out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_type *>(cache.data())[wm_index], in);
+          out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
         }
         arg.out(s * volume_4d_cb + x_cb, parity) = out;
       }

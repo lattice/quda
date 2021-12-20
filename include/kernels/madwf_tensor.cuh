@@ -66,12 +66,12 @@ namespace quda
       }
     }
 
-    template <class storage_type, class matrix_type_, int block_dim_x_> struct Tensor5DArg : kernel_param<> {
+    template <class storage_t, class matrix_t_, int block_dim_x_> struct Tensor5DArg : kernel_param<> {
 
-      using F = typename colorspinor_mapper<storage_type, 4, 3>::type;
-      using real = typename mapper<storage_type>::type;
+      using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
+      using real = typename mapper<storage_t>::type;
       using Vector = ColorSpinor<real, 3, 4>;
-      using matrix_type = matrix_type_;
+      using matrix_t = matrix_t_;
 
       static constexpr int block_dim_x = block_dim_x_;
 
@@ -83,15 +83,15 @@ namespace quda
 
       const int volume_4d_cb;
 
-      matrix_type *reduce_buffer = nullptr;
+      matrix_t *reduce_buffer = nullptr;
 
       const int nParity;
 
-      matrix_type *result_d;
+      matrix_t *result_d;
 
       int batch;
 
-      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, int num_x_blocks, matrix_type *result_d) :
+      Tensor5DArg(const ColorSpinorField &out, const ColorSpinorField &in, int num_x_blocks, matrix_t *result_d) :
         kernel_param(dim3(out.VolumeCB() / out.X(4), out.X(4), out.SiteSubset())),
         out(out),
         in(in),
@@ -116,8 +116,8 @@ namespace quda
         if (!in.isNative() || !out.isNative())
           errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
-        size_t reduce_bytes = num_x_blocks * sizeof(matrix_type) * out.X(4) * in.X(4);
-        reduce_buffer = reinterpret_cast<matrix_type *>(device_malloc(reduce_bytes));
+        size_t reduce_bytes = num_x_blocks * sizeof(matrix_t) * out.X(4) * in.X(4);
+        reduce_buffer = reinterpret_cast<matrix_t *>(device_malloc(reduce_bytes));
       }
 
       ~Tensor5DArg()
