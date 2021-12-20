@@ -9,9 +9,9 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#include <madwf_ml.h>
 #include <reliable_updates.h>
+
+#include <invert_preconditioner.h>
 
 namespace quda
 {
@@ -65,37 +65,20 @@ namespace quda
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
   {
     fillInnerSolverParam(Kparam, param);
     // Preconditioners do not need a deflation space,
     // so we explicily set this here.
     Kparam.deflate = false;
 
-    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
-      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-        K = new Acc<MadwfAcc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
-      } else { // unknown preconditioner
-        errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
-      }
-    } else {
-      if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-        K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
-      } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-        K = new MR(matPrecon, matPrecon, Kparam, profile);
-      } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
-        K = new SD(matPrecon, Kparam, profile);
-      } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
-        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
-      }
-    }
+    K = create_preconditioner(matPrecon, matEig, param, Kparam, profile);
   }
 
   PreconCG::~PreconCG()
   {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    if (K) delete K;
     destroyDeflationSpace();
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -104,7 +87,7 @@ namespace quda
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
                             int collect_miniter, double collect_tol)
   {
-    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) { K->train_param(*this, b); }
+    K->train_param(*this, b);
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 

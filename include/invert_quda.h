@@ -540,7 +540,9 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual void train_param(Solver &, ColorSpinorField &) { errorQuda("NOT implemented."); }
+    virtual void train_param(Solver &, ColorSpinorField &) {
+      // Do nothing
+    }
 
     virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
 
@@ -733,70 +735,6 @@ namespace quda {
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
 
-  /**
-     @brief  Generic solver with an accelerator.
-   */
-  template <class Transformer, class Base> class Acc : public Base
-  {
-
-    bool active_training = false;
-
-    Base ref_solver; // Here we declare a copy of the solver to avoid temporary buffer collisions.
-
-  public:
-    Transformer transformer;
-
-    Acc(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
-        SolverParam &param, TimeProfile &profile) :
-      Base(mat, matSloppy, matPrecon, matEig, param, profile),
-      ref_solver(mat, matSloppy, matPrecon, matEig, param, profile),
-      transformer(param)
-    {
-    }
-
-    virtual ~Acc() { }
-
-    /**
-     * @brief Forward transform, run base solver (e.g. CG), then backward transform.
-     * @param out Solution vector.
-     * @param in Right-hand side.
-     */
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in)
-    {
-      auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-        pushVerbosity(this->param.verbosity_precondition);
-        Base::operator()(out, in);
-        popVerbosity();
-      };
-
-      if (transformer.trained) {
-        transformer.apply(base, out, in);
-      } else {
-        ref_solver(out, in);
-      }
-    }
-
-    /**
-     * @brief Train the underlying accelerate parameter.
-     * @param null Solver to solve for null vectors.
-     * @param in meta color spinor field.
-     */
-    virtual void train_param(Solver &null, ColorSpinorField &in)
-    {
-      auto base = [&](ColorSpinorField &out, ColorSpinorField &in) {
-        pushVerbosity(QUDA_SILENT); // silent this since there are a lot of them.
-        Base::operator()(out, in);
-        popVerbosity();
-      };
-
-      if (!active_training && !transformer.trained) {
-        active_training = true;
-        transformer.train(Solver::matPrecon, base, null, in);
-        active_training = false;
-      }
-    }
-  };
-
   class CGNE : public CG
   {
 
@@ -915,7 +853,7 @@ namespace quda {
 
   class PreconCG : public Solver {
     private:
-      Solver *K;
+      std::unique_ptr<Solver> K;
       SolverParam Kparam; // parameters for preconditioner solve
 
     public:
