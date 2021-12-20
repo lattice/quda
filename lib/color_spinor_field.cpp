@@ -115,9 +115,9 @@ namespace quda
     for (int d = 0; d < nDim; d++) volume *= x[d];
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2;
 
-    if ((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) // two flavors
+    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2) // two flavors
       errorQuda(
-        "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n",
+        "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)",
         x[4]);
 
     if (param.pad != 0) errorQuda("Padding must be zero");

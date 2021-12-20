@@ -150,7 +150,6 @@ namespace quda
 
     /**
        @brief Save the value into the 3-d shared memory cache.
-       Implicitly store at coordinates given by thread_idx().
        @param[in] a The value to store in the shared memory cache
        @param[in] x The x index to use
        @param[in] y The y index to use
@@ -163,6 +162,42 @@ namespace quda
       y = (y == -1) ? tid.y : y;
       z = (z == -1) ? tid.z : z;
       save_detail(a, x, y, z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] x The x index to use
+     */
+    __device__ __host__ inline void save_x(const T &a, int x = -1)
+    {
+      auto tid = target::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      save_detail(a, x, tid.y, tid.z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] y The y index to use
+     */
+    __device__ __host__ inline void save_y(const T &a, int y = -1)
+    {
+      auto tid = target::thread_idx();
+      y = (y == -1) ? tid.y : y;
+      save_detail(a, tid.x, y, tid.z);
+    }
+
+    /**
+       @brief Save the value into the 3-d shared memory cache.
+       @param[in] a The value to store in the shared memory cache
+       @param[in] z The z index to use
+     */
+    __device__ __host__ inline void save_z(const T &a, int z = -1)
+    {
+      auto tid = target::thread_idx();
+      z = (z == -1) ? tid.z : z;
+      save_detail(a, tid.x, tid.y, z);
     }
 
     /**

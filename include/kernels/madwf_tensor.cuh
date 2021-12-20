@@ -149,7 +149,7 @@ namespace quda
         int t = s;
         while (t < Ls_in) {
           int index = t * target::block_dim().x + target::thread_idx().x;
-          cache.save(arg.in(t * volume_4d_cb + x_cb, parity), target::thread_idx().x, t);
+          cache.save_y(arg.in(t * volume_4d_cb + x_cb, parity), t);
           t += target::block_dim().y;
         }
         cache.sync();
@@ -157,7 +157,7 @@ namespace quda
         // t -> s_in, s-> s_out
         const Vector v = arg.out(s * volume_4d_cb + x_cb, parity);
         for (t = 0; t < Ls_in; t++) {
-          const Vector w = cache.load(target::thread_idx().x, t);
+          const Vector w = cache.load_y(t);
           int wm_index = s * Ls_in + t;
           vector_tensor_matrix(reduce_buffer, wm_index, v, w);
         }
