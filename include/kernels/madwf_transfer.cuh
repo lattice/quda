@@ -41,9 +41,9 @@ namespace quda
 #pragma unroll
           for (int row = 0; row < spin_dim; row++) {
             if (dagger) {
-              out(row, color) += conj(m(column, row)) * v_col;
+              out(row, color) = cmac(conj(m(column, row)), v_col, out(row, color));
             } else {
-              out(row, color) += m(row, column) * v_col;
+              out(row, color) = cmac(m(row, column), v_col, out(row, color));
             }
           }
         }
@@ -88,13 +88,13 @@ namespace quda
                     static_cast<int>(out.VolumeCB() / Ls_out));
         }
 
-        if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
-        if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
-        if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
-        if (out.Ncolor() != 3) errorQuda("nColor = %d not support", out.Ncolor());
+        if (in.Nspin() != 4) errorQuda("nSpin = %d not supported", in.Nspin());
+        if (in.Ncolor() != 3) errorQuda("nColor = %d not supported", in.Ncolor());
+        if (out.Nspin() != 4) errorQuda("nSpin = %d not supported", out.Nspin());
+        if (out.Ncolor() != 3) errorQuda("nColor = %d not supported", out.Ncolor());
 
-        if (!in.isNative() || !out.isNative())
-          errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        checkNative(in, out);
+
       }
     };
 
@@ -130,10 +130,6 @@ namespace quda
           thread_idx += target::block_dim().y * target::block_dim().x;
         }
         cache.sync();
-
-        if (x_cb >= volume_4d_cb) return;
-        if (s >= Ls_out) return;
-        if (parity >= arg.nParity) return;
 
         Vector out;
         // t -> s_in, s-> s_out

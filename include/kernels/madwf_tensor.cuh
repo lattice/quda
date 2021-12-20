@@ -52,11 +52,9 @@ namespace quda
 #pragma unroll
         for (int b = 0; b < spin_dim; b++) {
           int cs = a * spin_dim + b;
-          complex<real> z = 0;
-#pragma unroll
-          for (int color = 0; color < color_dim; color++) { z += conj(conj(v(a, color)) * w(b, color)); }
-          // Perform a block reduction across the x direction
+          complex<real> z = conj(innerProduct(v, w, a, b));
 
+          // Perform a block reduction across the x direction
           block_reduce_x(z);
 
           if (target::thread_idx().x == 0) {
@@ -108,13 +106,12 @@ namespace quda
                     static_cast<int>(out.VolumeCB() / Ls_out));
         }
 
-        if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
-        if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
-        if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
-        if (out.Ncolor() != 3) errorQuda("nColor = %d not support", out.Ncolor());
+        if (in.Nspin() != 4) errorQuda("nSpin = %d not supported", in.Nspin());
+        if (in.Ncolor() != 3) errorQuda("nColor = %d not supported", in.Ncolor());
+        if (out.Nspin() != 4) errorQuda("nSpin = %d not supported", out.Nspin());
+        if (out.Ncolor() != 3) errorQuda("nColor = %d not supported", out.Ncolor());
 
-        if (!in.isNative() || !out.isNative())
-          errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        checkNative(in, out);
 
         size_t reduce_bytes = num_x_blocks * sizeof(matrix_t) * out.X(4) * in.X(4);
         reduce_buffer = reinterpret_cast<matrix_t *>(device_malloc(reduce_bytes));
@@ -144,13 +141,8 @@ namespace quda
         using Vector = typename Arg::Vector;
 
         const int Ls_in = arg.Ls_in;
-        const int Ls_out = arg.Ls_out;
         const int volume_4d_cb = arg.volume_4d_cb;
         auto reduce_buffer = arg.reduce_buffer;
-
-        if (x_cb >= volume_4d_cb) return;
-        if (s >= Ls_out) return;
-        if (parity >= arg.nParity) return;
 
         SharedMemoryCache<Vector> cache;
 
