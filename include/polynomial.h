@@ -4,7 +4,7 @@
 #include <array>
 #include <vector>
 
-// Implimented according to https://en.wikipedia.org/wiki/Cubic_equation
+// Implemented according to https://en.wikipedia.org/wiki/Cubic_equation
 
 namespace quda
 {
