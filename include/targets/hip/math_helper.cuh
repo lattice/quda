@@ -5,6 +5,22 @@
 #include <hip/math_functions.h>
 
 namespace quda {
+
+ /**
+   * @brief Maximum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template<typename T>
+  inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
+
+  /**
+   * @brief Minimum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template<typename T>
+  inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
    
   /**
    * @brief Combined sin and cos colculation in QUDA NAMESPACE
@@ -75,7 +91,7 @@ namespace quda {
   	}
   };
  
-   // Impl for float type host
+   // Impl for double type host
   template <bool is_device> struct rsqrt_impl {
         inline double operator()(const double& a) {
            return 1.0/::sqrt(a);
