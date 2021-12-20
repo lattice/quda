@@ -152,10 +152,17 @@ namespace quda
        @brief Save the value into the 3-d shared memory cache.
        Implicitly store at coordinates given by thread_idx().
        @param[in] a The value to store in the shared memory cache
+       @param[in] x The x index to use
+       @param[in] y The y index to use
+       @param[in] z The z index to use
      */
-    __device__ __host__ inline void save(const T &a)
+    __device__ __host__ inline void save(const T &a, int x = -1, int y = -1, int z = -1)
     {
-      save_detail(a, target::thread_idx().x, target::thread_idx().y, target::thread_idx().z);
+      auto tid = target::thread_idx();
+      x = (x == -1) ? tid.x : x;
+      y = (y == -1) ? tid.y : y;
+      z = (z == -1) ? tid.z : z;
+      save_detail(a, x, y, z);
     }
 
     /**
@@ -208,34 +215,6 @@ namespace quda
       auto tid = target::thread_idx();
       z = (z == -1) ? tid.z : z;
       return load_detail(tid.x, tid.y, z);
-    }
-
-    /**
-       @brief Save a vector to the shared memory cache but with cutomized index and leading dimension
-       @param[in] index The customized index
-       @param[in] ld The leading dimension
-     */
-    __device__ inline void save_idx(int index, int ld, const T &a)
-    {
-      atom_t tmp[n_element];
-      memcpy(tmp, (void*)&a, sizeof(T));
-#pragma unroll
-      for (int i = 0; i < n_element; i++) cache<dynamic>()[i * ld + index] = tmp[i];
-    }
-
-    /**
-       @brief Load a vector from the shared memory cache but with cutomized index and leading dimension
-       @param[in] index The customized index
-       @param[in] ld The leading dimension
-     */
-    __device__ inline T load_idx(int index, int ld)
-    {
-      atom_t tmp[n_element];
-#pragma unroll
-      for (int i = 0; i < n_element; i++) tmp[i] = cache<dynamic>()[i * ld + index];
-      T a;
-      memcpy((void*)&a, tmp, sizeof(T));
-      return a;
     }
 
     /**

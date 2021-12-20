@@ -9,8 +9,6 @@
 namespace quda
 {
 
-  constexpr double PI = 3.141592653589793;
-
   inline std::vector<double> quadratic_formula(std::array<double, 3> coeff)
   {
 
@@ -84,7 +82,7 @@ namespace quda
 
         double theta = std::acos(1.5 * (q / p) * std::sqrt(-3.0 / p));
         double tmp = 2.0 * std::sqrt(-p / 3.0);
-        for (int k = 0; k < 3; k++) { t.push_back(tmp * std::cos((theta - 2.0 * PI * k) / 3.0)); }
+        for (int k = 0; k < 3; k++) { t.push_back(tmp * std::cos((theta - 2.0 * M_PI * k) / 3.0)); }
 
       } else if (delta < 0) {
 

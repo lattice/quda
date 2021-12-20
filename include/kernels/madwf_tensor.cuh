@@ -144,13 +144,12 @@ namespace quda
         const int volume_4d_cb = arg.volume_4d_cb;
         auto reduce_buffer = arg.reduce_buffer;
 
-        SharedMemoryCache<Vector> cache;
+        SharedMemoryCache<Vector> cache({target::block_dim().x, static_cast<unsigned int>(Ls_in), 1});
 
-        int ld = Ls_in * target::block_dim().x;
         int t = s;
         while (t < Ls_in) {
           int index = t * target::block_dim().x + target::thread_idx().x;
-          cache.save_idx(index, ld, arg.in(t * volume_4d_cb + x_cb, parity));
+          cache.save(arg.in(t * volume_4d_cb + x_cb, parity), target::thread_idx().x, t);
           t += target::block_dim().y;
         }
         cache.sync();
@@ -158,7 +157,7 @@ namespace quda
         // t -> s_in, s-> s_out
         const Vector v = arg.out(s * volume_4d_cb + x_cb, parity);
         for (t = 0; t < Ls_in; t++) {
-          const Vector w = cache.load_idx(t * target::block_dim().x + target::thread_idx().x, ld);
+          const Vector w = cache.load(target::thread_idx().x, t);
           int wm_index = s * Ls_in + t;
           vector_tensor_matrix(reduce_buffer, wm_index, v, w);
         }
