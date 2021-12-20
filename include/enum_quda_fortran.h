@@ -9,7 +9,7 @@
 #   gfortran).
 #*/
 
-#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
+#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
 
 #define QudaLinkType integer(4)
 
@@ -371,7 +371,6 @@
 #define QudaTwistFlavorType integer(4)
 #define QUDA_TWIST_SINGLET 1
 #define QUDA_TWIST_NONDEG_DOUBLET +2
-#define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 

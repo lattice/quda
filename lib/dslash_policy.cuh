@@ -27,7 +27,7 @@ namespace quda
     extern bool dslash_exterior_compute;
     extern bool dslash_comms;
     extern bool dslash_copy;
-    static cudaColorSpinorField *inSpinor;
+    static ColorSpinorField *inSpinor;
 
     /**
      * Arrays used for the dynamic scheduling.
@@ -120,7 +120,7 @@ namespace quda
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
   template <typename Dslash>
-  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, bool gdr)
+  inline void issueRecv(ColorSpinorField &input, const Dslash &dslash, bool gdr)
   {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
@@ -141,7 +141,7 @@ namespace quda
      @param[in] packIndex Stream index where the packing kernel will run
   */
   template <typename Dslash>
-  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location,
+  inline void issuePack(ColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location,
                         int packIndex, int shmem = 0)
   {
     auto &arg = dslash.dslashParam;
@@ -184,7 +184,7 @@ namespace quda
      @param[out] in Field that whose halos we are communicating
      @param[in] dslash The dslash object
   */
-  template <typename Dslash> inline void issueGather(cudaColorSpinorField &in, const Dslash &dslash)
+  template <typename Dslash> inline void issueGather(ColorSpinorField &in, const Dslash &dslash)
   {
 
     for (int i = 3; i >=0; i--) {
@@ -254,7 +254,7 @@ namespace quda
      @param[in] scatterIndex The stream index used for posting the host-to-device memory copy in
    */
   template <typename Dslash>
-  inline bool commsComplete(cudaColorSpinorField &in, const Dslash &, int dim, int dir, bool gdr_send,
+  inline bool commsComplete(ColorSpinorField &in, const Dslash &, int dim, int dir, bool gdr_send,
                             bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1)
   {
     PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
@@ -339,7 +339,7 @@ namespace quda
 
   template <typename Dslash> struct DslashPolicyImp {
 
-    virtual void operator()(Dslash &, cudaColorSpinorField *, const int, const int *, TimeProfile &) { }
+    virtual void operator()(Dslash &, ColorSpinorField *, const int, const int *, TimeProfile &) { }
 
     virtual ~DslashPolicyImp() { }
   };
@@ -350,7 +350,7 @@ namespace quda
   template <typename Dslash> struct DslashBasic : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       auto &dslashParam = dslash.dslashParam;
@@ -448,7 +448,7 @@ namespace quda
   template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
 
 #ifdef NVSHMEM_COMMS
-    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+    void operator()(Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB,
                     TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -489,7 +489,7 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
 #else
-    void operator()(Dslash &, cudaColorSpinorField *, const int, const int *, TimeProfile &)
+    void operator()(Dslash &, ColorSpinorField *, const int, const int *, TimeProfile &)
     {
       errorQuda("NVSHMEM Dslash policies not built.");
     }
@@ -507,7 +507,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedExterior : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -592,7 +592,7 @@ namespace quda
   template <typename Dslash> struct DslashGDR : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -676,7 +676,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedGDR : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -753,7 +753,7 @@ namespace quda
   template <typename Dslash> struct DslashGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -832,7 +832,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -906,7 +906,7 @@ namespace quda
   template <typename Dslash> struct DslashZeroCopyPack : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1009,7 +1009,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedZeroCopyPack : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1105,7 +1105,7 @@ namespace quda
   template <typename Dslash> struct DslashZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1197,7 +1197,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedZeroCopyPackGDRRecv : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1283,7 +1283,7 @@ namespace quda
   template <typename Dslash> struct DslashZeroCopy : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1375,7 +1375,7 @@ namespace quda
   template <typename Dslash> struct DslashFusedZeroCopy : DslashPolicyImp<Dslash> {
 
     void operator()(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
     {
 
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1462,7 +1462,7 @@ namespace quda
   */
   template <typename Dslash> struct DslashFusedPack : DslashPolicyImp<Dslash> {
 
-    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+    void operator()(Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB,
                     TimeProfile &profile)
     {
 
@@ -1555,7 +1555,7 @@ namespace quda
   */
   template <typename Dslash> struct DslashFusedPackFusedHalo : DslashPolicyImp<Dslash> {
 
-    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+    void operator()(Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB,
                     TimeProfile &profile)
     {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1741,7 +1741,7 @@ namespace quda
   {
     Dslash &dslash;
     decltype(dslash.dslashParam) &dslashParam;
-    cudaColorSpinorField *in;
+    ColorSpinorField &in;
     const int volume;
     const int *ghostFace;
     TimeProfile &profile;
@@ -1753,10 +1753,10 @@ namespace quda
 
   public:
     DslashPolicyTune(
-        Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *ghostFace, TimeProfile &profile) :
+        Dslash &dslash, const ColorSpinorField &in, const int volume, const int *ghostFace, TimeProfile &profile) :
         dslash(dslash),
         dslashParam(dslash.dslashParam),
-        in(in),
+        in(const_cast<ColorSpinorField &>(in)),
         volume(volume),
         ghostFace(ghostFace),
         profile(profile)
@@ -1917,7 +1917,7 @@ namespace quda
                 i == QudaDslashPolicy::QUDA_SHMEM_PACKFULL_DSLASH) {
 
               auto dslashImp = DslashFactory<Dslash>::create(i);
-              (*dslashImp)(dslash, in, volume, ghostFace, profile);
+              (*dslashImp)(dslash, &(this->in), volume, ghostFace, profile);
 
           } else if (i == QudaDslashPolicy::QUDA_GDR_DSLASH ||
                      i == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
@@ -1933,11 +1933,11 @@ namespace quda
               {
                 QudaDslashPolicy policy = DslashFactory<Dslash>::blacklist_map(i);
                 auto dslashImp = DslashFactory<Dslash>::create(policy);
-                (*dslashImp)(dslash, in, volume, ghostFace, profile);
+                (*dslashImp)(dslash, &(this->in), volume, ghostFace, profile);
               }
 
               auto dslashImp = DslashFactory<Dslash>::create(i);
-              (*dslashImp)(dslash, in, volume, ghostFace, profile);
+              (*dslashImp)(dslash, &(this->in), volume, ghostFace, profile);
 
             } else if (i != QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED) {
               errorQuda("Unsupported dslash policy %d\n", static_cast<int>(i));
@@ -1971,7 +1971,7 @@ namespace quda
      dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
      auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
-     (*dslashImp)(dslash, in, volume, ghostFace, profile);
+     (*dslashImp)(dslash, &in, volume, ghostFace, profile);
 
      // restore p2p state
      comm_enable_peer2peer(p2p_enabled);

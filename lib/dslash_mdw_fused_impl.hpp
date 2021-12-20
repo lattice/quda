@@ -9,6 +9,7 @@
 #include <dslash_quda.h>
 #include <instantiate_dslash.h>
 #include <kernels/dslash_mdw_fused.cuh>
+#include <dslash_mdw_fused.hpp>
 
 namespace quda
 {
@@ -17,7 +18,7 @@ namespace quda
 
 #ifdef QUDA_MMA_AVAILABLE
 
-    template <class store_t, int nColor, QudaReconstructType recon> class FusedDslash : public TunableGridStrideKernel2D
+    template <class store_t, int nColor, QudaReconstructType recon, int Ls_> class FusedDslash : public TunableGridStrideKernel2D
     {
       ColorSpinorField &out;
       const ColorSpinorField &in;
@@ -31,8 +32,8 @@ namespace quda
       int parity;
       int dim[4];
       int *shift;
+      static constexpr int Ls = Ls_;
       int *halo_shift;
-      const int Ls;
       const MdwfFusedDslashType type;
       unsigned int volume_4d_cb_active;
 
@@ -147,7 +148,6 @@ namespace quda
         parity(parity),
         shift(shift),
         halo_shift(halo_shift),
-        Ls(in.X(4)),
         type(type)
       {
         resizeStep(in.X(4)); // Ls must be contained in the block
@@ -183,19 +183,8 @@ namespace quda
       template <int block_dim_x, int min_blocks, bool reload, MdwfFusedDslashType type>
       void apply(const TuneParam &tp, const qudaStream_t &stream)
       {
-        switch (Ls) {
-        case 4: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 4, block_dim_x, min_blocks, reload>
-                                               (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
-        case 8: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 8, block_dim_x, min_blocks, reload>
-                                               (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
-        case 12: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 12, block_dim_x, min_blocks, reload>
-                                                (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
-        case 16: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 16, block_dim_x, min_blocks, reload>
-                                                (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
-        case 20: launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, 20, block_dim_x, min_blocks, reload>
-                                                (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift)); break;
-        default: errorQuda("Ls = %d not instantiated\n", Ls);
-        }          
+        launch_cuda<FusedMobiusDslash>(tp, stream, Arg<type, Ls, block_dim_x, min_blocks, reload>
+                                               (out, in, U, y, x, m_f, m_5, b_5, c_5, parity, shift, halo_shift));
       }
 
       template <int block_dim_x, bool reload, MdwfFusedDslashType type>
@@ -250,21 +239,11 @@ namespace quda
 #endif // QUDA_MMA_AVAILABLE
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && defined(QUDA_MMA_AVAILABLE)
-    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
-                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
-    {
-      checkLocation(out, in); // check all locations match
-      instantiatePreconditioner<FusedDslash>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
-                                             type);
-    }
-#else
-    void apply_fused_dslash(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, ColorSpinorField &,
-                            const ColorSpinorField &, double, double, const Complex *, const Complex *,
-                            bool, int, int [4], int [4], MdwfFusedDslashType)
-    {
-      errorQuda("Domain wall dslash with tensor cores has not been built");
-    }
+    template <int Ls>
+    struct FusedDslashLs {
+      template <class store_t, int nColor, QudaReconstructType recon>
+      using type = FusedDslash<store_t, nColor, recon, Ls>;
+    };
 #endif
   } // namespace mobius_tensor_core
 } // namespace quda

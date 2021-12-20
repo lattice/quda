@@ -57,16 +57,16 @@ struct StaggeredDslashTestWrapper {
   cpuGaugeField *cpuFat = nullptr;
   cpuGaugeField *cpuLong = nullptr;
 
-  cpuColorSpinorField *spinor = nullptr;
-  cpuColorSpinorField *spinorOut = nullptr;
-  cpuColorSpinorField *spinorRef = nullptr;
-  cpuColorSpinorField *tmpCpu = nullptr;
-  cudaColorSpinorField *cudaSpinor = nullptr;
-  cudaColorSpinorField *cudaSpinorOut = nullptr;
-  cudaColorSpinorField *tmp = nullptr;
+  std::unique_ptr<ColorSpinorField> spinor;
+  std::unique_ptr<ColorSpinorField> spinorOut;
+  std::unique_ptr<ColorSpinorField> spinorRef;
+  std::unique_ptr<ColorSpinorField> tmpCpu;
+  std::unique_ptr<ColorSpinorField> cudaSpinor;
+  std::unique_ptr<ColorSpinorField> cudaSpinorOut;
+  std::unique_ptr<ColorSpinorField> tmp;
 
-  std::vector<cpuColorSpinorField *> vp_spinor;
-  std::vector<cpuColorSpinorField *> vp_spinor_out;
+  std::vector<ColorSpinorField *> vp_spinor;
+  std::vector<ColorSpinorField *> vp_spinor_out;
 
   // In the HISQ case, we include building fat/long links in this unit test
   void *qdp_fatlink_cpu[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -92,21 +92,19 @@ struct StaggeredDslashTestWrapper {
     printfQuda("Calculating reference implementation...");
     switch (dtest_type) {
     case dslash_test_type::Dslash:
-      staggeredDslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
+      staggeredDslash(*spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, *spinor,
                       parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       break;
     case dslash_test_type::MatPC:
-      staggeredMatDagMat(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
-                         mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
+      staggeredMatDagMat(*spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, *spinor,
+                         mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, *tmpCpu, parity, dslash_type);
       break;
     case dslash_test_type::Mat:
       // the !dagger is to reconcile the QUDA convention of D_stag = {{ 2m, -D_{eo}}, -D_{oe}, 2m}} vs the host convention without the minus signs
-      staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu,
-                      ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Odd()),
-                      QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-      staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu,
-                      ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Even()),
-                      QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef->Even(), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                      spinor->Odd(), QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+      staggeredDslash(spinorRef->Odd(), qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu,
+                      spinor->Even(), QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor->V(), kappa, spinorRef->V(), spinor->Length(), gauge_param.cpu_prec);
       } else {
@@ -293,11 +291,12 @@ struct StaggeredDslashTestWrapper {
     csParam.gammaBasis = inv_param.gamma_basis; // this parameter is meaningless for staggered
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.pc_type = QUDA_4D_PC;
+    csParam.location = QUDA_CPU_FIELD_LOCATION;
 
-    spinor = new cpuColorSpinorField(csParam);
-    spinorOut = new cpuColorSpinorField(csParam);
-    spinorRef = new cpuColorSpinorField(csParam);
-    tmpCpu = new cpuColorSpinorField(csParam);
+    spinor = std::make_unique<ColorSpinorField>(csParam);
+    spinorOut = std::make_unique<ColorSpinorField>(csParam);
+    spinorRef = std::make_unique<ColorSpinorField>(csParam);
+    tmpCpu = std::make_unique<ColorSpinorField>(csParam);
 
     spinor->Source(QUDA_RANDOM_SOURCE);
 
@@ -305,26 +304,27 @@ struct StaggeredDslashTestWrapper {
       inv_param.num_src = num_src;
       inv_param.num_src_per_sub_partition = 1;
       for (int n = 0; n < num_src; n++) {
-        vp_spinor.push_back(new cpuColorSpinorField(csParam));
-        vp_spinor_out.push_back(new cpuColorSpinorField(csParam));
+        vp_spinor.push_back(new ColorSpinorField(csParam));
+        vp_spinor_out.push_back(new ColorSpinorField(csParam));
         *vp_spinor[n] = *spinor;
       }
     }
 
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    csParam.pad = inv_param.sp_pad;
+    csParam.pad = 0;
     csParam.setPrecision(inv_param.cuda_prec);
+    csParam.location = QUDA_CUDA_FIELD_LOCATION;
 
-    cudaSpinor = new cudaColorSpinorField(csParam);
-    cudaSpinorOut = new cudaColorSpinorField(csParam);
+    cudaSpinor = std::make_unique<ColorSpinorField>(csParam);
+    cudaSpinorOut = std::make_unique<ColorSpinorField>(csParam);
     *cudaSpinor = *spinor;
-    tmp = new cudaColorSpinorField(csParam);
+    tmp = std::make_unique<ColorSpinorField>(csParam);
 
     bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
     // because both call the same "Dslash" directly.
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.tmp1 = tmp;
+    diracParam.tmp1 = tmp.get();
     dirac = Dirac::create(diracParam);
 
     for (int dir = 0; dir < 4; dir++) {
@@ -353,35 +353,13 @@ struct StaggeredDslashTestWrapper {
       delete dirac;
       dirac = nullptr;
     }
-    if (cudaSpinor != nullptr) {
-      delete cudaSpinor;
-      cudaSpinor = nullptr;
-    }
-    if (cudaSpinorOut != nullptr) {
-      delete cudaSpinorOut;
-      cudaSpinorOut = nullptr;
-    }
-    if (tmp != nullptr) {
-      delete tmp;
-      tmp = nullptr;
-    }
-
-    if (spinor != nullptr) {
-      delete spinor;
-      spinor = nullptr;
-    }
-    if (spinorOut != nullptr) {
-      delete spinorOut;
-      spinorOut = nullptr;
-    }
-    if (spinorRef != nullptr) {
-      delete spinorRef;
-      spinorRef = nullptr;
-    }
-    if (tmpCpu != nullptr) {
-      delete tmpCpu;
-      tmpCpu = nullptr;
-    }
+    cudaSpinor.reset();
+    cudaSpinorOut.reset();
+    tmp.reset();
+    spinor.reset();
+    spinorOut.reset();
+    spinorRef.reset();
+    tmpCpu.reset();
 
     if (test_split_grid) {
       for (auto p : vp_spinor) { delete p; }
@@ -503,30 +481,31 @@ struct StaggeredDslashTestWrapper {
 
     if (test_split_grid) {
       for (int n = 0; n < num_src; n++) {
-        double spinor_ref_norm2 = blas::norm2(*spinorRef);
-        double spinor_out_norm2 = blas::norm2(*vp_spinor_out[n]);
+        double spinor_ref_norm = blas::norm2(*spinorRef);
+        double spinor_out_norm = blas::norm2(*vp_spinor_out[n]);
 
         bool failed = false;
         // Catching nans is weird.
-        if (std::isnan(spinor_ref_norm2)) { failed = true; }
-        if (std::isnan(spinor_out_norm2)) { failed = true; }
+        if (std::isnan(spinor_ref_norm)) { failed = true; }
+        if (std::isnan(spinor_out_norm)) { failed = true; }
 
-        printfQuda("Results: CPU=%f, CPU-CUDA=%f\n", spinor_ref_norm2, spinor_out_norm2);
-        deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinor_out[n]))));
+	printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
+                   spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
+        deviation = std::max(deviation, pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *vp_spinor_out[n]))));
         if (failed) { deviation = 1.0; }
       }
     } else {
-      double spinor_ref_norm2 = blas::norm2(*spinorRef);
-      double spinor_out_norm2 = blas::norm2(*spinorOut);
+      double spinor_ref_norm = blas::norm2(*spinorRef);
+      double spinor_out_norm = blas::norm2(*spinorOut);
 
       bool failed = false;
       // Catching nans is weird.
-      if (std::isnan(spinor_ref_norm2)) { failed = true; }
-      if (std::isnan(spinor_out_norm2)) { failed = true; }
+      if (std::isnan(spinor_ref_norm)) { failed = true; }
+      if (std::isnan(spinor_out_norm)) { failed = true; }
 
-      double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-      deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+      printfQuda("Results: CPU = %f, QUDA = %f, L2 relative deviation = %e\n",
+                 spinor_ref_norm, spinor_out_norm, 1.0 - sqrt(spinor_out_norm / spinor_ref_norm));
+      deviation = pow(10, -(double)(ColorSpinorField::Compare(*spinorRef, *spinorOut)));
       if (failed) { deviation = 1.0; }
     }
 
