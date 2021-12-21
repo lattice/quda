@@ -51,6 +51,17 @@
 #undef QUDA_CLOVER_RECONSTRUCT
 #endif
 
+#cmakedefine QUDA_CLOVER_CHOLESKY_PROMOTE
+#ifdef QUDA_CLOVER_CHOLESKY_PROMOTE
+/**
+ * @def   CLOVER_PROMOTE_CHOLESKY
+ * @brief This macro sets whether we promote the internal precision of
+ * Cholesky decomposition used to invert the clover term
+ */
+#define CLOVER_PROMOTE_CHOLESKY
+#undef QUDA_CLOVER_CHOLESKY_PROMOTE
+#endif
+
 #cmakedefine QUDA_FLOAT8
 #ifdef QUDA_FLOAT8
 /**

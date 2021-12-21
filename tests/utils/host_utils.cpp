@@ -215,8 +215,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
   } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
-             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
-                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET)) {
     cs_param->nDim = 5;
     cs_param->x[4] = 2;
   } else {

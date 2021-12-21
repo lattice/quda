@@ -8,7 +8,9 @@ namespace quda
 {
 
   DiracImprovedStaggeredKD::DiracImprovedStaggeredKD(const DiracParam &param) :
-    DiracImprovedStaggered(param), Xinv(param.xInvKD), parent_dirac_type(param.dirac == nullptr ? QUDA_INVALID_DIRAC : param.dirac->getDiracType())
+    DiracImprovedStaggered(param),
+    Xinv(param.xInvKD),
+    parent_dirac_type(param.dirac == nullptr ? QUDA_INVALID_DIRAC : param.dirac->getDiracType())
   {
   }
 
@@ -90,8 +92,8 @@ namespace quda
       flops += (8ll * 48 - 2ll) * 48 * in.Volume() / 16; // for 2^4 block
 
       if (mass == 0.) {
-        ApplyImprovedStaggered(out, *tmp2, *fatGauge, *longGauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO,
-                               commDim, profile);
+        ApplyImprovedStaggered(out, *tmp2, *fatGauge, *longGauge, 0., *tmp2, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+                               profile);
         flops += 1146ll * in.Volume();
       } else {
         ApplyImprovedStaggered(out, *tmp2, *fatGauge, *longGauge, 2. * mass, *tmp2, QUDA_INVALID_PARITY, dagger,
@@ -166,7 +168,8 @@ namespace quda
     // Should we support "preparing" and "reconstructing"?
   }
 
-  void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
+  void DiracImprovedStaggeredKD::reconstructSpecialMG(ColorSpinorField &, const ColorSpinorField &,
+                                                      const QudaSolutionType) const
   {
     // do nothing
 
@@ -182,12 +185,13 @@ namespace quda
     longGauge = long_gauge_in;
   }
 
-  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
-                                                double, bool allow_truncation) const
+  void DiracImprovedStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
+                                                double, double, bool allow_truncation) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
-    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *Xinv, mass, allow_truncation, QUDA_ASQTADKD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *Xinv, mass, allow_truncation, QUDA_ASQTADKD_DIRAC,
+                      QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggeredKD::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

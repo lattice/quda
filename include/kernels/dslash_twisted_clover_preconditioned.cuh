@@ -19,6 +19,7 @@ namespace quda
     const C A2inv; // A^{-2}
     real a;        // this is the scaling factor
     real b;        // this is the twist factor
+    real b2;
 
     TwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
                      double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
@@ -27,7 +28,8 @@ namespace quda
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a),
-      b(dagger ? -0.5 * b : 0.5 * b) // factor of 0.5 comes from basis transform
+      b(dagger ? -0.5 * b : 0.5 * b), // factor of 0.5 comes from basis transform
+      b2(0.25 * b * b)
     {
       checkPrecision(U, A);
       checkLocation(U, A);
@@ -81,22 +83,21 @@ namespace quda
 #pragma unroll
         for (int chirality = 0; chirality < 2; chirality++) {
 
-          const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
+          const complex<real> b(0.0, chirality == 0 ? arg.b : -arg.b);
           Mat A = arg.A(coord.x_cb, parity, chirality);
           HalfVector chi = out.chiral_project(chirality);
           chi = A * chi + b * chi;
 
           if (arg.dynamic_clover) {
             Mat A2 = A.square();
-            A2 += b.imag() * b.imag();
+            A2 += arg.b2;
             Cholesky<HMatrix, clover::cholesky_t<typename Arg::Float>, Arg::nColor * Arg::nSpin / 2> cholesky(A2);
-            chi = cholesky.solve(chi);
-            tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
+            chi = static_cast<real>(0.25) * cholesky.solve(chi);
           } else {
             Mat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
-            chi = A2inv * chi;
-            tmp += static_cast<real>(2.0) * chi.chiral_reconstruct(chirality);
+            chi = static_cast<real>(2.0) * (A2inv * chi);
           }
+          tmp += chi.chiral_reconstruct(chirality);
         }
 
         tmp.toNonRel(); // switch back to non-chiral basis

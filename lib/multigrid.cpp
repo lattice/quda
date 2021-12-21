@@ -249,10 +249,10 @@ namespace quda
     popLevel();
   }
 
-  void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, double mass)
+  void MG::resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                            double mass)
   {
-    if (param.level != 0)
-      errorQuda("The staggered KD operator can only be updated from level 0");
+    if (param.level != 0) errorQuda("The staggered KD operator can only be updated from level 0");
 
     if (param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD && param.transfer_type != QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("Attempting to update fine gauge fields of a \"coarse\" but non-KD operator");
@@ -261,7 +261,8 @@ namespace quda
     // a StaggeredKD op, we need to pass the StaggeredKD op the fat links
     auto dirac_type = diracSmoother->getDiracType();
 
-    if ((dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC) && param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+    if ((dirac_type == QUDA_ASQTAD_DIRAC || dirac_type == QUDA_ASQTADPC_DIRAC)
+        && param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
       // last nullptr is for the clover field
       diracCoarseResidual->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
       diracCoarseSmoother->updateFields(fat_gauge_in, fat_gauge_in, long_gauge_in, nullptr);
@@ -398,7 +399,9 @@ namespace quda
     if (diracCoarseSmootherSloppy) delete diracCoarseSmootherSloppy;
 
     // custom setup for the staggered KD ops
-    if (param.level == 0 && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
+    if (param.level == 0
+        && (param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD
+            || param.mg_global.transfer_type[param.level] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)) {
       auto dirac_type = diracSmoother->getDiracType();
 
       auto smoother_solve_type = param.mg_global.smoother_solve_type[param.level + 1];
@@ -431,7 +434,8 @@ namespace quda
       diracParamKD.matpcType = QUDA_MATPC_EVEN_EVEN; // We can use this to track left vs right block jacobi in the future
       diracParamKD.gauge = const_cast<cudaGaugeField *>(fine_gauge);
       diracParamKD.xInvKD = xInvKD.get(); // FIXME: pulling a raw unmanaged pointer out of a unique_ptr...
-      diracParamKD.dirac = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
+      diracParamKD.dirac
+        = const_cast<Dirac *>(diracSmoother); // used to determine if the outer solve is preconditioned or not
 
       diracParamKD.tmp1 = tmp_coarse;
       diracParamKD.tmp2 = tmp2_coarse;
@@ -460,7 +464,6 @@ namespace quda
           diracCoarseResidual = new DiracStaggeredKD(diracParamKD);
           diracCoarseSmoother = new DiracStaggeredKD(diracParamKD);
           diracCoarseSmootherSloppy = new DiracStaggeredKD(diracParamKD);
-
         }
       } else {
         errorQuda("Invalid dirac_type %d", dirac_type);
@@ -486,8 +489,8 @@ namespace quda
       diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
       for (int i = 0; i <= param.level; i++) {
         if ((param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
-            && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) ||
-            (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD)) {
+             && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE)
+            || (param.mg_global.transfer_type[i] == QUDA_TRANSFER_OPTIMIZED_KD)) {
           diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
         }
       }
@@ -941,23 +944,30 @@ namespace quda
     // and if the aggregate size is too small in a direction
     bool can_verify = true;
 
-    if ((param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC || 
-                                                              diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC)) {
+    if ((param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+        && (diracSmoother->getDiracType() == QUDA_STAGGERED_DIRAC
+            || diracSmoother->getDiracType() == QUDA_STAGGEREDPC_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC
+            || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC)) {
       // If we're doing an optimized build with the staggered operator, we need to skip the verify on level 0
       can_verify = false;
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
-    } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("Intentionally skipping staggered -> staggered KD verify because it's not a \"real\" coarsen\n");
+    } else if (diracSmoother->getDiracType() == QUDA_ASQTAD_DIRAC || diracSmoother->getDiracType() == QUDA_ASQTADKD_DIRAC
+               || diracSmoother->getDiracType() == QUDA_ASQTADPC_DIRAC) {
       // If we're doing anything with the asqtad operator, the long links can make verification difficult
 
       if (param.transfer_type == QUDA_TRANSFER_COARSE_KD || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
         can_verify = false;
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using the naively coarsened KD operator with asqtad long links, skipping verify...\n");
+        if (getVerbosity() >= QUDA_VERBOSE)
+          printfQuda("Using the naively coarsened KD operator with asqtad long links, skipping verify...\n");
       } else if (param.transfer_type == QUDA_TRANSFER_AGGREGATE || param.transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
         // need to see if the aggregate is smaller than 3 in any direction
         for (int d = 0; d < 4; d++) {
           if (param.mg_global.geo_block_size[param.level][d] < 3) {
             can_verify = false;
-            if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Aggregation geo_block_size[%d] = %d is less than 3, skipping verify for asqtad coarsen...\n", d, param.mg_global.geo_block_size[param.level][d]);
+            if (getVerbosity() >= QUDA_VERBOSE)
+              printfQuda("Aggregation geo_block_size[%d] = %d is less than 3, skipping verify for asqtad coarsen...\n",
+                         d, param.mg_global.geo_block_size[param.level][d]);
           }
         }
       }

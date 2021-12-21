@@ -49,9 +49,10 @@ namespace quda
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor, allow_truncation,
-        dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
 
     } else {
 
@@ -84,9 +85,10 @@ namespace quda
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa, mass, mu, mu_factor, allow_truncation,
-        dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
     }
   }
 
@@ -98,7 +100,7 @@ namespace quda
                                                    QudaMatPCType matpc, bool need_bidirectional)
   {
     constexpr bool allow_truncation = false;
-    
+
     if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
       errorQuda("use_mma not supported on the CPU");
     } else {
@@ -134,9 +136,10 @@ namespace quda
 
       // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor,
-        cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v_), v_, kappa, mass, mu,
-        mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+        yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, gAccessor,
+        gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v_), v_, kappa,
+        mass, mu, mu_factor, allow_truncation, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+        T.coarseToFine(Y.Location()));
     }
   }
 
@@ -163,7 +166,7 @@ namespace quda
       }
     } else
 #endif
-    if (fineColor == 24) { // coarsened Wilson or free field staggered
+      if (fineColor == 24) { // coarsened Wilson or free field staggered
       if (coarseColor == 24) {
         calculateYcoarse<use_mma, Float, vFloat, 24, fineSpin, 24, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
                                                                                cloverInv, kappa, mass, mu, mu_factor,
@@ -198,7 +201,7 @@ namespace quda
 #endif // NSPIN4
 #ifdef NSPIN1
     } else if (fineColor == 64) {
-      //if (coarseColor == 64) {
+      // if (coarseColor == 64) {
       //  calculateYcoarse<use_mma, Float, vFloat, 64, fineSpin, 64, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
       //                                                                         cloverInv, kappa, mass, mu, mu_factor,
       //                                                                         dirac, matpc, need_bidirectional);
