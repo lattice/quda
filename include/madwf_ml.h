@@ -14,6 +14,7 @@
 
 #include <device_vector.h>
 #include <invert_quda.h>
+#include <madwf_param.h>
 
 namespace quda
 {
@@ -40,27 +41,13 @@ namespace quda
   private:
     device_container device_param;
 
-    // The diagonal component to suppress the zero modes.
-    double mu;
-    int Ls_base;
+    MadwfParam param;
 
-    int null_miniter;
-    double null_tol;
-    int train_maxiter;
+    double mu; // internal copy of the suppression factor
 
     // persistent buffers for reuse.
     std::unique_ptr<ColorSpinorField> forward_tmp;
     std::unique_ptr<ColorSpinorField> backward_tmp;
-
-    // Whether or not load parameters from disk
-    bool param_load;
-    // Whether or not save parameters to disk
-    bool param_save;
-
-    // Path for loading parameters from disk
-    char param_infile[256];
-    // Path for saving parameters to disk
-    char param_outfile[256];
 
     // The underlying preconditioning precision
     QudaPrecision prec_precondition;

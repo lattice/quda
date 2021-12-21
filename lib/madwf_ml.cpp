@@ -3,26 +3,16 @@
 namespace quda
 {
 
-  MadwfAcc::MadwfAcc(const SolverParam &solve_param) :
-    mu(solve_param.madwf_diagonal_suppressor),
-    Ls_base(solve_param.madwf_ls),
-    null_miniter(solve_param.madwf_null_miniter),
-    null_tol(solve_param.madwf_null_tol),
-    train_maxiter(solve_param.madwf_train_maxiter),
-    param_load(solve_param.madwf_param_load == QUDA_BOOLEAN_TRUE),
-    param_save(solve_param.madwf_param_save == QUDA_BOOLEAN_TRUE),
+  MadwfAcc::MadwfAcc(const SolverParam &solve_param) : param(solve_param.madwf_param), mu(param.madwf_diagonal_suppressor),
     prec_precondition(solve_param.precision_precondition)
   {
-    strcpy(param_infile, solve_param.madwf_param_infile);
-    strcpy(param_outfile, solve_param.madwf_param_outfile);
-
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("Launching MADWF accelerator ... \n");
-      printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", mu);
-      printfQuda("madwf_ls (cheap Ls)                               = %d\n", Ls_base);
-      printfQuda("madwf_null_miniter                                = %d\n", null_miniter);
-      printfQuda("madwf_null_tol                                    = %4.2e\n", null_tol);
-      printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", train_maxiter);
+      printfQuda("madwf_mu (low modes suppressor)                   = %.4f\n", param.madwf_diagonal_suppressor);
+      printfQuda("madwf_ls (cheap Ls)                               = %d\n", param.madwf_ls);
+      printfQuda("madwf_null_miniter                                = %d\n", param.madwf_null_miniter);
+      printfQuda("madwf_null_tol                                    = %4.2e\n", param.madwf_null_tol);
+      printfQuda("madwf_train_maxiter (max # of iters for training) = %d\n", param.madwf_train_maxiter);
     }
   }
 
@@ -69,10 +59,11 @@ namespace quda
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
     int Ls = in.X(4);
+    int Ls_base = param.madwf_ls;
     int param_size = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
 
-    if (param_load) {
+    if (param.madwf_param_load) {
       char param_file_name[512];
       // Note that all ranks load from the same file.
       sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
@@ -83,7 +74,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training params loaded from CACHE.\n"); }
       } else {
         // the parameter is not in cache: load from file system.
-        std::string save_param_path(param_infile);
+        std::string save_param_path(param.madwf_param_infile);
         save_param_path += param_file_name_str;
         FILE *fp = fopen(save_param_path.c_str(), "rb");
         if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
@@ -126,7 +117,7 @@ namespace quda
     csParam.setPrecision(prec_precondition);
     for (auto &pB : B) { pB = new ColorSpinorField(csParam); }
 
-    null.solve_and_collect(null_x, null_b, B, null_miniter, null_tol);
+    null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
     for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
     saveTuneCache();
@@ -180,7 +171,7 @@ namespace quda
       printfQuda("beta          = %.3f\n", b);
       printfQuda("training mu   = %.3f\n", mu);
     }
-    for (int iteration = 0; iteration < train_maxiter; iteration++) {
+    for (int iteration = 0; iteration < param.madwf_train_maxiter; iteration++) {
 
       device_container D(param_size);
       double dmu = 0.0;
@@ -289,10 +280,10 @@ namespace quda
       count++;
     }
 
-    if (param_save) {
+    if (param.madwf_param_save) {
       host_param = device_param.to_host();
 
-      std::string save_param_path(param_outfile);
+      std::string save_param_path(param.madwf_param_outfile);
       char cstring[512];
       sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
       save_param_path += std::string(cstring);

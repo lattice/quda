@@ -10,6 +10,8 @@
 #include <vector>
 #include <memory>
 
+#include <madwf_param.h>
+
 namespace quda {
 
   /**
@@ -245,32 +247,7 @@ namespace quda {
         interface)*/
     bool mg_instance;
 
-    /** The diagonal constant to suppress the low modes when performing 5D transfer */
-    double madwf_diagonal_suppressor;
-
-    /** The target MADWF Ls to be used in the accelerator */
-    int madwf_ls;
-
-    /** The minimum number of iterations after which to generate the null vectors for MADWF */
-    int madwf_null_miniter;
-
-    /** The maximum tolerance after which to generate the null vectors for MADWF */
-    double madwf_null_tol;
-
-    /** The maximum number of iterations for the training iterations */
-    int madwf_train_maxiter;
-
-    /** Whether to load the MADWF parameters from the file system */
-    QudaBoolean madwf_param_load;
-
-    /** Whether to save the MADWF parameters to the file system */
-    QudaBoolean madwf_param_save;
-
-    /** Path to load from the file system */
-    char madwf_param_infile[256];
-
-    /** Path to save to the file system */
-    char madwf_param_outfile[256];
+    MadwfParam madwf_param;
 
     /** Whether to perform advanced features in a preconditioning inversion,
         including reliable updates, pipelining, and mixed precision. */
@@ -359,13 +336,6 @@ namespace quda {
       is_preconditioner(false),
       global_reduction(true),
       mg_instance(false),
-      madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
-      madwf_ls(param.madwf_ls),
-      madwf_null_miniter(param.madwf_null_miniter),
-      madwf_null_tol(param.madwf_null_tol),
-      madwf_train_maxiter(param.madwf_train_maxiter),
-      madwf_param_load(param.madwf_param_load),
-      madwf_param_save(param.madwf_param_save),
       precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ || param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ),
       extlib_type(param.extlib_type)
     {
@@ -381,8 +351,15 @@ namespace quda {
         rhs_idx = param.rhs_idx;
       }
 
-      strcpy(madwf_param_infile, param.madwf_param_infile);
-      strcpy(madwf_param_outfile, param.madwf_param_outfile);
+      madwf_param.madwf_diagonal_suppressor = param.madwf_diagonal_suppressor;
+      madwf_param.madwf_ls = param.madwf_ls;
+      madwf_param.madwf_null_miniter = param.madwf_null_miniter;
+      madwf_param.madwf_null_tol = param.madwf_null_tol;
+      madwf_param.madwf_train_maxiter = param.madwf_train_maxiter;
+      madwf_param.madwf_param_load = param.madwf_param_load == QUDA_BOOLEAN_TRUE;
+      madwf_param.madwf_param_save = param.madwf_param_save == QUDA_BOOLEAN_TRUE;
+      strcpy(madwf_param.madwf_param_infile, param.madwf_param_infile);
+      strcpy(madwf_param.madwf_param_outfile, param.madwf_param_outfile);
     }
 
     SolverParam(const SolverParam &param) :
@@ -445,13 +422,7 @@ namespace quda {
       is_preconditioner(param.is_preconditioner),
       global_reduction(param.global_reduction),
       mg_instance(param.mg_instance),
-      madwf_diagonal_suppressor(param.madwf_diagonal_suppressor),
-      madwf_ls(param.madwf_ls),
-      madwf_null_miniter(param.madwf_null_miniter),
-      madwf_null_tol(param.madwf_null_tol),
-      madwf_train_maxiter(param.madwf_train_maxiter),
-      madwf_param_load(param.madwf_param_load),
-      madwf_param_save(param.madwf_param_save),
+      madwf_param(param.madwf_param),
       precondition_no_advanced_feature(param.precondition_no_advanced_feature),
       extlib_type(param.extlib_type)
     {
@@ -468,9 +439,6 @@ namespace quda {
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
-
-      strcpy(madwf_param_infile, param.madwf_param_infile);
-      strcpy(madwf_param_outfile, param.madwf_param_outfile);
     }
 
     ~SolverParam() { }
