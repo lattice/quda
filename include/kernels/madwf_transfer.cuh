@@ -5,6 +5,12 @@
 #include <shared_memory_cache_helper.cuh>
 #include <madwf_transfer.h>
 
+/**
+  @file This file contains the argument and kernel that applies fifth dimension transfer to a vector:
+      out_s = T_{st} * in_t,
+  where s and t are fifth dimension indices. T_{st} is a spin matrix so T has shape Ls*4-by-Ls*4.
+*/
+
 namespace quda
 {
 
@@ -68,7 +74,7 @@ namespace quda
 
       const int volume_4d_cb;
 
-      const matrix_t *wm_p;
+      const matrix_t *wm_p; // points to the data that contains the transfer matrix
 
       const int nParity;
 
@@ -94,7 +100,6 @@ namespace quda
         if (out.Ncolor() != 3) errorQuda("nColor = %d not supported", out.Ncolor());
 
         checkNative(in, out);
-
       }
     };
 

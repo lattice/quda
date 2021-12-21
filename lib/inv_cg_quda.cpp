@@ -244,6 +244,13 @@ namespace quda {
 
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
+    /**
+      When CG is used as a preconditioner, we do not want enable the `advanced features`, which includes:
+      - Reliable updates
+      - Pipelining
+      - Always use zero as the initial guess
+      - Heavy quark residual
+    */
     bool advanced_feature = !(param.precondition_no_advanced_feature && param.is_preconditioner);
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);

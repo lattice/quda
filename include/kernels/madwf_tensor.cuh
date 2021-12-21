@@ -6,6 +6,13 @@
 #include <kernels/madwf_transfer.cuh>
 #include <block_reduce_helper.h>
 
+/**
+  @file This file contains the argument and kernel that forms a tensor outer product in the fifth
+  dimension given two input vectors,
+      T_{st} = out_s * in_t,
+  where s and t are fifth dimension indices. T_{st} is a spin matrix so T has shape Ls*4-by-Ls*4.
+*/
+
 namespace quda
 {
 
@@ -148,7 +155,6 @@ namespace quda
 
         int t = s;
         while (t < Ls_in) {
-          int index = t * target::block_dim().x + target::thread_idx().x;
           cache.save_y(arg.in(t * volume_4d_cb + x_cb, parity), t);
           t += target::block_dim().y;
         }
