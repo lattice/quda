@@ -794,7 +794,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.pipeline = pipeline;
 
   inv_param.Ls = 1;
@@ -1284,7 +1284,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = precon_schwarz_type;
