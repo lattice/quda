@@ -324,7 +324,8 @@ namespace quda {
        @brief This method only resets the KD operators with the updated fine links and rebuilds
               the KD inverse
      */
-    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in, double mass);
+    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                          double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -468,8 +469,9 @@ namespace quda {
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, const cudaGaugeField& longGauge,
-                         const GaugeField &XinvKD, double mass, bool allow_truncation, QudaDiracType dirac, QudaMatPCType matpc);
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
+                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)

@@ -1284,9 +1284,10 @@ struct mgInputStruct {
   int mg_levels;
   bool verify_results;
   QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
-  QudaTransferType optimized_kd;          // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
-  bool use_mma;                           // accelerate setup using MMA routines
-  bool allow_truncation;                   // allow dropping the long links for small (less than three) aggregate directions
+  QudaTransferType
+    optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
+  bool use_mma;          // accelerate setup using MMA routines
+  bool allow_truncation; // allow dropping the long links for small (less than three) aggregate directions
 
   // Setup
   int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
@@ -1295,7 +1296,7 @@ struct mgInputStruct {
   double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (first 1 1 1 1 for optimized, 2 2 2 2 for coarse)
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (first 1 1 1 1 for optimized, 2 2 2 2 for coarse)
 
   // Solve
   QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
@@ -1365,7 +1366,7 @@ struct mgInputStruct {
     setArrayDefaults();
 
     /* required or best-practice values for typical solves */
-    nvec[0] = 3;             // must be this
+    nvec[0] = 3;              // must be this
     geo_block_size[0][0] = 1; // must be this...
     geo_block_size[0][1] = 1; // "
     geo_block_size[0][2] = 1; // "
@@ -1898,7 +1899,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     if (i == 0) {
       for (int j = 0; j < 4; j++) {
-        mg_param.geo_block_size[i][j] = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 2 : 1; // Kahler-Dirac blocking
+        mg_param.geo_block_size[i][j]
+          = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 2 : 1; // Kahler-Dirac blocking
       }
     } else {
       for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
@@ -1930,7 +1932,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.spin_block_size[i] = 1;
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
-    mg_param.n_vec[i] = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
+    mg_param.n_vec[i]
+      = (i == 0) ? ((input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? 24 : 3) : input_struct.nvec[i];
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                          // number of times to Gram-Schmidt
     mg_param.precision_null[i] = input_struct.preconditioner_precision; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i]
@@ -1973,7 +1976,10 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     // from test routines: // smoother_solve_type[i];
     switch (i) {
     case 0: mg_param.smoother_solve_type[0] = QUDA_DIRECT_SOLVE; break;
-    case 1: mg_param.smoother_solve_type[1] = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_DIRECT_PC_SOLVE : QUDA_DIRECT_SOLVE; break;
+    case 1:
+      mg_param.smoother_solve_type[1]
+        = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_DIRECT_PC_SOLVE : QUDA_DIRECT_SOLVE;
+      break;
     default: mg_param.smoother_solve_type[i] = input_struct.coarse_solve_type[i]; break;
     }
 
@@ -2045,7 +2051,8 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     } else if (i == 1) {
 
       // Always this for now.
-      mg_param.coarse_grid_solution_type[i] = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
+      mg_param.coarse_grid_solution_type[i]
+        = (input_struct.optimized_kd == QUDA_TRANSFER_COARSE_KD) ? QUDA_MATPC_SOLUTION : QUDA_MAT_SOLUTION;
     } else {
 
       if (input_struct.coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
@@ -2068,7 +2075,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
-  if (input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD || input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) mg_param.spin_block_size[1] = 0;
+  if (input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD
+      || input_struct.optimized_kd == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+    mg_param.spin_block_size[1] = 0;
 
   mg_param.setup_type = QUDA_NULL_VECTOR_SETUP;     // setup_type;
   mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -2127,8 +2136,8 @@ void *qudaMultigridCreate(int external_precision, int quda_precision, double mas
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
   QudaGaugeParam long_param = newQudaGaugeParam();
-  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision,
-                 device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
+                 inv_args.tadpole, inv_args.naik_epsilon);
 
   // Set some other smart defaults
   fat_param.type = QUDA_ASQTAD_FAT_LINKS;
@@ -2194,8 +2203,8 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   QudaGaugeParam fat_param = newQudaGaugeParam();
   QudaGaugeParam long_param = newQudaGaugeParam();
-  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision,
-                 device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
+  setGaugeParams(fat_param, long_param, longlink, localDim, host_precision, device_precision, device_precision_sloppy,
+                 inv_args.tadpole, inv_args.naik_epsilon);
 
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
   fat_param.cuda_prec_precondition = mg_pack->preconditioner_precision;

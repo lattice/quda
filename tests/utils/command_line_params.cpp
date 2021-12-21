@@ -319,10 +319,11 @@ namespace
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
-  CLI::TransformPairs<QudaTransferType> transfer_type_map {{"aggregate", QUDA_TRANSFER_AGGREGATE},
-                                                           {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
-                                                           {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD},
-                                                           {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG}};
+  CLI::TransformPairs<QudaTransferType> transfer_type_map {
+    {"aggregate", QUDA_TRANSFER_AGGREGATE},
+    {"kd-coarse", QUDA_TRANSFER_COARSE_KD},
+    {"kd-optimized", QUDA_TRANSFER_OPTIMIZED_KD},
+    {"kd-optimized-drop-long", QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG}};
 
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
@@ -698,10 +699,11 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto solve_type_transform = CLI::QUDACheckedTransformer(solve_type_map);
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
-  
+
   opgroup->add_option("--mg-allow-truncation", mg_allow_truncation,
-    "Let multigrid coarsening trucate improvement terms in operators, e.g. dropping asqtad long links in a dimension with an aggreation length smaller than 3 (default false)");
-  
+                      "Let multigrid coarsening trucate improvement terms in operators, e.g. dropping asqtad long "
+                      "links in a dimension with an aggreation length smaller than 3 (default false)");
+
   quda_app->add_mgoption(
     opgroup, "--mg-block-size", geo_block_size, CLI::Validator(),
     "Set the geometric block size for the each multigrid levels transfer operator (default 4 4 4 4)");

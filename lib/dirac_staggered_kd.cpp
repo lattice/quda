@@ -7,9 +7,17 @@
 namespace quda
 {
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) : DiracStaggered(param), Xinv(param.xInvKD), parent_dirac_type(param.dirac == nullptr ? QUDA_INVALID_DIRAC : param.dirac->getDiracType()) { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracParam &param) :
+    DiracStaggered(param),
+    Xinv(param.xInvKD),
+    parent_dirac_type(param.dirac == nullptr ? QUDA_INVALID_DIRAC : param.dirac->getDiracType())
+  {
+  }
 
-  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) : DiracStaggered(dirac), Xinv(dirac.Xinv), parent_dirac_type(dirac.parent_dirac_type) { }
+  DiracStaggeredKD::DiracStaggeredKD(const DiracStaggeredKD &dirac) :
+    DiracStaggered(dirac), Xinv(dirac.Xinv), parent_dirac_type(dirac.parent_dirac_type)
+  {
+  }
 
   DiracStaggeredKD::~DiracStaggeredKD() { }
 
@@ -171,7 +179,8 @@ namespace quda
     Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
   }
 
-  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double, double, bool) const
+  void DiracStaggeredKD::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
+                                        double, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Staggered KD operators only support aggregation coarsening");
