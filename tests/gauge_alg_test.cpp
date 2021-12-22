@@ -118,8 +118,9 @@ protected:
   QudaGaugeFixParam fix_param;
 
   host_timer_t host_timer_1, host_timer_2;
-  double2 detu;
-  double3 plaq;
+  double2 det_u;
+  double2 trace_u;
+  double3 plaq_u;
   cudaGaugeField *U;
   int nsteps;
   int nhbsteps;
@@ -215,8 +216,8 @@ protected:
           unitarizeLinks(*U, num_failures_d);
           qudaDeviceSynchronize();
           if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
-          plaq = plaquette(*U);
-          printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
+          plaq_u = plaquette(*U);
+          printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_u.x, plaq_u.y, plaq_u.z);
         }
 
         host_timer_2.stop();
@@ -256,19 +257,23 @@ protected:
         unitarizeLinks(*U, num_failures_d);
         qudaDeviceSynchronize();
         if (*num_failures_h > 0) errorQuda("Error in the unitarization (%d errors)", *num_failures_h);
-
-        plaq = plaquette(*U);
-        printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
       }
 
-      // If a specific test type is requested, perfrom it now and then
+      // Unfixed Gauge data
+      plaq_u = plaquette(*U);
+      det_u = getLinkDeterminant(*U);
+      trace_u = getLinkTrace(*U);
+      printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_u.x, plaq_u.y, plaq_u.z);
+      printfQuda("Det: %.16e:%.16e\n", det_u.x, det_u.y);
+      printfQuda("Tr: %.16e:%.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);      
+      
+      // If a specific test type is requested, perform it now and then
       // turn off all Google tests in the tear down.
       switch (test_type) {
-      case 0:
-        // Do the Google testing
-        break;
-      case 1: run(); break;
-	//case 2: run_fft(); break;
+      case 0: // Do the Google testing
+	break;
+      case 1: // Do a specific test
+	run(); break;
       default: errorQuda("Invalid test type %d ", test_type);
       }
 
@@ -279,21 +284,37 @@ protected:
   virtual void TearDown()
   {
     if (execute) {
-      detu = getLinkDeterminant(*U);
-      double2 tru = getLinkTrace(*U);
-      printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
-      printfQuda("Tr: %.16e:%.16e\n", tru.x / 3.0, tru.y / 3.0);
+
+      // Compare gauge fixed data with original data
+      auto plaq_gf = plaquette(*U);
+      auto det_gf = getLinkDeterminant(*U);
+      auto trace_gf = getLinkTrace(*U);
+      printfQuda("Plaq:     %.16e, %.16e, %.16e\n", plaq_u.x, plaq_u.y, plaq_u.z);
+      printfQuda("Plaq GF:  %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
+      printfQuda("Det:      %.16e, %.16e\n", det_u.x, det_u.y);
+      printfQuda("Det GF:   %.16e, %.16e\n", det_gf.x, det_gf.y);
+      printfQuda("Trace:    %.16e, %.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);
+      printfQuda("Trace GF: %.16e, %.16e\n", trace_gf.x / 3.0, trace_gf.y / 3.0);
+
+      // As an observable, the plaquette value must remain invariant after
+      // gauge fixing.
+      ASSERT_TRUE(comparePlaquette(plaq_u, plaq_gf));
+
+      // The determinant of any SU(N) gauge field element must be (1.0,0.0) to
+      // machine precision
+      ASSERT_TRUE(CheckDeterminant(det_gf));
 
       delete U;
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
       PGaugeExchangeFree();
-
+      
       host_timer_1.stop();
       printfQuda("Time -> %.6f s\n", host_timer_1.last());
     }
     // If we performed a specific instance, switch off the
     // Google testing.
     if (test_type != 0) execute = false;
+    saveTuneCache();
   }
 
   virtual void run()
@@ -303,22 +324,48 @@ protected:
       fix_param = newQudaGaugeFixParam();
       setGaugeFixParam(fix_param);
       
-      // Setup gauge container.
+      printfQuda("%s gauge fixing with %s method\n", fix_param.gauge_dir == 4 ? "Landau" : "Coulomb", get_gaugefix_str(fix_param.fix_type));
+
+      // Setup CPU gauge container.
       gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
       gauge_param.t_boundary = QUDA_PERIODIC_T;
-      gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
+      gauge_param.location = QUDA_CPU_FIELD_LOCATION;
       
-      //GaugeFieldParam param(*U);
-      printfQuda("%s gauge fixing with %s method\n", fix_param.gauge_dir == 4 ? "Landau" : "Coulomb", get_gaugefix_str(fix_param.fix_type));
+      void *cpu_gauge[4];
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
       
-      computeGaugeFixingQuda(U->Gauge_p(), &gauge_param, &fix_param, nullptr);
+      GaugeFieldParam param(gauge_param);
+      param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      param.create = QUDA_NULL_FIELD_CREATE;
+      param.link_type = gauge_param.type;
+      param.reconstruct = gauge_param.reconstruct;
+      param.setPrecision(param.Precision(), true);
       
-      auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-      saveTuneCache();
+      auto *gauge = new cudaGaugeField(param);
+      
+      // Copy the target U field (extended) into regular GPU field, then
+      // save to a CPU field. This is done to test the CPU interface function
+      // and instructs the user how to use void pointers for the gauge data,
+      // and the gauge_param container.
+      copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);
+      saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
+      delete gauge;
+      
+      // Compute gauge fixing via interface
+      computeGaugeFixingQuda(cpu_gauge, &gauge_param, &fix_param, nullptr);
+
+      // cpu_gauge now contains the fixed gauge on the CPU. We now load that gauge
+      // to the device for inspection in the TearDown.
+      GaugeFieldParam fixed_param(gauge_param, cpu_gauge);
+      auto *fixed_cpu_gauge = new cpuGaugeField(fixed_param);
+      
+      // Copy the CPU field to U.
+      U->loadCPUField(*fixed_cpu_gauge);     
+
+      for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
+      delete fixed_cpu_gauge;
+	
       // Save if output string is specified
       if (gauge_store) save_gauge();
     }
@@ -327,9 +374,6 @@ protected:
   virtual void save_gauge()
   {
     printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
-
-    //QudaGaugeParam gauge_param = newQudaGaugeParam();
-    //setWilsonGaugeParam(gauge_param);
 
     void *cpu_gauge[4];
     for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
@@ -359,8 +403,11 @@ protected:
 TEST_F(GaugeAlgTest, Generation)
 {
   if (execute && !gauge_load) {
-    detu = getLinkDeterminant(*U);
-    ASSERT_TRUE(CheckDeterminant(detu));
+    det_u = getLinkDeterminant(*U);
+    //trace_u = getLinkTrace(*U);
+    //printfQuda("Det: %.16e:%.16e\n", det_u.x, det_u.y);
+    //printfQuda("Tr: %.16e:%.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);
+    ASSERT_TRUE(CheckDeterminant(det_u));
   }
 }
 
@@ -375,12 +422,7 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 4;
     
-    gaugeFixingOVR(*U, fix_param);
-    auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-    saveTuneCache();
+    gaugeFixingOVR(*U, fix_param);    
   }
 }
 
@@ -395,12 +437,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 3;
 
-    gaugeFixingOVR(*U, fix_param);
-    auto plaq_gf = plaquette(*U);
-    printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-    printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-    ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-    saveTuneCache();
+    gaugeFixingOVR(*U, fix_param);    
   }
 }
 
@@ -417,11 +454,6 @@ TEST_F(GaugeAlgTest, Landau_FFT)
       fix_param.gauge_dir = 4;
     
       gaugeFixingFFT(*U, fix_param);
-      auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-      saveTuneCache();
     }
   }
 }
@@ -439,11 +471,6 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
       fix_param.gauge_dir = 3;
 
       gaugeFixingFFT(*U, fix_param);
-      auto plaq_gf = plaquette(*U);
-      printfQuda("Plaq:    %.16e, %.16e, %.16e\n", plaq.x, plaq.y, plaq.z);
-      printfQuda("Plaq GF: %.16e, %.16e, %.16e\n", plaq_gf.x, plaq_gf.y, plaq_gf.z);
-      ASSERT_TRUE(comparePlaquette(plaq, plaq_gf));
-      saveTuneCache();
     }
   }
 }
@@ -470,10 +497,11 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setVerbosity(QUDA_VERBOSE);
+  setVerbosity(verbosity);
   setQudaPrecisions();
   setWilsonGaugeParam(gauge_param);
   setDims(gauge_param.X);
+  
   // call srand() with a rank-dependent seed
   initRand();
   // initialize the QUDA library
