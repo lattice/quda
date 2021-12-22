@@ -257,7 +257,7 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
-  two_test(argc, argv);
+  twolink_test(argc, argv);
   finalizeComms();
 }
 

@@ -156,7 +156,7 @@ namespace quda
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
-          staggered_qsmear, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          staggered_qsmear, in, in.VolumeCB(),
           in.GhostFaceCB(), profile);
 #else
         errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash and laplace to be enabled", in.Nspin());

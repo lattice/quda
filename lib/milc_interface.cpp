@@ -724,7 +724,6 @@ static void setInvertParams(QudaPrecision cpu_prec, QudaPrecision cuda_prec, Qud
   }
 
   invertParam->dagger = QUDA_DAG_NO;
-  invertParam->sp_pad = 0;
   invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
@@ -1870,9 +1869,6 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   inv_param.Ls = 1;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = host_precision;
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
@@ -2455,8 +2451,6 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.preserve_source               = QUDA_PRESERVE_SOURCE_NO;
   invertParam.gamma_basis                   = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   invertParam.dirac_order                   = QUDA_DIRAC_ORDER;
-  invertParam.sp_pad                        = 0;
-  invertParam.cl_pad                        = 0;
   invertParam.clover_cpu_prec               = host_precision;
   invertParam.clover_cuda_prec              = device_precision;
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;

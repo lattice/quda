@@ -38,8 +38,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  gauge_covdev.cpp 
-  cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
+  gauge_covdev.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
@@ -85,7 +84,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
-  dslash_mdw_fused.cu dslash5_mobius_eofa.cu
+  dslash5_mobius_eofa.cu
   instantiate.cpp version.cpp )
 # cmake-format: on
 
@@ -97,6 +96,7 @@ set(QUDA_DSLASH_OBJS
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
+  dslash_ndeg_twisted_clover.cu dslash_ndeg_twisted_clover_preconditioned.cu
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
@@ -126,6 +126,25 @@ foreach(item ${QUDA_OBJS})
 endforeach(item ${QUDA_OBJS})
 
 list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+
+set(QUDA_MDW_FUSED_LS_LIST "4,8,12,16,20" CACHE STRING "The list of Ls that get compiled")
+mark_as_advanced(QUDA_MDW_FUSED_LS_LIST)
+
+message(STATUS "QUDA_mdw_fused_Ls=${QUDA_MDW_FUSED_LS_LIST}")
+configure_file(dslash_mdw_fused.in.hpp dslash_mdw_fused.hpp @ONLY)
+
+set(QUDA_MDW_FUSED_ALLOWED_LS_LIST 4 8 12 16 20)
+if(QUDA_DIRAC_DOMAIN_WALL)
+  string(REPLACE "," ";" QUDA_MDW_FUSED_LS_LIST_SEMICOLON "${QUDA_MDW_FUSED_LS_LIST}")
+  foreach(QUDA_MDW_FUSED_LS ${QUDA_MDW_FUSED_LS_LIST_SEMICOLON})
+    if(NOT ${QUDA_MDW_FUSED_LS} IN_LIST QUDA_MDW_FUSED_ALLOWED_LS_LIST)
+      string(REPLACE ";" "," QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA "${QUDA_MDW_FUSED_ALLOWED_LS_LIST}")
+      message(FATAL_ERROR "'${QUDA_MDW_FUSED_LS}' is not a valid Ls: allowed ones are '${QUDA_MDW_FUSED_ALLOWED_LS_LIST_COMMA}'")
+    endif()
+    configure_file(dslash_mdw_fused.in.cu "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu" @ONLY)
+    list(APPEND QUDA_CU_OBJS "dslash_mdw_fused_ls${QUDA_MDW_FUSED_LS}.cu")
+  endforeach()
+endif()
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
@@ -371,6 +390,12 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
+if(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_CLOVER_DIRAC
+                                         GPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_NDEG_TWISTED_CLOVER)
+
+
 if(${QUDA_BUILD_NATIVE_LAPACK} STREQUAL "ON")
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE NATIVE_LAPACK_LIB)
@@ -458,6 +483,7 @@ endif()
 if(QUDA_QMP)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)
+  target_link_libraries(quda PUBLIC MPI::MPI_CXX)
 endif()
 
 if(QUDA_NVSHMEM)
@@ -479,18 +505,9 @@ if(QUDA_QIO)
 endif()
 
 if(QUDA_QDPJIT)
-  target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QDPJITHOME}/include>)
-  target_link_libraries(
-    quda
-    INTERFACE ${QDP_LDFLAGS}
-              ${QDP_LIB}
-              ${QDP_LIBS}
-              ${QIO_LIB}
-              ${LIME_LIB}
-              ${QUDA_QMP_LDFLAGS}
-              ${QMP_LIB}
-              MPI::MPI_CXX)
+   target_compile_definitions(quda PRIVATE USE_QDPJIT)
+   # this avoids issues when qdpjit is build as a static library we should eventually switch to target_link_libraries(quda PRIVATE QDPXX::qdp)	
+   target_include_directories(quda PRIVATE $<TARGET_PROPERTY:QDPXX::qdp,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
 if(QUDA_ARPACK)

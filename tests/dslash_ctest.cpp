@@ -8,9 +8,6 @@ DslashTestWrapper dslash_test_wrapper;
 int argc_copy;
 char **argv_copy;
 
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *recon_str[] = {"r18", "r12", "r8"};
-
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
 
@@ -173,7 +170,7 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
   std::stringstream ss;
   // std::cout << "getdslashtestname" << get_dslash_str(dslash_type) << "_" << prec_str[prec] << "_r" << recon <<
   // "_partition" << part << std::endl; ss << get_dslash_str(dslash_type) << "_";
-  ss << prec_str[prec];
+  ss << get_prec_str(getPrecision(prec));
   ss << "_r" << recon;
   ss << "_partition" << part;
   return ss.str();

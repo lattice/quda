@@ -24,14 +24,7 @@ namespace quda {
     inline void copy(ColorSpinorField &dst, const ColorSpinorField &src)
     {
       if (&dst == &src) return;
-
-      if (dst.Location() == QUDA_CUDA_FIELD_LOCATION && src.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        static_cast<cudaColorSpinorField &>(dst).copy(static_cast<const cudaColorSpinorField &>(src));
-      } else if (dst.Location() == QUDA_CPU_FIELD_LOCATION && src.Location() == QUDA_CPU_FIELD_LOCATION) {
-        static_cast<cpuColorSpinorField &>(dst).copy(static_cast<const cpuColorSpinorField &>(src));
-      } else {
-        errorQuda("Cannot call copy with fields with different locations");
-      }
+      dst.copy(src);
     }
 
     void ax(double a, ColorSpinorField &x);

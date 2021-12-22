@@ -155,6 +155,7 @@ option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ${QUDA_DIRAC
 option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ${QUDA_DIRAC_DEFAULT})
+option(QUDA_DIRAC_NDEG_TWISTED_CLOVER "build non-degenerate twisted clover Dirac operators" ${QUDA_DIRAC_DEFAULT})
 option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
 option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
 option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
@@ -162,8 +163,6 @@ option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
 option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
 option(QUDA_COVDEV "build code for covariant derivative" OFF)
 option(QUDA_LAPLACE "build laplace operator" OFF)
-# Dynamic inversion saves memory but decreases the flops
-option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
@@ -239,6 +238,10 @@ set(QUDA_RECONSTRUCT
     "7"
     CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+option(QUDA_CLOVER_DYNAMIC "Dynamically invert the clover term" ON)
+option(QUDA_CLOVER_RECONSTRUCT "set to ON to enable compressed clover storage (requires QUDA_CLOVER_DYNAMIC)" ON)
+option(QUDA_CLOVER_CHOLESKY_PROMOTE "Whether to promote the internal precision when inverting the clover term" ON)
+
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
 set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
 
@@ -291,6 +294,7 @@ mark_as_advanced(QUDA_VERBOSE_BUILD)
 mark_as_advanced(QUDA_MAX_MULTI_BLAS_N)
 mark_as_advanced(QUDA_PRECISION)
 mark_as_advanced(QUDA_RECONSTRUCT)
+mark_as_advanced(QUDA_CLOVER_CHOLESKY_PROMOTE)
 mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
@@ -469,6 +473,10 @@ CMAKE_DEPENDENT_OPTION(QUDA_HETEROGENEOUS_ATOMIC "enable heterogeneous atomic su
 
 if((QUDA_HETEROGENEOUS_ATOMIC OR QUDA_NVSHMEM) AND ${CMAKE_BUILD_TYPE} STREQUAL "SANITIZE")
   message(SEND_ERROR "QUDA_HETEROGENEOUS_ATOMIC=ON AND/OR QUDA_NVSHMEM=ON do not support SANITIZE build)")
+endif()
+
+if(QUDA_CLOVER_RECONSTRUCT AND NOT QUDA_CLOVER_DYNAMIC)
+  message(SEND_ERROR "QUDA_CLOVER_RECONSTRUCT requires QUDA_CLOVER_DYNAMIC)")
 endif()
 
 if(QUDA_NVSHMEM AND (${COMP_CAP} LESS "700"))
@@ -654,21 +662,18 @@ if(QUDA_QIO)
 endif()
 
 ####################################
-# USQCD QDPJIT
-####################################
-if(QUDA_QDPJIT)
-  if(NOT QUDA_QMP)
-    message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP.")
-  endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --ldflags
-                  OUTPUT_VARIABLE QDP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp\+\+-config --libs
-                  OUTPUT_VARIABLE QDP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
-  find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
-  find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
-
+ # USQCD QDPJIT
+ ####################################
+ if(QUDA_QDPJIT)
+   if(NOT QUDA_QMP)
+     message(SEND_ERROR "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
+   endif()
+   find_package(QDPXX REQUIRED)
+   if( NOT ${QDP_IS_QDPJIT} EQUAL 1 )
+     message(FATAL_ERROR "Found QDPXX but it is not QDP-JIT. Please specify with QDPXX_DIR pointing to the right path or add to the CMAKE_PREFIX_PATH")
+   endif()
+   set(QUDA_INTERFACE_QDPJIT ON)
+ endif()
 ####################################
 # MAGMA
 ####################################

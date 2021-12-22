@@ -379,6 +379,7 @@ namespace quda {
       gParamEx.r[d] = R[d];
     }
     if (recon != QUDA_RECONSTRUCT_INVALID) gParamEx.reconstruct = recon;
+    gParamEx.setPrecision(gParamEx.Precision(), true);
 
     auto *out = new cudaGaugeField(gParamEx);
 

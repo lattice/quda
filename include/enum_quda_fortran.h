@@ -9,7 +9,7 @@
 #   gfortran).
 #*/
 
-#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
+#define QUDA_INVALID_ENUM (-Z'7fffffff' - 1)
 
 #define QudaLinkType integer(4)
 
@@ -236,9 +236,10 @@
 #define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
-#define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
-#define QUDA_QDPJIT_CLOVER_ORDER 6 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
+#define QUDA_FLOAT8_CLOVER_ORDER 8   // even-odd float8 ordering
+#define QUDA_PACKED_CLOVER_ORDER 9   // even-odd packed
+#define QUDA_QDPJIT_CLOVER_ORDER 10  // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 11    // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
@@ -370,7 +371,6 @@
 #define QudaTwistFlavorType integer(4)
 #define QUDA_TWIST_SINGLET 1
 #define QUDA_TWIST_NONDEG_DOUBLET +2
-#define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 

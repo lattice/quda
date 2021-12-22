@@ -36,8 +36,8 @@ namespace quda
     }
 
   public:
-    NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
+  NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    Dslash(arg, out, in),
       shared(arg.asymmetric || !arg.dagger)
     {
       TunableKernel3D::resizeVector(2, arg.nParity);
@@ -103,16 +103,12 @@ namespace quda
         NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       } else {
         NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       }
     }
   };
@@ -133,7 +129,7 @@ namespace quda
                                           double, double, double, bool, const ColorSpinorField &, int, bool, bool,
                                           const int *, TimeProfile &)
   {
-    errorQuda("Non-degenerate twisted-mass dslash has not been built");
+    errorQuda("Non-degenerate preconditioned twisted-mass dslash has not been built");
   }
 #endif // GPU_NDEG_TWISTED_MASS_DIRAC
 

@@ -29,7 +29,9 @@ namespace quda {
       inB(inB),
       coeff(coeff)
     {
-      writeAuxString(",nvector=%d", (int)inA.size());
+      char tmp[16];
+      sprintf(tmp, ",nvector=%lu", inA.size());
+      strcat(aux, tmp);
       apply(device::get_default_stream());
     }
 
