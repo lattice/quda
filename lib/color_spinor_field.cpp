@@ -1316,7 +1316,7 @@ namespace quda
 
   void ColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
                                        const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
-                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_) const
+                                       bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_, int shmem) const
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) {
       // allocate ghost buffer if not yet allocated
@@ -1337,6 +1337,13 @@ namespace quda
 
       host_free(sendbuf);
     } else {
+      bool shmem_async = shmem & 2;
+      // first set default values to device if needed
+      MemoryLocation pack_destination[2 * QUDA_MAX_DIM], halo_location[2 * QUDA_MAX_DIM];
+      for (int i = 0; i < 2 * nDimComms; i++) {
+        pack_destination[i] = pack_destination_ ? pack_destination_[i] : Shmem;
+        halo_location[i] = halo_location_ ? halo_location_[i] : Device;
+      }
       // we are overriding the ghost precision, and it doesn't match what has already been allocated
       if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
         ghost_precision_reset = true;
@@ -1352,159 +1359,183 @@ namespace quda
       if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
       const_cast<ColorSpinorField &>(*this).createComms(nFace, false);
 
-      // first set default values to device if needed
-      MemoryLocation pack_destination[2 * QUDA_MAX_DIM], halo_location[2 * QUDA_MAX_DIM];
-      for (int i = 0; i < 2 * nDimComms; i++) {
-        pack_destination[i] = pack_destination_ ? pack_destination_[i] : Device;
-        halo_location[i] = halo_location_ ? halo_location_[i] : Device;
-      }
+      if (pack_destination[0] != Shmem) {
 
-      // Contiguous send buffers and we aggregate copies to reduce
-      // latency.  Only if all locations are "Device" and no p2p
-      bool fused_pack_memcpy = true;
+        // Contiguous send buffers and we aggregate copies to reduce
+        // latency.  Only if all locations are "Device" and no p2p
+        bool fused_pack_memcpy = true;
 
-      // Contiguous recv buffers and we aggregate copies to reduce
-      // latency.  Only if all locations are "Device" and no p2p
-      bool fused_halo_memcpy = true;
+        // Contiguous recv buffers and we aggregate copies to reduce
+        // latency.  Only if all locations are "Device" and no p2p
+        bool fused_halo_memcpy = true;
 
-      bool pack_host = false; // set to true if any of the ghost packing is being done to Host memory
-      bool halo_host = false; // set to true if the final halos will be left in Host memory
+        bool pack_host = false; // set to true if any of the ghost packing is being done to Host memory
+        bool halo_host = false; // set to true if the final halos will be left in Host memory
 
-      void *send[2 * QUDA_MAX_DIM];
-      for (int d = 0; d < nDimComms; d++) {
-        for (int dir = 0; dir < 2; dir++) {
-          send[2 * d + dir] = pack_destination[2 * d + dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                      my_face_dim_dir_d[bufferIndex][d][dir];
-          ghost_buf[2 * d + dir] = halo_location[2 * d + dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] :
-                                                                        from_face_dim_dir_d[bufferIndex][d][dir];
-        }
-
-        // if doing p2p, then we must pack to and load the halo from device memory
-        for (int dir = 0; dir < 2; dir++) {
-          if (comm_peer2peer_enabled(dir, d)) {
-            pack_destination[2 * d + dir] = Device;
-            halo_location[2 * d + 1 - dir] = Device;
+        void *send[4 * QUDA_MAX_DIM];
+        for (int d = 0; d < nDimComms; d++) {
+          for (int dir = 0; dir < 2; dir++) {
+            send[2 * d + dir] = pack_destination[2 * d + dir] == Host ? my_face_dim_dir_hd[bufferIndex][d][dir] :
+                                                                        my_face_dim_dir_d[bufferIndex][d][dir];
+            send[2 * QUDA_MAX_DIM + 2 * d + dir] = nullptr;
+            ghost_buf[2 * d + dir] = halo_location[2 * d + dir] == Host ? from_face_dim_dir_hd[bufferIndex][d][dir] :
+                                                                          from_face_dim_dir_d[bufferIndex][d][dir];
           }
+
+          // if doing p2p, then we must pack to and load the halo from device memory
+          for (int dir = 0; dir < 2; dir++) {
+            if (comm_peer2peer_enabled(dir, d)) {
+              pack_destination[2 * d + dir] = Device;
+              halo_location[2 * d + 1 - dir] = Device;
+            }
+          }
+
+          // if zero-copy packing or p2p is enabled then we cannot do fused memcpy
+          if (pack_destination[2 * d + 0] != Device || pack_destination[2 * d + 1] != Device
+              || comm_peer2peer_enabled_global())
+            fused_pack_memcpy = false;
+          // if zero-copy halo read or p2p is enabled then we cannot do fused memcpy
+          if (halo_location[2 * d + 0] != Device || halo_location[2 * d + 1] != Device || comm_peer2peer_enabled_global())
+            fused_halo_memcpy = false;
+
+          if (pack_destination[2 * d + 0] == Host || pack_destination[2 * d + 1] == Host) pack_host = true;
+          if (halo_location[2 * d + 0] == Host || halo_location[2 * d + 1] == Host) halo_host = true;
         }
 
-        // if zero-copy packing or p2p is enabled then we cannot do fused memcpy
-        if (pack_destination[2 * d + 0] != Device || pack_destination[2 * d + 1] != Device
-            || comm_peer2peer_enabled_global())
-          fused_pack_memcpy = false;
-        // if zero-copy halo read or p2p is enabled then we cannot do fused memcpy
-        if (halo_location[2 * d + 0] != Device || halo_location[2 * d + 1] != Device || comm_peer2peer_enabled_global())
-          fused_halo_memcpy = false;
+        // Error if zero-copy and p2p for now
+        if ((pack_host || halo_host) && comm_peer2peer_enabled_global())
+          errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
 
-        if (pack_destination[2 * d + 0] == Host || pack_destination[2 * d + 1] == Host) pack_host = true;
-        if (halo_location[2 * d + 0] == Host || halo_location[2 * d + 1] == Host) halo_host = true;
-      }
+        genericPackGhost(send, *this, parity, nFace, dagger,
+                         pack_destination); // FIXME - need support for asymmetric topologies
 
-      // Error if zero-copy and p2p for now
-      if ((pack_host || halo_host) && comm_peer2peer_enabled_global())
-        errorQuda("Cannot use zero-copy memory with peer-to-peer comms yet");
+        size_t total_bytes = 0;
+        for (int i = 0; i < nDimComms; i++)
+          if (comm_dim_partitioned(i)) total_bytes += 2 * ghost_face_bytes_aligned[i]; // 2 for fwd/bwd
 
-      genericPackGhost(send, *this, parity, nFace, dagger,
-                       pack_destination); // FIXME - need support for asymmetric topologies
-
-      size_t total_bytes = 0;
-      for (int i = 0; i < nDimComms; i++)
-        if (comm_dim_partitioned(i)) total_bytes += 2 * ghost_face_bytes_aligned[i]; // 2 for fwd/bwd
-
-      if (!gdr_send) {
-        if (!fused_pack_memcpy) {
-          for (int i = 0; i < nDimComms; i++) {
-            if (comm_dim_partitioned(i)) {
-              if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
-                  && // fuse forwards and backwards if possible
-                  pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                                2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
-              } else {
-                if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
+        if (!gdr_send) {
+          if (!fused_pack_memcpy) {
+            for (int i = 0; i < nDimComms; i++) {
+              if (comm_dim_partitioned(i)) {
+                if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
+                    && // fuse forwards and backwards if possible
+                    pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
                   qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
-                                  ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
-                if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                  qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
-                                  ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
+                                  2 * ghost_face_bytes_aligned[i], qudaMemcpyDeviceToHost, device::get_default_stream());
+                } else {
+                  if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
+                                    ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
+                  if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
+                    qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
+                                    ghost_face_bytes[i], qudaMemcpyDeviceToHost, device::get_default_stream());
+                }
               }
             }
-          }
-        } else if (total_bytes && !pack_host) {
-          qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, qudaMemcpyDeviceToHost,
-                          device::get_default_stream());
-        }
-      }
-
-      // prepost receive
-      for (int i = 0; i < 2 * nDimComms; i++)
-        const_cast<ColorSpinorField *>(this)->recvStart(i, device::get_default_stream(), gdr_recv);
-
-      bool sync = pack_host ? true : false; // no p2p if pack_host so we need to synchronize
-      // if not p2p in any direction then need to synchronize before MPI
-      for (int i = 0; i < nDimComms; i++)
-        if (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)) sync = true;
-      if (sync) qudaDeviceSynchronize(); // need to make sure packing and/or memcpy has finished before kicking off MPI
-
-      for (int p2p = 0; p2p < 2; p2p++) {
-        for (int dim = 0; dim < nDimComms; dim++) {
-          for (int dir = 0; dir < 2; dir++) {
-            if ((comm_peer2peer_enabled(dir, dim) + p2p) % 2 == 0) { // issue non-p2p transfers first
-              const_cast<ColorSpinorField *>(this)->sendStart(2 * dim + dir, device::get_stream(2 * dim + dir), gdr_send);
-            }
+          } else if (total_bytes && !pack_host) {
+            qudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes,
+                            qudaMemcpyDeviceToHost, device::get_default_stream());
           }
         }
-      }
 
-      bool comms_complete[2 * QUDA_MAX_DIM] = {};
-      int comms_done = 0;
-      while (comms_done < 2 * nDimComms) { // non-blocking query of each exchange and exit once all have completed
-        for (int dim = 0; dim < nDimComms; dim++) {
-          for (int dir = 0; dir < 2; dir++) {
-            if (!comms_complete[dim * 2 + dir]) {
-              comms_complete[2 * dim + dir] = const_cast<ColorSpinorField *>(this)->commsQuery(
-                2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
-              if (comms_complete[2 * dim + dir]) {
-                comms_done++;
-                if (comm_peer2peer_enabled(1 - dir, dim))
-                  qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
+        // prepost receive
+        for (int i = 0; i < 2 * nDimComms; i++)
+          const_cast<ColorSpinorField *>(this)->recvStart(i, device::get_default_stream(), gdr_recv);
+
+        bool sync = pack_host ? true : false; // no p2p if pack_host so we need to synchronize
+        // if not p2p in any direction then need to synchronize before MPI
+        for (int i = 0; i < nDimComms; i++)
+          if (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)) sync = true;
+        if (sync)
+          qudaDeviceSynchronize(); // need to make sure packing and/or memcpy has finished before kicking off MPI
+
+        for (int p2p = 0; p2p < 2; p2p++) {
+          for (int dim = 0; dim < nDimComms; dim++) {
+            for (int dir = 0; dir < 2; dir++) {
+              if ((comm_peer2peer_enabled(dir, dim) + p2p) % 2 == 0) { // issue non-p2p transfers first
+                const_cast<ColorSpinorField *>(this)->sendStart(2 * dim + dir, device::get_stream(2 * dim + dir),
+                                                                gdr_send);
               }
             }
           }
         }
-      }
 
-      if (!gdr_recv) {
-        if (!fused_halo_memcpy) {
-          for (int i = 0; i < nDimComms; i++) {
-            if (comm_dim_partitioned(i)) {
-              if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
-                  && // fuse forwards and backwards if possible
-                  halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
-                qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
-              } else {
-                if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
+        bool comms_complete[2 * QUDA_MAX_DIM] = {};
+        int comms_done = 0;
+        while (comms_done < 2 * nDimComms) { // non-blocking query of each exchange and exit once all have completed
+          for (int dim = 0; dim < nDimComms; dim++) {
+            for (int dir = 0; dir < 2; dir++) {
+              if (!comms_complete[dim * 2 + dir]) {
+                comms_complete[2 * dim + dir] = const_cast<ColorSpinorField *>(this)->commsQuery(
+                  2 * dim + dir, device::get_default_stream(), gdr_send, gdr_recv);
+                if (comms_complete[2 * dim + dir]) {
+                  comms_done++;
+                  if (comm_peer2peer_enabled(1 - dir, dim))
+                    qudaStreamWaitEvent(device::get_default_stream(), ipcRemoteCopyEvent[bufferIndex][1 - dir][dim], 0);
+                }
+              }
+            }
+          }
+        }
+
+        if (!gdr_recv) {
+          if (!fused_halo_memcpy) {
+            for (int i = 0; i < nDimComms; i++) {
+              if (comm_dim_partitioned(i)) {
+                if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i)
+                    && // fuse forwards and backwards if possible
+                    halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i)) {
                   qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
-                                  ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
-                if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
-                  qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
-                                  ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                                  2 * ghost_face_bytes_aligned[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                } else {
+                  if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
+                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
+                                    ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                  if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
+                    qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
+                                    ghost_face_bytes[i], qudaMemcpyHostToDevice, device::get_default_stream());
+                }
               }
             }
+          } else if (total_bytes && !halo_host) {
+            qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
+                            qudaMemcpyHostToDevice, device::get_default_stream());
           }
-        } else if (total_bytes && !halo_host) {
-          qudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes,
-                          qudaMemcpyHostToDevice, device::get_default_stream());
         }
-      }
 
-      // ensure that the p2p sending is completed before returning
-      for (int dim = 0; dim < nDimComms; dim++) {
-        if (!comm_dim_partitioned(dim)) continue;
-        for (int dir = 0; dir < 2; dir++) {
-          if (comm_peer2peer_enabled(dir, dim))
-            qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dir][dim], 0);
+        // ensure that the p2p sending is completed before returning
+        for (int dim = 0; dim < nDimComms; dim++) {
+          if (!comm_dim_partitioned(dim)) continue;
+          for (int dir = 0; dir < 2; dir++) {
+            if (comm_peer2peer_enabled(dir, dim))
+              qudaStreamWaitEvent(device::get_default_stream(), ipcCopyEvent[bufferIndex][dir][dim], 0);
+          }
         }
+      } else {
+        void *packBuffer[4 * QUDA_MAX_DIM];
+        shmem = (shmem | 1);
+        if (!shmem_async) shmem = (shmem | 4);
+        for (int dim = 0; dim < nDimComms; dim++) {
+          for (int dir = 0; dir < 2; dir++) {
+            switch (pack_destination[2 * dim + dir]) {
+            case Shmem: {
+              bool intranode = ghost_remote_send_buffer_d[bufferIndex][dim][dir] != nullptr;
+              packBuffer[2 * dim + dir] = intranode ?
+                static_cast<char *>(ghost_remote_send_buffer_d[bufferIndex][dim][dir]) + ghost_offset[dim][1 - dir] :
+                my_face_dim_dir_d[bufferIndex][dim][dir];
+              packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = intranode ?
+                nullptr :
+                static_cast<char *>(ghost_recv_buffer_d[bufferIndex]) + ghost_offset[dim][1 - dir];
+              ghost_buf[2 * dim + dir] = from_face_dim_dir_d[bufferIndex][dim][dir];
+            } break;
+            case Host:
+            case Device:
+            default: errorQuda("Undefined / unexpected pack_destination %d", pack_destination[2 * dim + dir]);
+            }
+          }
+        }
+        genericPackGhost(packBuffer, *this, parity, nFace, dagger, pack_destination,
+                         shmem); // FIXME - need support for asymmetric topologies
       }
     }
   }
