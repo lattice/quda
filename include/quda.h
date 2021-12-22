@@ -792,6 +792,8 @@ extern "C" {
     double tolerance;            /**< The tolerance of the gauge fixing quality (default 1e-6) */
     QudaBoolean theta_condition; /**< "Use the theta value to determine the gauge fixing if true. If false, use the
                                     delta value (default false)" */
+    QudaPrecision precision;     /**< The precision used by the algorithm */
+    
   } QudaGaugeFixParam;
 
   /*

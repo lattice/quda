@@ -5546,7 +5546,7 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
   gauge_param.link_type = g_param->type;
   gauge_param.reconstruct = g_param->reconstruct;
-  gauge_param.setPrecision(gauge_param.Precision(), true);
+  gauge_param.setPrecision(fix_param->precision, true);
   auto *device_gauge = new cudaGaugeField(gauge_param);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_INIT);
 

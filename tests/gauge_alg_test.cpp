@@ -111,6 +111,7 @@ void setGaugeFixParam(QudaGaugeFixParam &fix_param)
   fix_param.fft_alpha = gf_fft_alpha;
   fix_param.fft_autotune = gf_fft_alpha ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   fix_param.theta_condition = gf_theta_condition ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  fix_param.precision = cuda_prec;
 }
 
 class GaugeAlgTest : public ::testing::Test
@@ -161,11 +162,11 @@ protected:
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
-  bool CheckDeterminant(double2 detu)
+  bool CheckDeterminant(double2 det)
   {
-    double prec_val = 5e-8;
+    double prec_val = 1.0e-5;
     if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
-    return (std::abs(1.0 - detu.x) < prec_val && std::abs(detu.y) < prec_val);
+    return (std::abs(1.0 - det.x) < prec_val && std::abs(det.y) < prec_val);
   }
 
   virtual void SetUp()
@@ -190,7 +191,7 @@ protected:
         device_gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         device_gauge_param.create = QUDA_NULL_FIELD_CREATE;
         device_gauge_param.reconstruct = link_recon;
-        device_gauge_param.setPrecision(prec, true);
+        device_gauge_param.setPrecision(cuda_prec, true);
         for (int d = 0; d < 4; d++) {
           if (comm_dim_partitioned(d)) device_gauge_param.r[d] = 2;
           device_gauge_param.x[d] += 2 * device_gauge_param.r[d];
@@ -344,14 +345,14 @@ protected:
       gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * cpu_prec); }
 
       GaugeFieldParam param(gauge_param);
       param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       param.create = QUDA_NULL_FIELD_CREATE;
       param.link_type = gauge_param.type;
       param.reconstruct = gauge_param.reconstruct;
-      param.setPrecision(param.Precision(), true);
+      param.setPrecision(cuda_prec, true);
 
       auto *gauge = new cudaGaugeField(param);
 
@@ -379,6 +380,7 @@ protected:
 
       // Save if output string is specified
       if (gauge_store) save_gauge();
+      saveTuneCache();
     }
   }
 
@@ -424,24 +426,26 @@ TEST_F(GaugeAlgTest, Generation)
 TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   if (execute) {
-    printfQuda("Landau gauge fixing with overrelaxation\n");
+    printfQuda("Landau gauge fixing with overrelaxation method\n");
 
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 4;
 
     gaugeFixingOVR(*U, fix_param);
+    saveTuneCache();
   }
 }
 
 TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   if (execute) {
-    printfQuda("Coulomb gauge fixing with overrelaxation\n");
+    printfQuda("Coulomb gauge fixing with overrelaxation method\n");
 
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 3;
 
     gaugeFixingOVR(*U, fix_param);
+    saveTuneCache();
   }
 }
 
@@ -455,6 +459,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
       fix_param.gauge_dir = 4;
 
       gaugeFixingFFT(*U, fix_param);
+      saveTuneCache();
     }
   }
 }
@@ -469,6 +474,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
       fix_param.gauge_dir = 3;
 
       gaugeFixingFFT(*U, fix_param);
+      saveTuneCache();
     }
   }
 }
@@ -498,6 +504,7 @@ int main(int argc, char **argv)
   setVerbosity(verbosity);
   setQudaPrecisions();
   setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
   // call srand() with a rank-dependent seed

@@ -245,6 +245,7 @@ namespace quda {
       printfQuda("\tMaximum number of iterations: %d\n", steps);
       printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
       printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+      printfQuda("\tComputing in %s precision\n", sizeof(Float) == sizeof(double) ? "double" : "single");
     }
     
     const double unitarize_eps = 1e-14;
