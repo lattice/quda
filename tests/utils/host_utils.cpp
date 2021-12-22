@@ -980,8 +980,8 @@ int x4_from_full_index(int i)
 template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 {
   // Apply spatial scaling factor (u0) to spatial links
-  if(param->anisotropy != 1.0) {
-    double aniso_inv = 1.0/param->anisotropy;
+  if (param->anisotropy != 1.0) {
+    double aniso_inv = 1.0 / param->anisotropy;
     for (int d = 0; d < 3; d++) {
       for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= aniso_inv; }
     }
