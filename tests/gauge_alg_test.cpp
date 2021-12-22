@@ -158,14 +158,14 @@ protected:
     a1 = std::abs(a.y - b.y);
     a2 = std::abs(a.z - b.z);
     double prec_val = 1.0e-5;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1e-10;
     return ((a0 < prec_val) && (a1 < prec_val) && (a2 < prec_val));
   }
 
-  bool CheckDeterminant(double2 det)
+  bool checkDeterminant(double2 det)
   {
     double prec_val = 1.0e-5;
-    if (prec == QUDA_DOUBLE_PRECISION) prec_val = gf_tolerance * 1e2;
+    if (prec == QUDA_DOUBLE_PRECISION) prec_val = 1e-8;
     return (std::abs(1.0 - det.x) < prec_val && std::abs(det.y) < prec_val);
   }
 
@@ -313,7 +313,7 @@ protected:
 
       // The determinant of any SU(N) gauge field element must be (1.0,0.0) to
       // machine precision
-      ASSERT_TRUE(CheckDeterminant(det_gf));
+      ASSERT_TRUE(checkDeterminant(det_gf));
 
       delete U;
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
@@ -419,7 +419,7 @@ TEST_F(GaugeAlgTest, Generation)
     // Assert that the generated gauge is
     // on the SU(N) manifold
     det_u = getLinkDeterminant(*U);
-    ASSERT_TRUE(CheckDeterminant(det_u));
+    ASSERT_TRUE(checkDeterminant(det_u));
   }
 }
 
