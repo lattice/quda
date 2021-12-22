@@ -125,7 +125,7 @@ int main(int argc, char **argv)
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
     // CURAND random generator initialization
-    RNG *randstates = new RNG(*gauge, 1234);
+    RNG *randstates = new RNG(*gauge, quda_seed);
 
     int nsteps = heatbath_num_steps;
     int nwarm = heatbath_warmup_steps;

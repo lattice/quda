@@ -304,7 +304,7 @@ int main(int argc, char **argv)
   std::vector<double> gflops(Nsrc);
   std::vector<int> iter(Nsrc);
 
-  auto *rng = new quda::RNG(*check, 1234);
+  auto *rng = new quda::RNG(*check, quda_seed);
 
   for (int i = 0; i < Nsrc; i++) {
     // Populate the host spinor with random numbers.

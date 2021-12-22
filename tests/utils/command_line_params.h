@@ -151,6 +151,7 @@ template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map,
 // }
 // parameters
 
+extern int quda_seed;
 extern int device_ordinal;
 extern int rank_order;
 extern bool native_blas_lapack;

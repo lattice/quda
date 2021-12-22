@@ -299,7 +299,7 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------------
 
   // Prepare rng
-  auto *rng = new quda::RNG(*ref, 1234);
+  auto *rng = new quda::RNG(*ref, quda_seed);
 
   // Performance measuring
   std::vector<double> time(Nsrc);

@@ -195,7 +195,7 @@ protected:
 
         U = new cudaGaugeField(device_gauge_param);
 
-        RNG randstates(*U, 1234);
+        RNG randstates(*U, quda_seed);
 
         nsteps = heatbath_num_steps;
         nhbsteps = heatbath_num_heatbath_per_step;
@@ -271,6 +271,10 @@ protected:
       // turn off all Google tests in the tear down.
       switch (test_type) {
       case 0: // Do the Google testing
+	// Set gauge fixing params from the command line
+	// and adjust for this test type
+	fix_param = newQudaGaugeFixParam();
+	setGaugeFixParam(fix_param);
 	break;
       case 1: // Do a specific test
 	run(); break;
@@ -403,10 +407,9 @@ protected:
 TEST_F(GaugeAlgTest, Generation)
 {
   if (execute && !gauge_load) {
+    // Assert that the generated gauge is
+    // on the SU(N) manifold
     det_u = getLinkDeterminant(*U);
-    //trace_u = getLinkTrace(*U);
-    //printfQuda("Det: %.16e:%.16e\n", det_u.x, det_u.y);
-    //printfQuda("Tr: %.16e:%.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);
     ASSERT_TRUE(CheckDeterminant(det_u));
   }
 }
@@ -415,10 +418,7 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   if (execute) {
     printfQuda("Landau gauge fixing with overrelaxation\n");
-    // Set gauge fixing params from the command line
-    // and adjust for this test type
-    fix_param = newQudaGaugeFixParam();
-    setGaugeFixParam(fix_param);
+    
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 4;
     
@@ -430,10 +430,7 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   if (execute) {
     printfQuda("Coulomb gauge fixing with overrelaxation\n");
-    // Use gauge fixing params from the command line
-    // and adjust for this test type
-    fix_param = newQudaGaugeFixParam();
-    setGaugeFixParam(fix_param);
+    
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 3;
 
@@ -446,10 +443,7 @@ TEST_F(GaugeAlgTest, Landau_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Landau gauge fixing with steepest descent method with FFT\n");
-      // Set gauge fixing params from the command line
-      // and adjust for this test type
-      fix_param = newQudaGaugeFixParam();
-      setGaugeFixParam(fix_param);
+      
       fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
       fix_param.gauge_dir = 4;
     
@@ -463,10 +457,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Coulomb gauge fixing with steepest descent method with FFT\n");
-      // Set gauge fixing params from the command line
-      // and adjust for this test type
-      fix_param = newQudaGaugeFixParam();
-      setGaugeFixParam(fix_param);
+      
       fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
       fix_param.gauge_dir = 3;
 

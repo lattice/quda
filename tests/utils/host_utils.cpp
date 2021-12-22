@@ -320,7 +320,7 @@ void initRand()
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-  srand(17 * rank + 137);
+  srand(17 * rank + 137 + quda_seed);
 }
 
 void setDims(int *X)
