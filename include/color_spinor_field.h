@@ -629,8 +629,7 @@ namespace quda
      */
     void exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination = nullptr,
                        const MemoryLocation *halo_location = nullptr, bool gdr_send = false, bool gdr_recv = false,
-                       QudaPrecision ghost_precision = QUDA_INVALID_PRECISION) const;
-
+                       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION, int shmem=0) const;
     /**
       This function returns true if the field is stored in an internal
       field order, given the precision and the length of the spin
@@ -861,7 +860,7 @@ namespace quda
      @param[in[ location Array specifiying the memory location of each resulting ghost [2*dim+dir]
   */
   void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity, int nFace, int dagger,
-                        MemoryLocation *destination = nullptr);
+                        MemoryLocation *destination = nullptr, int shmem=0);
 
   /**
      @brief pre-declaration of RNG class (defined in non-device-safe random_quda.h)

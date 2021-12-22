@@ -7,6 +7,7 @@
 #include <shmem_helper.cuh>
 #include <fast_intdiv.h>
 #include <dslash_quda.h>
+#include <shmem_pack_helper.cuh>
 
 #if defined(_NVHPC_CUDA)
 #include <constant_kernel_arg.h>
