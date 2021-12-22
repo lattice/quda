@@ -151,6 +151,7 @@ bool mg_use_mma = false;
 #endif
 
 bool mg_allow_truncation = false;
+bool mg_staggered_kd_dagger_approximation = false;
 
 #ifdef NVSHMEM_COMMS
 bool use_mobius_fused_kernel = false;
@@ -869,6 +870,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
       "--mg-staggered-coarsen-type",
       staggered_transfer_type, "The type of coarsening to use for the top level staggered operator (aggregate, kd-coarse, kd-optimized (default))")
     ->transform(CLI::QUDACheckedTransformer(transfer_type_map));
+
+  opgroup->add_option(
+    "--mg-staggered-kd-dagger-approximation", mg_staggered_kd_dagger_approximation,
+    "Use the dagger approximation to Xinv, which is X^dagger (default = false)");
 
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");

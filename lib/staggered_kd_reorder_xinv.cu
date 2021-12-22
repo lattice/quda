@@ -78,12 +78,14 @@ namespace quda {
 
   template<typename Float, int fineColor>
   struct calculateStaggeredGeometryReorder {
-    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double mass) {
+    calculateStaggeredGeometryReorder(GaugeField &fineXinv, const GaugeField &coarseXinv, const bool dagger_approximation, const double) {
       // template on dagger approximation
       if (dagger_approximation)  {
         // approximate the inverse with the dagger: the free field for staggered, 
         // B^-1 = 1 / (4 * (d + mass^2)), where the 4 is due to the factor of 2 convention
-        double scale = 1. / (4. * (fineXinv.Ndim() + mass * mass));
+        // Point of future investigation: it seems like we don't need the scaling factor to get
+        // a consistent norm?
+        double scale = 1.; // / (4. * (fineXinv.Ndim() + mass * mass));
 
         // reset scales as appropriate
         if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {

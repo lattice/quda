@@ -1288,6 +1288,7 @@ struct mgInputStruct {
     optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
   bool use_mma;          // accelerate setup using MMA routines
   bool allow_truncation; // allow dropping the long links for small (less than three) aggregate directions
+  bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
   // Setup
   int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
@@ -1354,6 +1355,7 @@ struct mgInputStruct {
     optimized_kd(QUDA_TRANSFER_OPTIMIZED_KD),
     use_mma(true),
     allow_truncation(false),
+    dagger_approximation(false),
     deflate_n_ev(66),
     deflate_n_kr(128),
     deflate_max_restarts(50),
@@ -1566,6 +1568,12 @@ struct mgInputStruct {
         error_code = 1;
       } else {
         allow_truncation = input_line[1][0] == 't' ? true : false;
+      }
+    } else if (strcmp(input_line[0].c_str(), "dagger_approxiation") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        dagger_approximation = input_line[1][0] == 't' ? true : false;
       }
     } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
       if (input_line.size() < 3) {
@@ -1894,6 +1902,9 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
   // whether or not we allow dropping a long link when an aggregation size is smaller than 3
   mg_param.allow_truncation = input_struct.allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not we use the dagger approximation
+  mg_param.staggered_kd_dagger_approximation = input_struct.dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   for (int i = 0; i < mg_param.n_level; i++) {
 
