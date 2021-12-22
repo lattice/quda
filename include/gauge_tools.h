@@ -116,7 +116,7 @@ namespace quda
    * @param[in] fix_param Parameter struct that defines the gauge fixing
    */
   void gaugeFixingOVR(GaugeField &data, QudaGaugeFixParam &fix_param);
-  
+
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field

@@ -56,10 +56,12 @@ void display_test_info()
 
   switch (test_type) {
   case 0: printfQuda("\n Google testing\n"); break;
-  case 1: printfQuda("\n%s %s gauge fix\n", get_gaugefix_str(gf_fix_type), gf_gauge_dir == 4 ? "Landau" : "Coulomb"); break;
+  case 1:
+    printfQuda("\n%s %s gauge fix\n", get_gaugefix_str(gf_fix_type), gf_gauge_dir == 4 ? "Landau" : "Coulomb");
+    break;
   default: errorQuda("Undefined test type %d given", test_type);
   }
-  
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
@@ -97,7 +99,8 @@ void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(fix_type_map));
 }
 
-void setGaugeFixParam(QudaGaugeFixParam &fix_param) {
+void setGaugeFixParam(QudaGaugeFixParam &fix_param)
+{
   fix_param.fix_type = gf_fix_type;
   fix_param.gauge_dir = gf_gauge_dir;
   fix_param.maxiter = gf_maxiter;
@@ -168,7 +171,7 @@ protected:
   virtual void SetUp()
   {
     if (execute) {
-      
+
       // Setup gauge container.
       gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
@@ -183,7 +186,7 @@ protected:
 
       // If no field is loaded, create a physical quenched field on the device
       if (!gauge_load) {
-	GaugeFieldParam device_gauge_param(gauge_param);
+        GaugeFieldParam device_gauge_param(gauge_param);
         device_gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         device_gauge_param.create = QUDA_NULL_FIELD_CREATE;
         device_gauge_param.reconstruct = link_recon;
@@ -203,10 +206,12 @@ protected:
         coldstart = heatbath_coldstart;
         beta_value = heatbath_beta_value;
         host_timer_2.start();
-	
-        if (coldstart) InitGaugeField(*U);
-        else InitGaugeField(*U, randstates);
-	
+
+        if (coldstart)
+          InitGaugeField(*U);
+        else
+          InitGaugeField(*U, randstates);
+
         for (int step = 1; step <= nsteps; ++step) {
           printfQuda("Step %d\n", step);
           Monte(*U, randstates, beta_value, nhbsteps, novrsteps);
@@ -265,19 +270,20 @@ protected:
       trace_u = getLinkTrace(*U);
       printfQuda("Plaq: %.16e, %.16e, %.16e\n", plaq_u.x, plaq_u.y, plaq_u.z);
       printfQuda("Det: %.16e:%.16e\n", det_u.x, det_u.y);
-      printfQuda("Tr: %.16e:%.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);      
-      
+      printfQuda("Tr: %.16e:%.16e\n", trace_u.x / 3.0, trace_u.y / 3.0);
+
       // If a specific test type is requested, perform it now and then
       // turn off all Google tests in the tear down.
       switch (test_type) {
       case 0: // Do the Google testing
-	// Set gauge fixing params from the command line
-	// and adjust for this test type
-	fix_param = newQudaGaugeFixParam();
-	setGaugeFixParam(fix_param);
-	break;
+        // Set gauge fixing params from the command line
+        // and adjust for this test type
+        fix_param = newQudaGaugeFixParam();
+        setGaugeFixParam(fix_param);
+        break;
       case 1: // Do a specific test
-	run(); break;
+        run();
+        break;
       default: errorQuda("Invalid test type %d ", test_type);
       }
 
@@ -311,7 +317,7 @@ protected:
       delete U;
       // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
       PGaugeExchangeFree();
-      
+
       host_timer_1.stop();
       printfQuda("Time -> %.6f s\n", host_timer_1.last());
     }
@@ -327,27 +333,28 @@ protected:
       // Set gauge fixing params from the command line
       fix_param = newQudaGaugeFixParam();
       setGaugeFixParam(fix_param);
-      
-      printfQuda("%s gauge fixing with %s method\n", fix_param.gauge_dir == 4 ? "Landau" : "Coulomb", get_gaugefix_str(fix_param.fix_type));
+
+      printfQuda("%s gauge fixing with %s method\n", fix_param.gauge_dir == 4 ? "Landau" : "Coulomb",
+                 get_gaugefix_str(fix_param.fix_type));
 
       // Setup CPU gauge container.
       gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
       gauge_param.t_boundary = QUDA_PERIODIC_T;
       gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-      
+
       void *cpu_gauge[4];
       for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-      
+
       GaugeFieldParam param(gauge_param);
       param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       param.create = QUDA_NULL_FIELD_CREATE;
       param.link_type = gauge_param.type;
       param.reconstruct = gauge_param.reconstruct;
       param.setPrecision(param.Precision(), true);
-      
+
       auto *gauge = new cudaGaugeField(param);
-      
+
       // Copy the target U field (extended) into regular GPU field, then
       // save to a CPU field. This is done to test the CPU interface function
       // and instructs the user how to use void pointers for the gauge data,
@@ -355,7 +362,7 @@ protected:
       copyExtendedGauge(*gauge, *U, QUDA_CUDA_FIELD_LOCATION);
       saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
       delete gauge;
-      
+
       // Compute gauge fixing via interface
       computeGaugeFixingQuda(cpu_gauge, &gauge_param, &fix_param, nullptr);
 
@@ -363,18 +370,18 @@ protected:
       // to the device for inspection in the TearDown.
       GaugeFieldParam fixed_param(gauge_param, cpu_gauge);
       auto *fixed_cpu_gauge = new cpuGaugeField(fixed_param);
-      
+
       // Copy the CPU field to U.
-      U->loadCPUField(*fixed_cpu_gauge);     
+      U->loadCPUField(*fixed_cpu_gauge);
 
       for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
       delete fixed_cpu_gauge;
-	
+
       // Save if output string is specified
       if (gauge_store) save_gauge();
     }
   }
-  
+
   virtual void save_gauge()
   {
     printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
@@ -418,11 +425,11 @@ TEST_F(GaugeAlgTest, Landau_Overrelaxation)
 {
   if (execute) {
     printfQuda("Landau gauge fixing with overrelaxation\n");
-    
+
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 4;
-    
-    gaugeFixingOVR(*U, fix_param);    
+
+    gaugeFixingOVR(*U, fix_param);
   }
 }
 
@@ -430,11 +437,11 @@ TEST_F(GaugeAlgTest, Coulomb_Overrelaxation)
 {
   if (execute) {
     printfQuda("Coulomb gauge fixing with overrelaxation\n");
-    
+
     fix_param.fix_type = QUDA_GAUGEFIX_TYPE_OVR;
     fix_param.gauge_dir = 3;
 
-    gaugeFixingOVR(*U, fix_param);    
+    gaugeFixingOVR(*U, fix_param);
   }
 }
 
@@ -443,10 +450,10 @@ TEST_F(GaugeAlgTest, Landau_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Landau gauge fixing with steepest descent method with FFT\n");
-      
+
       fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
       fix_param.gauge_dir = 4;
-    
+
       gaugeFixingFFT(*U, fix_param);
     }
   }
@@ -457,7 +464,7 @@ TEST_F(GaugeAlgTest, Coulomb_FFT)
   if (execute) {
     if (!comm_partitioned()) {
       printfQuda("Coulomb gauge fixing with steepest descent method with FFT\n");
-      
+
       fix_param.fix_type = QUDA_GAUGEFIX_TYPE_FFT;
       fix_param.gauge_dir = 3;
 
@@ -492,12 +499,12 @@ int main(int argc, char **argv)
   setQudaPrecisions();
   setWilsonGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  
+
   // call srand() with a rank-dependent seed
   initRand();
   // initialize the QUDA library
   initQuda(device_ordinal);
-  
+
   display_test_info();
 
   // If we are passing a gauge field to the test, we must allocate host memory.

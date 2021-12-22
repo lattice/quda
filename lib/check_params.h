@@ -1079,7 +1079,7 @@ void printQudaGaugeFixParam(QudaGaugeFixParam *param)
   P(fft_autotune, QUDA_BOOLEAN_FALSE);
   P(theta_condition, QUDA_BOOLEAN_FALSE);
 #endif
-  
+
 #ifdef INIT_PARAM
   return ret;
 #endif

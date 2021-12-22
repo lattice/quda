@@ -777,7 +777,7 @@ extern "C" {
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
   } QudaBLASParam;
-    
+
   typedef struct QudaGaugeFixParam_s {
     size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
 

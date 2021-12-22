@@ -503,10 +503,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--save-gauge", gauge_outfile,
                        "Save gauge field \" file \" for the test (requires QIO, heatbath test only)");
 
-  quda_app->add_option("--seed", quda_seed,
-		       "Seed value for use in test suite (default 1234)")
-    ->check(CLI::PositiveNumber);
-  
+  quda_app->add_option("--seed", quda_seed, "Seed value for use in test suite (default 1234)")->check(CLI::PositiveNumber);
+
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
 

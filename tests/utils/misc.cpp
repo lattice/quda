@@ -160,7 +160,7 @@ const char *get_gaugefix_str(QudaGaugeFixType type)
   case QUDA_GAUGEFIX_TYPE_FFT: ret = "FFT"; break;
   default: ret = "unknown"; break;
   }
-  
+
   return ret;
 }
 

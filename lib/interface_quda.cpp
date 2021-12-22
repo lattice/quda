@@ -5528,15 +5528,16 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
     printQudaGaugeParam(g_param);
     printQudaGaugeFixParam(fix_param);
   }
-  
+
   // Check parameters
   checkGaugeParam(g_param);
   checkGaugeFixParam(fix_param);
 
-  if(g_param->location == QUDA_CUDA_FIELD_LOCATION) {
-    errorQuda("GPU gauge fixing not supported via QUDA interface. Please use direct kernel call: gaugeFixingOVR/gaugeFixingFFT");
+  if (g_param->location == QUDA_CUDA_FIELD_LOCATION) {
+    errorQuda("GPU gauge fixing not supported via QUDA interface. Please use direct kernel call: "
+              "gaugeFixingOVR/gaugeFixingFFT");
   }
-  
+
   profileGaugeFix.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gauge_param(*g_param, gauge);
   auto *cpu_gauge = new cpuGaugeField(gauge_param);
@@ -5546,14 +5547,14 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
   gauge_param.link_type = g_param->type;
   gauge_param.reconstruct = g_param->reconstruct;
   gauge_param.setPrecision(gauge_param.Precision(), true);
-  auto *device_gauge = new cudaGaugeField(gauge_param);    
+  auto *device_gauge = new cudaGaugeField(gauge_param);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_INIT);
-    
+
   // Load gauge to device
   profileGaugeFix.TPSTART(QUDA_PROFILE_H2D);
   device_gauge->loadCPUField(*cpu_gauge);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_H2D);
-  
+
   // Perform the update
   switch (fix_param->fix_type) {
 
@@ -5585,7 +5586,7 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
   profileGaugeFix.TPSTART(QUDA_PROFILE_D2H);
   device_gauge->saveCPUField(*cpu_gauge);
   profileGaugeFix.TPSTOP(QUDA_PROFILE_D2H);
-    
+
   profileGaugeFix.TPSTOP(QUDA_PROFILE_TOTAL);
 
   if (g_param->make_resident_gauge) {
@@ -5595,8 +5596,8 @@ int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixPar
     delete device_gauge;
   }
   delete cpu_gauge;
-  
-  if(timeinfo){
+
+  if (timeinfo) {
     timeinfo[0] = profileGaugeFix.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
     timeinfo[2] = profileGaugeFix.Last(QUDA_PROFILE_D2H);
