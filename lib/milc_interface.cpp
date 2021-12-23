@@ -1286,8 +1286,8 @@ struct mgInputStruct {
   QudaPrecision preconditioner_precision; // precision for near-nulls, coarse links
   QudaTransferType
     optimized_kd; // use the optimized KD operator (true), naive coarsened operator (false), or optimized dropped links (drop)
-  bool use_mma;          // accelerate setup using MMA routines
-  bool allow_truncation; // allow dropping the long links for small (less than three) aggregate directions
+  bool use_mma;              // accelerate setup using MMA routines
+  bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
   bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
   // Setup

@@ -421,7 +421,8 @@ namespace quda
         fine_gauge = const_cast<cudaGaugeField *>(
           reinterpret_cast<const DiracImprovedStaggered *>(diracSmoother)->getFatLinkField());
 
-      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(*fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
+      xInvKD = AllocateAndBuildStaggeredKahlerDiracInverse(
+        *fine_gauge, diracSmoother->Mass(), param.mg_global.staggered_kd_dagger_approximation == QUDA_BOOLEAN_TRUE);
 
       DiracParam diracParamKD;
       diracParamKD.kappa
