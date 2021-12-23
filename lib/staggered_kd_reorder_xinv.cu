@@ -89,7 +89,7 @@ namespace quda {
 
         // reset scales as appropriate
         if constexpr (sizeof(Float) < QUDA_SINGLE_PRECISION) {
-          double max_scale = coarseXinv.abs_max() * abs(scale) * 1.01;
+          double max_scale = coarseXinv.abs_max() * abs(scale);
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global xInv_max = %e\n", max_scale);
 
           fineXinv.Scale(max_scale);

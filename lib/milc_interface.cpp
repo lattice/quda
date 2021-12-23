@@ -1297,7 +1297,7 @@ struct mgInputStruct {
   double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (first 1 1 1 1 for optimized, 2 2 2 2 for coarse)
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first (1 1 1 1 for optimized, 2 2 2 2 for coarse KD) and last level
 
   // Solve
   QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
