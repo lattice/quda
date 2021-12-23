@@ -222,7 +222,7 @@ namespace quda {
 
     calculateStaggeredKDBlock(X, U, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e ; abs_max(X) = %e\n", X.norm2(0), X.abs_max(0));
 
     // Step 5: Calculate Xinv
     if (dagger_approximation) {
