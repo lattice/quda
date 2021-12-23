@@ -90,7 +90,7 @@ namespace quda {
     dslash::shmem_retcount_intra_t *retcount_intra;
     dslash::shmem_retcount_inter_t *retcount_inter;
     dslash::shmem_sync_t *sync_arr;
-#endif
+    #endif
     int shmem=0;
 
     PackGhostArg(const ColorSpinorField &a, int work_items, void **ghost, int parity, int nFace, int dagger, int shmem_) :
@@ -105,16 +105,16 @@ namespace quda {
       pc_type(a.PCType()),
       dc(a.getDslashConstant()),
       threadDimMapLower{},
-      threadDimMapUpper{}
+      threadDimMapUpper{},
 #ifdef NVSHMEM_COMMS
-      ,
-      counter((activeTuning() && !policyTuning()) ? 2 :dslash::inc_shmem_sync_counter2()),
+
+      counter((activeTuning() && !policyTuning()) ? 2 : dslash::inc_shmem_sync_counter2()),
       waitcounter(counter),
       retcount_intra(dslash::get_shmem_retcount_intra()),
       retcount_inter(dslash::get_shmem_retcount_inter()),
       sync_arr(dslash::get_shmem_sync_arr()),
+#endif
       shmem(shmem_)
-      #endif
     {
       int prev = -1; // previous dimension that was partitioned
       for (int i = 0; i < 4; i++) {
