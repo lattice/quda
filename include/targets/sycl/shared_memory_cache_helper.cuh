@@ -105,7 +105,8 @@ namespace quda
     {
 	auto g = getGroup();
 	//auto cache = sycl::group_local_memory_for_overwrite<atype>(g);
-	mem = sycl::group_local_memory<atype>(g);
+	//mem = sycl::group_local_memory<atype>(g);
+	mem = sycl::ext::oneapi::group_local_memory<atype>(g);
         //return reinterpret_cast<atom_t*>(cache_.get());
         cache_ = *mem.get();
     }
