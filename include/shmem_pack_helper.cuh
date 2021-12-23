@@ -1,8 +1,8 @@
 #pragma once
+#ifdef NVSHMEM_COMMS
 #include <cooperative_groups.h>
 namespace cg = cooperative_groups;
 
-#ifdef NVSHMEM_COMMS
   template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, const Arg &arg)
   {
     switch (shmemindex) {
