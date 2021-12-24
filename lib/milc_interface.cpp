@@ -1569,7 +1569,7 @@ struct mgInputStruct {
       } else {
         allow_truncation = input_line[1][0] == 't' ? true : false;
       }
-    } else if (strcmp(input_line[0].c_str(), "dagger_approxiation") == 0) {
+    } else if (strcmp(input_line[0].c_str(), "dagger_approximation") == 0) {
       if (input_line.size() < 2) {
         error_code = 1;
       } else {
