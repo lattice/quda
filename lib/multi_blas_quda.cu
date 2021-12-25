@@ -174,7 +174,7 @@ namespace quda {
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
         constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
-          std::min(max_N_multi_1d(), max_NXZ_power2<false, isFixed<store_t>::value>());
+          std::min(max_N_multi_1d_pow2(), max_NXZ_power2<false, isFixed<store_t>::value>());
         constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
 
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);

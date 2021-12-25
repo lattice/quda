@@ -125,6 +125,19 @@ namespace quda
     */
     constexpr int max_N_multi_1d() { return 24; }
 
+    constexpr int max_N_multi_1d_pow2()
+    {
+      unsigned int v = max_N_multi_1d();
+      v--;
+      v |= v >> 1;
+      v |= v >> 2;
+      v |= v >> 4;
+      v |= v >> 8;
+      v |= v >> 16;
+      v++;
+      return v >> 1;
+    }
+
     /**
        @brief Return the maximum power of two enabled by default for
        multi-blas.  We set a lower limit for multi-reductions, since
@@ -238,7 +251,7 @@ namespace quda
       size_t spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
+      size_t spinor_w_size = spinor_x_size;
 
       // compute the size remaining for the Y and W accessors
       const auto arg_size = (max_arg_size<Functor>()
@@ -271,6 +284,7 @@ namespace quda
 
       if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (NXZ != (int)x.size()) errorQuda("Compile-time %d and run-time %lu NXZ do not match", NXZ, x.size());
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
       if ( !(f.reducer || f.multi_1d) && NXZ * f.NYW * sizeof(typename Functor::coeff_t) > max_array_size())
