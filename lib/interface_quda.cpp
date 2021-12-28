@@ -4114,34 +4114,36 @@ void computeTwoLinkQuda(void *twolink, void *inlink, QudaGaugeParam *param)
     cudaInLinkEx = createExtendedGauge(*gaugePrecise, R, profileGaussianSmear);
   }
 
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.setPrecision(param->cuda_prec, true);
-  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  GaugeFieldParam gsParam(*gaugePrecise);
+
+  gsParam.create        = QUDA_NULL_FIELD_CREATE;
+  gsParam.link_type     = QUDA_ASQTAD_LONG_LINKS;
+  gsParam.reconstruct   = QUDA_RECONSTRUCT_NO;
+  gsParam.setPrecision(param->cuda_prec, true);
+  gsParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  gsParam.nFace         = 3;
+  gsParam.pad           = gsParam.pad*gsParam.nFace;
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_INIT);
- 
-  cudaGaugeField *gtmp = new cudaGaugeField(gParam);
 
   if(gaugeSmeared != nullptr) delete gaugeSmeared;
-  gaugeSmeared         = createExtendedGauge(*gtmp, R, profileGauge);
+  gaugeSmeared = new cudaGaugeField(gsParam);
+
   
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_INIT);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
 
   computeTwoLink(*gaugeSmeared, *cudaInLinkEx);
+  gaugeSmeared->exchangeGhost();
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_COMPUTE);
-  copyExtendedGauge(*gtmp, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
   //
-  gtmp->saveCPUField(cpuTwoLink, profileGaussianSmear);
+  gaugeSmeared->saveCPUField(cpuTwoLink, profileGaussianSmear);
 
   profileGaussianSmear.TPSTART(QUDA_PROFILE_FREE);
   
   delete gaugeSmeared;gaugeSmeared = nullptr;
-  delete gtmp;
   delete cudaInLinkEx;
 
   profileGaussianSmear.TPSTOP(QUDA_PROFILE_FREE);
