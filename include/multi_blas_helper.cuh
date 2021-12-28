@@ -125,6 +125,11 @@ namespace quda
     */
     constexpr int max_N_multi_1d() { return 24; }
 
+    /**
+       @brief Return the maximum size supported by multi-blas kernels
+       (max_N_multi_1d()) rounded down to the largest power of two.
+       This is used for the NXZ power-of-two instantiation.
+    */
     constexpr int max_N_multi_1d_pow2()
     {
       unsigned int v = max_N_multi_1d();
@@ -208,23 +213,29 @@ namespace quda
       using SpinorZ = SpinorX;
       using SpinorW = SpinorX;
 
-      // compute the size remaining for the Y and W accessors
-      constexpr auto arg_size = (max_arg_size<Functor>()
-                                 - sizeof(kernel_param<>)                                      // kernel_param parent
-                                 - sizeof(int)                                                 // NYW parameter
-                                 - sizeof(SpinorX[NXZ])                                        // SpinorX array
-                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
-                                 - sizeof(Functor)                                             // functor
-                                 - sizeof(dim3)                                                // threads parameter
-                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
-                                 - (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
-                                 )
-        / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
+      constexpr auto arg_known_size = (sizeof(kernel_param<>)                                        // kernel_param parent
+                                       + sizeof(int)                                                 // NYW parameter
+                                       + sizeof(SpinorX[NXZ])                                        // SpinorX array
+                                       + (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+                                       + sizeof(Functor)                                             // functor
+                                       + sizeof(dim3)                                                // threads parameter
+                                       + (!Functor::use_w ? sizeof(SpinorW *) : 0)                   // subtract pointer if not using W
+                                       + (Functor::reducer ? sizeof(ReduceArg<device_reduce_t>) : 0) // reduction buffers
+                                       );
 
-      // this is the maximum size limit imposed by the coefficient arrays
-      constexpr auto coeff_size = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
+      // size remaining for the Y and W accessors
+      constexpr auto arg_remainder_size = max_arg_size<Functor>() - arg_known_size;
+      static_assert(static_cast<int64_t>(max_arg_size<Functor>()) - static_cast<int64_t>(arg_known_size) > 0, "Remainder size not positive");
 
-      return std::min(arg_size, coeff_size);
+      // maximum NYW size based on max arg size
+      constexpr auto arg_nyw = arg_remainder_size / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
+      static_assert(arg_nyw != 0, "arg_nyw size is zero");
+
+      // maximum NYW imposed by the coefficients
+      constexpr auto coeff_nyw = Functor::coeff_mul ? max_array_size() / (NXZ * sizeof(typename Functor::coeff_t)) : arg_nyw;
+      static_assert(coeff_nyw != 0, "coeff_nyw is zero");
+
+      return std::min(arg_nyw, coeff_nyw);
     }
 
     /**
