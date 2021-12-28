@@ -423,36 +423,4 @@ namespace quda {
     }
   }
 
-/*template <typename Float>
-void print_matrix(const Float &m, unsigned int x) {
-
-  for (int s=0; s<o.Nspin(); s++) {
-    std::cout << "x = " << x << ", s = " << s << ", { ";
-    for (int c=0; c<o.Ncolor(); c++) {
-      std::cout << " ( " << o(x, s, c, 0) << " , " ;
-      if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
-      else std::cout << o(x, s, c, 1) << " ) " ;
-    }
-    std::cout << " } " << std::endl;
-  }
-
-}
-
-// print out the vector at volume point x
-void cpuColorSpinorField::PrintMatrix(unsigned int x) {
-  
-  switch(precision) {
-  case QUDA_DOUBLE_PRECISION:
-    print_matrix(*order_double, x);
-    break;
-  case QUDA_SINGLE_PRECISION:
-    print_matrix(*order_single, x);
-    break;
-  default:
-    errorQuda("Precision %d not implemented", precision); 
-  }
-
-}
-*/
-
 } // namespace quda

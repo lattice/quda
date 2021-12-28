@@ -78,14 +78,14 @@ namespace quda {
     }
   }
 
-  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, void *, void *, void *>;
+  using copy_pack_t = std::tuple<ColorSpinorField &, const ColorSpinorField &, QudaFieldLocation, void *, const void *>;
 
   template <int Ns, int Nc, typename dstFloat, typename srcFloat>
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, const copy_pack_t &pack)
   {
     auto &location = std::get<2>(pack);
     dstFloat *Dst = static_cast<dstFloat*>(std::get<3>(pack));
-    srcFloat *Src = static_cast<srcFloat*>(std::get<4>(pack));
+    srcFloat *Src = const_cast<srcFloat*>(static_cast<const srcFloat*>(std::get<4>(pack)));
 
     if (dst.Ndim() != src.Ndim())
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());

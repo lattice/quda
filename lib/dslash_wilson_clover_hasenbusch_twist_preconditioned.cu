@@ -127,9 +127,7 @@ namespace quda
       ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 
@@ -285,9 +283,7 @@ namespace quda
       ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 

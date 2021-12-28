@@ -195,8 +195,8 @@ namespace quda
     int max_size = (strcmp(eig_param->vec_infile, "") != 0 ? n_conv : n_kr + 1 + block_size);
     kSpace.reserve(max_size);
     cs_param.create = QUDA_ZERO_FIELD_CREATE;
-    for (int i = k_size; i < max_size; i++) kSpace.push_back(ColorSpinorField::Create(cs_param)); // FIXME - why do we need this to be zero initialized?
-    for (int b = r_size; b < block_size; b++) { r.push_back(ColorSpinorField::Create(cs_param)); }
+    for (int i = k_size; i < max_size; i++) kSpace.push_back(new ColorSpinorField(cs_param)); // FIXME - why do we need this to be zero initialized?
+    for (int b = r_size; b < block_size; b++) { r.push_back(new ColorSpinorField(cs_param)); }
     
     // Increase evals
     int eval_size = (strcmp(eig_param->coarse_vec_infile, "") != 0 ? n_conv : n_kr);
@@ -317,8 +317,8 @@ namespace quda
   {
     if (!tmp1 || !tmp2) {
       ColorSpinorParam param(in);
-      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
-      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+      if (!tmp1) tmp1 = new ColorSpinorField(param);
+      if (!tmp2) tmp2 = new ColorSpinorField(param);
     }
     mat(out, in, *tmp1, *tmp2);
 
@@ -357,11 +357,8 @@ namespace quda
     // C_1 is the current 'out' vector.
 
     // Clone 'in' to two temporary vectors.
-    ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
-    ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
-
-    blas::copy(*tmp1, in);
-    blas::copy(*tmp2, out);
+    auto tmp1 = std::make_unique<ColorSpinorField>(in);
+    auto tmp2 = std::make_unique<ColorSpinorField>(out);
 
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
@@ -389,9 +386,6 @@ namespace quda
       sigma_old = sigma;
     }
     blas::copy(out, *tmp2);
-
-    delete tmp1;
-    delete tmp2;
 
     // Save Chebyshev tuning
     saveTuneCache();
@@ -773,7 +767,7 @@ namespace quda
     std::vector<ColorSpinorField *> evecs_ptr;
     evecs_ptr.reserve(size);
     ColorSpinorParam cs_param(*r[0]);
-    temp.push_back(ColorSpinorField::Create(cs_param));
+    temp.push_back(new ColorSpinorField(cs_param));
     
     for (int i = 0; i < size; i++) {      
       // r = A * v_i      
@@ -859,6 +853,9 @@ namespace quda
     
     // Create the device side residual vector by cloning
     // the kSpace passed to the function.
+    ColorSpinorParam csParam(*kSpace[0]);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    r.push_back(new ColorSpinorField(csParam));
 
     bool deallocate = false;
     if (!r.size()) r.resize(1);
@@ -1024,9 +1021,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
@@ -1066,7 +1061,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(new ColorSpinorField(csParamClone));
         }
       }
 
@@ -1168,9 +1163,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
@@ -1210,7 +1203,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(new ColorSpinorField(csParamClone));
         }
       }
 

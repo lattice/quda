@@ -25,11 +25,20 @@ namespace quda {
 
     /**
        @brief Precision mapper that is used for the Cholesky
-       factorization when inverting the clover matrices
+       factorization when inverting the clover matrices.  If
+       CLOVER_PROMOTE_CHOLESKY is set, then we always use double
+       precision, else we use the same precision as the type.  For
+       fixed-point types we always use single precision regardless.
     */
+#ifdef CLOVER_PROMOTE_CHOLESKY
     template <typename T> struct cholesky_mapper {
       using type = double;
     };
+#else
+    template <typename T> struct cholesky_mapper {
+      using type = T;
+    };
+#endif
     template <> struct cholesky_mapper<short> {
       using type = float;
     };
@@ -85,8 +94,10 @@ namespace quda {
     void *cloverInv;  /** Pointer to the clover inverse field */
     double csw;       /** C_sw clover coefficient */
     double coeff;     /** Overall clover coefficient */
+    QudaTwistFlavorType twist_flavor; /** Twisted-mass flavor type */
     bool twisted;     /** Whether to create twisted mass clover */
-    double mu2;       /** Twisted mass term */
+    double mu2;       /** Chiral twisted mass term */
+    double epsilon2;  /** Flavor twisted mass term */
     double rho;       /** Hasenbusch rho term */
 
     QudaCloverFieldOrder order; /** Field order */
@@ -127,8 +138,9 @@ namespace quda {
       inverse(true),
       clover(nullptr),
       cloverInv(nullptr),
-      twisted(false),
+      twist_flavor(QUDA_TWIST_NO),
       mu2(0.0),
+      epsilon2(0.0),
       rho(0.0),
       location(QUDA_INVALID_FIELD_LOCATION)
     {
@@ -140,8 +152,9 @@ namespace quda {
       inverse(param.inverse),
       clover(param.clover),
       cloverInv(param.cloverInv),
-      twisted(param.twisted),
+      twist_flavor(param.twist_flavor),
       mu2(param.mu2),
+      epsilon2(param.epsilon2),
       rho(param.rho),
       location(param.location)
     {
@@ -157,13 +170,13 @@ namespace quda {
       // If clover_coeff is not set manually, then it is the product Csw * kappa.
       // If the user has set the clover_coeff manually, that value takes precedent.
       coeff(inv_param.clover_coeff == 0.0 ? inv_param.kappa * inv_param.clover_csw : inv_param.clover_coeff),
-      twisted(inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false),
-      mu2(twisted ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
+      twist_flavor(inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param.twist_flavor : QUDA_TWIST_NO),
+      mu2(twist_flavor != QUDA_TWIST_NO ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
+      epsilon2(twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? 4.0 * inv_param.kappa * inv_param.kappa * inv_param.epsilon * inv_param.epsilon : 0.0),
       rho(inv_param.clover_rho),
       location(QUDA_INVALID_FIELD_LOCATION)
     {
       siteSubset = QUDA_FULL_SITE_SUBSET;
-      pad = inv_param.cl_pad;
       for (int i = 0; i < nDim; i++) this->x[i] = x[i];
     }
 
@@ -192,8 +205,9 @@ namespace quda {
 
     double csw;
     double coeff;
-    bool twisted;
-    double mu2;
+    QudaTwistFlavorType twist_flavor;
+    double mu2;      // chiral twisted mass squared
+    double epsilon2; // flavour twisted mass squared
     double rho;
 
     QudaCloverFieldOrder order;
@@ -309,14 +323,19 @@ namespace quda {
     double Coeff() const { return coeff; }
 
     /**
-       @return If the clover field is associated with twisted-clover fermions
+       @return If the clover field is associated with twisted-clover fermions and which flavor type thereof
     */
-    bool Twisted() const { return twisted; }
+    QudaTwistFlavorType TwistFlavor() const { return twist_flavor; }
 
     /**
        @return mu^2 factor baked into inverse clover field (for twisted-clover inverse)
     */
     double Mu2() const { return mu2; }
+
+    /**
+       @return epsilon^2 factor baked into inverse clover field (for non-deg twisted-clover inverse)
+    */
+    double Epsilon2() const { return epsilon2; }
 
     /**
        @return rho factor backed into the clover field, (for real

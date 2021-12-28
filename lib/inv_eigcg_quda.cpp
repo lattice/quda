@@ -379,9 +379,10 @@ namespace quda {
       eigcg_args = new EigCGArgs(param.m, param.n_ev); // need only deflation meta structure
 
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
+      csParam.field = &b;
+      rp = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
+      yp = ColorSpinorField::Create(csParam);
 
       Ap = ColorSpinorField::Create(csParam);
       p  = ColorSpinorField::Create(csParam);

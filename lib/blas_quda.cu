@@ -146,12 +146,9 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    void zero(ColorSpinorField &a) {
-      if (typeid(a) == typeid(cudaColorSpinorField)) {
-	static_cast<cudaColorSpinorField&>(a).zero();
-      } else {
-	static_cast<cpuColorSpinorField&>(a).zero();
-      }
+    void zero(ColorSpinorField &a)
+    {
+      a.zero();
     }
 
     void init()
