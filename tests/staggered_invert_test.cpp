@@ -104,6 +104,7 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  setQudaStaggeredDefaultInvTestParams();
   setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
@@ -111,16 +112,13 @@ int main(int argc, char **argv)
   add_deflation_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
-  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
-                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
   setVerbosity(verbosity);
-  if (!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
 
   if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
@@ -138,9 +136,7 @@ int main(int argc, char **argv)
   // Only these fermions are supported in this file. Ensure a reasonable default,
   // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
-               get_dslash_str(QUDA_ASQTAD_DSLASH));
-    dslash_type = QUDA_ASQTAD_DSLASH;
+    errorQuda("dslash_type %s not supported", get_dslash_str(dslash_type));
   }
 
   // Need to add support for LAPLACE MG?
@@ -151,10 +147,70 @@ int main(int argc, char **argv)
     }
   }
 
-  // Deduce operator, solution, and operator preconditioning types
-  if (!inv_multigrid) setQudaStaggeredInvTestParams();
+  // Check solution type for multishift solver
+  if (multishift > 1) {
+    if (inv_type != QUDA_CG_INVERTER)
+      errorQuda("inv_type %s does not support multi-shift, expecting cg", get_solver_str(inv_type));
+    if (solution_type != QUDA_MATPC_SOLUTION)
+      errorQuda("solution type %s is not supported with multi-shift, expecting %s", get_solution_str(solution_type), get_solution_str(QUDA_MATPC_SOLUTION));
+  }
+
+  // Set n_naiks to 2 if eps_naik != 0.0
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    if (eps_naik != 0.0) {
+      if (compute_fatlong) {
+        n_naiks = 2;
+        printfQuda("Note: epsilon-naik != 0, testing epsilon correction links.\n");
+      } else {
+        eps_naik = 0.0;
+        printfQuda("Not computing fat-long, ignoring epsilon correction.\n");
+      }
+    } else {
+      printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
+    }
+  }
 
   display_test_info();
+  /**********/
+  // Tests have been removed, but for historical reasons:
+  //
+  // Test 0:
+  //   solve_type = QUDA_DIRECT_SOLVE
+  //   matpc_type = QUDA_MATPC_EVEN_EVEN (doesn't matter)
+  //   solution_type = QUDA_MAT_SOLUTION
+  //
+  // Test 1:
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_EVEN_EVEN
+  //   solution_type = QUDA_MAT_SOLUTION
+  //
+  // Test 2:
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_ODD_ODD
+  //   solution_type = QUDA_MAT_SOLUTION
+  //
+  // Test 3:
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_EVEN_EVEN
+  //   solution_type = QUDA_MATPC_SOLUTION
+  //
+  // Test 4:
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_ODD_ODD
+  //   solution_type = QUDA_MATPC_SOLUTION
+  //
+  // Test 5: multi-shift
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_EVEN_EVEN
+  //   solution_type = QUDA_MATPC_SOLUTION
+  //
+  // Test 6: multi-shift
+  //   solve_type = QUDA_DIRECT_PC_SOLVE
+  //   matpc_type = QUDA_MATPC_ODD_ODD
+  //   solution_type = QUDA_MATPC_SOLUTION
+
+
+  /**********/
 
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -319,16 +375,7 @@ int main(int argc, char **argv)
 
   // QUDA invert test
   //----------------------------------------------------------------------------
-  switch (test_type) {
-  case 0: // full parity solution, full parity system
-  case 1: // full parity solution, solving EVEN EVEN prec system
-  case 2: // full parity solution, solving ODD ODD prec system
-  case 3: // even parity solution, solving EVEN system
-  case 4: // odd parity solution, solving ODD system
-    if (multishift != 1) {
-      printfQuda("Multishift not supported for test %d\n", test_type);
-      exit(0);
-    }
+  if (multishift == 1) {
 
     for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM); }
 
@@ -367,17 +414,9 @@ int main(int argc, char **argv)
         verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
                                  (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
     }
-    break;
-
-  case 5: // multi mass CG, even parity solution, solving EVEN system
-  case 6: // multi mass CG, odd parity solution, solving ODD system
+  } else if (multishift > 1) {
 
     if (use_split_grid) { errorQuda("Multishift currently doesn't support split grid.\n"); }
-
-    if (multishift < 2) {
-      printfQuda("Multishift inverter requires more than one shift, multishift = %d\n", multishift);
-      exit(0);
-    }
 
     inv_param.num_offset = multishift;
     for (int i = 0; i < multishift; i++) {
@@ -411,11 +450,9 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
-    break;
-
-  default: errorQuda("Unsupported test type");
-
-  } // switch
+  } else {
+    errorQuda("Invalid number of shifts %d", multishift);
+  }
 
   // Compute timings
   if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);

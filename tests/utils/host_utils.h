@@ -43,8 +43,8 @@ extern QudaPrecision &cuda_prec_ritz;
 
 // Set some basic parameters via command line or use defaults
 // Implemented in set_params.cpp
+void setQudaStaggeredDefaultInvTestParams();
 void setQudaStaggeredEigTestParams();
-void setQudaStaggeredInvTestParams();
 
 // Staggered gauge field utils
 //------------------------------------------------------
