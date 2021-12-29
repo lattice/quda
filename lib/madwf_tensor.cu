@@ -22,7 +22,7 @@ namespace quda
 
     public:
       tensor_5D_wrapper(const ColorSpinorField &out, const ColorSpinorField &in, matrix_t *wm_p) :
-        TunableMultiReduction(out, out.X(4) * in.X(4)* 16), out(out), in(in), wm_p(wm_p)
+        TunableMultiReduction(out, out.X(4) * in.X(4)), out(out), in(in), wm_p(wm_p)
       {
         char tmp[512];
         sprintf(tmp, ",%02d->%02d", in.X(4), out.X(4));
@@ -43,7 +43,7 @@ namespace quda
         using reduce_t = typename Arg::reduce_t;
         std::vector<reduce_t> v; // dummy vector
         launch<Tensor5DReduce, reduce_t, comm_reduce_null<reduce_t>>(v, tp, stream, arg);
-        size_t bytes = out.X(4) * in.X(4)* 4 * 4 * sizeof(complex_t);
+        size_t bytes = out.X(4) * in.X(4) * spin_dim * spin_dim * sizeof(complex_t);
         qudaMemcpyAsync(wm_p, reducer::get_device_buffer(), bytes, qudaMemcpyDeviceToDevice, stream);
       }
 

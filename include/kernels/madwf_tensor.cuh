@@ -5,6 +5,7 @@
 #include <shared_memory_cache_helper.cuh>
 #include <reduce_helper.h>
 #include <kernels/madwf_transfer.cuh>
+#include <fast_intdiv.h>
 
 /**
   @file This file contains the argument and kernel that forms a tensor outer product in the fifth
@@ -19,25 +20,25 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class storage_t> struct Tensor5DReduceArg : ReduceArg<complex<typename mapper<storage_t>::type>> {
+    template <class storage_t> struct Tensor5DReduceArg : ReduceArg<array<complex<typename mapper<storage_t>::type>, spin_dim * spin_dim>> {
 
       using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
       using real = typename mapper<storage_t>::type;
-      using reduce_t = complex<real>;
+      using reduce_t = array<complex<real>, spin_dim * spin_dim>;
       using Vector = ColorSpinor<real, 3, 4>;
 
       const F out; // output vector field
       const F in;  // input vector field
 
-      const int Ls_out; // length of 5th dimension of the out field
-      const int Ls_in;  // length of 5th dimension of the in field
+      const int_fastdiv Ls_out; // length of 5th dimension of the out field
+      const int_fastdiv Ls_in;  // length of 5th dimension of the in field
 
       const int volume_4d_cb;
 
       const int nParity;
 
       Tensor5DReduceArg(const ColorSpinorField &out, const ColorSpinorField &in) :
-        ReduceArg<reduce_t>(dim3(out.VolumeCB() / out.X(4), out.X(4) * in.X(4) * spin_dim * spin_dim, out.SiteSubset()), out.X(4) * in.X(4) * spin_dim * spin_dim),
+        ReduceArg<reduce_t>(dim3(out.VolumeCB() / out.X(4), out.X(4) * in.X(4), out.SiteSubset()), out.X(4) * in.X(4)),
         out(out),
         in(in),
         Ls_out(out.X(4)),
@@ -45,9 +46,9 @@ namespace quda
         volume_4d_cb(in.VolumeCB() / in.X(4)),
         nParity(in.SiteSubset())
       {
-        if (volume_4d_cb != static_cast<int>(out.VolumeCB() / Ls_out)) {
+        if (volume_4d_cb != static_cast<int>(out.VolumeCB() / out.X(4))) {
           errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", volume_4d_cb,
-                    static_cast<int>(out.VolumeCB() / Ls_out));
+                    static_cast<int>(out.VolumeCB() / out.X(4)));
         }
 
         if (in.Nspin() != 4) errorQuda("nSpin = %d not supported", in.Nspin());
@@ -60,7 +61,15 @@ namespace quda
 
       __device__ __host__ reduce_t init() const
       {
-        return {0, 0};
+        reduce_t rst;
+#pragma unroll
+        for (int w_spin = 0; w_spin < spin_dim; w_spin++) {
+#pragma unroll
+          for (int v_spin = 0; v_spin < spin_dim; v_spin++) {
+            rst[v_spin * spin_dim + w_spin] = {0, 0};
+          }
+        }
+        return rst;
       }
 
     };
@@ -78,17 +87,22 @@ namespace quda
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int y, int parity)
       {
         // y = (v_s, w_s, v_spin, w_spin)
-        int w_spin = y % spin_dim; y /= spin_dim;
-        int v_spin = y % spin_dim; y /= spin_dim;
-        int w_s = y % arg.Ls_in; y /= arg.Ls_in;
-        int v_s = y;
+        int w_s = y % arg.Ls_in;
+        int v_s = y / arg.Ls_in;
 
         using Vector = typename Arg::Vector;
 
         const Vector v = arg.out(v_s * arg.volume_4d_cb + x_cb, parity);
         const Vector w = arg.in(w_s * arg.volume_4d_cb + x_cb, parity);
 
-        sum += conj(innerProduct(v, w, v_spin, w_spin));
+#pragma unroll
+        for (int w_spin = 0; w_spin < spin_dim; w_spin++) {
+#pragma unroll
+          for (int v_spin = 0; v_spin < spin_dim; v_spin++) {
+            sum[v_spin * spin_dim + w_spin] += conj(innerProduct(v, w, v_spin, w_spin));
+          }
+        }
+
         return sum;
       }
 
