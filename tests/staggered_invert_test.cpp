@@ -8,6 +8,7 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 #include <gauge_field.h>
+#include <blas_quda.h>
 
 // External headers
 #include <misc.h>
@@ -268,222 +269,214 @@ int main(int argc, char **argv)
   // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing
   dw_setDims(gauge_param.X, 1);
 
-  // Staggered Gauge construct START
-  //-----------------------------------------------------------------------------------
-  // Allocate host staggered gauge fields
-  void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void *milc_fatlink = nullptr;
-  void *milc_longlink = nullptr;
-  GaugeField *cpuFat = nullptr;
-  GaugeField *cpuLong = nullptr;
+  // Scope various stack variables
+  {
 
-  for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  }
-  milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-  milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+    // Staggered Gauge construct START
+    //-----------------------------------------------------------------------------------
+    // Allocate host staggered gauge fields
+    void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
+    void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
+    void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
+    void *milc_fatlink = nullptr;
+    void *milc_longlink = nullptr;
+    GaugeField *cpuFat = nullptr;
+    GaugeField *cpuLong = nullptr;
 
-  // For load, etc
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    for (int dir = 0; dir < 4; dir++) {
+      qdp_inlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      qdp_fatlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+      qdp_longlink[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    }
+    milc_fatlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+    milc_longlink = safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
-  // Reorder gauge fields to MILC order
-  reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    // For load, etc
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-  // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
-  // gauge fields with different parameters.
-  double plaq[3];
-  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
+    // Reorder gauge fields to MILC order
+    reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    // Compute fat link plaquette
-    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }
+    // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
+    // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
+    // gauge fields with different parameters.
+    double plaq[3];
+    computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
+    printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
-  // Create ghost gauge fields in case of multi GPU builds.
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
-    QUDA_ASQTAD_FAT_LINKS;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // Compute fat link plaquette
+      computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+      printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+    }
 
-  GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink);
-  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuFat = GaugeField::Create(cpuFatParam);
+    // Create ghost gauge fields in case of multi GPU builds.
+    gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+      QUDA_SU3_LINKS :
+      QUDA_ASQTAD_FAT_LINKS;
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param.location = QUDA_CPU_FIELD_LOCATION;
 
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(gauge_param, milc_longlink);
-  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLong = GaugeField::Create(cpuLongParam);
+    GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink);
+    cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    cpuFat = GaugeField::Create(cpuFatParam);
 
-  loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
+    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+    GaugeFieldParam cpuLongParam(gauge_param, milc_longlink);
+    cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    cpuLong = GaugeField::Create(cpuLongParam);
 
-  // Staggered Gauge construct END
-  //-----------------------------------------------------------------------------------
+    loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
-  // Setup the multigrid preconditioner
-  void *mg_preconditioner = nullptr;
-  if (inv_multigrid) {
-    if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
-    mg_preconditioner = newMultigridQuda(&mg_param);
-    inv_param.preconditioner = mg_preconditioner;
-  }
+    // Staggered Gauge construct END
+    //-----------------------------------------------------------------------------------
 
-  // Staggered vector construct START
-  //-----------------------------------------------------------------------------------
-  std::vector<quda::ColorSpinorField *> in;
-  std::vector<quda::ColorSpinorField *> out;
-  quda::ColorSpinorField *ref;
-  quda::ColorSpinorField *tmp;
-  quda::ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  for (int k = 0; k < Nsrc; k++) {
-    in.emplace_back(quda::ColorSpinorField::Create(cs_param));
-    out.emplace_back(quda::ColorSpinorField::Create(cs_param));
-  }
-  ref = quda::ColorSpinorField::Create(cs_param);
-  tmp = quda::ColorSpinorField::Create(cs_param);
-  // Staggered vector construct END
-  //-----------------------------------------------------------------------------------
+    // Setup the multigrid preconditioner
+    void *mg_preconditioner = nullptr;
+    if (inv_multigrid) {
+      if (use_split_grid) { errorQuda("Split grid does not work with MG yet."); }
+      mg_preconditioner = newMultigridQuda(&mg_param);
+      inv_param.preconditioner = mg_preconditioner;
+    }
 
-  // Prepare rng
-  auto *rng = new quda::RNG(*ref, 1234);
+    // Staggered vector construct START
+    //-----------------------------------------------------------------------------------
+    std::vector<std::unique_ptr<ColorSpinorField>> in;
+    in.resize(Nsrc);
 
-  // Performance measuring
-  std::vector<double> time(Nsrc);
-  std::vector<double> gflops(Nsrc);
-  std::vector<int> iter(Nsrc);
+    std::vector<std::unique_ptr<ColorSpinorField>> out;
+    out.resize(Nsrc);
 
-  // Pointers for tests 5 and 6
-  // Quark masses
-  std::vector<double> masses(multishift);
-  // Host array for solutions
-  void **outArray = (void **)safe_malloc(multishift * sizeof(void *));
-  // QUDA host array for internal checks and malloc
-  std::vector<ColorSpinorField *> qudaOutArray(multishift);
+    quda::ColorSpinorParam cs_param;
+    constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+    for (int k = 0; k < Nsrc; k++) {
+      in[k] = std::make_unique<ColorSpinorField>(cs_param);
+      out[k] = std::make_unique<ColorSpinorField>(cs_param);
+    }
+    quda::ColorSpinorField ref(cs_param);
+    quda::ColorSpinorField tmp(cs_param);
+    // Staggered vector construct END
+    //-----------------------------------------------------------------------------------
 
-  std::vector<quda::ColorSpinorField *> _h_b(Nsrc, nullptr);
-  std::vector<quda::ColorSpinorField *> _h_x(Nsrc, nullptr);
+    // Prepare rng
+    std::unique_ptr<quda::RNG> rng = std::make_unique<quda::RNG>(ref, 1234);
 
-  // QUDA invert test
-  //----------------------------------------------------------------------------
-  if (multishift == 1) {
+    // Performance measuring
+    std::vector<double> time(Nsrc);
+    std::vector<double> gflops(Nsrc);
+    std::vector<int> iter(Nsrc);
 
-    for (int k = 0; k < Nsrc; k++) { quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM); }
+    // Populate `in` with random noise
+    for (int k = 0; k < Nsrc; k++)
+      quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
 
-    if (!use_split_grid) {
+    // QUDA invert test
+    //----------------------------------------------------------------------------
+    if (multishift == 1) {
+
+      if (!use_split_grid) {
+        for (int k = 0; k < Nsrc; k++) {
+          if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+          invertQuda(out[k]->V(), in[k]->V(), &inv_param);
+          time[k] = inv_param.secs;
+          gflops[k] = inv_param.gflops / inv_param.secs;
+          iter[k] = inv_param.iter;
+          printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                     inv_param.gflops / inv_param.secs);
+        }
+      } else {
+        std::vector<void *> _hp_x(Nsrc);
+        std::vector<void *> _hp_b(Nsrc);
+        for (int k = 0; k < Nsrc; k++) {
+          _hp_x[k] = out[k]->V();
+          _hp_b[k] = in[k]->V();
+        }
+        inv_param.num_src = Nsrc;
+        inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
+        invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink,
+                                    &gauge_param);
+        comm_allreduce_int(&inv_param.iter);
+        inv_param.iter /= comm_size() / num_sub_partition;
+        comm_allreduce(&inv_param.gflops);
+        inv_param.gflops /= comm_size() / num_sub_partition;
+        comm_allreduce_max(&inv_param.secs);
+        printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
+                   inv_param.secs, inv_param.gflops / inv_param.secs);
+      }
+
       for (int k = 0; k < Nsrc; k++) {
-        if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-        invertQuda(out[k]->V(), in[k]->V(), &inv_param);
+        if (verify_results)
+          verifyStaggeredInversion(tmp, ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+                                   (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+      }
+    } else if (multishift > 1) {
+
+      if (use_split_grid) { errorQuda("Multishift currently doesn't support split grid.\n"); }
+
+      // Quark masses
+      std::vector<double> masses(multishift);
+      // Host array for solutions
+      void **outArray = (void **)safe_malloc(multishift * sizeof(void *));
+      // QUDA host array for internal checks and malloc
+      std::vector<std::unique_ptr<ColorSpinorField>> qudaOutArray;
+      qudaOutArray.resize(multishift);
+
+      inv_param.num_offset = multishift;
+      for (int i = 0; i < multishift; i++) {
+        // Set masses and offsets
+        masses[i] = 0.06 + i * i * 0.01;
+        inv_param.offset[i] = 4 * masses[i] * masses[i];
+        // Set tolerances for the heavy quarks, these can be set independently
+        // (functions of i) if desired
+        inv_param.tol_offset[i] = inv_param.tol;
+        inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+        // Allocate memory and set pointers
+        qudaOutArray[i] = std::make_unique<ColorSpinorField>(cs_param);
+        outArray[i] = qudaOutArray[i]->V();
+      }
+
+      for (int k = 0; k < Nsrc; k++) {
+        invertMultiShiftQuda((void **)outArray, in[k]->V(), &inv_param);
+
         time[k] = inv_param.secs;
         gflops[k] = inv_param.gflops / inv_param.secs;
         iter[k] = inv_param.iter;
         printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                    inv_param.gflops / inv_param.secs);
+
+        for (int i = 0; i < multishift; i++) {
+          printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+          verifyStaggeredInversion(tmp, ref, *in[k], *qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+                                   (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
+        }
       }
+
+      host_free(outArray);
+
     } else {
-      std::vector<void *> _hp_x(Nsrc);
-      std::vector<void *> _hp_b(Nsrc);
-      for (int k = 0; k < Nsrc; k++) {
-        _hp_x[k] = out[k]->V();
-        _hp_b[k] = in[k]->V();
-      }
-      inv_param.num_src = Nsrc;
-      inv_param.num_src_per_sub_partition = Nsrc / num_sub_partition;
-      invertMultiSrcStaggeredQuda(_hp_x.data(), _hp_b.data(), &inv_param, (void *)milc_fatlink, (void *)milc_longlink,
-                                  &gauge_param);
-      comm_allreduce_int(&inv_param.iter);
-      inv_param.iter /= comm_size() / num_sub_partition;
-      comm_allreduce(&inv_param.gflops);
-      inv_param.gflops /= comm_size() / num_sub_partition;
-      comm_allreduce_max(&inv_param.secs);
-      printfQuda("Done: %d sub-partitions - %i iter / %g secs = %g Gflops\n\n", num_sub_partition, inv_param.iter,
-                 inv_param.secs, inv_param.gflops / inv_param.secs);
+      errorQuda("Invalid number of shifts %d", multishift);
     }
 
-    for (int k = 0; k < Nsrc; k++) {
-      if (verify_results)
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *out[k], mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
-                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
+    // Compute timings
+    if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
+
+    // Free the multigrid solver
+    if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+
+    // Clean up gauge fields
+    for (int dir = 0; dir < 4; dir++) {
+      host_free(qdp_inlink[dir]);
+      host_free(qdp_fatlink[dir]);
+      host_free(qdp_longlink[dir]);
     }
-  } else if (multishift > 1) {
+    host_free(milc_fatlink);
+    host_free(milc_longlink);
 
-    if (use_split_grid) { errorQuda("Multishift currently doesn't support split grid.\n"); }
+    if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
+    if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
 
-    inv_param.num_offset = multishift;
-    for (int i = 0; i < multishift; i++) {
-      // Set masses and offsets
-      masses[i] = 0.06 + i * i * 0.01;
-      inv_param.offset[i] = 4 * masses[i] * masses[i];
-      // Set tolerances for the heavy quarks, these can be set independently
-      // (functions of i) if desired
-      inv_param.tol_offset[i] = inv_param.tol;
-      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-      // Allocate memory and set pointers
-      qudaOutArray[i] = ColorSpinorField::Create(cs_param);
-      outArray[i] = qudaOutArray[i]->V();
-    }
-
-    for (int k = 0; k < Nsrc; k++) {
-      quda::spinorNoise(*in[k], *rng, QUDA_NOISE_UNIFORM);
-      invertMultiShiftQuda((void **)outArray, in[k]->V(), &inv_param);
-
-      time[k] = inv_param.secs;
-      gflops[k] = inv_param.gflops / inv_param.secs;
-      iter[k] = inv_param.iter;
-      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
-                 inv_param.gflops / inv_param.secs);
-
-      for (int i = 0; i < multishift; i++) {
-        printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-        verifyStaggeredInversion(*tmp, *ref, *in[k], *qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
-                                 (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
-      }
-    }
-
-    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
-  } else {
-    errorQuda("Invalid number of shifts %d", multishift);
-  }
-
-  // Compute timings
-  if (Nsrc > 1 && !use_split_grid) performanceStats(time, gflops, iter);
-
-  // Free RNG
-  delete rng;
-
-  // Free the multigrid solver
-  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
-
-  // Clean up gauge fields
-  for (int dir = 0; dir < 4; dir++) {
-    host_free(qdp_inlink[dir]);
-    host_free(qdp_fatlink[dir]);
-    host_free(qdp_longlink[dir]);
-  }
-  host_free(milc_fatlink);
-  host_free(milc_longlink);
-
-  if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
-  if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
-
-  for (auto in_vec : in) { delete in_vec; }
-  for (auto out_vec : out) { delete out_vec; }
-  delete ref;
-  delete tmp;
-  host_free(outArray);
-
-  if (use_split_grid) {
-    for (auto p : _h_b) { delete p; }
-    for (auto p : _h_x) { delete p; }
   }
 
   // Finalize the QUDA library
