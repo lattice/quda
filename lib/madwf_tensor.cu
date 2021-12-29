@@ -3,72 +3,48 @@
 #include <device_vector.h>
 #include <madwf_transfer.h>
 #include <kernels/madwf_tensor.cuh>
+#include <tunable_reduction.h>
 
 namespace quda
 {
   namespace madwf_ml
   {
 
-    template <class storage_t, class matrix_t> class tensor_5D_wrapper : public TunableKernel3D
+    template <class storage_t, class matrix_t> class tensor_5D_wrapper : public TunableMultiReduction<1>
     {
       const ColorSpinorField &out;
       const ColorSpinorField &in;
       matrix_t *wm_p;
 
     private:
-      unsigned int sharedBytesPerThread() const
-      {
-        return in.X(4) * color_spin_dim * 2 * sizeof(typename mapper<storage_t>::type) / out.X(4);
-      }
-
-      unsigned int maxSharedBytesPerBlock() const
-      {
-        return maxDynamicSharedBytesPerBlock();
-      }
 
       unsigned int minThreads() const { return out.VolumeCB() / out.X(4); }
 
     public:
       tensor_5D_wrapper(const ColorSpinorField &out, const ColorSpinorField &in, matrix_t *wm_p) :
-        TunableKernel3D(out, out.X(4), out.SiteSubset()), out(out), in(in), wm_p(wm_p)
+        TunableMultiReduction(out, out.X(4) * in.X(4)* 16), out(out), in(in), wm_p(wm_p)
       {
-        TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
-
         char tmp[512];
         sprintf(tmp, ",%02d->%02d", in.X(4), out.X(4));
         strcat(aux, tmp);
         strcat(aux, ",tensor_5D");
 
+        commAsyncReductionSet(true);
         apply(device::get_default_stream());
+        commAsyncReductionSet(false);
       }
 
       void apply(const qudaStream_t &stream)
       {
-        constexpr int block_size = 128;
-
-        qudaEvent_t event = qudaEventCreate();
-
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        tp.set_max_shared_bytes = true;
-        using Arg = Tensor5DArg<storage_t, matrix_t, block_size>;
+        using Arg = Tensor5DReduceArg<storage_t>;
+        Arg arg(out, in);
         using complex_t = complex<typename Arg::real>;
-
-        // Each block has a Wilson Matrix.
-        int num_x_blocks = tp.grid.x;
-
-        Arg arg(out, in, num_x_blocks, wm_p);
-
-        launch<Tensor5D>(tp, stream, arg);
-
-        tp.grid = {static_cast<unsigned>(arg.Ls_in * arg.Ls_out * sizeof(matrix_t) / sizeof(complex_t)), 1, 1};
-        tp.block = {block_size, 1, 1};
-        tp.shared_bytes = 0;
-        arg.threads = {tp.grid.x * tp.block.x, 1, 1};
-        launch<Tensor5DReduce>(tp, stream, arg);
-
-        qudaEventRecord(event, stream);
-        while (!qudaEventQuery(event)) { }
-        qudaEventDestroy(event);
+        using reduce_t = typename Arg::reduce_t;
+        std::vector<reduce_t> v; // dummy vector
+        launch<Tensor5DReduce, reduce_t, comm_reduce_null<reduce_t>>(v, tp, stream, arg);
+        size_t bytes = out.X(4) * in.X(4)* 4 * 4 * sizeof(complex_t);
+        qudaMemcpyAsync(wm_p, reducer::get_device_buffer(), bytes, qudaMemcpyDeviceToDevice, stream);
       }
 
       long long flops() const { return 8ll * out.X(4) * 4ll * in.VolumeCB(); }
