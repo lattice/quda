@@ -173,8 +173,8 @@ namespace quda {
       template <int NXZ_max> std::enable_if_t<NXZ_max!=1, void> instantiate(const qudaStream_t &stream)
       {
         // if multi-1d then constrain the templates to no larger than max-1d size
-        constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false, isFixed<store_t>::value>() :
-          std::min(max_N_multi_1d_pow2(), max_NXZ_power2<false, isFixed<store_t>::value>());
+        constexpr int pow2_max = !decltype(f)::multi_1d ? max_NXZ_power2<false>() :
+          std::min(max_N_multi_1d_pow2(), max_NXZ_power2<false>());
         constexpr int linear_max = !decltype(f)::multi_1d ? MAX_MULTI_BLAS_N : std::min(max_N_multi_1d(), MAX_MULTI_BLAS_N);
 
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
@@ -192,9 +192,7 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (f.write.X) x[i]->backup();
           if (f.write.Y) y[i]->backup();
-          if (f.write.Z) z[i]->backup();
           if (f.write.W) w[i]->backup();
         }
       }
@@ -202,9 +200,7 @@ namespace quda {
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (f.write.X) x[i]->restore();
           if (f.write.Y) y[i]->restore();
-          if (f.write.Z) z[i]->restore();
           if (f.write.W) w[i]->restore();
         }
       }
@@ -278,9 +274,9 @@ namespace quda {
 
       if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
-        T *tmpmajor = new T[x.size() * y.size()];
-        T *tmpmajor0 = &tmpmajor[0];
-        T *tmpmajor1 = &tmpmajor[x.size() * (y.size() / 2)];
+        std::vector<T> tmpmajor(x.size() * y.size());
+        T *tmpmajor0 = tmpmajor.data();
+        T *tmpmajor1 = tmpmajor0 + x.size() * (y.size() / 2);
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
@@ -299,11 +295,9 @@ namespace quda {
 
         axpy_recurse<Functor>(tmpmajor0, x, y0, range_x, range(range_y.first, range_y.first + y0.size()), upper, coeff_width);
         axpy_recurse<Functor>(tmpmajor1, x, y1, range_x, range(range_y.first + y0.size(), range_y.second), upper, coeff_width);
-
-        delete[] tmpmajor;
       } else {
         // if at the bottom of recursion,
-        if (is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION)) {
+        if (is_valid_NXZ(x.size(), false)) {
           // since tile range is [first,second), e.g., [first,second-1], we need >= here
           // if upper triangular and upper-right tile corner is below diagonal return
           if (upper == 1 && range_y.first >= range_x.second) { return; }
@@ -338,8 +332,7 @@ namespace quda {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
       //                                         which lets us skip some tiles.
-      if (x.size() != y.size())
-      {
+      if (x.size() != y.size()) {
         errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), 1, 2);
@@ -349,8 +342,7 @@ namespace quda {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
       //                                         which lets us skip some tiles.
-      if (x.size() != y.size())
-      {
+      if (x.size() != y.size()) {
         errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), -1, 2);
@@ -373,9 +365,9 @@ namespace quda {
 
       if (y.size() > max_yw_size) {
         // We need to split up 'a' carefully since it's row-major.
-        Complex* tmpmajor = new Complex[x.size()*y.size()];
-        Complex* tmpmajor0 = &tmpmajor[0];
-        Complex* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
+        std::vector<Complex> tmpmajor(x.size() * y.size());
+        Complex *tmpmajor0 = tmpmajor.data();
+        Complex *tmpmajor1 = tmpmajor0 + x.size() * (y.size() / 2);
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
@@ -397,29 +389,29 @@ namespace quda {
 
         caxpyz_recurse(tmpmajor0, x, y0, z0, range_x, range(range_y.first, range_y.first + y0.size()), pass, upper);
         caxpyz_recurse(tmpmajor1, x, y1, z1, range_x, range(range_y.first + y0.size(), range_y.second), pass, upper);
-
-        delete[] tmpmajor;
       } else {
         // if at bottom of recursion check where we are
-        if (is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION)) {
-          // check if tile straddles diagonal
-          bool is_diagonal = (range_x.first < range_y.second) && (range_y.first < range_x.second);
-          if (pass==1) {
-            if (!is_diagonal) {
-              // if upper triangular and upper-right tile corner is below diagonal return
-              if (upper == 1 && range_y.first >= range_x.second) { return; }
-              // if lower triangular and lower-left tile corner is above diagonal return
-              if (upper == -1 && range_x.first >= range_y.second) { return; }
-              caxpy(a_, x, z); return;  // off diagonal
-            }
-            return;
-      	  } else {
-            if (!is_diagonal) return; // We're on the first pass, so we only want to update the diagonal.
-          }
+        if (is_valid_NXZ(x.size(), false)) {
+          // check if tile straddles diagonal for L/U variants
+          bool is_diagonal = (upper != 0) && (range_x.first < range_y.second) && (range_y.first < range_x.second);
+          // check if tile is first to be updated for full matrices
+          bool is_first = (upper == 0) && (range_x.first == 0);
+          // whether to do caxpyz
+          bool do_caxpyz = (upper != 0 && is_diagonal && pass == 0) || (upper == 0 && is_first);
+          // whether to do caxpy
+          bool do_caxpy = (upper != 0 && !is_diagonal && pass == 1) || (upper == 0 && !is_first);
 
-          coeff_array<Complex> a(a_), b, c;
-          constexpr bool mixed = false;
-          instantiate<multicaxpyz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, z);
+          if (do_caxpyz) {
+            coeff_array<Complex> a(a_), b, c;
+            constexpr bool mixed = false;
+            instantiate<multicaxpyz_, MultiBlas, mixed>(a, b, c, *x[0], *y[0], x, y, x, z);
+          } else if (do_caxpy) {
+            // if upper triangular and upper-right tile corner is below diagonal return
+            if (upper == 1 && range_y.first >= range_x.second) { return; }
+            // if lower triangular and lower-left tile corner is above diagonal return
+            if (upper == -1 && range_x.first >= range_y.second) { return; }
+            caxpy(a_, x, z);  // off diagonal
+          }
         } else {
           // split the problem in half and recurse
           const Complex *a0 = &a_[0];
@@ -436,14 +428,14 @@ namespace quda {
 
     void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
     {
-      // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
-      // second pass does caxpy on the off diagonals
-      caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 0);
     }
 
     void caxpyz_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
     {
+      if (x.size() != y.size()) {
+        errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
+      }
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 1);
@@ -453,6 +445,9 @@ namespace quda {
 
     void caxpyz_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
     {
+      if (x.size() != y.size()) {
+        errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
+      }
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, -1);
@@ -518,8 +513,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if (x_.size() <= (size_t)max_N_multi_1d() &&
-          is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only split if we have to.
+      if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false)) // only split if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the

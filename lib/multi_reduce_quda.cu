@@ -172,7 +172,7 @@ namespace quda {
 
       void apply(const qudaStream_t &stream)
       {
-        constexpr int pow2_max = max_NXZ_power2<true, isFixed<store_t>::value>();
+        constexpr int pow2_max = max_NXZ_power2<true>();
         if (NXZ <= pow2_max && is_power2(NXZ)) instantiatePow2<pow2_max>(stream);
         else if (NXZ <= MAX_MULTI_BLAS_N) instantiateLinear<MAX_MULTI_BLAS_N>(stream);
         else errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
