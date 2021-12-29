@@ -48,6 +48,7 @@ int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int maxiter_precondition = 10;
+QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
@@ -467,6 +468,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
+  quda_app->add_option("--verbosity-precondition", verbosity_precondition, "The the verbosity of the preconditioner (default summarize)")
+    ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 

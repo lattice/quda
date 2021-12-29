@@ -185,6 +185,7 @@ extern int Nsrc;
 extern int Msrc;
 extern int niter;
 extern int maxiter_precondition;
+extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;

@@ -3,8 +3,11 @@
 namespace quda
 {
 
-  MadwfAcc::MadwfAcc(const SolverParam &solve_param) : param(solve_param.madwf_param), mu(param.madwf_diagonal_suppressor),
-    prec_precondition(solve_param.precision_precondition)
+  MadwfAcc::MadwfAcc(const SolverParam &solve_param, TimeProfile &profile) :
+    param(solve_param.madwf_param),
+    mu(param.madwf_diagonal_suppressor),
+    prec_precondition(solve_param.precision_precondition),
+    profile(profile)
   {
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("Launching MADWF accelerator ... \n");
@@ -30,7 +33,9 @@ namespace quda
   void MadwfAcc::apply(Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
     madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, in, device_param, false);
+    pushVerbosity(QUDA_SILENT);
     base(*backward_tmp, *forward_tmp);
+    popVerbosity();
     madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(out, *backward_tmp, device_param, true);
 
     blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
@@ -64,6 +69,9 @@ namespace quda
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
+
+      profile.TPSTART(QUDA_PROFILE_IO);
+
       char param_file_name[512];
       // Note that all ranks load from the same file.
       sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
@@ -101,8 +109,12 @@ namespace quda
       forward_tmp = std::make_unique<ColorSpinorField>(csParam);
       backward_tmp = std::make_unique<ColorSpinorField>(csParam);
 
+      profile.TPSTOP(QUDA_PROFILE_IO);
+
       return;
     }
+
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(in);
     ColorSpinorField null_x(csParam);
@@ -117,7 +129,9 @@ namespace quda
     csParam.setPrecision(prec_precondition);
     for (auto &pB : B) { pB = new ColorSpinorField(csParam); }
 
+    profile.TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
+    profile.TPSTART(QUDA_PROFILE_INIT);
     for (auto &pB : B) { blas::ax(5e3 / sqrt(blas::norm2(*pB)), *pB); }
 
     saveTuneCache();
@@ -171,6 +185,10 @@ namespace quda
       printfQuda("beta          = %.3f\n", b);
       printfQuda("training mu   = %.3f\n", mu);
     }
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_TRAINING);
+
     for (int iteration = 0; iteration < param.madwf_train_maxiter; iteration++) {
 
       device_container D(param_size);
@@ -182,13 +200,17 @@ namespace quda
         chi2 += cost(ref, base, chi, *phi);
         // ATx(ATphi, *phi, T);
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
+        pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
+        popVerbosity();
 
         ref(Mchi, chi);
 
         // ATx(ATMchi, Mchi, T);
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, Mchi, device_param, false);
+        pushVerbosity(QUDA_SILENT);
         base(ATMchi, *forward_tmp);
+        popVerbosity();
 
         // d1 = A * T * phi -x- M * chi
         madwf_ml::tensor_5d_hh<transfer_float, transfer_t>(ATphi, Mchi, d1);
@@ -211,14 +233,18 @@ namespace quda
 
         // ATx(ATphi, *phi, T);
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
+        pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
+        popVerbosity();
 
         // D' * A * T * phi
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(theta, ATphi, P, true);
 
         // ATx(ADphi, *phi, P);
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, P, false);
+        pushVerbosity(QUDA_SILENT);
         base(ADphi, *forward_tmp);
+        popVerbosity();
 
         // T' * A * D * phi
         madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(tmp, ADphi, device_param, true);
@@ -261,11 +287,14 @@ namespace quda
       axpby(device_param, 0.0f, device_param, -alpha, P);
       if (tune_suppressor) { mu -= alpha * pmu; }
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("grad min iter %05d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                    iteration, chi2, chi2 / residual, alpha, mu);
       }
     }
+
+    profile.TPSTOP(QUDA_PROFILE_TRAINING);
+    profile.TPSTART(QUDA_PROFILE_IO);
 
     trained = true;
 
@@ -305,5 +334,6 @@ namespace quda
     for (auto &pB : B) { delete pB; }
 
     commGlobalReductionPop();
+    profile.TPSTOP(QUDA_PROFILE_IO);
   }
 } // namespace quda

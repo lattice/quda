@@ -246,7 +246,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
-  inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.verbosity_precondition = verbosity_precondition;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.omega = 1.0;
