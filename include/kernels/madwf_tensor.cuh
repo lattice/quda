@@ -10,7 +10,7 @@
 /**
   @file This file contains the argument and kernel that forms a tensor outer product in the fifth
   dimension given two input vectors,
-      T_{st} = out_s * in_t,
+      T_{st} = conj(x_s * y_t),
   where s and t are fifth dimension indices. T_{st} is a spin matrix so T has shape Ls*4-by-Ls*4.
 */
 
@@ -20,43 +20,44 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class storage_t> struct Tensor5DReduceArg : ReduceArg<array<complex<typename mapper<storage_t>::type>, spin_dim * spin_dim>> {
+    template <class storage_t>
+    struct Tensor5DReduceArg : ReduceArg<array<complex<typename mapper<storage_t>::type>, spin_dim * spin_dim>> {
 
       using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
       using real = typename mapper<storage_t>::type;
       using reduce_t = array<complex<real>, spin_dim * spin_dim>;
       using Vector = ColorSpinor<real, 3, 4>;
 
-      const F out; // output vector field
-      const F in;  // input vector field
+      const F x; // xput vector field
+      const F y; // yput vector field
 
-      const int_fastdiv Ls_out; // length of 5th dimension of the out field
-      const int_fastdiv Ls_in;  // length of 5th dimension of the in field
+      const int_fastdiv Ls_x; // length of 5th dimension of the x field
+      const int_fastdiv Ls_y; // length of 5th dimension of the in field
 
       const int volume_4d_cb;
 
       const int nParity;
 
-      Tensor5DReduceArg(const ColorSpinorField &out, const ColorSpinorField &in) :
-        ReduceArg<reduce_t>(dim3(out.VolumeCB() / out.X(4), out.X(4) * in.X(4), out.SiteSubset()), out.X(4) * in.X(4)),
-        out(out),
-        in(in),
-        Ls_out(out.X(4)),
-        Ls_in(in.X(4)),
-        volume_4d_cb(in.VolumeCB() / in.X(4)),
-        nParity(in.SiteSubset())
+      Tensor5DReduceArg(const ColorSpinorField &x, const ColorSpinorField &y) :
+        ReduceArg<reduce_t>(dim3(x.VolumeCB() / x.X(4), x.X(4) * y.X(4), x.SiteSubset()), x.X(4) * y.X(4)),
+        x(x),
+        y(y),
+        Ls_x(x.X(4)),
+        Ls_y(y.X(4)),
+        volume_4d_cb(y.VolumeCB() / y.X(4)),
+        nParity(y.SiteSubset())
       {
-        if (volume_4d_cb != static_cast<int>(out.VolumeCB() / out.X(4))) {
+        if (volume_4d_cb != static_cast<int>(x.VolumeCB() / x.X(4))) {
           errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", volume_4d_cb,
-                    static_cast<int>(out.VolumeCB() / out.X(4)));
+                    static_cast<int>(x.VolumeCB() / x.X(4)));
         }
 
-        if (in.Nspin() != 4) errorQuda("nSpin = %d not supported", in.Nspin());
-        if (in.Ncolor() != 3) errorQuda("nColor = %d not supported", in.Ncolor());
-        if (out.Nspin() != 4) errorQuda("nSpin = %d not supported", out.Nspin());
-        if (out.Ncolor() != 3) errorQuda("nColor = %d not supported", out.Ncolor());
+        if (y.Nspin() != 4) errorQuda("nSpin = %d not supported", y.Nspin());
+        if (y.Ncolor() != 3) errorQuda("nColor = %d not supported", y.Ncolor());
+        if (x.Nspin() != 4) errorQuda("nSpin = %d not supported", x.Nspin());
+        if (x.Ncolor() != 3) errorQuda("nColor = %d not supported", x.Ncolor());
 
-        checkNative(in, out);
+        checkNative(y, x);
       }
 
       __device__ __host__ reduce_t init() const
@@ -65,13 +66,10 @@ namespace quda
 #pragma unroll
         for (int w_spin = 0; w_spin < spin_dim; w_spin++) {
 #pragma unroll
-          for (int v_spin = 0; v_spin < spin_dim; v_spin++) {
-            rst[v_spin * spin_dim + w_spin] = {0, 0};
-          }
+          for (int v_spin = 0; v_spin < spin_dim; v_spin++) { rst[v_spin * spin_dim + w_spin] = {0, 0}; }
         }
         return rst;
       }
-
     };
 
     template <class Arg> struct Tensor5DReduce {
@@ -84,33 +82,28 @@ namespace quda
 
       static constexpr bool do_sum = true;
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int y, int parity)
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int batch_idx, int parity)
       {
-        // y = (v_s, w_s, v_spin, w_spin)
-        int w_s = y % arg.Ls_in;
-        int v_s = y / arg.Ls_in;
+        int y_s = batch_idx % arg.Ls_y;
+        int x_s = batch_idx / arg.Ls_y;
 
         using Vector = typename Arg::Vector;
 
-        const Vector v = arg.out(v_s * arg.volume_4d_cb + x_cb, parity);
-        const Vector w = arg.in(w_s * arg.volume_4d_cb + x_cb, parity);
+        const Vector x = arg.x(x_s * arg.volume_4d_cb + x_cb, parity);
+        const Vector y = arg.y(y_s * arg.volume_4d_cb + x_cb, parity);
 
 #pragma unroll
-        for (int w_spin = 0; w_spin < spin_dim; w_spin++) {
+        for (int y_spin = 0; y_spin < spin_dim; y_spin++) {
 #pragma unroll
-          for (int v_spin = 0; v_spin < spin_dim; v_spin++) {
-            sum[v_spin * spin_dim + w_spin] += conj(innerProduct(v, w, v_spin, w_spin));
+          for (int x_spin = 0; x_spin < spin_dim; x_spin++) {
+            sum[x_spin * spin_dim + y_spin] += conj(innerProduct(x, y, x_spin, y_spin));
           }
         }
 
         return sum;
       }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const
-      {
-        return a + b;
-      }
-
+      __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return a + b; }
     };
 
   } // namespace madwf_ml

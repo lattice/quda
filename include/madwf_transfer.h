@@ -20,7 +20,7 @@ namespace quda
                         bool dagger);
 
     template <class transfer_float, transfer_5D_t type>
-    void tensor_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, device_vector<float> &tp);
+    void tensor_5d_hh(const ColorSpinorField &x, const ColorSpinorField &y, device_vector<float> &tp);
 
   } // namespace madwf_ml
 } // namespace quda
