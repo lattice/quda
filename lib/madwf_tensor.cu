@@ -38,7 +38,6 @@ namespace quda
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         using Arg = Tensor5DReduceArg<storage_t>;
         Arg arg(x, y);
-        using complex_t = complex<typename Arg::real>;
         using reduce_t = typename Arg::reduce_t;
         arg.set_device_output_buffer(reinterpret_cast<reduce_t *>(wm_p));
         std::vector<reduce_t> v; // dummy vector

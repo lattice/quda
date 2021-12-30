@@ -7,7 +7,8 @@
 
 namespace quda
 {
-  std::unique_ptr<Solver> create_preconditioner(const DiracMatrix &matPrecon, const DiracMatrix &matEig, SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
+  std::shared_ptr<Solver> create_preconditioner(const DiracMatrix &matPrecon, const DiracMatrix &matEig,
+                                                SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
   {
     Solver *K = nullptr;
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
@@ -27,7 +28,6 @@ namespace quda
         errorQuda("Unknown inner solver %d", param.inv_type_precondition);
       }
     }
-    return std::unique_ptr<Solver>(K);
+    return std::shared_ptr<Solver>(K);
   }
-}
-
+} // namespace quda

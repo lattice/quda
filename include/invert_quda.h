@@ -821,7 +821,7 @@ namespace quda {
 
   class PreconCG : public Solver {
     private:
-      std::unique_ptr<Solver> K;
+      std::shared_ptr<Solver> K;
       SolverParam Kparam; // parameters for preconditioner solve
 
     public:
