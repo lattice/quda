@@ -38,6 +38,7 @@ namespace quda {
   template <typename Arg> struct transform_reducer {
     using count_t = decltype(Arg::n_items);
     using reduce_t = decltype(Arg::init_value);
+    using reducer_t = typename Arg::reducer;
 
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
