@@ -998,6 +998,12 @@ namespace quda {
     int geo_bs[QUDA_MAX_DIM] = { };
     for (int d = 0; d < 4; d++) geo_bs[d] = x_size[d] / xc_size[d];
 
+    // check if we can safely coarsen the KD op
+    if (dirac == QUDA_STAGGEREDKD_DIRAC || dirac == QUDA_ASQTADKD_DIRAC)
+      for (int d = 0; d < 4; d++)
+        if (geo_bs[d] % 2 != 0)
+          errorQuda("Invalid aggregation size geo_bs[%d] = %d for KD operator, aggregation size must be even", d, geo_bs[d]);
+
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 
     // If doing a preconditioned operator with a clover term then we

@@ -278,6 +278,7 @@ extern QudaTransferType staggered_transfer_type;
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
 extern bool mg_allow_truncation;
+extern bool mg_staggered_kd_dagger_approximation;
 
 extern bool use_mobius_fused_kernel;
 

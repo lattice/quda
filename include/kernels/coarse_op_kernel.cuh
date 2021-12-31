@@ -204,7 +204,7 @@ namespace quda {
      @param[in] nFace Depth of the halo
      @param[in] arg Kernel argument
   */
-  template <typename Arg> constexpr bool isHalo(const int coord[], int dim, const int nFace, const Arg &arg)
+  template <typename Arg> constexpr bool isHalo(const int coord[], int dim, int nFace, const Arg &arg)
   {
     switch (dim) {
     case 0: return arg.comm_dim[0] && coord[0] + nFace >= arg.x_size[0];
@@ -225,7 +225,7 @@ namespace quda {
      @param[in] dim Dimension
      @param[in] arg Kernel argument
   */
-  template <typename Arg> constexpr bool isCoarseDiagonal(const int coord[], const int coord_coarse[], int dim, const int nFace, const Arg &arg)
+  template <typename Arg> constexpr bool isCoarseDiagonal(const int coord[], const int coord_coarse[], int dim, int nFace, const Arg &arg)
   {
     switch (dim) {
     case 0: return ((coord[0] + nFace) % arg.x_size[0]) / arg.geo_bs[0] == coord_coarse[0];
@@ -1235,7 +1235,7 @@ namespace quda {
     if (arg.dir == QUDA_BACKWARDS) {
       const int s_c_row = arg.spin_map(0, parity);
 
-      // for backwards, we're tieing together <V^\dagger A U^\dagger | V>
+      // for backwards, we're tying together <V^\dagger A U^\dagger | V>
       // we need all s_c_col combinations; s_c_row is covered by parity
 #pragma unroll
       for (int s_c_col = 0; s_c_col < Arg::coarseSpin; s_c_col++) {
@@ -1255,7 +1255,7 @@ namespace quda {
       } // coarse spin (fine source parity)
       // end backwards direction
     } else if (arg.dir == QUDA_FORWARDS) {
-      // for forwards, we're tieing together <V^\dag A | U V>, so we only need
+      // for forwards, we're tying together <V^\dag A | U V>, so we only need
       // one component of UV
       int s_c_col = arg.spin_map(0, (parity+1)&1);
 #pragma unroll
@@ -1263,7 +1263,7 @@ namespace quda {
 #pragma unroll
         for (int k = 0; k < TileType::k; k += TileType::K) { // Sum over fine color 
 
-          // for forwards, we're tieing together <V^\dag A | U V>
+          // for forwards, we're tying together <V^\dag A | U V>
           auto AV = make_tile_At<complex, false>(tile);
           AV.loadCS(arg.AV, 0, 0, parity, x_cb, s_c_row, k, i0);
           AV *= static_cast<real>(-1.);

@@ -87,7 +87,7 @@ namespace quda {
 
      @param X[out] supersite-local Kahler-Dirac term
      @param g[in] fine gauge field (fat links for asqtad)
-     @param mass[in] Mass of staggered fermion (used for dagger approximation only)
+     @param mass[in] Mass of staggered fermion
    */
   void calculateStaggeredKDBlock(GaugeField &X, const GaugeField &g, const double mass)
   {
@@ -108,8 +108,9 @@ namespace quda {
      @param Xinv[out] KD inverse fine gauge in KD geometry
      @param gauge[in] fine gauge field (fat links for asqtad)
      @param mass[in] Mass of staggered fermion
+     @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
    */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass)
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     using namespace blas_lapack;
     auto invert = use_native() ? native::BatchInvertMatrix : generic::BatchInvertMatrix;
@@ -224,14 +225,6 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X.norm2(0));
 
     // Step 5: Calculate Xinv
-
-    // This should be revisited in the future. Using X^dagger
-    // empirically leads to a less useful preconditioner than X^{-1},
-    // though this was only with limited testing. One benefit of applying
-    // X^dagger instead is we could apply it directly from the gauge links
-    // as opposed to explicitly building it.
-    constexpr bool dagger_approximation = false;
-
     if (dagger_approximation) {
       xInvMilcOrder->copy(X);
     } else {
@@ -260,15 +253,17 @@ namespace quda {
 
     // Step 6: reorder the KD inverse into a "gauge field" with a QUDA_KDINVERSE_GEOMETRY
     // last two parameters: dagger approximation, mass (which becomes a scale in the dagger approx)
-    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);    
+    ReorderStaggeredKahlerDiracInverse(Xinv, *xInvMilcOrder, dagger_approximation, mass);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
-
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      if (dagger_approximation) printfQuda("Using the dagger approximation to Xinv\n");
+      printfQuda("xInvKdGeometry = %e\n", Xinv.norm2());
+    }
   }
 
 
   // Allocates and calculates the inverse KD block, returning Xinv
-  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass)
+  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass, const bool dagger_approximation)
   {
     GaugeFieldParam gParam(gauge);
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -284,7 +279,7 @@ namespace quda {
 
     std::unique_ptr<GaugeField> Xinv(reinterpret_cast<GaugeField*>(new cudaGaugeField(gParam)));
 
-    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass);
+    BuildStaggeredKahlerDiracInverse(*Xinv, gauge, mass, dagger_approximation);
 
     return Xinv;
   }
