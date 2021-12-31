@@ -46,7 +46,7 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
+        ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
@@ -86,7 +86,7 @@ namespace quda
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int) const
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int k) const
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;

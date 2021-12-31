@@ -251,7 +251,7 @@ namespace quda
     using TunableReduction2D<block_size_y>::grid_stride;
 
   protected:
-    const int n_batch;
+    const unsigned int n_batch;
 
     /**
        @brief we don't want to inherit TunableReduction2D behaviour
@@ -321,7 +321,7 @@ namespace quda
       if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
 
       auto value = MultiReduction_host<Functor, Arg>(arg);
-      for (int j = 0; j < (int)arg.threads.y; j++) {
+      for (int j = 0; j < (int)arg.threads.z; j++) {
         // copy element by element to output vector
         for (int i = 0; i < output_size; i++) {
           reinterpret_cast<typename scalar<T>::type *>(&result[j])[i]
@@ -357,13 +357,13 @@ namespace quda
     }
 
   public:
-    TunableMultiReduction(const LatticeField &field, int n_batch,
+    TunableMultiReduction(const LatticeField &field, unsigned int n_batch,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableReduction2D<block_size_y>(field, location), n_batch(n_batch)
     {
     }
 
-    TunableMultiReduction(size_t n_items, int n_batch, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+    TunableMultiReduction(size_t n_items, unsigned int n_batch, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
       TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch)
     {
     }
@@ -386,15 +386,15 @@ namespace quda
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = n_batch;
+      param.block = {param.block.x, 1, 1};
+      param.grid = {param.grid.x, 1, n_batch};
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = n_batch;
+      param.block = {param.block.x, 1, 1};
+      param.grid = {param.grid.x, 1, n_batch};
     }
   };
 
