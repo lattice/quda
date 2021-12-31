@@ -136,6 +136,7 @@ namespace quda {
   // forward declarations
   class DiracMatrix; // What are the differences in these classes?
   class DiracM;
+  class DiracMLocal;
   class DiracMdagM;
   class DiracMdagMLocal;
   class DiracMMdag;
@@ -149,6 +150,7 @@ namespace quda {
 
     friend class DiracMatrix;
     friend class DiracM;
+    friend class DiracMLocal;
     friend class DiracMdagM;
     friend class DiracMdagMLocal;
     friend class DiracMMdag;
@@ -234,6 +236,14 @@ namespace quda {
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
+
+    /**
+       @brief Apply the local M operator: equivalent to applying zero Dirichlet
+              boundary condition to M on each rank. Depending on the number of
+              stencil steps of the fermion type, this may require additional effort
+              to include the terms that hop out of the boundary and then hop back.
+    */
+    virtual void MLocal(ColorSpinorField &, const ColorSpinorField &) const { errorQuda("Not implemented!\n"); }
 
     /**
        @brief Apply MdagM operator which may be optimized
@@ -1302,6 +1312,8 @@ public:
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
+    void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
+
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
 			 const QudaSolutionType) const;
@@ -1531,6 +1543,8 @@ public:
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void MLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			 ColorSpinorField &x, ColorSpinorField &b,
@@ -2120,6 +2134,61 @@ public:
     int getStencilSteps() const
     {
       return dirac->getStencilSteps(); 
+    }
+  };
+
+  /* Gloms onto a DiracOp and provides an operator() which applies its Local */
+  class DiracMLocal : public DiracMatrix
+  {
+
+  public:
+    DiracMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMLocal(const Dirac *d) : DiracMatrix(d) { }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MLocal(out, in); }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      bool reset1 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp;
+        reset1 = true;
+      }
+      dirac->MLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp1, ColorSpinorField &tmp2) const
+    {
+      bool reset1 = false;
+      bool reset2 = false;
+      if (!dirac->tmp1) {
+        dirac->tmp1 = &tmp1;
+        reset1 = true;
+      }
+      if (!dirac->tmp2) {
+        dirac->tmp2 = &tmp2;
+        reset2 = true;
+      }
+      dirac->MLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
+      if (reset2) {
+        dirac->tmp2 = NULL;
+        reset2 = false;
+      }
+      if (reset1) {
+        dirac->tmp1 = NULL;
+        reset1 = false;
+      }
+    }
+
+    int getStencilSteps() const
+    {
+      return dirac->getStencilSteps();
     }
   };
 

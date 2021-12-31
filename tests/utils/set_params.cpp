@@ -900,11 +900,18 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
+
+// domain decomposition preconditioner parameters
+  inv_param.inv_type_precondition = precon_type;
+
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
-  inv_param.verbosity_precondition = QUDA_SILENT;
+  inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_eigensolver = prec_eigensolver;
+  inv_param.omega = 1.0;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
