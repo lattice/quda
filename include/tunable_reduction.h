@@ -387,14 +387,14 @@ namespace quda
     {
       Tunable::initTuneParam(param);
       param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, n_batch};
+      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
       param.block = {param.block.x, 1, 1};
-      param.grid = {param.grid.x, 1, n_batch};
+      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
     }
   };
 

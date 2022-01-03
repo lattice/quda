@@ -63,6 +63,7 @@ namespace quda
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
+    static constexpr unsigned int max_n_batch_block = 1; /** by default reductions do not support batching withing the block */
 
   private:
     const int n_reduce; /** number of reductions of length n_item */
@@ -167,10 +168,11 @@ namespace quda
   template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    using BlockReduce = BlockReduce<T, block_size_x, block_size_y>;
-    __shared__ bool isLastBlockDone;
+    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
+    using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
+    __shared__ bool isLastBlockDone[n_batch_block];
 
-    T aggregate = BlockReduce().Reduce(in, r);
+    T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 
     if (target::thread_idx().x == 0 && target::thread_idx().y == 0) {
       // need to call placement new constructor since partial is not necessarily constructed
@@ -180,13 +182,13 @@ namespace quda
       auto value = arg.count[idx].fetch_add(1, cuda::std::memory_order_release);
 
       // determine if last block
-      isLastBlockDone = (value == (target::grid_dim().x - 1));
+      isLastBlockDone[target::thread_idx().z] = (value == (target::grid_dim().x - 1));
     }
 
     __syncthreads();
 
     // finish the reduction if last block
-    if (isLastBlockDone) {
+    if (isLastBlockDone[target::thread_idx().z]) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
       T sum = arg.init();
       while (i < target::grid_dim().x) {
@@ -194,7 +196,7 @@ namespace quda
         i += block_size_x * block_size_y;
       }
 
-      sum = BlockReduce().template Reduce<true>(sum, r);
+      sum = BlockReduce(target::thread_idx().z).Reduce(sum, r);
 
       // write out the final reduced value
       if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
