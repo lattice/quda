@@ -281,7 +281,7 @@ namespace quda {
         coeff_array<T> a, b, c;
 
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned int)max_n_reduce()) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
           // problem will fit, so do the computation
           multiReduce<ReducerDiagonal, ReducerOffDiagonal>(tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
         } else {
@@ -320,7 +320,7 @@ namespace quda {
         }
 
         // we are at the leaf of the binary tree (e.g., we ran the kernel): perform the row-to-column-major transpose here.
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true) && x.size() * y.size() <= (unsigned int)max_n_reduce()) {
+        if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++)

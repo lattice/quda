@@ -51,18 +51,14 @@ namespace quda
     ReduceArg(dim3 threads, int n_reduce = 1, bool = false) :
       kernel_param<use_kernel_arg>(threads),
       launch_error(QUDA_ERROR_UNINITIALIZED),
-      n_reduce(n_reduce),
-      partial(static_cast<decltype(partial)>(reducer::get_device_buffer())),
-      result_d(static_cast<decltype(result_d)>(reducer::get_mapped_buffer())),
-      result_h(static_cast<decltype(result_h)>(reducer::get_host_buffer())),
-      count {reducer::get_count<count_t>()}
+      n_reduce(n_reduce)
     {
-      // check reduction buffers are large enough if requested
-      auto max_reduce_blocks = 2 * device::processor_count();
-      auto reduce_size = max_reduce_blocks * n_reduce * sizeof(*partial);
-      if (reduce_size > reducer::buffer_size())
-        errorQuda("Requested reduction requires a larger buffer %lu than allocated %lu", reduce_size,
-                  reducer::buffer_size());
+      reducer::init(n_reduce, sizeof(*partial));
+      // these buffers may be allocated in init, so we can't set the local copies until now
+      partial = static_cast<decltype(partial)>(reducer::get_device_buffer());
+      result_d = static_cast<decltype(result_d)>(reducer::get_mapped_buffer());
+      result_h = static_cast<decltype(result_h)>(reducer::get_host_buffer());
+      count = reducer::get_count<count_t>();
 
       if (commAsyncReduction()) result_d = partial;
     }
