@@ -1,4 +1,5 @@
 #include <madwf_ml.h>
+#include <madwf_transfer.h>
 
 namespace quda
 {
@@ -32,11 +33,11 @@ namespace quda
 
   void MadwfAcc::apply(Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
-    madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, in, device_param, false);
+    madwf_ml::transfer_5d_hh(*forward_tmp, in, device_param, false);
     pushVerbosity(QUDA_SILENT);
     base(*backward_tmp, *forward_tmp);
     popVerbosity();
-    madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(out, *backward_tmp, device_param, true);
+    madwf_ml::transfer_5d_hh(out, *backward_tmp, device_param, true);
 
     blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);
   }
@@ -199,7 +200,7 @@ namespace quda
       for (const auto &phi : B) {
         chi2 += cost(ref, base, chi, *phi);
         // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
         pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
         popVerbosity();
@@ -207,15 +208,15 @@ namespace quda
         ref(Mchi, chi);
 
         // ATx(ATMchi, Mchi, T);
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, Mchi, device_param, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
         pushVerbosity(QUDA_SILENT);
         base(ATMchi, *forward_tmp);
         popVerbosity();
 
         // d1 = A * T * phi -x- M * chi
-        madwf_ml::tensor_5d_hh<transfer_float, transfer_t>(ATphi, Mchi, d1);
+        madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
         // d2 = A * T * M * phi -x- phi
-        madwf_ml::tensor_5d_hh<transfer_float, transfer_t>(ATMchi, *phi, d2);
+        madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
 
         axpby(D, 2.0f, d1, 2.0f, d2);
         if (tune_suppressor) { dmu += 2.0 * blas::reDotProduct(Mchi, *phi); }
@@ -232,22 +233,22 @@ namespace quda
         chi2 += ind_chi2;
 
         // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, device_param, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
         pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
         popVerbosity();
 
         // D' * A * T * phi
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(theta, ATphi, P, true);
+        madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
 
         // ATx(ADphi, *phi, P);
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(*forward_tmp, *phi, P, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
         pushVerbosity(QUDA_SILENT);
         base(ADphi, *forward_tmp);
         popVerbosity();
 
         // T' * A * D * phi
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(tmp, ADphi, device_param, true);
+        madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);
         // theta
         blas::axpy(1.0, theta, tmp);
         if (tune_suppressor) { blas::axpy(pmu, *phi, tmp); }
@@ -255,7 +256,7 @@ namespace quda
         ref(theta, tmp);
 
         // lambda = D' * A * D * phi
-        madwf_ml::transfer_5d_hh<transfer_float, transfer_t>(tmp, ADphi, P, true);
+        madwf_ml::transfer_5d_hh(tmp, ADphi, P, true);
 
         ref(lambda, tmp);
 

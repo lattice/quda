@@ -6,7 +6,6 @@
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
-#include <madwf_transfer.h>
 #include <polynomial.h>
 
 #include <random_quda.h>
@@ -18,6 +17,41 @@
 
 namespace quda
 {
+  namespace madwf_ml
+  {
+    /**
+      @brief defines the types of 5th dimension transfer matrices:
+      - Wilson: has both the color and spin indices, d.o.f = (4 x 3) * (4 x 3) = 144
+      - Spin: only has the spin index, d.o.f = (4) * (4) = 16
+      - Chiral: only has the chiral index, d.o.f = 2
+    */
+    enum class transfer_5D_t { Wilson = 144, Spin = 16, Chiral = 2 };
+
+    /**
+      @brief A helper class to instantiate the precisions (half and quarter) for madwf_tensor and madwf_transfer
+    */
+    template <template <class T> class F, class... Args>
+    void instantiate_madwf(ColorSpinorField &out, const ColorSpinorField &in, Args... args)
+    {
+      switch (checkPrecision(out, in)) {
+      case QUDA_HALF_PRECISION: {
+#if QUDA_PRECISION & 2
+        F<short> w(out, in, args...);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+      } break;
+      case QUDA_QUARTER_PRECISION: {
+#if QUDA_PRECISION & 1
+        F<int8_t> w(out, in, args...);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+      } break;
+      default: errorQuda("Unsupported precision %d", in.Precision());
+      }
+    }
+  } // namespace madwf_ml
 
   /**
     @brief A class for performing the Mobius Accelerated Domain Wall Fermion (MADWF) with the machine learning (ML)

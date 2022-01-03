@@ -6,6 +6,7 @@
 #include <reduce_helper.h>
 #include <kernels/madwf_transfer.cuh>
 #include <fast_intdiv.h>
+#include <madwf_ml.h>
 
 /**
   @file This file contains the argument and kernel that forms a tensor outer product in the fifth

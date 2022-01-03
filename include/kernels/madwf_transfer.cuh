@@ -4,6 +4,7 @@
 #include <color_spinor_field_order.h>
 #include <shared_memory_cache_helper.cuh>
 #include <madwf_transfer.h>
+#include <madwf_ml.h>
 
 /**
   @file This file contains the argument and kernel that applies fifth dimension transfer to a vector:
@@ -57,12 +58,12 @@ namespace quda
       return out;
     }
 
-    template <class storage_t, class matrix_t_, bool dagger_> struct Transfer5DArg : kernel_param<> {
+    template <class storage_t, bool dagger_> struct Transfer5DArg : kernel_param<> {
 
       using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
       using real = typename mapper<storage_t>::type;
       using Vector = ColorSpinor<real, 3, 4>;
-      using matrix_t = matrix_t_;
+      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
 
       static constexpr bool dagger = dagger_;
 
@@ -78,14 +79,14 @@ namespace quda
 
       const int nParity;
 
-      Transfer5DArg(ColorSpinorField &out, const ColorSpinorField &in, const matrix_t *wm_p) :
+      Transfer5DArg(ColorSpinorField &out, const ColorSpinorField &in, const MadwfAcc::transfer_float *wm_p) :
         kernel_param(dim3(out.VolumeCB() / out.X(4), out.X(4), out.SiteSubset())),
         out(out),
         in(in),
         Ls_out(out.X(4)),
         Ls_in(in.X(4)),
         volume_4d_cb(in.VolumeCB() / in.X(4)),
-        wm_p(wm_p),
+        wm_p(reinterpret_cast<const matrix_t *>(wm_p)),
         nParity(in.SiteSubset())
       {
 
