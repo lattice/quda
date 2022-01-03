@@ -121,27 +121,31 @@ namespace quda {
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
           const int length = x[0]->Length() / (nParity * M);
 
-          tp.block.x *= tp.aux.x; // include warp-split factor
-
-          switch (tp.aux.x) {
-          case 1:
-            Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
-                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-            break;
+          if (tp.aux.x > 1 && (length * tp.aux.x) % device::warp_size() != 0) {
+            // if problem size isn't divisible by the warp size then we can't use warp splitting
+            launchError() = QUDA_ERROR;
+          } else {
+            tp.block.x *= tp.aux.x; // include warp-split factor
+            switch (tp.aux.x) {
+            case 1:
+              Launch(tp, stream, MultiBlasArg<1, device_real_t, M, NXZ, device_store_t, N,
+                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+              break;
 #ifdef WARP_SPLIT
-          case 2:
-            Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
-                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-            break;
-          case 4:
-            Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
-                   device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
-            break;
+            case 2:
+              Launch(tp, stream, MultiBlasArg<2, device_real_t, M, NXZ, device_store_t, N,
+                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+              break;
+            case 4:
+              Launch(tp, stream, MultiBlasArg<4, device_real_t, M, NXZ, device_store_t, N,
+                     device_y_store_t, Ny, decltype(f_)>(x, y, z, w, f_, NYW, length));
+              break;
 #endif
-          default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
-          }
+            default: errorQuda("warp-split factor %d not instantiated", static_cast<int>(tp.aux.x));
+            }
 
-          tp.block.x /= tp.aux.x; // restore block size
+            tp.block.x /= tp.aux.x; // restore block size
+          }
         } else {
           errorQuda("Only implemented for GPU fields");
         }
