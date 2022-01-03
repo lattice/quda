@@ -14,6 +14,19 @@ namespace quda
   {
 
     /**
+       @brief Return the batch block size used for multi reductions.
+       For now, we leave this at 1 unless fast-compilation is enabled,
+       since it provides negligible benefit (but substantially longer
+       tuning).  When fast-compilation is enabled, the increased batch
+       count can dramatically improve performance.
+     */
+#ifndef QUDA_FAST_COMPILE_REDUCE
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
+#else
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
+#endif
+
+    /**
        @brief Parameter struct for generic multi-reduce blas kernel.
        @tparam real_ The precision of the calculation
        @tparam n_ The number of real elements per thread
@@ -36,6 +49,7 @@ namespace quda
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
+      static constexpr unsigned int max_n_batch_block = max_n_batch_block_multi_reduce();
       const int NYW;
       Reducer f;
 

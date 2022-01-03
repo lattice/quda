@@ -31,6 +31,25 @@ namespace quda {
         return false;
       }
 
+      bool advanceBlockDim(TuneParam &param) const
+      {
+        if (TunableMultiReduction::advanceBlockDim(param)) {
+          return true;
+        } else {
+          if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2) &&
+              param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block() &&
+              param.block.z < max_n_batch_block_multi_reduce()) {
+            param.block.z++;
+            param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+            return true;
+          } else { // we have run off the end so let's reset
+            param.block.z = 1;
+            param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+            return false;
+          }
+        }
+      }
+
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &, const ColorSpinorField &,
                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
@@ -77,6 +96,11 @@ namespace quda {
         strcat(aux, NXZ_str);
         strcat(aux, ",Nyw=");
         strcat(aux, NYW_str);
+
+        char max_nyw_tile[8];
+        u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
+        strcat(aux, ",max_nyw_tile=");
+        strcat(aux, max_nyw_tile);
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
@@ -133,7 +157,7 @@ namespace quda {
           if (b.data) { set_param<multi_1d>(arg, 'b', b); }
           if (c.data) { set_param<multi_1d>(arg, 'c', c); }
 #endif
-          // we intentional do not do a global reduction in the launch, and defer until the entire "tile" is complete
+          // we intentionally do not do a global reduction in the launch, and defer until the entire "tile" is complete
           launch<MultiReduce_, host_reduce_t, comm_reduce_null<host_reduce_t>>(result_, tp, stream, arg);
 
           // need to transpose for same order with vector thread reduction
@@ -362,6 +386,11 @@ namespace quda {
         strcat(aux, ",multi-blas-n=");
         strcat(aux, size);
 
+        char max_nyw_tile[8];
+        u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
+        strcat(aux, ",max_nyw_tile=");
+        strcat(aux, max_nyw_tile);
+
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
         // FIXME this will break if the kernels are destructive - which they aren't here
@@ -523,6 +552,11 @@ namespace quda {
         u64toa(size, MAX_MULTI_BLAS_N);
         strcat(aux, ",multi-blas-n=");
         strcat(aux, size);
+
+        char max_nyw_tile[8];
+        u32toa(max_nyw_tile, max_n_batch_block_multi_reduce());
+        strcat(aux, ",max_nyw_tile=");
+        strcat(aux, max_nyw_tile);
 
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
