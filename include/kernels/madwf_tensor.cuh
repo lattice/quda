@@ -39,8 +39,10 @@ namespace quda
 
       const int nParity;
 
+      static constexpr unsigned int max_n_batch_block = 1u;
+
       Tensor5DReduceArg(const ColorSpinorField &x, const ColorSpinorField &y) :
-        ReduceArg<reduce_t>(dim3(x.VolumeCB() / x.X(4), x.X(4) * y.X(4), x.SiteSubset()), x.X(4) * y.X(4)),
+        ReduceArg<reduce_t>(dim3(x.VolumeCB() / x.X(4), x.SiteSubset(), x.X(4) * y.X(4)), x.X(4) * y.X(4)),
         x(x),
         y(y),
         Ls_x(x.X(4)),
@@ -83,7 +85,7 @@ namespace quda
 
       static constexpr bool do_sum = true;
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int batch_idx, int parity)
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int parity, int batch_idx)
       {
         int y_s = batch_idx % arg.Ls_y;
         int x_s = batch_idx / arg.Ls_y;

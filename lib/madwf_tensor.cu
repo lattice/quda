@@ -45,7 +45,7 @@ namespace quda
         launch<Tensor5DReduce, reduce_t, comm_reduce_null<reduce_t>>(v, tp, stream, arg);
       }
 
-      long long flops() const { return 8ll * x.X(4) * 4ll * y.VolumeCB(); }
+      long long flops() const { return (18ll + 2ll + 2ll) * x.X(4) * 4ll * y.VolumeCB() * 4ll; }
       long long bytes() const { return y.Bytes() + x.Bytes(); }
     };
 

@@ -51,7 +51,7 @@ namespace quda
         }
       }
 
-      long long flops() const { return 8ll * out.X(4) * 4ll * in.VolumeCB(); }
+      long long flops() const { return 8ll * out.X(4) * 4ll * 12ll * in.VolumeCB(); }
       long long bytes() const { return in.Bytes() + out.Bytes(); }
     };
 
