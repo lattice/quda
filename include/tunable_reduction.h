@@ -364,17 +364,13 @@ namespace quda
   public:
     TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(field, location),
-      n_batch(n_batch),
-      n_batch_block_max(n_batch_block_max)
+      TunableReduction2D<block_size_y>(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
     TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(n_items, location),
-      n_batch(n_batch),
-      n_batch_block_max(n_batch_block_max)
+      TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -394,9 +390,9 @@ namespace quda
       if (rtn) {
         return true;
       } else {
-        if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2) &&
-            param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block() &&
-            param.block.z < n_batch_block_max) {
+        if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
+            && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
+            && param.block.z < n_batch_block_max) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
           return true;
