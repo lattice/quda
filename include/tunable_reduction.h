@@ -304,6 +304,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
@@ -315,6 +317,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       using reduce_t = typename Functor<Arg>::reduce_t;
 
       int input_size = vec_length<reduce_t>::value;
