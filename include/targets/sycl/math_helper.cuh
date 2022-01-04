@@ -1,10 +1,10 @@
 #pragma once
 
 #include <math.h>
-#include <array.h>
 
 namespace quda {
 
+#if 0
   /**
    * @brief Round
    * @param a the argument
@@ -17,30 +17,23 @@ namespace quda {
   {
     return sycl::round(a);
   }
+#endif
 
   /**
-   * @brief Max
-   * @param a the argument
-   * @param b the argument
-   *
-   * Max
-   *
+   * @brief Maximum of two numbers
+   * @param a first number
+   * @param b second number
    */
   template<typename T>
-  inline T max(T a, T b)
-  {
-    return sycl::max(a, b);
-  }
+  inline __host__ __device__ T max(const T &a, const T &b) { return a > b ? a : b; }
 
-  template<typename T, int N>
-  inline array<T,N> max(const array<T,N> &a, const array<T,N> &b)
-  {
-    array<T,N> result;
-    for(int i=0; i<N; i++) {
-      result[i] = sycl::max(a[i], b[i]);
-    }
-    return result;
-  }
+  /**
+   * @brief Minimum of two numbers
+   * @param a first number
+   * @param b second number
+   */
+  template<typename T>
+  inline __host__ __device__ T min(const T &a, const T &b) { return a < b ? a : b; }
 
   /**
    * @brief Combined sin and cos colculation in QUDA NAMESPACE
