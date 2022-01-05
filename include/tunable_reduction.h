@@ -304,6 +304,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
@@ -315,6 +317,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       using reduce_t = typename Functor<Arg>::reduce_t;
 
       int input_size = vec_length<reduce_t>::value;
@@ -360,17 +364,13 @@ namespace quda
   public:
     TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(field, location),
-      n_batch(n_batch),
-      n_batch_block_max(n_batch_block_max)
+      TunableReduction2D<block_size_y>(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
     TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(n_items, location),
-      n_batch(n_batch),
-      n_batch_block_max(n_batch_block_max)
+      TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -390,9 +390,9 @@ namespace quda
       if (rtn) {
         return true;
       } else {
-        if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2) &&
-            param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block() &&
-            param.block.z < n_batch_block_max) {
+        if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
+            && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
+            && param.block.z < n_batch_block_max) {
           param.block.z++;
           param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
           return true;

@@ -176,10 +176,7 @@ bool is_site_unroll(Kernel kernel)
 }
 
 // return false if kernel does not support mixed precision (y prec > x prec)
-bool is_mixed(Kernel kernel)
-{
-  return (kernel != Kernel::caxpyz_block);
-}
+bool is_mixed(Kernel kernel) { return (kernel != Kernel::caxpyz_block); }
 
 bool skip_kernel(prec_pair_t pair, Kernel kernel)
 {
