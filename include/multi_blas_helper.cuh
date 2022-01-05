@@ -150,16 +150,9 @@ namespace quda
        NXZ unroll for multi-reductions lead to poor performance due to
        register spilling.
        @tparam reducer Whether we using a reducer
-       @tparam fixed Whether we are using fixed point
        @return Max power of two
      */
-#if QUDA_PRECISION <= 3
-    // if we only have a fixed-point build then we need this WAR to avoid some invalid template instantiations
-    // this is temporary - can be removed once the norm and v pointers are fused
-    template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : 64; }
-#else
-    template <bool reducer, bool fixed> constexpr int max_NXZ_power2() { return reducer ? 16 : (fixed ? 64 : 128); }
-#endif
+    template <bool reducer> constexpr int max_NXZ_power2() { return reducer ? 16 : 128; }
 
     /**
        @brief Return the maximum power of two enabled by default for
@@ -168,10 +161,9 @@ namespace quda
        NXZ unroll for multi-reductions lead to poor performance due to
        register spilling.
        @param[in] reducer Whether we using a reducer
-       @param[in] fixed Whether we are using fixed point
        @return Max power of two
     */
-    inline int max_NXZ_power2(bool reducer, bool fixed = false) { return reducer ? 16 : (fixed ? 64 : 128); }
+    inline int max_NXZ_power2(bool reducer) { return reducer ? 16 : 128; }
 
     /**
        @brief Return if the requested nxz parameter is valid or
@@ -180,10 +172,10 @@ namespace quda
        @param[in] nxz Requested nxz parameter
        @return True if valid, false if not
      */
-    inline bool is_valid_NXZ(int nxz, bool reducer, bool fixed = false)
+    inline bool is_valid_NXZ(int nxz, bool reducer)
     {
       if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
-          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer, fixed))) {
+          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer))) {
         return true;
       } else {
         return false;
@@ -258,7 +250,7 @@ namespace quda
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      NXZ = is_valid_NXZ(NXZ, Functor::reducer, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
+      NXZ = is_valid_NXZ(NXZ, Functor::reducer) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size = x_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_y_size = y_fixed ? sizeof(Spinor<short, 4>) : sizeof(Spinor<float, 4>);
       size_t spinor_z_size = spinor_x_size;
@@ -293,16 +285,12 @@ namespace quda
       constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Functor>();
       const int NYW_max_check = max_YW_size<Functor>(x.size(), x[0]->Precision(), y[0]->Precision());
 
-      if (!is_valid_NXZ(NXZ, f.reducer, x[0]->Precision() < QUDA_SINGLE_PRECISION))
-        errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ(NXZ, f.reducer)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NXZ != (int)x.size()) errorQuda("Compile-time %d and run-time %lu NXZ do not match", NXZ, x.size());
       if (NYW_max != NYW_max_check) errorQuda("Compile-time %d and run-time %d limits disagree", NYW_max, NYW_max_check);
       if (f.NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", f.NYW, NYW_max);
       if ( !(f.reducer || f.multi_1d) && NXZ * f.NYW * sizeof(typename Functor::coeff_t) > max_array_size())
         errorQuda("Coefficient matrix exceeds max size (%lu > %lu)", NXZ * f.NYW * sizeof(typename Functor::coeff_t), max_array_size());
-      if (f.reducer && NXZ * f.NYW > max_n_reduce())
-        errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d * %d > %d",
-                  NXZ * f.NYW, NXZ, f.NYW, max_n_reduce());
       if (Functor::multi_1d && std::min(NXZ, f.NYW) != 1)
         errorQuda("Expected 1-d multi-blas but appears 2-d (NXZ = %d, NYW = %d)", NXZ, f.NYW);
       if (Functor::multi_1d && std::max(NXZ, f.NYW) > max_N_multi_1d())
