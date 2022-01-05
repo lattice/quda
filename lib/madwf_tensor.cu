@@ -45,7 +45,7 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         Arg arg(x, y);
-        arg.set_device_output_buffer(reinterpret_cast<reduce_t *>(wm_p));
+        arg.set_output_async_buffer(reinterpret_cast<reduce_t *>(wm_p));
         std::vector<reduce_t> v; // dummy vector
         launch<Tensor5DReduce, reduce_t, comm_reduce_null<reduce_t>>(v, tp, stream, arg);
       }

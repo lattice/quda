@@ -99,7 +99,7 @@ namespace quda
         for (int y_spin = 0; y_spin < spin_dim; y_spin++) {
 #pragma unroll
           for (int x_spin = 0; x_spin < spin_dim; x_spin++) {
-            sum[x_spin * spin_dim + y_spin] += conj(innerProduct(x, y, x_spin, y_spin));
+            sum[x_spin * spin_dim + y_spin] += innerProduct(y, x, y_spin, x_spin);
           }
         }
 
