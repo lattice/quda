@@ -245,7 +245,7 @@ namespace quda {
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
     /**
-      When CG is used as a preconditioner, we do not want enable the `advanced features`, which includes:
+      When CG is used as a preconditioner, and we disable the `advanced features`, these features are turned off:
       - Reliable updates
       - Pipelining
       - Always use zero as the initial guess
