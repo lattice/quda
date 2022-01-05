@@ -4,6 +4,7 @@
 #include <madwf_transfer.h>
 #include <kernels/madwf_transfer.cuh>
 #include <madwf_ml.h>
+#include <uint_to_char.h>
 
 namespace quda
 {
@@ -18,7 +19,6 @@ namespace quda
       bool dagger;
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
 
-    private:
       unsigned int sharedBytesPerThread() const { return 0; }
 
       unsigned int sharedBytesPerBlock(const TuneParam &) const { return out.X(4) * in.X(4) * sizeof(matrix_t); }
@@ -32,9 +32,13 @@ namespace quda
       {
         TunableKernel2D_base<false>::resizeStep(out.X(4)); // Ls must be contained in the block
 
-        char tmp[512];
-        sprintf(tmp, ",%02d->%02d", in.X(4), out.X(4));
-        strcat(aux, tmp);
+        char in_str[16];
+        char out_str[16];
+        i32toa(in_str, in.X(4));
+        strcat(aux, in_str);
+        strcat(aux, "->");
+        i32toa(out_str, out.X(4));
+        strcat(aux, out_str);
         strcat(aux, ",transfer_5D");
         if (dagger) strcat(aux, ",Dagger");
 

@@ -70,37 +70,7 @@ namespace quda
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
-
-      profile.TPSTART(QUDA_PROFILE_IO);
-
-      char param_file_name[512];
-      // Note that all ranks load from the same file.
-      sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
-      std::string param_file_name_str(param_file_name);
-      auto search_cache = host_training_param_cache.find(param_file_name_str);
-      if (search_cache != host_training_param_cache.end()) {
-        host_param = search_cache->second;
-        if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training params loaded from CACHE.\n"); }
-      } else {
-        // the parameter is not in cache: load from file system.
-        std::string save_param_path(param.madwf_param_infile);
-        save_param_path += param_file_name_str;
-        FILE *fp = fopen(save_param_path.c_str(), "rb");
-        if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
-        size_t fread_count = fread(host_param.data(), sizeof(float), host_param.size(), fp);
-        fclose(fp);
-        if (fread_count != host_param.size()) {
-          errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
-                    host_param.size());
-        }
-        host_training_param_cache.insert({param_file_name_str, host_param});
-        printf("Rank %05d: Training params loaded from FILE %s ... \n", comm_rank(), save_param_path.c_str());
-        comm_barrier();
-        if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("All ranks loaded.\n"); }
-      }
-      device_param.resize(param_size); // 2 for complex
-      device_param.from_host(host_param);
-      trained = true;
+      load_parameter(Ls, Ls_base, param_size);
 
       ColorSpinorParam csParam(in);
       csParam.x[4] = Ls_base;
@@ -109,8 +79,6 @@ namespace quda
 
       forward_tmp = std::make_unique<ColorSpinorField>(csParam);
       backward_tmp = std::make_unique<ColorSpinorField>(csParam);
-
-      profile.TPSTOP(QUDA_PROFILE_IO);
 
       return;
     }
@@ -294,9 +262,6 @@ namespace quda
       }
     }
 
-    profile.TPSTOP(QUDA_PROFILE_TRAINING);
-    profile.TPSTART(QUDA_PROFILE_IO);
-
     trained = true;
 
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
@@ -309,25 +274,10 @@ namespace quda
       }
       count++;
     }
+    profile.TPSTOP(QUDA_PROFILE_TRAINING);
 
     if (param.madwf_param_save) {
-      host_param = device_param.to_host();
-
-      std::string save_param_path(param.madwf_param_outfile);
-      char cstring[512];
-      sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
-      save_param_path += std::string(cstring);
-      FILE *fp = fopen(save_param_path.c_str(), "w");
-      size_t fwrite_count = fwrite(host_param.data(), sizeof(transfer_float), host_param.size(), fp);
-      fclose(fp);
-      if (fwrite_count != host_param.size()) {
-        errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
-                  host_param.size());
-      }
-      if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str());
-      }
-
+      save_parameter(Ls, Ls_base);
       comm_barrier();
     }
 
@@ -335,6 +285,63 @@ namespace quda
     for (auto &pB : B) { delete pB; }
 
     commGlobalReductionPop();
+  }
+
+  void MadwfAcc::save_parameter(int Ls, int Ls_base) {
+    profile.TPSTART(QUDA_PROFILE_IO);
+    std::vector<transfer_float> host_param = device_param.to_host();
+
+    std::string save_param_path(param.madwf_param_outfile);
+    char cstring[512];
+    sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
+    save_param_path += std::string(cstring);
+    FILE *fp = fopen(save_param_path.c_str(), "w");
+    size_t fwrite_count = fwrite(host_param.data(), sizeof(transfer_float), host_param.size(), fp);
+    fclose(fp);
+    if (fwrite_count != host_param.size()) {
+      errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
+          host_param.size());
+    }
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str());
+    }
+    profile.TPSTOP(QUDA_PROFILE_IO);
+  }
+
+  void MadwfAcc::load_parameter(int Ls, int Ls_base, size_t param_size) {
+    profile.TPSTART(QUDA_PROFILE_IO);
+
+    std::vector<transfer_float> host_param(param_size);
+
+    char param_file_name[512];
+    // Note that all ranks load from the same file.
+    sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
+    std::string param_file_name_str(param_file_name);
+    auto search_cache = host_training_param_cache.find(param_file_name_str);
+    if (search_cache != host_training_param_cache.end()) {
+      host_param = search_cache->second;
+      if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training params loaded from CACHE.\n"); }
+    } else {
+      // the parameter is not in cache: load from file system.
+      std::string save_param_path(param.madwf_param_infile);
+      save_param_path += param_file_name_str;
+      FILE *fp = fopen(save_param_path.c_str(), "rb");
+      if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
+      size_t fread_count = fread(host_param.data(), sizeof(float), host_param.size(), fp);
+      fclose(fp);
+      if (fread_count != host_param.size()) {
+        errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
+            host_param.size());
+      }
+      host_training_param_cache.insert({param_file_name_str, host_param});
+      printf("Rank %05d: Training params loaded from FILE %s ... \n", comm_rank(), save_param_path.c_str());
+      comm_barrier();
+      if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("All ranks loaded.\n"); }
+    }
+    device_param.resize(param_size); // 2 for complex
+    device_param.from_host(host_param);
+    trained = true;
+
     profile.TPSTOP(QUDA_PROFILE_IO);
   }
 } // namespace quda

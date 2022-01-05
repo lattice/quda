@@ -5,6 +5,7 @@
 #include <kernels/madwf_tensor.cuh>
 #include <tunable_reduction.h>
 #include <madwf_ml.h>
+#include <uint_to_char.h>
 
 namespace quda
 {
@@ -19,16 +20,20 @@ namespace quda
       using reduce_t = typename Arg::reduce_t;
       reduce_t *wm_p;
 
-    private:
       unsigned int minThreads() const { return x.VolumeCB() / x.X(4); }
 
     public:
       tensor_5D_wrapper(const ColorSpinorField &x, const ColorSpinorField &y, MadwfAcc::transfer_float *wm_p) :
         TunableMultiReduction(x, x.X(4) * y.X(4)), x(x), y(y), wm_p(reinterpret_cast<reduce_t *>(wm_p))
       {
-        char tmp[512];
-        sprintf(tmp, ",%02d->%02d", y.X(4), x.X(4));
-        strcat(aux, tmp);
+        char x_str[16];
+        char y_str[16];
+        strcat(aux, ",");
+        i32toa(x_str, x.X(4));
+        strcat(aux, x_str);
+        strcat(aux, "x");
+        i32toa(y_str, y.X(4));
+        strcat(aux, y_str);
         strcat(aux, ",tensor_5D");
 
         commAsyncReductionSet(true);

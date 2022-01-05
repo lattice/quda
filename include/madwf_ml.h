@@ -35,18 +35,18 @@ namespace quda
     {
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-#if QUDA_PRECISION & 2
-        F<short> w(out, in, args...);
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
+        if constexpr (QUDA_PRECISION & 2) {
+          F<short> w(out, in, args...);
+        } else {
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+        }
       } break;
       case QUDA_QUARTER_PRECISION: {
-#if QUDA_PRECISION & 1
-        F<int8_t> w(out, in, args...);
-#else
-        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
-#endif
+        if constexpr (QUDA_PRECISION & 1) {
+          F<int8_t> w(out, in, args...);
+        } else {
+          errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+        }
       } break;
       default: errorQuda("Unsupported precision %d", in.Precision());
       }
@@ -106,6 +106,21 @@ namespace quda
       @param[in] in the input vector
     */
     double cost(const DiracMatrix &ref, Solver &base, ColorSpinorField &out, const ColorSpinorField &in);
+
+    /**
+      @brief Save the current parameter to disk
+      @param[in] Ls the original (larger) 5th dimension size
+      @param[in] Ls_base the reduced 5th dimension size
+    */
+    void save_parameter(int Ls, int Ls_base);
+
+    /**
+      @brief Load the parameter from disk
+      @param[in] Ls the original (larger) 5th dimension size
+      @param[in] Ls_base the reduced 5th dimension size
+      @param[in] param_size the expected parameter size
+    */
+    void load_parameter(int Ls, int Ls_base, size_t param_size);
 
   public:
     /**
