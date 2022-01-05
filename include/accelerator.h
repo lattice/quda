@@ -12,6 +12,8 @@ namespace quda
     - Now assume we have another set of operator B and vector c and y. The acceleration works as
         y = forward(x) -> c = Solver[B, y] -> b = backward(c),
       as long as Solver[B, y] is faster than Solver[A, x], a speed up might be achieved.
+    - As an analogy to multi-grid, forward is the restrictor, backward is the prolongator, and Solver is
+      the coarse grid solve.
     - In this class, the overloaded operator() performs the above `acceleration`.
     - The method train_param provides the transformer_t class the original operator A (`matPrecon`), the
       Solver (`base_solver`), and another solver object that can be used to generate null space vector.

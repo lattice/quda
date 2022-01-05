@@ -59,6 +59,13 @@ namespace quda
     - As indicated, the parameters, ultimately contained in `device_param`, need to be trained by calling the
     `train` method.
     - Once trained, the accelerated operator can be applied with the `apply` method.
+    @param transfer_float the floating-point type we use for the transfer matrix
+    @param trained whether this object has been trained or not
+    @param mu internal copy of the suppression factor
+    @param forward_tmp, backward_tmp persistent ColorSpinorField buffers for reuse
+    @param prec_precondition the underlying preconditioning precision
+    @param host_training_param_cache a static map that holds the cached parameters, so we do not need to load the same
+      set of parameters multiple times from disk
   */
   struct MadwfAcc {
 
@@ -66,10 +73,8 @@ namespace quda
 
     static constexpr madwf_ml::transfer_5D_t transfer_t = madwf_ml::transfer_5D_t::Spin;
 
-    // The parameters to be trained.
     using device_container = device_vector<transfer_float>;
 
-    // Has device_param been trained?
     bool trained = false;
 
   private:
@@ -77,19 +82,15 @@ namespace quda
 
     MadwfParam param;
 
-    double mu; // internal copy of the suppression factor
+    double mu;
 
-    // persistent buffers for reuse.
     std::unique_ptr<ColorSpinorField> forward_tmp;
     std::unique_ptr<ColorSpinorField> backward_tmp;
 
-    // The underlying preconditioning precision
     QudaPrecision prec_precondition;
 
-    // A static map that holds the cached parameters
     static std::unordered_map<std::string, std::vector<transfer_float>> host_training_param_cache; // empty map
 
-    // Time profile
     TimeProfile &profile;
 
     /**

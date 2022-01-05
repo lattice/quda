@@ -34,7 +34,7 @@ namespace quda
     {
       size_t bytes = _size * sizeof(real);
       if (bytes > 0) {
-        _device_data = reinterpret_cast<real *>(device_malloc(bytes));
+        _device_data = reinterpret_cast<real *>(pool_device_malloc(bytes));
         if (!_device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.", bytes); }
         qudaMemcpy(_device_data, host_vector.data(), bytes, qudaMemcpyHostToDevice);
       }
