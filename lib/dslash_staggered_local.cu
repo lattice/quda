@@ -69,18 +69,22 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, phase> arg(out, in, U, L, a, x, parity, step);
-      if (step == QUDA_STAGGERED_LOCAL_STEP1 || step == QUDA_STAGGERED_LOCAL_STEP2) {
-        launch<LocalStaggeredHoppingApply>(tp, stream, arg);
+      if (step == QUDA_STAGGERED_LOCAL_STEP1) {
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP1, phase> arg(out, in, U, L, a, x, parity);
+        launch<LocalStaggeredApply>(tp, stream, arg);
+      } else if (step == QUDA_STAGGERED_LOCAL_STEP2) {
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_STEP2, phase> arg(out, in, U, L, a, x, parity);
+        launch<LocalStaggeredApply>(tp, stream, arg);
       } else if (step == QUDA_STAGGERED_LOCAL_CLOVER) {
-        //launch<LocalStaggeredCloverApply>(tp, stream, arg);
+        LocalStaggeredArg<Float, nColor, reconstruct_u, reconstruct_l, improved, QUDA_STAGGERED_LOCAL_CLOVER, phase> arg(out, in, U, L, a, x, parity);
+        launch<LocalStaggeredApply>(tp, stream, arg);
       } else {
         errorQuda("Invalid staggered local type %d", step);
       }
     }
 
-    //void preTune() { out.backup(); } // Restore if the in and out fields alias
-    //void postTune() { out.restore(); } // Restore if the in and out fields alias
+    void preTune() { if (step == QUDA_STAGGERED_LOCAL_CLOVER) out.backup(); } // Restore if the in and out fields alias
+    void postTune() { if (step == QUDA_STAGGERED_LOCAL_CLOVER) out.restore(); } // Restore if the in and out fields alias
     long long flops() const {
       return 0ll; // FIXME
     }

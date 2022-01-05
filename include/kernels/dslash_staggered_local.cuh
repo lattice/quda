@@ -13,7 +13,7 @@ namespace quda
      @brief Parameter structure for driving the local Staggered Dslash operator
   */
   template <typename Float, int nColor_, QudaReconstructType reconstruct_u_,
-            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredLocalType step_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct LocalStaggeredArg : kernel_param<> {
     typedef typename mapper<Float>::type real;
 
@@ -46,15 +46,15 @@ namespace quda
 
     const real a; /** xpay scale factor */
     const int parity; /** parity we're gathering from */
-    const QudaStaggeredLocalType step; /** which step of the local staggered dslash we're applying */
 
     const real tboundary; /** temporal boundary condition */
     const bool is_first_time_slice; /** are we on the first (global) time slice */
     const bool is_last_time_slice; /** are we on the last (global) time slice */
-    static constexpr bool improved = improved_;
+    static constexpr bool improved = improved_; /** whether or not we're applying the improved operator */
+    static constexpr QudaStaggeredLocalType step = step_; /** which step of the local staggered dslash we're applying */
 
     LocalStaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
-                 const ColorSpinorField &x, int parity, QudaStaggeredLocalType step) :
+                 const ColorSpinorField &x, int parity) :
       kernel_param(dim3(out.VolumeCB(), 1, 1)),
       out(out),
       in(in),
@@ -63,7 +63,6 @@ namespace quda
       L(L),
       a(a),
       parity(parity),
-      step(step),
       tboundary(U.TBoundary()),
       is_first_time_slice(comm_coord(3) == 0 ? true : false),
       is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false)
@@ -84,9 +83,9 @@ namespace quda
   };
 
   template <typename Arg>
-  struct LocalStaggeredHoppingApply {
+  struct LocalStaggeredApply {
     const Arg &arg;
-    constexpr LocalStaggeredHoppingApply(const Arg &arg) : arg(arg) {}
+    constexpr LocalStaggeredApply(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
 
     /**
@@ -103,7 +102,6 @@ namespace quda
 
       // to be updated if we implement a full-parity version
       constexpr int my_spinor_parity = 0;
-      constexpr int their_spinor_parity = 0;
 
       Vector out;
 
@@ -112,54 +110,114 @@ namespace quda
       coord.X = getCoords(coord, x_cb, arg.dim, arg.parity);
       coord.s = 0;
 
+      // helper lambda for getting U
+      auto getU = [&] (int d_, int x_cb_, int parity_, int sign_) -> Link {
+        return arg.improved ? arg.U(d_, x_cb_, parity_) : arg.U(d_, x_cb_, parity_, StaggeredPhase(coord, d_, sign_, arg));
+      };
+
+      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
+
+        // helper lambda for getting U from ghost zone
+        auto getUGhost = [&] (int d_, int ghost_idx_, int parity_, int sign_) -> Link {
+          return arg.improved ? arg.U.Ghost(d_, ghost_idx_, parity_) : arg.U.Ghost(d_, ghost_idx_, parity_, StaggeredPhase(coord, d_, sign_, arg));
+        };
+
+        // the "in" vector at out's site --- this gets reused many times so (for now) we stick it in registers
+        Vector in = arg.in(x_cb, my_spinor_parity);
+
 #pragma unroll
-      for (int d = 0; d < nDim; d++)
-      {
+        for (int d = 0; d < nDim; d++) {
 
-        // standard - forward direction
-        if (!arg.is_partitioned[d] || (coord[d] + 1) < arg.dim[d])
-        {
-          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ? arg.U(d, coord.x_cb, arg.parity) : arg.U(d, coord.x_cb, arg.parity, StaggeredPhase(coord, d, +1, arg));
-          Vector in = arg.in(fwd_idx, their_spinor_parity);
-          out = mv_add(U, in, out);
-        }
+          // standard - forward direction
+          if (arg.is_partitioned[d] && (coord[d] + 1) == arg.dim[d]) {
+            Vector accum;
+            const Link U = getU(d, x_cb, arg.parity, +1);
+            {
+              // backward: gather from (X - 1), store in X (ghost)
+              // would have been in previous pass
+              accum = mv_add(conj(U), -accum, accum);
+            }
+            {
+              // forward: gather from X (ghost), store in (X - 1)
+              out = mv_add(U, accum, out);
+            }
+          }
 
-        // improved - forward direction
-        if (arg.improved && (!arg.is_partitioned[d] || (coord[d] + 3) < arg.dim[d]))
-        {
-          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
-          const Link L = arg.L(d, coord.x_cb, arg.parity);
-          const Vector in = arg.in(fwd3_idx, their_spinor_parity);
-          out = mv_add(L, in, out);
-        }
+          // standard - backward direction
+          if (arg.is_partitioned[d] && (coord[d] - 1) == -1) {
+            Vector accum;
+            const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+            const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
+            {
+              // forward: gather from 0, store in -1 (ghost)
+              // would have been in previous pass
+              accum = mv_add(U, in, accum);
+            }
+            {
+              // forward: gather from -1 (ghost), store in 0
+              out = mv_add(conj(U), -accum, out);
+            }
+          }
+        } // dimension
 
-        // standard - backward direction
-        if (!arg.is_partitioned[d] || (coord[d] - 1) >= 0)
-        {
-          const int back_idx = linkIndexM1(coord, arg.dim, d);
-          const int gauge_idx = back_idx;
-          const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - arg.parity) :
-            arg.U(d, gauge_idx, 1 - arg.parity, StaggeredPhase(coord, d, -1, arg));
-          Vector in = arg.in(back_idx, their_spinor_parity);
-          out = mv_add(conj(U), -in, out);
-        }
+      } else {
 
-        // improved - backward direction
-        if (arg.improved && (!arg.is_partitioned[d] || (coord[d] - 3) >= 0))
-        {
-          const int back3_idx = linkIndexM3(coord, arg.dim, d);
-          const int gauge_idx = back3_idx;
-          const Link L = arg.L(d, gauge_idx, 1 - arg.parity);
-          const Vector in = arg.in(back3_idx, their_spinor_parity);
-          out = mv_add(conj(L), -in, out);
-        }
+        // to be updated if we implement a full-parity version
+        constexpr int their_spinor_parity = 0;
 
-      } // dimension
+#pragma unroll
+        for (int d = 0; d < nDim; d++) {
 
-      if (arg.step == QUDA_STAGGERED_LOCAL_STEP2) {
+          // standard - forward direction
+          if (!arg.is_partitioned[d] || (coord[d] + 1) < arg.dim[d])
+          {
+            const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+            const Link U = getU(d, coord.x_cb, arg.parity, +1);
+            Vector in = arg.in(fwd_idx, their_spinor_parity);
+            out = mv_add(U, in, out);
+          }
+
+          // improved - forward direction
+          if (arg.improved && (!arg.is_partitioned[d] || (coord[d] + 3) < arg.dim[d]))
+          {
+            const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
+            const Link L = arg.L(d, coord.x_cb, arg.parity);
+            const Vector in = arg.in(fwd3_idx, their_spinor_parity);
+            out = mv_add(L, in, out);
+          }
+
+          // standard - backward direction
+          if (!arg.is_partitioned[d] || (coord[d] - 1) >= 0)
+          {
+            const int back_idx = linkIndexM1(coord, arg.dim, d);
+            const int gauge_idx = back_idx;
+            const Link U = getU(d, gauge_idx, 1 - arg.parity, -1);
+            Vector in = arg.in(back_idx, their_spinor_parity);
+            out = mv_add(conj(U), -in, out);
+          }
+
+          // improved - backward direction
+          if (arg.improved && (!arg.is_partitioned[d] || (coord[d] - 3) >= 0))
+          {
+            const int back3_idx = linkIndexM3(coord, arg.dim, d);
+            const int gauge_idx = back3_idx;
+            const Link L = arg.L(d, gauge_idx, 1 - arg.parity);
+            const Vector in = arg.in(back3_idx, their_spinor_parity);
+            out = mv_add(conj(L), -in, out);
+          }
+
+        } // dimension
+
+      } // is clover
+
+      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_STEP2) {
         Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * x - out;
+      }
+
+      if constexpr (Arg::step == QUDA_STAGGERED_LOCAL_CLOVER) {
+        Vector partial_out = arg.out(coord.x_cb, my_spinor_parity);
+        out = partial_out - out;
       }
 
       arg.out(coord.x_cb, my_spinor_parity) = out;

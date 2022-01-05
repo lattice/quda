@@ -223,7 +223,7 @@ namespace quda {
     ApplyLocalStaggered(out, *tmp1, *gauge, *gauge, 4. * mass * mass, in, parity, false, QUDA_STAGGERED_LOCAL_STEP2);
 
     // apply boundary "clover" terms
-    //ApplyLocalStaggered(out, in, *gauge, *gauge, 0., in, parity, false, QUDA_STAGGERED_LOCAL_CLOVER);
+    ApplyLocalStaggered(out, in, *gauge, *gauge, 0., in, parity, false, QUDA_STAGGERED_LOCAL_CLOVER);
 
     deleteTmp(&tmp1, reset);
   }
