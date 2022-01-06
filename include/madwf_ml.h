@@ -35,14 +35,14 @@ namespace quda
     {
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-        if constexpr (QUDA_PRECISION & 2) {
+        if constexpr (static_cast<bool>(QUDA_PRECISION & 2)) {
           F<short> w(out, in, args...);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
         }
       } break;
       case QUDA_QUARTER_PRECISION: {
-        if constexpr (QUDA_PRECISION & 1) {
+        if constexpr (static_cast<bool>(QUDA_PRECISION & 1)) {
           F<int8_t> w(out, in, args...);
         } else {
           errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);

@@ -71,7 +71,7 @@ namespace quda
 
     ~device_vector()
     {
-      if (_device_data) { device_free(_device_data); }
+      if (_device_data) { pool_device_free(_device_data); }
     }
 
     /**
