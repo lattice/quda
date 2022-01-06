@@ -31,31 +31,12 @@ namespace quda {
         return false;
       }
 
-      bool advanceBlockDim(TuneParam &param) const
-      {
-        if (TunableMultiReduction::advanceBlockDim(param)) {
-          return true;
-        } else {
-          if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2) &&
-              param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block() &&
-              param.block.z < max_n_batch_block_multi_reduce()) {
-            param.block.z++;
-            param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
-            return true;
-          } else { // we have run off the end so let's reset
-            param.block.z = 1;
-            param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
-            return false;
-          }
-        }
-      }
-
     public:
       MultiReduce(const T &a, const T &b, const T &c, const ColorSpinorField &, const ColorSpinorField &,
                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                   host_reduce_t *result) :
-        TunableMultiReduction(*x[0], y.size()),
+        TunableMultiReduction(*x[0], y.size(), max_n_batch_block_multi_reduce()),
         NXZ(x.size()),
         NYW(y.size()),
         r(NXZ, NYW),

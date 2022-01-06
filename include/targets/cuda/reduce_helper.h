@@ -63,7 +63,8 @@ namespace quda
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
     qudaError_t launch_error; /** only do complete if no launch error to avoid hang */
-    static constexpr unsigned int max_n_batch_block = 1; /** by default reductions do not support batching withing the block */
+    static constexpr unsigned int max_n_batch_block
+      = 1; /** by default reductions do not support batching withing the block */
 
   private:
     const int n_reduce; /** number of reductions of length n_item */
@@ -164,7 +165,8 @@ namespace quda
   template <int block_size_x, int block_size_y, typename Reducer, typename Arg, typename T>
   __device__ inline void reduce(Arg &arg, const Reducer &r, const T &in, const int idx)
   {
-    constexpr auto n_batch_block = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
+    constexpr auto n_batch_block
+      = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     __shared__ bool isLastBlockDone[n_batch_block];
 

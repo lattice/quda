@@ -146,8 +146,8 @@ namespace quda {
       int nthreads = param.block.x * param.block.y * param.block.z;
       param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));
 
-      if (param.block.x > max_threads || param.shared_bytes > max_shared ||
-          param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
+      if (param.block.x > max_threads || param.shared_bytes > max_shared
+          || param.block.x * param.block.y * param.block.z > device::max_threads_per_block()) {
         resetBlockDim(param);
         int nthreads = param.block.x * param.block.y * param.block.z;
         param.shared_bytes = std::max(sharedBytesPerThread() * nthreads, sharedBytesPerBlock(param));

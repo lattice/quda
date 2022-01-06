@@ -8,16 +8,18 @@
 
 namespace quda {
 
-  namespace reducer {
+  namespace reducer
+  {
 
     /**
        @brief Free any persistent allocations associated with global reduction
      */
     void destroy();
 
-  }
+  } // namespace reducer
 
-  namespace blas {
+  namespace blas
+  {
 
     void setParam(int kernel, int prec, int threads, int blocks);
 
