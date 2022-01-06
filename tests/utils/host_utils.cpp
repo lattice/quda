@@ -69,6 +69,7 @@ void setQudaPrecisions()
   if (prec_eigensolver == QUDA_INVALID_PRECISION) prec_eigensolver = prec_sloppy;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) prec_refinement_sloppy = prec_precondition;
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
@@ -319,7 +320,7 @@ void initRand()
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #endif
 
-  srand(17 * rank + 137);
+  srand(17 * rank + 137 + quda_seed);
 }
 
 void setDims(int *X)
@@ -979,8 +980,11 @@ int x4_from_full_index(int i)
 template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 {
   // Apply spatial scaling factor (u0) to spatial links
-  for (int d = 0; d < 3; d++) {
-    for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
+  if (param->anisotropy != 1.0) {
+    double aniso_inv = 1.0 / param->anisotropy;
+    for (int d = 0; d < 3; d++) {
+      for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] *= aniso_inv; }
+    }
   }
 
   // Apply boundary conditions to temporal links

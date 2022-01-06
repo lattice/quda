@@ -244,7 +244,7 @@ int main(int argc, char **argv)
     obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;
 
     // CURAND random generator initialization
-    RNG *randstates = new RNG(*gauge, 1234);
+    RNG *randstates = new RNG(*gauge, quda_seed);
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;

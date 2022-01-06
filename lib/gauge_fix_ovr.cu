@@ -223,12 +223,17 @@ namespace quda {
   };
 
   template <typename Float, QudaReconstructType recon, int gauge_dir>
-  void gaugeFixingOVR(GaugeField &data,const int Nsteps, const int verbose_interval,
-                      const double relax_boost, const double tolerance,
-                      const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField &data, QudaGaugeFixParam &fix_param)
   {
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
+    double relax_boost = fix_param.ovr_relaxation_boost;
+    double tolerance = fix_param.tolerance;
+    QudaBoolean theta_condition = fix_param.theta_condition;
+    int steps = fix_param.maxiter;
+    int reunit_interval = fix_param.reunit_interval;
+    int verbose_interval = fix_param.verbosity_interval;
+    
     profileInternalGaugeFixOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     double flop = 0;
     double byte = 0;
@@ -236,10 +241,11 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("\tOverrelaxation boost parameter: %e\n", relax_boost);
       printfQuda("\tTolerance: %le\n", tolerance);
-      printfQuda("\tStop criterion method: %s\n", stopWtheta ? "Theta" : "Delta");
-      printfQuda("\tMaximum number of iterations: %d\n", Nsteps);
+      printfQuda("\tStop criterion method: %s\n", theta_condition == QUDA_BOOLEAN_TRUE ? "Theta" : "Delta");
+      printfQuda("\tMaximum number of iterations: %d\n", steps);
       printfQuda("\tReunitarize at every %d steps\n", reunit_interval);
       printfQuda("\tPrint convergence results at every %d steps\n", verbose_interval);
+      printfQuda("\tComputing in %s precision\n", sizeof(Float) == sizeof(double) ? "double" : "single");
     }
     
     const double unitarize_eps = 1e-14;
@@ -313,7 +319,7 @@ namespace quda {
     flop += (double)GaugeFixQuality.flops();
     byte += (double)GaugeFixQuality.bytes();
     double action0 = argQ.getAction();
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
     *num_failures_h = 0;
     unitarizeLinks(data, data, num_failures_d);
@@ -324,7 +330,7 @@ namespace quda {
     GaugeFix<Float, recon, gauge_dir> gfixBorderPoints(data, relax_boost, borderpoints, true, threads);
 
     int iter = 0;
-    for (iter = 0; iter < Nsteps; iter++) {
+    for (iter = 0; iter < steps; iter++) {
       for (int p = 0; p < 2; p++) {
         if (comm_partitioned()) {
           gfixBorderPoints.setParity(p); //compute border points
@@ -413,8 +419,8 @@ namespace quda {
       double action = argQ.getAction();
       double diff = abs(action0 - action);
       if ((iter % verbose_interval) == (verbose_interval - 1) && getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
-      if (stopWtheta) {
+        printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      if (theta_condition == QUDA_BOOLEAN_TRUE) {
         if (argQ.getTheta() < tolerance) break;
       } else {
         if ( diff < tolerance ) break;
@@ -436,7 +442,7 @@ namespace quda {
       byte += (double)GaugeFixQuality.bytes();
       double action = argQ.getAction();
       double diff = abs(action0 - action);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %05d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
 
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
@@ -470,17 +476,16 @@ namespace quda {
   }
 
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
-  GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                 const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
+  GaugeFixingOVR(GaugeField& data, QudaGaugeFixParam &fix_param)
     {
-      if (gauge_dir == 4) {
-	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 4>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else if (gauge_dir == 3) {
-	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing...\n");
-        gaugeFixingOVR<Float, recon, 3>(data, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+      if (fix_param.gauge_dir == 4) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Landau gauge fixing with Overrelaxation\n");
+        gaugeFixingOVR<Float, recon, 4>(data, fix_param);
+      } else if (fix_param.gauge_dir == 3) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Starting Coulomb gauge fixing with Overrelaxation\n");
+        gaugeFixingOVR<Float, recon, 3>(data, fix_param);
       } else {
-        errorQuda("Unexpected gauge_dir = %d", gauge_dir);
+        errorQuda("Unexpected gauge_dir = %d", fix_param.gauge_dir);
       }
     }
   };
@@ -488,22 +493,15 @@ namespace quda {
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field
-   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
-   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
+   * @param[in] fix_param Parameter struct defining the gauge fixing
    */
 #ifdef GPU_GAUGE_ALG
-  void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta)
+  void gaugeFixingOVR(GaugeField& data, QudaGaugeFixParam &fix_param)
   {
-    instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+    instantiate<GaugeFixingOVR>(data, fix_param);
   }
 #else
-  void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const int)
+  void gaugeFixingOVR(GaugeField&, QudaGaugeFixParam &)
   {
     errorQuda("Gauge fixing has not been built");
   }

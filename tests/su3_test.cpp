@@ -94,7 +94,6 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
@@ -117,27 +116,29 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
-  setWilsonGaugeParam(gauge_param);
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-  setDims(gauge_param.X);
-
-  void *gauge[4], *new_gauge[4];
-
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
-  }
-
   initQuda(device_ordinal);
-
   setVerbosity(verbosity);
 
   // call srand() with a rank-dependent seed
   initRand();
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  setDims(gauge_param.X);
+
+  // All user inputs now defined
+  display_test_info();
+
+  // *** QUDA parameters begin here.
+  void *gauge[4], *new_gauge[4];
+  for (int dir = 0; dir < 4; dir++) {
+    gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+  }
 
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
@@ -150,9 +151,6 @@ int main(int argc, char **argv)
              plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
-
-  // All user inputs now defined
-  display_test_info();
 
   // Topological charge and gauge energy
   double q_charge_check = 0.0;

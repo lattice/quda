@@ -268,7 +268,7 @@ void printQudaCloverParam(QudaInvertParam *param)
 
 #if defined CHECK_PARAM
   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
-    errorQuda("Unexpected QudaInvertParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+    errorQuda("Unexpected QudaCloverParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
 #else
   P(struct_size, (size_t)INVALID_INT);
 #endif
@@ -1047,8 +1047,45 @@ void printQudaBLASParam(QudaBLASParam *param)
 #endif
 }
 
-// clean up
+#if defined INIT_PARAM
+QudaGaugeFixParam newQudaGaugeFixParam(void)
+{
+  QudaGaugeFixParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeFixParam(QudaGaugeFixParam *param)
+{
+#else
+void printQudaGaugeFixParam(QudaGaugeFixParam *param)
+{
+  printfQuda("QUDA gauge fix parameters:\n");
+#endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeFixParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
+  P(gauge_dir, INVALID_INT);
+  P(maxiter, INVALID_INT);
+  P(verbosity_interval, INVALID_INT);
+  P(reunit_interval, INVALID_INT);
+  P(ovr_relaxation_boost, INVALID_DOUBLE);
+  P(fft_alpha, INVALID_DOUBLE);
+  P(tolerance, INVALID_DOUBLE);
+
+#ifndef CHECK_PARAM
+  P(fft_autotune, QUDA_BOOLEAN_FALSE);
+  P(theta_condition, QUDA_BOOLEAN_FALSE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+// clean up
 #undef INVALID_INT
 #undef INVALID_DOUBLE
 #undef P

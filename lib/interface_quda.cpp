@@ -237,8 +237,7 @@ static TimeProfile profileMomAction("momActionQuda");
 static TimeProfile profileEnd("endQuda");
 
 //!< Profiler for GaugeFixing
-static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
-static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
+static TimeProfile profileGaugeFix("gaugeFixQuda");
 
 //!< Profiler for toal time spend between init and end
 static TimeProfile profileInit2End("initQuda-endQuda",false);
@@ -1482,6 +1481,7 @@ void endQuda(void)
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
+    profileGaugeFix.Print();
     profileEnd.Print();
 
     profileInit2End.Print();
@@ -5518,141 +5518,88 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   popOutputPrefix();
 }
 
-int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
-                              const unsigned int verbose_interval, const double relax_boost, const double tolerance,
-                              const unsigned int reunit_interval, const unsigned int stopWtheta, QudaGaugeParam *param,
-                              double *timeinfo)
+int computeGaugeFixingQuda(void *gauge, QudaGaugeParam *g_param, QudaGaugeFixParam *fix_param, double *timeinfo)
 {
-  GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugeFix.TPSTART(QUDA_PROFILE_TOTAL);
 
-  checkGaugeParam(param);
-
-  GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_INIT);
-  GaugeFieldParam gParam(*param, gauge);
-  auto *cpuGauge = new cpuGaugeField(gParam);
-
-  // gParam.pad = getFatLinkPadding(param->X);
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type = param->type;
-  gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(gParam.Precision(), true);
-  auto *cudaInGauge = new cudaGaugeField(gParam);
-
-  GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_INIT);
-  GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_H2D);
-
-  ///if (!param->use_resident_gauge) {   // load fields onto the device
-  cudaInGauge->loadCPUField(*cpuGauge);
- /* } else { // or use resident fields already present
-    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
-    cudaInGauge = gaugePrecise;
-    gaugePrecise = nullptr;
-  } */
-
-  GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_H2D);
-
-  if (comm_size() == 1) {
-    // perform the update
-    GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugeFixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
-                   stopWtheta);
-    GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
-  } else {
-    cudaGaugeField *cudaInGaugeEx = createExtendedGauge(*cudaInGauge, R, GaugeFixOVRQuda);
-
-    // perform the update
-    GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-    gaugeFixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval,
-                   stopWtheta);
-    GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    //HOW TO COPY BACK TO CPU: cudaInGaugeEx->cpuGauge
-    copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+    printQudaGaugeParam(g_param);
+    printQudaGaugeFixParam(fix_param);
   }
 
-  // copy the gauge field back to the host
-  GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_D2H);
-  cudaInGauge->saveCPUField(*cpuGauge);
-  GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_D2H);
+  // Check parameters
+  checkGaugeParam(g_param);
+  checkGaugeFixParam(fix_param);
 
-  GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_TOTAL);
+  if (g_param->location == QUDA_CUDA_FIELD_LOCATION) {
+    errorQuda("GPU gauge fixing not supported via QUDA interface. Please use direct kernel call: "
+              "gaugeFixingOVR/gaugeFixingFFT");
+  }
 
-  if (param->make_resident_gauge) {
+  profileGaugeFix.TPSTART(QUDA_PROFILE_INIT);
+  GaugeFieldParam gauge_param(*g_param, gauge);
+  auto *cpu_gauge = new cpuGaugeField(gauge_param);
+
+  // Make GPU field
+  gauge_param.create = QUDA_NULL_FIELD_CREATE;
+  gauge_param.link_type = g_param->type;
+  gauge_param.reconstruct = g_param->reconstruct;
+  gauge_param.setPrecision(fix_param->precision, true);
+  auto *device_gauge = new cudaGaugeField(gauge_param);
+  profileGaugeFix.TPSTOP(QUDA_PROFILE_INIT);
+
+  // Load gauge to device
+  profileGaugeFix.TPSTART(QUDA_PROFILE_H2D);
+  device_gauge->loadCPUField(*cpu_gauge);
+  profileGaugeFix.TPSTOP(QUDA_PROFILE_H2D);
+
+  // Perform the update
+  switch (fix_param->fix_type) {
+
+  case QUDA_GAUGEFIX_TYPE_OVR:
+    if (comm_size() == 1) {
+      profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
+      gaugeFixingOVR(*device_gauge, *fix_param);
+      profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
+    } else {
+      // For MPI, we must perform a halo exchange
+      cudaGaugeField *device_gauge_extended = createExtendedGauge(*device_gauge, R, profileGaugeFix);
+      profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
+      gaugeFixingOVR(*device_gauge_extended, *fix_param);
+      profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
+      copyExtendedGauge(*device_gauge, *device_gauge_extended, QUDA_CUDA_FIELD_LOCATION);
+    }
+    break;
+
+  case QUDA_GAUGEFIX_TYPE_FFT:
+    profileGaugeFix.TPSTART(QUDA_PROFILE_COMPUTE);
+    gaugeFixingFFT(*device_gauge, *fix_param);
+    profileGaugeFix.TPSTOP(QUDA_PROFILE_COMPUTE);
+    break;
+
+  default: errorQuda("Unkown gauge fix type %d", fix_param->fix_type);
+  }
+
+  // Copy the fixed gauge field back to the host.
+  profileGaugeFix.TPSTART(QUDA_PROFILE_D2H);
+  device_gauge->saveCPUField(*cpu_gauge);
+  profileGaugeFix.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaugeFix.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  if (g_param->make_resident_gauge) {
     if (gaugePrecise != nullptr) delete gaugePrecise;
-    gaugePrecise = cudaInGauge;
+    gaugePrecise = device_gauge;
   } else {
-    delete cudaInGauge;
+    delete device_gauge;
   }
-
-  if(timeinfo){
-    timeinfo[0] = GaugeFixOVRQuda.Last(QUDA_PROFILE_H2D);
-    timeinfo[1] = GaugeFixOVRQuda.Last(QUDA_PROFILE_COMPUTE);
-    timeinfo[2] = GaugeFixOVRQuda.Last(QUDA_PROFILE_D2H);
-  }
-
-  return 0;
-}
-
-int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
-  const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
-  const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
-{
-  GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_TOTAL);
-
-  checkGaugeParam(param);
-
-  GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_INIT);
-
-  GaugeFieldParam gParam(*param, gauge);
-  auto *cpuGauge = new cpuGaugeField(gParam);
-
-  //gParam.pad = getFatLinkPadding(param->X);
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = param->type;
-  gParam.reconstruct = param->reconstruct;
-  gParam.setPrecision(gParam.Precision(), true);
-  auto *cudaInGauge = new cudaGaugeField(gParam);
-
-
-  GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_INIT);
-
-  GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_H2D);
-
-  //if (!param->use_resident_gauge) {   // load fields onto the device
-  cudaInGauge->loadCPUField(*cpuGauge);
-  /*} else { // or use resident fields already present
-    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
-    cudaInGauge = gaugePrecise;
-    gaugePrecise = nullptr;
-  } */
-
-  GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_H2D);
-
-  // perform the update
-  GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  gaugeFixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-
-  GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  // copy the gauge field back to the host
-  GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_D2H);
-  cudaInGauge->saveCPUField(*cpuGauge);
-  GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_D2H);
-
-  GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  if (param->make_resident_gauge) {
-    if (gaugePrecise != nullptr) delete gaugePrecise;
-    gaugePrecise = cudaInGauge;
-  } else {
-    delete cudaInGauge;
-  }
+  delete cpu_gauge;
 
   if (timeinfo) {
-    timeinfo[0] = GaugeFixFFTQuda.Last(QUDA_PROFILE_H2D);
-    timeinfo[1] = GaugeFixFFTQuda.Last(QUDA_PROFILE_COMPUTE);
-    timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
+    timeinfo[0] = profileGaugeFix.Last(QUDA_PROFILE_H2D);
+    timeinfo[1] = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
+    timeinfo[2] = profileGaugeFix.Last(QUDA_PROFILE_D2H);
   }
 
   return 0;

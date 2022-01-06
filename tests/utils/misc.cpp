@@ -151,6 +151,19 @@ const char *get_contract_str(QudaContractType type)
   return ret;
 }
 
+const char *get_gaugefix_str(QudaGaugeFixType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_GAUGEFIX_TYPE_OVR: ret = "Overrelaxation"; break;
+  case QUDA_GAUGEFIX_TYPE_FFT: ret = "FFT"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
 const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 {
   const char *ret;
