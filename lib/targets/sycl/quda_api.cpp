@@ -218,29 +218,10 @@ namespace quda
     if (kind == qudaMemcpyDeviceToDevice) {
       QudaMem copy(dst, src, count, kind, stream, true, func, file, line);
     } else {
-#ifdef USE_DRIVER_API
-      switch (kind) {
-      case qudaMemcpyDeviceToHost:
-        PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, device::get_quda_stream(stream)), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
-        break;
-      case qudaMemcpyHostToDevice:
-        PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, device::get_quda_stream(stream)), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
-        break;
-      case qudaMemcpyDeviceToDevice:
-        PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, device::get_quda_stream(stream)), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
-        break;
-      case qudaMemcpyDefault:
-        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, device::get_quda_stream(stream)), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
-        break;
-      default:
-        errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
-      }
-#else
       //PROFILE(cudaMemcpyAsync(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_cuda_stream(stream)),
       //kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
       auto q = device::get_target_stream(stream);
       q.memcpy(dst, src, count);
-#endif
     }
   }
 

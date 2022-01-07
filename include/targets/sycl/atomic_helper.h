@@ -34,28 +34,28 @@ static inline uint __float_as_uint(float x) {
   return *reinterpret_cast<uint*>(&x);
 }
 
-static inline int atomicAdd(int* address, int val)
+static inline int atomicAdd(int *address, int val)
 {
   auto ar = makeAtomicRef(address);
   auto old = ar.fetch_add(val);
   return old;
 }
 
-static inline float atomicAdd(float* address, float val)
+static inline float atomicAdd(float *address, float val)
 {
   auto ar = makeAtomicRef(address);
   auto old = ar.fetch_add(val);
   return old;
 }
 
-static inline double atomicAdd(double* address, double val)
+static inline double atomicAdd(double *address, double val)
 {
   auto ar = makeAtomicRef(address);
   auto old = ar.fetch_add(val);
   return old;
 }
 
-static inline uint32_t atomicMax(uint32_t* address, uint32_t val)
+static inline uint32_t atomicMax(uint32_t *address, uint32_t val)
 {
   auto ar = makeAtomicRef(address);
   auto old = ar.fetch_max(val);

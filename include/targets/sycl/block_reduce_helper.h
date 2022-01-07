@@ -1,7 +1,7 @@
 #pragma once
 
 #include <target_device.h>
-//#include <reducer.h>
+#include <reducer.h>
 #include <group_reduce.h>
 
 /**
@@ -281,14 +281,32 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return Reduced value (defined in logical thread 0 only)
      */
-    template <bool async = true, typename reducer_t>
-    inline T Reduce(const T &value, const reducer_t &r)
+    template <bool async = true, typename U>
+    inline T
+    ReduceNotSum(const T &value, const quda::maximum<U> &r)
     {
-      static_assert(batch_size == 1, "Cannot do Reduce with batch_size > 1");
-      auto grp = getGroup();
-      T result;
-      blockReduce(grp, result, value, r);
-      return result;
+      return Max<async>(value);
+    }
+
+    template <bool async = true, typename U>
+    inline T
+    ReduceNotSum(const T &value, const quda::minimum<U> &r)
+    {
+      return Min<async>(value);
+    }
+
+    template <bool async = true, typename reducer_t>
+    inline std::enable_if_t<!reducer_t::do_sum,T>
+    Reduce(const T &value, const reducer_t &r)
+    {
+      return ReduceNotSum<async>(value, typename reducer_t::reducer_t());
+    }
+
+    template <bool async = true, typename reducer_t>
+    inline std::enable_if_t<reducer_t::do_sum,T>
+    Reduce(const T &value, const reducer_t &r)
+    {
+      return Sum<async>(value);
     }
 
     /**

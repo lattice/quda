@@ -138,33 +138,29 @@ namespace quda {
   }
 
 
-  template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
+  template <template <typename> class Functor, typename Arg, bool grid_stride = true>
   void MultiReductionImpl(const Arg &arg, const sycl::nd_item<3> &ndi)
   {
-    using reduce_t = typename Transformer<Arg>::reduce_t;
-    Transformer<Arg> t(arg);
-    //Transformer<Arg> t(const_cast<Arg&>(arg));
+    using reduce_t = typename Functor<Arg>::reduce_t;
+    Functor<Arg> t(arg);
 
-    //auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto idx = ndi.get_global_id(0);
-    //auto j = threadIdx.y + blockIdx.y * blockDim.y;
-    auto j = ndi.get_global_id(1);
-    //auto k = threadIdx.z;
-    auto k = ndi.get_local_id(2);
+    auto k = ndi.get_local_id(1);
+    auto j = ndi.get_global_id(2);
 
-    if (j >= arg.threads.y) return;
+    if (j >= arg.threads.z) return;
 
     reduce_t value = arg.init();
 
     while (idx < arg.threads.x) {
-      value = t(value, idx, j, k);
-      //if (grid_stride) idx += blockDim.x * gridDim.x; else break;
+      value = t(value, idx, k, j);
       if (grid_stride) idx += ndi.get_global_range(0); else break;
     }
 
     // perform final inter-block reduction and write out result
     reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
   }
+#if 0
   template <template <typename> class Transformer, typename Arg,
 	    typename S, bool grid_stride = true>
   void MultiReductionImpl1(const Arg &arg, sycl::nd_item<3> &ndi, S &sum)
@@ -182,6 +178,7 @@ namespace quda {
     }
     sum.combine(value);
   }
+#endif
   template <template <typename> class Transformer, typename Arg, bool grid_stride = true>
   qudaError_t
   MultiReduction(const TuneParam &tp, const qudaStream_t &stream, const Arg &arg)

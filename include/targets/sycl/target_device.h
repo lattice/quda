@@ -49,45 +49,36 @@ namespace quda {
     template <> struct block_dim_impl<true> { dim3 operator()() { return getBlockDim(); } };
 
     /**
-       @brief Helper function that returns the thread block
-       dimensions.  On CUDA this returns the intrinsic blockDim,
-       whereas on the host this returns (1, 1, 1).
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
     */
-    //__device__ __host__ inline dim3 block_dim() { return dispatch<block_dim_impl>(); }
     inline dim3 block_dim() { return getBlockDim(); }
 
-
-    template <bool is_device> struct block_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
-#ifdef QUDA_CUDA_CC
-    template <> struct block_idx_impl<true> { __device__ dim3 operator()() { return dim3(blockIdx.x, blockIdx.y, blockIdx.z); } };
-#endif
+    /**
+       @brief Helper function that returns the grid dimensions.  On
+       CUDA this returns the intrinsic blockDim, whereas on the host
+       this returns (1, 1, 1).
+    */
+    inline dim3 grid_dim() { return getGridDim(); }
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        blockIdx, whereas on the host this just returns (0, 0, 0).
     */
-    //__device__ __host__ inline dim3 block_idx() { return dispatch<block_idx_impl>(); }
     inline dim3 block_idx() { return getBlockIdx(); }
-
-
-    template <bool is_device> struct thread_idx_impl { dim3 operator()() { return dim3(0, 0, 0); } };
-#ifdef QUDA_CUDA_CC
-    template <> struct thread_idx_impl<true> { __device__ dim3 operator()() { return dim3(threadIdx.x, threadIdx.y, threadIdx.z); } };
-#endif
 
     /**
        @brief Helper function that returns the thread indices within a
        thread block.  On CUDA this returns the intrinsic
        threadIdx, whereas on the host this just returns (0, 0, 0).
     */
-    //__device__ __host__ inline dim3 thread_idx() { return dispatch<thread_idx_impl>(); }
     inline dim3 thread_idx() { return getThreadIdx(); }
 
     inline uint local_linear_id() { return getLocalLinearId(); }
 
-  }
-
+  } // namespace target
 
   namespace device {
 

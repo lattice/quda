@@ -521,7 +521,6 @@ void initQudaMemory()
   createDslashEvents();
 
   blas_lapack::native::init();
-  blas::init();
 
   num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -1431,7 +1430,7 @@ void endQuda(void)
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::destroy();
+  reducer::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
