@@ -25,8 +25,6 @@ namespace quda {
   class Propagator;
 
   class ColorSpinorField;
-  class cudaColorSpinorField;
-  class cpuColorSpinorField;
   
   class GaugeField;
   class cpuGaugeField;

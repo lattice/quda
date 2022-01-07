@@ -181,7 +181,7 @@ namespace quda
     */
     template <typename real>
     struct multicaxpyz_ : public MultiBlasFunctor<complex<real>> {
-      static constexpr memory_access<1, 0, 0, 1> read{ };
+      static constexpr memory_access<1, 1, 0, 0> read{ };
       static constexpr memory_access<0, 0, 0, 1> write{ };
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;

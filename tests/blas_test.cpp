@@ -30,24 +30,26 @@ using namespace quda;
 */
 
 // these are pointers to the host fields
-ColorSpinorField *xH, *yH, *zH, *wH, *vH, *xoH, *yoH, *zoH;
+std::unique_ptr<ColorSpinorField> xH, yH, zH, wH, vH;
+ColorSpinorField *xoH, *yoH, *zoH;
 
 // these are pointers to the device fields that have "this precision"
-ColorSpinorField *xD, *yD, *zD, *wD, *vD;
+std::unique_ptr<ColorSpinorField> xD, yD, zD, wD, vD;
 
 // these are pointers to the device multi-fields that have "this precision"
-ColorSpinorField *xmD, *ymD, *zmD;
+std::unique_ptr<ColorSpinorField> xmD, ymD, zmD, wmD;
 
 // these are pointers to the device fields that have "this precision"
-ColorSpinorField *xoD, *yoD, *zoD, *woD, *voD;
+std::unique_ptr<ColorSpinorField> xoD, yoD, zoD, woD, voD;
 
 // these are pointers to the device multi-fields that have "other precision"
-ColorSpinorField *xmoD, *ymoD, *zmoD;
+std::unique_ptr<ColorSpinorField> xmoD, ymoD, zmoD;
 
 // these are pointers to the host multi-fields that have "this precision"
-std::vector<cpuColorSpinorField *> xmH;
-std::vector<cpuColorSpinorField *> ymH;
-std::vector<cpuColorSpinorField *> zmH;
+std::vector<ColorSpinorField *> xmH;
+std::vector<ColorSpinorField *> ymH;
+std::vector<ColorSpinorField *> zmH;
+std::vector<ColorSpinorField *> wmH;
 int Nspin;
 int Ncolor;
 
@@ -105,6 +107,7 @@ enum class Kernel {
   caxpyBzpx,
   axpy_block,
   caxpy_block,
+  caxpyz_block,
   axpyBzpcx_block,
   reDotProductNorm_block,
   reDotProduct_block,
@@ -148,6 +151,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::caxpyBzpx, "caxpyBzpx"},
      {Kernel::axpy_block, "axpy_block"},
      {Kernel::caxpy_block, "caxpy_block"},
+     {Kernel::caxpyz_block, "caxpyz_block"},
      {Kernel::axpyBzpcx_block, "axpyBzpcx_block"},
      {Kernel::reDotProductNorm_block, "reDotProductNorm_block"},
      {Kernel::reDotProduct_block, "reDotProduct_block"},
@@ -170,6 +174,9 @@ bool is_site_unroll(Kernel kernel)
 {
   return (kernel == Kernel::HeavyQuarkResidualNorm || kernel == Kernel::xpyHeavyQuarkResidualNorm);
 }
+
+// return false if kernel does not support mixed precision (y prec > x prec)
+bool is_mixed(Kernel kernel) { return (kernel != Kernel::caxpyz_block); }
 
 bool skip_kernel(prec_pair_t pair, Kernel kernel)
 {
@@ -196,6 +203,9 @@ bool skip_kernel(prec_pair_t pair, Kernel kernel)
     return true;
   }
 
+  // only test mixed precision if supported
+  if (!is_mixed(kernel) && this_prec != other_prec) return true;
+
   return false;
 }
 
@@ -205,7 +215,6 @@ void initFields(prec_pair_t prec_pair)
   param.nColor = Ncolor;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
-  param.pad = 0;  // padding must be zero for cpu fields
 
   switch (solve_type) {
   case QUDA_DIRECT_PC_SOLVE:
@@ -229,34 +238,36 @@ void initFields(prec_pair_t prec_pair)
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   param.create = QUDA_ZERO_FIELD_CREATE;
   param.pc_type = QUDA_4D_PC;
+  param.location = QUDA_CPU_FIELD_LOCATION;
 
-  vH = new cpuColorSpinorField(param);
-  wH = new cpuColorSpinorField(param);
-  xH = new cpuColorSpinorField(param);
-  yH = new cpuColorSpinorField(param);
-  zH = new cpuColorSpinorField(param);
+  vH = std::make_unique<ColorSpinorField>(param);
+  wH = std::make_unique<ColorSpinorField>(param);
+  xH = std::make_unique<ColorSpinorField>(param);
+  yH = std::make_unique<ColorSpinorField>(param);
+  zH = std::make_unique<ColorSpinorField>(param);
 
   // all host fields are double precision, so the "other" fields just alias the regular fields
-  xoH = xH;
-  yoH = yH;
-  zoH = zH;
+  xoH = xH.get();
+  yoH = yH.get();
+  zoH = zH.get();
 
   xmH.reserve(Nsrc);
-  for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new ColorSpinorField(param));
   ymH.reserve(Msrc);
-  for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new ColorSpinorField(param));
   zmH.reserve(Nsrc);
-  for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
+  for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new ColorSpinorField(param));
+  wmH.reserve(Nsrc);
+  for (int cid = 0; cid < Msrc; cid++) wmH.push_back(new ColorSpinorField(param));
 
-  static_cast<cpuColorSpinorField *>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  static_cast<cpuColorSpinorField *>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  for (int i = 0; i < Nsrc; i++) { static_cast<cpuColorSpinorField *>(xmH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
-  for (int i = 0; i < Msrc; i++) { static_cast<cpuColorSpinorField *>(ymH[i])->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  for (int i = 0; i < Nsrc; i++) { xmH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
+  for (int i = 0; i < Msrc; i++) { ymH[i]->Source(QUDA_RANDOM_SOURCE, 0, 0, 0); }
   // Now set the parameters for the cuda fields
-  // param.pad = xdim*ydim*zdim/2;
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -265,18 +276,19 @@ void initFields(prec_pair_t prec_pair)
   QudaPrecision prec_other = prec_pair.second;
 
   param.setPrecision(prec, prec, true);
-  vD = new cudaColorSpinorField(param);
-  wD = new cudaColorSpinorField(param);
-  xD = new cudaColorSpinorField(param);
-  yD = new cudaColorSpinorField(param);
-  zD = new cudaColorSpinorField(param);
+  param.location = QUDA_CUDA_FIELD_LOCATION;
+  vD = std::make_unique<ColorSpinorField>(param);
+  wD = std::make_unique<ColorSpinorField>(param);
+  xD = std::make_unique<ColorSpinorField>(param);
+  yD = std::make_unique<ColorSpinorField>(param);
+  zD = std::make_unique<ColorSpinorField>(param);
 
   param.setPrecision(prec_other, prec_other, true);
-  voD = new cudaColorSpinorField(param);
-  woD = new cudaColorSpinorField(param);
-  xoD = new cudaColorSpinorField(param);
-  yoD = new cudaColorSpinorField(param);
-  zoD = new cudaColorSpinorField(param);
+  voD = std::make_unique<ColorSpinorField>(param);
+  woD = std::make_unique<ColorSpinorField>(param);
+  xoD = std::make_unique<ColorSpinorField>(param);
+  yoD = std::make_unique<ColorSpinorField>(param);
+  zoD = std::make_unique<ColorSpinorField>(param);
 
   // create composite fields
   param.is_composite = true;
@@ -284,23 +296,26 @@ void initFields(prec_pair_t prec_pair)
 
   param.setPrecision(prec, prec, true);
   param.composite_dim = Nsrc;
-  xmD = new cudaColorSpinorField(param);
+  xmD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Msrc;
-  ymD = new cudaColorSpinorField(param);
+  ymD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Nsrc;
-  zmD = new cudaColorSpinorField(param);
+  zmD = std::make_unique<ColorSpinorField>(param);
+
+  param.composite_dim = Msrc;
+  wmD = std::make_unique<ColorSpinorField>(param);
 
   param.setPrecision(prec_other, prec_other, true);
   param.composite_dim = Nsrc;
-  xmoD = new cudaColorSpinorField(param);
+  xmoD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Msrc;
-  ymoD = new cudaColorSpinorField(param);
+  ymoD = std::make_unique<ColorSpinorField>(param);
 
   param.composite_dim = Nsrc;
-  zmoD = new cudaColorSpinorField(param);
+  zmoD = std::make_unique<ColorSpinorField>(param);
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 && (prec < QUDA_SINGLE_PRECISION || prec_other < QUDA_HALF_PRECISION));
@@ -317,35 +332,38 @@ void initFields(prec_pair_t prec_pair)
 void freeFields()
 {
   // release memory
-  delete vD;
-  delete wD;
-  delete xD;
-  delete yD;
-  delete zD;
-  delete voD;
-  delete woD;
-  delete xoD;
-  delete yoD;
-  delete zoD;
-  delete xmD;
-  delete ymD;
-  delete zmD;
-  delete xmoD;
-  delete ymoD;
-  delete zmoD;
+  vD.reset();
+  wD.reset();
+  xD.reset();
+  yD.reset();
+  zD.reset();
+  voD.reset();
+  woD.reset();
+  xoD.reset();
+  yoD.reset();
+  zoD.reset();
+  xmD.reset();
+  ymD.reset();
+  zmD.reset();
+  wmD.reset();
+  xmoD.reset();
+  ymoD.reset();
+  zmoD.reset();
 
   // release memory
-  delete vH;
-  delete wH;
-  delete xH;
-  delete yH;
-  delete zH;
+  vH.reset();
+  wH.reset();
+  xH.reset();
+  yH.reset();
+  zH.reset();
   for (int i = 0; i < Nsrc; i++) delete xmH[i];
   for (int i = 0; i < Msrc; i++) delete ymH[i];
   for (int i = 0; i < Nsrc; i++) delete zmH[i];
+  for (int i = 0; i < Msrc; i++) delete wmH[i];
   xmH.clear();
   ymH.clear();
   zmH.clear();
+  wmH.clear();
 }
 
 double benchmark(Kernel kernel, const int niter)
@@ -490,6 +508,10 @@ double benchmark(Kernel kernel, const int niter)
 
     case Kernel::caxpy_block:
       for (int i = 0; i < niter; ++i) blas::caxpy(A, *xmD, *ymoD);
+      break;
+
+    case Kernel::caxpyz_block:
+      for (int i = 0; i < niter; ++i) blas::caxpyz(A, *xmD, *ymD, *wmD);
       break;
 
     case Kernel::axpyBzpcx_block:
@@ -866,12 +888,28 @@ double test(Kernel kernel)
     for (int i = 0; i < Msrc; i++) ymoD->Component(i) = *(ymH[i]);
 
     blas::caxpy(A, *xmD, *ymoD);
-    for (int i = 0; i < Nsrc; i++) {
-      for (int j = 0; j < Msrc; j++) { blas::caxpy(A[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
+    for (int j = 0; j < Msrc; j++) {
+      for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
     }
     error = 0;
     for (int i = 0; i < Msrc; i++) {
       error += fabs(blas::norm2((ymoD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+    }
+    error /= Msrc;
+    break;
+
+  case Kernel::caxpyz_block:
+    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+
+    blas::caxpyz(A, *xmD, *ymD, *wmD);
+    for (int j = 0; j < Msrc; j++) {
+      *wmH[j] = *ymH[j];
+      for (int i = 0; i < Nsrc; i++) { blas::caxpy(A[Msrc * i + j], *(xmH[i]), *(wmH[j])); }
+    }
+    error = 0;
+    for (int i = 0; i < Msrc; i++) {
+      error += fabs(blas::norm2((wmD->Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
     }
     error /= Msrc;
     break;

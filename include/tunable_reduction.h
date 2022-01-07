@@ -236,22 +236,23 @@ namespace quda
   };
 
   /**
-     @brief This derived tunable class is for reduction kernels, and
-     partners the Reduction2D kernel.  The x threads will
-     typically correspond to the checkerboarded volume.  Each thread
-     block is two dimensional, with the y dimension typically equal to
-     two and is the parity dimension.
+     @brief This derived tunable class is for multi-reduction kernels,
+     and partners the MultiReduction kernel.  Each thread block is
+     three dimensional.  The x threads will typically correspond to
+     the checkerboarded volume.  The y thread dimension is constrained
+     to remain inside the thread block and this dimension is
+     contracted in the reduction.  The z thread dimension is a batch
+     dimension that is not contracted in the reduction.
    */
   template <int block_size_y = 1> class TunableMultiReduction : public TunableReduction2D<block_size_y>
   {
-    // for now we do not support anything other than block_size_y = 1
-    static_assert(block_size_y == 1, "only block_size_y = 1 supported");
     using Tunable::apply;
     using TunableReduction2D<block_size_y>::location;
     using TunableReduction2D<block_size_y>::grid_stride;
 
   protected:
-    const int n_batch;
+    const unsigned int n_batch;           /** Reduction batch size */
+    const unsigned int n_batch_block_max; /** Maximum reduction batch per thread block */
 
     /**
        @brief we don't want to inherit TunableReduction2D behaviour
@@ -303,7 +304,9 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
-      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);//!!
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
+      arg.launch_error = launch<device::max_multi_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
@@ -314,6 +317,8 @@ namespace quda
     template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
+      if (n_batch_block_max > Arg::max_n_batch_block)
+        errorQuda("n_batch_block_max = %u greater than maximum supported %u", n_batch_block_max, Arg::max_n_batch_block);
       using reduce_t = typename Functor<Arg>::reduce_t;
 
       int input_size = vec_length<reduce_t>::value;
@@ -321,7 +326,7 @@ namespace quda
       if (output_size != input_size) errorQuda("Input %d and output %d length do not match", input_size, output_size);
 
       auto value = MultiReduction_host<Functor, Arg>(arg);
-      for (int j = 0; j < (int)arg.threads.y; j++) {
+      for (int j = 0; j < (int)arg.threads.z; j++) {
         // copy element by element to output vector
         for (int i = 0; i < output_size; i++) {
           reinterpret_cast<typename scalar<T>::type *>(&result[j])[i]
@@ -357,14 +362,15 @@ namespace quda
     }
 
   public:
-    TunableMultiReduction(const LatticeField &field, int n_batch,
+    TunableMultiReduction(const LatticeField &field, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
                           QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(field, location), n_batch(n_batch)
+      TunableReduction2D<block_size_y>(field, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
-    TunableMultiReduction(size_t n_items, int n_batch, QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
-      TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch)
+    TunableMultiReduction(size_t n_items, unsigned int n_batch, unsigned int n_batch_block_max = 1u,
+                          QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION) :
+      TunableReduction2D<block_size_y>(n_items, location), n_batch(n_batch), n_batch_block_max(n_batch_block_max)
     {
     }
 
@@ -380,21 +386,36 @@ namespace quda
       do {
         rtn = Tunable::advanceBlockDim(param);
       } while (rtn && !is_power2(param.block.x));
-      return rtn;
+
+      if (rtn) {
+        return true;
+      } else {
+        if (param.block.z < n_batch && param.block.z < device::max_threads_per_block_dim(2)
+            && param.block.x * param.block.y * (param.block.z + 1) <= device::max_threads_per_block()
+            && param.block.z < n_batch_block_max) {
+          param.block.z++;
+          param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+          return true;
+        } else { // we have run off the end so let's reset
+          param.block.z = 1;
+          param.grid.z = (n_batch + param.block.z - 1) / param.block.z;
+          return false;
+        }
+      }
     }
 
     void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = n_batch;
+      param.block = {param.block.x, 1, 1};
+      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = 1;
-      param.grid.y = n_batch;
+      param.block = {param.block.x, 1, 1};
+      param.grid = {param.grid.x, 1, (n_batch + param.block.z - 1) / param.block.z};
     }
   };
 

@@ -562,9 +562,9 @@ namespace quda {
   QudaFieldLocation LatticeField::Location() const
   {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (typeid(*this) == typeid(cudaColorSpinorField) || typeid(*this) == typeid(cudaGaugeField)) {
+    if (typeid(*this) == typeid(cudaGaugeField)) {
       location = QUDA_CUDA_FIELD_LOCATION;
-    } else if (typeid(*this) == typeid(cpuColorSpinorField) || typeid(*this) == typeid(cpuGaugeField)) {
+    } else if (typeid(*this) == typeid(cpuGaugeField)) {
       location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
@@ -577,7 +577,7 @@ namespace quda {
   void LatticeField::write(char *) { errorQuda("Not implemented"); }
 
   int LatticeField::Nvec() const {
-    if (typeid(*this) == typeid(const cudaColorSpinorField)) {
+    if (typeid(*this) == typeid(const ColorSpinorField)) {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());

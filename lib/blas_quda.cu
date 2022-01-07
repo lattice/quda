@@ -5,11 +5,6 @@
 
 namespace quda {
 
-  namespace reducer {
-    void init();
-    void destroy();
-  }
-  
   namespace blas {
 
     unsigned long long flops;
@@ -146,22 +141,9 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    void zero(ColorSpinorField &a) {
-      if (typeid(a) == typeid(cudaColorSpinorField)) {
-	static_cast<cudaColorSpinorField&>(a).zero();
-      } else {
-	static_cast<cpuColorSpinorField&>(a).zero();
-      }
-    }
-
-    void init()
+    void zero(ColorSpinorField &a)
     {
-      reducer::init();
-    }
-
-    void destroy(void)
-    {
-      reducer::destroy();
+      a.zero();
     }
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)

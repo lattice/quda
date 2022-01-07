@@ -149,16 +149,12 @@ namespace quda
         CovDevArg<Float, nColor, 4, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
         CovDev<decltype(arg)> covDev(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(covDev)> policy(
-          covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, in.VolumeCB(), in.GhostFaceCB(), profile);
       } else if (in.Nspin() == 1) {
         CovDevArg<Float, nColor, 1, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
         CovDev<decltype(arg)> covDev(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(covDev)> policy(
-          covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(covDev)> policy(covDev, in, in.VolumeCB(), in.GhostFaceCB(), profile);
       } else {
         errorQuda("Spin not supported\n");
       }
