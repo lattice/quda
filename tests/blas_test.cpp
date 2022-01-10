@@ -78,6 +78,7 @@ enum class Kernel {
   copyHS,
   copyLS,
   axpbyz,
+  axpbypczw,
   ax,
   caxpy,
   caxpby,
@@ -122,6 +123,7 @@ const std::map<Kernel, std::string> kernel_map
   = {{Kernel::copyHS, "copyHS"},
      {Kernel::copyLS, "copyLS"},
      {Kernel::axpbyz, "axpbyz"},
+     {Kernel::axpbypczw, "axpbypczw"},
      {Kernel::ax, "ax"},
      {Kernel::caxpy, "caxpy"},
      {Kernel::caxpby, "caxpby"},
@@ -394,6 +396,10 @@ double benchmark(Kernel kernel, const int niter)
       for (int i = 0; i < niter; ++i) blas::axpbyz(a, *xD, b, *yoD, *zoD);
       break;
 
+    case Kernel::axpbypczw:
+      for (int i = 0; i < niter; ++i) blas::axpbypczw(a, *xD, b, *yD, c, *zD, *wD);
+      break;
+
     case Kernel::ax:
       for (int i = 0; i < niter; ++i) blas::ax(a, *xD);
       break;
@@ -607,6 +613,16 @@ double test(Kernel kernel)
     blas::axpbyz(a, *xD, b, *yoD, *zoD);
     blas::axpbyz(a, *xH, b, *yH, *zH);
     error = ERROR(zo);
+    break;
+
+    case Kernel::axpbypczw:
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *wD = *wH;
+    blas::axpbypczw(a, *xD, b, *yD, c, *zD, *wD);
+    blas::axpbypczw(a, *xH, b, *yH, c, *zH, *wH);
+    error = ERROR(w);
     break;
 
   case Kernel::ax:
