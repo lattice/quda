@@ -764,6 +764,12 @@ extern "C" {
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
+    /** Whether or not to let MG coarsening drop improvements, for ex dropping long links in small aggregation dimensions */
+    QudaBoolean allow_truncation;
+
+    /** Whether or not to use the dagger approximation for the KD preconditioned operator */
+    QudaBoolean staggered_kd_dagger_approximation;
+
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;
 

@@ -102,6 +102,7 @@ int main(int argc, char **argv)
   setQudaDefaultMgTestParams();
   // command line options
   auto app = make_app();
+  add_heatbath_option_group(app);
   add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);

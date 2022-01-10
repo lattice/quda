@@ -956,6 +956,18 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(allow_truncation, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_truncation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_FALSE);
+#else
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   P(thin_update_only, QUDA_BOOLEAN_FALSE);
 #else
   P(thin_update_only, QUDA_BOOLEAN_INVALID);
