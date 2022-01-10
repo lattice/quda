@@ -1007,10 +1007,10 @@ namespace quda {
     bool lambda_init;
     QudaCABasis basis;
 
-    Complex *Q_AQandg; // Fused inner product matrix
-    Complex *Q_AS; // inner product matrix
-    Complex *alpha; // QAQ^{-1} g
-    Complex *beta; // QAQ^{-1} QpolyS
+    double *Q_AQandg; // Fused inner product matrix
+    double *Q_AS; // inner product matrix
+    double *alpha; // QAQ^{-1} g
+    double *beta; // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
