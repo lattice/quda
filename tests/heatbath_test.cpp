@@ -56,6 +56,7 @@ int main(int argc, char **argv)
 {
   // command line options
   auto app = make_app();
+  add_heatbath_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
