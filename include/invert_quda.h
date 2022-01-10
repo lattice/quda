@@ -211,6 +211,15 @@ namespace quda {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double ca_lambda_max; // -1 -> power iter generate
 
+    /** Basis for CA algorithms in a preconditioner */
+    QudaCABasis ca_basis_precondition;
+
+    /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner */
+    double ca_lambda_min_precondition;
+
+    /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner */
+    double ca_lambda_max_precondition; // -1 -> power iter generate
+
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
@@ -312,6 +321,9 @@ namespace quda {
       ca_basis(param.ca_basis),
       ca_lambda_min(param.ca_lambda_min),
       ca_lambda_max(param.ca_lambda_max),
+      ca_basis_precondition(param.ca_basis_precondition),
+      ca_lambda_min_precondition(param.ca_lambda_min_precondition),
+      ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       secs(param.secs),
       gflops(param.gflops),

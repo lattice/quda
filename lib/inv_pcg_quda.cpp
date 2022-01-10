@@ -44,6 +44,9 @@ namespace quda
     inner.maxiter = outer.maxiter_precondition;
     if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
       inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+      inner.ca_basis = outer.ca_basis_precondition;
+      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
+      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
     } else {
       inner.Nsteps = outer.precondition_cycle;
     }
