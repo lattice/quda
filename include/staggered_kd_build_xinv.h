@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <gauge_field.h>
 
 namespace quda
@@ -7,23 +9,32 @@ namespace quda
 
   /**
      @brief Build the Kahler-Dirac inverse block for KD operators.
-     @param[out] out Xinv resulting Kahler-Dirac inverse (assumed allocated)
-     @param[in] in gauge original fine gauge field
-     @param[in] in mass the mass of the original staggered operator w/out factor of 2 convention
+     @param Xinv[out] Resulting Kahler-Dirac inverse (assumed allocated)
+     @param gauge[in] Original fine gauge field
+     @param mass [in] Mass of the original staggered operator w/out factor of 2 convention
+     @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
   */
-  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass);
+  void BuildStaggeredKahlerDiracInverse(GaugeField &Xinv, const cudaGaugeField &gauge, const double mass,
+                                        const bool dagger_approximation);
+
+  /**
+     @brief Perform the reordering of the Kahler-Dirac inverse block from a coarse scalar field to a KD geometry gauge field
+     @param xInvFineLayout[out] Kahler-Dirac inverse in KD geometry gauge field
+     @param xInvCoarseLayout[in] Kahler-Dirac inverse in coarse geometry MILC layout
+     @param dagger_approximation[in] Whether or not we're doing the dagger approximation, where you pass in X instead
+     @param msas [in] Mass of the original staggered operator w/out factor of 2 convention, needed for dagger approx
+  */
+  void ReorderStaggeredKahlerDiracInverse(GaugeField &xInvFineLayout, const GaugeField &xInvCoarseLayout,
+                                          const bool dagger_approximation, const double mass);
 
   /**
      @brief Allocate and build the Kahler-Dirac inverse block for KD operators
-     @param[in] in gauge original fine gauge field
-     @param[in] in mass the mass of the original staggered operator w/out factor of 2 convention
-     @param[in] in precision of Xinv field
-     @return constructed Xinv, which needs to be deleted manually
+     @param gauge[in] Original fine gauge field
+     @param mass[in] Mass of the original staggered operator w/out factor of 2 convention
+     @param dagger_approximation[in] Whether or not to use the dagger approximation, using the dagger of X instead of Xinv
+     @return constructed Xinv
   */
-  cudaGaugeField *AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
-                                                              const QudaPrecision override_prec);
+  std::unique_ptr<GaugeField> AllocateAndBuildStaggeredKahlerDiracInverse(const cudaGaugeField &gauge, const double mass,
+                                                                          const bool dagger_approximation);
 
-  // Note: see routine
-  // void ApplyStaggeredKahlerDiracInverse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Xinv,
-  // bool dagger); in dslash_quda.h as it is relevant for applying the above op.
 } // namespace quda
