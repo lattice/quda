@@ -16,7 +16,7 @@ namespace quda
     {
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      using Arg = Tensor5DReduceArg<storage_t>;
+      using Arg = Tensor5DReduceArg<storage_t, 4, 3>;
       using reduce_t = typename Arg::reduce_t;
       reduce_t *wm_p;
 
@@ -64,7 +64,7 @@ namespace quda
         errorQuda("ColorSpinorFields are not single parity: y = %d, x = %d", y.SiteSubset(), x.SiteSubset());
       }
 
-      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
+      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
       size_t m_size = y.X(4) * x.X(4) * sizeof(matrix_t);
       if (transfer_parameter.size() * sizeof(float) != m_size) {
         errorQuda("Training Parameter size mismatch %lu neq %lu.", transfer_parameter.size() * sizeof(float), m_size);

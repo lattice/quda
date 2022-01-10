@@ -21,13 +21,16 @@ namespace quda
   namespace madwf_ml
   {
 
-    template <class storage_t>
-    struct Tensor5DReduceArg : ReduceArg<array<complex<typename mapper<storage_t>::type>, spin_dim * spin_dim>> {
+    template <class storage_t, int nSpin_, int nColor_>
+    struct Tensor5DReduceArg : ReduceArg<array<complex<typename mapper<storage_t>::type>, nSpin_ * nSpin_>> {
 
-      using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
+      static constexpr int nSpin = nSpin_;
+      static constexpr int nColor = nColor_;
+
+      using F = typename colorspinor_mapper<storage_t, nSpin, nColor>::type;
       using real = typename mapper<storage_t>::type;
-      using reduce_t = array<complex<real>, spin_dim * spin_dim>;
-      using Vector = ColorSpinor<real, 3, 4>;
+      using reduce_t = array<complex<real>, nSpin * nSpin>;
+      using Vector = ColorSpinor<real, nColor, nSpin>;
 
       const F x; // xput vector field
       const F y; // yput vector field
@@ -67,9 +70,9 @@ namespace quda
       {
         reduce_t rst;
 #pragma unroll
-        for (int w_spin = 0; w_spin < spin_dim; w_spin++) {
+        for (int w_spin = 0; w_spin < nSpin; w_spin++) {
 #pragma unroll
-          for (int v_spin = 0; v_spin < spin_dim; v_spin++) { rst[v_spin * spin_dim + w_spin] = {0, 0}; }
+          for (int v_spin = 0; v_spin < nSpin; v_spin++) { rst[v_spin * nSpin + w_spin] = {0, 0}; }
         }
         return rst;
       }
@@ -96,10 +99,10 @@ namespace quda
         const Vector y = arg.y(y_s * arg.volume_4d_cb + x_cb, parity);
 
 #pragma unroll
-        for (int y_spin = 0; y_spin < spin_dim; y_spin++) {
+        for (int y_spin = 0; y_spin < Arg::nSpin; y_spin++) {
 #pragma unroll
-          for (int x_spin = 0; x_spin < spin_dim; x_spin++) {
-            sum[x_spin * spin_dim + y_spin] += innerProduct(y, x, y_spin, x_spin);
+          for (int x_spin = 0; x_spin < Arg::nSpin; x_spin++) {
+            sum[x_spin * Arg::nSpin + y_spin] += innerProduct(y, x, y_spin, x_spin);
           }
         }
 

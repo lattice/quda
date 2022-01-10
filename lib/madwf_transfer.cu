@@ -17,7 +17,7 @@ namespace quda
       const ColorSpinorField &in;
       const MadwfAcc::transfer_float *wm_p;
       bool dagger;
-      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
+      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
 
       unsigned int sharedBytesPerThread() const { return 0; }
 
@@ -49,9 +49,9 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (dagger) {
-          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_t, true>(out, in, wm_p));
+          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_t, 4, 3, true>(out, in, wm_p));
         } else {
-          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_t, false>(out, in, wm_p));
+          launch<Transfer5D>(tp, stream, Transfer5DArg<storage_t, 4, 3, false>(out, in, wm_p));
         }
       }
 
@@ -69,7 +69,7 @@ namespace quda
         errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", in.SiteSubset(), out.SiteSubset());
       }
 
-      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
+      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
       size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_t);
       if (tp.size() * sizeof(float) != m_size) {
         errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.size() * sizeof(float), m_size);

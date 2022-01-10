@@ -17,36 +17,26 @@ namespace quda
 
   namespace madwf_ml
   {
-    constexpr int spin_dim = 4;
-    constexpr int color_dim = 3;
-    constexpr int sm_dim = spin_dim * spin_dim;
 
-    constexpr int color_spin_dim = spin_dim * color_dim;
-    constexpr int wm_dim = color_spin_dim * color_spin_dim;
-
-    template <class real> using WilsonVector = ColorSpinor<real, color_dim, spin_dim>;
-
-    template <class real> using SpinMatrix = Matrix<complex<real>, spin_dim>;
-
-    template <class real, transfer_5D_t transfer_t> struct transfer_5D_mapper {
+    template <class real, int nSpin, int nColor, transfer_5D_t transfer_t> struct transfer_5D_mapper {
     };
 
-    template <class real> struct transfer_5D_mapper<real, transfer_5D_t::Spin> {
-      using type = SpinMatrix<real>;
+    template <class real, int nSpin, int nColor> struct transfer_5D_mapper<real, nSpin, nColor, transfer_5D_t::Spin> {
+      using type = Matrix<complex<real>, nSpin>;
     };
 
-    template <bool dagger, class real>
-    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const SpinMatrix<real> &m,
-                                                                         const WilsonVector<real> &v)
+    template <bool dagger, class real, int nSpin, int nColor>
+    __device__ __host__ inline ColorSpinor<real, nColor, nSpin>
+    matrix_vector_multiply(const Matrix<complex<real>, nSpin> &m, const ColorSpinor<real, nColor, nSpin> &v)
     {
-      WilsonVector<real> out; // out is initialized to zero
+      ColorSpinor<real, nColor, nSpin> out; // out is initialized to zero
 #pragma unroll
-      for (int color = 0; color < color_dim; color++) {
+      for (int color = 0; color < nColor; color++) {
 #pragma unroll
-        for (int column = 0; column < spin_dim; column++) {
+        for (int column = 0; column < nSpin; column++) {
           auto v_col = v(column, color);
 #pragma unroll
-          for (int row = 0; row < spin_dim; row++) {
+          for (int row = 0; row < nSpin; row++) {
             if (dagger) {
               out(row, color) = cmac(conj(m(column, row)), v_col, out(row, color));
             } else {
@@ -58,12 +48,15 @@ namespace quda
       return out;
     }
 
-    template <class storage_t, bool dagger_> struct Transfer5DArg : kernel_param<> {
+    template <class storage_t, int nSpin_, int nColor_, bool dagger_> struct Transfer5DArg : kernel_param<> {
+
+      static constexpr int nSpin = nSpin_;
+      static constexpr int nColor = nColor_;
 
       using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
       using real = typename mapper<storage_t>::type;
       using Vector = ColorSpinor<real, 3, 4>;
-      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, MadwfAcc::transfer_t>::type;
+      using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, nSpin, nColor, MadwfAcc::transfer_t>::type;
 
       static constexpr bool dagger = dagger_;
 
