@@ -142,6 +142,16 @@ int main(int argc, char **argv)
     prop_array_ptr[i] = prop_array + offset;
   }
 
+  
+  // create meson block
+  const int NVEC=10;
+  auto *meson_blocks = (double *)malloc(spinor_dim*NVEC*NVEC*bytes_per_float);
+  auto *eigenvectors = (double *)malloc(spinor_dim*NVEC*bytes_per_float);
+  
+  createMesonBlocksQuda(meson_blocks, eigenvectors);
+
+  
+
   //clean up
   if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   freeGaugeQuda();
