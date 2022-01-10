@@ -23,7 +23,7 @@ namespace quda
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
-      = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
+      = (outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) ? outer.precision_sloppy : outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -42,7 +42,7 @@ namespace quda
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
       inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
     } else {
       inner.Nsteps = outer.precondition_cycle;
@@ -70,6 +70,8 @@ namespace quda
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
       K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+    } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+      K = new CACG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {

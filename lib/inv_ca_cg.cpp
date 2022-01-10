@@ -721,6 +721,8 @@ namespace quda {
 
         for (int i = 0; i < param.Nkrylov * (param.Nkrylov+1); i++) { Q_AQandg[i] = real(Q_AQandg[i]); }
 
+        compute_alpha();
+
         // update the solution vector
         std::vector<ColorSpinorField*> X;
         X.push_back(&x);
@@ -728,7 +730,7 @@ namespace quda {
 
         // no need to update AS
         r2 = real(Q_AQandg[param.Nkrylov]); // actually the old r2... so we do one more iter than needed...
-        
+
       }
 
 
@@ -745,6 +747,7 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
       // Note: this won't reliable update when the norm _increases_.
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
+
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
