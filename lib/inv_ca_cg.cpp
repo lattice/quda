@@ -649,56 +649,54 @@ namespace quda {
         }
       }
 
-      // first iteration, copy S and AS into Q and AQ
-      if (total_iter == 0) {
-        // first iteration Q = S
-        for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
-        for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
-
-      } else {
-
-
-        // Compute the beta coefficients for updating Q, AQ
-        // 1. compute matrix Q_AS = -Q^\dagger AS
-        // 2. Solve Q_AQ beta = Q_AS
-        std::vector<ColorSpinorField*> R;
-        for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
-        blas::cDotProduct(Q_AS, AQ, R);
-        for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
-
-        compute_beta();
-
-        // update direction vectors
-        blas::caxpyz(beta, Q, R, Qtmp);
-        for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
-
-        blas::caxpyz(beta, AQ, AS, Qtmp);
-        for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
-      }
-
-      // compute the alpha coefficients
-      // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
-      // 2. Solve Q_AQ alpha = g
-      {
-        std::vector<ColorSpinorField*> Q2;
-        for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
-        Q2.push_back(S[0]);
-        blas::cDotProduct(Q_AQandg, Q, Q2);
-
-        for (int i = 0; i < param.Nkrylov*(param.Nkrylov+1); i++) { Q_AQandg[i] = real(Q_AQandg[i]); }
-
-        compute_alpha();
-      }
-
-      // update the solution vector
-      std::vector<ColorSpinorField*> X;
-      X.push_back(&x);
-      blas::caxpy(alpha, Q, X);
-
-      // no need to compute residual vector if only doing a single fixed iteration
-      // perhaps we could save the mat-vec here if we compute "Ap"
-      // vectors when we update p?
+      // we can greatly simplify the workflow for fixed iterations
       if (!fixed_iteration) {
+        // first iteration, copy S and AS into Q and AQ
+        if (total_iter == 0) {
+          // first iteration Q = S
+          for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
+          for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
+
+        } else {
+
+
+          // Compute the beta coefficients for updating Q, AQ
+          // 1. compute matrix Q_AS = -Q^\dagger AS
+          // 2. Solve Q_AQ beta = Q_AS
+          std::vector<ColorSpinorField*> R;
+          for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
+          blas::cDotProduct(Q_AS, AQ, R);
+          for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
+
+          compute_beta();
+
+          // update direction vectors
+          blas::caxpyz(beta, Q, R, Qtmp);
+          for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
+
+          blas::caxpyz(beta, AQ, AS, Qtmp);
+          for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
+        }
+
+        // compute the alpha coefficients
+        // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
+        // 2. Solve Q_AQ alpha = g
+        {
+          std::vector<ColorSpinorField*> Q2;
+          for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
+          Q2.push_back(S[0]);
+          blas::cDotProduct(Q_AQandg, Q, Q2);
+
+          for (int i = 0; i < param.Nkrylov*(param.Nkrylov+1); i++) { Q_AQandg[i] = real(Q_AQandg[i]); }
+
+          compute_alpha();
+        }
+
+        // update the solution vector
+        std::vector<ColorSpinorField*> X;
+        X.push_back(&x);
+        blas::caxpy(alpha, Q, X);
+
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
         std::vector<ColorSpinorField*> S0{S[0]};
 
@@ -707,7 +705,32 @@ namespace quda {
         //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
         /*else*/ r2 = real(Q_AQandg[param.Nkrylov]); // actually the old r2... so we do one more iter than needed...
 
+      } else {
+        // fixed iterations
+        // On the first pass, Q = S; AQ = AQ. We can just skip that.
+
+        // We don't compute beta on the first iteration
+
+        // We do compute the alpha coefficients: this is the same code as above
+        // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
+        // 2. Solve "Q_AQ" alpha = g
+        std::vector<ColorSpinorField*> S2;
+        for (int i = 0; i < n_krylov; i++) S2.push_back(AS[i]);
+        S2.push_back(S[0]);
+        blas::cDotProduct(Q_AQandg, S, S2);
+
+        for (int i = 0; i < param.Nkrylov * (param.Nkrylov+1); i++) { Q_AQandg[i] = real(Q_AQandg[i]); }
+
+        // update the solution vector
+        std::vector<ColorSpinorField*> X;
+        X.push_back(&x);
+        blas::caxpy(alpha, S, X);
+
+        // no need to update AS
+        r2 = real(Q_AQandg[param.Nkrylov]); // actually the old r2... so we do one more iter than needed...
+        
       }
+
 
       // NOTE: Because we always carry around the residual from an iteration before, we
       // "lie" about which iteration we're on so the printed residual matches with the
