@@ -360,6 +360,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
+  P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
 #else
@@ -377,10 +379,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }
-  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
+  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
+  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
 #endif
 
   P(tol, INVALID_DOUBLE);
@@ -926,6 +930,18 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 #else
   P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(allow_truncation, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_truncation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_FALSE);
+#else
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM

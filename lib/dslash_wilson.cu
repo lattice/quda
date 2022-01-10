@@ -20,7 +20,12 @@ namespace quda
     using Dslash = Dslash<wilson, Arg>;
 
   public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    {
+      if(in.Ndim() == 5) {
+        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      }
+    }
 
     void apply(const qudaStream_t &stream)
     {

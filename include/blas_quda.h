@@ -6,12 +6,19 @@
 
 namespace quda {
 
-  namespace blas {
+  namespace reducer
+  {
 
-    // creates and destroys reduction buffers
-    void init();
+    /**
+       @brief Free any persistent allocations associated with global reduction
+     */
     void destroy();
-    
+
+  } // namespace reducer
+
+  namespace blas
+  {
+
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;

@@ -5,11 +5,6 @@
 
 namespace quda {
 
-  namespace reducer {
-    void init();
-    void destroy();
-  }
-  
   namespace blas {
 
     unsigned long long flops;
@@ -149,16 +144,6 @@ namespace quda {
     void zero(ColorSpinorField &a)
     {
       a.zero();
-    }
-
-    void init()
-    {
-      reducer::init();
-    }
-
-    void destroy(void)
-    {
-      reducer::destroy();
     }
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z)

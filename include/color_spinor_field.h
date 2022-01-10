@@ -227,7 +227,8 @@ namespace quda
           || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
-      } else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
+      } else if ((inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+                 && twistFlavor == QUDA_TWIST_NONDEG_DOUBLET) {
         nDim++;
         x[4] = 2; // for two flavors
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -693,19 +694,23 @@ namespace quda
 
     CompositeColorSpinorField &Components() { return components; };
 
-    ColorSpinorField &Component(int idx)
-    {
-      if (!IsComposite()) errorQuda("Not composite field");
-      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
-    }
+    /**
+       @brief Return the idx^th component of the composite field.  An
+       error will be thrown if the field is not a composite field, or
+       if an out of bounds idx is requested.
+       @param[in] idx Component index
+       @return Component reference
+    */
+    ColorSpinorField &Component(int idx);
 
-    const ColorSpinorField &Component(int idx) const
-    {
-      if (!IsComposite()) errorQuda("Not composite field");
-      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
-    }
+    /**
+       @brief Return the idx^th component of the composite field.  An
+       error will be thrown if the field is not a composite field, or
+       if an out of bounds idx is requested.
+       @param[in] idx Component index
+       @return Component const reference
+    */
+    const ColorSpinorField &Component(int idx) const;
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index

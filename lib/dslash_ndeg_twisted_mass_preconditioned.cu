@@ -36,8 +36,8 @@ namespace quda
     }
 
   public:
-    NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
+  NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    Dslash(arg, out, in),
       shared(arg.asymmetric || !arg.dagger)
     {
       TunableKernel3D::resizeVector(2, arg.nParity);
@@ -129,7 +129,7 @@ namespace quda
                                           double, double, double, bool, const ColorSpinorField &, int, bool, bool,
                                           const int *, TimeProfile &)
   {
-    errorQuda("Non-degenerate twisted-mass dslash has not been built");
+    errorQuda("Non-degenerate preconditioned twisted-mass dslash has not been built");
   }
 #endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
