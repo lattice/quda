@@ -43,7 +43,7 @@ namespace quda {
     cudaGaugeField *longGauge; // used by staggered only
     int laplace3D;
     CloverField *clover;
-    cudaGaugeField *xInvKD; // used for the Kahler-Dirac operator only
+    GaugeField *xInvKD; // used for the Kahler-Dirac operator only
 
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
@@ -63,6 +63,7 @@ namespace quda {
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
     bool use_mma;            // whether to use tensor cores where applicable
+    bool allow_truncation; /** whether or not we let MG coarsening drop improvements, for ex drop long links for small aggregate dimensions */
 
     bool use_mobius_fused_kernel; // Whether or not use fused kernels for Mobius
 
@@ -88,6 +89,7 @@ namespace quda {
 #else
       use_mma(false),
 #endif
+      allow_truncation(false),
 #ifdef NVSHMEM_COMMS
       use_mobius_fused_kernel(false)
 #else
@@ -117,6 +119,7 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
       printfQuda("use_mma = %d\n", use_mma);
+      printfQuda("allow_truncation = %d\n", allow_truncation);
       printfQuda("use_mobius_fused_kernel = %s\n", use_mobius_fused_kernel ? "true" : "false");
     }
   };
@@ -329,6 +332,11 @@ namespace quda {
     virtual double MuFactor() const { return 0.; }
 
     /**
+       @brief accessor for if we let MG coarsening drop we can drop improvements, for ex long links for small aggregation dimensions
+    */
+    virtual bool AllowTruncation() const { return false; }
+
+    /**
        @brief  returns and then zeroes flopcount
     */
     unsigned long long Flops() const
@@ -390,11 +398,14 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, for ex dropping long links for
+     * small aggregate sizes
      */
-    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double) const
+    virtual void createCoarseOp(GaugeField &, GaugeField &, const Transfer &, double, double, double, double, bool) const
     {errorQuda("Not implemented");}
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
@@ -454,9 +465,10 @@ namespace quda {
      * @param T[in] Transfer operator defining the coarse grid
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      * @param kappa Kappa parameter for the coarse operator
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for Wilson operator
      */
-    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				double kappa, double mass=0.,double mu=0., double mu_factor=0.) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0.,
+                                double mu = 0., double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -543,9 +555,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -605,9 +618,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (set to zero)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover operator
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -660,9 +674,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Even-odd preconditioned clover
@@ -713,9 +728,10 @@ namespace quda {
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (set to zero)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for clover hasenbusch
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full domain wall
@@ -1018,9 +1034,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_trunation = false) const;
   };
 
   // Even-odd preconditioned twisted mass
@@ -1061,9 +1078,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted mass
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Full twisted mass with a clover term
@@ -1136,9 +1154,10 @@ public:
      * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1202,9 +1221,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for twisted clover
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1272,12 +1292,12 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-      double kappa, double mass, double mu=0., double mu_factor=0.) const;
-      
-    
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const;          
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
+
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1303,6 +1323,30 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_STAGGEREDPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
+
+    /**
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0., bool allow_truncation = false) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1310,7 +1354,8 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField *Xinv;        /** inverse Kahler-Dirac matrix */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracStaggeredKD(const DiracParam &param);
@@ -1373,9 +1418,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for staggered
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1469,9 +1515,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1508,6 +1555,30 @@ public:
     virtual QudaDiracType getDiracType() const { return QUDA_ASQTADPC_DIRAC; }
 
     virtual bool hermitian() const { return true; }
+
+    /**
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long links here
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
   };
 
   // Kahler-Dirac preconditioned staggered
@@ -1515,7 +1586,8 @@ public:
   {
 
   protected:
-    mutable cudaGaugeField *Xinv; /** inverse Kahler-Dirac matrix */
+    mutable GaugeField *Xinv;        /** inverse Kahler-Dirac matrix */
+    QudaDiracType parent_dirac_type; /** Type of parent Dirac operator, needed here to determine if parent is pc'd or not */
 
   public:
     DiracImprovedStaggeredKD(const DiracParam &param);
@@ -1577,9 +1649,10 @@ public:
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, dropping long for asqtad
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
-                        double mu_factor = 0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor, bool allow_truncation) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
@@ -1606,6 +1679,7 @@ public:
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
+    const bool allow_truncation; /** Whether or not we let coarsening drop improvements, for ex dropping long links for small aggregate sizes */
     const bool use_mma;            /** Whether to use tensor cores or not */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
@@ -1655,6 +1729,7 @@ public:
     double Mass() const { return mass; }
     double Mu() const { return mu; }
     double MuFactor() const { return mu_factor; }
+    bool AllowTruncation() const { return allow_truncation; }
 
     /**
        @param[in] param Parameters defining this operator
@@ -1753,10 +1828,10 @@ public:
      * @param mass Mass parameter (assumed to be zero, staggered mass gets built into clover)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
-
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
      * @brief Create the precondtioned coarse operator
@@ -1822,9 +1897,10 @@ public:
      * @param mass Mass parameter for the coarse operator, assumed to be zero
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
+     * @param allow_truncation [in] whether or not we let coarsening drop improvements, none available for coarse op
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass, double mu, double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu,
+                        double mu_factor = 0., bool allow_truncation = false) const;
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
