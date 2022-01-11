@@ -633,12 +633,7 @@ namespace quda {
           // Enter recursion relation
           if (n_krylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            double factors[] = { 2.*m_map, 2.*b_map, -1 };
             for (int k = 2; k < n_krylov; k++) {
-              //std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
-              //std::vector<ColorSpinorField*> Sk{S[k]};
-              //blas::zero(*S[k]);
-              //blas::axpy(factors, recur2, Sk);
               blas::axpbypczw(2. * m_map, *AS[k-1], 2. * b_map, *S[k-1], -1., *S[k-2], *S[k]);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
@@ -656,7 +651,6 @@ namespace quda {
 
         } else {
 
-
           // Compute the beta coefficients for updating Q, AQ
           // 1. compute matrix Q_AS = -Q^\dagger AS
           // 2. Solve Q_AQ beta = Q_AS
@@ -667,16 +661,11 @@ namespace quda {
           compute_beta();
 
           // update direction vectors
-          Complex *beta_ = new Complex[n_krylov * n_krylov];
-          for (int i = 0; i < n_krylov * n_krylov; i++) beta_[i] = beta[i];
-
-          blas::caxpyz(beta_, Q, R, Qtmp);
+          blas::axpyz(beta, Q, R, Qtmp);
           for (int i = 0; i < n_krylov * n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
-          blas::caxpyz(beta_, AQ, AS, Qtmp);
+          blas::axpyz(beta, AQ, AS, Qtmp);
           for (int i = 0; i < n_krylov * n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
-
-          delete beta_;
         }
 
         // compute the alpha coefficients
