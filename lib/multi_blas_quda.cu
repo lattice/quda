@@ -436,7 +436,7 @@ namespace quda {
 
     void axpyz(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
     {
-      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0, 2);
+      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0, 1);
     }
 
     void axpyz_U(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
@@ -445,10 +445,10 @@ namespace quda {
         errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       // a is upper triangular.
-      // first pass does the caxpyz on the diagonal
-      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 1, 2);
-      // second pass does caxpy on the off diagonals
-      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1, 2);
+      // first pass does the axpyz on the diagonal
+      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 1, 1);
+      // second pass does axpy on the off diagonals
+      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1, 1);
     }
 
     void axpyz_L(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
@@ -457,10 +457,10 @@ namespace quda {
         errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       // a is upper triangular.
-      // first pass does the caxpyz on the diagonal
-      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, -1, 2);
-      // second pass does caxpy on the off diagonals
-      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1, 2);
+      // first pass does the axpyz on the diagonal
+      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, -1, 1);
+      // second pass does axpy on the off diagonals
+      axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1, 1);
     }
 
 

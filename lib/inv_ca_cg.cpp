@@ -504,7 +504,7 @@ namespace quda {
       }
     }
 
-    // compute intitial residual depending on whether we have an initial guess or not
+    // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);
       //r = b - Ax0
@@ -662,10 +662,10 @@ namespace quda {
 
           // update direction vectors
           blas::axpyz(beta, Q, R, Qtmp);
-          for (int i = 0; i < n_krylov * n_krylov; i++) std::swap(Q[i], Qtmp[i]);
+          for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
           blas::axpyz(beta, AQ, AS, Qtmp);
-          for (int i = 0; i < n_krylov * n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
+          for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
         }
 
         // compute the alpha coefficients
