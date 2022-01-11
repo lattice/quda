@@ -62,6 +62,15 @@ namespace quda
     inner.sloppy_converge = true;
   }
 
+  // extract parameters determined while running the inner solver
+  static void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  {
+    // extract a_max, which may have been determined via power iterations
+    if (outer.inv_type_precondition == QUDA_CA_CG_INVERTER && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
+    }
+  }
+
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
@@ -87,6 +96,7 @@ namespace quda
   PreconCG::~PreconCG()
   {
     profile.TPSTART(QUDA_PROFILE_FREE);
+    extractInnerSolverParam(param, Kparam);
 
     if (K) delete K;
     destroyDeflationSpace();

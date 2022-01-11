@@ -399,6 +399,9 @@ namespace quda {
       ca_basis(param.ca_basis),
       ca_lambda_min(param.ca_lambda_min),
       ca_lambda_max(param.ca_lambda_max),
+      ca_basis_precondition(param.ca_basis_precondition),
+      ca_lambda_min_precondition(param.ca_lambda_min_precondition),
+      ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       secs(param.secs),
       gflops(param.gflops),
@@ -461,6 +464,9 @@ namespace quda {
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
+
+      param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+      param.ca_lambda_max_precondition = ca_lambda_max_precondition;
 
       if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
