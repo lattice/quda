@@ -654,8 +654,8 @@ namespace quda {
           // Compute the beta coefficients for updating Q, AQ
           // 1. compute matrix Q_AS = -Q^\dagger AS
           // 2. Solve Q_AQ beta = Q_AS
-          std::vector<ColorSpinorField*> R;
-          for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
+          std::vector<ColorSpinorField*> R(n_krylov);
+          for (int i = 0; i < n_krylov; i++) R[i] = S[i];
           blas::reDotProduct(Q_AS, AQ, R);
 
           compute_beta();
@@ -672,17 +672,16 @@ namespace quda {
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          std::vector<ColorSpinorField*> Q2;
-          for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
-          Q2.push_back(S[0]);
+          std::vector<ColorSpinorField*> Q2(n_krylov + 1);
+          for (int i = 0; i < n_krylov; i++) Q2[i] = AQ[i];
+          Q2[n_krylov] = S[0];
           blas::reDotProduct(Q_AQandg, Q, Q2);
 
           compute_alpha();
         }
 
         // update the solution vector
-        std::vector<ColorSpinorField*> X;
-        X.push_back(&x);
+        std::vector<ColorSpinorField*> X = {&x};
         blas::axpy(alpha, Q, X);
 
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
@@ -701,16 +700,15 @@ namespace quda {
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        std::vector<ColorSpinorField*> S2;
-        for (int i = 0; i < n_krylov; i++) S2.push_back(AS[i]);
-        S2.push_back(S[0]);
+        std::vector<ColorSpinorField*> S2(n_krylov + 1);
+        for (int i = 0; i < n_krylov; i++) S2[i] = AS[i];
+        S2[n_krylov] = S[0];
         blas::reDotProduct(Q_AQandg, S, S2);
 
         compute_alpha();
 
         // update the solution vector
-        std::vector<ColorSpinorField*> X;
-        X.push_back(&x);
+        std::vector<ColorSpinorField*> X = {&x};
         blas::axpy(alpha, S, X);
 
         // no need to update AS
