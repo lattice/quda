@@ -611,18 +611,6 @@ double test(Kernel kernel)
 
   case Kernel::ax:
     *xD = *xH;
-    //{
-    //  *yH = *xH;
-    //  *zH = *xD;
-    //  auto nxH = blas::norm2(*xH);
-    //  auto nxD = blas::norm2(*xD);
-    //  auto nyH = blas::norm2(*yH);
-    //  auto nzH = blas::norm2(*zH);
-    //  printf("nxH: %g\n", nxH);
-    //  printf("nxD: %g\n", nxD);
-    //  printf("nyH: %g\n", nyH);
-    //  printf("nzH: %g\n", nzH);
-    //}
     blas::ax(a, *xD);
     blas::ax(a, *xH);
     error = ERROR(x);
@@ -1149,7 +1137,7 @@ TEST_P(BlasTest, verify)
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
   double deviation = test(kernel);
-  //warningQuda("%-35s error: %e (0x%lx)\n",kernel_map.at(kernel).c_str(),deviation,*(long*)&deviation);
+  // printfQuda("%-35s error = %e\n", names[kernel], deviation);
   double tol_x
     = (prec_pair.first == QUDA_DOUBLE_PRECISION ?
          1e-12 :

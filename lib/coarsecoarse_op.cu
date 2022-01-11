@@ -54,15 +54,11 @@ namespace quda {
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mass, double mu, double mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional, bool use_mma)
   {
-    #if 0
     if (use_mma) {
       CoarseCoarseOpMMA(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
     } else {
-#endif
       CoarseCoarseOp(Y, X, T, gauge, clover, cloverInv, kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional);
-    #if 0
     }
-#endif
   }
 
 }
