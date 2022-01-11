@@ -4,6 +4,7 @@
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>
+#include <memory>
 
 // at the moment double-precision multigrid is only enabled when debugging
 #ifdef HOST_DEBUG
@@ -251,7 +252,7 @@ namespace quda {
     ColorSpinorField *tmp2_coarse;
 
     /** Kahler-Dirac Xinv */
-    cudaGaugeField *xInvKD;
+    std::unique_ptr<GaugeField> xInvKD;
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual;
@@ -318,6 +319,13 @@ namespace quda {
        @param Whether we are refreshing the null-space components or just updating the operators
      */
     void reset(bool refresh=false);
+
+    /**
+       @brief This method only resets the KD operators with the updated fine links and rebuilds
+              the KD inverse
+     */
+    void resetStaggeredKD(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                          double mass);
 
     /**
        @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
@@ -452,15 +460,18 @@ namespace quda {
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
      @param T[in] Transfer operator that defines the coarse space
-     @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param gauge[in] Gauge field from fine grid
+     @param longGauge[in] Long link field in case of HISQ operator
      @param XinvKD[in] Inverse Kahler-Dirac block
      @param mass[in] Mass parameter
+     @param allow_truncation[in] Whether or not we can drop the long links for small aggregation dimensions
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
   void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge,
-                         const cudaGaugeField *XinvKD, double mass, QudaDiracType dirac, QudaMatPCType matpc);
+                         const cudaGaugeField &longGauge, const GaugeField &XinvKD, double mass, bool allow_truncation,
+                         QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
