@@ -1493,6 +1493,15 @@ extern "C" {
    * @param step_size Size of Wilson Flow step
    * @param meas_interval Measure the Q charge and field energy every Nth step
    * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void performWFlownStep_param(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
+  QudaGaugeObservableParam *param);
+
+  /**
+   * overload of performWFlownStep_param, 
+   * but without passing a pointer to QudaGaugeObservableParam
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
