@@ -519,7 +519,6 @@ void initQudaMemory()
   createDslashEvents();
 
   blas_lapack::native::init();
-  blas::init();
 
   num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -1429,7 +1428,7 @@ void endQuda(void)
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::destroy();
+  reducer::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
@@ -2481,7 +2480,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+      || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   }
@@ -2564,6 +2564,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     }
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.
+
+    // If we're doing a staggered or asqtad KD op, a thin update needs to update the
+    // fields for the KD op as well.
+    if (mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+        || mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      if (param->overlap) errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
+
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, param->mass);
+    }
 
   } else {
 
