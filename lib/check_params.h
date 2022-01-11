@@ -322,7 +322,6 @@ void printQudaCloverParam(QudaInvertParam *param)
   P(clover_csw, INVALID_DOUBLE);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
-    P(cl_pad, INVALID_INT);
 
 #ifndef INIT_PARAM
   }
@@ -359,6 +358,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
+  P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
 #else
@@ -376,10 +377,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }
-  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
+  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
+  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
 #endif
 
   P(tol, INVALID_DOUBLE);
@@ -516,7 +519,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
-  P(sp_pad, INVALID_INT);
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);

@@ -68,8 +68,8 @@ static const double projector[8][4][4][2] = {
 
 
 // todo pass projector
-template <typename Float>
-void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
+template <typename Float> void multiplySpinorByDiracProjector(Float *res, int projIdx, const Float *spinorIn)
+{
   for (int i=0; i<4*3*2; i++) res[i] = 0.0;
 
   for (int s = 0; s < 4; s++) {
@@ -86,7 +86,6 @@ void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
     }
   }
 }
-
 
 //
 // dslashReference()
@@ -114,7 +113,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
   for (int i = 0; i < Vh; i++) {
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink(i, dir, oddBit, gaugeEven, gaugeOdd, 1);
-      sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
+      const sFloat *spinor = spinorNeighbor(i, dir, oddBit, spinorField, 1);
 
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
@@ -152,7 +151,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloa
 
     for (int dir = 0; dir < 8; dir++) {
       gFloat *gauge = gaugeLink_mg4dir(i, dir, oddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
-      sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
+      const sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
 
       sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
@@ -194,6 +193,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qu
   // Get spinor ghost fields
   // First wrap the input spinor into a ColorSpinorField
   ColorSpinorParam csParam;
+  csParam.location = QUDA_CPU_FIELD_LOCATION;
   csParam.v = in;
   csParam.nColor = 3;
   csParam.nSpin = 4;
@@ -209,7 +209,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qu
   csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   csParam.pc_type = QUDA_4D_PC;
 
-  cpuColorSpinorField inField(csParam);
+  ColorSpinorField inField(csParam);
 
   {  // Now do the exchange
     QudaParity otherParity = QUDA_INVALID_PARITY;
@@ -469,24 +469,35 @@ void ndeg_twist_gamma5(void *outf1, void *outf2, void *inf1, void *inf2, const i
   }
 }
 
-void tm_ndeg_dslash(void *res1, void *res2, void **gauge, void *spinorField1, void *spinorField2, double kappa, double mu, 
-	           double epsilon, int oddBit, int daggerBit, QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+void tm_ndeg_dslash(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int oddBit,
+                    int daggerBit, QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-  if (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
-    ndeg_twist_gamma5(spinorField1, spinorField2, spinorField1, spinorField2, daggerBit, kappa, mu, epsilon, Vh,
-        QUDA_TWIST_GAMMA5_INVERSE, precision);
+  void *out1 = out;
+  void *out2 = (char *)out1 + Vh * spinor_site_size * precision;
 
-  wil_dslash(res1, gauge, spinorField1, oddBit, daggerBit, precision, gauge_param);
-  wil_dslash(res2, gauge, spinorField2, oddBit, daggerBit, precision, gauge_param);
-  
+  void *in1 = in;
+  void *in2 = (char *)in1 + Vh * spinor_site_size * precision;
+
+  if (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD))
+    ndeg_twist_gamma5(in1, in2, in1, in2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+
+  wil_dslash(out1, gauge, in1, oddBit, daggerBit, precision, gauge_param);
+  wil_dslash(out2, gauge, in2, oddBit, daggerBit, precision, gauge_param);
+
   if (!daggerBit || (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC)) {
-    ndeg_twist_gamma5(res1, res2, res1, res2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
+    ndeg_twist_gamma5(out1, out2, out1, out2, daggerBit, kappa, mu, epsilon, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
   }
 }
 
+void tm_ndeg_matpc(void *outEven, void **gauge, void *inEven, double kappa, double mu, double epsilon,
+                   QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param)
+{
 
-void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, void *inEven2, double kappa, double mu, double epsilon,
-	   QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) {
+  void *outEven1 = outEven;
+  void *outEven2 = (char *)outEven1 + Vh * spinor_site_size * precision;
+
+  void *inEven1 = inEven;
+  void *inEven2 = (char *)inEven1 + Vh * spinor_site_size * precision;
 
   void *tmp1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmp2 = safe_malloc(Vh * spinor_site_size * precision);
@@ -554,21 +565,21 @@ void tm_ndeg_matpc(void *outEven1, void *outEven2, void **gauge, void *inEven1, 
   host_free(tmp2);
 }
 
-
-void tm_ndeg_mat(void *evenOut, void* oddOut, void **gauge, void *evenIn, void *oddIn,  double kappa, double mu, double epsilon, int daggerBit, QudaPrecision precision, QudaGaugeParam &gauge_param) 
+void tm_ndeg_mat(void *out, void **gauge, void *in, double kappa, double mu, double epsilon, int daggerBit,
+                 QudaPrecision precision, QudaGaugeParam &gauge_param)
 {
-  //V-4d volume and Vh=V/2
-  void *inEven1   = evenIn;
-  void *inEven2 = (char *)evenIn + precision * Vh * spinor_site_size;
+  // V-4d volume and Vh=V/2, see tests/utils/host_utils.cpp -> setDims()
+  void *inEven1 = in;
+  void *inEven2 = (char *)inEven1 + precision * Vh * spinor_site_size;
 
-  void *inOdd1    = oddIn;
-  void *inOdd2 = (char *)oddIn + precision * Vh * spinor_site_size;
+  void *inOdd1 = (char *)inEven2 + precision * Vh * spinor_site_size;
+  void *inOdd2 = (char *)inOdd1 + precision * Vh * spinor_site_size;
 
-  void *outEven1  = evenOut;
-  void *outEven2 = (char *)evenOut + precision * Vh * spinor_site_size;
+  void *outEven1 = out;
+  void *outEven2 = (char *)outEven1 + precision * Vh * spinor_site_size;
 
-  void *outOdd1   = oddOut;
-  void *outOdd2 = (char *)oddOut + precision * Vh * spinor_site_size;
+  void *outOdd1 = (char *)outEven2 + precision * Vh * spinor_site_size;
+  void *outOdd2 = (char *)outOdd1 + precision * Vh * spinor_site_size;
 
   void *tmpEven1 = safe_malloc(Vh * spinor_site_size * precision);
   void *tmpEven2 = safe_malloc(Vh * spinor_site_size * precision);
