@@ -18,7 +18,7 @@ namespace quda {
     reducer r;
 
     TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init_value, reducer r) :
-      ReduceArg<reduce_t>(dim3(n_items, v.size(), 1), v.size()),
+      ReduceArg<reduce_t>(dim3(n_items, 1, v.size()), v.size()),
       n_items(n_items),
       n_batch(v.size()),
       init_value(init_value),
@@ -48,7 +48,7 @@ namespace quda {
 
     __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return arg.r(a, b); }
 
-    __device__ __host__ inline reduce_t operator()(reduce_t &value, count_t i, int j, int)
+    __device__ __host__ inline reduce_t operator()(reduce_t &value, count_t i, int, int j)
     {
       auto v = arg.v[j];
       auto t = arg.h(v[i]);

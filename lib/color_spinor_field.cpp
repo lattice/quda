@@ -735,6 +735,20 @@ namespace quda
     return *odd;
   }
 
+  ColorSpinorField& ColorSpinorField::Component(int idx)
+  {
+    if (!IsComposite()) errorQuda("Not composite field");
+    if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+    return *(components[idx]);
+  }
+
+  const ColorSpinorField &ColorSpinorField::Component(int idx) const
+  {
+    if (!IsComposite()) errorQuda("Not composite field");
+    if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+    return *(components[idx]);
+  }
+
   void *const *ColorSpinorField::Ghost() const { return ghost_buf; }
 
   const void *ColorSpinorField::Ghost2() const
