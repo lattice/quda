@@ -47,8 +47,8 @@ namespace quda {
 
     void axpyZpbx(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, double b);
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, ColorSpinorField& z, double c);
-    void axpbypczw(double a, ColorSpinorField &x, double b, ColorSpinorField &y, double c,
-                    ColorSpinorField &z, ColorSpinorField &w);
+    void axpbypczw(double a, ColorSpinorField &x, double b, ColorSpinorField &y, double c, ColorSpinorField &z,
+                   ColorSpinorField &w);
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
@@ -277,7 +277,8 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+    void axpyz(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+               std::vector<ColorSpinorField *> &z);
 
     /**
        @brief This is a wrapper for calling the block "axpyz" with a
@@ -305,7 +306,8 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+    void axpyz_U(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                 std::vector<ColorSpinorField *> &z);
 
     /**
        @brief This is a wrapper for calling the block "axpyz" with a
@@ -333,7 +335,8 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z);
+    void axpyz_L(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                 std::vector<ColorSpinorField *> &z);
 
     /**
        @brief This is a wrapper for calling the block "axpyz" with a

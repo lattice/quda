@@ -2856,11 +2856,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(*x));
     }
-  } else  if (getVerbosity() >= QUDA_VERBOSE) {
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
     printfQuda("Source: %g\n", nb);
-    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("Initial guess: %g\n", blas::norm2(*x));
-    }
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(*x)); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
@@ -3056,9 +3054,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Solution = %g\n", blas::norm2(*x));
-  }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(*x)); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {

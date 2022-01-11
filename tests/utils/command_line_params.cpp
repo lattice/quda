@@ -385,13 +385,16 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
 
-  quda_app->add_option("--ca-basis-type-precondition", ca_basis_precondition, "The basis to use for CA-CG when used as a preconditioner (default power)")
+  quda_app
+    ->add_option("--ca-basis-type-precondition", ca_basis_precondition,
+                 "The basis to use for CA-CG when used as a preconditioner (default power)")
     ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
+  quda_app->add_option("--cheby-basis-eig-max-precondition", ca_lambda_max_precondition,
+                       "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG when used as a "
+                       "preconditioner (default is to guess with power iterations)");
   quda_app->add_option(
-    "--cheby-basis-eig-max-precondition",
-    ca_lambda_max_precondition, "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG when used as a preconditioner (default is to guess with power iterations)");
-  quda_app->add_option("--cheby-basis-eig-min-precondition", ca_lambda_min_precondition,
-                       "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG when used as a preconditioner (default 0)");
+    "--cheby-basis-eig-min-precondition", ca_lambda_min_precondition,
+    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG when used as a preconditioner (default 0)");
 
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
   quda_app

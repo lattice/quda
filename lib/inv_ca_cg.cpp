@@ -235,10 +235,10 @@ namespace quda {
         profile.TPSTART(QUDA_PROFILE_INIT);
       }
 
-      Q_AQandg = new double[param.Nkrylov*(param.Nkrylov+1)];
-      Q_AS = new double[param.Nkrylov*param.Nkrylov];
+      Q_AQandg = new double[param.Nkrylov * (param.Nkrylov + 1)];
+      Q_AS = new double[param.Nkrylov * param.Nkrylov];
       alpha = new double[param.Nkrylov];
-      beta = new double[param.Nkrylov*param.Nkrylov];
+      beta = new double[param.Nkrylov * param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
       bool use_source = false; // need to preserve source for residual computation
@@ -294,8 +294,7 @@ namespace quda {
   }
 
   // template!
-  template <int N>
-  void compute_alpha_N(double* Q_AQandg, double* alpha)
+  template <int N> void compute_alpha_N(double *Q_AQandg, double *alpha)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
     typedef Matrix<double, N, 1> vector;
@@ -368,8 +367,7 @@ namespace quda {
   }
 
   // template!
-  template <int N>
-  void compute_beta_N(double* Q_AQandg, double* Q_AS, double* beta)
+  template <int N> void compute_beta_N(double *Q_AQandg, double *Q_AS, double *beta)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
 
@@ -634,7 +632,7 @@ namespace quda {
           if (n_krylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
             for (int k = 2; k < n_krylov; k++) {
-              blas::axpbypczw(2. * m_map, *AS[k-1], 2. * b_map, *S[k-1], -1., *S[k-2], *S[k]);
+              blas::axpbypczw(2. * m_map, *AS[k - 1], 2. * b_map, *S[k - 1], -1., *S[k - 2], *S[k]);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
           }
@@ -654,7 +652,7 @@ namespace quda {
           // Compute the beta coefficients for updating Q, AQ
           // 1. compute matrix Q_AS = -Q^\dagger AS
           // 2. Solve Q_AQ beta = Q_AS
-          std::vector<ColorSpinorField*> R(n_krylov);
+          std::vector<ColorSpinorField *> R(n_krylov);
           for (int i = 0; i < n_krylov; i++) R[i] = S[i];
           blas::reDotProduct(Q_AS, AQ, R);
 
@@ -672,7 +670,7 @@ namespace quda {
         // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
         // 2. Solve Q_AQ alpha = g
         {
-          std::vector<ColorSpinorField*> Q2(n_krylov + 1);
+          std::vector<ColorSpinorField *> Q2(n_krylov + 1);
           for (int i = 0; i < n_krylov; i++) Q2[i] = AQ[i];
           Q2[n_krylov] = S[0];
           blas::reDotProduct(Q_AQandg, Q, Q2);
@@ -681,7 +679,7 @@ namespace quda {
         }
 
         // update the solution vector
-        std::vector<ColorSpinorField*> X = {&x};
+        std::vector<ColorSpinorField *> X = {&x};
         blas::axpy(alpha, Q, X);
 
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
@@ -700,7 +698,7 @@ namespace quda {
         // We do compute the alpha coefficients: this is the same code as above
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
-        std::vector<ColorSpinorField*> S2(n_krylov + 1);
+        std::vector<ColorSpinorField *> S2(n_krylov + 1);
         for (int i = 0; i < n_krylov; i++) S2[i] = AS[i];
         S2[n_krylov] = S[0];
         blas::reDotProduct(Q_AQandg, S, S2);
@@ -708,13 +706,12 @@ namespace quda {
         compute_alpha();
 
         // update the solution vector
-        std::vector<ColorSpinorField*> X = {&x};
+        std::vector<ColorSpinorField *> X = {&x};
         blas::axpy(alpha, S, X);
 
         // no need to update AS
         r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       }
-
 
       // NOTE: Because we always carry around the residual from an iteration before, we
       // "lie" about which iteration we're on so the printed residual matches with the

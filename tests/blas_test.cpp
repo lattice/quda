@@ -184,10 +184,8 @@ bool is_mixed(Kernel kernel)
 {
   switch (kernel) {
   case Kernel::axpyz_block:
-  case Kernel::caxpyz_block:
-    return false;
-  default:
-    return true;
+  case Kernel::caxpyz_block: return false;
+  default: return true;
   }
 }
 
@@ -630,7 +628,7 @@ double test(Kernel kernel)
     error = ERROR(zo);
     break;
 
-    case Kernel::axpbypczw:
+  case Kernel::axpbypczw:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;

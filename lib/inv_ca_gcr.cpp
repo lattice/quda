@@ -105,8 +105,8 @@ namespace quda {
 #if 1
     // only a single reduction but requires using the full dot product 
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<ColorSpinorField*> Q(N + 1);
-    for (int i=0; i<N; i++) Q[i] = q[i];
+    std::vector<ColorSpinorField *> Q(N + 1);
+    for (int i = 0; i < N; i++) Q[i] = q[i];
     Q[N] = &b;
 
     // Construct the matrix Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
@@ -122,7 +122,7 @@ namespace quda {
 #else
     // two reductions but uses the Hermitian block dot product
     // compute rhs vector phi = Q* b = (q_i, b)
-    std::vector<ColorSpinorField*> B = {&b};
+    std::vector<ColorSpinorField *> B = {&b};
     Complex *phi_ = new Complex[N];
     blas::cDotProduct(phi_,q, B);
     for (int i=0; i<N; i++) phi(i) = phi_[i];
@@ -302,9 +302,9 @@ namespace quda {
       solve(alpha, q, *p[0]);
 
       // update the solution vector
-      std::vector<ColorSpinorField*> X = {&x};
+      std::vector<ColorSpinorField *> X = {&x};
       // need to make sure P is only length n_krylov
-      std::vector<ColorSpinorField*> P(n_krylov);
+      std::vector<ColorSpinorField *> P(n_krylov);
       for (int i = 0; i < n_krylov; i++) P[i] = p[i];
       blas::caxpy(alpha, P, X);
 
@@ -312,7 +312,7 @@ namespace quda {
       // residual vector and only doing a single fixed iteration
       if (!fixed_iteration || param.return_residual) {
         // update the residual vector
-        std::vector<ColorSpinorField*> R = {&r};
+        std::vector<ColorSpinorField *> R = {&r};
         for (int i = 0; i < n_krylov; i++) alpha[i] = -alpha[i];
         blas::caxpy(alpha, q, R);
       }

@@ -1014,9 +1014,9 @@ namespace quda {
     QudaCABasis basis;
 
     double *Q_AQandg; // Fused inner product matrix
-    double *Q_AS; // inner product matrix
-    double *alpha; // QAQ^{-1} g
-    double *beta; // QAQ^{-1} QpolyS
+    double *Q_AS;     // inner product matrix
+    double *alpha;    // QAQ^{-1} g
+    double *beta;     // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
