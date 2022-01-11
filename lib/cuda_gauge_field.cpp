@@ -86,8 +86,6 @@ namespace quda {
 
   cudaGaugeField::~cudaGaugeField()
   {
-    destroyComms();
-
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       switch(mem_type) {
       case QUDA_MEMORY_DEVICE:

@@ -7,7 +7,6 @@ namespace quda {
 
   GaugeFieldParam::GaugeFieldParam(const GaugeField &u) :
     LatticeFieldParam(u),
-    location(u.Location()),
     nColor(u.Ncolor()),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
@@ -52,6 +51,7 @@ namespace quda {
     site_offset(param.site_offset),
     site_size(param.site_size)
   {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
     if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
@@ -368,6 +368,7 @@ namespace quda {
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
     GaugeFieldParam gParamEx(in);
+    gParamEx.location = QUDA_CUDA_FIELD_LOCATION;
     gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
     gParamEx.pad = 0;
     gParamEx.nFace = 1;
@@ -399,6 +400,7 @@ namespace quda {
     GaugeFieldParam gauge_field_param(gauge_param, gauge);
     cpuGaugeField cpu(gauge_field_param);
 
+    gauge_field_param.location = QUDA_CPU_FIELD_LOCATION;
     gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
     gauge_field_param.create = QUDA_ZERO_FIELD_CREATE;
     for (int d = 0; d < 4; d++) {

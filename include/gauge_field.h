@@ -42,7 +42,6 @@ namespace quda {
 
   struct GaugeFieldParam : public LatticeFieldParam {
 
-    QudaFieldLocation location; // where are we storing the field (CUDA or GPU)?
     int nColor;
     int nFace;
 
@@ -83,7 +82,6 @@ namespace quda {
     // Default constructor
     GaugeFieldParam(void *const h_gauge = NULL) :
       LatticeFieldParam(),
-      location(QUDA_INVALID_FIELD_LOCATION),
       nColor(3),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),
@@ -109,8 +107,7 @@ namespace quda {
 
     GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct, const int pad,
                     const QudaFieldGeometry geometry, const QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
-      LatticeFieldParam(4, x, pad, precision, ghostExchange),
-      location(QUDA_INVALID_FIELD_LOCATION),
+      LatticeFieldParam(4, x, pad, QUDA_INVALID_FIELD_LOCATION, precision, ghostExchange),
       nColor(3),
       nFace(0),
       reconstruct(reconstruct),
@@ -134,7 +131,6 @@ namespace quda {
 
     GaugeFieldParam(const QudaGaugeParam &param, void *h_gauge = nullptr, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
       LatticeFieldParam(param),
-      location(QUDA_CPU_FIELD_LOCATION),
       nColor(3),
       nFace(0),
       reconstruct(QUDA_RECONSTRUCT_NO),

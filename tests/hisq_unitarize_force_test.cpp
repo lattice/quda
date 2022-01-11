@@ -57,6 +57,7 @@ static void hisq_force_init()
 
   setDims(gaugeParam.X);
 
+  gaugeParam.location = QUDA_CPU_FIELD_LOCATION;
   gaugeParam.cpu_prec = QUDA_DOUBLE_PRECISION;
   gaugeParam.cuda_prec = prec;
   gaugeParam.reconstruct = link_recon;
@@ -81,6 +82,7 @@ static void hisq_force_init()
   createNoisyLinkCPU((void**)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
   createNoisyLinkCPU((void**)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed+1);
 
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   gParam.setPrecision(gaugeParam.cuda_prec, true);
 
   cudaFatLink = new cudaGaugeField(gParam);

@@ -92,10 +92,8 @@ namespace quda
     CompositeColorSpinorFieldDescriptor(bool is_composite, int dim, bool is_component = false, int id = 0) :
       is_composite(is_composite), is_component(is_component), dim(dim), id(id), volume(0), volumeCB(0), length(0), bytes(0)
     {
-      if (is_composite && is_component)
-        errorQuda("Composite type is not implemented");
-      else if (is_composite && dim == 0)
-        is_composite = false;
+      if (is_composite && is_component) errorQuda("Composite type is not implemented");
+      else if (is_composite && dim == 0) is_composite = false;
     }
 
     CompositeColorSpinorFieldDescriptor(const CompositeColorSpinorFieldDescriptor &descr) = default;
@@ -105,8 +103,6 @@ namespace quda
   {
 
   public:
-    QudaFieldLocation location; // where are we storing the field (CUDA or CPU)?
-
     int nColor; // Number of colors of the field
     int nSpin;  // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
     int nVec;   // number of packed vectors (for multigrid transfer operator)
@@ -166,7 +162,6 @@ namespace quda
 
     ColorSpinorParam() :
       LatticeFieldParam(),
-      location(QUDA_INVALID_FIELD_LOCATION),
       nColor(0),
       nSpin(0),
       nVec(1),
@@ -189,8 +184,7 @@ namespace quda
 
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
-      LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
-      location(location),
+      LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
       nColor(3),
       nSpin((inv_param.dslash_type == QUDA_ASQTAD_DSLASH || inv_param.dslash_type == QUDA_STAGGERED_DSLASH
              || inv_param.dslash_type == QUDA_LAPLACE_DSLASH) ?
@@ -262,8 +256,7 @@ namespace quda
 
     // normally used to create cuda param from a cpu param
     ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param, QudaFieldLocation location) :
-      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
-      location(location),
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, location, inv_param.cuda_prec),
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
       nVec(cpuParam.nVec),
@@ -329,12 +322,6 @@ namespace quda
     int nSpin;
     int nVec;
 
-    int nDim;
-    int x[QUDA_MAX_DIM];
-
-    size_t volume;
-    size_t volumeCB;
-
     QudaTwistFlavorType twistFlavor;
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
@@ -366,10 +353,8 @@ namespace quda
     size_t bytes;     // size in bytes of spinor field
     size_t bytes_raw; // actual data size neglecting alignment
 
-    QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
     QudaFieldOrder fieldOrder;
-    QudaFieldLocation location;
     QudaGammaBasis gammaBasis;
 
     // in the case of full fields, these are references to the even / odd sublattices
@@ -388,7 +373,13 @@ namespace quda
     */
     void createGhostZone(int nFace, bool spin_project = true) const;
 
+    /**
+       @brief Fills the param with this field's meta data (used for
+       creating a cloned field)
+       @param[in] param The parameter we are filling
+    */
     void fill(ColorSpinorParam &) const;
+
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
 
     /**
@@ -405,7 +396,7 @@ namespace quda
     static size_t ghostFaceBytes[QUDA_MAX_DIM];
     static void freeGhostBuffer(void);
 
-    // ColorSpinorField();
+    ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
     ColorSpinorField(const ColorSpinorParam &);
 
@@ -416,6 +407,12 @@ namespace quda
     void copy(const ColorSpinorField &);
 
     void zero();
+
+    /**
+       @brief Clears any allocations in the field and returns the
+       field to being uninitialized.
+     */
+    void clear();
 
     /**
        @brief Zero the padded regions added on to the field.  Ensures
@@ -432,8 +429,6 @@ namespace quda
     const int *X() const { return x; }
     int X(int d) const { return x[d]; }
     size_t Length() const { return length; }
-    size_t Volume() const { return volume; }
-    size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     size_t Bytes() const { return bytes; }
     size_t TotalBytes() const { return bytes; }
     size_t GhostBytes() const { return ghost_bytes; }
@@ -638,11 +633,6 @@ namespace quda
       */
     bool isNative() const { return colorspinor::isNative(fieldOrder, precision, nSpin, nColor); }
 
-    /**
-       @return The location of the field
-    */
-    QudaFieldLocation Location() const { return location; }
-
     bool IsComposite() const { return composite_descr.is_composite; }
     bool IsComponent() const { return composite_descr.is_component; }
 
@@ -697,14 +687,14 @@ namespace quda
     {
       if (!IsComposite()) errorQuda("Not composite field");
       if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
+      return *(components[idx]);
     }
 
     const ColorSpinorField &Component(int idx) const
     {
       if (!IsComposite()) errorQuda("Not composite field");
       if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(dynamic_cast<ColorSpinorField *>(components[idx]));
+      return *(components[idx]);
     }
 
     /**

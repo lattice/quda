@@ -44,16 +44,67 @@ namespace quda {
 
   int LatticeField::bufferIndex = 0;
 
-  LatticeFieldParam::LatticeFieldParam(const LatticeField &field)
-    : precision(field.Precision()), ghost_precision(field.Precision()),
-      nDim(field.Ndim()), pad(field.Pad()),
-      siteSubset(field.SiteSubset()), mem_type(field.MemType()),
-      ghostExchange(field.GhostExchange()), scale(field.Scale())
+  LatticeFieldParam::LatticeFieldParam(const LatticeField &field) :
+    location(field.Location()),
+    precision(field.Precision()),
+    ghost_precision(field.Precision()),
+    nDim(field.Ndim()),
+    pad(field.Pad()),
+    siteSubset(field.SiteSubset()),
+    mem_type(field.MemType()),
+    ghostExchange(field.GhostExchange()),
+    scale(field.Scale())
   {
     for(int dir=0; dir<nDim; ++dir) {
       x[dir] = field.X()[dir];
       r[dir] = field.R()[dir];
     }
+  }
+
+  LatticeField::LatticeField() :
+    volume(0),
+    localVolume(0),
+    pad(0),
+    total_bytes(0),
+    nDim(0),
+    location(QUDA_INVALID_FIELD_LOCATION),
+    precision(QUDA_INVALID_PRECISION),
+    ghost_precision(QUDA_INVALID_PRECISION),
+    ghost_precision_reset(false),
+    scale(0.0),
+    siteSubset(QUDA_INVALID_SITE_SUBSET),
+    ghostExchange(QUDA_GHOST_EXCHANGE_INVALID),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    my_face_dim_dir_h {},
+    my_face_dim_dir_hd {},
+    my_face_dim_dir_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    from_face_dim_dir_h {},
+    from_face_dim_dir_hd {},
+    from_face_dim_dir_d {},
+    mh_recv_fwd {},
+    mh_recv_back {},
+    mh_send_fwd {},
+    mh_send_back {},
+    mh_recv_rdma_fwd {},
+    mh_recv_rdma_back {},
+    mh_send_rdma_fwd {},
+    mh_send_rdma_back {},
+    initComms(false),
+    mem_type(QUDA_MEMORY_INVALID),
+    backup_h(nullptr),
+    backup_norm_h(nullptr),
+    backed_up(false)
+  {
   }
 
   LatticeField::LatticeField(const LatticeFieldParam &param) :
@@ -62,6 +113,7 @@ namespace quda {
     pad(param.pad),
     total_bytes(0),
     nDim(param.nDim),
+    location(param.location),
     precision(param.Precision()),
     ghost_precision(param.GhostPrecision()),
     ghost_precision_reset(false),
@@ -76,82 +128,30 @@ namespace quda {
     my_face_h {},
     my_face_hd {},
     my_face_d {},
+    my_face_dim_dir_h {},
+    my_face_dim_dir_hd {},
+    my_face_dim_dir_d {},
     from_face_h {},
     from_face_hd {},
     from_face_d {},
+    from_face_dim_dir_h {},
+    from_face_dim_dir_hd {},
+    from_face_dim_dir_d {},
+    mh_recv_fwd {},
+    mh_recv_back {},
+    mh_send_fwd {},
+    mh_send_back {},
+    mh_recv_rdma_fwd {},
+    mh_recv_rdma_back {},
+    mh_send_rdma_fwd {},
+    mh_send_rdma_back {},
     initComms(false),
     mem_type(param.mem_type),
     backup_h(nullptr),
     backup_norm_h(nullptr),
     backed_up(false)
   {
-    precisionCheck();
-
-    for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
-      for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
-
-        for (int b = 0; b < 2; b++) {
-          my_face_dim_dir_d[b][dim][dir] = nullptr;
-          my_face_dim_dir_hd[b][dim][dir] = nullptr;
-          my_face_dim_dir_h[b][dim][dir] = nullptr;
-
-          from_face_dim_dir_d[b][dim][dir] = nullptr;
-          from_face_dim_dir_hd[b][dim][dir] = nullptr;
-          from_face_dim_dir_h[b][dim][dir] = nullptr;
-        }
-
-        mh_recv_fwd[dir][dim] = nullptr;
-        mh_recv_back[dir][dim] = nullptr;
-        mh_send_fwd[dir][dim] = nullptr;
-        mh_send_back[dir][dim] = nullptr;
-
-        mh_recv_rdma_fwd[dir][dim] = nullptr;
-        mh_recv_rdma_back[dir][dim] = nullptr;
-        mh_send_rdma_fwd[dir][dim] = nullptr;
-        mh_send_rdma_back[dir][dim] = nullptr;
-      }
-    }
-
-    for (int i=0; i<nDim; i++) {
-      x[i] = param.x[i];
-      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
-      local_x[i] = x[i] - 2 * r[i];
-      volume *= x[i];
-      localVolume *= local_x[i];
-      surface[i] = 1;
-      local_surface[i] = 1;
-      for (int j=0; j<nDim; j++) {
-	if (i==j) continue;
-	surface[i] *= param.x[j];
-        local_surface[i] *= param.x[j] - 2 * param.r[j];
-      }
-    }
-
-    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
-    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
-    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
-    stride = volumeCB + pad;
-
-    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
-    for (int i = 0; i < nDim; i++) {
-      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
-      local_surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i == 0) ? local_surface[i] / 2 : local_surface[i];
-    }
-
-    // for 5-dimensional fields, we only communicate in the space-time dimensions
-    nDimComms = nDim == 5 ? 4 : nDim;
-
-    switch (precision) {
-    case QUDA_DOUBLE_PRECISION:
-    case QUDA_SINGLE_PRECISION:
-    case QUDA_HALF_PRECISION:
-    case QUDA_QUARTER_PRECISION:
-      break;
-    default:
-      errorQuda("Unknown precision %d", precision);
-    }
-
-    setTuningString();
+    create(param);
   }
 
   LatticeField::LatticeField(const LatticeField &field) :
@@ -163,6 +163,7 @@ namespace quda {
     pad(field.pad),
     total_bytes(0),
     nDim(field.nDim),
+    location(field.location),
     precision(field.precision),
     ghost_precision(field.ghost_precision),
     ghost_precision_reset(false),
@@ -178,56 +179,116 @@ namespace quda {
     my_face_h {},
     my_face_hd {},
     my_face_d {},
+    my_face_dim_dir_h {},
+    my_face_dim_dir_hd {},
+    my_face_dim_dir_d {},
     from_face_h {},
     from_face_hd {},
     from_face_d {},
+    from_face_dim_dir_h {},
+    from_face_dim_dir_hd {},
+    from_face_dim_dir_d {},
+    mh_recv_fwd {},
+    mh_recv_back {},
+    mh_send_fwd {},
+    mh_send_back {},
+    mh_recv_rdma_fwd {},
+    mh_recv_rdma_back {},
+    mh_send_rdma_fwd {},
+    mh_send_rdma_back {},
     initComms(false),
     mem_type(field.mem_type),
     backup_h(nullptr),
     backup_norm_h(nullptr),
     backed_up(false)
   {
+    LatticeFieldParam param;
+    field.fill(param);
+    create(param);
+  }
+
+  LatticeField::~LatticeField()
+  {
+    destroyComms();
+  }
+
+  LatticeField &LatticeField::operator=(const LatticeField &src)
+  {
+    if (&src != this) {
+      destroyComms();
+      LatticeFieldParam param;
+      src.fill(param);
+      create(param);
+    }
+    return *this;
+  }
+
+  void LatticeField::clear()
+  {
+    destroyComms();
+  }
+
+  void LatticeField::create(const LatticeFieldParam &param)
+  {
+    if (param.location == QUDA_INVALID_FIELD_LOCATION) errorQuda("Invalid field location");
+    location = param.location;
+    precision = param.Precision();
     precisionCheck();
 
-    for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
-      for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+    if (param.nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions nDim = %d too great", param.nDim);
+    nDim = param.nDim;
 
-        for (int b = 0; b < 2; b++) {
-          my_face_dim_dir_d[b][dim][dir] = nullptr;
-          my_face_dim_dir_hd[b][dim][dir] = nullptr;
-          my_face_dim_dir_h[b][dim][dir] = nullptr;
-
-          from_face_dim_dir_d[b][dim][dir] = nullptr;
-          from_face_dim_dir_hd[b][dim][dir] = nullptr;
-          from_face_dim_dir_h[b][dim][dir] = nullptr;
-        }
-
-        mh_recv_fwd[dir][dim] = nullptr;
-        mh_recv_back[dir][dim] = nullptr;
-        mh_send_fwd[dir][dim] = nullptr;
-        mh_send_back[dir][dim] = nullptr;
-
-        mh_recv_rdma_fwd[dir][dim] = nullptr;
-        mh_recv_rdma_back[dir][dim] = nullptr;
-        mh_send_rdma_fwd[dir][dim] = nullptr;
-        mh_send_rdma_back[dir][dim] = nullptr;
+    volume = 1;
+    localVolume = 1;
+    for (int i=0; i<nDim; i++) {
+      x[i] = param.x[i];
+      r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
+      local_x[i] = x[i] - 2 * r[i];
+      volume *= x[i];
+      localVolume *= local_x[i];
+      surface[i] = 1;
+      local_surface[i] = 1;
+      for (int j=0; j<nDim; j++) {
+	if (i==j) continue;
+	surface[i] *= param.x[j];
+        local_surface[i] *= param.x[j] - 2 * param.r[j];
       }
     }
 
-    for (int i=0; i<nDim; i++) {
-      x[i] = field.x[i];
-      r[i] = field.r[i];
-      local_x[i] = field.local_x[i];
-      surface[i] = field.surface[i];
-      surfaceCB[i] = field.surfaceCB[i];
-      local_surface[i] = field.local_surface[i];
-      local_surfaceCB[i] = field.local_surfaceCB[i];
+    if (param.siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
+    siteSubset = param.siteSubset;
+    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
+    localVolumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? localVolume / 2 : localVolume;
+    stride = volumeCB + pad;
+
+    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
+    for (int i = 0; i < nDim; i++) {
+      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
+      local_surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i == 0) ? local_surface[i] / 2 : local_surface[i];
     }
+
+    // for 5-dimensional fields, we only communicate in the space-time dimensions
+    nDimComms = nDim == 5 ? 4 : nDim;
+
+    mem_type = param.mem_type;
 
     setTuningString();
   }
 
-  LatticeField::~LatticeField() { }
+  void LatticeField::fill(LatticeFieldParam &param) const
+  {
+    param.location = location;
+    param.precision = precision;
+    param.ghost_precision = ghost_precision;
+    param.nDim = nDim;
+    memcpy(param.x, x, sizeof(x));
+    param.pad = pad;
+    param.siteSubset = siteSubset;
+    param.mem_type = mem_type;
+    param.ghostExchange = ghostExchange;
+    memcpy(param.r, r, sizeof(r));
+    param.scale = scale;
+  }
 
   void LatticeField::allocateGhostBuffer(size_t ghost_bytes) const
   {
@@ -378,6 +439,8 @@ namespace quda {
 
   void LatticeField::destroyComms()
   {
+    if (Location() != QUDA_CUDA_FIELD_LOCATION) return;
+
     if (initComms) {
 
       // ensure that all processes bring down their communicators
@@ -557,19 +620,6 @@ namespace quda {
           errorQuda("local_surfaceCB[%d] does not match %d %d", i, local_surfaceCB[i], a.local_surfaceCB[i]);
       }
     }
-  }
-
-  QudaFieldLocation LatticeField::Location() const
-  {
-    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (typeid(*this) == typeid(cudaGaugeField)) {
-      location = QUDA_CUDA_FIELD_LOCATION;
-    } else if (typeid(*this) == typeid(cpuGaugeField)) {
-      location = QUDA_CPU_FIELD_LOCATION;
-    } else {
-      errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
-    }
-    return location;
   }
 
   void LatticeField::read(char *) { errorQuda("Not implemented"); }

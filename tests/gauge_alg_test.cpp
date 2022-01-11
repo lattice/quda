@@ -135,6 +135,7 @@ protected:
       // If no field is loaded, create a physical quenched field on the device
       if (!gauge_load) {
         GaugeFieldParam gParam(param);
+        gParam.location = QUDA_CUDA_FIELD_LOCATION;
         gParam.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
         gParam.create = QUDA_NULL_FIELD_CREATE;
         gParam.reconstruct = link_recon;
@@ -185,6 +186,7 @@ protected:
         GaugeField *host = GaugeField::Create(gauge_field_param);
 
         // switch the parameters for creating the mirror precise cuda gauge field
+        gauge_field_param.location = QUDA_CUDA_FIELD_LOCATION;
         gauge_field_param.create = QUDA_NULL_FIELD_CREATE;
         gauge_field_param.reconstruct = param.reconstruct;
         gauge_field_param.setPrecision(param.cuda_prec, true);
@@ -296,6 +298,7 @@ protected:
     for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
     GaugeFieldParam gParam(param);
+    gParam.location = QUDA_CUDA_FIELD_LOCATION;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.link_type = param.type;

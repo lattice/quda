@@ -127,6 +127,7 @@ static int unitarize_link_test(int &test_rc)
 
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge  = fatlink;
+  gParam.location = QUDA_CPU_FIELD_LOCATION;
   cpuFatLink  = new cpuGaugeField(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -139,6 +140,7 @@ static int unitarize_link_test(int &test_rc)
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.setPrecision(prec, true);
+  gParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaFatLink = new cudaGaugeField(gParam);
   cudaULink   = new cudaGaugeField(gParam);
 

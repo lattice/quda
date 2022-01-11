@@ -42,6 +42,11 @@ namespace quda {
 
   struct LatticeFieldParam {
 
+    friend class LatticeField;
+
+    /** Location of the field */
+    QudaFieldLocation location;
+
   protected:
     /** Field precision */
     QudaPrecision precision;
@@ -80,10 +85,16 @@ namespace quda {
     /**
        @brief Default constructor for LatticeFieldParam
     */
-    LatticeFieldParam()
-    : precision(QUDA_INVALID_PRECISION), ghost_precision(QUDA_INVALID_PRECISION), nDim(4), pad(0),
-      siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
+    LatticeFieldParam() :
+      location(QUDA_INVALID_FIELD_LOCATION),
+      precision(QUDA_INVALID_PRECISION),
+      ghost_precision(QUDA_INVALID_PRECISION),
+      nDim(4),
+      pad(0),
+      siteSubset(QUDA_INVALID_SITE_SUBSET),
+      mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+      scale(1.0)
     {
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
         x[i] = 0;
@@ -99,11 +110,17 @@ namespace quda {
        @param[in] precision Field Precision
        @param[in] ghostExchange Type of ghost exchange
     */
-    LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
-		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
-    : precision(precision), ghost_precision(precision), nDim(nDim), pad(pad),
-      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(ghostExchange), scale(1.0)
+    LatticeFieldParam(int nDim, const int *x, int pad, QudaFieldLocation location,
+                      QudaPrecision precision, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
+      location(location),
+      precision(precision),
+      ghost_precision(precision),
+      nDim(nDim),
+      pad(pad),
+      siteSubset(QUDA_FULL_SITE_SUBSET),
+      mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(ghostExchange),
+      scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
@@ -118,10 +135,16 @@ namespace quda {
        field.
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
-    LatticeFieldParam(const QudaGaugeParam &param) 
-    :  precision(param.cpu_prec), ghost_precision(param.cpu_prec), nDim(4), pad(0),
-      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
+    LatticeFieldParam(const QudaGaugeParam &param) :
+      location(QUDA_CPU_FIELD_LOCATION),
+      precision(param.cpu_prec),
+      ghost_precision(param.cpu_prec),
+      nDim(4),
+      pad(0),
+      siteSubset(QUDA_FULL_SITE_SUBSET),
+      mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(QUDA_GHOST_EXCHANGE_NO),
+      scale(param.scale)
     {
       for (int i = 0; i < QUDA_MAX_DIM; i++) {
         this->x[i] = i < nDim ? param.X[i] : 0;
@@ -180,6 +203,9 @@ namespace quda {
 
     /** Array storing the local surface size in each dimension */
     int local_surfaceCB[QUDA_MAX_DIM];
+
+    /** Location of the field */
+    QudaFieldLocation location;
 
     /** Precision of the field */
     QudaPrecision precision;
@@ -407,7 +433,7 @@ namespace quda {
       case QUDA_HALF_PRECISION:
       case QUDA_SINGLE_PRECISION:
       case QUDA_DOUBLE_PRECISION: break;
-      default: errorQuda("Unknown precision %d\n", precision);
+      default: errorQuda("Unknown precision %d", precision);
       }
     }
 
@@ -416,6 +442,11 @@ namespace quda {
     mutable bool backed_up;
 
   public:
+
+    /**
+       Default constructor
+    */
+    LatticeField();
 
     /**
        Constructor for creating a LatticeField from a LatticeFieldParam
@@ -435,6 +466,29 @@ namespace quda {
     */
     virtual ~LatticeField();
     
+    /**
+       @brief Assignment operator
+     */
+    LatticeField &operator=(const LatticeField &);
+
+    /**
+       @brief Create the field as specified by the param
+    */
+    void create(const LatticeFieldParam &param);
+
+    /**
+       @brief Clears any allocations in the field and returns the
+       field to being uninitialized.
+     */
+    virtual void clear();
+
+    /**
+       @brief Fills the param with this field's meta data (used for
+       creating a cloned field)
+       @param[in] param The parameter we are filling
+    */
+    void fill(LatticeFieldParam &param) const;
+
     /**
        @brief Allocate the static ghost buffers
        @param[in] ghost_bytes Size of the ghost buffer to allocate
@@ -606,7 +660,7 @@ namespace quda {
     /**
        @return Field subset type
      */
-    virtual QudaSiteSubset SiteSubset() const { return siteSubset; }
+    QudaSiteSubset SiteSubset() const { return siteSubset; }
 
     /**
        @return Mem type
@@ -622,7 +676,7 @@ namespace quda {
     /**
        @return The location of the field
     */
-    virtual QudaFieldLocation Location() const;
+    QudaFieldLocation Location() const { return location; }
 
     /**
        @return The total storage allocated

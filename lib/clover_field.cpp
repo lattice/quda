@@ -25,8 +25,7 @@ namespace quda {
     epsilon2(a.Epsilon2()),
     rho(a.Rho()),
     order(a.Order()),
-    create(QUDA_NULL_FIELD_CREATE),
-    location(a.Location())
+    create(QUDA_NULL_FIELD_CREATE)
   {
     precision = a.Precision();
     nDim = a.Ndim();
@@ -51,9 +50,9 @@ namespace quda {
     rho(param.rho),
     order(param.order),
     create(param.create),
-    location(param.location),
     trlog {0, 0}
   {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Unexpected siteSubset %d", siteSubset);
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
     if (!isNative() && precision < QUDA_SINGLE_PRECISION)
       errorQuda("Fixed-point precision only supported on native field");

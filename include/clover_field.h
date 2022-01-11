@@ -102,7 +102,6 @@ namespace quda {
 
     QudaCloverFieldOrder order; /** Field order */
     QudaFieldCreate create;     /** Creation type */
-    QudaFieldLocation location; /** Location of the field */
 
     /**
        @brief Helper function for setting the precision and corresponding
@@ -141,8 +140,7 @@ namespace quda {
       twist_flavor(QUDA_TWIST_NO),
       mu2(0.0),
       epsilon2(0.0),
-      rho(0.0),
-      location(QUDA_INVALID_FIELD_LOCATION)
+      rho(0.0)
     {
     }
 
@@ -155,8 +153,7 @@ namespace quda {
       twist_flavor(param.twist_flavor),
       mu2(param.mu2),
       epsilon2(param.epsilon2),
-      rho(param.rho),
-      location(param.location)
+      rho(param.rho)
     {
     }
 
@@ -173,8 +170,7 @@ namespace quda {
       twist_flavor(inv_param.dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? inv_param.twist_flavor : QUDA_TWIST_NO),
       mu2(twist_flavor != QUDA_TWIST_NO ? 4. * inv_param.kappa * inv_param.kappa * inv_param.mu * inv_param.mu : 0.0),
       epsilon2(twist_flavor == QUDA_TWIST_NONDEG_DOUBLET ? 4.0 * inv_param.kappa * inv_param.kappa * inv_param.epsilon * inv_param.epsilon : 0.0),
-      rho(inv_param.clover_rho),
-      location(QUDA_INVALID_FIELD_LOCATION)
+      rho(inv_param.clover_rho)
     {
       siteSubset = QUDA_FULL_SITE_SUBSET;
       for (int i = 0; i < nDim; i++) this->x[i] = x[i];
@@ -212,8 +208,6 @@ namespace quda {
 
     QudaCloverFieldOrder order;
     QudaFieldCreate create;
-
-    QudaFieldLocation location;
 
     mutable array<double, 2> trlog;
 
@@ -273,11 +267,6 @@ namespace quda {
     bool isNative() const { return clover::isNative(order, precision); }
 
     /**
-       @return The location of the field
-    */
-    QudaFieldLocation Location() const { return location; }
-
-    /**
        @return Array storing trlog on each parity
     */
     auto &TrLog() const { return trlog; }
@@ -288,7 +277,7 @@ namespace quda {
     QudaCloverFieldOrder Order() const { return order; }
 
     /**
-       @return The size of the fieldallocation
+       @return The size of the field allocation
      */
     size_t Bytes() const { return bytes; }
 
