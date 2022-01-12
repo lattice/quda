@@ -17,7 +17,7 @@ namespace quda {
   // Utility functions for Gram-Schmidt. Based on GCR functions.
   // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1.
 
-  void BiCGstabL::computeTau(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j)
+  void BiCGstabL::computeTau(Complex **tau, double* sigma, std::vector<ColorSpinorField*> &r, int begin, int size, int j)
   {
     Complex *Tau = new Complex[size];
     std::vector<ColorSpinorField*> a(size), b(1);
@@ -36,9 +36,8 @@ namespace quda {
     delete []Tau;
   }
   
-  void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j)
+  void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> &r, int begin, int size, int j)
   {
-
     Complex *tau_ = new Complex[size];
     for (int i=0; i<size; i++)
     {
@@ -53,9 +52,8 @@ namespace quda {
     delete[] tau_;
   }
 
-  void BiCGstabL::orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline)
+  void BiCGstabL::orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> &r, int j, int pipeline)
   {
-
     switch (pipeline)
     {
       case 0: // no kernel fusion
@@ -104,7 +102,7 @@ namespace quda {
 
   }
 
-  void BiCGstabL::updateUend(Complex *gamma, std::vector<ColorSpinorField *> u, int n_krylov)
+  void BiCGstabL::updateUend(Complex *gamma, std::vector<ColorSpinorField *> &u, int n_krylov)
   {
     // for (j = 0; j <= n_krylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
     Complex *gamma_ = new Complex[n_krylov];
@@ -119,7 +117,7 @@ namespace quda {
   }
 
   void BiCGstabL::updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
-                              std::vector<ColorSpinorField *> r, ColorSpinorField &x, int n_krylov)
+                              std::vector<ColorSpinorField *> &r, ColorSpinorField &x, int n_krylov)
   {
 #if 0
     blas::caxpy(gamma[1], *r[0], x);
