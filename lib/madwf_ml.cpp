@@ -67,7 +67,7 @@ namespace quda
 
     int Ls = in.X(4);
     int Ls_base = param.madwf_ls;
-    int size_t = Ls * Ls_base * complex_matrix_size * 2;
+    size_t param_size = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
@@ -280,10 +280,15 @@ namespace quda
 
     if (param.madwf_param_save) {
       profile.TPSTART(QUDA_PROFILE_IO);
-      save_parameter(Ls, Ls_base);
+      if (comm_rank() == 0) { save_parameter(Ls, Ls_base); } // Only rank zero write out to the disk
       comm_barrier();
       profile.TPSTOP(QUDA_PROFILE_IO);
     }
+
+    // Broadcast the trained parameters
+    host_param = device_param.to_host();
+    comm_broadcast(host_param.data(), host_param.size() * sizeof(transfer_float));
+    device_param.from_host(host_param);
 
     // Destroy all dynamically allocated stuff.
     for (auto &pB : B) { delete pB; }
@@ -296,7 +301,7 @@ namespace quda
 
     std::string save_param_path(param.madwf_param_outfile);
     char cstring[512];
-    sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
+    sprintf(cstring, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, mu);
     save_param_path += std::string(cstring);
     FILE *fp = fopen(save_param_path.c_str(), "w");
     if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
@@ -312,12 +317,13 @@ namespace quda
   }
 
   void MadwfAcc::load_parameter(int Ls, int Ls_base) {
+    constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
     size_t param_size = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
 
     char param_file_name[512];
     // Note that all ranks load from the same file.
-    sprintf(param_file_name, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", 0, Ls, Ls_base, mu);
+    sprintf(param_file_name, "/madwf_trained_param_ls_%02d_%02d_mu_%.3f.dat", Ls, Ls_base, mu);
     std::string param_file_name_str(param_file_name);
     auto search_cache = host_training_param_cache.find(param_file_name_str);
     if (search_cache != host_training_param_cache.end()) {
