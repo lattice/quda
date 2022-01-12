@@ -330,6 +330,15 @@ extern "C" {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double ca_lambda_max;
 
+    /** Basis for CA algorithms in a preconditioned solver */
+    QudaCABasis ca_basis_precondition;
+
+    /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_min_precondition;
+
+    /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_max_precondition;
+
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
 

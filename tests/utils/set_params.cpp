@@ -246,6 +246,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.verbosity_precondition = verbosity_precondition;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
@@ -714,9 +717,12 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.omega = 1.0;
 
   // Whether or not to use native BLAS LAPACK

@@ -166,15 +166,15 @@ namespace quda {
       instantiate<caxpby_, Blas, false>(a, b, Complex(0.0), x, y, x, x, y);
     }
 
-    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, const Complex &c,
+    void axpbypczw(double a, ColorSpinorField &x, double b, ColorSpinorField &y, double c,
                     ColorSpinorField &z, ColorSpinorField &w)
     {
-      instantiate<caxpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
+      instantiate<axpbypczw_, Blas, false>(a, b, c, x, y, z, w, y);
     }
 
     void cxpaypbz(ColorSpinorField &x, const Complex &a, ColorSpinorField &y, const Complex &b, ColorSpinorField &z)
     {
-      instantiate<caxpbypczw_, Blas, false>(Complex(1.0), a, b, x, y, z, z, y);
+      instantiate<cxpaypbz_, Blas, false>(a, b, Complex(0.0), x, y, z, x, y);
     }
 
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, ColorSpinorField& z, double c)

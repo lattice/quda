@@ -14,12 +14,16 @@ namespace quda
     if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
       if (param.inv_type_precondition == QUDA_CG_INVERTER) {
         K = new AcceleratedSolver<MadwfAcc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new AcceleratedSolver<MadwfAcc, CACG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
       } else { // unknown preconditioner
         errorQuda("Unknown inner solver %d for MADWF", param.inv_type_precondition);
       }
     } else {
       if (param.inv_type_precondition == QUDA_CG_INVERTER) {
         K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+      } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+        K = new CACG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
       } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
         K = new MR(matPrecon, matPrecon, Kparam, profile);
       } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
