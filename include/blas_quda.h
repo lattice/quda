@@ -349,7 +349,7 @@ namespace quda {
        @param y[in] Computed output matrix
        @param z[out] vector of input/output ColorSpinorFields
     */
-    void caxpyz_L(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+    void axpyz_L(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
