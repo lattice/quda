@@ -67,13 +67,13 @@ namespace quda
 
     int Ls = in.X(4);
     int Ls_base = param.madwf_ls;
-    int param_size = Ls * Ls_base * complex_matrix_size * 2;
+    int size_t = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
       profile.TPSTOP(QUDA_PROFILE_INIT);
       profile.TPSTART(QUDA_PROFILE_IO);
-      load_parameter(Ls, Ls_base, param_size);
+      load_parameter(Ls, Ls_base);
 
       ColorSpinorParam csParam(in);
       csParam.x[4] = Ls_base;
@@ -311,7 +311,8 @@ namespace quda
     }
   }
 
-  void MadwfAcc::load_parameter(int Ls, int Ls_base, size_t param_size) {
+  void MadwfAcc::load_parameter(int Ls, int Ls_base) {
+    size_t param_size = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
 
     char param_file_name[512];

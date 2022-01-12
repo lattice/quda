@@ -119,9 +119,8 @@ namespace quda
       @brief Load the parameter from disk
       @param[in] Ls the original (larger) 5th dimension size
       @param[in] Ls_base the reduced 5th dimension size
-      @param[in] param_size the expected parameter size
     */
-    void load_parameter(int Ls, int Ls_base, size_t param_size);
+    void load_parameter(int Ls, int Ls_base);
 
   public:
     /**
