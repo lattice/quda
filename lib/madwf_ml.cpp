@@ -344,4 +344,7 @@ namespace quda
 
     profile.TPSTOP(QUDA_PROFILE_IO);
   }
+
+  std::unordered_map<std::string, std::vector<float>> MadwfAcc::host_training_param_cache; // empty map
+
 } // namespace quda
