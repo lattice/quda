@@ -35,7 +35,6 @@ namespace quda
       const F x; // xput vector field
       const F y; // yput vector field
 
-      const int_fastdiv Ls_x; // length of 5th dimension of the x field
       const int_fastdiv Ls_y; // length of 5th dimension of the in field
 
       const int volume_4d_cb;
@@ -48,7 +47,6 @@ namespace quda
         ReduceArg<reduce_t>(dim3(x.VolumeCB() / x.X(4), x.SiteSubset(), x.X(4) * y.X(4)), x.X(4) * y.X(4)),
         x(x),
         y(y),
-        Ls_x(x.X(4)),
         Ls_y(y.X(4)),
         volume_4d_cb(y.VolumeCB() / y.X(4)),
         nParity(y.SiteSubset())

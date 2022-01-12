@@ -62,6 +62,7 @@ namespace quda
                        bool tune_suppressor)
   {
 
+    profile.TPSTART(QUDA_PROFILE_INIT);
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
     int Ls = in.X(4);
@@ -70,6 +71,8 @@ namespace quda
     std::vector<transfer_float> host_param(param_size);
 
     if (param.madwf_param_load) {
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile.TPSTART(QUDA_PROFILE_IO);
       load_parameter(Ls, Ls_base, param_size);
 
       ColorSpinorParam csParam(in);
@@ -79,17 +82,16 @@ namespace quda
 
       forward_tmp = std::make_unique<ColorSpinorField>(csParam);
       backward_tmp = std::make_unique<ColorSpinorField>(csParam);
+      profile.TPSTOP(QUDA_PROFILE_IO);
 
       return;
     }
-
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     ColorSpinorParam csParam(in);
     ColorSpinorField null_x(csParam);
     ColorSpinorField null_b(csParam);
 
-    RNG rng(null_b, 1234);
+    RNG rng(null_b, 2767);
 
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Generating Null Space Vectors ... \n"); }
     spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
@@ -277,8 +279,10 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_TRAINING);
 
     if (param.madwf_param_save) {
+      profile.TPSTART(QUDA_PROFILE_IO);
       save_parameter(Ls, Ls_base);
       comm_barrier();
+      profile.TPSTOP(QUDA_PROFILE_IO);
     }
 
     // Destroy all dynamically allocated stuff.
@@ -288,7 +292,6 @@ namespace quda
   }
 
   void MadwfAcc::save_parameter(int Ls, int Ls_base) {
-    profile.TPSTART(QUDA_PROFILE_IO);
     std::vector<transfer_float> host_param = device_param.to_host();
 
     std::string save_param_path(param.madwf_param_outfile);
@@ -296,6 +299,7 @@ namespace quda
     sprintf(cstring, "/madwf_trained_param_rank_%05d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_base, mu);
     save_param_path += std::string(cstring);
     FILE *fp = fopen(save_param_path.c_str(), "w");
+    if (!fp) { errorQuda("Unable to open file %s\n", save_param_path.c_str()); }
     size_t fwrite_count = fwrite(host_param.data(), sizeof(transfer_float), host_param.size(), fp);
     fclose(fp);
     if (fwrite_count != host_param.size()) {
@@ -305,12 +309,9 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str());
     }
-    profile.TPSTOP(QUDA_PROFILE_IO);
   }
 
   void MadwfAcc::load_parameter(int Ls, int Ls_base, size_t param_size) {
-    profile.TPSTART(QUDA_PROFILE_IO);
-
     std::vector<transfer_float> host_param(param_size);
 
     char param_file_name[512];
@@ -341,8 +342,6 @@ namespace quda
     device_param.resize(param_size); // 2 for complex
     device_param.from_host(host_param);
     trained = true;
-
-    profile.TPSTOP(QUDA_PROFILE_IO);
   }
 
   std::unordered_map<std::string, std::vector<float>> MadwfAcc::host_training_param_cache; // empty map
