@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <contract_quda.h>
+
 #include <tunable_nd.h>
 #include <tunable_reduction.h>
 #include <instantiate.h>
@@ -55,8 +56,7 @@ namespace quda {
       }
     };
     
-    
-    //#ifdef GPU_BLAS_3D
+#ifdef GPU_BLAS_3D
     void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y)
     {      
       checkPrecision(x, y);
@@ -76,13 +76,12 @@ namespace quda {
       // We must give a 4D Lattice field as the first argument
       instantiate<copy3D>(y, x, slice, type);
     }
-    
-    // #else
-    //     void axpby(const int, std::vector<double> &, ColorSpinorField &, std::vector<double> &, ColorSpinorField &) 
-    //     {
-    //       errorQuda("BLAS 3D code has not been built"); 
-    //     }
-    // #endif
+#else
+    void copy(const int, const copy3dType, ColorSpinorField &, ColorSpinorField &) 
+    {
+      errorQuda("BLAS 3D code has not been built"); 
+    }
+#endif
 
     
     template <typename Float, int nColor> class axpby3D : TunableKernel2D
@@ -134,7 +133,7 @@ namespace quda {
       }
     };
     
-    //#ifdef GPU_BLAS_3D
+#ifdef GPU_BLAS_3D
     void axpby(std::vector<double> &a, ColorSpinorField &x, std::vector<double> &b, ColorSpinorField &y)
     {            
       // Check prec, spins, color, coeffs
@@ -145,14 +144,13 @@ namespace quda {
       
       // We must give a Lattice field as the first argument
       instantiate<axpby3D>(x, y, a.data(), b.data());
+    }    
+#else
+    void axpby(std::vector<double> &, ColorSpinorField &, std::vector<double> &, ColorSpinorField &) 
+    {
+      errorQuda("BLAS 3D code has not been built"); 
     }
-    
-    // #else
-    //     void axpby(const int, std::vector<double> &, ColorSpinorField &, std::vector<double> &, ColorSpinorField &) 
-    //     {
-    //       errorQuda("BLAS 3D code has not been built"); 
-    //     }
-    // #endif
+#endif
 
     template <typename Float, int nColor> class caxpby3D : TunableKernel2D
     {
@@ -203,7 +201,7 @@ namespace quda {
       }
     };
     
-    //#ifdef GPU_BLAS_3D
+#ifdef GPU_BLAS_3D
     void caxpby(std::vector<Complex> &a, ColorSpinorField &x, std::vector<Complex> &b, ColorSpinorField &y)
     {
       
@@ -220,14 +218,13 @@ namespace quda {
       
       // We must give a Lattice field as the first argument
       instantiate<caxpby3D>(x, y, a.data(), b.data());
+    }    
+#else
+    void axpby(std::vector<Complex> &, ColorSpinorField &, std::vector<Complex> &, ColorSpinorField &) 
+    {
+      errorQuda("BLAS 3D code has not been built"); 
     }
-    
-    // #else
-    //     void axpby(const int, std::vector<double> &, ColorSpinorField &, std::vector<double> &, ColorSpinorField &) 
-    //     {
-    //       errorQuda("BLAS 3D code has not been built"); 
-    //     }
-    // #endif
+#endif
 
 
     
@@ -256,13 +253,6 @@ namespace quda {
 	reDotProduct3dArg<Float, nColor> arg(x, y);
 	launch<reDotProduct3d, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	
-	// Zero out the local results.
-	//std::vector<double> result_local(x.X()[3], 0.0);
-	//if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
-	
-	//reDotProduct3dArg<Float, nColor> arg(x, y);
-	//launch<reDotProduct3d>(result_local, tp, stream, arg);
-
 	// Copy results back to host array
 	if(!activeTuning()) {
 	  std::vector<double> result_tmp(comm_dim(3) * x.X()[3], 0.0);
@@ -292,7 +282,7 @@ namespace quda {
       }
     };
     
-    //#ifdef GPU_CONTRACT
+#ifdef GPU_BLAS_3D
     void reDotProduct(std::vector<double> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       // Check spins
@@ -307,19 +297,12 @@ namespace quda {
       // We must give a Lattice field as the first argument
       instantiate<reDotProduct3D>(x, y, result);
     }
-    // #else
-    //     void reDotProduct(const int, std::vector<double> &, const ColorSpinorField &, void *, const ColorSpinorField &) 
-    //     {
-    //       errorQuda("BLAS 3D code has not been built"); 
-    //     }
-    // #endif
-
-    // #else
-    //     void reDotProduct(const int, std::vector<double> &, const ColorSpinorField &, void *, const ColorSpinorField &) 
-    //     {
-    //       errorQuda("BLAS 3D code has not been built"); 
-    //     }
-    // #endif
+#else
+    void reDotProduct(std::vector<double> &, const ColorSpinorField &, const ColorSpinorField &) 
+    {
+      errorQuda("BLAS 3D code has not been built"); 
+    }
+#endif
 
     template <typename Float, int nColor> class cDotProduct3D : TunableMultiReduction<1>
     {
@@ -376,7 +359,7 @@ namespace quda {
       }
     };
     
-    //#ifdef GPU_CONTRACT
+#ifdef GPU_BLAS_3D
     void cDotProduct(std::vector<Complex> &result, const ColorSpinorField &x, const ColorSpinorField &y)
     {
       // Check spins
@@ -391,7 +374,13 @@ namespace quda {
       // We must give a Lattice field as the first argument
       instantiate<cDotProduct3D>(x, y, result);
     }
+#else
+    void cDotProduct(std::vector<Complex> &, const ColorSpinorField &, const ColorSpinorField &) 
+    {
+      errorQuda("BLAS 3D code has not been built"); 
+    }
+#endif
     
-  } // blas3d
+  } // namespace blas3d
   
 } // namespace quda

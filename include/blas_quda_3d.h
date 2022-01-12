@@ -8,7 +8,9 @@ namespace quda {
   namespace blas3d {
 
     // Local enum for the 3D copy type
-    enum copy3dType { COPY_TO_3D, COPY_FROM_3D };    
+    enum copy3dType { COPY_TO_3D, COPY_FROM_3D };
+
+    // 3D slict to 3D slice copy
     void copy(const int slice, const copy3dType type, ColorSpinorField &x, ColorSpinorField &y);
 
     // Reductions 

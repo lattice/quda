@@ -209,7 +209,7 @@ namespace quda
 	  num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
 	  num_locked_3D[t] += iter_locked_3D[t];
 	}
-	
+
 	if (getVerbosity() >= QUDA_VERBOSE &&
 	    comm_coord(0) == 0 &&
 	    comm_coord(1) == 0 &&
@@ -268,10 +268,16 @@ namespace quda
         printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", n_conv,
                    restart_iter, iter);
 
-        // Dump all Ritz values and residua if using Chebyshev
-	for (int t = 0; t < ortho_dim_size; t++) {
-	  for (int i = 0; i < n_conv && eig_param->use_poly_acc; i++) {
-	    printfQuda("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t, i, alpha_3D[t][i], 0.0, residua_3D[t][i]);
+	if (getVerbosity() >= QUDA_VERBOSE && eig_param->use_poly_acc &&
+	    comm_coord(0) == 0 &&
+	    comm_coord(1) == 0 &&
+	    comm_coord(2) == 0) {
+	  // Dump all Ritz values and residua if using Chebyshev
+	  int t_offset = ortho_dim_size * comm_coord(3);
+	  for (int t = 0; t < ortho_dim_size; t++) {
+	    for (int i = 0; i < n_conv; i++) {
+	      printf("RitzValue[%d][%04d]: (%+.16e, %+.16e) residual %.16e\n", t_offset + t, i, alpha_3D[t][i], 0.0, residua_3D[t][i]);
+	    }
 	  }
 	}
       }
@@ -760,6 +766,7 @@ namespace quda
       for(int t=0; t<ortho_dim_size; t++) residua_3D[t][i] = sqrt(norms[t]);
     }
 
+#if 0
     for(int t=0; t<ortho_dim_size; t++) {
       for (int i = 0; i < size; i++) {
 	
@@ -774,9 +781,7 @@ namespace quda
 	evals[t*size + i] = evals_t[i][t];
       }
     }
-    
-    
-#if 0
+#else 
     // If size = n_conv, this routine is called post sort
     if (size == n_conv) {
       // We are computing T problems split across T nodes, so we must do an MPI gather
@@ -814,7 +819,6 @@ namespace quda
 	  evals[t*size + i] = evals_t_all[t*size + i];
 	}
     }
-    
 #endif
 
     delete temp[0];
