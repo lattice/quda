@@ -1784,7 +1784,6 @@ namespace quda {
 
   void massRescale(ColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
   {
-
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
                     || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
@@ -2852,14 +2851,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = blas::norm2(h_b);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      double nh_x = blas::norm2(h_x);
-      double nx = blas::norm2(*x);
-      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(*x));
     }
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Source: %g\n", nb);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(*x)); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
@@ -3055,10 +3054,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    printfQuda("Solution = %g\n",nx);
-  }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(*x)); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
@@ -3113,10 +3109,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     param->action[1] = action.imag();
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(*x), blas::norm2(h_x));
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Reconstructed solution: %g\n", blas::norm2(*x));
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
