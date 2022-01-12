@@ -1,9 +1,11 @@
 #pragma once
 
 #include <target_device.h>
-#include <reduce_helper.h>
+#include <kernel_helper.h>
+#include <block_reduce_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This helper function swizzles the block index through
@@ -14,7 +16,21 @@ namespace quda {
      which is the effective matrix dimension that we are tranposing in
      this mapping.
 
-     @taram Arg Kernel argument struct
+     Specifically, the thread block id is remapped by
+     transposing its coordinates: if the original order can be
+     parameterized by
+
+     blockIdx.x = j * swizzle + i,
+
+     then the new order is
+
+     block_idx = i * (gridDim.x / swizzle) + j
+
+     We need to factor out any remainder and leave this in original
+     ordering.
+
+     @param arg Kernel argument struct
+     @return Swizzled block index
    */
   template <typename Arg> __device__ constexpr int virtual_block_idx(const Arg &arg)
   {
@@ -23,7 +39,6 @@ namespace quda {
       // the portion of the grid that is exactly divisible by the number of SMs
       const auto gridp = gridDim.x - gridDim.x % arg.swizzle_factor;
 
-      block_idx = blockIdx.x;
       if (block_idx < gridp) {
         // this is the portion of the block that we are going to transpose
         const int i = blockIdx.x % arg.swizzle_factor;
@@ -69,7 +84,7 @@ namespace quda {
   {
     const dim3 block_idx(virtual_block_idx(arg), blockIdx.y, 0);
     const dim3 thread_idx(threadIdx.x, threadIdx.y, 0);
-    auto j = blockDim.y*blockIdx.y + threadIdx.y;
+    auto j = blockDim.y * blockIdx.y + threadIdx.y;
     if (j >= arg.threads.y) return;
 
     Functor<Arg> t(arg);
@@ -91,8 +106,9 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> BlockKernel2D(Arg arg)
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     BlockKernel2D_impl<Functor, Arg>(arg);
@@ -113,11 +129,12 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = false>
-    __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ? Arg::block_size : 0)
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
+  __launch_bounds__(Arg::launch_bounds || Arg::block_size > 512 ?
+                      Arg::block_size :
+                      0) __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> BlockKernel2D()
   {
     static_assert(!grid_stride, "grid_stride not supported for BlockKernel");
     BlockKernel2D_impl<Functor, Arg>(device::get_arg<Arg>());
   }
 
-}
+} // namespace quda

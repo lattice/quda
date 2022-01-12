@@ -10,7 +10,7 @@
 
 #include <quda_fp16.cuh>
 
-#include <cub_helper.cuh>
+#include <block_reduce_helper.h>
 
 #if (__COMPUTE_CAPABILITY__ < 750)
 
@@ -24,20 +24,6 @@
 
 namespace quda
 {
-
-  template <class T> struct TensorCoreSharedMemory {
-    __device__ inline operator T *()
-    {
-      extern __shared__ int __smem[];
-      return (T *)__smem;
-    }
-
-    __device__ inline operator const T *() const
-    {
-      extern __shared__ int __smem[];
-      return (T *)__smem;
-    }
-  };
 
   // matrix a for a generic matrix: column major, M/M_sm(size/padded size) by k
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
@@ -260,40 +246,31 @@ namespace quda
   constexpr float target_scale = 2e3;
 
   template <int block_x, int block_y, class Vector>
-  __device__ inline void block_wise_reduce_vector(const Vector &v, float *smem_scale)
+  __device__ inline float block_wise_reduce_vector(const Vector &v)
   {
-    __syncthreads();
-
-    int lane_id = ((threadIdx.y * blockDim.x + threadIdx.x) & 31);
-    int warp_id = ((threadIdx.y * blockDim.x + threadIdx.x) >> 5);
-
     // Find the maximum absolute value in a lane
-    float warp_max = 0.0f;
+    float warp_max[2] = {0.0f, 0.0f};
 #pragma unroll
     for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
       for (int color = 0; color < N_COLORS; color++) {
-        __float_max_abs_floats__(warp_max, v(spin, color).real());
-        __float_max_abs_floats__(warp_max, v(spin, color).imag());
+        __float_max_abs_floats__(warp_max[0], v(spin, color).real());
+        __float_max_abs_floats__(warp_max[1], v(spin, color).imag());
       }
     }
+    warp_max[0] = fmaxf(warp_max[0], warp_max[1]);
 
-    typedef cub::BlockReduce<float, block_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_y, 1, __COMPUTE_CAPABILITY__> BlockReduce;
-    __shared__ typename BlockReduce::TempStorage temp_storage;
-    float aggregate = BlockReduce(temp_storage).Reduce(warp_max, cub::Max());
-
-    if (warp_id == 0 && lane_id == 0) { smem_scale[0] = aggregate / target_scale; }
-    __syncthreads();
+    return BlockReduce<float, block_x, block_y>().AllMax(warp_max[0]) / target_scale;
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store
   // to sm_b
   template <int block_x, int block_y, int N_sm_d2, bool accumulate, bool store = true, class Vector>
-  __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float *smem_scale, float m_scale = 1.0f)
+  __device__ inline void load_matrix_b_vector(Vector &v, half2 *sm_b, float &scale, float m_scale = 1.0f)
   {
     if (accumulate) {
-      float previous_scale = smem_scale[0] * m_scale;
+      float previous_scale = scale * m_scale;
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
@@ -305,16 +282,14 @@ namespace quda
       }
     }
     if (store) {
-      block_wise_reduce_vector<block_x, block_y>(v, smem_scale);
-      // Now smem_scale[0] contains the maximum value
-      float current_scale = smem_scale[0];
+      scale = block_wise_reduce_vector<block_x, block_y>(v);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
         for (int color = 0; color < N_COLORS; color++) {
-          float real = v(spin, color).real() / current_scale;
-          float imag = v(spin, color).imag() / current_scale;
-          int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + N_COLORS * threadIdx.x + color;
+          float real = v(spin, color).real() / scale;
+          float imag = v(spin, color).imag() / scale;
+          int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
           sm_b[idx] = __floats2half2_rn(real, imag);
         }
       }

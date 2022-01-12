@@ -236,32 +236,32 @@ namespace quda {
     protected:
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<double> &result;
+      std::vector<double> &result_global;
       
     public:
       reDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		     std::vector<double> &result) :
+		     std::vector<double> &result_global) :
 	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result)
+	result_global(result_global)
       {
 	apply(device::get_default_stream());
       }
       
       void apply(const qudaStream_t &stream)
-      {
+      {	
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	reDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<reDotProduct3d>(result, tp, stream, arg);
-
-	/*
-	// Zero out the local results.
 	std::vector<double> result_local(x.X()[3]);
+	reDotProduct3dArg<Float, nColor> arg(x, y);
+	launch<reDotProduct3d, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
+	
+	// Zero out the local results.
+	//std::vector<double> result_local(x.X()[3], 0.0);
 	//if(!activeTuning()) for(int i=0; i<x.X()[3]; i++) result_local[i] = 0.0;
 	
-	reDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<reDotProduct3d>(result_local, tp, stream, arg);
+	//reDotProduct3dArg<Float, nColor> arg(x, y);
+	//launch<reDotProduct3d>(result_local, tp, stream, arg);
 
 	// Copy results back to host array
 	if(!activeTuning()) {
@@ -276,10 +276,9 @@ namespace quda {
 	  
 	  // Copy back to MPI local array for t
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
+	    result_global[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
-	}
-	*/
+	}	
       }
       
       long long flops() const
@@ -327,15 +326,15 @@ namespace quda {
     protected:
       const ColorSpinorField &x;
       const ColorSpinorField &y;
-      std::vector<Complex> &result;
+      std::vector<Complex> &result_global;
       
     public:
       cDotProduct3D(const ColorSpinorField &x, const ColorSpinorField &y,
-		    std::vector<Complex> &result) :
+		    std::vector<Complex> &result_global) :
 	TunableMultiReduction(x, x.X()[3]),
 	x(x),
 	y(y),
-	result(result)
+	result_global(result_global)
       {
 	apply(device::get_default_stream());
       }
@@ -343,15 +342,9 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	cDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<cDotProduct3d>(result, tp, stream, arg);
-	
-	/*
-	// Zero out the local results.
 	std::vector<double> result_local(2*x.X()[3]);
-	
 	cDotProduct3dArg<Float, nColor> arg(x, y);
-	launch<cDotProduct3d>(result_local, tp, stream, arg);
+	launch<cDotProduct3d, double, comm_reduce_null<double>>(result_local, tp, stream, arg);
 	
 	// Copy results back to host array
 	if(!activeTuning()) {
@@ -367,10 +360,9 @@ namespace quda {
 	  
 	  // Copy back to MPI local arrat for t
 	  for(int i=0; i<x.X()[3]; i++) {
-	    result[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
+	    result_global[i] = result_tmp[comm_coord(3) * x.X()[3] + i];
 	  }
-	}
-	*/
+	}	
       }
     
       long long flops() const
@@ -403,4 +395,3 @@ namespace quda {
   } // blas3d
   
 } // namespace quda
-

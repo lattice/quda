@@ -6,8 +6,10 @@
 #include <math_helper.cuh>
 #include <color_spinor_field_order.h>
 #include <constant_kernel_arg.h> // allow for large parameter structs
-#include <block_reduction_kernel.h>
+#include <block_reduce_helper.h>
 #include <fast_intdiv.h>
+#include <array.h>
+#include <block_reduction_kernel.h>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE
@@ -103,7 +105,7 @@ namespace quda {
     static_assert(Arg::nVec % mVec == 0, "mVec must be a factor of nVec");
 
     using sum_t = typename Arg::sum_t;
-    using dot_t = vector_type<complex<sum_t>, mVec>;
+    using dot_t = array<complex<sum_t>, mVec>;
     using real = typename Arg::real;
 
     constexpr BlockOrtho_(const Arg &arg) : arg(arg) {}
@@ -135,11 +137,10 @@ namespace quda {
       int x_offset_cb[n_sites_per_thread];
       int x_cb[n_sites_per_thread];
 
-#pragma unroll
       for (int tx = 0; tx < n_sites_per_thread; tx++) {
         int x_fine_offset_tx = x_fine_offset * n_sites_per_thread + tx;
         // all threads with x_fine_offset greater than aggregate_size_cb are second parity
-        int parity_offset = x_fine_offset_tx >= arg.aggregate_size_cb ? 1 : 0;
+        int parity_offset = (x_fine_offset_tx >= arg.aggregate_size_cb && fineSpin != 1) ? 1 : 0;
         x_offset_cb[tx] = x_fine_offset_tx - parity_offset * arg.aggregate_size_cb;
         parity[tx] = fineSpin == 1 ? chirality : arg.nParity == 2 ? parity_offset : arg.parity;
 
@@ -148,8 +149,8 @@ namespace quda {
       }
       if (fineSpin == 1) chirality = 0; // when using staggered chirality is mapped to parity
 
-      BlockReduce<dot_t, block_size> dot_reducer;
-      BlockReduce<sum_t, block_size> norm_reducer;
+      BlockReduce<dot_t, block_size> dot_reducer{0};
+      BlockReduce<sum_t, block_size> norm_reducer{0};
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
@@ -157,7 +158,6 @@ namespace quda {
 
           ColorSpinor<real, nColor, spinBlock> v[mVec][n_sites_per_thread];
 
-#pragma unroll
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
             if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
@@ -177,8 +177,7 @@ namespace quda {
           for (int i = 0; i < j; i++) { // compute (j,i) block inner products
             ColorSpinor<real, nColor, spinBlock> vi[n_sites_per_thread];
 
-            dot_t dot;
-#pragma unroll
+            dot_t dot{0};
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               load(vi[tx], parity[tx], x_cb[tx], chirality, i);
@@ -187,10 +186,9 @@ namespace quda {
               for (int m = 0; m < mVec; m++) dot[m] += innerProduct(vi[tx], v[m][tx]);
             }
 
-            dot = dot_reducer.AllSum(dot);
+            dot = dot_reducer.template AllSum<false>(dot);
 
             // subtract the blocks to orthogonalise
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
@@ -202,18 +200,16 @@ namespace quda {
 #pragma unroll
           for (int m = 0; m < mVec; m++) {
 
-            dot_t dot;
-#pragma unroll
+            dot_t dot{0};
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
               for (int i = 0; i < m; i++) dot[i] += innerProduct(v[i][tx], v[m][tx]);
             }
             
-            dot = dot_reducer.AllSum(dot);
+            dot = dot_reducer.template AllSum<false>(dot);
             
             sum_t nrm = 0.0;
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll
@@ -221,17 +217,15 @@ namespace quda {
               nrm += norm2(v[m][tx]);
             }
 
-            nrm = norm_reducer.AllSum(nrm);
+            nrm = norm_reducer.template AllSum<false>(nrm);
             auto nrm_inv = nrm > 0.0 ? quda::rsqrt(nrm) : 0.0;
 
-#pragma unroll
             for (int tx = 0; tx < n_sites_per_thread; tx++) {
               if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
               v[m][tx] *= nrm_inv;
             }
           }
 
-#pragma unroll
           for (int tx = 0; tx < n_sites_per_thread; tx++) {
             if (x_offset_cb[tx] >= arg.aggregate_size_cb) break;
 #pragma unroll

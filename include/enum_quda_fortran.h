@@ -12,8 +12,7 @@
 #   gfortran).
 #*/
 
-#/* can't include limits.h in a Fortran program */
-#define QUDA_INVALID_ENUM (-2147483647 - 1) 
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #define QudaLinkType integer(4)
 
@@ -132,7 +131,7 @@
 #define QudaEigType integer(4)
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
 #define QUDA_EIG_BLK_IR_LANCZOS 1 // Block Thick Restarted Lanczos Solver
-#define QUDA_EIG_IR_ARNOLDI 2     // Implicitly restarted Arnoldi solver
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver
 #define QUDA_EIG_BLK_IR_ARNOLDI 3 // Block Implicitly restarted Arnoldi solver (not yet implemented)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 

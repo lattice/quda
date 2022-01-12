@@ -579,24 +579,24 @@ namespace quda {
 
         if (use_heavy_quark_res && k % heavy_quark_check == 0) {
           if (&x != &xSloppy) {
-            blas::copy(tmp,y);
-	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+            blas::copy(tmp, y);
+            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
           } else {
             blas::copy(r, rSloppy);
-	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
           }
         }
 
         // alternative reliable updates
         if (alternative_reliable) {
-	  d = d_new;
+          d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
 	  d_new = d + u*rNorm + uhigh*Anorm * xnorm;
 	  if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
             printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
-	}
-	steps_since_reliable++;
+        }
+        steps_since_reliable++;
 
       } else {
 
@@ -712,9 +712,10 @@ namespace quda {
         }
 
         steps_since_reliable = 0;
-        r0Norm = sqrt(r2);
+        r0Norm = sqrt(r2);	
         rUpdate++;
-
+	printfQuda("CG: Reliable update %d\n", rUpdate);
+	
         heavy_quark_res_old = heavy_quark_res;
       }
 
@@ -792,376 +793,342 @@ namespace quda {
 
 #ifndef BLOCKSOLVER
 
-void CG::blocksolve(ColorSpinorField&, ColorSpinorField&) { errorQuda("QUDA_BLOCKSOLVER not built."); }
+  void CG::blocksolve(ColorSpinorField &, ColorSpinorField &) { errorQuda("QUDA_BLOCKSOLVER not built."); }
 
 #else
 
-void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b)
-{
-  if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
-  errorQuda("Not supported");
+  void CG::blocksolve(ColorSpinorField &x, ColorSpinorField &b)
+  {
+    if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
-  using Eigen::MatrixXcd;
+    using Eigen::MatrixXcd;
 
-  // Check to see that we're not trying to invert on a zero-field source
-  //MW: it might be useful to check what to do here.
-  double b2[QUDA_MAX_MULTI_SHIFT];
-  double b2avg=0;
-  for(int i=0; i< param.num_src; i++){
-    b2[i]=blas::norm2(b.Component(i));
-    b2avg += b2[i];
-    if(b2[i] == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
-      errorQuda("Warning: inverting on zero-field source - undefined for block solver\n");
-      x=b;
-      param.true_res = 0.0;
-      param.true_res_hq = 0.0;
-      return;
-    }
-  }
-
-  b2avg = b2avg / param.num_src;
-
-  ColorSpinorParam csParam(x);
-  if (!init) {
-    csParam.setPrecision(param.precision);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    rp = ColorSpinorField::Create(csParam);
-    yp = ColorSpinorField::Create(csParam);
-
-    // sloppy fields
-    csParam.setPrecision(param.precision_sloppy);
-    pp = ColorSpinorField::Create(csParam);
-    App = ColorSpinorField::Create(csParam);
-    if(param.precision != param.precision_sloppy) {
-      rSloppyp = ColorSpinorField::Create(csParam);
-      xSloppyp = ColorSpinorField::Create(csParam);
-    } else {
-      rSloppyp = rp;
-      param.use_sloppy_partial_accumulator = false;
+    // Check to see that we're not trying to invert on a zero-field source
+    // MW: it might be useful to check what to do here.
+    double b2[QUDA_MAX_MULTI_SHIFT];
+    double b2avg = 0;
+    for (int i = 0; i < param.num_src; i++) {
+      b2[i] = blas::norm2(b.Component(i));
+      b2avg += b2[i];
+      if (b2[i] == 0) {
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        errorQuda("Warning: inverting on zero-field source - undefined for block solver\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
+      }
     }
 
-    // temporary fields
-    tmpp = ColorSpinorField::Create(csParam);
-    if(!mat.isStaggered()) {
-      // tmp2 only needed for multi-gpu Wilson-like kernels
-      tmp2p = ColorSpinorField::Create(csParam);
-      // additional high-precision temporary if Wilson and mixed-precision
+    b2avg = b2avg / param.num_src;
+
+    ColorSpinorParam csParam(x);
+    if (!init) {
       csParam.setPrecision(param.precision);
-      tmp3p = (param.precision != param.precision_sloppy) ?
-	ColorSpinorField::Create(csParam) : tmpp;
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      rp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(csParam);
+
+      // sloppy fields
+      csParam.setPrecision(param.precision_sloppy);
+      pp = ColorSpinorField::Create(csParam);
+      App = ColorSpinorField::Create(csParam);
+      if (param.precision != param.precision_sloppy) {
+        rSloppyp = ColorSpinorField::Create(csParam);
+        xSloppyp = ColorSpinorField::Create(csParam);
+      } else {
+        rSloppyp = rp;
+        param.use_sloppy_partial_accumulator = false;
+      }
+
+      // temporary fields
+      tmpp = ColorSpinorField::Create(csParam);
+      if (!mat.isStaggered()) {
+        // tmp2 only needed for multi-gpu Wilson-like kernels
+        tmp2p = ColorSpinorField::Create(csParam);
+        // additional high-precision temporary if Wilson and mixed-precision
+        csParam.setPrecision(param.precision);
+        tmp3p = (param.precision != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : tmpp;
+      } else {
+        tmp3p = tmp2p = tmpp;
+      }
+
+      init = true;
+    }
+
+    if (!rnewp) {
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
+      // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    }
+
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &y = *yp;
+    ColorSpinorField &p = *pp;
+    ColorSpinorField &Ap = *App;
+    ColorSpinorField &rnew = *rnewp;
+    ColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &tmp2 = *tmp2p;
+    ColorSpinorField &tmp3 = *tmp3p;
+    ColorSpinorField &rSloppy = *rSloppyp;
+    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+
+    // calculate residuals for all vectors
+    // and initialize r2 matrix
+    double r2avg = 0;
+    MatrixXcd r2(param.num_src, param.num_src);
+    for (int i = 0; i < param.num_src; i++) {
+      mat(r.Component(i), x.Component(i), y.Component(i));
+      r2(i, i) = blas::xmyNorm(b.Component(i), r.Component(i));
+      r2avg += r2(i, i).real();
+      printfQuda("r2[%i] %e\n", i, r2(i, i).real());
+    }
+    for (int i = 0; i < param.num_src; i++) {
+      for (int j = i + 1; j < param.num_src; j++) {
+        r2(i, j) = blas::cDotProduct(r.Component(i), r.Component(j));
+        r2(j, i) = std::conj(r2(i, j));
+      }
+    }
+
+    blas::copy(rSloppy, r);
+    blas::copy(p, rSloppy);
+    blas::copy(rnew, rSloppy);
+
+    if (&x != &xSloppy) {
+      blas::copy(y, x);
+      blas::zero(xSloppy);
     } else {
-      tmp3p = tmp2p = tmpp;
+      blas::zero(y);
     }
 
-    init = true;
-  }
+    const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    if (use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
 
-  if(!rnewp) {
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
-    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
-  }
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  ColorSpinorField &r = *rp;
-  ColorSpinorField &y = *yp;
-  ColorSpinorField &p = *pp;
-  ColorSpinorField &Ap = *App;
-  ColorSpinorField &rnew = *rnewp;
-  ColorSpinorField &tmp = *tmpp;
-  ColorSpinorField &tmp2 = *tmp2p;
-  ColorSpinorField &tmp3 = *tmp3p;
-  ColorSpinorField &rSloppy = *rSloppyp;
-  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
+    double stop[QUDA_MAX_MULTI_SHIFT];
 
-  // calculate residuals for all vectors
-  // and initialize r2 matrix
-  double r2avg=0;
-  MatrixXcd r2(param.num_src, param.num_src);
-  for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i));
-    r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
-    r2avg += r2(i,i).real();
-    printfQuda("r2[%i] %e\n", i, r2(i,i).real());
-  }
-  for(int i=0; i<param.num_src; i++){
-    for(int j=i+1; j < param.num_src; j++){
-      r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-      r2(j,i) = std::conj(r2(i,j));
-    }
-  }
-
-  blas::copy(rSloppy, r);
-  blas::copy(p, rSloppy);
-  blas::copy(rnew, rSloppy);
-
-  if (&x != &xSloppy) {
-    blas::copy(y, x);
-    blas::zero(xSloppy);
-  } else {
-    blas::zero(y);
-  }
-
-  const bool use_heavy_quark_res =
-  (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-  if(use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
-
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-  profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-  double stop[QUDA_MAX_MULTI_SHIFT];
-
-  for(int i = 0; i < param.num_src; i++){
-    stop[i] = stopping(param.tol, b2[i], param.residual_type);  // stopping condition of solver
-  }
-
-  // Eigen Matrices instead of scalars
-  MatrixXcd alpha = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd beta = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd C = MatrixXcd::Zero(param.num_src,param.num_src);
-  MatrixXcd S = MatrixXcd::Identity(param.num_src,param.num_src);
-  MatrixXcd pAp = MatrixXcd::Identity(param.num_src,param.num_src);
-  quda::Complex * AC = new quda::Complex[param.num_src*param.num_src];
-
-  #ifdef MWVERBOSE
-  MatrixXcd pTp =  MatrixXcd::Identity(param.num_src,param.num_src);
-  #endif
-
-
-
-
-  //FIXME:reliable updates currently not implemented
-  /*
-  double rNorm[QUDA_MAX_MULTI_SHIFT];
-  double r0Norm[QUDA_MAX_MULTI_SHIFT];
-  double maxrx[QUDA_MAX_MULTI_SHIFT];
-  double maxrr[QUDA_MAX_MULTI_SHIFT];
-
-  for(int i = 0; i < param.num_src; i++){
-    rNorm[i] = sqrt(r2(i,i).real());
-    r0Norm[i] = rNorm[i];
-    maxrx[i] = rNorm[i];
-    maxrr[i] = rNorm[i];
-  }
-  bool L2breakdown = false;
-  int rUpdate = 0;
-  nt steps_since_reliable = 1;
-  */
-
-  profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profile.TPSTART(QUDA_PROFILE_COMPUTE);
-  blas::flops = 0;
-
-  int k = 0;
-
-  PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
-  bool allconverged = true;
-  bool converged[QUDA_MAX_MULTI_SHIFT];
-  for(int i=0; i<param.num_src; i++){
-    converged[i] = convergence(r2(i,i).real(), 0., stop[i], param.tol_hq);
-    allconverged = allconverged && converged[i];
-  }
-
-  // CHolesky decomposition
-  MatrixXcd L = r2.llt().matrixL();//// retrieve factor L  in the decomposition
-  C = L.adjoint();
-  MatrixXcd Linv = C.inverse();
-
-  #ifdef MWVERBOSE
-  std::cout << "r2\n " << r2 << std::endl;
-  std::cout << "L\n " << L.adjoint() << std::endl;
-  #endif
-
-  // set p to QR decompsition of r
-  // temporary hack - use AC to pass matrix arguments to multiblas
-  for(int i=0; i<param.num_src; i++){
-    blas::zero(p.Component(i));
-    for(int j=0;j<param.num_src; j++){
-      AC[i*param.num_src + j] = Linv(i,j);
-    }
-  }
-  blas::caxpy(AC,r,p);
-
-  // set rsloppy to to QR decompoistion of r (p)
-  for(int i=0; i< param.num_src; i++){
-    blas::copy(rSloppy.Component(i), p.Component(i));
-  }
-
-  #ifdef MWVERBOSE
-  for(int i=0; i<param.num_src; i++){
-    for(int j=0; j<param.num_src; j++){
-      pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
-    }
-  }
-  std::cout << " pTp  " << std::endl << pTp << std::endl;
-  std::cout << " L " << std::endl << L.adjoint() << std::endl;
-  std::cout << " C " << std::endl << C << std::endl;
-  #endif
-
-  while ( !allconverged && k < param.maxiter ) {
-    // apply matrix
-    for(int i=0; i<param.num_src; i++){
-      matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i));  // tmp as tmp
+    for (int i = 0; i < param.num_src; i++) {
+      stop[i] = stopping(param.tol, b2[i], param.residual_type); // stopping condition of solver
     }
 
-    // calculate pAp
-    for(int i=0; i<param.num_src; i++){
-      for(int j=i; j < param.num_src; j++){
-        pAp(i,j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
-        if (i!=j) pAp(j,i) = std::conj(pAp(i,j));
-      }
-    }
+    // Eigen Matrices instead of scalars
+    MatrixXcd alpha = MatrixXcd::Zero(param.num_src, param.num_src);
+    MatrixXcd beta = MatrixXcd::Zero(param.num_src, param.num_src);
+    MatrixXcd C = MatrixXcd::Zero(param.num_src, param.num_src);
+    MatrixXcd S = MatrixXcd::Identity(param.num_src, param.num_src);
+    MatrixXcd pAp = MatrixXcd::Identity(param.num_src, param.num_src);
+    quda::Complex *AC = new quda::Complex[param.num_src * param.num_src];
 
-    // update Xsloppy
-    alpha = pAp.inverse() * C;
-    // temporary hack using AC
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0;j<param.num_src; j++){
-        AC[i*param.num_src + j] = alpha(i,j);
-      }
-    }
-    blas::caxpy(AC,p,xSloppy);
+#ifdef MWVERBOSE
+    MatrixXcd pTp = MatrixXcd::Identity(param.num_src, param.num_src);
+#endif
 
-    // update rSloppy
-    beta = pAp.inverse();
-    // temporary hack
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0;j<param.num_src; j++){
-        AC[i*param.num_src + j] = -beta(i,j);
-      }
-    }
-    blas::caxpy(AC,Ap,rSloppy);
+    // FIXME:reliable updates currently not implemented
+    /*
+    double rNorm[QUDA_MAX_MULTI_SHIFT];
+    double r0Norm[QUDA_MAX_MULTI_SHIFT];
+    double maxrx[QUDA_MAX_MULTI_SHIFT];
+    double maxrr[QUDA_MAX_MULTI_SHIFT];
 
-    // orthorgonalize R
-    // copy rSloppy to rnew as temporary
-    for(int i=0; i< param.num_src; i++){
-      blas::copy(rnew.Component(i), rSloppy.Component(i));
+    for(int i = 0; i < param.num_src; i++){
+      rNorm[i] = sqrt(r2(i,i).real());
+      r0Norm[i] = rNorm[i];
+      maxrx[i] = rNorm[i];
+      maxrr[i] = rNorm[i];
     }
-    for(int i=0; i<param.num_src; i++){
-      for(int j=i; j < param.num_src; j++){
-        r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-        if (i!=j) r2(j,i) = std::conj(r2(i,j));
-      }
-    }
-    // Cholesky decomposition
-    L = r2.llt().matrixL();// retrieve factor L  in the decomposition
-    S = L.adjoint();
-    Linv = S.inverse();
-    // temporary hack
-    for(int i=0; i<param.num_src; i++){
-      blas::zero(rSloppy.Component(i));
-      for(int j=0;j<param.num_src; j++){
-        AC[i*param.num_src + j] = Linv(i,j);
-      }
-    }
-    blas::caxpy(AC,rnew,rSloppy);
+    bool L2breakdown = false;
+    int rUpdate = 0;
+    nt steps_since_reliable = 1;
+    */
 
-    #ifdef MWVERBOSE
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0; j<param.num_src; j++){
-        pTp(i,j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
-      }
-    }
-    std::cout << " rTr " << std::endl << pTp << std::endl;
-    std::cout <<  "QR" << S<<  std::endl << "QP " << S.inverse()*S << std::endl;;
-    #endif
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    blas::flops = 0;
 
-    // update p
-    // use rnew as temporary again for summing up
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(rnew.Component(i),rSloppy.Component(i));
-    }
-    // temporary hack
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0;j<param.num_src; j++){
-        AC[i*param.num_src + j] = std::conj(S(j,i));
-      }
-    }
-    blas::caxpy(AC,p,rnew);
-    // set p = rnew
-    for(int i=0; i < param.num_src; i++){
-      blas::copy(p.Component(i),rnew.Component(i));
-    }
+    int k = 0;
 
-    // update C
-    C = S * C;
-
-    #ifdef MWVERBOSE
-    for(int i=0; i<param.num_src; i++){
-      for(int j=0; j<param.num_src; j++){
-        pTp(i,j) = blas::cDotProduct(p.Component(i), p.Component(j));
-      }
-    }
-    std::cout << " pTp " << std::endl << pTp << std::endl;
-    std::cout <<  "S " << S<<  std::endl << "C " << C << std::endl;
-    #endif
-
-    // calculate the residuals for all shifts
-    r2avg=0;
-    for (int j=0; j<param.num_src; j++ ){
-      r2(j,j) = C(0,j)*conj(C(0,j));
-      for(int i=1; i < param.num_src; i++)
-      r2(j,j) += C(i,j) * conj(C(i,j));
-      r2avg += r2(j,j).real();
-    }
-
-    k++;
-    PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
-    // check convergence
-    allconverged = true;
-    for(int i=0; i<param.num_src; i++){
-      converged[i] = convergence(r2(i,i).real(), 0, stop[i], param.tol_hq);
+    PrintStats("CG", k, r2avg / param.num_src, b2avg, 0.);
+    bool allconverged = true;
+    bool converged[QUDA_MAX_MULTI_SHIFT];
+    for (int i = 0; i < param.num_src; i++) {
+      converged[i] = convergence(r2(i, i).real(), 0., stop[i], param.tol_hq);
       allconverged = allconverged && converged[i];
     }
 
+    // CHolesky decomposition
+    MatrixXcd L = r2.llt().matrixL(); //// retrieve factor L  in the decomposition
+    C = L.adjoint();
+    MatrixXcd Linv = C.inverse();
 
+#ifdef MWVERBOSE
+    std::cout << "r2\n " << r2 << std::endl;
+    std::cout << "L\n " << L.adjoint() << std::endl;
+#endif
+
+    // set p to QR decompsition of r
+    // temporary hack - use AC to pass matrix arguments to multiblas
+    for (int i = 0; i < param.num_src; i++) {
+      blas::zero(p.Component(i));
+      for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
+    }
+    blas::caxpy(AC, r, p);
+
+    // set rsloppy to to QR decompoistion of r (p)
+    for (int i = 0; i < param.num_src; i++) { blas::copy(rSloppy.Component(i), p.Component(i)); }
+
+#ifdef MWVERBOSE
+    for (int i = 0; i < param.num_src; i++) {
+      for (int j = 0; j < param.num_src; j++) { pTp(i, j) = blas::cDotProduct(p.Component(i), p.Component(j)); }
+    }
+    std::cout << " pTp  " << std::endl << pTp << std::endl;
+    std::cout << " L " << std::endl << L.adjoint() << std::endl;
+    std::cout << " C " << std::endl << C << std::endl;
+#endif
+
+    while (!allconverged && k < param.maxiter) {
+      // apply matrix
+      for (int i = 0; i < param.num_src; i++) {
+        matSloppy(Ap.Component(i), p.Component(i), tmp.Component(i), tmp2.Component(i)); // tmp as tmp
+      }
+
+      // calculate pAp
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = i; j < param.num_src; j++) {
+          pAp(i, j) = blas::cDotProduct(p.Component(i), Ap.Component(j));
+          if (i != j) pAp(j, i) = std::conj(pAp(i, j));
+        }
+      }
+
+      // update Xsloppy
+      alpha = pAp.inverse() * C;
+      // temporary hack using AC
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = alpha(i, j); }
+      }
+      blas::caxpy(AC, p, xSloppy);
+
+      // update rSloppy
+      beta = pAp.inverse();
+      // temporary hack
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = -beta(i, j); }
+      }
+      blas::caxpy(AC, Ap, rSloppy);
+
+      // orthorgonalize R
+      // copy rSloppy to rnew as temporary
+      for (int i = 0; i < param.num_src; i++) { blas::copy(rnew.Component(i), rSloppy.Component(i)); }
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = i; j < param.num_src; j++) {
+          r2(i, j) = blas::cDotProduct(r.Component(i), r.Component(j));
+          if (i != j) r2(j, i) = std::conj(r2(i, j));
+        }
+      }
+      // Cholesky decomposition
+      L = r2.llt().matrixL(); // retrieve factor L  in the decomposition
+      S = L.adjoint();
+      Linv = S.inverse();
+      // temporary hack
+      for (int i = 0; i < param.num_src; i++) {
+        blas::zero(rSloppy.Component(i));
+        for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = Linv(i, j); }
+      }
+      blas::caxpy(AC, rnew, rSloppy);
+
+#ifdef MWVERBOSE
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = 0; j < param.num_src; j++) {
+          pTp(i, j) = blas::cDotProduct(rSloppy.Component(i), rSloppy.Component(j));
+        }
+      }
+      std::cout << " rTr " << std::endl << pTp << std::endl;
+      std::cout << "QR" << S << std::endl << "QP " << S.inverse() * S << std::endl;
+      ;
+#endif
+
+      // update p
+      // use rnew as temporary again for summing up
+      for (int i = 0; i < param.num_src; i++) { blas::copy(rnew.Component(i), rSloppy.Component(i)); }
+      // temporary hack
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = 0; j < param.num_src; j++) { AC[i * param.num_src + j] = std::conj(S(j, i)); }
+      }
+      blas::caxpy(AC, p, rnew);
+      // set p = rnew
+      for (int i = 0; i < param.num_src; i++) { blas::copy(p.Component(i), rnew.Component(i)); }
+
+      // update C
+      C = S * C;
+
+#ifdef MWVERBOSE
+      for (int i = 0; i < param.num_src; i++) {
+        for (int j = 0; j < param.num_src; j++) { pTp(i, j) = blas::cDotProduct(p.Component(i), p.Component(j)); }
+      }
+      std::cout << " pTp " << std::endl << pTp << std::endl;
+      std::cout << "S " << S << std::endl << "C " << C << std::endl;
+#endif
+
+      // calculate the residuals for all shifts
+      r2avg = 0;
+      for (int j = 0; j < param.num_src; j++) {
+        r2(j, j) = C(0, j) * conj(C(0, j));
+        for (int i = 1; i < param.num_src; i++) r2(j, j) += C(i, j) * conj(C(i, j));
+        r2avg += r2(j, j).real();
+      }
+
+      k++;
+      PrintStats("CG", k, r2avg / param.num_src, b2avg, 0);
+      // check convergence
+      allconverged = true;
+      for (int i = 0; i < param.num_src; i++) {
+        converged[i] = convergence(r2(i, i).real(), 0, stop[i], param.tol_hq);
+        allconverged = allconverged && converged[i];
+      }
+    }
+
+    for (int i = 0; i < param.num_src; i++) { blas::xpy(y.Component(i), xSloppy.Component(i)); }
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops()) * 1e-9;
+    param.gflops = gflops;
+    param.iter += k;
+
+    if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+
+    // if (getVerbosity() >= QUDA_VERBOSE)
+    // printfQuda("CG: Reliable updates = %d\n", rUpdate);
+
+    // compute the true residuals
+    for (int i = 0; i < param.num_src; i++) {
+      mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
+      param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
+      param.true_res_offset[i] = param.true_res;
+      param.true_res_hq_offset[i] = param.true_res_hq;
+
+      PrintSummary("CG", k, r2(i, i).real(), b2[i], stop[i], 0.0);
+    }
+
+    // reset the flops counters
+    blas::flops = 0;
+    mat.flops();
+    matSloppy.flops();
+
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
+
+    delete[] AC;
+    profile.TPSTOP(QUDA_PROFILE_FREE);
+
+    return;
   }
-
-  for(int i=0; i<param.num_src; i++){
-    blas::xpy(y.Component(i), xSloppy.Component(i));
-  }
-
-  profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-
-  param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-  double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
-  param.gflops = gflops;
-  param.iter += k;
-
-  if (k == param.maxiter)
-  warningQuda("Exceeded maximum iterations %d", param.maxiter);
-
-  // if (getVerbosity() >= QUDA_VERBOSE)
-  // printfQuda("CG: Reliable updates = %d\n", rUpdate);
-
-  // compute the true residuals
-  for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i), tmp3.Component(i));
-    param.true_res = sqrt(blas::xmyNorm(b.Component(i), r.Component(i)) / b2[i]);
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x.Component(i), r.Component(i)).z);
-    param.true_res_offset[i] = param.true_res;
-    param.true_res_hq_offset[i] = param.true_res_hq;
-
-    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
-  }
-
-  // reset the flops counters
-  blas::flops = 0;
-  mat.flops();
-  matSloppy.flops();
-
-  profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profile.TPSTART(QUDA_PROFILE_FREE);
-
-  delete[] AC;
-  profile.TPSTOP(QUDA_PROFILE_FREE);
-
-  return;
-
-}
 #endif
 
 #else
@@ -1389,7 +1356,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     double n = blas::norm2(p.Component(i));
     blas::ax(1/sqrt(n),p.Component(i));
     for(int j=i+1; j < param.num_src; j++) {
-      auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
+      auto ri = blas::cDotProduct(p.Component(i), p.Component(j));
       blas::caxpy(-ri,p.Component(i),p.Component(j));
     }
   }
@@ -1540,7 +1507,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
           double n = blas::norm2(p.Component(i));
           blas::ax(1/sqrt(n),p.Component(i));
           for(int j=i+1; j < param.num_src; j++) {
-            auto ri = blas::cDotProduct(p.Component(i),p.Component(j));
+            auto ri = blas::cDotProduct(p.Component(i), p.Component(j));
             blas::caxpy(-ri,p.Component(i),p.Component(j));
 
           }

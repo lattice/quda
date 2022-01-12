@@ -22,7 +22,9 @@
 #include <misc.h>
 
 #include <qio_field.h>
+#ifdef QUDA_ZFP
 #include <zfp.h>
+#endif
 
 template <typename T> using complex = std::complex<T>;
 
@@ -271,8 +273,9 @@ void constructWilsonSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInve
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
-  } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) &&
-             (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
+  } else if ((inv_param->dslash_type == QUDA_TWISTED_MASS_DSLASH || inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+             && (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET
+                 || inv_param->twist_flavor == QUDA_TWIST_DEG_DOUBLET)) {
     cs_param->nDim = 5;
     cs_param->x[4] = 2;
   } else {
@@ -1996,6 +1999,7 @@ void performanceStats(std::vector<double> &time, std::vector<double> &gflops, st
              Nsrc, mean_iter, stddev_iter, mean_time, stddev_time, mean_gflops, stddev_gflops);
 }
 
+#ifdef QUDA_ZFP
 // compress and decompress contiguous blocks
 double process4D(double* buffer, uint blocks, double tolerance, uint block_size)
 {
@@ -2465,3 +2469,5 @@ double zfp_compress_decompress_prop(void *prop_in, void *prop_out, bool zfp_4D)
   }
   return comp_ratio;
 }
+
+#endif

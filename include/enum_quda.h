@@ -1,8 +1,9 @@
 #pragma once
 
-#include <limits.h>
+// Required for N_COLORS definition in gauge reconstruct
 #include <quda_define.h>
-#define QUDA_INVALID_ENUM INT_MIN
+
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #ifdef __cplusplus
 extern "C" {

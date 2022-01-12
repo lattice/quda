@@ -149,10 +149,16 @@ QudaTransferType staggered_transfer_type = QUDA_TRANSFER_COARSE_KD;
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
 
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
 bool mg_use_mma = true;
 #else
 bool mg_use_mma = false;
+#endif
+
+#ifdef NVSHMEM_COMMS
+bool use_mobius_fused_kernel = false;
+#else
+bool use_mobius_fused_kernel = true;
 #endif
 
 int n_ev = 8;
@@ -443,8 +449,14 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
-  quda_app->add_option("--clover-coeff", clover_coeff, "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default 1.0) and kappa. "
-		       "If the user populates this value with anything other than 0.0, the passed value will override the inferred value)")->capture_default_str();
+  quda_app
+    ->add_option("--clover-coeff", clover_coeff,
+                 "The overall clover coefficient, kappa * Csw. (default 0.0. Will be inferred from clover-csw (default "
+                 "1.0) and kappa. "
+                 "If the user populates this value with anything other than 0.0, the passed value will override the "
+                 "inferred value)")
+    ->capture_default_str();
+
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-clover-trlog", compute_clover_trlog,
@@ -650,6 +662,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--tgridsize", grid_t, "Set grid size in T dimension (default 1)")->excludes(gridsizeopt);
 
+  quda_app->add_option("--mobius-fused-kernel", use_mobius_fused_kernel, "Use fused kernels for Mobius, default true");
   return quda_app;
 }
 
@@ -866,8 +879,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)");
   quda_app->add_mgoption(opgroup, "--mg-n-block-ortho", n_block_ortho, CLI::PositiveNumber,
                          "The number of times to run Gram-Schmidt during block orthonormalization (default 1)");
-  quda_app->add_mgoption(opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
-                         "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-block-ortho-two-pass", block_ortho_two_pass, CLI::Validator(),
+    "Whether to use a two block-orthogonalization when using fixed-point null space vectors (default true)");
   quda_app->add_mgoption(opgroup, "--mg-nu-post", nu_post, CLI::PositiveNumber,
                          "The number of post-smoother applications to do at a given multigrid level (default 2)");
   quda_app->add_mgoption(opgroup, "--mg-nu-pre", nu_pre, CLI::PositiveNumber,
@@ -968,6 +982,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-smear", gauge_smear, "Smear the gauge field prior to inversion (default false)");
+  
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+  
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-stout-rho", stout_smear_rho,
@@ -985,7 +1004,6 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");

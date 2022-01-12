@@ -310,7 +310,7 @@ void printQudaCloverParam(QudaInvertParam *param)
     P(return_clover_inverse, 0);
     P(clover_rho, 0.0);
     P(clover_coeff, 0.0);
-    P(clover_csw, 0.0);    
+    P(clover_csw, 0.0);
 #else
   P(compute_clover_trlog, QUDA_INVALID_PRECISION);
   P(compute_clover, QUDA_INVALID_PRECISION);
@@ -675,6 +675,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+#ifdef NVSHMEM_COMMS
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
+#endif
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }
@@ -691,10 +701,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #if defined CHECK_PARAM
-  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
-    errorQuda("Unexpected QudaMultigridParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+     errorQuda("Unexpected QudaMultigridParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
 #else
-  P(struct_size, (size_t)INVALID_INT);
+     P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -914,7 +924,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
   P(use_mma, QUDA_BOOLEAN_TRUE);
 #else
   P(use_mma, QUDA_BOOLEAN_FALSE);

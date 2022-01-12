@@ -8,8 +8,8 @@
 
 namespace quda {
 
-  using spinor_array = vector_type<double2, 4>;
-  using spinor_matrix = vector_type<double2, 16>;
+  using spinor_array = array<double2, 4>;
+  using spinor_matrix = array<double2, 16>;
   
   template <int reduction_dim, class T> __device__ int idx_from_t_xyz(int t, int xyz, T X[4])
   {

@@ -138,45 +138,62 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       // mat_norm is updated.
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	for (int i = num_locked_3D[t]; i < n_kr; i++) {
-	  if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
+      for (int t = 0; t < ortho_dim_size; t++) {
+	// If this temporal block has not converged,
+	// update the arrow mat alpha vaue
+	if(!converged_3D[t]) {
+	  for (int i = num_locked_3D[t]; i < n_kr; i++) {
+	    if (fabs(alpha_3D[t][i]) > mat_norm_3D[t]) mat_norm_3D[t] = fabs(alpha_3D[t][i]);
+	  }
 	}
       }
       
       // Locking check
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	iter_locked_3D[t] = 0;
-	for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
-	  if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	      printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]],
-			 epsilon * mat_norm_3D[t]);
-	    iter_locked_3D[t] = i;	    
-	  } else {
-	    // Unlikely to find new locked pairs	    
-	    break;
+      for (int t = 0; t < ortho_dim_size; t++) {
+	// If this temporal block has not converged,
+	// deduce how many eigenvectors we may lock.
+	if(!converged_3D[t]) {
+	  iter_locked_3D[t] = 0;
+	  for (int i = 1; i < (n_kr - num_locked_3D[t]); i++) {
+	    if (residua_3D[t][i + num_locked_3D[t]] < epsilon * mat_norm_3D[t]) {
+	      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+		printfQuda("**** Locking %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]],
+			   epsilon * mat_norm_3D[t]);
+	      iter_locked_3D[t] = i;	    
+	    } else {
+	      // Unlikely to find new locked pairs	    
+	      break;
+	    }
 	  }
 	}
       }
 
       // Convergence check
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	iter_converged_3D[t] = iter_locked_3D[t];
-	for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
-	  if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
-	    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	      printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
-	    iter_converged_3D[t] = i;
-	  } else {
-	    // Unlikely to find new converged pairs
-	    break;
+      for (int t = 0; t < ortho_dim_size; t++) {
+	// If this temporal block has not converged,
+	// deduce how many have converged.
+	if(!converged_3D[t]) {
+	  iter_converged_3D[t] = iter_locked_3D[t];
+	  for (int i = iter_locked_3D[t] + 1; i < n_kr - num_locked_3D[t]; i++) {
+	    if (residua_3D[t][i + num_locked_3D[t]] < tol * mat_norm_3D[t]) {
+	      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+		printfQuda("**** Converged %d %d resid=%+.6e condition=%.6e ****\n", t, i, residua_3D[t][i + num_locked_3D[t]], tol * mat_norm_3D[t]);
+	      iter_converged_3D[t] = i;
+	    } else {
+	      // Unlikely to find new converged pairs
+	      break;
+	    }
 	  }
 	}
       }
 
-      for (int t = 0; t < ortho_dim_size  && !converged_3D[t]; t++) {
-	iter_keep_3D[t] = std::min(iter_converged_3D[t] + (n_kr - num_converged_3D[t]) / 2, n_kr - num_locked_3D[t] - 12);
+      // Restart keep
+      for (int t = 0; t < ortho_dim_size; t++) {
+	// If this temporal block has not converged,
+	// deduce the number we will keep for the next restart.
+	if(!converged_3D[t]) {	  
+	  iter_keep_3D[t] = std::min(iter_converged_3D[t] + (n_kr - num_converged_3D[t]) / 2, n_kr - num_locked_3D[t] - 12);
+	}
       }
       
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -184,12 +201,19 @@ namespace quda
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       int t_offset = ortho_dim_size * comm_coord(3);      
-      for (int t = 0; t < ortho_dim_size && !converged_3D[t]; t++) {
-	num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
-	num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
-	num_locked_3D[t] += iter_locked_3D[t];
-
-	if (getVerbosity() >= QUDA_VERBOSE && comm_coord(0) == 0 && comm_coord(1) == 0 && comm_coord(2) == 0) {
+      for (int t = 0; t < ortho_dim_size; t++) {
+	// If this temporal block has not converged,
+	// update values from this iter
+	if(!converged_3D[t]) {
+	  num_converged_3D[t] = num_locked_3D[t] + iter_converged_3D[t];
+	  num_keep_3D[t] = num_locked_3D[t] + iter_keep_3D[t];
+	  num_locked_3D[t] += iter_locked_3D[t];
+	}
+	
+	if (getVerbosity() >= QUDA_VERBOSE &&
+	    comm_coord(0) == 0 &&
+	    comm_coord(1) == 0 &&
+	    comm_coord(2) == 0) {
 	  printf("%04d converged eigenvalues for timeslice %d at restart iter %04d\n", num_converged_3D[t], t_offset + t, restart_iter + 1);
 	  printf("iter Conv[%d] = %d\n", t_offset + t, iter_converged_3D[t]);
 	  printf("iter Keep[%d] = %d\n", t_offset + t, iter_keep_3D[t]);
@@ -736,6 +760,23 @@ namespace quda
       for(int t=0; t<ortho_dim_size; t++) residua_3D[t][i] = sqrt(norms[t]);
     }
 
+    for(int t=0; t<ortho_dim_size; t++) {
+      for (int i = 0; i < size; i++) {
+	
+	if(getVerbosity() >= QUDA_SUMMARIZE) { 
+	  printfQuda("Eval[%02d][%04d] = (%+.16e,%+.16e) residual = %+.16e\n", t, i,
+		     evals_t[i][t].real(), evals_t[i][t].imag(),
+		     residua_3D[t][i]);
+	}
+	
+	// Transfer evals to eval array
+	evals.resize(size * evecs[0]->X()[3]);
+	evals[t*size + i] = evals_t[i][t];
+      }
+    }
+    
+    
+#if 0
     // If size = n_conv, this routine is called post sort
     if (size == n_conv) {
       // We are computing T problems split across T nodes, so we must do an MPI gather
@@ -773,7 +814,9 @@ namespace quda
 	  evals[t*size + i] = evals_t_all[t*size + i];
 	}
     }
-  
+    
+#endif
+
     delete temp[0];
     
     // Save Eval tuning

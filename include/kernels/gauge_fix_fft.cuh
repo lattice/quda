@@ -2,6 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
+#include <array.h>
 #include <kernel.h>
 #include <reduction_kernel.h>
 #include <fast_intdiv.h>
@@ -149,8 +150,8 @@ namespace quda {
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
-  struct GaugeFixQualityFFTArg : public ReduceArg<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  struct GaugeFixQualityFFTArg : public ReduceArg<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -166,18 +167,19 @@ namespace quda {
       ReduceArg<reduce_t>(dim3(data.VolumeCB(), 2, 1), 1, true), // reset = true
       data(data),
       delta(delta),
+      result{0, 0},
       volume(data.Volume())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t(); }
+    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction() { return result[0]; }
     double getTheta() { return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityFFT : plus<vector_type<double, 2>> {
-    using reduce_t = vector_type<double, 2>;
+  template <typename Arg> struct FixQualityFFT : plus<array<double, 2>> {
+    using reduce_t = array<double, 2>;
     using plus<reduce_t>::operator();
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }
@@ -188,7 +190,7 @@ namespace quda {
      */
     __device__ __host__ inline reduce_t operator()(reduce_t &value, int x_cb, int parity)
     {
-      reduce_t data;
+      reduce_t data{0, 0};
       using matrix = Matrix<complex<typename Arg::real>, 3>;
       int x[4];
       getCoords(x, x_cb, arg.X, parity);

@@ -166,10 +166,13 @@ int main(int argc, char **argv)
 
     if (strcmp(latfile, "") || !coldstart) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
-      copyExtendedResidentGaugeQuda((void*)gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
-      if (coldstart) InitGaugeField(*gaugeEx);
-      //else InitGaugeField(*gaugeEx, *randstates);
+      if (coldstart)
+        InitGaugeField(*gaugeEx);
+      else
+        InitGaugeField(*gaugeEx, *randstates);
+
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);	
       // load the gauge field from gauge
@@ -228,11 +231,10 @@ int main(int argc, char **argv)
       freeGaugeQuda();
       
       // Save if output string is specified
-      if (strcmp(gauge_outfile,"")) {
-	saveGaugeField(step, gaugeEx, gauge);
-      }      
+      if (strcmp(gauge_outfile,"")) saveGaugeField(step, gaugeEx, gauge);
+      else printfQuda("No output file specified.\n");
     }
-
+    
     delete gauge;
     delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
@@ -252,7 +254,7 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
 
-  for (int dir = 0; dir<4; dir++) host_free(load_gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) host_free(load_gauge[dir]);
 
   // finalize the QUDA library
   endQuda();

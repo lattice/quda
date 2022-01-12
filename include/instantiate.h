@@ -70,10 +70,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &, Args &&...)
-    {
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
-    }
+    instantiateApply(G &, Args &&...) { errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon); }
   };
 
   /**
@@ -134,7 +131,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
 #if (QUDA_PRECISION & 8) || (QUDA_PRECISION & 4)
-  constexpr void instantiate(G &U, Args &&... args)
+  constexpr void instantiate(G &U, Args &&...args)
 #else
   constexpr void instantiate(G &U, Args &&...)
 #endif
@@ -199,7 +196,7 @@ namespace quda
      @param[in,out] args Additional arguments for kernels
   */
   template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
-  constexpr void instantiate(F &field, Args &&... args)
+  constexpr void instantiate(F &field, Args &&...args)
   {
     if (field.Ncolor() == N_COLORS) {
       Apply<store_t, N_COLORS>(field, args...);

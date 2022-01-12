@@ -106,9 +106,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
-    case QUDA_EIG_BLK_IR_ARNOLDI:
-      errorQuda("Block IR Arnoldi not implemented");
-      break;
+    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);

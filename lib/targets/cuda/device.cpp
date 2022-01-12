@@ -16,7 +16,7 @@ static cudaDeviceProp deviceProp;
 static cudaStream_t *streams;
 static const int Nstream = 9;
 
-#define CHECK_CUDA_ERROR(func)                                          \
+#define CHECK_CUDA_ERROR(func)                                                                                         \
   target::cuda::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
@@ -200,7 +200,7 @@ namespace quda
       for (int i=0; i<Nstream-1; i++) {
         CHECK_CUDA_ERROR(cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority));
       }
-      CHECK_CUDA_ERROR(cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority));
+      CHECK_CUDA_ERROR(cudaStreamCreateWithPriority(&streams[Nstream - 1], cudaStreamDefault, leastPriority));
     }
 
     void destroy()
@@ -224,7 +224,7 @@ namespace quda
       qudaStream_t stream;
       stream.idx = i;
       return stream;
-      //return qudaStream_t(i);
+      // return qudaStream_t(i);
       // return streams[i];
     }
 
@@ -233,14 +233,11 @@ namespace quda
       qudaStream_t stream;
       stream.idx = Nstream - 1;
       return stream;
-      //return qudaStream_t(Nstream - 1);
-      //return streams[Nstream - 1];
+      // return qudaStream_t(Nstream - 1);
+      // return streams[Nstream - 1];
     }
 
-    unsigned int get_default_stream_idx()
-    {
-      return Nstream - 1;
-    }
+    unsigned int get_default_stream_idx() { return Nstream - 1; }
 
     bool managed_memory_supported()
     {
@@ -276,42 +273,10 @@ namespace quda
 
     unsigned int max_blocks_per_processor()
     {
-#if CUDA_VERSION >= 11000
       static int max_blocks_per_sm = 0;
       if (!max_blocks_per_sm)
         CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid()));
       return max_blocks_per_sm;
-#else
-      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
-      switch (deviceProp.major) {
-      case 2:
-	return 8;
-	break;
-      case 3:
-	return 16;
-	break;
-      case 5:
-	 return 32;
-	 break;
-      case 6: 
-	 return 32;
-	 break;
-      case 7:
-	{
-          switch (deviceProp.minor) {
-            case 0: return 32; break;
-            case 2: return 32; break;
-            case 5: return 16; break;
-	    default: return 32; break;
-	  };
-        }
-	break;
-      default:
-        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
-                    deviceProp.major, deviceProp.minor);
-        return 32;
-      }
-#endif
     }
 
     namespace profile
@@ -325,18 +290,16 @@ namespace quda
 
   } // namespace device
 
+  namespace target
+  {
 
-  namespace target {
+    namespace cuda
+    {
 
-    namespace cuda {
+      cudaStream_t get_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
 
-      cudaStream_t get_stream(const qudaStream_t &stream)
-      {
-        return streams[stream.idx];
-      }
+    } // namespace cuda
 
-    }
-
-  }
+  } // namespace target
 
 } // namespace quda

@@ -43,7 +43,7 @@ struct DslashTime {
   double cpu_min;
   double cpu_max;
 
-  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) {}
+  DslashTime() : event_time(0.0), cpu_time(0.0), cpu_min(DBL_MAX), cpu_max(0.0) { }
 };
 
 struct DslashTestWrapper {
@@ -1047,7 +1047,7 @@ struct DslashTestWrapper {
 
         dslash_time.cpu_time += host_timer.last();
         // skip first and last iterations since they may skew these metrics if comms are not synchronous
-        if (i>0 && i<niter) {
+        if (i > 0 && i < niter) {
           dslash_time.cpu_min = std::min(dslash_time.cpu_min, host_timer.last());
           dslash_time.cpu_max = std::max(dslash_time.cpu_max, host_timer.last());
         }
@@ -1109,7 +1109,8 @@ struct DslashTestWrapper {
         double norm2_cpu = blas::norm2(*spinorRef);
         double norm2_cpu_cuda = blas::norm2(*vp_spinorOut[n]);
         printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
-        deviation = std::max(deviation, pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
+        deviation
+          = std::max(deviation, std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *vp_spinorOut[n]))));
       }
     } else {
       double norm2_cpu = blas::norm2(*spinorRef);
@@ -1120,7 +1121,7 @@ struct DslashTestWrapper {
       } else {
         printfQuda("Result: CPU = %f, CPU-QUDA = %f\n", norm2_cpu, norm2_cpu_cuda);
       }
-      deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+      deviation = std::pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
     }
     return deviation;
   }

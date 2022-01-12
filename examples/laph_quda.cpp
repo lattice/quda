@@ -20,7 +20,7 @@ void constructGaugeField(QudaGaugeParam &gauge_param, cudaGaugeField *gaugeEx,
   
   if (strcmp(latfile, "")) { // We loaded in a gauge field
     // copy internal extended field to gaugeEx
-    copyExtendedResidentGaugeQuda((void*)gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    copyExtendedResidentGaugeQuda((void*)gaugeEx);
   } else {
     if (heatbath_coldstart) InitGaugeField(*gaugeEx);
     else InitGaugeField(*gaugeEx, *randstates);

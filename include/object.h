@@ -13,29 +13,19 @@
 #include <malloc_quda.h>
 
 namespace quda {
-  
-  class Object {
-    
-    
-  public:
-    inline Object() { }
-    inline virtual ~Object() { }
-    
-    inline static void* operator new(std::size_t size) {
-      return safe_malloc(size);
-    }
-    
-    inline static void operator delete(void* p) {
-      host_free(p);
-    }
-  
-    inline static void* operator new[](std::size_t size) {
-      return safe_malloc(size);
-    }
-  
-    inline static void operator delete[](void* p) {
-      host_free(p);
-    }
+
+  struct Object {
+
+    Object() { }
+    virtual ~Object() { }
+
+    void *operator new(std::size_t size) { return safe_malloc(size); }
+
+    void operator delete(void *p) { host_free(p); }
+
+    void *operator new[](std::size_t size) { return safe_malloc(size); }
+
+    void operator delete[](void *p) { host_free(p); }
   };
 
 } // namespace quda

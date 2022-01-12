@@ -56,6 +56,7 @@ TEST(unitarization, verify) {
 
 static int unitarize_link_test(int &test_rc)
 {
+  setVerbosity(verbosity);
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;

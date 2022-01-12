@@ -42,18 +42,22 @@ namespace quda
     return rtn;
   }
 
-  namespace target {
+  namespace target
+  {
 
-    namespace cuda {
+    namespace cuda
+    {
 
-      void set_runtime_error(cudaError_t error, const char *api_func, const char *func, const char *file, const char *line,
-                             bool allow_error)
+      void set_runtime_error(cudaError_t error, const char *api_func, const char *func, const char *file,
+                             const char *line, bool allow_error)
       {
         if (error == cudaSuccess) return;
         last_error = error == cudaSuccess ? QUDA_SUCCESS : QUDA_ERROR;
         last_error_str = cudaGetErrorString(error);
-        if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, cudaGetErrorString(error), file, line, func);
-        else cudaGetLastError(); // clear the error state
+        if (!allow_error)
+          errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, cudaGetErrorString(error), file, line, func);
+        else
+          cudaGetLastError(); // clear the error state
       }
 
       void set_driver_error(CUresult error, const char *api_func, const char *func, const char *file, const char *line,
@@ -64,33 +68,35 @@ namespace quda
         const char *str;
         cuGetErrorName(error, &str);
         last_error_str = str;
-        if (!allow_error) errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, str, file, line, func);
-        else cudaGetLastError(); // clear the error state
+        if (!allow_error)
+          errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, str, file, line, func);
+        else
+          cudaGetLastError(); // clear the error state
       }
 
-    }
+    } // namespace cuda
 
-  }
+  } // namespace target
 
   using namespace target::cuda;
 
   // Agnostic way to return a cuda API flag
-  namespace {
-    inline
-    cudaMemcpyKind qudaMemcpyKindToAPI( const qudaMemcpyKind& k)
+  namespace
+  {
+    inline cudaMemcpyKind qudaMemcpyKindToAPI(const qudaMemcpyKind &k)
     {
-      switch(k) {
-      case qudaMemcpyHostToHost : return cudaMemcpyHostToHost;
-      case qudaMemcpyHostToDevice : return cudaMemcpyHostToDevice;
-      case qudaMemcpyDeviceToHost : return cudaMemcpyDeviceToHost;
-      case qudaMemcpyDeviceToDevice : return cudaMemcpyDeviceToDevice;
-      case qudaMemcpyDefault : return cudaMemcpyDefault;
+      switch (k) {
+      case qudaMemcpyHostToHost: return cudaMemcpyHostToHost;
+      case qudaMemcpyHostToDevice: return cudaMemcpyHostToDevice;
+      case qudaMemcpyDeviceToHost: return cudaMemcpyDeviceToHost;
+      case qudaMemcpyDeviceToDevice: return cudaMemcpyDeviceToDevice;
+      case qudaMemcpyDefault: return cudaMemcpyDefault;
       default:
-	errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
-	return cudaMemcpyDefault; // keep warnings away
+        errorQuda(" unknown value for qudaMemcpyKind %d", static_cast<int>(k));
+        return cudaMemcpyDefault; // keep warnings away
       }
     }
-  }
+  } // namespace
 
   // No need to abstract these across the library so keep these definitions local to CUDA target
 
@@ -239,16 +245,20 @@ namespace quda
           CUresult error = CUDA_SUCCESS;
           switch (kind) {
           case cudaMemcpyDeviceToHost:
-            PROFILE(error = cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
+            PROFILE(error = cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, get_stream(stream)),
+                    QUDA_PROFILE_MEMCPY_D2H_ASYNC);
             break;
           case cudaMemcpyHostToDevice:
-            PROFILE(error = cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+            PROFILE(error = cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, get_stream(stream)),
+                    QUDA_PROFILE_MEMCPY_H2D_ASYNC);
             break;
           case cudaMemcpyDeviceToDevice:
-            PROFILE(error = cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+            PROFILE(error = cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)),
+                    QUDA_PROFILE_MEMCPY_D2D_ASYNC);
             break;
           case cudaMemcpyDefault:
-            PROFILE(error = cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+            PROFILE(error = cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)),
+                    QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
             break;
           default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
           }
@@ -287,14 +297,12 @@ namespace quda
         }
       } else {
 #ifdef USE_DRIVER_API
-        CUresult error = async ?
-          cuMemsetD32Async((CUdeviceptr)dst, value, count / 4, get_stream(stream)) :
-          cuMemsetD32((CUdeviceptr)dst, value, count / 4);
+        CUresult error = async ? cuMemsetD32Async((CUdeviceptr)dst, value, count / 4, get_stream(stream)) :
+                                 cuMemsetD32((CUdeviceptr)dst, value, count / 4);
         set_driver_error(error, "cuMemset", func, file, line, active_tuning);
 #else
-        cudaError_t error = async ?
-          cudaMemsetAsync(dst, value, count, get_stream(stream)) :
-          cudaMemset(dst, value, count);
+        cudaError_t error
+          = async ? cudaMemsetAsync(dst, value, count, get_stream(stream)) : cudaMemset(dst, value, count);
         set_runtime_error(error, "cudaMemset", func, file, line, active_tuning);
 #endif
       }
@@ -314,8 +322,8 @@ namespace quda
     long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2 * count : count; }
   };
 
-  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
-                   const char *func, const char *file, const char *line)
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
+                   const char *line)
   {
     if (count == 0) return;
     QudaMem copy(dst, src, count, qudaMemcpyKindToAPI(kind), device::get_default_stream(), false, func, file, line);
@@ -338,10 +346,12 @@ namespace quda
         PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
         break;
       case qudaMemcpyDeviceToDevice:
-        PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
+        PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)),
+                QUDA_PROFILE_MEMCPY_D2D_ASYNC);
         break;
       case qudaMemcpyDefault:
-        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)), QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
+        PROFILE(cuMemcpyAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, get_stream(stream)),
+                QUDA_PROFILE_MEMCPY_DEFAULT_ASYNC);
         break;
       default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
       }
@@ -352,8 +362,8 @@ namespace quda
     }
   }
 
-  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream,
-                           const char *func, const char *file, const char *line)
+  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream, const char *func,
+                           const char *file, const char *line)
   {
     if (count == 0) return;
     auto error = cudaMemcpyAsync(dst, src, count, cudaMemcpyDeviceToDevice, get_stream(stream));
@@ -404,7 +414,7 @@ namespace quda
 
   bool qudaEventQuery_(qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+    cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(quda_event.event);
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     switch (error) {
@@ -425,7 +435,7 @@ namespace quda
 
   void qudaEventRecord_(qudaEvent_t &quda_event, qudaStream_t stream, const char *func, const char *file, const char *line)
   {
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+    cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(quda_event.event);
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventRecord(event, get_stream(stream)), QUDA_PROFILE_EVENT_RECORD);
     set_driver_error(error, __func__, func, file, line);
@@ -438,7 +448,7 @@ namespace quda
   void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t quda_event, unsigned int flags, const char *func,
                             const char *file, const char *line)
   {
-    cudaEvent_t &event = reinterpret_cast<cudaEvent_t&>(quda_event.event);
+    cudaEvent_t &event = reinterpret_cast<cudaEvent_t &>(quda_event.event);
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(get_stream(stream), event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     set_driver_error(error, __func__, func, file, line);
@@ -454,7 +464,7 @@ namespace quda
     cudaError_t error = cudaEventCreateWithFlags(&cuda_event, cudaEventDisableTiming);
     set_runtime_error(error, __func__, func, file, line);
     qudaEvent_t quda_event;
-    quda_event.event = reinterpret_cast<void*>(cuda_event);
+    quda_event.event = reinterpret_cast<void *>(cuda_event);
     return quda_event;
   }
 
@@ -464,12 +474,12 @@ namespace quda
     cudaError_t error = cudaEventCreate(&cuda_event);
     set_runtime_error(error, __func__, func, file, line);
     qudaEvent_t quda_event;
-    quda_event.event = reinterpret_cast<void*>(cuda_event);
+    quda_event.event = reinterpret_cast<void *>(cuda_event);
     return quda_event;
   }
 
-  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop,
-                              const char *func, const char *file, const char *line)
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop, const char *func, const char *file,
+                              const char *line)
   {
     float elapsed_time;
     cudaError_t error = cudaEventElapsedTime(&elapsed_time, reinterpret_cast<cudaEvent_t>(start.event),
@@ -480,13 +490,13 @@ namespace quda
 
   void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
-    cudaError_t error = cudaEventDestroy(reinterpret_cast<cudaEvent_t&>(event.event));
+    cudaError_t error = cudaEventDestroy(reinterpret_cast<cudaEvent_t &>(event.event));
     set_runtime_error(error, __func__, func, file, line);
   }
 
   void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {
-    const cudaEvent_t &event = reinterpret_cast<const cudaEvent_t&>(quda_event.event);
+    const cudaEvent_t &event = reinterpret_cast<const cudaEvent_t &>(quda_event.event);
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     set_driver_error(error, __func__, func, file, line);
@@ -518,7 +528,7 @@ namespace quda
 #endif
   }
 
-  void* qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
+  void *qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line)
   {
     void *ptr;
     cudaError_t error = cudaGetSymbolAddress(&ptr, symbol);

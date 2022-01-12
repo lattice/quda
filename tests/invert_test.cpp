@@ -322,7 +322,7 @@ int main(int argc, char **argv)
       } else {
         invertQuda(out[i]->V(), in[i]->V(), &inv_param);
 	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-        invertQuda(in[i]->V(), out[i]->V(), &inv_param);
+        //invertQuda(in[i]->V(), out[i]->V(), &inv_param);
       }
       
       time[i] = inv_param.secs;
