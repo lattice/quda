@@ -69,6 +69,8 @@ namespace quda
         errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", in.SiteSubset(), out.SiteSubset());
       }
 
+      if (x.Ndim() != 5 || y.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
+
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
       size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_t);
       if (tp.size() * sizeof(float) != m_size) {

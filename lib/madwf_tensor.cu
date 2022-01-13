@@ -65,6 +65,9 @@ namespace quda
       }
 
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
+
+      if (x.Ndim() != 5 || y.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
+
       size_t m_size = y.X(4) * x.X(4) * sizeof(matrix_t);
       if (transfer_parameter.size() * sizeof(float) != m_size) {
         errorQuda("Training Parameter size mismatch %lu neq %lu.", transfer_parameter.size() * sizeof(float), m_size);
