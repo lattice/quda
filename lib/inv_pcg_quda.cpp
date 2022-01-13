@@ -169,9 +169,6 @@ namespace quda
     ColorSpinorField &tmp2 = *tmp2p;
     ColorSpinorField &tmp3 = *tmp3p;
 
-    const double u = precisionEpsilon(param.precision_sloppy);
-    const double uhigh = precisionEpsilon(); // solver precision
-
     double Anorm = 0;
 
     // for alternative reliable updates
@@ -278,7 +275,21 @@ namespace quda
 
     int collect = v_r.size();
 
-    reliable_updates ru(alternative_reliable, u, uhigh, Anorm, r2, param.delta, param.max_res_increase, param.max_res_increase_total, use_heavy_quark_res, param.max_hq_res_increase, param.max_hq_res_increase);
+    ReliableUpdatesParams ru_params;
+
+    ru_params.alternative_reliable = alternative_reliable;
+    ru_params.u = precisionEpsilon(param.precision_sloppy);
+    ru_params.uhigh = precisionEpsilon(); // solver precision
+    ru_params.Anorm = Anorm;
+    ru_params.delta = param.delta;
+
+    ru_params.maxResIncrease = param.max_res_increase;
+    ru_params.maxResIncreaseTotal = param.max_res_increase_total;
+    ru_params.use_heavy_quark_res = use_heavy_quark_res;
+    ru_params.hqmaxresIncrease = param.max_hq_res_increase;
+    ru_params.hqmaxresRestartTotal = param.max_hq_res_restart_total;
+
+    ReliableUpdates ru(ru_params, r2);
 
     while (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 

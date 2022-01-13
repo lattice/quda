@@ -446,9 +446,21 @@ namespace quda {
 
     bool converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
-    reliable_updates ru(alternative_reliable, u, uhigh, Anorm, r2, param.delta,
-      param.max_res_increase, param.max_res_increase_total,
-      use_heavy_quark_res, param.max_hq_res_increase, param.max_hq_res_restart_total);
+    ReliableUpdatesParams ru_params;
+
+    ru_params.alternative_reliable = alternative_reliable;
+    ru_params.u = u;
+    ru_params.uhigh = uhigh; // solver precision
+    ru_params.Anorm = Anorm;
+    ru_params.delta = param.delta;
+
+    ru_params.maxResIncrease = param.max_res_increase;
+    ru_params.maxResIncreaseTotal = param.max_res_increase_total;
+    ru_params.use_heavy_quark_res = use_heavy_quark_res;
+    ru_params.hqmaxresIncrease = param.max_hq_res_increase;
+    ru_params.hqmaxresRestartTotal = param.max_hq_res_restart_total;
+
+    ReliableUpdates ru(ru_params, r2);
 
     while ( !converged && k < param.maxiter ) {
       matSloppy(Ap, *p[j], tmp, tmp2);  // tmp as tmp
