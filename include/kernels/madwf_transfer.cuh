@@ -26,10 +26,9 @@ namespace quda
     };
 
     template <bool dagger, class real, int nSpin, int nColor>
-    __device__ __host__ inline ColorSpinor<real, nColor, nSpin>
-    matrix_vector_multiply(const Matrix<complex<real>, nSpin> &m, const ColorSpinor<real, nColor, nSpin> &v)
+    __device__ __host__ inline void
+    matrix_vector_multiply(ColorSpinor<real, nColor, nSpin> &out, const Matrix<complex<real>, nSpin> &m, const ColorSpinor<real, nColor, nSpin> &v)
     {
-      ColorSpinor<real, nColor, nSpin> out; // out is initialized to zero
 #pragma unroll
       for (int color = 0; color < nColor; color++) {
 #pragma unroll
@@ -45,7 +44,6 @@ namespace quda
           }
         }
       }
-      return out;
     }
 
     template <class storage_t, int nSpin_, int nColor_, bool dagger_> struct Transfer5DArg : kernel_param<> {
@@ -82,7 +80,6 @@ namespace quda
         wm_p(reinterpret_cast<const matrix_t *>(wm_p)),
         nParity(in.SiteSubset())
       {
-
         if (volume_4d_cb != static_cast<int>(out.VolumeCB() / Ls_out)) {
           errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", volume_4d_cb,
                     static_cast<int>(out.VolumeCB() / Ls_out));
@@ -135,7 +132,7 @@ namespace quda
         for (int t = 0; t < Ls_in; t++) {
           Vector in = arg.in(t * volume_4d_cb + x_cb, parity);
           int wm_index = dagger ? t * Ls_out + s : s * Ls_in + t;
-          out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
+          matrix_vector_multiply<dagger>(out, reinterpret_cast<const matrix_t *>(cache.data())[wm_index], in);
         }
         arg.out(s * volume_4d_cb + x_cb, parity) = out;
       }
