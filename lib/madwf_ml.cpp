@@ -65,6 +65,8 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_INIT);
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
 
+    if (in.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
+
     int Ls = in.X(4);
     int Ls_base = param.madwf_ls;
     size_t param_size = Ls * Ls_base * complex_matrix_size * 2;
