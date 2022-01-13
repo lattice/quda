@@ -396,23 +396,64 @@ namespace quda
     static size_t ghostFaceBytes[QUDA_MAX_DIM];
     static void freeGhostBuffer(void);
 
+    /**
+       @brief Default constructor
+    */
     ColorSpinorField();
-    ColorSpinorField(const ColorSpinorField &);
-    ColorSpinorField(const ColorSpinorParam &);
 
+    /**
+       @brief Copy constructor for creating a ColorSpinorField from another ColorSpinorField
+       @param[in] field Instance of ColorSpinorField from which we are cloning
+    */
+    ColorSpinorField(const ColorSpinorField &field);
+
+    /**
+       @brief Move constructor for creating a ColorSpinorField from another ColorSpinorField
+       @param[in] field Instance of ColorSpinorField from which we are moving
+    */
+    ColorSpinorField(ColorSpinorField &&field);
+
+    /**
+       @brief Constructor for creating a ColorSpinorField from a ColorSpinorParam
+       @param param Contains the metadata for creating the field
+    */
+    ColorSpinorField(const ColorSpinorParam &param);
+
+    /**
+       @brief Destructor for ColorSpinorField
+    */
     virtual ~ColorSpinorField();
 
-    ColorSpinorField &operator=(const ColorSpinorField &);
+    /**
+       @brief Copy assignment operator
+       @param[in] field Instance from which we are copying
+       @return Reference to this field
+     */
+    ColorSpinorField &operator=(const ColorSpinorField &field);
 
-    void copy(const ColorSpinorField &);
-
-    void zero();
+    /**
+       @brief Move assignment operator
+       @param[in] field Instance from which we are moving
+       @return Reference to this field
+     */
+    ColorSpinorField &operator=(ColorSpinorField &&field);
 
     /**
        @brief Clears any allocations in the field and returns the
        field to being uninitialized.
      */
     void clear();
+
+    /**
+       @brief Copy the source field contents into this
+       @param[in] src Source from which we are copying
+     */
+    void copy(const ColorSpinorField &src);
+
+    /**
+       @brief Zero all elements of this field
+     */
+    void zero();
 
     /**
        @brief Zero the padded regions added on to the field.  Ensures

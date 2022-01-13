@@ -223,6 +223,53 @@ namespace quda {
     return *this;
   }
 
+  LatticeField &LatticeField::operator=(LatticeField &&src)
+  {
+    if (&src != this) {
+      // when we move a field, we lose all comms allocations
+      destroyComms();
+      src.destroyComms();
+
+      volume = std::exchange(src.volume, 0);
+      volumeCB = std::exchange(src.volumeCB, 0);
+      localVolume = std::exchange(src.localVolume, 0);
+      localVolumeCB = std::exchange(src.localVolumeCB, 0);
+      stride = std::exchange(src.stride, 0);
+      pad = std::exchange(src.pad, 0);
+      total_bytes = std::exchange(src.total_bytes, 0);
+      nDim = std::exchange(src.nDim, 0);
+      memcpy(x, src.x, sizeof(x));
+      memcpy(r, src.r, sizeof(r));
+      memcpy(local_x, src.local_x, sizeof(local_x));
+      memcpy(surface, src.surface, sizeof(surface));
+      memcpy(surfaceCB, src.surfaceCB, sizeof(surfaceCB));
+      memcpy(local_surface, src.local_surface, sizeof(local_surface));
+      memcpy(local_surfaceCB, src.local_surfaceCB, sizeof(local_surfaceCB));
+      location = std::exchange(src.location, QUDA_INVALID_FIELD_LOCATION);
+      precision = std::exchange(src.precision, QUDA_INVALID_PRECISION);
+      ghost_precision = std::exchange(src.ghost_precision, QUDA_INVALID_PRECISION);
+      ghost_precision_reset = std::exchange(src.ghost_precision_reset, false);
+      scale = std::exchange(src.scale, 0.0);
+      siteSubset = std::exchange(src.siteSubset, QUDA_INVALID_SITE_SUBSET);
+      ghostExchange = std::exchange(src.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID);
+      nDimComms = std::exchange(src.nDimComms, 0);
+
+#if 0
+      // these should never be set by definition for an rvalue reference
+      ghost_bytes = 0;
+      ghost_bytes_old = 0;
+      memset(ghost_face_bytes, '0', sizeof(ghost_face_bytes));
+      memset(ghost_face_bytes_aligned, '0', sizeof(ghost_face_bytes_aligned));
+      memset(ghost_offset, '0', sizeof(ghost_offset));
+#endif
+
+      memcpy(vol_string, src.vol_string, sizeof(vol_string));
+      memcpy(aux_string, src.aux_string, sizeof(aux_string));
+      mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
+    }
+    return *this;
+  }
+
   void LatticeField::clear()
   {
     destroyComms();
@@ -448,17 +495,50 @@ namespace quda {
       qudaDeviceSynchronize();
       comm_barrier();
 
+      for (int b=0; b<2; b++) {
+        my_face_h[b] = nullptr;
+        my_face_hd[b] = nullptr;
+        my_face_d[b] = nullptr;
+        from_face_h[b] = nullptr;
+        from_face_hd[b] = nullptr;
+        from_face_d[b] = nullptr;
+      }
+
+      // initialize ghost send pointers
+      for (int i=0; i<nDimComms; i++) {
+        for (int dir = 0; dir < 2; dir++) {
+          for (int b = 0; b < 2; ++b) {
+            my_face_dim_dir_h[b][i][dir] = nullptr;
+            from_face_dim_dir_h[b][i][dir] = nullptr;
+
+            my_face_dim_dir_hd[b][i][dir] = nullptr;
+            from_face_dim_dir_hd[b][i][dir] = nullptr;
+
+            my_face_dim_dir_d[b][i][dir] = nullptr;
+            from_face_dim_dir_d[b][i][dir] = nullptr;
+          } // loop over b
+        }   // loop over direction
+      } // loop over dimension
+
       for (int b=0; b<2; ++b) {
 	for (int i=0; i<nDimComms; i++) {
           if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
+          mh_recv_fwd[b][i] = nullptr;
           if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
+          mh_recv_back[b][i] = nullptr;
           if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
+          mh_send_fwd[b][i] = nullptr;
           if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
+          mh_send_back[b][i] = nullptr;
 
           if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
+          mh_recv_rdma_fwd[b][i] = nullptr;
           if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
+          mh_recv_rdma_back[b][i] = nullptr;
           if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
+          mh_send_rdma_fwd[b][i] = nullptr;
           if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
+          mh_send_rdma_back[b][i] = nullptr;
         }
       } // loop over b
 

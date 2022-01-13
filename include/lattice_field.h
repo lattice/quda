@@ -444,35 +444,50 @@ namespace quda {
   public:
 
     /**
-       Default constructor
+       @brief Default constructor
     */
     LatticeField();
 
     /**
-       Constructor for creating a LatticeField from a LatticeFieldParam
-       @param param Contains the metadata for creating the LatticeField
-    */
-    LatticeField(const LatticeFieldParam &param);
-
-    /**
-       Constructor for creating a LatticeField from another LatticeField
-       @param field Instance of LatticeField from which we are
-       inheriting metadata
+       @brief Copy constructor for creating a LatticeField from another LatticeField
+       @param field Instance of LatticeField from which we are cloning
     */
     LatticeField(const LatticeField &field);
 
     /**
-       Destructor for LatticeField
+       @brief Move constructor for creating a LatticeField from another LatticeField
+       @param field Instance of LatticeField from which we are moving
+    */
+    LatticeField(LatticeField &&field);
+
+    /**
+       @brief Constructor for creating a LatticeField from a LatticeFieldParam
+       @param param Contains the metadata for creating the field
+    */
+    LatticeField(const LatticeFieldParam &param);
+
+    /**
+       @brief Destructor for LatticeField
     */
     virtual ~LatticeField();
     
     /**
-       @brief Assignment operator
+       @brief Copy assignment operator
+       @param[in] field Instance from which we are copying
+       @return Reference to this field
      */
     LatticeField &operator=(const LatticeField &);
 
     /**
+       @brief Move assignment operator
+       @param[in] field Instance from which we are moving
+       @return Reference to this field
+     */
+    LatticeField &operator=(LatticeField &&);
+
+    /**
        @brief Create the field as specified by the param
+       @param[in] Parameter struct
     */
     void create(const LatticeFieldParam &param);
 
