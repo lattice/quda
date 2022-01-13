@@ -225,6 +225,9 @@ namespace quda {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    /** The type of accelerator type to use for preconditioner */
+    QudaAcceleratorType accelerator_type_precondition;
+
     /**< The time taken by the solver */
     double secs;
 
@@ -333,6 +336,7 @@ namespace quda {
       ca_lambda_min_precondition(param.ca_lambda_min_precondition),
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
+      accelerator_type_precondition(param.accelerator_type_precondition),
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
@@ -348,7 +352,7 @@ namespace quda {
       is_preconditioner(false),
       global_reduction(true),
       mg_instance(false),
-      precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ || param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ),
+      precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ),
       extlib_type(param.extlib_type)
     {
       if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
@@ -422,6 +426,7 @@ namespace quda {
       ca_lambda_min_precondition(param.ca_lambda_min_precondition),
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
+      accelerator_type_precondition(param.accelerator_type_precondition),
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.precision_ritz),

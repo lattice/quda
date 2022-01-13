@@ -229,6 +229,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type_precondition = precon_type;
 
   inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
 
   inv_param.madwf_diagonal_suppressor = madwf_diagonal_suppressor;
   inv_param.madwf_ls = madwf_ls;
@@ -717,6 +718,7 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -871,6 +873,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -1318,6 +1321,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;

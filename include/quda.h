@@ -345,6 +345,9 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    /** The type of accelerator type to use for preconditioner */
+    QudaAcceleratorType accelerator_type_precondition;
+
     /**
      * The following parameters are the ones used to perform the adaptive MADWF in MSPCG
      * See section 3.3 of [arXiv:2104.05615]

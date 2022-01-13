@@ -549,6 +549,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
   P(schwarz_type, QUDA_INVALID_SCHWARZ);
+  P(accelerator_type_precondition, QUDA_INVALID_ACCELERATOR);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
@@ -561,7 +562,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifndef INIT_PARAM
-  if (param->schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+  if (param->accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
 #endif
   P(madwf_diagonal_suppressor, INVALID_DOUBLE);
   P(madwf_ls, INVALID_INT);

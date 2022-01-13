@@ -11,7 +11,7 @@ namespace quda
                                                 SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
   {
     Solver *K = nullptr;
-    if (param.schwarz_type == QUDA_ADDITIVE_MADWF_SCHWARZ) {
+    if (param.accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
       if (param.inv_type_precondition == QUDA_CG_INVERTER) {
         K = new AcceleratedSolver<MadwfAcc, CG>(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
       } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {

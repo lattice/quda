@@ -133,6 +133,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_gaugefix_option_group(std::shared_ptr<QUDAApp> quda_app);
@@ -204,6 +205,7 @@ extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
+extern QudaAcceleratorType precon_accelerator_type;
 
 extern double madwf_diagonal_suppressor;
 extern int madwf_ls;

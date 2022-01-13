@@ -183,10 +183,14 @@ typedef enum QudaMultigridCycleType_s {
 
 typedef enum QudaSchwarzType_s {
   QUDA_ADDITIVE_SCHWARZ = 0,
-  QUDA_ADDITIVE_MADWF_SCHWARZ = 1,
-  QUDA_MULTIPLICATIVE_SCHWARZ = 2,
+  QUDA_MULTIPLICATIVE_SCHWARZ = 1,
   QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
 } QudaSchwarzType;
+
+typedef enum QudaAcceleratorType_s {
+  QUDA_MADWF_ACCELERATOR = 0, // Use the MADWF accelerator
+  QUDA_INVALID_ACCELERATOR = QUDA_INVALID_ENUM
+} QudaAcceleratorType;
 
 typedef enum QudaResidualType_s {
   QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
