@@ -74,7 +74,7 @@ void errorQuda_(const char *func, const char *file, int line, ...);
   do {                                                                                                                 \
     fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \
     fprintf(getOutputFile(), __VA_ARGS__);                                                                             \
-    errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__);                                            \
+    errorQuda_(__PRETTY_FUNCTION__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__); \
   } while (0)
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
@@ -126,3 +126,9 @@ void errorQuda_(const char *func, const char *file, int line, ...);
 } while (0)
 
 #endif // MULTI_GPU
+
+#define logQuda(verbosity, ...)                            \
+  if (getVerbosity() >= verbosity) {                       \
+    printfQuda(__VA_ARGS__);                               \
+  }
+
