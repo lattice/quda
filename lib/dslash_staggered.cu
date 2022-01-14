@@ -51,7 +51,7 @@ namespace quda
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                    TimeProfile &profile)
     {
-      if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+      if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC || (U.LinkType() == QUDA_GENERAL_LINKS && U.Reconstruct() == QUDA_RECONSTRUCT_NO)) {
 #ifdef BUILD_MILC_INTERFACE
         constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
         constexpr bool improved = false;
@@ -60,9 +60,7 @@ namespace quda
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(
-          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
 #else
         errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif
@@ -75,21 +73,19 @@ namespace quda
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(
-          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered, in, in.VolumeCB(), in.GhostFaceCB(), profile);
 #else
         errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif
       } else {
-        errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
+        errorQuda("Unsupported combination of staggered phase type %d gauge link type %d and reconstruct %d", U.StaggeredPhase(), U.LinkType(), U.Reconstruct());
       }
     }
 #else
     StaggeredApply(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, double,
                    const ColorSpinorField &, int, bool, const int *, TimeProfile &)
     {
-      errorQuda("Unsupported staggered phase type %d", U.StaggeredPhase());
+      errorQuda("Unsupported combination of staggered phase type %d gauge link type %d and reconstruct %d", U.StaggeredPhase(), U.LinkType(), U.Reconstruct());
     }
 #endif
   };

@@ -231,6 +231,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
@@ -246,9 +249,6 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.verbosity = verbosity;
 
@@ -335,9 +335,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -570,6 +567,14 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  // whether or not to let MG coarsening drop improvements
+  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
@@ -605,9 +610,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 void setMultigridInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -700,9 +702,12 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.omega = 1.0;
 
   // Whether or not to use native BLAS LAPACK
@@ -771,9 +776,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 void setContractInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
@@ -802,7 +804,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.pipeline = pipeline;
 
   inv_param.Ls = 1;
@@ -845,9 +847,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   // these can be set individually
   for (int i = 0; i < inv_param.num_offset; i++) {
@@ -943,8 +942,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
@@ -959,9 +956,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -989,6 +983,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
@@ -1144,7 +1145,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
-  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+      || staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 
@@ -1187,9 +1189,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 void setDeflatedInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -1300,7 +1299,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = precon_schwarz_type;

@@ -189,6 +189,9 @@ extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
 extern double ca_lambda_max;
+extern QudaCABasis ca_basis_precondition;
+extern double ca_lambda_min_precondition;
+extern double ca_lambda_max_precondition;
 extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
@@ -277,6 +280,8 @@ extern QudaTransferType staggered_transfer_type;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern bool mg_use_mma;
+extern bool mg_allow_truncation;
+extern bool mg_staggered_kd_dagger_approximation;
 
 extern bool use_mobius_fused_kernel;
 

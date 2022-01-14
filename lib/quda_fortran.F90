@@ -66,8 +66,12 @@ module quda_fortran
      integer(4) :: overlap ! width of domain overlap
 
      ! When computing momentum, should we overwrite it or accumulate
-     ! to it (only presenty support in gauge-force)
+     ! to it (only presently used in gauge-force)
      integer(4) :: overwrite_mom
+
+     ! When computing products of gauge links, should we overwrite the output or accumulate
+     ! to it? (only presently used in gauge-path)
+     integer(4) :: overwrite_gauge
 
      integer(4) :: use_resident_gauge  ! Use the resident gauge field
      integer(4) :: use_resident_mom    ! Use the resident momentume field
@@ -107,8 +111,9 @@ module quda_fortran
      real(8) :: mq2; ! EOFA parameter
      real(8) :: mq3; ! EOFA parameter
 
-     real(8) :: mu    ! Twisted mass parameter
-     real(8) :: epsilon ! Twisted mass parameter
+     real(8) :: mu    ! Chiral twisted mass parameter
+     real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
@@ -209,9 +214,6 @@ module quda_fortran
 
      QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
 
-     integer(4) :: sp_pad
-     integer(4) :: cl_pad
-
      integer(4) :: iter
      real(8) :: gflops
      real(8) :: secs
@@ -266,6 +268,15 @@ module quda_fortran
 
      ! Maximum eigenvalue for Chebyshev CA basis
      real(8) :: ca_lambda_max
+
+     ! Basis for CA algorithms in preconditioner solvers
+     QudaCABasis :: ca_basis_precondition
+
+     ! Minimum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_min_precondition
+
+     ! Maximum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_max_precondition
 
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle

@@ -30,16 +30,10 @@ namespace quda
 
     bool tuneSharedBytes() const { return false; }
 
-    void initTuneParam(TuneParam &param) const
-    {
-      Tunable::initTuneParam(param);
-      param.grid.y = v.size();
-    }
-
   public:
     TransformReduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, count_t n_items,
                     transformer &h, reduce_t init, reducer &r) :
-      TunableMultiReduction(n_items, v.size(), location),
+      TunableMultiReduction(n_items, v.size(), Arg::max_n_batch_block, location),
       location(location),
       result(result),
       v(v),
