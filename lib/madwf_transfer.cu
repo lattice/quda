@@ -34,6 +34,7 @@ namespace quda
 
         char in_str[16];
         char out_str[16];
+        strcat(aux, ",");
         i32toa(in_str, in.X(4));
         strcat(aux, in_str);
         strcat(aux, "->");
@@ -70,6 +71,8 @@ namespace quda
       }
 
       if (out.Ndim() != 5 || in.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
+      if (out.Nspin() != 4 || in.Nspin() != 4) errorQuda("out.nSpin = %d, in.nSpin = %d not supported", out.Nspin(), in.Nspin());
+      if (out.Ncolor() != 3 || in.Ncolor() != 3) errorQuda("out.nColor = %d, in.nColor = %d, not supported", out.Ncolor(), in.Ncolor());
 
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
       size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_t);

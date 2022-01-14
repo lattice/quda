@@ -85,11 +85,6 @@ namespace quda
                     static_cast<int>(out.VolumeCB() / Ls_out));
         }
 
-        if (in.Nspin() != 4) errorQuda("nSpin = %d not supported", in.Nspin());
-        if (in.Ncolor() != 3) errorQuda("nColor = %d not supported", in.Ncolor());
-        if (out.Nspin() != 4) errorQuda("nSpin = %d not supported", out.Nspin());
-        if (out.Ncolor() != 3) errorQuda("nColor = %d not supported", out.Ncolor());
-
         checkNative(in, out);
       }
     };

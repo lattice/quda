@@ -535,7 +535,7 @@ namespace quda {
       // Do nothing
     }
 
-    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField> &, int, double) { errorQuda("NOT implemented."); }
 
     void set_tol(double tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
@@ -855,12 +855,12 @@ namespace quda {
 
       void operator()(ColorSpinorField &out, ColorSpinorField &in)
       {
-        std::vector<ColorSpinorField *> v_r(0);
+        std::vector<ColorSpinorField> v_r(0, in);
         this->solve_and_collect(out, in, v_r, 0, 0);
       }
 
       virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in,
-                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_col);
+                                     std::vector<ColorSpinorField> &v_r, int collect_miniter, double collect_col);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
