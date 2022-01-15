@@ -12,6 +12,12 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
+#define CHOLESKY
+
+#ifdef CHOLESKY
+#include <eigen_helper.h>
+#endif
+
 namespace quda {
 
   // Utility functions for Gram-Schmidt. Based on GCR functions.
@@ -273,7 +279,7 @@ namespace quda {
     delete[] tau; 
     
     if (init) {
-      delete r_sloppy_saved_p; 
+      delete r_sloppy_saved_p;
       delete u[0];
       for (int i = 1; i < n_krylov + 1; i++) {
         delete r[i];
@@ -281,10 +287,7 @@ namespace quda {
       }
 
       delete x_sloppy_saved_p; 
-      delete r_fullp;
       delete r0_saved_p;
-      delete yp;
-      delete tempp; 
       
       init = false;
     }
@@ -327,10 +330,10 @@ namespace quda {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       
       // Full precision variables.
-      r_fullp = ColorSpinorField::Create(csParam);
+      r_fullp = std::make_unique<ColorSpinorField>(csParam);
       
       // Create temporary.
-      yp = ColorSpinorField::Create(csParam);
+      yp = std::make_unique<ColorSpinorField>(csParam);
       
       // Sloppy precision variables.
       csParam.setPrecision(param.precision_sloppy); 
@@ -342,7 +345,7 @@ namespace quda {
       r0_saved_p = ColorSpinorField::Create(csParam); // Used depending on precision. 
       
       // Temporary
-      tempp = ColorSpinorField::Create(csParam); 
+      tempp = std::make_unique<ColorSpinorField>(csParam); 
       
       // Residual (+ extra residuals for BiCG steps), Search directions.
       // Remark: search directions are sloppy in GCR. I wonder if we can
@@ -535,6 +538,98 @@ namespace quda {
 
       } // End BiCG part.
 
+#ifdef CHOLESKY
+
+      // MR part
+      {
+        using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
+        using vector = Matrix<std::complex<double>, Dynamic, 1>;
+
+        // Compute M
+        std::vector<ColorSpinorField*> r_vec(n_krylov);
+        for (int i = 0; i < n_krylov; i++) r_vec[i] = r[i+1];
+        Complex M_map[n_krylov * n_krylov];
+
+        blas::cDotProduct(M_map, r_vec, r_vec);
+
+        matrix M = Map<matrix>(M_map, n_krylov, n_krylov);
+
+        // Compute Cholesky decomposition
+        // M = Sigma^\dagger Sigma
+        Eigen::LLT<matrix> chol;
+        chol.compute(M);
+        matrix Sigma = chol.matrixU(); // upper right triangular; M = U^dagger U;
+
+        // Compute \vec{gamma} = M^{-1} R^\dagger \vec{r_0}
+        std::vector<ColorSpinorField*> r_0(1);
+        r_0[0] = r[0];
+
+        Complex R_dag_r_map[n_krylov];
+        blas::cDotProduct(R_dag_r_map, r_vec, r_0);
+        vector R_dag_r_ = Map<vector>(R_dag_r_map, n_krylov, 1);
+
+        vector gamma = chol.solve(R_dag_r_);
+
+        // copy things appropriately
+        omega = gamma(n_krylov-1);
+
+        //for (int i = 0; i < n_krylov; i++) {
+        //  gamma[i+1] = gamma_(i);
+        //  gamma_prime[i+1] = gamma_prime_(i);
+        //  gamma_prime_prime[i+1] = gamma_prime_prime_(i);
+        //}
+
+
+        Complex gamma_[n_krylov];
+
+        // update u
+        {
+          // u = u[0] - \sum_{j=1}^L \gamma_L u_L
+          for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
+
+          std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
+          std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+
+          blas::caxpy(gamma_, u_, u0);
+        }
+
+        // update x and r
+        // x = x[0] + \sum_{j=1}^L \gamma_L r_{L-1}
+        // r = r[0] - \sum_{j=1}^L \gamma_L r_L
+        // we see that if we're a bit clever with zero padding we can
+        // reuse r between the two updates.
+        Complex gamma_for_x[n_krylov + 1];
+        for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
+        gamma_for_x[n_krylov] = 0; // do not want to update with last r
+
+        Complex gamma_for_r[n_krylov + 1];
+        gamma_for_r[0] = 0; // do not want to update with first r
+        for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
+
+        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
+
+        // unfused
+        /*{
+          // update x
+          for (int i = 0; i < n_krylov; i++) { gamma_[i] = gamma(i); }
+          std::vector<ColorSpinorField*> x0(1);
+          x0[0] = &x_sloppy;
+          std::vector<ColorSpinorField*> x_(r.begin(), r.end() - 1);
+          blas::caxpy(gamma_, x_, x0);
+
+          // update r
+          for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
+
+          std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end());
+          std::vector<ColorSpinorField*> r0(r.begin(), r.begin() + 1);
+
+          blas::caxpy(gamma_, r_, r0);
+        }*/
+
+      }
+
+#else
+
       // MR part. Really just modified Gram-Schmidt.
       // The algorithm uses the byproducts of the Gram-Schmidt to update x
       //   and other such niceties. One day I'll read the paper more closely.
@@ -595,6 +690,8 @@ namespace quda {
       //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
       //}
       updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, n_krylov);
+
+#endif
 
       // sigma[0] = r_0^2
       sigma[0] = blas::norm2(*r[0]);

@@ -887,17 +887,17 @@ namespace quda {
 
     // pointers to fields to avoid multiple creation overhead
     // full precision fields
-    ColorSpinorField *r_fullp;   //! Full precision residual.
-    ColorSpinorField *yp;        //! Full precision temporary.
+    std::unique_ptr<ColorSpinorField> r_fullp;   //! Full precision residual.
+    std::unique_ptr<ColorSpinorField> yp;        //! Full precision temporary.
     // sloppy precision fields
-    ColorSpinorField *tempp;          //! Sloppy temporary vector.
+    std::unique_ptr<ColorSpinorField> tempp;          //! Sloppy temporary vector.
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
 
     // Saved, preallocated vectors. (may or may not get used depending on precision.)
     ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
     ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
-    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
+    ColorSpinorField* r_sloppy_saved_p; //! Current residual, in BiCG language.
 
     /**
        Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
