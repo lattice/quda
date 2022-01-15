@@ -545,14 +545,30 @@ namespace quda {
         using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
         using vector = Matrix<std::complex<double>, Dynamic, 1>;
 
-        // Compute M
-        std::vector<ColorSpinorField*> r_vec(n_krylov);
-        for (int i = 0; i < n_krylov; i++) r_vec[i] = r[i+1];
-        Complex M_map[n_krylov * n_krylov];
+        // Compute gamma: minimize ||r - R \gamma||, where R is an L x R matrix
+        // of r_1, r_2, ...
+        // This requires computing R^dagger R and inverting it against R^dagger r_0,
+        // which is solving the least squares problem in gamma.
+        std::vector<ColorSpinorField*> r_dagger_vec(n_krylov);
+        for (int i = 0; i < n_krylov; i++) r_dagger_vec[i] = r[i+1];
 
-        blas::cDotProduct(M_map, r_vec, r_vec);
+        std::vector<ColorSpinorField*> r_vec(n_krylov+1);
+        for (int i = 0; i <= n_krylov; i++) r_vec[i] = r[i];
+        
+        // storage for {r_0, R}^dagger x R
+        Complex r_dagger_dot_r[(n_krylov + 1) * n_krylov];
 
-        matrix M = Map<matrix>(M_map, n_krylov, n_krylov);
+        blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
+
+        matrix M(n_krylov, n_krylov);
+        vector R_dag_r0(n_krylov);
+
+        for (int i = 0; i < n_krylov; i++) {
+          for (int j = 0; j < n_krylov; j++) {
+            M(i, j) = r_dagger_dot_r[i * (n_krylov + 1) + (j + 1)];
+          }
+          R_dag_r0(i) = r_dagger_dot_r[i * (n_krylov + 1)];
+        }
 
         // Compute Cholesky decomposition
         // M = Sigma^\dagger Sigma
@@ -561,14 +577,14 @@ namespace quda {
         matrix Sigma = chol.matrixU(); // upper right triangular; M = U^dagger U;
 
         // Compute \vec{gamma} = M^{-1} R^\dagger \vec{r_0}
-        std::vector<ColorSpinorField*> r_0(1);
+        /*std::vector<ColorSpinorField*> r_0(1);
         r_0[0] = r[0];
 
         Complex R_dag_r_map[n_krylov];
         blas::cDotProduct(R_dag_r_map, r_vec, r_0);
-        vector R_dag_r_ = Map<vector>(R_dag_r_map, n_krylov, 1);
+        vector R_dag_r_ = Map<vector>(R_dag_r_map, n_krylov, 1);*/
 
-        vector gamma = chol.solve(R_dag_r_);
+        vector gamma = chol.solve(R_dag_r0);
 
         // copy things appropriately
         omega = gamma(n_krylov-1);
