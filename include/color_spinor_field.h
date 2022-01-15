@@ -724,19 +724,23 @@ namespace quda
 
     CompositeColorSpinorField &Components() { return components; };
 
-    ColorSpinorField &Component(int idx)
-    {
-      if (!IsComposite()) errorQuda("Not composite field");
-      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(components[idx]);
-    }
+    /**
+       @brief Return the idx^th component of the composite field.  An
+       error will be thrown if the field is not a composite field, or
+       if an out of bounds idx is requested.
+       @param[in] idx Component index
+       @return Component reference
+    */
+    ColorSpinorField &Component(int idx);
 
-    const ColorSpinorField &Component(int idx) const
-    {
-      if (!IsComposite()) errorQuda("Not composite field");
-      if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
-      return *(components[idx]);
-    }
+    /**
+       @brief Return the idx^th component of the composite field.  An
+       error will be thrown if the field is not a composite field, or
+       if an out of bounds idx is requested.
+       @param[in] idx Component index
+       @return Component const reference
+    */
+    const ColorSpinorField &Component(int idx) const;
 
     /**
      * Compute the n-dimensional site index given the 1-d offset index

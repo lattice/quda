@@ -13,6 +13,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(nullptr),
     X_h(nullptr),
@@ -44,6 +45,7 @@ namespace quda {
     transfer(nullptr),
     dirac(nullptr),
     need_bidirectional(false),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(Y_h),
     X_h(X_h),
@@ -71,6 +73,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    allow_truncation(param.allow_truncation),
     use_mma(param.use_mma),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
@@ -198,7 +201,7 @@ namespace quda {
 
     if (!gpu_setup) {
 
-      dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor());
+      dirac->createCoarseOp(*Y_h, *X_h, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
       // save the intermediate tunecache after the UV and VUV tune
       saveTuneCache();
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
@@ -228,7 +231,7 @@ namespace quda {
         GaugeField *Y_order = cudaGaugeField::Create(Y_param);
         GaugeField *X_order = cudaGaugeField::Create(X_param);
 
-        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor());
+        dirac->createCoarseOp(*Y_order, *X_order, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();
@@ -256,7 +259,7 @@ namespace quda {
         delete X_order;
 
       } else {
-        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor());
+        dirac->createCoarseOp(*Y_d, *X_d, *transfer, kappa, mass, Mu(), MuFactor(), AllowTruncation());
 
         // save the intermediate tunecache after the UV and VUV tune
         saveTuneCache();
@@ -424,7 +427,7 @@ namespace quda {
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                   double mu_factor) const
+                                   double mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");
@@ -647,7 +650,7 @@ namespace quda {
   //operator we are coarsening the Yhat links, not the Y links.  We
   //pass the fine clover fields, though they are actually ignored.
   void DiracCoarsePC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
-                                     double mu_factor) const
+                                     double mu_factor, bool) const
   {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Coarse operators only support aggregation coarsening");

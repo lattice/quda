@@ -77,6 +77,7 @@ enum class Kernel {
   copyHS,
   copyLS,
   axpbyz,
+  axpbypczw,
   ax,
   caxpy,
   caxpby,
@@ -106,6 +107,7 @@ enum class Kernel {
   caxpyBzpx,
   axpy_block,
   caxpy_block,
+  axpyz_block,
   caxpyz_block,
   axpyBzpcx_block,
   reDotProductNorm_block,
@@ -121,6 +123,7 @@ const std::map<Kernel, std::string> kernel_map
   = {{Kernel::copyHS, "copyHS"},
      {Kernel::copyLS, "copyLS"},
      {Kernel::axpbyz, "axpbyz"},
+     {Kernel::axpbypczw, "axpbypczw"},
      {Kernel::ax, "ax"},
      {Kernel::caxpy, "caxpy"},
      {Kernel::caxpby, "caxpby"},
@@ -150,6 +153,7 @@ const std::map<Kernel, std::string> kernel_map
      {Kernel::caxpyBzpx, "caxpyBzpx"},
      {Kernel::axpy_block, "axpy_block"},
      {Kernel::caxpy_block, "caxpy_block"},
+     {Kernel::axpyz_block, "axpyz_block"},
      {Kernel::caxpyz_block, "caxpyz_block"},
      {Kernel::axpyBzpcx_block, "axpyBzpcx_block"},
      {Kernel::reDotProductNorm_block, "reDotProductNorm_block"},
@@ -175,7 +179,14 @@ bool is_site_unroll(Kernel kernel)
 }
 
 // return false if kernel does not support mixed precision (y prec > x prec)
-bool is_mixed(Kernel kernel) { return (kernel != Kernel::caxpyz_block); }
+bool is_mixed(Kernel kernel)
+{
+  switch (kernel) {
+  case Kernel::axpyz_block:
+  case Kernel::caxpyz_block: return false;
+  default: return true;
+  }
+}
 
 bool skip_kernel(prec_pair_t pair, Kernel kernel)
 {
@@ -388,6 +399,10 @@ double benchmark(Kernel kernel, const int niter)
       for (int i = 0; i < niter; ++i) blas::axpbyz(a, xD, b, yoD, zoD);
       break;
 
+    case Kernel::axpbypczw:
+      for (int i = 0; i < niter; ++i) blas::axpbypczw(a, xD, b, yD, c, zD, wD);
+      break;
+
     case Kernel::ax:
       for (int i = 0; i < niter; ++i) blas::ax(a, xD);
       break;
@@ -504,6 +519,10 @@ double benchmark(Kernel kernel, const int niter)
       for (int i = 0; i < niter; ++i) blas::caxpy(A, xmD, ymoD);
       break;
 
+    case Kernel::axpyz_block:
+      for (int i = 0; i < niter; ++i) blas::axpyz(Ar, xmD, ymD, wmD);
+      break;
+
     case Kernel::caxpyz_block:
       for (int i = 0; i < niter; ++i) blas::caxpyz(A, xmD, ymD, wmD);
       break;
@@ -605,6 +624,16 @@ double test(Kernel kernel)
     blas::axpbyz(a, xD, b, yoD, zoD);
     blas::axpbyz(a, xH, b, yH, zH);
     error = ERROR(zo);
+    break;
+
+  case Kernel::axpbypczw:
+    xD = xH;
+    yD = yH;
+    zD = zH;
+    wD = wH;
+    blas::axpbypczw(a, xD, b, yD, c, zD, wD);
+    blas::axpbypczw(a, xH, b, yH, c, zH, wH);
+    error = ERROR(w);
     break;
 
   case Kernel::ax:
@@ -892,6 +921,22 @@ double test(Kernel kernel)
     error = 0;
     for (int i = 0; i < Msrc; i++) {
       error += fabs(blas::norm2((ymoD.Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+    }
+    error /= Msrc;
+    break;
+
+  case Kernel::axpyz_block:
+    for (int i = 0; i < Nsrc; i++) xmD.Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD.Component(i) = *(ymH[i]);
+
+    blas::axpyz(Ar.data(), xmD, ymD, wmD);
+    for (int j = 0; j < Msrc; j++) {
+      *wmH[j] = *ymH[j];
+      for (int i = 0; i < Nsrc; i++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(wmH[j])); }
+    }
+    error = 0;
+    for (int i = 0; i < Msrc; i++) {
+      error += fabs(blas::norm2((wmD.Component(i))) - blas::norm2(*(wmH[i]))) / blas::norm2(*(wmH[i]));
     }
     error /= Msrc;
     break;

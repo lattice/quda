@@ -18,6 +18,7 @@ namespace quda {
   {
     QudaFieldLocation location = Y.Location();
     constexpr bool use_mma = false;
+    constexpr bool staggered_allow_truncation = false;
 
     bool need_bidirectional = false;
     if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_TRUE; }
@@ -55,8 +56,8 @@ namespace quda {
 
       calculateY<use_mma, QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
-         kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
+	 avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
+         kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -91,8 +92,8 @@ namespace quda {
 
       calculateY<use_mma, QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
-         kappa, mass, mu, mu_factor, dirac, matpc, need_bidirectional,
+         avAccessor, vAccessor, gAccessor, gAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v,
+         kappa, mass, mu, mu_factor, staggered_allow_truncation, dirac, matpc, need_bidirectional,
          T.fineToCoarse(location), T.coarseToFine(location));
     }
 
