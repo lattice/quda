@@ -11,19 +11,96 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#define CHOLESKY
-
-#ifdef CHOLESKY
 #include <eigen_helper.h>
-#endif
 
 namespace quda {
+
+  // Compute the MR portion of BiCGstab-L
+  void BiCGstabL::computeMR(ColorSpinorField &x_sloppy)
+  {
+    using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
+    using vector = Matrix<std::complex<double>, Dynamic, 1>;
+
+    // Compute gamma: minimize ||r - R \gamma||, where R is an L x R matrix
+    // of r_1, r_2, ...
+    // This requires computing R^dagger R and inverting it against R^dagger r_0,
+    // which is solving the least squares problem in gamma. We pack this
+    // into one fused block-blas by doing a fused calculation of {r_0, R}^dagger x R
+    std::vector<ColorSpinorField*> r_dagger_vec(n_krylov);
+    for (int i = 0; i < n_krylov; i++) r_dagger_vec[i] = r[i+1];
+
+    std::vector<ColorSpinorField*> r_vec(n_krylov+1);
+    for (int i = 0; i <= n_krylov; i++) r_vec[i] = r[i];
+    
+    Complex r_dagger_dot_r[(n_krylov + 1) * n_krylov];
+
+    blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
+
+    matrix R_dag_R(n_krylov, n_krylov);
+    vector R_dag_r0(n_krylov);
+
+    for (int i = 0; i < n_krylov; i++) {
+      for (int j = 0; j < n_krylov; j++) {
+        R_dag_R(i, j) = r_dagger_dot_r[i * (n_krylov + 1) + (j + 1)];
+      }
+      R_dag_r0(i) = r_dagger_dot_r[i * (n_krylov + 1)];
+    }
+
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+    }
+
+    // Compute LDL decomposition, solve least squares problem for gamma
+    Eigen::LDLT<matrix> ldlt;
+    ldlt.compute(R_dag_R);
+    vector gamma = ldlt.solve(R_dag_r0);
+
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_EIGEN);
+      param.secs += profile.Last(QUDA_PROFILE_EIGEN);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    }
+
+    // Update omega for the next BiCG iteration
+    omega = gamma(n_krylov-1);
+
+    Complex gamma_[n_krylov];
+
+    // update u
+    {
+      // u = u[0] - \sum_{j=1}^L \gamma_L u_L
+      for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
+
+      std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
+      std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+
+      blas::caxpy(gamma_, u_, u0);
+    }
+
+    // update x and r
+    {
+      // x = x[0] + \sum_{j=1}^L \gamma_L r_{L-1}
+      // r = r[0] - \sum_{j=1}^L \gamma_L r_L
+      // we see that if we're a bit clever with zero padding we can
+      // reuse r between the two updates.
+      Complex gamma_for_x[n_krylov + 1];
+      for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
+      gamma_for_x[n_krylov] = 0; // do not want to update with last r
+
+      Complex gamma_for_r[n_krylov + 1];
+      gamma_for_r[0] = 0; // do not want to update with first r
+      for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
+
+      blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
+    }
+  }
 
   // Utility functions for Gram-Schmidt. Based on GCR functions.
   // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1.
 
-  void BiCGstabL::computeTau(Complex **tau, double* sigma, std::vector<ColorSpinorField*> &r, int begin, int size, int j)
+  void BiCGstabL::computeTau(int begin, int size, int j)
   {
     Complex *Tau = new Complex[size];
     std::vector<ColorSpinorField*> a(size), b(1);
@@ -42,7 +119,7 @@ namespace quda {
     delete []Tau;
   }
   
-  void BiCGstabL::updateR(Complex **tau, std::vector<ColorSpinorField*> &r, int begin, int size, int j)
+  void BiCGstabL::updateR(int begin, int size, int j)
   {
     Complex *tau_ = new Complex[size];
     for (int i=0; i<size; i++)
@@ -58,101 +135,154 @@ namespace quda {
     delete[] tau_;
   }
 
-  void BiCGstabL::orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> &r, int j, int pipeline)
+  /**
+     Legacy routine for the original pipelined Gram-Schmit
+     See "The MR part" in https://etna.math.kent.edu/vol.1.1993/pp11-32.dir/pp11-32.pdf
+   */
+  void BiCGstabL::legacyComputeMR(ColorSpinorField &x_sloppy)
   {
-    switch (pipeline)
-    {
-      case 0: // no kernel fusion
-        for (int i=1; i<j; i++) // 5 (j-2) memory transactions here. Start at 1 b/c bicgstabl convention.
-        { 
+    // MR part. Really just modified Gram-Schmidt.
+    // The algorithm uses the byproducts of the Gram-Schmidt to update x
+    // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
+    for (int j = 1; j <= n_krylov; j++) {
+
+      // Formerly orthoDir
+      { 
+        // This becomes a fused operator below.
+        /*for (int i = 1; i < j; i++)
+        {
+          // tau_ij = <r_i,r_j>/sigma_i.
           tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
-          blas::caxpy(-tau[i][j], *r[i], *r[j]);
-        }
-        break;
-      case 1: // basic kernel fusion
-        if (j==1) // start at 1.
-        {
-          break;
-        }
-        tau[1][j] = blas::cDotProduct(*r[1], *r[j])/sigma[1];
-        for (int i=1; i<j-1; i++) // 4 (j-2) memory transactions here. start at 1.
-        {
-          tau[i+1][j] = blas::caxpyDotzy(-tau[i][j], *r[i], *r[j], *r[i+1])/sigma[i+1];
-        }
-        blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
-        break;
-    default:
-        {
-          const int N = pipeline;
-          // We're orthogonalizing r[j] against r[1], ..., r[j-1].
-          // We need to do (j-1)/N updates of length N, at 1,1+N,1+2*N,...
-          // After, we do 1 update of length (j-1)%N.
           
-          // (j-1)/N updates of length N, at 1,1+N,1+2*N,...
-          int step;
-          for (step = 0; step < (j-1)/N; step++)
-          {
-            computeTau(tau, sigma, r, 1+step*N, N, j);
-            updateR(tau, r, 1+step*N, N, j);
-          }
+          // r_j = r_j - tau_ij r_i;
+          blas::caxpy(-tau[i][j], *r[i], *r[j]);
+        }*/
 
-          if ((j-1)%N != 0) // need to update the remainder
-          {
-            // 1 update of length (j-1)%N.
-            computeTau(tau, sigma, r, 1+step*N, (j-1)%N, j);
-            updateR(tau, r, 1+step*N, (j-1)%N, j);
-          }
+        switch (pipeline)
+        {
+          case 0: // no kernel fusion
+            for (int i=1; i<j; i++) // 5 (j-2) memory transactions here. Start at 1 b/c bicgstabl convention.
+            { 
+              tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
+              blas::caxpy(-tau[i][j], *r[i], *r[j]);
+            }
+            break;
+          case 1: // basic kernel fusion
+            if (j==1) // start at 1.
+            {
+              break;
+            }
+            tau[1][j] = blas::cDotProduct(*r[1], *r[j])/sigma[1];
+            for (int i=1; i<j-1; i++) // 4 (j-2) memory transactions here. start at 1.
+            {
+              tau[i+1][j] = blas::caxpyDotzy(-tau[i][j], *r[i], *r[j], *r[i+1])/sigma[i+1];
+            }
+            blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
+            break;
+        default:
+            {
+              const int N = pipeline;
+              // We're orthogonalizing r[j] against r[1], ..., r[j-1].
+              // We need to do (j-1)/N updates of length N, at 1,1+N,1+2*N,...
+              // After, we do 1 update of length (j-1)%N.
+              
+              // (j-1)/N updates of length N, at 1,1+N,1+2*N,...
+              int step;
+              for (step = 0; step < (j-1)/N; step++)
+              {
+                computeTau(1+step*N, N, j);
+                updateR(1+step*N, N, j);
+              }
+
+              if ((j-1)%N != 0) // need to update the remainder
+              {
+                // 1 update of length (j-1)%N.
+                computeTau(1+step*N, (j-1)%N, j);
+                updateR(1+step*N, (j-1)%N, j);
+              }
+            }
+            break;
         }
-        break;
+      }
+      
+      
+      // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
+      
+      // This becomes a fused operator below.
+      //sigma[j] = blas::norm2(*r[j]);
+      //gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
+      
+      // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
+      double3 rjr = blas::cDotProductNormA(*r[j], *r[0]); 
+      sigma[j] = rjr.z;
+      gamma_prime[j] = Complex(rjr.x, rjr.y)/sigma[j];
     }
 
-  }
+    // gamma[n_krylov] = gamma'[n_krylov], omega = gamma[n_krylov]
+    gamma[n_krylov] = gamma_prime[n_krylov];
+    omega = gamma[n_krylov];
 
-  void BiCGstabL::updateUend(Complex *gamma, std::vector<ColorSpinorField *> &u, int n_krylov)
-  {
-    // for (j = 0; j <= n_krylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
-    Complex *gamma_ = new Complex[n_krylov];
-    for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
-
-    std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
-    std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
-
-    blas::caxpy(gamma_, u_, u0);
-
-    delete[] gamma_;
-  }
-
-  void BiCGstabL::updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
-                              std::vector<ColorSpinorField *> &r, ColorSpinorField &x, int n_krylov)
-  {
-#if 0
-    blas::caxpy(gamma[1], *r[0], x);
-    blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
-    for (int j = 1; j < n_krylov; j++)
-    {
-      blas::caxpy(gamma_prime_prime[j], *r[j], x);
-      blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+    // gamma = T^(-1) gamma_prime. It's in the paper, I promise.
+    for (int j = n_krylov - 1; j > 0; j--) {
+      // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to n_krylov} tau_ji gamma_i
+      gamma[j] = gamma_prime[j];
+      for (int i = j + 1; i <= n_krylov; i++) { gamma[j] = gamma[j] - tau[j][i] * gamma[i]; }
     }
-#else
-    // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_kKrylov), but
-    // the alternative way would be un-fusing some calls, which would require
-    // loading and saving x twice. In a solve where the sloppy precision is lower than
-    // the full precision, this can be a killer.
-    Complex *gamma_prime_prime_ = new Complex[n_krylov + 1];
-    Complex *gamma_prime_ = new Complex[n_krylov + 1];
-    gamma_prime_prime_[0] = gamma[1];
-    gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
-    gamma_prime_[0] = 0.0; // r[0] never gets updated with r[0]... obvs.
-    gamma_prime_[n_krylov] = -gamma_prime[n_krylov];
-    for (int i = 1; i < n_krylov; i++) {
-      gamma_prime_prime_[i] = gamma_prime_prime[i];
-      gamma_prime_[i] = -gamma_prime[i];
+
+    // gamma'' = T S gamma. Check paper for defn of S.
+    for (int j = 1; j < n_krylov; j++) {
+      gamma_prime_prime[j] = gamma[j+1];
+      for (int i = j + 1; i < n_krylov; i++) {
+        gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j][i]*gamma[i+1];
+      }
     }
-    blas::caxpyBxpz(gamma_prime_prime_, r, x, gamma_prime_, *r[0]);
+
+    // Update x, r, u.
+    // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = n_krylov.
     
-    delete[] gamma_prime_prime_;
-    delete[] gamma_prime_;
-#endif
+    // formerly updateUEnd
+    {
+      // for (j = 0; j < n_krylov; j++) { caxpy(-gamma[j], *u[j+1], *u[0]); }
+      Complex *gamma_ = new Complex[n_krylov];
+      for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
+
+      std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
+      std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+
+      blas::caxpy(gamma_, u_, u0);
+
+      delete[] gamma_;
+    }
+
+    // formerly updateXREnd
+    {
+      // blas::caxpy(gamma[1], *r[0], x_sloppy);
+      // blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
+      // for (j = 1; j < n_krylov; j++) {
+      //  blas::caxpy(gamma_gamma_prime[j], *r[j], x_sloppy);
+      //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
+      //}
+
+      // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_kKrylov), but
+      // the alternative way would be un-fusing some calls, which would require
+      // loading and saving x twice. In a solve where the sloppy precision is lower than
+      // the full precision, this can be a killer.
+      Complex *gamma_prime_prime_ = new Complex[n_krylov + 1];
+      Complex *gamma_prime_ = new Complex[n_krylov + 1];
+      gamma_prime_prime_[0] = gamma[1];
+      gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
+      gamma_prime_[0] = 0.0; // r[0] never gets updated with r[0]... obvs.
+      gamma_prime_[n_krylov] = -gamma_prime[n_krylov];
+      for (int i = 1; i < n_krylov; i++) {
+        gamma_prime_prime_[i] = gamma_prime_prime[i];
+        gamma_prime_[i] = -gamma_prime[i];
+      }
+      blas::caxpyBxpz(gamma_prime_prime_, r, x_sloppy, gamma_prime_, *r[0]);
+      
+      delete[] gamma_prime_prime_;
+      delete[] gamma_prime_;
+
+    }
   }
   
   /**
@@ -461,7 +591,7 @@ namespace quda {
     //bool l2_converge = false;
     //double r2_old = r2;
 
-    int pipeline = param.pipeline;
+    pipeline = param.pipeline;
     
     // Create the worker class for updating non-critical r, u vectors.
     BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, &alpha, &beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps() );
@@ -538,188 +668,12 @@ namespace quda {
 
       } // End BiCG part.
 
-#ifdef CHOLESKY
+      // Perform the MR portion of BiCGstab-L
+      computeMR(x_sloppy);
 
-      // MR part
-      {
-        using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
-        using vector = Matrix<std::complex<double>, Dynamic, 1>;
-
-        // Compute gamma: minimize ||r - R \gamma||, where R is an L x R matrix
-        // of r_1, r_2, ...
-        // This requires computing R^dagger R and inverting it against R^dagger r_0,
-        // which is solving the least squares problem in gamma.
-        std::vector<ColorSpinorField*> r_dagger_vec(n_krylov);
-        for (int i = 0; i < n_krylov; i++) r_dagger_vec[i] = r[i+1];
-
-        std::vector<ColorSpinorField*> r_vec(n_krylov+1);
-        for (int i = 0; i <= n_krylov; i++) r_vec[i] = r[i];
-        
-        // storage for {r_0, R}^dagger x R
-        Complex r_dagger_dot_r[(n_krylov + 1) * n_krylov];
-
-        blas::cDotProduct(r_dagger_dot_r, r_dagger_vec, r_vec);
-
-        matrix M(n_krylov, n_krylov);
-        vector R_dag_r0(n_krylov);
-
-        for (int i = 0; i < n_krylov; i++) {
-          for (int j = 0; j < n_krylov; j++) {
-            M(i, j) = r_dagger_dot_r[i * (n_krylov + 1) + (j + 1)];
-          }
-          R_dag_r0(i) = r_dagger_dot_r[i * (n_krylov + 1)];
-        }
-
-        if (!param.is_preconditioner) {
-          profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-          param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-          profile.TPSTART(QUDA_PROFILE_EIGEN);
-        }
-
-        // Compute Cholesky decomposition
-        // M = Sigma^\dagger Sigma
-        Eigen::LLT<matrix> chol;
-        chol.compute(M);
-        matrix Sigma = chol.matrixU(); // upper right triangular; M = U^dagger U;
-
-        // Compute \vec{gamma} = M^{-1} R^\dagger \vec{r_0}
-        /*std::vector<ColorSpinorField*> r_0(1);
-        r_0[0] = r[0];
-
-        Complex R_dag_r_map[n_krylov];
-        blas::cDotProduct(R_dag_r_map, r_vec, r_0);
-        vector R_dag_r_ = Map<vector>(R_dag_r_map, n_krylov, 1);*/
-
-        vector gamma = chol.solve(R_dag_r0);
-
-        if (!param.is_preconditioner) {
-          profile.TPSTOP(QUDA_PROFILE_EIGEN);
-          param.secs += profile.Last(QUDA_PROFILE_EIGEN);
-          profile.TPSTART(QUDA_PROFILE_COMPUTE);
-        }
-
-        // copy things appropriately
-        omega = gamma(n_krylov-1);
-
-        //for (int i = 0; i < n_krylov; i++) {
-        //  gamma[i+1] = gamma_(i);
-        //  gamma_prime[i+1] = gamma_prime_(i);
-        //  gamma_prime_prime[i+1] = gamma_prime_prime_(i);
-        //}
-
-
-        Complex gamma_[n_krylov];
-
-        // update u
-        {
-          // u = u[0] - \sum_{j=1}^L \gamma_L u_L
-          for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
-
-          std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
-          std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
-
-          blas::caxpy(gamma_, u_, u0);
-        }
-
-        // update x and r
-        // x = x[0] + \sum_{j=1}^L \gamma_L r_{L-1}
-        // r = r[0] - \sum_{j=1}^L \gamma_L r_L
-        // we see that if we're a bit clever with zero padding we can
-        // reuse r between the two updates.
-        Complex gamma_for_x[n_krylov + 1];
-        for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
-        gamma_for_x[n_krylov] = 0; // do not want to update with last r
-
-        Complex gamma_for_r[n_krylov + 1];
-        gamma_for_r[0] = 0; // do not want to update with first r
-        for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
-
-        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
-
-        // unfused
-        /*{
-          // update x
-          for (int i = 0; i < n_krylov; i++) { gamma_[i] = gamma(i); }
-          std::vector<ColorSpinorField*> x0(1);
-          x0[0] = &x_sloppy;
-          std::vector<ColorSpinorField*> x_(r.begin(), r.end() - 1);
-          blas::caxpy(gamma_, x_, x0);
-
-          // update r
-          for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
-
-          std::vector<ColorSpinorField*> r_(r.begin() + 1, r.end());
-          std::vector<ColorSpinorField*> r0(r.begin(), r.begin() + 1);
-
-          blas::caxpy(gamma_, r_, r0);
-        }*/
-
-      }
-
-#else
-
-      // MR part. Really just modified Gram-Schmidt.
-      // The algorithm uses the byproducts of the Gram-Schmidt to update x
-      //   and other such niceties. One day I'll read the paper more closely.
-      // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
-      for (int j = 1; j <= n_krylov; j++) {
-
-        // This becomes a fused operator below.
-        /*for (int i = 1; i < j; i++)
-        {
-          // tau_ij = <r_i,r_j>/sigma_i.
-          tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
-          
-          // r_j = r_j - tau_ij r_i;
-          blas::caxpy(-tau[i][j], *r[i], *r[j]);
-        }*/
-        orthoDir(tau, sigma, r, j, pipeline);
-        
-        // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
-        
-        // This becomes a fused operator below.
-        //sigma[j] = blas::norm2(*r[j]);
-        //gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
-        
-        // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
-        double3 rjr = blas::cDotProductNormA(*r[j], *r[0]); 
-        sigma[j] = rjr.z;
-        gamma_prime[j] = Complex(rjr.x, rjr.y)/sigma[j];
-      }
-
-      // gamma[n_krylov] = gamma'[n_krylov], omega = gamma[n_krylov]
-      gamma[n_krylov] = gamma_prime[n_krylov];
-      omega = gamma[n_krylov];
-
-      // gamma = T^(-1) gamma_prime. It's in the paper, I promise.
-      for (int j = n_krylov - 1; j > 0; j--) {
-        // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to n_krylov} tau_ji gamma_i
-        gamma[j] = gamma_prime[j];
-        for (int i = j + 1; i <= n_krylov; i++) { gamma[j] = gamma[j] - tau[j][i] * gamma[i]; }
-      }
-
-      // gamma'' = T S gamma. Check paper for defn of S.
-      for (int j = 1; j < n_krylov; j++) {
-        gamma_prime_prime[j] = gamma[j+1];
-        for (int i = j + 1; i < n_krylov; i++) {
-          gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j][i]*gamma[i+1];
-        }
-      }
-
-      // Update x, r, u.
-      // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = n_krylov.
-      // for (j = 0; j < n_krylov; j++) { caxpy(-gamma[j], *u[j], *u[0]); }
-      updateUend(gamma, u, n_krylov);
-
-      // blas::caxpy(gamma[1], *r[0], x_sloppy);
-      // blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
-      // for (j = 1; j < n_krylov; j++) {
-      //  blas::caxpy(gamma_gamma_prime[j], *r[j], x_sloppy);
-      //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
-      //}
-      updateXRend(gamma, gamma_prime, gamma_prime_prime, r, x_sloppy, n_krylov);
-
-#endif
+      // Legacy version matching the BiCGstab-L paper which performs
+      // an explicit Gram-Schmidt for the MR portion
+      // legacyComputeMR(x_sloppy);
 
       // sigma[0] = r_0^2
       sigma[0] = blas::norm2(*r[0]);

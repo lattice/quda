@@ -878,6 +878,7 @@ namespace quda {
        The size of the Krylov space that BiCGstabL uses.
      */
     int n_krylov; // in the language of BiCGstabL, this is L.
+    int pipeline; // pipelining factor for legacyGramSchmidt
 
     // Various coefficients and params needed on each iteration.
     Complex rho0, rho1, alpha, omega, beta;           // Various coefficients for the BiCG part of BiCGstab-L.
@@ -902,18 +903,23 @@ namespace quda {
     /**
        Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
-    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
+    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);    
 
     /**
-       Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
+       Internal routine for performing the MR part of BiCGstab-L
      */
-    void computeTau(Complex **tau, double *sigma, std::vector<ColorSpinorField*> &r, int begin, int size, int j);
-    void updateR(Complex **tau, std::vector<ColorSpinorField*> &r, int begin, int size, int j);
-    void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> &r, int j, int pipeline);
+    void computeMR(ColorSpinorField &x_sloppy);
 
-    void updateUend(Complex *gamma, std::vector<ColorSpinorField *> &u, int n_krylov);
-    void updateXRend(Complex *gamma, Complex *gamma_prime, Complex *gamma_prime_prime,
-                     std::vector<ColorSpinorField *> &r, ColorSpinorField &x, int n_krylov);
+    /**
+       Legacy routines that encapsulate the original pipelined Gram-Schmit.
+       In theory these should be a bit more numerically stable than the
+       fully fused version in computeMR, but in practice that seems to be
+       lost in the noise, and the fused nature of computeMR wins in terms of
+       time to solution.
+     */
+    void computeTau(int begin, int size, int j);
+    void updateR(int begin, int size, int j);
+    void legacyComputeMR(ColorSpinorField &x_sloppy);
 
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
