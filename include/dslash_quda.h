@@ -821,4 +821,3 @@ namespace quda
   */  
   void make4DChiralProp(ColorSpinorField &out, ColorSpinorField &in);
 } // namespace quda
-

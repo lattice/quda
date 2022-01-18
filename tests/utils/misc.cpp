@@ -72,7 +72,9 @@ const char *get_recon_str(QudaReconstructType recon)
   switch (recon) {
   case QUDA_RECONSTRUCT_13: ret = "13"; break;
   case QUDA_RECONSTRUCT_12: ret = "12"; break;
+#if (N_COLORS > 2)
   case QUDA_RECONSTRUCT_9: ret = "9"; break;
+#endif
   case QUDA_RECONSTRUCT_8: ret = "8"; break;
   case QUDA_RECONSTRUCT_NO: ret = "18"; break;
   default: ret = "unknown"; break;
@@ -175,6 +177,7 @@ const char *get_eig_type_str(QudaEigType type)
   switch (type) {
   case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
   case QUDA_EIG_BLK_TR_LANCZOS: ret = "blktrlm"; break;
+  case QUDA_EIG_TR_LANCZOS_3D: ret = "trlm3D"; break;
   case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
   case QUDA_EIG_BLK_IR_ARNOLDI: ret = "blkiram"; break;
   default: ret = "unknown eigensolver"; break;

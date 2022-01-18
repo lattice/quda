@@ -63,7 +63,7 @@ namespace quda {
 
 #ifdef GPU_GAUGE_ALG
   /**
-   * @brief Perform a cold start to the gauge field, identity SU(3)
+   * @brief Perform a cold start to the gauge field, identity SU(N)
    * matrix, also fills the ghost links in multi-GPU case (no need to
    * exchange data)
    *
@@ -74,7 +74,7 @@ namespace quda {
     instantiate<InitGaugeCold>(data);
   }
 
-  /** @brief Perform a hot start to the gauge field, random SU(3)
+  /** @brief Perform a hot start to the gauge field, random SU(N)
    * matrix, followed by reunitarization, also exchange borders links
    * in multi-GPU case.
    *

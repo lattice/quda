@@ -74,11 +74,11 @@ namespace quda {
         x[0] = (2 * idx + xodd) - za * X[0];
         break;
       }
-
+      
       int id = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
       using real = typename mapper<typename Arg::real>::type;
       real tmp[Arg::recon];
-      complex<real> data[9];
+      complex<real> data[N_COLORS*N_COLORS];
 
       if (arg.pack) {
         arg.U.load(data, id, arg.dir, arg.parity);

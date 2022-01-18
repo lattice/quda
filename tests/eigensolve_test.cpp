@@ -144,7 +144,9 @@ int main(int argc, char **argv)
   for (int i = 0; i < eig_n_conv; i++) {
     host_evecs[i] = (void *)safe_malloc(V * eig_inv_param.Ls * spinor_site_size * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)safe_malloc(eig_param.n_ev * sizeof(double _Complex));
+  int n_evals = eig_param.n_conv;
+  if(eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) n_evals *= tdim;
+  double _Complex *host_evals = (double _Complex *)safe_malloc(n_evals * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the

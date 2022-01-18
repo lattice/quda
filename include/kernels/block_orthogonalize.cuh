@@ -19,12 +19,12 @@ namespace quda {
   // number of vectors to simultaneously orthogonalize
   template <int nColor, int nVec, int block_size> constexpr int tile_size()
   {
-    return nColor == 3 && block_size < 1024 ? (nVec % 4 == 0 ? 4 : nVec % 3 == 0 ? 3 : 2) : 1;
+    return nColor == N_COLORS && block_size < 1024 ? (nVec % 4 == 0 ? 4 : nVec % 3 == 0 ? 3 : 2) : 1;
   }
 
   template <int nColor, int nVec> constexpr int tile_size(int block_size)
   {
-    return nColor == 3 && block_size < 1024 ? (nVec % 4 == 0 ? 4 : nVec % 3 == 0 ? 3 : 2) : 1;
+    return nColor == N_COLORS && block_size < 1024 ? (nVec % 4 == 0 ? 4 : nVec % 3 == 0 ? 3 : 2) : 1;
   }
 
   /**

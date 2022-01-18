@@ -438,7 +438,7 @@ namespace quda {
       double diff = abs(action0 - action);
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter + 1, argQ.getAction(), argQ.getTheta(), diff);
     }
-
+    
     for (int i = 0; i < 2 && nlinksfaces; i++) managed_free(borderpoints[i]);
     host_free(num_failures_h);
 
@@ -468,7 +468,7 @@ namespace quda {
       printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
     }
   }
-
+  
   template <typename Float, int nColor, QudaReconstructType recon> struct GaugeFixingOVR {
   GaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval,
                  const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta)
@@ -496,16 +496,16 @@ namespace quda {
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
-#ifdef GPU_GAUGE_ALG
+#if defined(GPU_GAUGE_ALG) && (N_COLORS == 3)
   void gaugeFixingOVR(GaugeField& data, const int gauge_dir, const int Nsteps, const int verbose_interval, const double relax_boost,
-                      const double tolerance, const int reunit_interval, const int stopWtheta)
+			const double tolerance, const int reunit_interval, const int stopWtheta)
   {
     instantiate<GaugeFixingOVR>(data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
   }
 #else
   void gaugeFixingOVR(GaugeField&, const int, const int, const int, const double, const double, const int, const int)
   {
-    errorQuda("Gauge fixing has not been built");
+    errorQuda("Gauge fixing has not been built or Nc != 3");
   }
 #endif
 

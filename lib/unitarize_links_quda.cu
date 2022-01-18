@@ -10,7 +10,6 @@ namespace quda {
   // when we switch to C++17 consider [[maybe_unused]]
   __attribute__((unused)) static const int max_iter_newton = 20;
   __attribute__((unused))static const int max_iter = 20;
-
   __attribute__((unused)) static double unitarize_eps = 1e-14;
   __attribute__((unused)) static double max_error = 1e-10;
   __attribute__((unused)) static int reunit_allow_svd = 1;
@@ -52,25 +51,26 @@ namespace quda {
       }
     }
   }
-
+  
+  
   void unitarizeLinksCPU(GaugeField &outfield, const GaugeField& infield)
   {
     if (checkLocation(outfield, infield) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
     checkPrecision(outfield, infield);
 
     int num_failures = 0;
-    Matrix<complex<double>,3> inlink, outlink;
+    Matrix<complex<double>,N_COLORS> inlink, outlink;
 
     for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
+	  copyLinkToArray(((float*)(outfield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS)), outlink);
 	} else if (infield.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(inlink, ((double*)(infield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	  if (unitarizeLinkNewton(outlink, inlink, max_iter_newton) == false ) num_failures++;
-	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink);
+	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS)), outlink);
 	} // precision?
       } // dir
     }   // loop over volume
@@ -87,14 +87,14 @@ namespace quda {
   bool isUnitary(const GaugeField& field, double max_error)
   {
     if (field.Location() != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
-    Matrix<complex<double>,3> link, identity;
+    Matrix<complex<double>,N_COLORS> link, identity;
 
     for (unsigned int i = 0; i < field.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir) {
 	if (field.Precision() == QUDA_SINGLE_PRECISION) {
-	  copyArrayToLink(link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(link, ((float*)(field.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	} else if (field.Precision() == QUDA_DOUBLE_PRECISION) {
-	  copyArrayToLink(link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
+	  copyArrayToLink(link, ((double*)(field.Gauge_p()) + (i*4 + dir)*(2*N_COLORS*N_COLORS))); // order of arguments?
 	} else {
 	  errorQuda("Unsupported precision\n");
 	}
@@ -169,7 +169,7 @@ namespace quda {
 
   void unitarizeLinks(GaugeField &links, int* fails) { unitarizeLinks(links, links, fails); }
 
-  template <typename Float, int nColor, QudaReconstructType recon> class ProjectSU3 : TunableKernel3D {
+  template <typename Float, int nColor, QudaReconstructType recon> class ProjectSUN : TunableKernel3D {
     using real = typename mapper<Float>::type;
     GaugeField &u;
     real tol;
@@ -177,7 +177,7 @@ namespace quda {
     unsigned int minThreads() const { return u.VolumeCB(); }
 
   public:
-    ProjectSU3(GaugeField &u, double tol, int *fails) :
+    ProjectSUN(GaugeField &u, double tol, int *fails) :
       TunableKernel3D(u, 2, 4),
       u(u),
       tol(tol),
@@ -189,7 +189,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch<Projector>(tp, stream, ProjectSU3Arg<Float, nColor, recon>(u, tol, fails));
+      launch<Projector>(tp, stream, ProjectSUNArg<Float, nColor, recon>(u, tol, fails));
     }
 
     void preTune() { u.backup(); }
@@ -203,16 +203,16 @@ namespace quda {
   };
 
 #ifdef GPU_GAUGE_TOOLS
-  void projectSU3(GaugeField &u, double tol, int *fails)
+  void projectSUN(GaugeField &u, double tol, int *fails)
   {
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
+    instantiate<ProjectSUN, ReconstructWilson>(u, tol, fails);
   }
 #else
-  void projectSU3(GaugeField &, double, int *)
+  void projectSUN(GaugeField &, double, int *)
   {
     errorQuda("Gauge tools have not been built");
   }

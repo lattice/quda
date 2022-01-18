@@ -1472,7 +1472,7 @@ namespace quda
   }
 
   // generate a full span of free vectors.
-  // FIXME: Assumes fine level is SU(3).
+  // FIXME: Assumes fine level is SU(N).
   void MG::buildFreeVectors(std::vector<ColorSpinorField *> &B)
   {
     pushLevel(param.level);
@@ -1483,12 +1483,12 @@ namespace quda
     const int Ncolor = B[0]->Ncolor();
     const int Nspin = B[0]->Nspin();
 
-    if (Ncolor == 3) // fine level
+    if (Ncolor == N_COLORS) // fine level
     {
       if (Nspin == 4) // Wilson or Twisted Mass (singlet)
       {
-        // There needs to be 6 null vectors -> 12 after chirality.
-        if (Nvec != 6) errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
+        // There needs to be 2*N_COLORS null vectors -> 4*N_COLORS after chirality.
+        if (Nvec != 2*N_COLORS) errorQuda("\nError in MG::buildFreeVectors: Wilson-type fermions require Nvec = 6");
 
         if (getVerbosity() >= QUDA_VERBOSE)
           printfQuda("Building %d free field vectors for Wilson-type fermions\n", Nvec);

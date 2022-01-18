@@ -14,7 +14,7 @@ namespace quda {
     using real_out_t  = typename mapper<store_out_t>::type;
     using real_in_t  = typename mapper<store_in_t>::type;
     static constexpr int length = length_;
-    static constexpr int nColor = Ncolor(length);
+    static constexpr int nColor = gauge::Ncolor(length);
     OutOrder out;
     const InOrder in;
     int volume;
@@ -51,10 +51,12 @@ namespace quda {
 	  for (int i=0; i<Arg::nColor; i++)
 	    for (int j=0; j<Arg::nColor; j++) {
               complex<typename Arg::real_in_t> u = arg.in(d, parity, x, i, j);
+
 	      if (std::isnan(u.real()))
-	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j));
+	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j));
 	      if (std::isnan(u.imag()))
-		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(Arg::length)+j+1));
+		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Arg::nColor+j+1));
+
             }
 #else
 	  Matrix<complex<typename Arg::real_in_t>, Arg::nColor> u = arg.in(d, x, parity);

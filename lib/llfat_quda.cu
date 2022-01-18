@@ -58,7 +58,7 @@ namespace quda {
       launch<ComputeOneLink>(tp, stream, arg);
     }
 
-    long long flops() const { return 2*4*arg.threads.x*18; }
+    long long flops() const { return 2*4*arg.threads.x*2*N_COLORS*N_COLORS; }
     long long bytes() const { return 2*4*arg.threads.x*(arg.u.Bytes()+arg.link.Bytes()); }
   };
 

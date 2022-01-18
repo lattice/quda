@@ -15,8 +15,8 @@ namespace quda {
     static constexpr int nSpin = 1;
     static constexpr int dim = dim_;
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
-    using GU = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
-    using GL = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
+    using GU = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2*N_COLORS*N_COLORS>::type;
+    using GL = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2*N_COLORS*N_COLORS>::type;
 
     GU U;        /** output one-hop field */
     GL L;        /** output three-hop field */

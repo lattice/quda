@@ -45,10 +45,10 @@ auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z
 template <typename reduce_t, typename Float, typename zFloat, int nSpin, QudaFieldOrder order, typename R>
 auto genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
 {
-  if (x.Ncolor() != 3 && x.Nspin() != 2) errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
+  if (x.Ncolor() != N_COLORS && x.Nspin() != 2) errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
   reduce_t value;
-  if (x.Ncolor() == 3) {
-    value = genericReduce<reduce_t, Float, zFloat, nSpin, 3, order, R>(x, y, z, w, v, r);
+  if (x.Ncolor() == N_COLORS) {
+    value = genericReduce<reduce_t, Float, zFloat, nSpin, N_COLORS, order, R>(x, y, z, w, v, r);
 #ifdef GPU_MULTIGRID
 #ifdef NSPIN4
   } else if (x.Ncolor() == 6) { // free field Wilson

@@ -71,7 +71,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value;
-        if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
+        if (site_unroll_check && (x.Ncolor() != N_COLORS || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
         if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -85,7 +85,7 @@ namespace quda {
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          constexpr int M = site_unroll ? (nSpin == 4 ? 2*4*N_COLORS : 2*N_COLORS) : N; // real numbers per thread
           const int threads = x.Length() / (nParity * M);
 
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -104,7 +104,7 @@ namespace quda {
           constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value;
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
-          constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
+          constexpr int M = N; // if site unrolling then M=N will be 2*4*N_COLORS/2*N_COLORS, e.g., full AoS
           const int threads = x.Length() / (nParity * M);
 
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

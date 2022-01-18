@@ -86,7 +86,7 @@ namespace quda {
 #pragma unroll
       for (int s=0; s<Arg::fineSpin; s++) {
 
-	constexpr int color_unroll = Arg::fineColor == 3 ? 3 : 2;
+	constexpr int color_unroll = Arg::fineColor == N_COLORS ? N_COLORS : 2;
 
 	complex<typename Arg::real> partial[color_unroll];
 #pragma unroll

@@ -10,6 +10,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <zfp.h>
+
 // Local Enum type for IO
 typedef enum CorrelatorFlavors_s {
   CORRELATOR_QQ,
@@ -208,20 +210,67 @@ void invert_and_contract(void **source_array_ptr, void **prop_array_ptr_1, void 
     // The overall shift of the position of the corr. need this when the source is not at origin.
     corr_param.overall_shift_dim = source[corr_param.corr_dim];
 
+    double time0 = 0.0;
+    double ave_comp_ratio = 0.0;
+    bool zfp_4D = false;
+
     // Loop over spin X color dilution positions, construct the sources and invert
-    for (int i = 0; i < cs_param.nSpin * cs_param.nColor; i++) {
+    for (int prop = 0; prop < cs_param.nSpin * cs_param.nColor; prop++) {
       // FIXME add the smearing
-      constructPointSpinorSource(source_array_ptr[i], inv_param.cpu_prec, gauge_param.X, i, source);
-
-      // Gaussian smear the source.
-      performGaussianSmearNStep(source_array_ptr[i], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
+      constructPointSpinorSource(source_array_ptr[prop], inv_param.cpu_prec, gauge_param.X, prop, source);
       
-      invertQuda(prop_array_ptr_2[i], source_array_ptr[i], &inv_param);
+      // Gaussian smear the source.
+      performGaussianSmearNStep(source_array_ptr[prop], &source_smear_param, prop_source_smear_steps, prop_source_smear_coeff);
+      
+      invertQuda(prop_array_ptr_2[prop], source_array_ptr[prop], &inv_param);
 
+      // We can now run CG on the reconstrcuted prop. It should give us back the 
+      // source provided there was no sink smearing
+      //------------------------------------------------------------------------
+      size_t bytes_per_float = sizeof(double);
+      int n_elems = V * spinor_site_size;
+      auto *prop_array_zfp = (double *)malloc(n_elems * bytes_per_float);     
+      time0 = -((double)clock());        
+      ave_comp_ratio += zfp_compress_decompress_prop(prop_array_ptr_2[prop], prop_array_zfp, zfp_4D);
+      // stop the timer
+      time0 += clock();
+      time0 /= CLOCKS_PER_SEC;
+
+      // Collect data on the element by element differences. Replace 
+      // prop_array_ptr_2[prop] with the zfp version for further testing
+      double L2norm = 0.0;
+      double diff = 0.0;
+      for(int i=0; i<n_elems; i++) {
+	diff = ((double*)prop_array_zfp)[i] - ((double*)prop_array_ptr_2[prop])[i];
+	((double*)prop_array_ptr_2[prop])[i] = ((double*)prop_array_zfp)[i];
+	L2norm += diff*diff;
+      }
+      L2norm /= n_elems;
+
+      // Use prop_array_zfp as an initial guess to a solve
+      inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      invertQuda(prop_array_zfp, source_array_ptr[prop], &inv_param);
+      inv_param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+      
+      if(!zfp_4D) {
+	printf("L2 norm (prop_zfp - prop_true) MPI RANK %03d = %e\n", tdim * comm_coord(3), sqrt(L2norm));
+	fflush(stdout);
+      }
+      // Continue with measurements using the ZFP array
+      //------------------------------------------------------------------------
+      
       // Gaussian smear the sink.
-      performGaussianSmearNStep(prop_array_ptr_2[i], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
+      performGaussianSmearNStep(prop_array_ptr_2[prop], &sink_smear_param, prop_sink_smear_steps, prop_sink_smear_coeff);
     }
     
+    // Get global compression average
+    comm_allreduce(&ave_comp_ratio);
+    int norm = spinor_site_size * (zfp_4D ? 1 : (tdim * comm_dim(3))) * spinor_site_size/2; 
+    if (comm_rank() == 0) {
+      printf("Average compression total ratio = %f (%.2fx)\n", ave_comp_ratio/(norm), 1.0/(ave_comp_ratio/(norm)));
+      fflush(stdout);
+    }
+
     memset(correlation_function_sum, 0, corr_param.corr_size_in_bytes); // zero out the result array
     contractFTQuda(prop_array_ptr_1, prop_array_ptr_2, &correlation_function_sum, contract_type,
                    (void *)&cs_param, gauge_param.X, source, momentum.begin());

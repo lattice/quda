@@ -105,8 +105,6 @@ int main(int argc, char **argv)
 // Performs the CPU GPU comparison with the given parameters
 int test(int contractionType, QudaPrecision test_prec)
 {
-  int X[4] = {xdim, ydim, zdim, tdim};
-
   QudaInvertParam inv_param = newQudaInvertParam();
   setContractInvertParam(inv_param);
   inv_param.cpu_prec = test_prec;
@@ -145,7 +143,7 @@ int test(int contractionType, QudaPrecision test_prec)
   }
 
   // Perform GPU contraction.
-  contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
+  //contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
 
   // Compare each site contraction from the host and device.
   // It returns the number of faults it detects.

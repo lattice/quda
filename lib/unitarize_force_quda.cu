@@ -73,8 +73,8 @@ namespace quda {
 
     template <typename Float, typename Arg> void unitarizeForceCPU(Arg &arg)
     {
-      Matrix<complex<double>, 3> v, result, oprod;
-      Matrix<complex<Float>, 3> v_tmp, result_tmp, oprod_tmp;
+      Matrix<complex<double>, N_COLORS> v, result, oprod;
+      Matrix<complex<Float>, N_COLORS> v_tmp, result_tmp, oprod_tmp;
 
       for (int parity = 0; parity < 2; parity++) {
         for (unsigned int i = 0; i < arg.threads.x; i++) {
@@ -98,7 +98,7 @@ namespace quda {
     {
       if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
       int num_failures = 0;
-      constexpr int nColor = 3;
+      constexpr int nColor = N_COLORS;
       Matrix<complex<double>, nColor> old_force, new_force, v;
       if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
         if (u.Precision() == QUDA_DOUBLE_PRECISION) {

@@ -141,10 +141,10 @@ namespace quda {
     constexpr int coarseSpin = 2;
 
     // Template over fine color
-    if (in.Ncolor() == 3) { // standard QCD
+    if (in.Ncolor() == N_COLORS) { 
 #ifdef NSPIN4
       if (in.Nspin() == 4) {
-        constexpr int fineColor = 3;
+        constexpr int fineColor = N_COLORS;
         constexpr int fineSpin = 4;
 
         // first check that the spin_map matches the spin_mapper
@@ -153,8 +153,8 @@ namespace quda {
           for (int p=0; p<2; p++)
             if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-        if (nVec == 6) { // free field Wilson
-          Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+        if (nVec == 2*N_COLORS) { // free field Wilson
+          Restrict<Float,fineSpin,fineColor,coarseSpin,2*N_COLORS>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else if (nVec == 24) {
           Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else if (nVec == 32) {
@@ -166,7 +166,7 @@ namespace quda {
 #endif // NSPIN4
 #ifdef NSPIN1
       if (in.Nspin() == 1) {
-        constexpr int fineColor = 3;
+        constexpr int fineColor = N_COLORS;
         constexpr int fineSpin = 1;
 
         // first check that the spin_map matches the spin_mapper
@@ -190,7 +190,7 @@ namespace quda {
         errorQuda("Unexpected nSpin = %d", in.Nspin());
       }
 
-    } else { // Nc != 3
+    } else { // Nc != N_COLORS
 
       if (in.Nspin() != 2) errorQuda("Unexpected nSpin = %d", in.Nspin());
       constexpr int fineSpin = 2;
@@ -202,10 +202,10 @@ namespace quda {
           if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
 #ifdef NSPIN4
-      if (in.Ncolor() == 6) { // Coarsen coarsened Wilson free field
-        const int fineColor = 6;
-        if (nVec == 6) {
-          Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      if (in.Ncolor() == 2*N_COLORS) { // Coarsen coarsened Wilson free field
+        const int fineColor = 2*N_COLORS;
+        if (nVec == 2*N_COLORS) {
+          Restrict<Float,fineSpin,fineColor,coarseSpin,2*N_COLORS>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         } else {
           errorQuda("Unsupported nVec %d", nVec);
         }
@@ -258,7 +258,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nColor %d", in.Ncolor());
       }
-    } // Nc != 3
+    } // Nc != N_COLORS
   }
 
 #ifdef GPU_MULTIGRID

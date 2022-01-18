@@ -221,7 +221,7 @@ struct StaggeredDslashTestWrapper {
     // prepare and load the GPU fields
 
 #ifdef MULTI_GPU
-    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SUN_LINKS;
     gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     GaugeFieldParam cpuFatParam(gauge_param, milc_fatlink_cpu);
     cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -237,7 +237,7 @@ struct StaggeredDslashTestWrapper {
     }
 #endif
 
-    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+    gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SUN_LINKS;
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
                                              QUDA_RECONSTRUCT_13 :

@@ -42,6 +42,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+bool fund_gauge = false;
 double gaussian_sigma = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
@@ -264,6 +265,11 @@ int prop_n_sources = 1;
 QudaPrecision prop_save_prec = QUDA_SINGLE_PRECISION;
 
 // SU(3) smearing options
+double su3_qr_tol = 1e-6;
+int su3_qr_maxiter = 100;
+int su3_taylor_N = 25;
+int su3_comp_block_size = 4;
+double su3_comp_tol = 1e-6;
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
 double ape_smear_rho = 0.6;
@@ -372,6 +378,7 @@ namespace
 
   CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
                                                  {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS},
+						 {"trlm3D", QUDA_EIG_TR_LANCZOS_3D},
                                                  {"iram", QUDA_EIG_IR_ARNOLDI},
                                                  {"blkiram", QUDA_EIG_BLK_IR_ARNOLDI}};
 
@@ -596,12 +603,15 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
-    "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
-
+    "Generate a unit valued gauge field in the tests. (default false)");
+  quda_app->add_option(
+    "--fund-gauge", fund_gauge,
+    "Generate a fundamental valued gauge field in the tests. (default false)");
+  
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--verify", verify_results, "Verify the GPU results using CPU results (default true)");
-
+  
   // lattice dimensions
   auto dimopt = quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)")->check(CLI::Range(1, 512));
   auto sdimopt = quda_app
@@ -687,7 +697,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-n-kr", eig_n_kr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
                       "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
-  opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
+  opgroup->add_option("--eig-poly-deg", eig_poly_deg, "The degree of the Chebyshev polynomial (default 100)");
   opgroup->add_option(
     "--eig-require-convergence",
     eig_require_convergence, "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
@@ -972,6 +982,11 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-smear", gauge_smear, "Smear the gauge field prior to inversion (default false)");
+  
+  opgroup->add_option("--su3-smear-type", gauge_smear_type, "The type of smearing to use (default stout)")
+    ->transform(CLI::QUDACheckedTransformer(gauge_smear_type_map));
+  
   opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-stout-rho", stout_smear_rho,
@@ -989,10 +1004,19 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
     ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
-  ;
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-qr-tol", su3_qr_tol, "Tolerance on the link QR solver (default 1e-6)");
+  
+  opgroup->add_option("--su3-qr-maxiter", su3_qr_maxiter, "Maximum iterations of the link QR solver (default 100)");
+
+  opgroup->add_option("--su3-taylor-N", su3_taylor_N, "The degree of the link Taylor expansion of exp(iH) (default 25)");
+
+  opgroup->add_option("--su3-comp-tol", su3_comp_tol, "The tolerance of the ZFP lossy link compression (default 1e-6)");
+  
+  opgroup->add_option("--su3-comp-block-size", su3_comp_block_size, "The block size of the ZFP lossy link compression (default 4)");
 }
 
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
@@ -1056,7 +1080,7 @@ void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--prop-sink-smear-steps", prop_sink_smear_steps,
                       "Set the number of sink smearing steps (default 0)");
-
+  
   opgroup->add_option("--prop-smear-type", prop_smear_type, "Type of fermion smearing to employ (default gaussian)")
     ->transform(CLI::QUDACheckedTransformer(fermion_smear_type_map));
 

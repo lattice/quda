@@ -17,9 +17,6 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define DABS(a) ((a)<(0.)?(-(a)):(a))
-
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -51,6 +48,34 @@ void display_test_info()
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 }
+
+void saveGaugeField(int step, cudaGaugeField *gaugeEx, cudaGaugeField *gauge) {
+
+  char step_str[16];
+  char this_file_name[256];
+  
+  strcpy(this_file_name, gauge_outfile);  
+  sprintf(step_str, "_step%d.lime", step);
+  strcat(this_file_name, step_str);
+  printfQuda("Saving the gauge field to file %s\n", this_file_name);
+  
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  setWilsonGaugeParam(gauge_param);
+  
+  void *cpu_gauge[4];
+  for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
+  
+  // copy into regular field
+  copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  
+  saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+  
+  write_gauge_field(this_file_name, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+  
+  for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+}
+
+
 
 int main(int argc, char **argv)
 {
@@ -85,14 +110,14 @@ int main(int argc, char **argv)
 
   // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
-
+  
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
-
+  
   int *num_failures_h = (int *)mapped_malloc(sizeof(int));
   int *num_failures_d = (int *)get_mapped_device_pointer(num_failures_h);
   *num_failures_h = 0;
@@ -131,7 +156,7 @@ int main(int argc, char **argv)
     int nwarm = heatbath_warmup_steps;
     int nhbsteps = heatbath_num_heatbath_per_step;
     int novrsteps = heatbath_num_overrelax_per_step;
-    bool  coldstart = heatbath_coldstart;
+    bool coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
     printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value, strcmp(latfile,"") ? "loaded" : (coldstart ? "cold" : "hot"));
@@ -139,7 +164,7 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile, "")) { // We loaded in a gauge field
+    if (strcmp(latfile, "") || !coldstart) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
       copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
@@ -149,15 +174,13 @@ int main(int argc, char **argv)
         InitGaugeField(*gaugeEx, *randstates);
 
       // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
+      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);	
       // load the gauge field from gauge
       gauge_param.gauge_order = gauge->Order();
       gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     }
-
+    
     QudaGaugeObservableParam param = newQudaGaugeObservableParam();
     param.compute_plaquette = QUDA_BOOLEAN_TRUE;
     param.compute_qcharge = QUDA_BOOLEAN_TRUE;
@@ -173,8 +196,8 @@ int main(int argc, char **argv)
       for (int step = 1; step <= nwarm; ++step) {
         Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
-        quda::unitarizeLinks(*gaugeEx, num_failures_d);
-        if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+	quda::unitarizeLinks(*gaugeEx, num_failures_d);
+	if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
       }
     }
 
@@ -191,12 +214,12 @@ int main(int argc, char **argv)
 
     freeGaugeQuda();
 
-    for(int step=1; step<=nsteps; ++step){
+    for(int step=1; step <= nsteps; ++step){
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
       quda::unitarizeLinks(*gaugeEx, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the unitarization\n");
+      if (*num_failures_h > 0) errorQuda("%d errors detected in the unitarization", (int)(*num_failures_h));
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -206,34 +229,14 @@ int main(int argc, char **argv)
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 
       freeGaugeQuda();
+      
+      // Save if output string is specified
+      if (strcmp(gauge_outfile,"")) saveGaugeField(step, gaugeEx, gauge);
+      else printfQuda("No output file specified.\n");
     }
-
-    // Save if output string is specified
-    if (strcmp(gauge_outfile,"")) {
-
-      printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
-
-      QudaGaugeParam gauge_param = newQudaGaugeParam();
-      setWilsonGaugeParam(gauge_param);
-
-      void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = safe_malloc(V * gauge_site_size * gauge_param.cpu_prec); }
-
-      // copy into regular field
-      copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
-
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-
-      for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
-    } else {
-      printfQuda("No output file specified.\n");
-    }
-
+    
     delete gauge;
-    delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    delete gaugeEx;   //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
     delete randstates;

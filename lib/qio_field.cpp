@@ -148,10 +148,10 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
   // Various checks
   // Note: we exclude gauge fields from this b/c QUDA originally saved gauge fields as
-  // nSpin == 1, nColor == 9, while it's supposed to be (0,3).
+  // nSpin == 1, nColor == N_COLORS*N_COLORS, while it's supposed to be (0,N_COLORS).
   // Further, even if the nSpin and nColor don't agree, what really matters is the
   // total typesize check.
-  if (len != 18) {
+  if (len != 2*N_COLORS*N_COLORS) {
     if (in_nSpin != nSpin) warningQuda("QIO_get_spins %d does not match expected number of colors %d", in_nSpin, nSpin);
 
     if (in_nColor != nColor)
@@ -165,8 +165,8 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
   // Print the XML string.
   // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
-  // Tracked on github via #936
-  if (len != 18 && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
+  // Tracked on github via #936 
+  if (len != 2*N_COLORS*N_COLORS && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
 
   // Get total size. Could probably check the filesize better, but tbd.
   size_t rec_size = file_prec * count * len;
@@ -195,9 +195,9 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   return 0;
 }
 
-int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
+int read_suN_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
 {
-  return read_field(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9, 18);
+  return read_field(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, N_COLORS*N_COLORS, 2*N_COLORS*N_COLORS);
 }
 
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
@@ -255,10 +255,10 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
   if (infile == NULL) { errorQuda("Open file failed\n"); }
 
-  /* Read the su3 field record */
-  printfQuda("%s: reading su3 field\n",__func__); fflush(stdout);
-  int status = read_su3_field(infile, 4, gauge, precision);
-  if (status) { errorQuda("read_su3_field failed %d\n", status); }
+  /* Read the suN field record */
+  printfQuda("%s: reading SU(%d) field\n",__func__, N_COLORS); fflush(stdout);
+  int status = read_suN_field(infile, 4, gauge, precision);
+  if (status) { errorQuda("read_suN_field failed %d\n", status); }
 
   /* Close the file */
   QIO_close_read(infile);
@@ -291,11 +291,26 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 {
   // Prepare a string.
   std::string xml_record = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><quda";
+  
   switch (len) {
-  case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-  case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  default: xml_record += "MGColorSpinorField>"; break;       // MG color spinor vector
+  case (2*N_COLORS): xml_record += "StaggeredColorSpinorField>"; break; // SU(N) staggered
+  case (2*N_COLORS*N_COLORS): {
+    if(nSpin == 0) xml_record += "GaugeFieldFile>"; // SU(N) gauge field
+    else xml_record += "WilsonColorSpinorField>"; // SU(N) Wilson
+    break;
+  }
+    //case (2*4*N_COLORS): xml_record += "WilsonColorSpinorField>"; break;  // SU(N) Wilson
+  case 96:
+#if (N_COLORS != 8)
+  case 128:
+#endif
+  case 256:
+  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+#if (N_COLORS != 6)
+  case 72: xml_record += "StaggeredPropagator>"; break; // SU(3) staggered * 12
+#endif
+  case 288: xml_record += "WilsonPropagator>"; break;   // SU(3) Wilson vec * 12    
+  default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n";
   xml_record += "<version>BETA</version>\n";
@@ -321,14 +336,24 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   } // abuse/hack
 
   // A lot of this is redundant of the record info, but eh.
-  xml_record += "  <nColor>" + std::to_string(nColor) + "</nColor>\n";
-  xml_record += "  <nSpin>" + std::to_string(nSpin) + "</nSpin>\n";
-  xml_record += "</info>\n</quda";
+  xml_record += "<nColor>" + std::to_string(nColor) + "</nColor>";
+  xml_record += "<nSpin>" + std::to_string(nSpin) + "</nSpin>";
+  xml_record += "</info></quda";  
   switch (len) {
-  case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-  case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
-  case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  default: xml_record += "MGColorSpinorField>";              // MG color spinor vector
+  case (2*N_COLORS): xml_record += "StaggeredColorSpinorField>"; break; // SU(N) staggered
+  case (2*N_COLORS*N_COLORS): {
+    if(nSpin == 0) xml_record += "GaugeFieldFile>"; // SU(N) gauge field
+    else xml_record += "WilsonColorSpinorField>"; // SU(N) Wilson
+    break;
+  }
+    //case (2*4*N_COLORS): xml_record += "WilsonColorSpinorField>"; break;  // SU(N) Wilson
+  case 96:
+#if (N_COLORS != 8)
+  case 128:
+#endif
+  case 256:
+  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
+  default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "\n\n";
 
@@ -381,11 +406,11 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   return 0;
 }
 
-int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
+int write_suN_field(QIO_Writer *outfile, int count, void *field_out[],
     QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
 {
-  return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3,
-                     18, type);
+  return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0,
+		     N_COLORS, 2*N_COLORS*N_COLORS, type);
 }
 
 void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
@@ -397,16 +422,16 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   QudaPrecision file_prec = precision;
 
   char type[128];
-  sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", 3);
+  sprintf(type, "QUDA_%sNc%d_GaugeField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", N_COLORS);
 
   /* Open the test file for writing */
   QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
   if (outfile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Write the gauge field record */
-  printfQuda("%s: writing the gauge field\n", __func__); fflush(stdout);
-  int status = write_su3_field(outfile, 4, gauge, precision, precision, type);
-  if (status) { errorQuda("write_gauge_field failed %d\n", status); }
+  printfQuda("%s: writing the SU(%d) gauge field\n", __func__, N_COLORS); fflush(stdout);
+  int status = write_suN_field(outfile, 4, gauge, precision, precision, type);
+  if (status) { errorQuda("write suN gauge field failed %d\n", status); }
 
   /* Close the file */
   QIO_close_write(outfile);
@@ -439,4 +464,3 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   QIO_close_write(outfile);
   printfQuda("%s: Closed file for writing\n",__func__);
 }
-

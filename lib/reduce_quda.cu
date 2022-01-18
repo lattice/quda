@@ -74,7 +74,7 @@ namespace quda {
       void apply(const qudaStream_t &stream)
       {
         constexpr bool site_unroll_check = !std::is_same<store_t, y_store_t>::value || isFixed<store_t>::value || decltype(r)::site_unroll;
-        if (site_unroll_check && (x.Ncolor() != 3 || x.Nspin() == 2))
+        if (site_unroll_check && (x.Ncolor() != N_COLORS || x.Nspin() == 2))
           errorQuda("site unroll not supported for nSpin = %d nColor = %d", x.Nspin(), x.Ncolor());
 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -89,7 +89,7 @@ namespace quda {
           constexpr bool site_unroll = !std::is_same<device_store_t, device_y_store_t>::value || isFixed<device_store_t>::value || decltype(r)::site_unroll;
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
-          constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
+          constexpr int M = site_unroll ? (nSpin == 4 ? 2*4*N_COLORS : 2*N_COLORS) : N; // real numbers per thread
           const int length = x.Length() / M;
 
           ReductionArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
@@ -109,7 +109,7 @@ namespace quda {
           constexpr bool site_unroll = !std::is_same<host_store_t, host_y_store_t>::value || isFixed<host_store_t>::value || decltype(r)::site_unroll;
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
-          constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
+          constexpr int M = N; // if site unrolling then M=N will be (2*4*N_COLORS)/(2*N_COLORS), e.g., full AoS
           const int length = x.Length() / M;
 
           ReductionArg<host_real_t, M, host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
@@ -228,8 +228,8 @@ namespace quda {
 
     double3 HeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &r)
     {
-      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
-      if (x.Ncolor() != 3) return make_double3(0.0, 0.0, 0.0);
+      // in case of x.Ncolor()!=N_COLORS (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor() != N_COLORS) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = instantiateReduce<HeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, r, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;
@@ -237,8 +237,8 @@ namespace quda {
 
     double3 xpyHeavyQuarkResidualNorm(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &r)
     {
-      // in case of x.Ncolor()!=3 (MG mainly) reduce_core do not support this function.
-      if (x.Ncolor()!=3) return make_double3(0.0, 0.0, 0.0);
+      // in case of x.Ncolor()!=N_COLORS (MG mainly) reduce_core do not support this function.
+      if (x.Ncolor() != N_COLORS) return make_double3(0.0, 0.0, 0.0);
       double3 rtn = instantiateReduce<xpyHeavyQuarkResidualNorm_, false>(0.0, 0.0, 0.0, x, y, r, r, r);
       rtn.z /= (x.Volume()*comm_size());
       return rtn;

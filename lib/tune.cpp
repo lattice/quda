@@ -862,7 +862,7 @@ namespace quda
         if (verbosity >= QUDA_DEBUG_VERBOSE)
           for (auto elem : tunecache) std::cout << elem.first << ": " << elem.second << std::endl;
 
-        errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
+        //errorQuda("Failed to find key entry (%s:%s:%s)", key.name, key.volume, key.aux);
       }
       param = tunecache[key]; // read this now for all processes
 

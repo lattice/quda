@@ -460,7 +460,7 @@ namespace quda
     /*
       per direction / dimension flops
       spin project flops = Nc * Ns
-      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      SU(Nc) matrix-vector flops = (8 Nc - 2) * Nc
       spin reconstruction flops = 2 * Nc * Ns (just an accumulation to all components)
       xpay = 2 * 2 * Nc * Ns
 
@@ -475,7 +475,7 @@ namespace quda
     */
     virtual long long flops() const override
     {
-      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(N) matrix-vector flops
       int num_mv_multiply = in.Nspin() == 4 ? 2 : 1;
       int ghost_flops = (num_mv_multiply * mv_flops + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
@@ -506,7 +506,7 @@ namespace quda
           flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads;
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
-                  num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
+                  num_dir * num_mv_multiply * mv_flops +                  // SU(N) matrix-vector multiplies
                   ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
           * sites; // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites;

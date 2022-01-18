@@ -1,5 +1,4 @@
-#ifndef _DOMAIN_WALL_DSLASH_REFERENCE_H
-#define _DOMAIN_WALL_DSLASH_REFERENCE_H
+#pragma once
 
 #include <enum_quda.h>
 #include <quda.h>
@@ -71,5 +70,3 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
 #ifdef __cplusplus
 }
 #endif
-
-#endif // _DSLASH_REFERENCE_H

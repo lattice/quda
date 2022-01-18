@@ -53,8 +53,8 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
-    if (in.Ncolor() == 3) {
-      instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
+    if (in.Ncolor() == N_COLORS) {
+      instantiate<Apply, Recon, Float, N_COLORS>(out, in, U, args...);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }

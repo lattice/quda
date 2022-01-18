@@ -209,14 +209,23 @@ namespace quda {
 #pragma unroll
           for (int i=0; i<N; ++i){
             if( fabs(identity(i,i).real() - 1.0) > max_error ||
-                fabs(identity(i,i).imag()) > max_error) return false;
-
+                fabs(identity(i,i).imag()) > max_error) {
+	      for(int j=0; j<N; ++j) {
+		for(int k=0; k<N; ++k) {
+		  //printf("link (%d,%d) error = %e,%e\n", j, k, fabs(identity(j,k).real() - 1.0), fabs(identity(j,k).imag()));
+		}
+	      }
+	      return false;
+	    }							   
+	    
 #pragma unroll
             for (int j=i+1; j<N; ++j){
               if( fabs(identity(i,j).real()) > max_error ||
                   fabs(identity(i,j).imag()) > max_error ||
                   fabs(identity(j,i).real()) > max_error ||
                   fabs(identity(j,i).imag()) > max_error ){
+		//printf("off diag %d,%d error = %e,%e\n", i, j, fabs(identity(i,j).real()), fabs(identity(i,j).imag()));
+		//printf("off diag %d,%d error = %e,%e\n", j, i, fabs(identity(j,i).real()), fabs(identity(j,i).imag()));
                 return false;
               }
             }
@@ -226,10 +235,14 @@ namespace quda {
           for (int i=0; i<N; i++) {
 #pragma unroll
             for (int j=0; j<N; j++) {
-              if (is_nan((*this)(i, j).real()) || is_nan((*this)(i, j).imag())) return false;
+              if (is_nan((*this)(i,j).real()) ||
+                  is_nan((*this)(i,j).imag())) {
+		printf("off diag %d,%d nan error\n", j, i);
+		return false;
+	      }
             }
           }
-
+	  
           return true;
         }
 
@@ -409,33 +422,139 @@ namespace quda {
       }
     }
   }
+  
+  template<class T, int Nc>
+    __device__ __host__ inline T getTrace(const Matrix<T,Nc>& a)
+  {
+    T result;
+    result = a(0,0);
+    for(int i=1; i<Nc; i++) result += a(i,i);
+    return result;
+  }
 
+  template<class T, int N, typename = std::enable_if_t<(N > 1)>>
+    __device__ __host__ inline  Matrix<T,N-1> getSubMat(const Matrix<T,N> &a, int p, int q)
+    {
+      Matrix<T, N-1> subMat;
+      setZero(&subMat);
+      int i=0, j=0;
+      for (int row = 0; row < N; row++) {
+	for (int col = 0; col < N; col++) {
+	  if (row != p && col != q) {
+	    subMat(i,j) = a(row,col);
+	    j++;
+	    // Row is filled, so increase row index and reset col index
+	    if (j == N - 1) {
+	      j = 0;
+	      i++;
+	    }
+	  }
+	}
+      }
+      return subMat;
+    }
+  
   template<class T>
-    __device__ __host__ inline T getTrace(const Matrix<T,3>& a)
+    __device__ __host__ inline T det3helper(const Matrix<T,4> &a, int i1, int i2, int i3, int j1, int j2, int j3)
     {
-      return a(0,0) + a(1,1) + a(2,2);
+      return a(i1,j1)
+	* (a(i2,j2) * a(i3,j3) - a(i2,j3) * a(i3,j2));
     }
-
-
-  template< template<typename,int> class Mat, class T>
-    __device__ __host__ inline  T getDeterminant(const Mat<T,3> & a){
-
+  
+  template<class T, int i, int j>
+    __device__ __host__ inline T cofactor4x4(const Matrix<T,4> &a)
+  {
+      enum {
+	i1 = (i+1) % 4,
+	i2 = (i+2) % 4,
+	i3 = (i+3) % 4,
+	j1 = (j+1) % 4,
+	j2 = (j+2) % 4,
+	j3 = (j+3) % 4
+      };      
+      return (det3helper(a, i1, i2, i3, j1, j2, j3) +
+	      det3helper(a, i2, i3, i1, j1, j2, j3) +
+	      det3helper(a, i3, i1, i2, j1, j2, j3));
+    }
+  
+  
+  template<class T>
+    __device__ __host__ inline T det4helper(const Matrix<T,4> &a, int j, int k, int m, int n)
+    {
+      return ((a(j,0) * a(k,1) - a(k,0) * a(j,1)) *
+	      (a(m,2) * a(n,3) - a(n,2) * a(m,3)));
+    }
+  
+  template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,1> &a)
+    {
       T result;
-      result = a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2))
-        - a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0))
-        + a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0));
-
+      result = a(0,0);
       return result;
     }
-
-  template< template<typename,int> class Mat, class T, int N>
-    __device__ __host__ inline Mat<T,N> operator+(const Mat<T,N> & a, const Mat<T,N> & b)
+  
+  template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,2> &a)
     {
-      Mat<T,N> result;
-#pragma unroll
-      for (int i = 0; i < a.size(); i++) result.data[i] = a.data[i] + b.data[i];
+      T result;
+      result = a(0,0) * a(1,1) - a(0,1) * a(1,0);
       return result;
     }
+
+    template<class T>
+    __device__ __host__ inline T getDeterminant(const Matrix<T,3> &a)
+      {
+	T result;
+	result = (a(0,0)*(a(1,1)*a(2,2) - a(2,1)*a(1,2)) -
+		  a(0,1)*(a(1,0)*a(2,2) - a(1,2)*a(2,0)) + 
+		  a(0,2)*(a(1,0)*a(2,1) - a(1,1)*a(2,0)));
+	return result;
+      }
+
+    template<class T>
+      __device__ __host__ inline T getDeterminant(const Matrix<T,4> &a)
+      {
+	T result;	
+	result = (det4helper(a,0,1,2,3) -
+		  det4helper(a,0,2,1,3) +
+		  det4helper(a,0,3,1,2) +
+		  det4helper(a,1,2,0,3) -
+		  det4helper(a,1,3,0,2) +
+		  det4helper(a,2,3,0,1));
+	return result;
+      }
+    
+    template<class T, int N, typename = std::enable_if_t<(N > 4)>>
+      __device__ __host__ inline T getDeterminant(const Matrix<T,N> &a)
+      {
+	T result;	
+	// Move along the top row, recursively get the determinant
+	// of the submatrix and multiply with the relevant sign.
+	result = static_cast<typename T::value_type>(0.0);
+
+	Matrix<T,N-1> sub_mat;
+	int sign = 1;
+	T temp;
+	for (int i=0; i<N; i++) {
+	  temp = a(0,i);
+	  sub_mat = getSubMat(a,0,i);
+	  temp *= getDeterminant(sub_mat);
+	  temp *= sign;
+	  result += temp;
+	  sign *= -1;
+	}
+	return result;
+      }
+    
+    
+    template< template<typename,int> class Mat, class T, int N>
+      __device__ __host__ inline Mat<T,N> operator+(const Mat<T,N> & a, const Mat<T,N> & b)
+      {
+	Mat<T,N> result;
+#pragma unroll
+	for (int i=0; i<N*N; i++) result.data[i] = a.data[i] + b.data[i];
+	return result;
+      }
 
 
   template< template<typename,int> class Mat, class T, int N>
@@ -523,6 +642,8 @@ namespace quda {
   /**
      @brief Specialization of complex matrix multiplication that will issue optimal fma instructions
    */
+  // DMH: Use template specialisation enable_if_t here
+#if N_COLORS > 2
   template< template<typename> class complex, typename T, int N>
     __device__ __host__ inline Matrix<complex<T>,N> operator*(const Matrix<complex<T>,N> &a, const Matrix<complex<T>,N> &b)
     {
@@ -546,6 +667,7 @@ namespace quda {
       }
       return result;
     }
+#endif
 
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
@@ -556,12 +678,12 @@ namespace quda {
   }
 
 
-  // This is so that I can multiply real and complex matrice
+  // This is so that I can multiply real and complex matrices
   template <class T, class U, int N>
   __device__ __host__ inline Matrix<typename PromoteTypeId<T, U>::type, N> operator*(const Matrix<T, N> &a,
                                                                                      const Matrix<U, N> &b)
-  {
-    Matrix<typename PromoteTypeId<T, U>::type, N> result;
+    {
+      Matrix<typename PromoteTypeId<T, U>::type, N> result;
 #pragma unroll
       for (int i=0; i<N; i++) {
 #pragma unroll
@@ -574,8 +696,9 @@ namespace quda {
 	}
       }
       return result;
-  }
-
+      
+    }
+  
   template<class T>
     __device__ __host__ inline
     Matrix<T,2> operator*(const Matrix<T,2> & a, const Matrix<T,2> & b)
@@ -587,69 +710,205 @@ namespace quda {
       result(1,1) = a(1,0)*b(0,1) + a(1,1)*b(1,1);
       return result;
     }
-
-
+  
   template<class T, int N>
     __device__ __host__ inline
     Matrix<T,N> conj(const Matrix<T,N> & other){
-      Matrix<T,N> result;
+    Matrix<T,N> result;
 #pragma unroll
-      for (int i=0; i<N; ++i){
+    for (int i=0; i<N; ++i){
 #pragma unroll
-        for (int j=0; j<N; ++j){
-          result(i,j) = conj( other(j,i) );
-        }
+      for (int j=0; j<N; ++j){
+	result(i,j) = conj( other(j,i) );
       }
-      return result;
     }
+    return result;
+  }
+  
+  
+  template<class T>
+    __device__  __host__ inline
+    Matrix<T,1> inverse(const Matrix<T,1> &u)
+    {
+      Matrix<T,1> uinv;
+      uinv(0,0) = static_cast<typename T::value_type>(1.0)/u(0,0);
+      return uinv;
+    }
+  
+  template<class T>
+    __device__  __host__ inline
+    Matrix<T,2> inverse(const Matrix<T,2> &u)
+    {
+      Matrix<T,2> uinv;
+      const T det = getDeterminant(u);
+      const T det_inv = static_cast<typename T::value_type>(1.0)/det;
 
-
+      uinv(0,0) = det_inv*u(1,1);
+      uinv(0,1) = det_inv*u(1,0);
+      uinv(1,0) = det_inv*u(0,1);
+      uinv(1,1) = det_inv*u(0,0);
+      return uinv;
+    }
+  
   template<class T>
     __device__  __host__ inline
     Matrix<T,3> inverse(const Matrix<T,3> &u)
     {
+      Matrix<T,3> uinv;
       const T det = getDeterminant(u);
       const T det_inv = static_cast<typename T::value_type>(1.0)/det;
-      Matrix<T,3> uinv;
-
       T temp;
-
+      
       temp = u(1,1)*u(2,2) - u(1,2)*u(2,1);
       uinv(0,0) = (det_inv*temp);
-
+      
       temp = u(0,2)*u(2,1) - u(0,1)*u(2,2);
       uinv(0,1) = (temp*det_inv);
-
+      
       temp = u(0,1)*u(1,2)  - u(0,2)*u(1,1);
       uinv(0,2) = (temp*det_inv);
-
+      
       temp = u(1,2)*u(2,0) - u(1,0)*u(2,2);
       uinv(1,0) = (det_inv*temp);
-
+      
       temp = u(0,0)*u(2,2) - u(0,2)*u(2,0);
       uinv(1,1) = (temp*det_inv);
-
+      
       temp = u(0,2)*u(1,0) - u(0,0)*u(1,2);
       uinv(1,2) = (temp*det_inv);
-
+      
       temp = u(1,0)*u(2,1) - u(1,1)*u(2,0);
       uinv(2,0) = (det_inv*temp);
-
+      
       temp = u(0,1)*u(2,0) - u(0,0)*u(2,1);
       uinv(2,1) = (temp*det_inv);
-
+      
       temp = u(0,0)*u(1,1) - u(0,1)*u(1,0);
       uinv(2,2) = (temp*det_inv);
-
       return uinv;
     }
 
+    template<class T>
+      __device__  __host__ inline
+    Matrix<T,4> inverse(const Matrix<T,4> &u)
+      {
+	Matrix<T,4> uinv;
+	T temp;	
+	uinv(0,0) =  cofactor4x4<T,0,0>(u);
+	uinv(1,0) = -cofactor4x4<T,0,1>(u);
+	uinv(2,0) =  cofactor4x4<T,0,2>(u);
+	uinv(3,0) = -cofactor4x4<T,0,3>(u);
+	uinv(0,2) =  cofactor4x4<T,2,0>(u);
+	uinv(1,2) = -cofactor4x4<T,2,1>(u);
+	uinv(2,2) =  cofactor4x4<T,2,2>(u);
+	uinv(3,2) = -cofactor4x4<T,2,3>(u);
+	uinv(0,1) = -cofactor4x4<T,1,0>(u);
+	uinv(1,1) =  cofactor4x4<T,1,1>(u);
+	uinv(2,1) = -cofactor4x4<T,1,2>(u);
+	uinv(3,1) =  cofactor4x4<T,1,3>(u);
+	uinv(0,3) = -cofactor4x4<T,3,0>(u);
+	uinv(1,3) =  cofactor4x4<T,3,1>(u);
+	uinv(2,3) = -cofactor4x4<T,3,2>(u);
+	uinv(3,3) =  cofactor4x4<T,3,3>(u);
 
+	// Scale the result to lie on the U(N) manifold
+	temp = static_cast<typename T::value_type>(0.0);
+	for(int i=0; i<4; i++) {
+	  temp += u(i,0) * uinv(0,i);
+	}
+	uinv *= static_cast<typename T::value_type>(1.0)/temp;
+	return uinv;
+      }
 
-  template<class T, int N>
-    __device__ __host__ inline
-    void setIdentity(Matrix<T,N>* m){
+    /**
+       @brief Compute the matrix inverse via LU decomposition
+       @param[in] u The matrix to be inverted
+       @return uinv The inverse of u 
+    */
+    template<class T, int N, typename = std::enable_if_t<(N > 4)>>
+      __device__  __host__ inline
+      Matrix<T,N> inverse(const Matrix<T,N> &u)
+      {
+	Matrix<T,N> uinv;
+	Matrix<T,N> u_cpy = u;
+	
+	double tol = 1e-10;
+	int i = 0, j = 0, k = 0, i_max = 0;
+	int pivots[N+1];
+	using Float = typename T::value_type;
+	Float max_u = 0.0, abs_u = 0.0;
+	T temp = static_cast<typename T::value_type>(0.0);
+	
+	for (i = 0; i <= N; i++) pivots[i] = i; //Permutation matrix	
+	for (i = 0; i < N; i++) {
+	  max_u = 0.0;
+	  i_max = i;
+	  
+	  for (k = i; k < N; k++)
+            if ((abs_u = abs(u_cpy(k,i))) > max_u) { 
+	      max_u = abs_u;
+	      i_max = k;
+            }
+	  
+	  if (max_u < tol) {
+	    setZero(&uinv);
+	    return uinv; //failure, matrix is degenerate
+	  }
+	  
+	  if (i_max != i) {
+            //pivoting pivots
+            j = pivots[i];
+            pivots[i] = pivots[i_max];
+            pivots[i_max] = j;
+	    
+            //pivoting rows of u
+#pragma unroll
+	    for(int r=0; r<N; r++) {
+	      temp = u_cpy(i,r);
+	      u_cpy(i, r) = u_cpy(i_max, r);
+	      u_cpy(i_max,r) = temp;
+	    }
+	    
+            //counting pivots starting from N
+	    // In a future implementation, we may wish
+	    // default to this methos for computing the
+	    // determinant of a large Nc matrix
+            pivots[N]++;
+	  }
+	  
+	  for (j = i + 1; j < N; j++) {
+	    u_cpy(j,i) /= u_cpy(i,i);
+	    
+            for (k = i + 1; k < N; k++)
+	      u_cpy(j,k) -= u_cpy(j,i) * u_cpy(i,k);
+	  }
+	}
 
+	// Compute inverse
+	for (int j = 0; j < N; j++) {
+	  for (int i = 0; i < N; i++) {
+	    uinv(i,j) = pivots[i] == j ? 1.0 : 0.0;
+	    
+	    for (int k = 0; k < i; k++)
+	      uinv(i,j) -= u_cpy(i,k) * uinv(k,j);
+	  }
+	  
+	  for (int i = N - 1; i >= 0; i--) {
+	    for (int k = i + 1; k < N; k++)
+	      uinv(i,j) -= u_cpy(i,k) * uinv(k,j);
+	    
+	    uinv(i,j) /= u_cpy(i,i);
+	  }
+	}	
+	return uinv;
+      }
+    
+    
+    
+    template<class T, int N>
+      __device__ __host__ inline
+      void setIdentity(Matrix<T,N>* m){
+      
 #pragma unroll
       for (int i=0; i<N; ++i){
         (*m)(i,i) = 1;
@@ -828,7 +1087,6 @@ namespace quda {
       }
       return os;
     }
-
   template<class Cmplx>
     __device__  __host__ inline
     void computeLinkInverse(Matrix<Cmplx,3>* uinv, const Matrix<Cmplx,3>& u)
@@ -875,7 +1133,7 @@ namespace quda {
     res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
     return res;
   }
-
+  
   template<class T>
   __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
     T tr = (a(0,0) + a(1,1) + a(2,2)) / static_cast<T>(3.0);
@@ -896,26 +1154,23 @@ namespace quda {
     return sum;
   }
 
-  template<class Cmplx>
+  template<class Cmplx, int N>
     __host__ __device__ inline
-    void printLink(const Matrix<Cmplx,3>& link){
-    printf("(%lf, %lf)\t", link(0, 0).real(), link(0, 0).imag());
-    printf("(%lf, %lf)\t", link(0, 1).real(), link(0, 1).imag());
-    printf("(%lf, %lf)\n", link(0, 2).real(), link(0, 2).imag());
-    printf("(%lf, %lf)\t", link(1, 0).real(), link(1, 0).imag());
-    printf("(%lf, %lf)\t", link(1, 1).real(), link(1, 1).imag());
-    printf("(%lf, %lf)\n", link(1, 2).real(), link(1, 2).imag());
-    printf("(%lf, %lf)\t", link(2, 0).real(), link(2, 0).imag());
-    printf("(%lf, %lf)\t", link(2, 1).real(), link(2, 1).imag());
-    printf("(%lf, %lf)\n", link(2, 2).real(), link(2, 2).imag());
-    printf("\n");
+    void printLink(const Matrix<Cmplx,N>& link)
+  {
+    for(int i=0; i<N; i++) {
+      for(int j=0; j<N; j++) {      
+	printf("(%lf, %lf)\t", link(i,j).x, link(i,j).y);
+      }
     }
-
-  template<class Cmplx>
+    printf("\n");
+  }
+  
+  template<class Cmplx, int N>
   __device__ __host__
-    double ErrorSU3(const Matrix<Cmplx,3>& matrix)
+    double ErrorSUN(const Matrix<Cmplx,N>& matrix)
     {
-      const Matrix<Cmplx,3> identity_comp = conj(matrix)*matrix;
+      const Matrix<Cmplx,N> identity_comp = conj(matrix)*matrix;
       double error = 0.0;
       Cmplx temp(0,0);
       int i=0;
@@ -923,9 +1178,9 @@ namespace quda {
 
       //error = ||U^dagger U - I||_L2
 #pragma unroll
-      for (i=0; i<3; ++i)
+      for (i=0; i<N; ++i)
 #pragma unroll
-	for (j=0; j<3; ++j)
+	for (j=0; j<N; ++j)
 	  if(i==j) {
 	    temp = identity_comp(i,j);
 	    temp -= 1.0;
@@ -937,33 +1192,76 @@ namespace quda {
       //error is L2 norm, should be (very close) to zero.
       return error;
     }
+  
+  /**
+     @brief Perform a 12th order Taylor expansion of exp(iQ=q) to approximate SU(N) matrix 
+     exponentiation. The argument q must be anti hermitian.
+     @param[in/out] q The matrix to be exponentiated
+  */  
+  template <class T, int N> __device__ __host__ void expsuNTaylor(Matrix<T, N> &q, int m)
+  {
+    // Port of the CHROMA implementation
+    // In place  q = 1 + q + (1/2)*q^2 + (1/(2*3)*q^3 + ... + (1/n!)*(q)^n up to n = 12
+    typedef decltype(q(0, 0).x) RealType;
 
-    template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
-    {
-      // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
-      // This algorithm is outlined in
-      // http://arxiv.org/pdf/hep-lat/0311018v1.pdf
-      // Equation numbers in the paper are referenced by [eq_no].
-
+    T I(0.0,1.0);
+    q *= I;
+    
+    Matrix<T,N> temp1 = q;
+    Matrix<T,N> temp2 = q;
+    Matrix<T,N> temp3;
+    Matrix<T,N> Id;
+    setIdentity(&Id);
+    
+    // The first two terms...
+    q += Id;
+    
+    // ...of an mth order expansion
+    for(int i = 2; i <= m; i++) {
+      
+      RealType coeff = 1.0/i;
+      
+      temp3 = temp2 * temp1;
+      temp2 = temp3 * coeff;
+      q += temp2;
+    }
+  }
+  
+  /**
+     @brief For SU(3), use Cayley-Hamilton Theorem for SU(3) exp{iQ}. This algorithm is outlined in
+     http://arxiv.org/pdf/hep-lat/0311018v1.pdf. Equation numbers in the paper are referenced by [eq_no].
+     For SU(N), use the 12th order taylor series fallback.
+     @param[in] Q The matrix to be exponentiated
+     @out The exponentiated matrix
+  */
+  template <class T, int Nc> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, Nc> &Q)
+  {
+    // The return matrix
+    Matrix<T,Nc> exp_iQ;
+    
+    if(Nc == 3) {
+      
       //Declarations
       using real = typename T::value_type;
-
-      real inv3 = 1.0 / 3.0;
-      Matrix<T,3> temp1;
-      Matrix<T,3> temp2;
+      
+      real inv3 = 1.0 / 3.0;      
+      Matrix<T,Nc> temp1;
+      Matrix<T,Nc> temp2;
+      
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
       real c0 = getDeterminant(Q).real();
       //[15] c1 = 1/2Tr(Q^2)
       // Q = Q^dag => Tr(Q^2) = Tr(QQ^dag) = sum_ab [Q_ab * Q_ab^*]
       temp1 = Q;
       temp1 = temp1 * Q;
+
       real Tr_re = getTrace(temp1).real();
       real c1 = static_cast<real>(0.5) * Tr_re;
 
       //We now have the coeffiecients c0 and c1.
       //We now find: exp(iQ) = f0*I + f1*Q + f2*Q^2
       //      where       fj = fj(c0,c1), j=0,1,2.
-
+      
       //[17]
       real sqrt_c1_inv3 = sqrt(c1 * inv3);
       real c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
@@ -975,10 +1273,10 @@ namespace quda {
       quda::sincos(theta * inv3, &w_p, &u_p);
       //[23]
       u_p *= sqrt_c1_inv3;
-
+      
       //[24]
       w_p *= sqrt(c1);
-
+      
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
       real u_sq = u_p * u_p;
       real w_sq = w_p * w_p;
@@ -996,7 +1294,7 @@ namespace quda {
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-
+      
       //[34] Test for c0 < 0.
       int parity = 0;
       if(c0 < 0) {
@@ -1004,7 +1302,7 @@ namespace quda {
 	parity = 1;
 	//calculate fj with c0 > 0 and then convert all fj.
       }
-
+	
       //Get all the numerators for fj,
       //[30] f0
       real hj_re
@@ -1029,39 +1327,44 @@ namespace quda {
         f1.real(-f1.real());
         f2.imag(-f2.imag());
       }
-
+      
       //[19] Construct exp{iQ}
-      Matrix<T, 3> exp_iQ;
       setZero(&exp_iQ);
-      Matrix<T,3> UnitM;
+      Matrix<T,Nc> UnitM;
       setIdentity(&UnitM);
       // +f0*I
       temp1 = f0 * UnitM;
       exp_iQ = temp1;
-
+      
       // +f1*Q
       temp1 = f1 * Q;
       exp_iQ += temp1;
-
+      
       // +f2*Q^2
       temp1 = Q * Q;
       temp2 = f2 * temp1;
       exp_iQ += temp2;
 
       //exp(iQ) is now defined.
-      return exp_iQ;
     }
-
-    /**
-       Direct port of the TIFR expsu3 algorithm
-    */
-    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, 3> &q)
-    {
+    else {
+      exp_iQ = Q;
+      expsuNTaylor(exp_iQ, 20);
+    }     
+    return exp_iQ;
+  }
+  
+  /**
+     @brief Direct port of the TIFR expsu3 algorithm
+  */
+  template <typename Float, int Nc> __device__ __host__ void expsuN(Matrix<complex<Float>, Nc> &q)
+  {
+    if(Nc == 3) {
       typedef complex<Float> Complex;
-
+      
       Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / (Float)3.0;
       Complex a3 = q(0) * q(4) * q(8) + q(1) * q(5) * q(6) + q(2) * q(3) * q(7) - q(6) * q(4) * q(2)
-        - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
+	- q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
 
       Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
       Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
@@ -1131,5 +1434,8 @@ namespace quda {
       q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
-
+    else {
+      expsuNTaylor(q, 20);
+    }
+  }
 } // end namespace quda

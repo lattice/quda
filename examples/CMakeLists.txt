@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 # set the project name and version
-project(QUDAexamples VERSION 1.0.0)
+project(QUDAexamples VERSION 0.0.0)
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
@@ -17,7 +21,7 @@ check_language(CUDA)
 enable_language(CUDA)
 message(STATUS "CUDA Compiler is" ${CMAKE_CUDA_COMPILER})
 message(STATUS "Compiler ID is " ${CMAKE_CUDA_COMPILER_ID})
-
+  
 # CUDA Wrapper for finding libs etc
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
@@ -32,10 +36,12 @@ set(QUDA_SOURCE_HOME "" CACHE PATH "Path to QUDA source")
 find_library(QUDA quda ${QUDA_BUILD_HOME}/lib)
 find_library(QUDA_TEST quda_test ${QUDA_BUILD_HOME}/tests)
 
-# Multi-GPU options
+# Dependency options
 option(USE_QIO "link to the QIO code (requires QMP)" OFF)
 option(USE_QMP "link to the QMP multi-GPU code" OFF)
 option(USE_MPI "link to the MPI multi-GPU code" OFF)
+option(USE_ZFP "enable ZFP" OFF)
+option(USE_OPENMP "enable OpenMP" OFF)
 
 if(USE_MPI AND USE_QMP)
   message(SEND_ERROR "Specifying USE_QMP and USE_MPI might result in undefined behavior. If you intend to use QMP set USE_MPI=OFF.")
@@ -79,6 +85,9 @@ endif()
 if(USE_QMP)
   find_library(QMP qmp ${QUDA_BUILD_HOME}/usqcd/lib)
 endif()
+if(USE_ZFP)
+  find_library(ZFP zfp ${QUDA_BUILD_HOME}/zfp/lib)
+endif()
 
 # Create library dependency
 set(EXAMPLES_LIBS ${QUDA} ${QUDA_TEST})
@@ -90,9 +99,24 @@ if(USE_QMP)
 elseif(USE_MPI)
   list(APPEND EXAMPLES_LIBS ${MPI_LIBS})
 endif()
+if(USE_OPENMP) 
+  find_package(OpenMP)
+  if(OpenMP_CXX_FOUND)
+    list(APPEND EXAMPLES_LIBS OpenMP::OpenMP_CXX)
+  endif()
+endif()
+
+if(USE_ZFP)
+  list(APPEND EXAMPLES_LIBS ${ZFP})
+endif()
 
 # Create includes
 set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_BUILD_HOME}/include/externals ${QUDA_SOURCE_HOME}/tests/utils ${QUDA_SOURCE_HOME}/tests/host_reference ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+
+if(USE_ZFP)
+  list(APPEND EXAMPLES_INC ${QUDA_BUILD_HOME}/zfp/include)
+endif()
+
 
 # Set install path
 include(GNUInstallDirs)
@@ -110,7 +134,13 @@ add_executable(heatbath_quda heatbath_quda.cpp)
 target_link_libraries(heatbath_quda ${EXAMPLES_LIBS})
 target_include_directories(heatbath_quda PUBLIC ${EXAMPLES_INC})
 
+<<<<<<< HEAD
+add_executable(laph_quda laph_quda.cpp)
+target_link_libraries(laph_quda ${EXAMPLES_LIBS})
+target_include_directories(laph_quda PUBLIC ${EXAMPLES_INC})
+=======
 
 add_executable(slaph_contractions slaph_contractions.cpp)
 target_link_libraries(slaph_contractions ${EXAMPLES_LIBS})
 target_include_directories(slaph_contractions PUBLIC ${EXAMPLES_INC})
+>>>>>>> feature/slaph_contractions_chris

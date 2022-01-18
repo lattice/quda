@@ -59,7 +59,7 @@ namespace quda {
   template <typename Float> struct GhostExtractEx {
     GhostExtractEx(const GaugeField &u, int dim, const int *R, void **ghost, bool extract)
     {
-      const int length = 18;
+      const int length = 2*N_COLORS*N_COLORS;
 
       if (u.isNative()) {
         if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {

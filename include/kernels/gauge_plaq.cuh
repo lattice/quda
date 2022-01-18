@@ -13,7 +13,7 @@ namespace quda {
     using reduce_t = array<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static_assert(nColor == N_COLORS, "GaugePlaqArg instantiated incorrectly");
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
@@ -41,7 +41,7 @@ namespace quda {
   template<typename Arg>
   __device__ inline double plaquette(const Arg &arg, int x[], int parity, int mu, int nu)
   {
-    using Link = Matrix<complex<typename Arg::Float>,3>;
+    using Link = Matrix<complex<typename Arg::Float>,Arg::nColor>;
 
     int dx[4] = {0, 0, 0, 0};
     Link U1 = arg.U(mu, linkIndexShift(x,dx,arg.E), parity);

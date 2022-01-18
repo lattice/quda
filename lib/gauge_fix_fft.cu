@@ -1,4 +1,4 @@
-#include <quda_internal.h>
+#include <quda_internal.h> 
 #include <quda_matrix.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
@@ -398,6 +398,5 @@ namespace quda {
   {
     errorQuda("Gauge fixing has bot been built");
   }
-#endif
-
+#endif  
 }

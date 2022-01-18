@@ -2,7 +2,7 @@
 
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
-#include <su3_project.cuh>
+#include <suN_project.cuh>
 #include <index_helper.cuh>
 #include <color_spinor.h>
 #include <svd_quda.h>
@@ -59,7 +59,11 @@ namespace quda {
 
     for (int i=0; i<n; ++i) {
       for (int j=0; j<n; ++j) {
-	if (fabs(temporary(i,j).real()) > max_error || fabs(temporary(i,j).imag()) > max_error) {
+	if (fabs(temporary(i,j).x) > max_error ||
+	    fabs(temporary(i,j).y) > max_error ||
+	    temporary(i,j).x != temporary(i,j).x ||
+	    temporary(i,j).y != temporary(i,j).y ) {
+	  printf("is not consistent at %d,%d, %e, %e\n", i, j, temporary(i,j).x, temporary(i,j).y);
 	  return false;
 	}
       }
@@ -111,9 +115,9 @@ namespace quda {
       } else {
 	theta = acos(cosTheta); // this is the primary performance limiter
       }
-
+      
       const real sqrt_s = s*rsqrt_s;
-
+      
 #if 0 // experimental version
       real as, ac;
       quda::sincos( theta*static_cast<real>(1.0 / 3.0), &as, &ac );
@@ -128,41 +132,43 @@ namespace quda {
       g[2] = c[0]*static_cast<real>(1.0 / 3.0) + 2*sqrt_s*cos( theta*static_cast<real>(1.0 / 3.0) + static_cast<real>(4.0 * M_PI / 3.0));
 #endif
     }
-
+    
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
     real det = getDeterminant(q).real();
     if (fabs(det) < arg.svd_abs_error) return false;
     if (!checkRelativeError<double>(g[0]*g[1]*g[2], det, arg.svd_rel_error)) return false;
-
+      
     // At this point we have finished with the c's
     // use these to store sqrt(g)
     for(int i=0; i<3; ++i) c[i] = sqrt(g[i]);
-
+    
     // done with the g's, use these to store u, v, w
     g[0] = c[0]+c[1]+c[2];
     g[1] = c[0]*c[1] + c[0]*c[2] + c[1]*c[2];
     g[2] = c[0]*c[1]*c[2];
-
+    
     const real denominator = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) );
     c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) * denominator;
     c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) * denominator;
     c[2] = g[0] * denominator;
-
+    
     tempq = c[1]*q + c[2]*qsq;
     // Add a real scalar
     tempq(0,0).x += c[0];
     tempq(1,1).x += c[0];
     tempq(2,2).x += c[0];
-
+    
     res = tempq;
-
+    
     return true;
   }
-
+  
   template <typename real, typename mat, typename Arg>
   __host__ __device__ bool unitarizeLinkMILC(mat &out, const mat &in, const Arg &arg)
   {
+    // Canonnical Nc = 3 strategy
+#if (N_COLORS == 3)
     mat u;
     if (!arg.reunit_svd_only) {
       if (reciprocalRoot<real>(u, conj(in)*in, arg) ) {
@@ -177,30 +183,39 @@ namespace quda {
 
     mat v;
     real singular_values[3];
-    computeSVD<real>(in, u, v, singular_values);
+    computeSVD<real>(in, u, v, singular_values);    
     out = u * conj(v);
     return true;
+#else
+    // Brute force Nc != 3 strategy
+    return unitarizeLinkNewton(out, in, 10000);
+#endif
+    
   } // unitarizeMILC
-
+  
   template <typename mat>
   __host__ __device__ bool unitarizeLinkNewton(mat &out, const mat& in, int max_iter)
   {
     mat u = in;
-
-    for (int i=0; i<max_iter; ++i) {
+    bool is_unitarized = false;
+    int i = 0;
+    while (!is_unitarized && i < max_iter) {
       mat uinv = inverse(u);
       u = 0.5*(u + conj(uinv));
+      if((i+1)%10 == 0) is_unitarized = isUnitarizedLinkConsistent(in, u, 1e-7);	
+      i++;
     }
-
-    if (isUnitarizedLinkConsistent(in,u,0.0000001)==false) {
-      printf("ERROR: Unitarized link is not consistent with incoming link\n");
+    
+    if (!is_unitarized) {
+      //printf("ERROR: Unitarized link is not consistent with incoming link"
+      //" tol %e and %d iterations\n", 1e-7, max_iter);
       return false;
     }
+    //printf("is %sunitary at %d\n", is_unitarized ? "" : "not ", i);
     out = u;
-
     return true;
   }
-
+  
   template <typename Arg> struct Unitarize
   {
     const Arg &arg;
@@ -219,13 +234,12 @@ namespace quda {
         if (result.isUnitary(arg.max_error) == false) atomic_fetch_add(arg.fails, 1);
       }
       tmp = result;
-
       arg.out(mu, x_cb, parity) = tmp;
     }
   };
 
   template <typename Float, int nColor_, QudaReconstructType recon_>
-  struct ProjectSU3Arg : kernel_param<> {
+  struct ProjectSUNArg : kernel_param<> {
     using real = typename mapper<Float>::type;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -234,7 +248,7 @@ namespace quda {
 
     real tol;
     int *fails;
-    ProjectSU3Arg(GaugeField &u, real tol, int *fails) :
+    ProjectSUNArg(GaugeField &u, real tol, int *fails) :
       kernel_param(dim3(u.VolumeCB(), 2, 4)),
       u(u),
       tol(tol),
@@ -251,11 +265,11 @@ namespace quda {
     {
       Matrix<complex<typename Arg::real>, Arg::nColor> u = arg.u(mu, x_cb, parity);
 
-      polarSu3<typename Arg::real>(u, arg.tol);
+      polarSUN<typename Arg::real>(u, arg.tol);
 
       // count number of failures
       if (u.isUnitary(arg.tol) == false) atomic_fetch_add(arg.fails, 1);
-
+      
       arg.u(mu, x_cb, parity) = u;
     }
   };

@@ -1,11 +1,11 @@
 #pragma once
 
 /**
- * @file su3_project.cuh
+ * @file suN_project.cuh
  * 
  * @section Description
  * 
- * This header file defines an interative SU(3) projection algorithm
+ * This header file defines an iterative SU(N) projection algorithm
  */
 
 #include <quda_matrix.h>
@@ -44,23 +44,23 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < in.rows(); j++) {
         if (i>j) { // off-diagonal identity check
-        if (fabs(identity(i,j).real()) > tol || fabs(identity(i,j).imag()) > tol ||
-            fabs(identity(j,i).real()) > tol || fabs(identity(j,i).imag()) > tol )
-          return false;
+	  if (fabs(identity(i,j).real()) > tol || fabs(identity(i,j).imag()) > tol ||
+	      fabs(identity(j,i).real()) > tol || fabs(identity(j,i).imag()) > tol )
+	    return false;
         }
       }
     }
-
+    
     return true;
   }
 
   /**
-   * @brief Print out deviation for each component (used for
-   * debugging only).
-   *
-   * @param inv The inverse of the input matrix
-   * @param in The input matrix to which we're reporting its unitarity
-   */
+     @brief Print out deviation for each component (used for
+     debugging only).
+     
+     @param inv The inverse of the input matrix
+     @param in The input matrix to which we're reporting its unitarity
+  */
   template <typename Matrix>
   __host__ __device__ void checkUnitaryPrint(const Matrix &inv, const Matrix &in)
   {
@@ -75,20 +75,21 @@ namespace quda {
   }
 
   /**
-   * @brief Project the input matrix on the SU(3) group.  First
-   * unitarize the matrix and then project onto the special unitary
-   * group.
-   *
-   * @param in The input matrix to which we're projecting
-   * @param tol Tolerance to which this check is applied
-   */
-  template <typename Float>
-  __host__ __device__ inline void polarSu3(Matrix<complex<Float>,3> &in, Float tol)
+     @brief Project the input matrix on the SU(N) group.  First
+     unitarize the matrix and then project onto the special unitary
+     group.
+     
+     @param in The input matrix to which we're projecting
+     @param tol Tolerance to which this check is applied
+  */
+  template <typename Float, int N>
+  __host__ __device__ inline void polarSUN(Matrix<complex<Float>,N> &in, Float tol)
   {
-    constexpr Float negative_third = -1.0/3.0;
-    constexpr Float negative_sixth = -1.0/6.0;
-    Matrix<complex<Float>,3> out = in;
-    Matrix<complex<Float>,3> inv = inverse(in);
+
+    constexpr Float negative_one_on_N = -1.0/N;
+    constexpr Float negative_one_on_2N = -1.0/(2*N);
+    Matrix<complex<Float>,N> out = in;
+    Matrix<complex<Float>,N> inv = inverse(in);
 
     constexpr int max_iter = 100;
     int i = 0;
@@ -99,14 +100,12 @@ namespace quda {
 
     // now project onto special unitary group
     complex<Float> det = getDeterminant(out);
-    Float mod = pow(norm(det), negative_sixth);
+    Float mod = pow(norm(det), negative_one_on_2N);
     Float angle = arg(det);
 
     Float re, im;
-    quda::sincos(negative_third * angle, &im, &re);
+    quda::sincos(negative_one_on_N * angle, &im, &re);
 
     in = complex<Float>(mod * re, mod * im) * out;
   }
-
-  
 } // namespace quda

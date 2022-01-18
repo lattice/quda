@@ -54,7 +54,7 @@ void init() {
   for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = safe_malloc(V * gauge_site_size * param.cpu_prec); }
   cpsCpuGauge_p = safe_malloc(4 * V * gauge_site_size * param.cpu_prec);
 
-  csParam.nColor = 3;
+  csParam.nColor = N_COLORS;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   csParam.pc_type = QUDA_4D_PC;

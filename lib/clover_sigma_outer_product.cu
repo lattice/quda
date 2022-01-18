@@ -47,6 +47,7 @@ namespace quda {
 
     long long flops() const
     {
+      // DMH FIXME
       return ((144 + 18) * inA.size() + 18) * 6 * oprod.Volume(); // spin trace + multiply-add
     }
     long long bytes() const

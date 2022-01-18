@@ -218,7 +218,7 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = prec;
   gParam.type = link_type;
 
-  gParam.reconstruct_sloppy = gParam.reconstruct = ((link_type == QUDA_SU3_LINKS) ? QUDA_RECONSTRUCT_12 : QUDA_RECONSTRUCT_NO);
+  gParam.reconstruct_sloppy = gParam.reconstruct = ((link_type == QUDA_SUN_LINKS) ? QUDA_RECONSTRUCT_12 : QUDA_RECONSTRUCT_NO);
   gParam.gauge_order   = QUDA_MILC_GAUGE_ORDER;
   gParam.t_boundary    = QUDA_PERIODIC_T;
   gParam.gauge_fix     = QUDA_GAUGE_FIXED_NO;
@@ -411,7 +411,7 @@ void qudaUnitarizeSU3Phased(int prec, double tol, QudaMILCSiteArg_t *arg, int ph
   qudaGaugeParam.return_result_gauge = true;
   have_resident_gauge = false;
 
-  projectSU3Quda(gauge, tol, &qudaGaugeParam);
+  projectSUNQuda(gauge, tol, &qudaGaugeParam);
   invalidateGaugeQuda();
   qudamilc_called<false>(__func__);
   return;
@@ -566,7 +566,7 @@ void qudaGaugeForcePhased(int precision, int num_loop_types, double milc_loop_co
 
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_SU3_LINKS);
+      QUDA_SUN_LINKS);
   void *gauge = arg->site ? arg->site : arg->link;
   void *mom = arg->site ? arg->site : arg->mom;
 
@@ -821,7 +821,7 @@ static void setGaugeParams(QudaGaugeParam &fat_param, QudaGaugeParam &long_param
     long_param.reconstruct_precondition = long_param.reconstruct_sloppy;
   } else {
     // naive staggered parameters
-    fat_param.type = QUDA_SU3_LINKS;
+    fat_param.type = QUDA_SUN_LINKS;
     fat_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   }
 
@@ -2272,7 +2272,7 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
   qudamilc_called<true>(__func__);
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaGaugeParam qudaGaugeParam
-    = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+    = newMILCGaugeParam(localDim, qudaPrecision, (geometry == 1) ? QUDA_GENERAL_LINKS : QUDA_SUN_LINKS);
   qudamilc_called<false>(__func__);
   return createGaugeFieldQuda(gauge, geometry, &qudaGaugeParam);
 }
@@ -2700,7 +2700,7 @@ void qudaGaugeFixingOVR(int precision, unsigned int gauge_dir, int Nsteps, int v
 {
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_SU3_LINKS);
+      QUDA_SUN_LINKS);
   qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 

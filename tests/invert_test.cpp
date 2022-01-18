@@ -14,8 +14,6 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -216,7 +214,7 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-
+  
   // Allocate host side memory for the gauge field.
   //----------------------------------------------------------------------------
   void *gauge[4];
@@ -263,14 +261,13 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // Vector construct START
-  //-----------------------------------------------------------------------------------
+  //----------------------------------------------------------------------------------
   std::vector<quda::ColorSpinorField *> in(Nsrc);
   std::vector<quda::ColorSpinorField *> out(Nsrc);
   std::vector<quda::ColorSpinorField *> out_multishift(multishift * Nsrc);
   quda::ColorSpinorParam cs_param;
-  quda::ColorSpinorField *check = quda::ColorSpinorField::Create(cs_param);
-  
   constructWilsonSpinorParam(&cs_param, &inv_param, &gauge_param);
+  auto check = quda::ColorSpinorField::Create(cs_param);
   std::vector<std::vector<void *>> _hp_multi_x(Nsrc, std::vector<void *>(multishift));
 
   // QUDA host array for internal checks and malloc
@@ -324,8 +321,10 @@ int main(int argc, char **argv)
         invertMultiShiftQuda(_hp_multi_x[i].data(), in[i]->V(), &inv_param);
       } else {
         invertQuda(out[i]->V(), in[i]->V(), &inv_param);
+	inv_param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        //invertQuda(in[i]->V(), out[i]->V(), &inv_param);
       }
-
+      
       time[i] = inv_param.secs;
       gflops[i] = inv_param.gflops / inv_param.secs;
       iter[i] = inv_param.iter;

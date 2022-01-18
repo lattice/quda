@@ -30,9 +30,9 @@ namespace quda
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
     static constexpr QudaStaggeredPhase phase = phase_;
-    using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
+    using GU = typename gauge_mapper<Float, reconstruct_u, 2*N_COLORS*N_COLORS, phase, gauge_direct_load, ghost, use_inphase>::type;
     using GL =
-        typename gauge_mapper<Float, reconstruct_l, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
+        typename gauge_mapper<Float, reconstruct_l, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost, use_inphase>::type;
 
     F out;      /** output vector field */
     const F in; /** input vector field */

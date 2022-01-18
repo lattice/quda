@@ -16,7 +16,7 @@ namespace quda {
 
   public:
     RNGInit(RNG &rng, const LatticeField &meta, unsigned long long seed) :
-      TunableKernel2D(meta, meta.SiteSubset()),
+      TunableKernel2D(meta, 2),
       rng(rng),
       meta(meta),
       seed(seed)
@@ -27,9 +27,10 @@ namespace quda {
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      launch_device<init_random>(tp, stream, rngArg(rng.State(), seed, meta));
+      rngArg arg(rng.State(), seed, meta);
+      launch_device<init_random>(tp, stream, arg);
     }
-
+    
     long long flops() const { return 0; }
     long long bytes() const { return 0; }
   };
@@ -50,7 +51,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                  size * sizeof(RNGState) / (float)(1048576));
-
+    
     RNGInit(*this, meta, seed);
   }
 

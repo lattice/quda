@@ -171,7 +171,7 @@ namespace quda {
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
     switch (field.Ncolor()) {
-    case 6: CopyGenericColorSpinor<6, dst_t, src_t>(param); break;
+    case 2*N_COLORS: CopyGenericColorSpinor<2*N_COLORS, dst_t, src_t>(param); break;
     case 18: CopyGenericColorSpinor<18, dst_t, src_t>(param); break;
     case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;
     case 32: CopyGenericColorSpinor<32, dst_t, src_t>(param); break;
@@ -197,11 +197,15 @@ namespace quda {
   void instantiateColor(const ColorSpinorField &field, const param_t &param)
   {
     switch (field.Ncolor()) {
-    case 6: CopyGenericColorSpinor<6, dst_t, src_t>(param); break;
+    case 2*N_COLORS: CopyGenericColorSpinor<2*N_COLORS, dst_t, src_t>(param); break;
     case 18: CopyGenericColorSpinor<18, dst_t, src_t>(param); break;
     case 24: CopyGenericColorSpinor<24, dst_t, src_t>(param); break;
+#if N_COLORS != 16
     case 32: CopyGenericColorSpinor<32, dst_t, src_t>(param); break;
+#endif
+#if N_COLORS != 18
     case 36: CopyGenericColorSpinor<36, dst_t, src_t>(param); break;
+#endif
     case 72: CopyGenericColorSpinor<72, dst_t, src_t>(param); break;
     case 96: CopyGenericColorSpinor<96, dst_t, src_t>(param); break;
     case 576: CopyGenericColorSpinor<576, dst_t, src_t>(param); break;

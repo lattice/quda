@@ -191,8 +191,8 @@ bool skip_kernel(prec_pair_t pair, Kernel kernel)
   if (Nspin == 2 && this_prec < QUDA_SINGLE_PRECISION) {
     // avoid quarter, half precision tests if doing coarse fields
     return true;
-  } else if (Ncolor != 3 && is_site_unroll(kernel)) {
-    // only benchmark heavy-quark norm if doing 3 colors
+  } else if (Ncolor != N_COLORS && is_site_unroll(kernel)) {
+    // only benchmark heavy-quark norm if doing N_COLORS colors
     return true;
   }
 
@@ -1023,8 +1023,9 @@ int main(int argc, char **argv)
     if (Ncolor == 0) Ncolor = 24;
   } else {
     // set spin according to the type of dslash
-    Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
-    Ncolor = 3;
+    Nspin = (dslash_type == QUDA_ASQTAD_DSLASH ||
+	     dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
+    Ncolor = N_COLORS;
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

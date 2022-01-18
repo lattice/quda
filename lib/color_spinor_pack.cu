@@ -143,33 +143,34 @@ namespace quda {
     long long bytes() const { return work_items * 2 * a.Nspin() * a.Ncolor() * (a.Precision() + a.GhostPrecision()); }
   };
 
-  // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise
+  // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only N_COLORS colors otherwise
+  // DMH CHECKME
   template<typename T, typename G, int nSpin, int nColor_> struct precision_spin_color_mapper { static constexpr int nColor = nColor_; };
 #ifndef NSPIN1
-  template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = 3; };
+  template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 
 #ifdef NSPIN4
   // never need block-float format with nSpin=4 fields for arbitrary colors
-  template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
-  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,4,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = N_COLORS; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,4,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 
 #ifdef NSPIN1
   // never need block-float format with nSpin=4 fields for arbitrary colors
-  template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
-  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,1,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = N_COLORS; };
+  template<int nColor_> struct precision_spin_color_mapper<float,int8_t,1,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 
 #ifndef GPU_MULTIGRID_DOUBLE
 #ifdef NSPIN1
-  template<int nColor_> struct precision_spin_color_mapper<double,double,1,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<double,double,1,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 #ifdef NSPIN2
-  template<int nColor_> struct precision_spin_color_mapper<double,double,2,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<double,double,2,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 #ifdef NSPIN4
-  template<int nColor_> struct precision_spin_color_mapper<double,double,4,nColor_> { static constexpr int nColor = 3; };
+  template<int nColor_> struct precision_spin_color_mapper<double,double,4,nColor_> { static constexpr int nColor = N_COLORS; };
 #endif
 #endif
 
@@ -178,25 +179,25 @@ namespace quda {
                         int nFace, int dagger, MemoryLocation *destination)
   {
 #ifndef NSPIN1
-    if (a.Ncolor() != 3 && a.Nspin() == 1)
+    if (a.Ncolor() != N_COLORS && a.Nspin() == 1)
       errorQuda("Ncolor = %d not supported for Nspin = %d fields", a.Ncolor(), a.Nspin());
 #endif
-    if (a.Ncolor() != 3 && a.Nspin() == 4 && a.Precision() == QUDA_SINGLE_PRECISION &&
+    if (a.Ncolor() != N_COLORS && a.Nspin() == 4 && a.Precision() == QUDA_SINGLE_PRECISION &&
         (a.GhostPrecision() == QUDA_HALF_PRECISION || a.GhostPrecision() == QUDA_QUARTER_PRECISION) )
       errorQuda("Ncolor = %d not supported for Nspin = %d fields with precision = %d and ghost_precision = %d",
                 a.Ncolor(), a.Nspin(), a.Precision(), a.GhostPrecision());
 #ifndef GPU_MULTIGRID_DOUBLE
-    if ( a.Ncolor() != 3 && a.Precision() == QUDA_DOUBLE_PRECISION)
+    if ( a.Ncolor() != N_COLORS && a.Precision() == QUDA_DOUBLE_PRECISION)
       errorQuda("Ncolor = %d not supported for double precision fields", a.Ncolor());
 #endif
 
-    if (a.Ncolor() == 3) {
-      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    if (a.Ncolor() == N_COLORS) {
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef GPU_MULTIGRID
-    } else if (a.Ncolor() == 6) {
-      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
-      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 2*N_COLORS) {
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,2*N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 3*2*N_COLORS) { // Needed for two level free field Wilson
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,3*2*N_COLORS>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 24) { // Needed for K-D staggered Wilson
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN4
@@ -209,10 +210,12 @@ namespace quda {
     } else if (a.Ncolor() == 64) { // Needed for staggered Nc = 64
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #endif // NSPIN1
-    } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
-      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec, or staggered Nc = 96
-      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == N_COLORS*24) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS*24>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == N_COLORS*32) { // wilson 3 -> 32 nvec, or staggered Nc = 96
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,N_COLORS*32>::nColor>(ghost, a, parity, nFace, dagger, destination);
+    } else if (a.Ncolor() == 120) { // wilson 5 -> 120 nvec, or staggered Nc = 120
+      GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,120>::nColor>(ghost, a, parity, nFace, dagger, destination);
 #ifdef NSPIN1
     } else if (a.Ncolor() == 192) { // staggered 3 -> 64 Nvec
       GhostPack<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,192>::nColor>(ghost, a, parity, nFace, dagger, destination);

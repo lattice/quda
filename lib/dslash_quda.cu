@@ -189,5 +189,4 @@ namespace quda {
     device_pinned_free(_interior_count);
 #endif
   }
-
 } // namespace quda
