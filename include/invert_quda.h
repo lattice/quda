@@ -874,6 +874,8 @@ namespace quda {
   class BiCGstabL : public Solver {
 
   private:
+    const DiracMdagM matMdagM; // used by the eigensolver
+
     /**
        The size of the Krylov space that BiCGstabL uses.
      */
@@ -929,7 +931,7 @@ namespace quda {
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
   public:
-    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstabL();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);

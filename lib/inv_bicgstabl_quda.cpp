@@ -379,8 +379,10 @@ namespace quda {
     extern Worker* aux_worker;
   }
 
-  BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matSloppy, matSloppy, param, profile), n_krylov(param.Nkrylov), init(false)
+  BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, matEig, param, profile),
+    matMdagM(matEig.Expose()),
+    n_krylov(param.Nkrylov), init(false)
   {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
@@ -422,6 +424,8 @@ namespace quda {
       init = false;
     }
     
+    destroyDeflationSpace();
+
     profile.TPSTOP(QUDA_PROFILE_FREE);
     
   }
@@ -496,7 +500,36 @@ namespace quda {
     ColorSpinorField &y = *yp;
     ColorSpinorField &temp = *tempp;
     
-    ColorSpinorField *r0p, *x_sloppyp; // Get assigned below. 
+    ColorSpinorField *r0p, *x_sloppyp; // Get assigned below.
+
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      if (param.eig_param.eig_type == QUDA_EIG_TR_LANCZOS || param.eig_param.eig_type == QUDA_EIG_BLK_TR_LANCZOS) {
+        constructDeflationSpace(b, matMdagM);
+      } else {
+        // Use Arnoldi to inspect the space only and turn off deflation
+        constructDeflationSpace(b, mat);
+        param.deflate = false;
+      }
+      if (deflate_compute) {
+        // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        (*eig_solve)(evecs, evals);
+        if (param.deflate) {
+          // double the size of the Krylov space
+          extendSVDDeflationSpace();
+          // populate extra memory with L/R singular vectors
+          eig_solve->computeSVD(matMdagM, evecs, evals);
+        }
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        recompute_evals = false;
+      }
+    }
     
     // Compute initial residual depending on whether we have an initial guess or not.
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
@@ -508,6 +541,21 @@ namespace quda {
       r2 = b2;
       blas::zero(x); // defensive measure in case solution isn't already zero
       blas::zero(y);
+    }
+
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      eig_solve->deflateSVD(x, r_full, evecs, evals, true);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r_full, x, temp);
+      //if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r_full);
+        blas::copy(y, x);
+      //} else {
+      //  blas::xpay(b, -1.0, r_full);
+      //  r2 = b2; // dummy setting
+      //}
     }
     
     // Check to see that we're not trying to invert on a zero-field source
