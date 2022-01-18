@@ -1,5 +1,3 @@
-TEST COMMIT
-
 # QUDA 1.1.0
 
 ## Overview
