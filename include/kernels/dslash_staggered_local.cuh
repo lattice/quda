@@ -129,35 +129,118 @@ namespace quda
         for (int d = 0; d < nDim; d++) {
 
           // standard - forward direction
-          if (arg.is_partitioned[d] && (coord[d] + 1) == arg.dim[d]) {
-            Vector accum;
-            const Link U = getU(d, x_cb, arg.parity, +1);
+          if (arg.is_partitioned[d] && (coord[d] + 1) >= arg.dim[d]) {
+            // perform backwards (from previous pass) -- gathering to "X"
+            Vector accum; 
+
+            // backwards - standard (gather from X - 1, to X)
             {
-              // backward: gather from (X - 1), store in X (ghost)
-              // would have been in previous pass
-              accum = mv_add(conj(U), -accum, accum);
+              const Link U = getU(d, x_cb, arg.parity, +1);
+              accum = mv_add(conj(U), -in, accum);
             }
+
+            // backwards -- improved (gather from X - 3, to X)
+            if (arg.improved) {
+              const int back2_idx = linkIndexM2(coord, arg.dim, d);
+              const int gauge_idx = back2_idx;
+              const Link L = arg.L(d, gauge_idx, arg.parity);
+              const Vector in_L = arg.in(back2_idx, my_spinor_parity);
+              accum = mv_add(conj(L), -in_L, accum);
+            }
+
+            // forwards - standard (gather from X, to X - 1)
             {
-              // forward: gather from X (ghost), store in (X - 1)
+              const Link U = getU(d, x_cb, arg.parity, +1);
               out = mv_add(U, accum, out);
             }
           }
 
-          // standard - backward direction
-          if (arg.is_partitioned[d] && (coord[d] - 1) == -1) {
+          // improved - forward direction
+          if (arg.improved && arg.is_partitioned[d] && (coord[d] + 3) >= arg.dim[d]) {
+            // perform backwards (from previous pass) -- gathering to ["X", "X+1", "X+2"]
             Vector accum;
-            const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
-            const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
+
+            // backwards - standard (gather from X - 1, to X)
+            if ((coord[d] + 3) == arg.dim[d]) {
+              const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+              const int gauge_idx = fwd2_idx;
+              const Link U = getU(d, gauge_idx, arg.parity, +1);
+              const Vector in_U = arg.in(fwd2_idx, my_spinor_parity);
+              accum = mv_add(conj(U), -in_U, accum);
+            }
+
+            // backwards - improved (gather from ["X-3","X-2","X-1"] to ["X","X+1","X+2"])
             {
-              // forward: gather from 0, store in -1 (ghost)
-              // would have been in previous pass
+              const Link L = arg.L(d, x_cb, arg.parity);
+              accum = mv_add(conj(L), -in, accum);
+            }
+
+            // forwards - improved (gather from ["X", "X+1", "X+2"] to ["X-3","X-2","X-1"])
+            {
+              const Link L = arg.L(d, x_cb, arg.parity);
+              out = mv_add(L, accum, out);
+            }
+          }
+
+          // standard - backward direction
+          if (arg.is_partitioned[d] && (coord[d] - 1) < 0) {
+            // perform forwards (from previous pass) -- gathering to "-1"
+            Vector accum;
+
+            // forwards - standard (gather from 0, to -1)
+            {
+              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
               accum = mv_add(U, in, accum);
             }
+
+            // forwards -- improved (gather from 2, to -1)
+            if (arg.improved) {
+              // when updating replace arg.nFace with 1 here
+              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+              const int fwd2_idx = linkIndexP2(coord, arg.dim, d);
+              const Vector in_L = arg.in(fwd2_idx, my_spinor_parity);
+              accum = mv_add(L, in_L, accum);
+            }
+
+            // backwards - standard (gather from -1, to 0)
             {
-              // forward: gather from -1 (ghost), store in 0
+              const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link U = getUGhost(d, ghost_idx2, 1 - arg.parity, -1); // link is in ghost zone
               out = mv_add(conj(U), -accum, out);
             }
           }
+
+          // improved - backward direction 
+          if (arg.improved && arg.is_partitioned[d] && (coord[d] - 3) < arg.dim[d]) {
+            // perform forwards (from previous pass) -- gathering to ["0", "1", "2"]
+            Vector accum;
+
+            // forwards - standard (gather from 0, to -1)
+            if (coord[d] == 2) {
+              const int back2_idx = linkIndexM2(coord, arg.dim, d);
+              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1 - 2); // don't worry about it
+              const Link U = getUGhost(d, ghost_idx, 1 - arg.parity, -1);
+              const Vector in_U = arg.in(back2_idx, my_spinor_parity);
+              accum = mv_add(U, in_U, accum);
+            }
+
+            // forwards - improved (gather from ["0","1","2"] to ["-3","-2","-1"])
+            {
+              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+              accum = mv_add(L, in, accum);
+            }
+
+            // backwards - improved (gather from ["-3", "-2", "-1"] to ["0","1","2"])
+            {
+              const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+              const Link L = arg.L.Ghost(d, ghost_idx, 1 - arg.parity);
+              out = mv_add(conj(L), -accum, out);
+            }
+          }
+
         } // dimension
 
       } else {
