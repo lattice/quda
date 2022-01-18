@@ -570,6 +570,12 @@ namespace quda {
           R_dag_r0(i) = r_dagger_dot_r[i * (n_krylov + 1)];
         }
 
+        if (!param.is_preconditioner) {
+          profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+          param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+          profile.TPSTART(QUDA_PROFILE_EIGEN);
+        }
+
         // Compute Cholesky decomposition
         // M = Sigma^\dagger Sigma
         Eigen::LLT<matrix> chol;
@@ -585,6 +591,12 @@ namespace quda {
         vector R_dag_r_ = Map<vector>(R_dag_r_map, n_krylov, 1);*/
 
         vector gamma = chol.solve(R_dag_r0);
+
+        if (!param.is_preconditioner) {
+          profile.TPSTOP(QUDA_PROFILE_EIGEN);
+          param.secs += profile.Last(QUDA_PROFILE_EIGEN);
+          profile.TPSTART(QUDA_PROFILE_COMPUTE);
+        }
 
         // copy things appropriately
         omega = gamma(n_krylov-1);
@@ -783,7 +795,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
@@ -817,6 +829,7 @@ namespace quda {
     // Done with epilogue, begin free.
     
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    param.secs += profile.Last(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
     
     // ...yup...
