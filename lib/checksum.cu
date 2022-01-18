@@ -63,7 +63,7 @@ namespace quda {
   {
     uint64_t checksum = 0;
     switch (u.Ncolor()) {
-    case 3: checksum = Checksum<T,3>(u,mini); break;
+    case N_COLORS: checksum = Checksum<T,N_COLORS>(u,mini); break;
     default: errorQuda("Unsupported nColor = %d", u.Ncolor());
     }
     return checksum;

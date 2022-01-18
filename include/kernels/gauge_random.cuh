@@ -13,7 +13,7 @@ namespace quda {
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     static constexpr bool group = group_;
-
+    
     using Gauge = typename gauge_mapper<Float, recon>::type;
 
     int E[4]; // extended grid dimensions
@@ -22,12 +22,14 @@ namespace quda {
     Gauge U;
     RNGState *rng;
     real sigma; // where U = exp(sigma * H)
-
-    GaugeGaussArg(const GaugeField &U, RNGState *rng, double sigma) :
+    QudaFieldGeometry geom; 
+    
+    GaugeGaussArg(const GaugeField &U, RNGState *rng, const double sigma, const QudaFieldGeometry geom) :
       kernel_param(dim3(U.LocalVolumeCB(), 2, 1)),
       U(U),
       rng(rng),
-      sigma(sigma)
+      sigma(sigma),
+      geom(geom)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = U.R()[dir];
@@ -37,6 +39,7 @@ namespace quda {
     }
   };
 
+  // DMH: FIXME SUN
   template <typename real, typename Link> __device__ __host__ Link gauss_su3(RNGState &localState)
   {
     Link ret;
@@ -55,21 +58,21 @@ namespace quda {
       temp2[i] *= radius[i];
     }
 
-    // construct Anti-Hermitian matrix
+    // construct Hermitian matrix
     const real rsqrt_3 = quda::rsqrt(3.0);
-    ret(0, 0) = complex<real>(0.0, temp1[2] + rsqrt_3 * temp2[3]);
-    ret(1, 1) = complex<real>(0.0, -temp1[2] + rsqrt_3 * temp2[3]);
-    ret(2, 2) = complex<real>(0.0, -2.0 * rsqrt_3 * temp2[3]);
+    ret(0, 0) = complex<real>(temp1[2] + rsqrt_3 * temp2[3], 0.0);
+    ret(1, 1) = complex<real>(-temp1[2] + rsqrt_3 * temp2[3], 0.0);
+    ret(2, 2) = complex<real>(-2.0 * rsqrt_3 * temp2[3], 0.0);
     ret(0, 1) = complex<real>(temp1[0], temp1[1]);
-    ret(1, 0) = complex<real>(-temp1[0], temp1[1]);
+    ret(1, 0) = complex<real>(temp1[0], -temp1[1]);
     ret(0, 2) = complex<real>(temp1[3], temp2[0]);
-    ret(2, 0) = complex<real>(-temp1[3], temp2[0]);
+    ret(2, 0) = complex<real>(temp1[3], -temp2[0]);
     ret(1, 2) = complex<real>(temp2[1], temp2[2]);
-    ret(2, 1) = complex<real>(-temp2[1], temp2[2]);
+    ret(2, 1) = complex<real>(temp2[1], -temp2[2]);
 
     return ret;
   }
-
+  
   template <typename Arg> struct GaussGauge
   {
     const Arg &arg;
@@ -84,24 +87,28 @@ namespace quda {
       int x[4];
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
-
+      
+      int dim_max = (arg.geom == QUDA_SCALAR_GEOMETRY ? 1 :
+		     arg.geom == QUDA_VECTOR_GEOMETRY ? 4 :
+		     arg.geom == QUDA_TENSOR_GEOMETRY ? 6 : 8);
+      
       if (arg.group && arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the identity and finish
         Link I;
         setIdentity(&I);
-        for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
+        for (int mu = 0; mu < dim_max; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
       } else {
-        for (int mu = 0; mu < 4; mu++) {
+        for (int mu = 0; mu < dim_max; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
-
+	  
           // generate Gaussian distributed su(n) fiueld
           Link u = gauss_su3<real, Link>(localState);
           if (arg.group) {
             u = arg.sigma * u;
-            expsu3<real>(u);
+            expsuNTaylor(u, 25);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
-
+	  
           arg.rng[parity * arg.threads.x + x_cb] = localState;
         }
       }

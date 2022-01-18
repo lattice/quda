@@ -13,16 +13,18 @@ namespace quda {
     GaugeField &U;
     RNG &rng;
     Float sigma;
+    QudaFieldGeometry geom;
     bool group;
     unsigned int minThreads() const { return U.VolumeCB(); }
 
   public:
-    GaugeGauss(GaugeField &U, RNG &rng, double sigma) :
+    GaugeGauss(GaugeField &U, RNG &rng, const double sigma, const QudaFieldGeometry geom) :
       TunableKernel2D(U, 2),
       U(U),
       rng(rng),
       sigma(static_cast<Float>(sigma)),
-      group(U.LinkType() == QUDA_SU3_LINKS)
+      geom(geom),
+      group(U.LinkType() == QUDA_SUN_LINKS)
     {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (group) printfQuda("Creating Gaussian distrbuted Lie group field with sigma = %e\n", sigma);
@@ -31,17 +33,17 @@ namespace quda {
       strcat(aux, group ? ",lie_group" : "lie_algebra");
       apply(device::get_default_stream());
     }
-
+    
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (group) {
-        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, true>(U, rng.State(), sigma));
+        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, true>(U, rng.State(), sigma, U.Geometry()));
       } else {
-        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, false>(U, rng.State(), sigma));
+        launch<GaussGauge>(tp, stream, GaugeGaussArg<Float, nColor, recon, false>(U, rng.State(), sigma, U.Geometry()));
       }
     }
-
+    
     long long flops() const { return 0; }
     long long bytes() const { return U.Bytes(); }
 
@@ -52,10 +54,10 @@ namespace quda {
   void gaugeGauss(GaugeField &U, RNG &rng, double sigma)
   {
     if (!U.isNative()) errorQuda("Order %d with %d reconstruct not supported", U.Order(), U.Reconstruct());
-    if (U.LinkType() != QUDA_SU3_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
+    if (U.LinkType() != QUDA_SUN_LINKS && U.LinkType() != QUDA_MOMENTUM_LINKS)
       errorQuda("Unexpected link type %d", U.LinkType());
 
-    instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma);
+    instantiate<GaugeGauss, ReconstructFull>(U, rng, sigma, U.Geometry());
 
     // ensure multi-gpu consistency if required
     if (U.GhostExchange() == QUDA_GHOST_EXCHANGE_EXTENDED) {

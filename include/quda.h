@@ -505,6 +505,11 @@ extern "C" {
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
 
+    /** The orthogonal direction in the 3D eigensolver **/
+    int ortho_dim;
+    
+    /** The size of the orthogonal direction in the 3D eigensolver **/
+    int ortho_dim_size;
     //-------------------------------------------------
 
     // EIG-CG PARAMS
@@ -1300,14 +1305,14 @@ extern "C" {
   void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param);
 
   /**
-   * Project the input field on the SU(3) group.  If the target
+   * Project the input field on the SU(N) group.  If the target
    * tolerance is not met, this routine will give a runtime error.
    *
    * @param gauge_h The gauge field to be updated
    * @param tol The tolerance to which we iterate
    * @param param The parameters of the gauge field
    */
-  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param);
+  void projectSUNQuda(void *gauge_h, double tol, QudaGaugeParam *param);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
@@ -1396,7 +1401,7 @@ extern "C" {
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
-   * @param u_link          SU(3) think link variables.
+   * @param u_link          SU(N) think link variables.
    * @param quark           The input fermion field.
    * @param num             The number of quark fields
    * @param num_naik        The number of naik contributions
@@ -1430,6 +1435,25 @@ extern "C" {
   void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
+     @brief Perform an eigendecomposition on the links and then create 
+     an hermitian matrix from which the fundamental representation
+     can be read, assuming Gell-Mann matricies tau. The compute
+     is performed on gaugePrecise and teh result is stored in 
+     gaugeFundamental.
+
+     The Algorithm
+     U = exp(iH) where H = sum_{i=1..N^2-1} \alpha_i \tau_i  
+     UV = lambdaV = exp(i sigma)V,
+     HV = sigmaV,
+     hence H = V S V^{\dag} | S = diag(sigma_1, sigma_2, ... , sigma_N) 
+     
+     @param[in] qr_tol The tolerance on the QR solver
+     @param[in] qr_max_iter The maximum number of iterations in the QR
+     @param[in] taylor_N The number of terms in the Taylor expansion of exp(iH) 
+  */
+  void computeGaugeFundamental(const double qr_tol, const int qr_max_iter, const int taylor_N);
+  
+  /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
    * @param Array for storing the averages (total, spatial, temporal)
    */
@@ -1437,7 +1461,8 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externally allocated GaugeField
+   * @param Pointer to externalGaugeResident cudaGaugeField
+   * @param Location of gauge field
    */
   void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
@@ -1487,6 +1512,18 @@ extern "C" {
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
   /**
+   * Performs Heatbath on gaugePrecise
+   * @param beta Beta simulation value 
+   * @param num_start Starting label for simulation
+   * @param num_steps Number of simulation steps after warm up
+   * @param num_warmup_steps Number of simulation steps to warm up
+   * @param num_heatbath_per_step Number of heatbath iterations per step
+   * @param num_overrelax_per_step Number of overrelaxation iterations per step
+   * @param coldstart Whether to do a coldstart (unit gauge) or hot start (random gauge)
+   */
+  //void performHeatbath(double beta, unsigned int num_start, unsigned int num_steps, unsigned int num_warmup_steps, unsigned int num_heatbath_per_step, unsigned int num_overrelax_per_step, bool coldstart);
+  
+  /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the
    * observables are computed on this, else the resident gauge field
@@ -1513,24 +1550,6 @@ extern "C" {
 		      const QudaContractType cType, void *cs_param_ptr,
 		      const int *X, const int *const source_position, int* Mom);
   
-  /**
-   * Public function to perform color contractions of the host spinorfields contained
-   * inside first two arguments. Used for cases where one wishes to contract data in
-   * either the T or Z dim
-   * @param[in] h_prop_array_flavor_1 pointer to pointers of ColorSpinorField host data
-   * @param[in] h_prop_array_flavor_2 pointer to pointers of ColorSpinorField host data
-   * @param[out] h_result adress of pointer to the 16*corr_dim complex numbers of the
-   *            result correlators
-   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
-   * @param[in] param meta data for construction of ColorSpinorFields.
-   * @param[in] colorspinorparam pointer to a ColorSpinorParam meta data for
-   *            construction of ColorSpinorFields
-   * @param[in] X spacetime data for construction of ColorSpinorFields
-   */
-  
-  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
-                    const int *X);
-
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
@@ -1583,7 +1602,48 @@ extern "C" {
   
   void make4DMidPointProp(void *out4D_ptr, void *in5D_ptr, QudaInvertParam *inv_param5D, QudaInvertParam *inv_param4D,
                           const int *X);
+  
+  /**
+   * @brief Hacks for Callat. Will document at PR time
+   */
+  void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
+		       QudaInvertParam inv_param, unsigned int n_ev, const int X[4]);
 
+  void laphBaryonKernel(int n1, int n2, int n3, int n_mom,
+			double _Complex *host_coeffs1, 
+			double _Complex *host_coeffs2, 
+			double _Complex *host_coeffs3,
+			double _Complex *mom_ptr, 
+			int n_ev, void **ev_ptr, 
+			void *ret_array,
+			int block_size_mom_proj,
+			const int X[4]);
+  
+  void laphCurrentKernel(int n1, int n2, int n_mom,
+                         int block_size_mom_proj,
+			 void **host_quark, 
+			 void **host_quark_bar, 
+			 int *host_mom, 
+			 void *ret_array,
+			 const int X[4]);
+  
+  void laphBaryonKernelComputeModeTripletA(int nMom, int nEv, int block_size_mom_proj,
+					   void **host_evec, 
+					   double _Complex *host_mom,
+					   double _Complex *return_array,
+					   const int X[4]);  
+  
+  void laphBaryonKernelComputeModeTripletB(int n1, int n2, int n3, int n_mom, int n_ev, 
+					   double _Complex *host_coeffs1, 
+					   double _Complex *host_coeffs2, 
+					   double _Complex *host_coeffs3,
+					   double _Complex *host_mode_trip_buf, 
+					   double _Complex *return_array);
+
+  void laphBaryonKernelComputeModeTripletEnd();
+
+  void createLAPHsource(void *source, void **evecs, int source_t, int source_s, int eig_n);
+  
   /**
   * Convert a 4D point source to a 5D one
   * @param in4D_ptr    Contains 4D pointsource
@@ -1619,6 +1679,19 @@ extern "C" {
   void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
+
+
+
+  ///-----------LAPH SCATTERING-----------------------///
+
+  void createMesonBlocksQuda(const void *mesonBlocks, const void *eigenVectors);
+
+
+  ///-----------END LAPH SCATTERING--------------------///
+
+
+
+
 
 #ifdef __cplusplus
 }

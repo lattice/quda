@@ -1,5 +1,4 @@
-#ifndef _WILSON_DSLASH_REFERENCE_H
-#define _WILSON_DSLASH_REFERENCE_H
+#pragma once
 
 #include <enum_quda.h>
 #include <quda.h>
@@ -68,5 +67,3 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
-#endif // _WILSON_DSLASH_REFERENCE_H

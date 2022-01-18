@@ -14,15 +14,15 @@ namespace quda
   void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
 
   /**
-   * @brief Project the input gauge field onto the SU(3) group.  This
+   * @brief Project the input gauge field onto the SU(N) group.  This
    * is a destructive operation.  The number of link failures is
    * reported so appropriate action can be taken.
    *
-   * @param U Gauge field that we are projecting onto SU(3)
+   * @param U Gauge field that we are projecting onto SU(N)
    * @param tol Tolerance to which the iterative algorithm works
    * @param fails Number of link failures (device pointer)
    */
-  void projectSU3(GaugeField &U, double tol, int *fails);
+  void projectSUN(GaugeField &U, double tol, int *fails);
 
   /**
      @brief Compute the plaquette of the gauge field
@@ -48,7 +48,6 @@ namespace quda
      @param[in] rngstate random states
      @param[in] sigma Width of Gaussian distrubution
   */
-
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
 
   /**
@@ -65,9 +64,35 @@ namespace quda
      @param[in] seed The seed used for the RNG
      @param[in] sigma Wdith of the Gaussian distribution
   */
-
   void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);
 
+  /**
+     @brief Apply a gauge transformation on gauge.
+     @param[in] gauge The gauge field to transform
+     @param[in] transform The gauge transformations
+  */
+  void gaugeTransform(GaugeField &gauge, const GaugeField &transform);
+  
+  /**
+     @brief Perform an eigendecomposition on the links and then create 
+     an hermitian matrix from which the fundamental representation
+     can be read, assuming Gell-Mann matricies tau.
+
+     The Algorithm
+     U = exp(iH) where H = sum_{i=1..N^2-1} \alpha_i \tau_i,
+     UV = lambdaV = exp(i sigma)V,
+     HV = sigmaV,
+     hence H = V S V^{\dag} | S = diag(sigma_1, sigma_2, ... , sigma_N).
+
+     @param[out] out The hermitian matrix H
+     @param[in] in The SU(N) gauge field
+     @param[in] qr_tol The tolerance on the QR solver
+     @param[in] qr_max_iter The maximum number of iterations in the QR
+     @param[in] taylor_N The number of terms in the Taylor expansion of exp(iH)     
+  */
+  void gaugeFundamentalRep(GaugeField &out, const GaugeField &in, const double qr_tol, const int qr_max_iter,
+			   const int taylor_N);
+  
   /**
      @brief Apply APE smearing to the gauge field
 
@@ -124,7 +149,7 @@ namespace quda
    * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    */
   void gaugeFixingOVR(GaugeField &data, const int gauge_dir, const int Nsteps, const int verbose_interval,
-                      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
+		      const double relax_boost, const double tolerance, const int reunit_interval, const int stopWtheta);
 
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.

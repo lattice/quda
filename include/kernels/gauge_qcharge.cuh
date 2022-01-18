@@ -12,7 +12,7 @@ namespace quda
     using reduce_t = array<double, 3>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
-    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static_assert(nColor == N_COLORS, "QChargeArg instantiated incorrectly");
     static constexpr QudaReconstructType recon = recon_;
     static constexpr bool density = density_;
     typedef typename gauge_mapper<Float,recon>::type F;

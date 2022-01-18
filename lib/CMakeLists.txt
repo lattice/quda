@@ -22,10 +22,13 @@ endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
+
+  evec_project_sum.cu color_contract.cu #color_cross.cu 
+  
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu coarsecoarse_op_mma.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp vector_io.cpp
+  eig_iram.cpp eig_trlm.cpp eig_block_trlm.cpp eig_lanczos3d.cpp vector_io.cpp
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
@@ -33,6 +36,7 @@ set (QUDA_OBJS
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  gauge_fundamental.cu gauge_transform.cu
   gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp
@@ -52,7 +56,7 @@ set (QUDA_OBJS
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_apply_xinv.cu
-  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu blas_quda_3d.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
@@ -86,7 +90,8 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash_mdw_fused.cu dslash5_mobius_eofa.cu
-  instantiate.cpp version.cpp )
+  instantiate.cpp version.cpp
+  laph.cpp )
 # cmake-format: on
 
 # current workaround for nvshmem
@@ -445,6 +450,10 @@ if(QUDA_LAPLACE)
   target_compile_definitions(quda PUBLIC GPU_LAPLACE)
 endif(QUDA_LAPLACE)
 
+if(QUDA_BLAS_3D)
+  target_compile_definitions(quda PUBLIC GPU_BLAS_3D)
+endif(QUDA_BLAS_3D)
+	
 # MULTI GPU AND USQCD
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda PUBLIC MULTI_GPU)
@@ -527,6 +536,18 @@ if(QUDA_OPENBLAS)
     target_link_libraries(quda_cpp PUBLIC openblas)
   else()
     target_link_libraries(quda INTERFACE ${OPENBLAS})
+  endif()
+endif()
+
+
+if(QUDA_ZFP)
+  target_compile_definitions(quda PRIVATE ZFP_LIB)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_ZFP_HOME}/include>)
+  if(QUDA_DOWLOAD_ZFP)
+    target_link_libraries(quda PUBLIC zfp)
+    target_link_libraries(quda_cpp PUBLIC zfp)
+  else()
+    target_link_libraries(quda INTERFACE ${ZFP})
   endif()
 endif()
 

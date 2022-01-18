@@ -12,6 +12,7 @@
 #include <qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#include <blas_quda_3d.h>
 #include <util_quda.h>
 #include <tune_quda.h>
 #include <vector_io.h>
@@ -19,7 +20,6 @@
 
 namespace quda
 {
-
   // Eigensolver class
   //-----------------------------------------------------------------------------
   EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
@@ -115,6 +115,10 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");
       eig_solver = new BLKTRLM(mat, eig_param, profile);
       break;
+    case QUDA_EIG_TR_LANCZOS_3D:
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating 3D TR Lanczos eigensolver\n");
+      eig_solver = new TRLM3D(mat, eig_param, profile);
+      break;
     default: errorQuda("Invalid eig solver type");
     }
 
@@ -167,7 +171,7 @@ namespace quda
     }
     if (!orthed) errorQuda("Failed to orthonormalise initial guesses");
   }
-
+  
   void EigenSolver::checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace)
   {
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
@@ -182,8 +186,8 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
+    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
     for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
@@ -245,8 +249,8 @@ namespace quda
     // Resize Krylov Space
     for (unsigned int i = n_conv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(n_conv);
-    evals.resize(n_conv);
-
+    evals.resize(eig_param->eig_type == QUDA_EIG_TR_LANCZOS_3D ? comm_dim(3) * kSpace[0]->X()[3] * n_conv : n_conv);
+    
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
@@ -373,7 +377,6 @@ namespace quda
 
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
   {
-
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
@@ -405,7 +408,7 @@ namespace quda
     // Increase final result by 10% for safety
     return result * 1.10;
   }
-
+  
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
   {
     bool orthed = true;
@@ -480,7 +483,7 @@ namespace quda
     // Save orthonormalisation tuning
     saveTuneCache();
   }
-
+  
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
   {
     std::vector<int> pivots(size);
@@ -529,7 +532,7 @@ namespace quda
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
-
+    
     // Alias the vectors we wish to keep
     vecs_ptr.reserve(block_i_rank);
     for (int i = i_range.first; i < i_range.second; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
@@ -537,9 +540,9 @@ namespace quda
     kSpace_ptr.reserve(block_j_rank);
     for (int j = j_range.first; j < j_range.second; j++) {
       int k = n_kr + 1 + j - j_range.first;
-      kSpace_ptr.push_back(kSpace[k]);
+      kSpace_ptr.push_back(kSpace[k]);      
     }
-
+    
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
@@ -1077,7 +1080,7 @@ namespace quda
         kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
-
+      
       // Alias the vectors we wish to keep.
       vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) vecs_ptr.push_back(kSpace[locked + j]);

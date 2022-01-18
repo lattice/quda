@@ -9,10 +9,11 @@ namespace quda {
 
   /**
     @brief Calculate the SU(2) index block in the SU(Nc) matrix
-    @param block number to calculate the index's, the total number of blocks is Nc * (Nc - 1) / 2.
-    @return Returns two index's in int2 type, accessed by .x and .y.
- */
-  template <int nColor>
+    @param block number to calculate the indices, the total number of blocks is 
+    nColor * ( nColor - 1) / 2.
+    @return Returns two indices in int2 type, accessed by .x and .y.
+  */
+  template<int nColor>
   __host__ __device__ static inline int2 IndexBlock(int block){
     int2 id;
     int i1;
@@ -36,10 +37,11 @@ namespace quda {
 
   /**
     @brief Calculate the SU(2) index block in the SU(Nc) matrix
-    @param block number to calculate de index's, the total number of blocks is Nc * (Nc - 1) / 2.
+    @param block number to calculate de indices, the total number of blocks is 
+    nColor * ( nColor - 1) / 2.
     @param p store the first index
     @param q store the second index
- */
+  */
   template<int nColor>
   __host__ __device__ static inline void IndexBlock(int block, int &p, int &q){
     if ( nColor == 3 ) {
@@ -67,7 +69,8 @@ namespace quda {
   }
 
   /**
-    @brief Generate full SU(2) matrix (four real numbers instead of 2x2 complex matrix) and update link matrix.
+    @brief Generate full SU(2) matrix (four real numbers instead of 2x2 complex matrix)
+    and update link matrix.
     Get from MILC code.
     @param al weight
     @param localstate CURAND rng state

@@ -6,12 +6,12 @@
 #include <random_quda.h>
 #include <color_spinor_field.h>
 
-#define gauge_site_size 18      // real numbers per link
-#define spinor_site_size 24     // real numbers per wilson spinor
-#define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
-#define clover_site_size 72     // real numbers per block-diagonal clover matrix
-#define mom_site_size 10        // real numbers per momentum
-#define hw_site_size 12         // real numbers per half wilson
+#define gauge_site_size 2*N_COLORS*N_COLORS // real numbers per link
+#define spinor_site_size 2*4*N_COLORS       // real numbers per wilson spinor
+#define stag_spinor_site_size 2*N_COLORS    // real numbers per staggered 'spinor'
+#define clover_site_size 2*4*N_COLORS*N_COLORS // real numbers per block-diagonal clover matrix
+#define mom_site_size 10 // real numbers per momentum
+#define hw_site_size 4*N_COLORS // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -93,11 +93,17 @@ void saveHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, QudaLinkType 
 void saveDeviceGaugeField(cudaGaugeField *gaugeEx, cudaGaugeField *gauge);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
+void exponentiateHostGaugeField(void **gauge, int m, QudaPrecision precision);
+void fundamentalHostGaugeField(void **gauge, QudaPrecision precision);
+
+template <typename Float> void constructFundamentalGaugeField(Float **res);
+template <typename Float> void expsuNTaylor(Float **res, int m);
 template <typename Float> void constructCloverField(Float *res, double norm, double diag);
 template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param);
 template <typename Float>
 void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
 template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
+template <typename Float> void constructUnitaryGaugeField(Float **res);
 //------------------------------------------------------
 
 // Spinor utils
@@ -236,7 +242,9 @@ inline int getReconstructNibble(QudaReconstructType recon)
   case QUDA_RECONSTRUCT_NO: return 4;
   case QUDA_RECONSTRUCT_13:
   case QUDA_RECONSTRUCT_12: return 2;
+#if (N_COLORS > 2)
   case QUDA_RECONSTRUCT_9:
+#endif
   case QUDA_RECONSTRUCT_8: return 1;
   default: return 0;
   }
@@ -277,3 +285,9 @@ void setFermionSmearParam(QudaInvertParam &inv_param, double omega, int steps);
 void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
+
+// ZFP
+double process3D(double* buffer, uint blocks, double tolerance, uint block_size);
+double process4D(double* buffer, uint blocks, double tolerance, uint block_size);
+double zfp_compress_decompress_link(void **array_in, void **array_out);
+double zfp_compress_decompress_prop(void *prop_in, void *prop_out, bool zfp_4D);

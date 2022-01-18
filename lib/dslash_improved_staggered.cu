@@ -47,7 +47,7 @@ namespace quda
 
     /*
       per direction / dimension flops
-      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      SU(N) matrix-vector flops = (8 Nc - 2) * Nc
       xpay = 2 * 2 * Nc * Ns
 
       So for the full dslash we have
@@ -58,7 +58,7 @@ namespace quda
     */
     long long flops() const
     {
-      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(3) matrix-vector flops
+      int mv_flops = (8 * in.Ncolor() - 2) * in.Ncolor(); // SU(N) matrix-vector flops
       int ghost_flops = (3 + 1) * (mv_flops + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
       int num_dir = 2 * 4;                               // hard code factor of 4 in direction since fields may be 5-d
@@ -79,7 +79,7 @@ namespace quda
       case UBER_KERNEL:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
-        flops_ = (2 * num_dir * mv_flops + // SU(3) matrix-vector multiplies
+        flops_ = (2 * num_dir * mv_flops + // SU(N) matrix-vector multiplies
                   (2 * num_dir - 1) * 2 * in.Ncolor() * in.Nspin())
           * sites;                                  // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites; // axpy is always on interior

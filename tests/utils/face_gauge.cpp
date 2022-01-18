@@ -28,10 +28,6 @@ enum {
   XDOWN = 7
 };
 
-
-//FIXME remove this legacy macro
-#define gauge_site_size 18 // real numbers per gauge field
-
 static void* fwd_nbr_staple[4];
 static void* back_nbr_staple[4];
 static void* fwd_nbr_staple_sendbuf[4];
@@ -148,13 +144,13 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
                 int index = (a * f[dir][0] + b * f[dir][1] + c * f[dir][2] + d * f[dir][3]) >> 1;
                 int oddness = (a+b+c+d)%2;
 		if (oddness == 0){ //even
-		  for(int i=0;i < 18;i++){
-		    even_dst[18*even_dst_index+i] = even_src[18*index + i];
+		  for(int i=0;i < gauge_site_size;i++){
+		    even_dst[gauge_site_size*even_dst_index+i] = even_src[gauge_site_size*index + i];
 		  }
 		  even_dst_index++;
 		}else{ //odd
-		  for(int i=0;i < 18;i++){
-		    odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+		  for(int i=0;i < gauge_site_size;i++){
+		    odd_dst[gauge_site_size*odd_dst_index+i] = odd_src[gauge_site_size*index + i];
 		  }
 		  odd_dst_index++;
 		}
@@ -216,12 +212,12 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
       int oddness = ( (X[nu]-1) + 0 + i + j) %2;
       if(oddness==0){
         for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
-          memcpy(&dst_even[(18 * even_dst_idx + tmpidx) * prec], &src_even[(18 * src_idx + tmpidx) * prec], prec);
+          memcpy(&dst_even[(gauge_site_size * even_dst_idx + tmpidx) * prec], &src_even[(gauge_site_size * src_idx + tmpidx) * prec], prec);
         }
         even_dst_idx++;
       }else{
         for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
-          memcpy(&dst_odd[(18 * odd_dst_idx + tmpidx) * prec], &src_odd[(18 * src_idx + tmpidx) * prec], prec);
+          memcpy(&dst_odd[(gauge_site_size * odd_dst_idx + tmpidx) * prec], &src_odd[(gauge_site_size * src_idx + tmpidx) * prec], prec);
         }
         odd_dst_idx++;
       }//if
@@ -329,13 +325,13 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
 	      int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
 	      int oddness = (a+b+c+d)%2;
 	      if (oddness == 0){ //even
-		for(int i=0;i < 18;i++){
-		  even_dst[18*even_dst_index+i] = even_src[18*index + i];
+		for(int i=0;i < gauge_site_size;i++){
+		  even_dst[gauge_site_size*even_dst_index+i] = even_src[gauge_site_size*index + i];
 		}
 		even_dst_index++;
 	      }else{ //odd
-		for(int i=0;i < 18;i++){
-		  odd_dst[18*odd_dst_index+i] = odd_src[18*index + i];
+		for(int i=0;i < gauge_site_size;i++){
+		  odd_dst[gauge_site_size*odd_dst_index+i] = odd_src[gauge_site_size*index + i];
 		}
 		odd_dst_index++;
 	      }

@@ -11,7 +11,7 @@ namespace quda {
     GhostExtract(const GaugeField &u, void **Ghost_, bool extract, int offset)
     {
       Float **Ghost = reinterpret_cast<Float**>(Ghost_);
-      constexpr int nColor = 3;
+      constexpr int nColor = N_COLORS;
       constexpr int length = nColor * nColor * 2;
 
       if (u.isNative()) {
@@ -42,7 +42,7 @@ namespace quda {
         } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
 #if QUDA_RECONSTRUCT & 1
           if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
-            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type;
+            using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_MILC>::type;
             ExtractGhost<Float, nColor, G>(u, Ghost, extract, offset);
           } else if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
             using G = typename gauge_mapper<Float, QUDA_RECONSTRUCT_9>::type;
@@ -123,7 +123,8 @@ namespace quda {
 
     // if number of colors doesn't equal three then we must have
     // coarse-gauge field
-    if (u.Ncolor() != 3) {
+    //printfQuda("Here colors = %d\n", u.Ncolor());
+    if (u.Ncolor() != N_COLORS) {
       extractGaugeGhostMG(u, ghost, extract, offset);
     } else {
       instantiatePrecision<GhostExtract>(u, ghost, extract, offset);

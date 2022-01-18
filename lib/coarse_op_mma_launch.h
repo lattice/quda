@@ -104,14 +104,14 @@ namespace quda
     }
 
     /**
-        The following functions have switch's that list computeUV and computeVUV MMA kernels instantiations.
+        The following functions have switches that list computeUV and computeVUV MMA kernels instantiations.
         if query_max = true, it will simply return how many instantiations there are; if query_max = false,
         the MMA kernel is launched with the corresponding configuration.
      */
 
     template <bool query_max = false, class Arg, class Tunable>
-    std::enable_if_t<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
-    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
+    std::enable_if_t<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
+    launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)      
     {
       if (query_max) return 1;
       switch (tp.aux.x) {
@@ -396,27 +396,41 @@ namespace quda
       errorQuda("MMA implementation is ONLY built for !from_coarse.");
       return -1;
     }
-
+    
     template <bool query_max = false, class Arg, class Tunable>
-    std::enable_if_t<Arg::fineColor == 6 && Arg::coarseColor == 6 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
-    {
-      if (query_max) return 2;
-      switch (tp.aux.x) {
-      // clang-format off
-      case 0: launch_compute_vuv_kernel< 16,  16,   8,   8,   4>(tp, arg, min_threads, stream, tunable); break;
-      case 1: launch_compute_vuv_kernel< 16,  16,   8,   4,   8>(tp, arg, min_threads, stream, tunable); break;
-      // clang-format on
-      default:
-        errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
-                  Arg::fineColor, Arg::coarseColor);
+      std::enable_if_t<Arg::fineColor == 2*N_COLORS && Arg::coarseColor == 2*N_COLORS && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
+      {
+#if (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 8)
+	constexpr int k_tile = 8;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 12)
+	constexpr int k_tile = 12;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 16)
+	constexpr int k_tile = 16;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 32)
+	constexpr int k_tile = 32;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 64)
+	constexpr int k_tile = 64;
+#elif (__COMPUTE_CAPABILITY__ < 750) && (2*N_COLORS <= 128)
+	constexpr int k_tile = 128;
+#endif
+
+	if (query_max) return 2;
+	switch (tp.aux.x) {
+	  // clang-format off
+	case 0: launch_compute_vuv_kernel<16,  16,   k_tile,   8,   4>(tp, arg, min_threads, stream, tunable); break;
+	case 1: launch_compute_vuv_kernel<16,  16,   k_tile,   4,   8>(tp, arg, min_threads, stream, tunable); break;
+	  // clang-format on
+	default:
+	  errorQuda("tp.aux.x(=%d) is NOT supported by (%d, %d, %d, %d).", tp.aux.x, Arg::fineSpin, Arg::coarseSpin,
+		    Arg::fineColor, Arg::coarseColor);
+	}
+	return -1;
       }
-      return -1;
-    }
-
+      
     template <bool query_max = false, class Arg, class Tunable>
-    std::enable_if_t<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
-    launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
+      std::enable_if_t<Arg::fineColor == 24 && Arg::coarseColor == 24 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
+      launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
     {
 #if (__COMPUTE_CAPABILITY__ >= 750) // Turing or above
       if (query_max) return 1;

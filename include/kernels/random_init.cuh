@@ -39,15 +39,15 @@ namespace quda {
     const Arg &arg;
     __device__ constexpr init_random(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ inline void operator()(int id, int parity)
+    
+    __device__ inline void operator()(int x_cb, int parity)
     {
       // Each thread gets same seed, a different sequence number, no offset
       int x[4];
-      getCoords(x, id, arg.X, parity);
+      getCoords(x, x_cb, arg.X, parity);
       for (int i = 0; i < 4; i++) x[i] += arg.commCoord[i] * arg.X[i];
       int idd = (((x[3] * arg.X_global[2] + x[2]) * arg.X_global[1]) + x[1]) * arg.X_global[0] + x[0];
-      random_init(arg.seed, idd, 0, arg.state[parity * arg.threads.x + id]);
+      random_init(arg.seed, idd, 0, arg.state[parity * arg.threads.x + x_cb]);
     }
   };
 

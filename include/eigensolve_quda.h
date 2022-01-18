@@ -8,7 +8,6 @@
 
 namespace quda
 {
-
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -447,7 +446,7 @@ namespace quda
     // Tridiagonal/Arrow matrix, fixed size.
     double *alpha;
     double *beta;
-
+    
     /**
        @brief Compute eigenpairs
        @param[in] kSpace Krylov vector space
@@ -550,6 +549,151 @@ namespace quda
   };
 
   /**
+     @brief Thick Restarted Lanczos Method for 3D slices
+  */
+  class TRLM3D : public EigenSolver
+  {
+  public:
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    TRLM3D(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
+    virtual ~TRLM3D();
+
+    /**
+       @return Whether the solver is only for Hermitian systems
+    */
+    virtual bool hermitian() { return true; } /** TRLM3D is only for Hermitian systems */
+
+    // Variable size matrix (for the 3D problem)
+    std::vector<std::vector<double>> ritz_mat_3D;
+
+    // Arrays for 3D residua
+    std::vector<std::vector<double>> residua_3D;
+
+    // Array for convergence
+    std::vector<bool> converged_3D;
+    std::vector<bool> active_3D;
+    std::vector<int> iter_locked_3D;
+    std::vector<int> iter_keep_3D;
+    std::vector<int> iter_converged_3D;
+    std::vector<int> num_locked_3D;
+    std::vector<int> num_keep_3D;
+    std::vector<int> num_converged_3D;
+    
+    // Tridiagonal/Arrow matrices, fixed size (for the 3D problem)
+    double **alpha_3D;
+    double **beta_3D;
+    
+    // The orthogonal direction and size in the 3D problem
+    int ortho_dim;
+    int ortho_dim_size;
+    
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Lanczos step: extends the Krylov space.
+       @param[in] v Vector space
+       @param[in] j Index of vector being computed
+    */
+    void lanczosStep3D(std::vector<ColorSpinorField *> v, int j);
+
+    /**
+       @brief Reorder the Krylov space by eigenvalue
+       @param[in] kSpace the Krylov space
+    */
+    void reorder3D(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Get the eigendecomposition from the arrow matrix
+    */
+    void eigensolveFromArrowMat3D();
+
+    /**
+       @brief Rotate the Ritz vectors using the arrow matrix eigendecomposition
+       @param[in] nKspace current Krylov space
+    */
+    void computeKeptRitz3D(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Orthogonalise input vectors r against
+       vector space v using block-BLAS
+       @param[in] v Vector space
+       @param[in] r Vectors to be orthogonalised
+       @param[in] j Use vectors v[0:j]
+       @param[in] s array of
+    */
+    void blockOrthogonalize3D(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
+
+    /**
+       @brief Check for an initial guess. If none present, populate with rands, then
+       orthonormalise
+       @param[in] kSpace The Krylov space vectors
+    */
+    void prepareInitialGuess3D(std::vector<ColorSpinorField *> &kSpace, int ortho_dim_size);
+    
+    /**
+       @brief Estimate the spectral radius of the operator for the max value of the
+       Chebyshev polynomial
+       @param[in] mat Matrix operator
+       @param[in] out Output spinor
+       @param[in] in Input spinor
+    */
+    double estimateChebyOpMax3D(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @brief Check for a maximum of the Chebyshev operator
+       @param[in] mat The problem operator
+       @param[in] kSpace The Krylov space vectors
+    */
+    void checkChebyOpMax3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Compute eigenvalues and their residiua
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+       @param[in] size The number of eigenvalues to compute
+    */
+    void computeEvals3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+			int size);
+
+    /**
+       @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+    */
+    void computeEvals3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+    {
+      computeEvals3D(mat, evecs, evals, n_conv);
+    }
+    
+    /**
+       @brief Load and check eigenpairs from file
+       @param[in] mat Matrix operator
+       @param[in] eig_vecs The eigenvectors to save
+       @param[in] file The filename to save
+    */
+    void loadFromFile3D(const DiracMatrix &mat, std::vector<ColorSpinorField *> &eig_vecs, std::vector<Complex> &evals);
+
+    int getArrayMinMax3D(const std::vector<int> &array, const int limit, const bool min);
+      
+  };
+  
+  /**
      @brief Implicitly Restarted Arnoldi Method.
   */
   class IRAM : public EigenSolver
@@ -622,6 +766,13 @@ namespace quda
     */
     void qrIteration(Complex **Q, Complex **R);
 
+    /**
+       @brief Egensolve from an upper triangular matrix
+       @param[in] T The triangular matrix
+       @param[out] E The eigenvectors 
+    */
+    void eigensolveUpperT(Complex **T, Complex **E);
+    
     /**
        @brief Reorder the Krylov space and eigenvalues
        @param[in] kSpace The Krylov space

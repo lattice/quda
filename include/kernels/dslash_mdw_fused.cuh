@@ -44,7 +44,7 @@ namespace quda {
       using F = typename colorspinor_mapper<storage_type, 4, nColor, spin_project, spinor_direct_load>::type; // color spin field order
       static constexpr bool gauge_direct_load = true;                          // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
-      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
+      using G = typename gauge_mapper<storage_type, recon, 2*N_COLORS*N_COLORS, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -206,7 +206,7 @@ namespace quda {
     __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], Arg &arg, int s)
     {
       typedef typename mapper<storage_type>::type compute_type;
-      typedef Matrix<complex<compute_type>, 3> Link;
+      typedef Matrix<complex<compute_type>, N_COLORS> Link;
       const int their_spinor_parity = arg.nParity == 2 ? 1 - arg.parity : 0;
 
       const int index_4d_cb = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
@@ -292,7 +292,7 @@ namespace quda {
       {
         using storage_type = typename Arg::storage_type;
         using real = typename mapper<storage_type>::type;
-        using Vector = ColorSpinor<real, 3, 4>;
+        using Vector = ColorSpinor<real, N_COLORS, 4>;
         constexpr int Ls = Arg::Ls;
         const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 

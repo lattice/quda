@@ -712,9 +712,10 @@ namespace quda {
         }
 
         steps_since_reliable = 0;
-        r0Norm = sqrt(r2);
+        r0Norm = sqrt(r2);	
         rUpdate++;
-
+	printfQuda("CG: Reliable update %d\n", rUpdate);
+	
         heavy_quark_res_old = heavy_quark_res;
       }
 

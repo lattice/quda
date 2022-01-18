@@ -65,31 +65,36 @@ namespace quda
 #endif
 
   // Vector types used for AoS load-store on CPU
-  template <> struct VectorType<double, 24> {
-    using type = array<double, 24>;
+  template <> struct VectorType<double, 2*4*N_COLORS> {
+    using type = array<double, 2*4*N_COLORS>;
   };
-  template <> struct VectorType<float, 24> {
-    using type = array<float, 24>;
+  template <> struct VectorType<float, 2*4*N_COLORS> {
+    using type = array<float, 2*4*N_COLORS>;
   };
-  template <> struct VectorType<short, 24> {
-    using type = array<short, 24>;
+  template <> struct VectorType<short, 2*4*N_COLORS> {
+    using type = array<short, 2*4*N_COLORS>;
   };
-  template <> struct VectorType<int8_t, 24> {
-    using type = array<int8_t, 24>;
-  };
-  template <> struct VectorType<double, 6> {
-    using type = array<double, 6>;
-  };
-  template <> struct VectorType<float, 6> {
-    using type = array<float, 6>;
-  };
-  template <> struct VectorType<short, 6> {
-    using type = array<short, 6>;
-  };
-  template <> struct VectorType<int8_t, 6> {
-    using type = array<int8_t, 6>;
+  template <> struct VectorType<int8_t, 2*4*N_COLORS> {
+    using type = array<int8_t, 2*4*N_COLORS>;
   };
 
+  // If Nc = 4 or 2, the code below is already instantated
+  // in quda/include/register_traits.h
+#if (N_COLORS != 2 && N_COLORS != 4)
+  template <> struct VectorType<double, 2*N_COLORS> {
+    using type = array<double, 2*N_COLORS>;
+  };
+  template <> struct VectorType<float, 2*N_COLORS> {
+    using type = array<float, 2*N_COLORS>;
+  };
+  template <> struct VectorType<short, 2*N_COLORS> {
+    using type = array<short, 2*N_COLORS>;
+  };
+  template <> struct VectorType<int8_t, 2*N_COLORS> {
+    using type = array<int8_t, 2*N_COLORS>;
+  };
+#endif
+  
   namespace blas
   {
 
@@ -333,14 +338,14 @@ namespace quda
     template <> constexpr int n_vector<float, false, 1, false>() { return 4; }
 
     // AoS ordering is used on CPU uses when we are site unrolling
-    template <> constexpr int n_vector<double, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<double, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<float, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<float, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<short, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<short, false, 1, true>() { return 6; }
-    template <> constexpr int n_vector<int8_t, false, 4, true>() { return 24; }
-    template <> constexpr int n_vector<int8_t, false, 1, true>() { return 6; }
+    template <> constexpr int n_vector<double, false, 4, true>() { return 2*4*N_COLORS; }
+    template <> constexpr int n_vector<double, false, 1, true>() { return 2*N_COLORS; }
+    template <> constexpr int n_vector<float, false, 4, true>() { return 2*4*N_COLORS; }
+    template <> constexpr int n_vector<float, false, 1, true>() { return 2*N_COLORS; }
+    template <> constexpr int n_vector<short, false, 4, true>() { return 2*4*N_COLORS; }
+    template <> constexpr int n_vector<short, false, 1, true>() { return 2*N_COLORS; }
+    template <> constexpr int n_vector<int8_t, false, 4, true>() { return 2*4*N_COLORS; }
+    template <> constexpr int n_vector<int8_t, false, 1, true>() { return 2*N_COLORS; }
 
     template <template <typename...> class Functor,
               template <template <typename...> class, typename store_t, typename y_store_t, int, typename> class Blas,

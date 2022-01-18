@@ -67,6 +67,7 @@ protected:
   Timer<false> a0, a1;
   double2 detu;
   double3 plaq;
+
   GaugeField *U;
   int nsteps;
   int nhbsteps;

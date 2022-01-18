@@ -17,7 +17,7 @@ namespace quda
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr int nvector = nvector_;
-    using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 18>::type;
+    using Oprod = typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO, 2*N_COLORS*N_COLORS>::type;
     using F = typename colorspinor_mapper<Float, nSpin, nColor>::type;
 
     Oprod oprod;

@@ -104,7 +104,7 @@ namespace quda
   copy_field(int out, int in, int parity, const Arg &arg)
   {
     using Element = typename Arg::Element;
-    constexpr int length = 72;
+    constexpr int length = 8*N_COLORS*N_COLORS;
     Element reg_in[length];
     Element reg_out[length];
     arg.in.load(reg_in, in, parity);

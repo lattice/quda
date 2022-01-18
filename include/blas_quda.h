@@ -1,10 +1,7 @@
-#ifndef _QUDA_BLAS_H
-#define _QUDA_BLAS_H
+#pragma once
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
-
-// ---------- blas_quda.cu ----------
 
 namespace quda {
 
@@ -443,5 +440,3 @@ namespace quda {
   } // namespace blas
 
 } // namespace quda
-
-#endif // _QUDA_BLAS_H

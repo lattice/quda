@@ -149,11 +149,11 @@ namespace quda
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 #ifdef NSPIN4
-    if (fineColor == 6) { // free field Wilson
-      if (coarseColor == 6) {
-        calculateYcoarse<use_mma, Float, vFloat, 6, fineSpin, 6, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover,
-                                                                             cloverInv, kappa, mass, mu, mu_factor,
-                                                                             dirac, matpc, need_bidirectional);
+    if (fineColor == 2*N_COLORS) { // free field Wilson
+      if (coarseColor == 2*N_COLORS) {
+        calculateYcoarse<use_mma, Float, vFloat, 2*N_COLORS, fineSpin, 2*N_COLORS, coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv,
+                                                                             kappa, mass, mu, mu_factor, dirac, matpc,
+                                                                             need_bidirectional);
       } else {
         errorQuda("Unsupported fineColor = %d coarseColor = %d\n", fineColor, coarseColor);
       }

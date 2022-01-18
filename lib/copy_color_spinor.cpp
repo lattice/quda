@@ -50,7 +50,7 @@ namespace quda
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
     copy_pack pack(dst, src, location, Dst, Src, dstNorm, srcNorm);
-    if (dst.Ncolor() == 3) {
+    if (dst.Ncolor() == N_COLORS) {
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
           copyGenericColorSpinorDD(pack);

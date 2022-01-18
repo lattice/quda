@@ -17,7 +17,7 @@
 template <typename sFloat, typename cFloat>
 void cloverReference(sFloat *out, cFloat *clover, sFloat *in, int parity) {
   int nSpin = 4;
-  int nColor = 3;
+  int nColor = N_COLORS;
   int N = nColor * nSpin / 2;
   int chiralBlock = N + 2*(N-1)*N/2;
 
@@ -137,7 +137,7 @@ void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void 
     xpay(tmp, kappa2, out, Vh * spinor_site_size, precision);
     break;
   default:
-    errorQuda("Unsupoorted matpc=%d", matpc_type);
+    errorQuda("Unsupported matpc=%d", matpc_type);
   }
 
   host_free(tmp);
@@ -176,9 +176,9 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
     for(int i = 0; i < Vh; i++)
       for(int s = 0; s < 4; s++) {
         double a5 = ((s / 2) ? -1.0 : +1.0) * a;
-        for(int c = 0; c < 3; c++) {
-          ((double *) out)[i * 24 + s * 6 + c * 2 + 0] = ((double *) tmpH)[i * 24 + s * 6 + c * 2 + 0] - a5*((double *) in)[i * 24 + s * 6 + c * 2 + 1];
-          ((double *) out)[i * 24 + s * 6 + c * 2 + 1] = ((double *) tmpH)[i * 24 + s * 6 + c * 2 + 1] + a5*((double *) in)[i * 24 + s * 6 + c * 2 + 0];
+        for(int c = 0; c < N_COLORS; c++) {
+          ((double *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] = ((double *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5*((double *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1];
+          ((double *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] = ((double *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5*((double *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0];
         }
       }
     break;
@@ -186,9 +186,9 @@ void applyTwist(void *out, void *in, void *tmpH, double a, QudaPrecision precisi
     for(int i = 0; i < Vh; i++)
       for(int s = 0; s < 4; s++) {
         float a5 = ((s / 2) ? -1.0 : +1.0) * a;
-        for(int c = 0; c < 3; c++) {
-          ((float *) out)[i * 24 + s * 6 + c * 2 + 0] = ((float *) tmpH)[i * 24 + s * 6 + c * 2 + 0] - a5*((float *) in)[i * 24 + s * 6 + c * 2 + 1];
-          ((float *) out)[i * 24 + s * 6 + c * 2 + 1] = ((float *) tmpH)[i * 24 + s * 6 + c * 2 + 1] + a5*((float *) in)[i * 24 + s * 6 + c * 2 + 0];
+        for(int c = 0; c < N_COLORS; c++) {
+          ((float *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] = ((float *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0] - a5*((float *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1];
+          ((float *) out)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] = ((float *) tmpH)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 1] + a5*((float *) in)[i * spinor_site_size + s * 2*N_COLORS + c * 2 + 0];
         }
       }
     break;

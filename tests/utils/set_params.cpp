@@ -5,7 +5,7 @@
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
-  gauge_param.type = QUDA_SU3_LINKS;
+  gauge_param.type = QUDA_SUN_LINKS;
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
@@ -294,6 +294,8 @@ void setFermionSmearParam(QudaInvertParam &smear_param, double omega, int steps)
   smear_param.laplace3D = laplace3D; // Omit this dim
   smear_param.solution_type = QUDA_MAT_SOLUTION;
   smear_param.solve_type = QUDA_DIRECT_SOLVE;
+  smear_param.clover_coeff = 0.0;
+  smear_param.clover_csw = 0.0;
 }
 
 
@@ -302,11 +304,24 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_BLK_TR_LANCZOS || eig_type == QUDA_EIG_TR_LANCZOS_3D)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver.");
   }
 
+  if (eig_type == QUDA_EIG_TR_LANCZOS_3D &&
+      dslash_type != QUDA_LAPLACE_DSLASH && 
+      laplace3D > 3) errorQuda("3D TRLM must be used with Laplace type operator with one dimension omitted");
+  
+  eig_param.ortho_dim = laplace3D;
+  switch (laplace3D) {
+  case 3: eig_param.ortho_dim_size = tdim; break;
+  case 2: eig_param.ortho_dim_size = zdim; break;
+  case 1: eig_param.ortho_dim_size = ydim; break;
+  case 0: eig_param.ortho_dim_size = xdim; break;
+  default: eig_param.ortho_dim_size = 0;
+  }    
+  
   // The solver will exit when n_conv extremal eigenpairs have converged
   if (eig_n_conv < 0) {
     eig_param.n_conv = eig_n_ev;
@@ -325,7 +340,7 @@ void setEigParam(QudaEigParam &eig_param)
   }
 
   eig_param.block_size
-    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ? 1 : eig_block_size;
+    = (eig_param.eig_type == QUDA_EIG_TR_LANCZOS || eig_param.eig_type == QUDA_EIG_IR_ARNOLDI || eig_param.eig_type == QUDA_EIG_TR_LANCZOS_3D) ? 1 : eig_block_size;
   eig_param.n_ev = eig_n_ev;
   eig_param.n_kr = eig_n_kr;
   eig_param.tol = eig_tol;
@@ -627,6 +642,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
 
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+
   // Use kappa * csw or supplied clover_coeff
   inv_param.clover_csw = clover_csw;
   if (clover_coeff == 0.0) {
@@ -739,6 +761,13 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
 
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
@@ -755,6 +784,10 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
+  if (mg_eig_type[level] == QUDA_EIG_TR_LANCZOS_3D) {
+    errorQuda("Only 4D eigensolvers may be used in MG");
+  }
+  
   mg_eig_param.block_size
     = (mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type == QUDA_EIG_IR_ARNOLDI) ?
     1 :
@@ -896,6 +929,13 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
 
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+  
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
@@ -1222,6 +1262,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
 
+  // Gauge smear param
+  inv_param.gauge_smear = (gauge_smear ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+  inv_param.gauge_smear_type = gauge_smear_type;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_STOUT) inv_param.gauge_smear_coeff = stout_smear_rho;
+  if (inv_param.gauge_smear_type == QUDA_GAUGE_SMEAR_TYPE_APE) inv_param.gauge_smear_coeff = ape_smear_rho;
+  inv_param.gauge_smear_steps = gauge_smear_steps;
+  
   inv_param.struct_size = sizeof(inv_param);
 }
 

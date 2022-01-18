@@ -816,8 +816,8 @@ namespace quda {
       errorQuda("Input Dirac operator %d should have nSpin=4, not nSpin=%d\n", dirac, fineSpin);
     if (is_dirac_staggered && fineSpin != 1)
       errorQuda("Input Dirac operator %d should have nSpin=1, not nSpin=%d\n", dirac, fineSpin);
-    if (!is_dirac_coarse && fineColor != 3)
-      errorQuda("Input Dirac operator %d should have nColor=3, not nColor=%d\n", dirac, fineColor);
+    if (!is_dirac_coarse && fineColor != N_COLORS)
+      errorQuda("Input Dirac operator %d should have nColor=%d, not nColor=%d\n", dirac, N_COLORS, fineColor);
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;

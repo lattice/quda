@@ -12,8 +12,8 @@ namespace quda
       int *num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
       *num_failures_h = 0;
       auto tol = u.Precision() == QUDA_DOUBLE_PRECISION ? 1e-14 : 1e-6;
-      projectSU3(u, tol, num_failures_d);
-      if (*num_failures_h > 0) errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+      projectSUN(u, tol, num_failures_d);
+      if (*num_failures_h > 0) errorQuda("Error in the SU(%d) unitarization: %d failures\n", N_COLORS, *num_failures_h);
       pool_pinned_free(num_failures_h);
     }
 

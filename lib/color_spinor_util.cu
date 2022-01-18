@@ -130,8 +130,8 @@ namespace quda {
   void genericSource(const pack_t &pack)
   {
     auto &a = std::get<0>(pack);
-    if (a.Ncolor() == 3) {
-      genericSource<Float,nSpin,3,order>(pack);
+    if (a.Ncolor() == N_COLORS) {
+      genericSource<Float,nSpin,N_COLORS,order>(pack);
 #ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 4) {
       genericSource<Float,nSpin,4,order>(pack);
@@ -274,8 +274,8 @@ namespace quda {
   template <typename oFloat, typename iFloat, QudaFieldOrder order>
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
-    if (a.Ncolor() == 3) {
-      constexpr int Nc = 3;
+    if (a.Ncolor() == N_COLORS) {
+      constexpr int Nc = N_COLORS;
       if (a.Nspin() == 4) {
         constexpr int Ns = 4;
         FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
@@ -370,16 +370,16 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, QudaFieldOrder order> void genericPrintVector(const cpuColorSpinorField &a, unsigned int x)
   {
-    if (a.Ncolor() == 3 && a.Nspin() == 1)  {
-      FieldOrderCB<Float,1,3,1,order> A(a);
+    if (a.Ncolor() == N_COLORS && a.Nspin() == 1)  {
+      FieldOrderCB<Float,1,N_COLORS,1,order> A(a);
       print_vector(A, x);
     }
-    else if (a.Ncolor() == 3 && a.Nspin() == 4)  {
-      FieldOrderCB<Float,4,3,1,order> A(a);
+    else if (a.Ncolor() == N_COLORS && a.Nspin() == 4)  {
+      FieldOrderCB<Float,4,N_COLORS,1,order> A(a);
       print_vector(A, x);
     }
-    else if (a.Ncolor() == 3 && a.Nspin() == 1)  {
-      FieldOrderCB<Float,1,3,1,order> A(a);
+    else if (a.Ncolor() == N_COLORS && a.Nspin() == 1)  {
+      FieldOrderCB<Float,1,N_COLORS,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 2 && a.Nspin() == 2) {
@@ -511,10 +511,10 @@ else if (a.Ncolor() == 96 && a.Nspin() == 2) {
   template <typename Float> struct GenericCudaPrintVector {
     GenericCudaPrintVector(const cudaColorSpinorField &field, unsigned int i)
     {
-      if (field.Ncolor() == 3 && field.Nspin() == 4) {
-        genericCudaPrintVector<Float, 4, 3>(field, i);
-      } else if (field.Ncolor() == 3 && field.Nspin() == 1) {
-        genericCudaPrintVector<Float, 1, 3>(field, i);
+      if (field.Ncolor() == N_COLORS && field.Nspin() == 4) {
+        genericCudaPrintVector<Float, 4, N_COLORS>(field, i);
+      } else if (field.Ncolor() == N_COLORS && field.Nspin() == 1) {
+        genericCudaPrintVector<Float, 1, N_COLORS>(field, i);
       } else if (field.Ncolor() == 6 && field.Nspin() == 2) { // wilson free field MG
         genericCudaPrintVector<Float, 2, 6>(field, i);
       } else if (field.Ncolor() == 24 && field.Nspin() == 2) { // common value for Wilson, also staggered free field

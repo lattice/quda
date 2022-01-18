@@ -253,7 +253,7 @@ namespace quda
 #pragma unroll
     for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
-      for (int color = 0; color < 3; color++) {
+      for (int color = 0; color < N_COLORS; color++) {
         __float_max_abs_floats__(warp_max[0], v(spin, color).real());
         __float_max_abs_floats__(warp_max[1], v(spin, color).imag());
       }
@@ -274,8 +274,8 @@ namespace quda
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
-        for (int color = 0; color < 3; color++) {
-          int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
+        for (int color = 0; color < N_COLORS; color++) {
+          int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + N_COLORS * threadIdx.x + color;
           half2 h = sm_b[idx];
           v(spin, color) += complex<float>(h.x, h.y) * previous_scale;
         }
@@ -286,7 +286,7 @@ namespace quda
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
-        for (int color = 0; color < 3; color++) {
+        for (int color = 0; color < N_COLORS; color++) {
           float real = v(spin, color).real() / scale;
           float imag = v(spin, color).imag() / scale;
           int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
@@ -303,11 +303,12 @@ namespace quda
   {
     half max_ = 0.0f;
     constexpr int N_sm_d2 = N_sm / 2;
+    constexpr int Nc = N_COLORS;
 #pragma unroll
     for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
-      for (int color = 0; color < 3; color++) {
-        int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
+      for (int color = 0; color < N_COLORS; color++) {
+        int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + N_COLORS * threadIdx.x + color;
         __half_max_abs_half2__(max_, sm_b[idx]);
       }
     }
@@ -320,6 +321,22 @@ namespace quda
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
 
+    // Nc = 2
+#if (N_COLORS == 2)
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    vector_store(&out[sid + 0 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    vector_store(&out[sid + 1 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    // Nc = 3
+#elif (N_COLORS == 3)
     a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     c = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
@@ -337,36 +354,193 @@ namespace quda
     c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    // Nc = 4
+#elif (N_COLORS == 4)
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    vector_store(&out[sid + 0 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    vector_store(&out[sid + 1 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+    
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    vector_store(&out[sid + 3 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    // Nc = 5
+#elif (N_COLORS == 5)
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    vector_store(&out[sid + 0 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 5], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    vector_store(&out[sid + 1 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+    
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    vector_store(&out[sid + 3 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    vector_store(&out[sid + 3 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
+#endif
+
 #else
 
     typedef typename VectorType<storage_type, 4>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b;
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    // Nc = 2
+#if (N_COLORS == 2)    
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
     out[sid + 0 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
     out[sid + 1 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
     out[sid + 2 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
     out[sid + 3 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    // Nc = 3
+#elif (N_COLORS == 3)    
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 0 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    out[sid + 1 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    out[sid + 2 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 3 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
     out[sid + 4 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
-    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
-    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
 
+    // Nc = 4
+#elif (N_COLORS == 4)
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 0 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 1 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 2 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 3 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 4 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 6 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 7 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    // Nc = 5
+#elif (N_COLORS == 5)
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 0 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 1 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    out[sid + 2 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    out[sid + 3 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    out[sid + 4 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    out[sid + 6 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 0], max_i_div_max2_);
+    out[sid + 7 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 2], max_i_div_max2_);
+    out[sid + 8 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+    
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 3], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + Nc * threadIdx.x + 4], max_i_div_max2_);
+    out[sid + 9 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+#endif
 #endif
   }
 

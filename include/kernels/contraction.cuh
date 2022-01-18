@@ -3,10 +3,15 @@
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
+#include <fast_intdiv.h>
 #include <matrix_field.h>
 #include <kernel.h>
+#include <kernels/contraction_helper.cuh>
 #include <fast_intdiv.h>
 
+<<<<<<< HEAD
+namespace quda {
+=======
 namespace quda
 {
 
@@ -239,6 +244,7 @@ namespace quda
     x[reduction_dim] = t;    
     return (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]);
   }
+>>>>>>> feature/slaph_contractions_chris
    
   template <typename Float, int nColor_, int reduction_dim_ = 3>
   struct ContractionSummedArg : public ReduceArg<spinor_array>
@@ -282,15 +288,15 @@ namespace quda
 	X[i] = x.X()[i];
 	mom_mode[i] = mom_mode_in[i];
         source_position[i] = source_position_in[i];
-        offsets[i] = comm_coord(i) * x.X()[i];
+	offsets[i] = comm_coord(i) * x.X()[i]; 
         NxNyNzNt[i] = comm_dim(i) * x.X()[i];
       }
     }
-    __device__ __host__ spinor_array init() const { return spinor_array(); }
+    __device__ __host__ spinor_matrix init() const { return spinor_matrix(); }
   };
   
-  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_array> {
-    using reduce_t = spinor_array;
+  template <typename Arg> struct DegrandRossiContractFT : plus<spinor_matrix> {
+    using reduce_t = spinor_matrix;
     using plus<reduce_t>::operator();    
     const Arg &arg;
     constexpr DegrandRossiContractFT(const Arg &arg) : arg(arg) {}
@@ -304,7 +310,7 @@ namespace quda
       using real = typename Arg::real;
       using Vector = ColorSpinor<real, nColor, nSpin>;
 
-      reduce_t result_all_channels = spinor_array();
+      reduce_t result_all_channels = spinor_matrix();
       int s1 = arg.s1;
       int b1 = arg.b1;
       int mom_mode[4];
@@ -400,36 +406,7 @@ namespace quda
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
-
-  template <typename Arg> struct ColorContract {
-    const Arg &arg;
-    constexpr ColorContract(const Arg &arg) : arg(arg) {}
-    static constexpr const char *filename() { return KERNEL_FILE; }
-
-    __device__ __host__ inline void operator()(int x_cb, int parity)
-    {
-      constexpr int nSpin = Arg::nSpin;
-      using real = typename Arg::real;
-      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
-
-      Vector x = arg.x(x_cb, parity);
-      Vector y = arg.y(x_cb, parity);
-
-      Matrix<complex<real>, nSpin> A;
-#pragma unroll
-      for (int mu = 0; mu < nSpin; mu++) {
-#pragma unroll
-        for (int nu = 0; nu < nSpin; nu++) {
-          // Color inner product: <\phi(x)_{\mu} | \phi(y)_{\nu}>
-          // The Bra is conjugated
-          A(mu, nu) = innerProduct(x, y, mu, nu);
-        }
-      }
-
-      arg.s.save(A, x_cb, parity);
-    }
-  };
-
+    
   template <typename Arg> struct DegrandRossiContract {
     const Arg &arg;
     constexpr DegrandRossiContract(const Arg &arg) : arg(arg) {}
