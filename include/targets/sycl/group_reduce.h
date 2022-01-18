@@ -4,7 +4,7 @@
 #include <array.h>
 
 template <typename T>
-inline void blockReduceSum(sycl::group<3> grp, T &out, T in)
+inline void blockReduceSum(sycl::group<3> grp, T &out, const T &in)
 {
   out = sycl::reduce_over_group(grp, in, sycl::plus<>());
 }
@@ -23,8 +23,8 @@ inline std::enable_if_t<N==6,void>
 blockReduceSum(sycl::group<3> grp, array<T,N> &out, const array<T,N> &in)
 {
   for(int i=0; i<2; i++) {
-    auto inx = reinterpret_cast<const array<T,3>*>(&in[16*i]);
-    auto outx = reinterpret_cast<array<T,3>*>(&out[16*i]);
+    auto inx = reinterpret_cast<const array<T,3>*>(&in[3*i]);
+    auto outx = reinterpret_cast<array<T,3>*>(&out[3*i]);
     blockReduceSum(grp, *outx, *inx);
   }
 }
@@ -42,7 +42,7 @@ blockReduceSum(sycl::group<3> grp, array<T,N> &out, const array<T,N> &in)
 
 template <typename T, int N>
 inline void blockReduceSum(sycl::group<3> grp, array<vec2<T>,N> &out,
-		    const array<vec2<T>,N> &in)
+			   const array<vec2<T>,N> &in)
 {
   const int N2 = 2 * N;
   auto inx = reinterpret_cast<const array<T,N2>*>(&in);
@@ -52,7 +52,7 @@ inline void blockReduceSum(sycl::group<3> grp, array<vec2<T>,N> &out,
 
 template <typename T>
 inline void blockReduceSum(sycl::group<3> grp, quda::complex<T> &out,
-		    const quda::complex<T> &in)
+			   const quda::complex<T> &in)
 {
   auto inx = reinterpret_cast<const array<T,2>*>(&in);
   auto outx = reinterpret_cast<array<T,2>*>(&out);
@@ -61,7 +61,7 @@ inline void blockReduceSum(sycl::group<3> grp, quda::complex<T> &out,
 
 template <typename T, int N>
 inline void blockReduceSum(sycl::group<3> grp, array<quda::complex<T>,N> &out,
-		    const array<quda::complex<T>,N> &in)
+			   const array<quda::complex<T>,N> &in)
 {
   const int N2 = 2 * N;
   auto inx = reinterpret_cast<const array<T,N2>*>(&in);
