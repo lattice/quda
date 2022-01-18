@@ -1680,19 +1680,6 @@ extern "C" {
 
   void setMPICommHandleQuda(void *mycomm);
 
-
-
-  ///-----------LAPH SCATTERING-----------------------///
-
-  void createMesonBlocksQuda(const void *mesonBlocks, const void *eigenVectors);
-
-
-  ///-----------END LAPH SCATTERING--------------------///
-
-
-
-
-
 #ifdef __cplusplus
 }
 #endif

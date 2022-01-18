@@ -90,8 +90,7 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash_mdw_fused.cu dslash5_mobius_eofa.cu
-  instantiate.cpp version.cpp
-  laph.cpp )
+  instantiate.cpp version.cpp )
 # cmake-format: on
 
 # current workaround for nvshmem
