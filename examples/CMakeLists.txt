@@ -98,10 +98,6 @@ set(EXAMPLES_INC ${QUDA_BUILD_HOME}/include ${QUDA_BUILD_HOME}/include/externals
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
-add_executable(laph_contractions_quda laph_contractions_quda.cpp)
-target_link_libraries(laph_contractions_quda ${EXAMPLES_LIBS})
-target_include_directories(laph_contractions_quda PUBLIC ${EXAMPLES_INC})
-
 add_executable(correlator_quda correlator_quda.cpp)
 target_link_libraries(correlator_quda ${EXAMPLES_LIBS})
 target_include_directories(correlator_quda PUBLIC ${EXAMPLES_INC})
