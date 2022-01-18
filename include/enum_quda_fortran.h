@@ -497,5 +497,4 @@
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0
 #define QUDA_EIGEN_EXTLIB 1
-#define QUDA_MAGMA_EXTLIB 2
 #define QUDA_EXTLIB_INVALID QUDA_INVALID_ENUM
