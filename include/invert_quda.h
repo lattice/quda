@@ -211,6 +211,15 @@ namespace quda {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double ca_lambda_max; // -1 -> power iter generate
 
+    /** Basis for CA algorithms in a preconditioner */
+    QudaCABasis ca_basis_precondition;
+
+    /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner */
+    double ca_lambda_min_precondition;
+
+    /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner */
+    double ca_lambda_max_precondition; // -1 -> power iter generate
+
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
@@ -312,6 +321,9 @@ namespace quda {
       ca_basis(param.ca_basis),
       ca_lambda_min(param.ca_lambda_min),
       ca_lambda_max(param.ca_lambda_max),
+      ca_basis_precondition(param.ca_basis_precondition),
+      ca_lambda_min_precondition(param.ca_lambda_min_precondition),
+      ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       secs(param.secs),
       gflops(param.gflops),
@@ -387,6 +399,9 @@ namespace quda {
       ca_basis(param.ca_basis),
       ca_lambda_min(param.ca_lambda_min),
       ca_lambda_max(param.ca_lambda_max),
+      ca_basis_precondition(param.ca_basis_precondition),
+      ca_lambda_min_precondition(param.ca_lambda_min_precondition),
+      ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
       secs(param.secs),
       gflops(param.gflops),
@@ -449,6 +464,9 @@ namespace quda {
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
+
+      param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+      param.ca_lambda_max_precondition = ca_lambda_max_precondition;
 
       if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
@@ -1008,10 +1026,10 @@ namespace quda {
     bool lambda_init;
     QudaCABasis basis;
 
-    Complex *Q_AQandg; // Fused inner product matrix
-    Complex *Q_AS; // inner product matrix
-    Complex *alpha; // QAQ^{-1} g
-    Complex *beta; // QAQ^{-1} QpolyS
+    double *Q_AQandg; // Fused inner product matrix
+    double *Q_AS;     // inner product matrix
+    double *alpha;    // QAQ^{-1} g
+    double *beta;     // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;

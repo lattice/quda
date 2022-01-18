@@ -269,6 +269,15 @@ module quda_fortran
      ! Maximum eigenvalue for Chebyshev CA basis
      real(8) :: ca_lambda_max
 
+     ! Basis for CA algorithms in preconditioner solvers
+     QudaCABasis :: ca_basis_precondition
+
+     ! Minimum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_min_precondition
+
+     ! Maximum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_max_precondition
+
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle
 
@@ -311,7 +320,7 @@ module quda_fortran
      ! Precision to store the chronological basis in
      integer(4)::chrono_precision;
 
-     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     ! Which external library to use in the linear solvers (Eigen) */
      QudaExtLibType :: extlib_type
 
      ! Whether to use the platform native or generic BLAS / LAPACK */

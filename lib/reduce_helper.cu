@@ -26,6 +26,7 @@ namespace quda
 
     static size_t allocated_bytes = 0;
     static int allocated_n_reduce = 0;
+    static bool init_event = false;
 
     template <typename T>
     struct init_reduce : public TunableKernel1D {
@@ -82,7 +83,6 @@ namespace quda
         allocated_n_reduce = n_reduce;
       }
 
-      static bool init_event = false;
       if (!init_event) {
         reduceEnd = qudaEventCreate();
         init_event = true;
@@ -91,7 +91,7 @@ namespace quda
 
     void destroy()
     {
-      qudaEventDestroy(reduceEnd);
+      if (init_event) qudaEventDestroy(reduceEnd);
 
       if (reduce_count) {
         device_free(reduce_count);

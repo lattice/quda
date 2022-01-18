@@ -23,7 +23,9 @@ namespace quda
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
-      = (outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER) ? outer.precision_sloppy : outer.precision_precondition;
+      = (outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER) ?
+      outer.precision_sloppy :
+      outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -42,8 +44,11 @@ namespace quda
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
       inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+      inner.ca_basis = outer.ca_basis_precondition;
+      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
+      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
     } else {
       inner.Nsteps = outer.precondition_cycle;
     }
@@ -59,6 +64,15 @@ namespace quda
     inner.sloppy_converge = true;
   }
 
+  // extract parameters determined while running the inner solver
+  static void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  {
+    // extract a_max, which may have been determined via power iterations
+    if (outer.inv_type_precondition == QUDA_CA_CG_INVERTER && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
+    }
+  }
+
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
@@ -70,6 +84,8 @@ namespace quda
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
       K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+    } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+      K = new CACG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -89,6 +105,7 @@ namespace quda
   PreconCG::~PreconCG()
   {
     profile.TPSTART(QUDA_PROFILE_FREE);
+    extractInnerSolverParam(param, Kparam);
 
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
 
