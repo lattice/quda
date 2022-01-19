@@ -7,6 +7,16 @@
 
 namespace quda
 {
+  /**
+    @brief Create a preconditioning solver given the operators and parameters. Currently only a few solvers are
+      instantiated, and only the MADWF accelerator is currently supported.
+    @param[in] matPrecon the preconditioner
+    @param[in] matEig the eigen-space operator that is to be used to construct the solver
+    @param[in] param the outer solver param
+    @param[in] Kparam the inner solver param
+    @param[in] profile the timer profile
+    @return the created preconditioning solver, decorated by std::shared_ptr
+  */
   std::shared_ptr<Solver> create_preconditioner(const DiracMatrix &matPrecon, const DiracMatrix &matEig,
                                                 SolverParam &param, SolverParam &Kparam, TimeProfile &profile)
   {

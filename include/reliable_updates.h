@@ -4,6 +4,29 @@
 #include <blas_quda.h>
 #include <util_quda.h>
 
+/**
+  @brief a struct that includes the parameters that determines how reliable updates (aka defect correction, etc)
+    should be performed. There are two variants:
+    - The "original" or the naive one (alternative_reliable = false), where higher precision corrections are
+      made every time the redidual is decreased to
+        (delta) * (the residual when the last reliable update is performed)
+    - A more sophisticated approach where the lower precision inaccuracy is estimated and accumulated from
+      iteration to iteration, and higher precision corrections are made when this inaccuracy is higher than a
+      threashhold. See https://doi.org/10.1137/S1064827599353865 for reference.
+  @param alternative_reliable determines which approach we use: alternative_reliable = false means the first
+    approach, alternative_reliable = true means the second approach
+  @param u the lower precision tolerance, only relevant for the second approach
+  @param uhigh the higher precision tolerance, only relevant for the second approach
+  @param Anorm The normal of the underlying operator that is to be used to estimate the lower precision inaccuracy,
+    only relevant for the second approach
+  @param maxResIncrease number of consecutive residual increases between reliable updates allowed: should only matter for
+    the first approach
+  @param maxResIncreaseTotal total number of residual increases between reliable updates allowed: should only matter for
+    the first approach
+  @param use_heavy_quark_res whether or not using heavy quark residual
+  @param hqmaxresIncrease same as maxResIncrease, but for heavy quark
+  @param hqmaxresRestartTotal total number of heavy quark restarts allowed
+ */
 struct ReliableUpdatesParams {
 
   bool alternative_reliable;
@@ -60,6 +83,11 @@ struct ReliableUpdates {
 
   int rUpdate = 0;
 
+  /**
+    @brief constructor
+    @param params the parameters
+    @param r2 the residual norm squared
+   */
   ReliableUpdates(ReliableUpdatesParams params, double r2) :
     params(params),
     deps(sqrt(params.u)),
@@ -77,13 +105,25 @@ struct ReliableUpdates {
     }
   }
 
+  /**
+    @brief Update the norm squared for p (thus ppnorm)
+   */
   void update_ppnorm(double ppnorm_) { ppnorm = ppnorm_; }
 
+  /**
+    @brief Update the norm for r (thus rNorm)
+   */
   void update_rNorm(double rNorm_) { rNorm = rNorm_; }
 
+  /**
+    @brief Update maxr_deflate
+   */
   void update_maxr_deflate(double r2) { maxr_deflate = sqrt(r2); }
 
-  // Evaluate whether a reliable update is needed
+  /**
+    @brief Evaluate whether a reliable update is needed
+    @param r2_old the old residual norm squared
+   */
   void evaluate(double r2_old)
   {
     if (params.alternative_reliable) {
@@ -99,13 +139,20 @@ struct ReliableUpdates {
     }
   }
 
-  // Set updateX to 1
+  /**
+    @brief Set updateX to 1
+   */
   void set_updateX() { updateX = 1; }
 
-  // Whether it is time to do reliable update
+  /**
+    @brief Whether it is time to do reliable update
+   */
   bool trigger() { return updateR || updateX; }
 
-  // Accumulate the estimate for error - used when reliable update is not performed
+  /**
+    @brief Accumulate the estimate for error - used when reliable update is not performed
+    @param alpha the alpha that is used in CG to update the solution vector x, given p
+   */
   void accumulate_norm(double alpha)
   {
     // accumulate norms
@@ -120,7 +167,11 @@ struct ReliableUpdates {
     steps_since_reliable++;
   }
 
-  // Reset the estimate for error - used when reliable update is performed
+  /**
+    @brief Reset the estimate for error - used when reliable update is performed
+    @param r2 the residual norm squared
+    @param y2 the solution vector norm squared
+   */
   void update_norm(double r2, ColorSpinorField &y)
   {
     // update_norms
@@ -140,7 +191,13 @@ struct ReliableUpdates {
     }
   }
 
-  // Whether we should break out
+  /**
+    @brief Whether we should break out, i.e. we have reached the limit of the precisions
+    @param r2 residual norm squared
+    @param stop the stopping condition
+    @param[in/out] L2breakdown whether or not L2 breakdown
+    @param L2breakdown_eps L2 breakdown epsilon
+   */
   bool reliable_break(double r2, double stop, bool &L2breakdown, double L2breakdown_eps)
   {
     // break-out check if we have reached the limit of the precision
@@ -168,7 +225,13 @@ struct ReliableUpdates {
     return false;
   }
 
-  // Whether we should break out for heavy quark
+  /**
+    @brief Whether we should break out for heavy quark
+    @param L2breakdown whether or not L2 breakdown
+    @param heavy_quark_res the heavy quark residual
+    @param heavy_quark_res_old the old heavy quark residual
+    @param[in/out] heavy_quark_restart whether should restart the heavy quark
+   */
   bool reliable_heavy_quark_break(bool L2breakdown, double heavy_quark_res, double heavy_quark_res_old,
                                   bool &heavy_quark_restart)
   {
@@ -201,7 +264,10 @@ struct ReliableUpdates {
     return false;
   }
 
-  // Reset the counters - after a reliable update has been performed
+  /**
+    @brief Reset the counters - after a reliable update has been performed
+    @param r2 residual norm squared
+  */
   void reset(double r2)
   {
     steps_since_reliable = 0;
