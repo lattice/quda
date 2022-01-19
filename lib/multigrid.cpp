@@ -610,7 +610,7 @@ namespace quda
         if (param_coarse_solver->inv_type != QUDA_CA_CGNR_INVERTER && param_coarse_solver->inv_type != QUDA_CGNR_INVERTER
             && param_coarse_solver->inv_type != QUDA_CA_CGNE_INVERTER
             && param_coarse_solver->inv_type != QUDA_CGNE_INVERTER && param_coarse_solver->inv_type != QUDA_CA_GCR_INVERTER
-            && param_coarse_solver->inv_type != QUDA_GCR_INVERTER) {
+            && param_coarse_solver->inv_type != QUDA_GCR_INVERTER && param_coarse_solver->inv_type != QUDA_BICGSTABL_INVERTER) {
           errorQuda("Coarse grid deflation not supported with coarse solver %d", param_coarse_solver->inv_type);
         }
 
