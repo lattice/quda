@@ -1,55 +1,60 @@
 #include <gauge_field_order.h>
 #include <multigrid_helper.cuh>
+#include <index_helper.cuh>
 #include <kernel.h>
 
 namespace quda {
 
-  template <typename Float_, int coarseSpin_, int fineColor_, int coarseColor_,
-            typename coarseGauge, typename fineGauge, bool kd_build_x_ = false>
+  template <typename Float, int fineColor_, QudaGaugeFieldOrder order, bool kd_build_x_ = false>
   struct CalculateStaggeredYArg : kernel_param<> {
 
-    using real = typename mapper<Float_>::type;
-    static constexpr int coarseSpin = coarseSpin_;
-    static_assert(coarseSpin == 2, "Only coarseSpin == 2 is supported");
+    using real = typename mapper<Float>::type;
+
+    static constexpr int nDim = 4;
     static constexpr int fineColor = fineColor_;
-    static constexpr int coarseColor = coarseColor_;
-    static_assert(8 * fineColor == coarseColor, "requires 8 * fineColor == coarseColor");
+    static constexpr int coarseSpin = 2;
+    static constexpr int coarseColor = 24;
 
     static constexpr bool kd_build_x = kd_build_x_; /** If true, then we only build X and not Y */
 
-    coarseGauge Y;           /** Computed coarse link field */
-    coarseGauge X;           /** Computed coarse clover field */
+    using gFine = typename gauge::FieldOrder<real,fineColor,1,order>;
+    using gCoarse = typename gauge::FieldOrder<real, coarseColor * coarseSpin, coarseSpin, order, true, Float>;
 
-    const fineGauge U;       /** Fine grid (fat-)link field */
-    // May have a long-link variable in the future.
+    gCoarse Y;           /** Computed coarse link field */
+    gCoarse X;           /** Computed coarse clover field */
+
+    const gFine U;       /** Fine grid (fat-)link field */
 
     int_fastdiv x_size[QUDA_MAX_DIM];   /** Dimensions of fine grid */
     int xc_size[QUDA_MAX_DIM];  /** Dimensions of coarse grid */
 
-    int_fastdiv geo_bs[QUDA_MAX_DIM];   /** Geometric block dimensions */
     const spin_mapper<1,coarseSpin> spin_map; /** Helper that maps fine spin to coarse spin */
 
-    real mass;                /** staggered mass value */
     const int fineVolumeCB;   /** Fine grid volume */
     const int coarseVolumeCB; /** Coarse grid volume */
+    real two_mass;            /** Two times the staggered mass value */
 
-    static constexpr int coarse_color = coarseColor;
-
-    CalculateStaggeredYArg(coarseGauge &Y, coarseGauge &X, const fineGauge &U, double mass,
-                           const int *x_size_, const int *xc_size_, int *geo_bs_ = nullptr) :
+    CalculateStaggeredYArg(GaugeField &Y, GaugeField &X, const GaugeField &U, double mass) :
       kernel_param(dim3(U.VolumeCB(), fineColor * fineColor, 2)),
       Y(Y),
       X(X),
       U(U),
       spin_map(),
-      mass(static_cast<real>(mass)),
       fineVolumeCB(U.VolumeCB()),
-      coarseVolumeCB(X.VolumeCB())
+      coarseVolumeCB(X.VolumeCB()),
+      two_mass(static_cast<real>(2. * mass))
     {
-      for (int i=0; i<QUDA_MAX_DIM; i++) {
-        x_size[i] = x_size_[i];
-        xc_size[i] = xc_size_[i];
-        geo_bs[i] = geo_bs_ ? geo_bs_[i] : 2;
+      if (X.Ndim() != nDim || Y.Ndim() != nDim)
+        errorQuda("Number of dimensions %d %d is not supported", X.Ndim(), Y.Ndim());
+      if (X.Ncolor() != coarseColor * coarseSpin || Y.Ncolor() != coarseColor * coarseSpin)
+        errorQuda("Unsupported coarse colors %d %d", coarseSpin * X.Ncolor(), coarseSpin * Y.Ncolor());
+      for (int i=0; i<nDim; i++) {
+        x_size[i] = U.X()[i];
+        xc_size[i] = X.X()[i];
+        // check that local volumes are consistent
+        if (2 * xc_size[i] != x_size[i]) {
+          errorQuda("Inconsistent fine dimension %d and coarse KD dimension %d", static_cast<int>(x_size[i]), xc_size[i]);
+        }
       }
     }
 
@@ -64,6 +69,7 @@ namespace quda {
     __device__ __host__ void operator()(int x_cb, int c, int parity)
     {
       using real = typename Arg::real;
+      using complex = complex<real>;
       constexpr int nDim = 4;
 
       int ic_f = c / Arg::fineColor;
@@ -75,7 +81,7 @@ namespace quda {
       getCoords(coord, x_cb, arg.x_size, parity);
 
       // Compute coarse coordinates
-      for (int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/arg.geo_bs[d];
+      for (int d = 0; d < nDim; d++) coord_coarse[d] = coord[d] / 2;
       int coarse_parity = 0;
       for (int d = 0; d < nDim; d++) coarse_parity += coord_coarse[d];
       coarse_parity &= 1;
@@ -101,11 +107,9 @@ QUDA_UNROLL
 
         //Check to see if we are on the edge of a block.  If adjacent site
         //is in same block, M = X, else M = Y
-        const bool isDiagonal = Arg::kd_build_x ?
-          ((coord[mu] + 1) % arg.x_size[mu]) / 2 == coord_coarse[mu] :
-          ((coord[mu] + 1) % arg.x_size[mu]) / arg.geo_bs[mu] == coord_coarse[mu];
+        const bool isDiagonal = ((coord[mu] + 1) % arg.x_size[mu]) / 2 == coord_coarse[mu];
 
-        complex<real> vuv = arg.U(mu,parity,x_cb,ic_f,jc_f);
+        complex vuv = arg.U(mu,parity,x_cb,ic_f,jc_f);
 
         if (isDiagonal) {
           // backwards
@@ -126,7 +130,7 @@ QUDA_UNROLL
         for (int s = 0; s < Arg::coarseSpin; s++) {
 QUDA_UNROLL
           for (int c = 0; c < Arg::coarseColor; c++) {
-            arg.X(0,parity,x_cb,s,s,c,c) = static_cast<real>(2.0) * complex<real>(arg.mass, 0.0); // staggered conventions. No need to +=
+            arg.X(0,parity,x_cb,s,s,c,c) = complex(arg.two_mass, 0.0); // staggered conventions. No need to +=
           } //Color
         } //Spin
       }

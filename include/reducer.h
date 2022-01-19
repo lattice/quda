@@ -3,7 +3,8 @@
 #include "complex_quda.h"
 #include "quda_constants.h"
 #include "quda_api.h"
-#include "float_vector.h"
+#include <math_helper.cuh>
+#include <array.h>
 
 /**
    @file reducer.h
@@ -23,9 +24,18 @@ namespace quda
   namespace reducer
   {
     /**
-       @return the reduce buffer size allocated
+       @brief Inititalizes any persistent buffers required for performing global
+       reductions.  If necessary, any previously allocated buffers will be resized.
+       @param n_reduce The number of reductions to perform
+       @param reduce_size Size in bytes of each value
     */
-    size_t buffer_size();
+    void init(int n_reduce, size_t reduce_size);
+
+    /**
+       @brief Free any persistent buffers associated with global
+       reductions.
+    */
+    void destroy();
 
     /**
        @return pointer to device reduction buffer
@@ -58,13 +68,12 @@ namespace quda
     qudaEvent_t &get_event();
   } // namespace reducer
 
-  constexpr int max_n_reduce() { return QUDA_MAX_MULTI_REDUCE; }
-
   /**
      plus reducer, used for conventional sum reductions
    */
   template <typename T> struct plus {
     static constexpr bool do_sum = true;
+    using reducer_t = plus<T>;
     __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
 #ifdef QUDA_TARGET_OMPTARGET
     static inline T reduce_omp(T a, T b) { return a + b; }
@@ -77,9 +86,10 @@ namespace quda
    */
   template <typename T> struct maximum {
     static constexpr bool do_sum = false;
-    __device__ __host__ inline T operator()(T a, T b) const { return a > b ? a : b; }
+    using reducer_t = maximum<T>;
+    __device__ __host__ inline T operator()(T a, T b) const { return quda::max(a, b); }
 #ifdef QUDA_TARGET_OMPTARGET
-    static inline T reduce_omp(T a, T b) { return a > b ? a : b; }
+    static inline T reduce_omp(T a, T b) { return quda::max(a, b); }
     static inline T init_omp() { return ::quda::zero<T>(); }  // FIXME wrong for negative values.
 #endif
   };
@@ -89,9 +99,10 @@ namespace quda
    */
   template <typename T> struct minimum {
     static constexpr bool do_sum = false;
-    __device__ __host__ inline T operator()(T a, T b) const { return a < b ? a : b; }
+    using reducer_t = minimum<T>;
+    __device__ __host__ inline T operator()(T a, T b) const { return quda::min(a, b); }
 #ifdef QUDA_TARGET_OMPTARGET
-    static inline T reduce_omp(T a, T b) { return a < b ? a : b; }
+    static inline T reduce_omp(T a, T b) { return quda::min(a, b); }
     static inline T init_omp() { return ::quda::zero<T>(); }  // FIXME wrong for positive values.
 #endif
   };

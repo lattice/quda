@@ -154,6 +154,7 @@ namespace quda
         constexpr int coarseSpin = Arg::coarseSpin;
 
         constexpr int nDim = 4;
+        constexpr int nFace = 1;
         int coord[QUDA_MAX_DIM];
         int coord_coarse[QUDA_MAX_DIM];
 
@@ -164,7 +165,7 @@ namespace quda
 
         // Check to see if we are on the edge of a block.  If adjacent site
         // is in same block, M = X, else M = Y
-        const bool isDiagonal = isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, Arg::dim, arg);
+        const bool isDiagonal = isFromCoarseClover || isCoarseDiagonal(coord, coord_coarse, Arg::dim, nFace, arg);
 
         int coarse_parity = 0;
 

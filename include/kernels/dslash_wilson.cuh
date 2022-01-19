@@ -149,7 +149,7 @@ QUDA_UNROLL
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-
+      
       auto coord = getCoords<QUDA_4D_PC, mykernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
@@ -158,7 +158,6 @@ QUDA_UNROLL
 
       int xs = coord.x_cb + coord.s * arg.dc.volume_4d_cb;
       if (xpay && mykernel_type == INTERIOR_KERNEL) {
-
         Vector x = arg.x(xs, my_spinor_parity);
         out = x + arg.a * out;
       } else if (mykernel_type != INTERIOR_KERNEL && active) {

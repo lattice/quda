@@ -70,32 +70,6 @@ static bool redundant_comms = false;
 
 #include <blas_lapack.h>
 
-//for MAGMA lib:
-#include <blas_magma.h>
-
-static bool InitMagma = false;
-
-void openMagma() {
-
-  if (!InitMagma) {
-    OpenMagma();
-    InitMagma = true;
-  } else {
-    printfQuda("\nMAGMA library was already initialized..\n");
-  }
-
-}
-
-void closeMagma(){
-
-  if (InitMagma) {
-    CloseMagma();
-    InitMagma = false;
-  } else {
-    printfQuda("\nMAGMA library was not initialized..\n");
-  }
-
-}
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -171,6 +145,9 @@ static TimeProfile profileFatLink("computeKSLinkQuda");
 
 //!< Profiler for computeGaugeForceQuda
 static TimeProfile profileGaugeForce("computeGaugeForceQuda");
+
+//!< Profiler for computeGaugePathQuda
+static TimeProfile profileGaugePath("computeGaugePathQuda");
 
 //!<Profiler for updateGaugeFieldQuda
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
@@ -516,7 +493,6 @@ void initQudaMemory()
   createDslashEvents();
 
   blas_lapack::native::init();
-  blas::init();
 
   num_failures_h = static_cast<int *>(mapped_malloc(sizeof(int)));
   num_failures_d = static_cast<int *>(get_mapped_device_pointer(num_failures_h));
@@ -1426,7 +1402,7 @@ void endQuda(void)
 
   blas_lapack::generic::destroy();
   blas_lapack::native::destroy();
-  blas::destroy();
+  reducer::destroy();
 
   pool::flush_pinned();
   pool::flush_device();
@@ -1611,6 +1587,7 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
+    diracParam.tm_rho = inv_param->tm_rho;
 
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
 
@@ -1781,7 +1758,6 @@ namespace quda {
 
   void massRescale(ColorSpinorField &b, QudaInvertParam &param, bool for_multishift)
   {
-
     double kappa5 = (0.5/(5.0 + param.m5));
     double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
                     || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
@@ -2469,7 +2445,8 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (mg_param.transfer_type[0] == QUDA_TRANSFER_COARSE_KD || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+      || mg_param.transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
   }
@@ -2552,6 +2529,15 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
     }
     // The above changes are propagated internally by use of references, pointers, etc, so
     // no further updates are needed.
+
+    // If we're doing a staggered or asqtad KD op, a thin update needs to update the
+    // fields for the KD op as well.
+    if (mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD
+        || mg_param->transfer_type[0] == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      if (param->overlap) errorQuda("Updating the staggered/asqtad KD field with param->overlap set is not supported");
+
+      mg->mg->resetStaggeredKD(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, param->mass);
+    }
 
   } else {
 
@@ -2698,9 +2684,6 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
 void* newDeflationQuda(QudaEigParam *eig_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-#ifdef MAGMA_LIB
-  openMagma();
-#endif
   auto *defl = new deflated_solver(*eig_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -2711,9 +2694,6 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 }
 
 void destroyDeflationQuda(void *df) {
-#ifdef MAGMA_LIB
-  closeMagma();
-#endif
   delete static_cast<deflated_solver*>(df);
 }
 
@@ -2839,14 +2819,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = blas::norm2(h_b);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      double nh_x = blas::norm2(h_x);
-      double nx = blas::norm2(*x);
-      printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(*x));
     }
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Source: %g\n", nb);
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(*x)); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
@@ -3042,10 +3022,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    printfQuda("Solution = %g\n",nx);
-  }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(*x)); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
@@ -3100,10 +3077,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     param->action[1] = action.imag();
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = blas::norm2(*x);
-    double nh_x = blas::norm2(h_x);
-    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(*x), blas::norm2(h_x));
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Reconstructed solution: %g\n", blas::norm2(*x));
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -4148,6 +4125,88 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.TPSTOP(QUDA_PROFILE_FREE);
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
+  return 0;
+}
+
+int computeGaugePathQuda(void *out, void *siteLink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                         int num_paths, int max_length, double eb3, QudaGaugeParam *qudaGaugeParam)
+{
+  profileGaugePath.TPSTART(QUDA_PROFILE_TOTAL);
+  profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+
+  checkGaugeParam(qudaGaugeParam);
+
+  GaugeFieldParam gParam(*qudaGaugeParam, siteLink);
+  gParam.site_offset = qudaGaugeParam->gauge_offset;
+  gParam.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuSiteLink = (!qudaGaugeParam->use_resident_gauge) ? new cpuGaugeField(gParam) : nullptr;
+
+  cudaGaugeField *cudaSiteLink = nullptr;
+
+  if (qudaGaugeParam->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaSiteLink = gaugePrecise;
+  } else {
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
+
+    cudaSiteLink = new cudaGaugeField(gParam);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaSiteLink->loadCPUField(*cpuSiteLink);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+
+    profileGaugePath.TPSTART(QUDA_PROFILE_INIT);
+  }
+
+  GaugeFieldParam gParamOut(*qudaGaugeParam, out);
+  gParamOut.site_offset = qudaGaugeParam->gauge_offset;
+  gParamOut.site_size = qudaGaugeParam->site_size;
+  cpuGaugeField *cpuOut = new cpuGaugeField(gParamOut);
+  gParamOut.create = qudaGaugeParam->overwrite_gauge ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE;
+  gParamOut.reconstruct = qudaGaugeParam->reconstruct;
+  gParamOut.setPrecision(qudaGaugeParam->cuda_prec, true);
+  cudaGaugeField *cudaOut = new cudaGaugeField(gParamOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_INIT);
+  if (!qudaGaugeParam->overwrite_gauge) {
+    profileGaugePath.TPSTART(QUDA_PROFILE_H2D);
+    cudaOut->loadCPUField(*cpuOut);
+    profileGaugePath.TPSTOP(QUDA_PROFILE_H2D);
+  }
+
+  cudaGaugeField *cudaGauge = createExtendedGauge(*cudaSiteLink, R, profileGaugePath);
+  // apply / remove phase as appropriate
+  if (cudaGauge->StaggeredPhaseApplied()) cudaGauge->removeStaggeredPhase();
+
+  // actually do the computation
+  profileGaugePath.TPSTART(QUDA_PROFILE_COMPUTE);
+  gaugePath(*cudaOut, *cudaGauge, eb3, input_path_buf, path_length, loop_coeff, num_paths, max_length);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_D2H);
+  cudaOut->saveCPUField(*cpuOut);
+  profileGaugePath.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileGaugePath.TPSTART(QUDA_PROFILE_FREE);
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
+    gaugePrecise = cudaSiteLink;
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaSiteLink;
+    delete cudaGauge;
+  }
+
+  delete cudaOut;
+
+  if (cpuSiteLink) delete cpuSiteLink;
+  if (cpuOut) delete cpuOut;
+  profileGaugePath.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileGaugePath.TPSTOP(QUDA_PROFILE_TOTAL);
   return 0;
 }
 

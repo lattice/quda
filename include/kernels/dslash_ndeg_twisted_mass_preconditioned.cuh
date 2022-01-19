@@ -105,9 +105,9 @@ namespace quda
         cache.sync(); // safe to sync in here since other threads will exit
         if (isComplete<mykernel_type>(arg, coord) && active) {
           if (flavor == 0)
-            out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load(threadIdx.x, 1, threadIdx.z));
+            out = arg.a * (out + arg.b * out.igamma(4) + arg.c * cache.load_y(1));
           else
-            out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load(threadIdx.x, 0, threadIdx.z));
+            out = arg.a * (out - arg.b * out.igamma(4) + arg.c * cache.load_y(0));
         }
       }
 

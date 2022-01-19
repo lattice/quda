@@ -115,9 +115,9 @@ namespace quda
     for (int d = 0; d < nDim; d++) volume *= x[d];
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2;
 
-    if ((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) // two flavors
+    if (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET && x[4] != 2) // two flavors
       errorQuda(
-        "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n",
+        "Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)",
         x[4]);
 
     if (param.pad != 0) errorQuda("Padding must be zero");
@@ -733,6 +733,20 @@ namespace quda
     if (siteSubset != QUDA_FULL_SITE_SUBSET) errorQuda("Cannot return odd subset of %d subset", siteSubset);
     if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER) errorQuda("Cannot return even subset of QDPJIT field");
     return *odd;
+  }
+
+  ColorSpinorField& ColorSpinorField::Component(int idx)
+  {
+    if (!IsComposite()) errorQuda("Not composite field");
+    if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+    return *(components[idx]);
+  }
+
+  const ColorSpinorField &ColorSpinorField::Component(int idx) const
+  {
+    if (!IsComposite()) errorQuda("Not composite field");
+    if (idx >= CompositeDim()) errorQuda("Invalid component index %d (size = %d)", idx, CompositeDim());
+    return *(components[idx]);
   }
 
   void *const *ColorSpinorField::Ghost() const { return ghost_buf; }
