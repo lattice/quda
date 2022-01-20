@@ -884,6 +884,17 @@ namespace quda
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
+  ColorSpinorField ColorSpinorField::create_alias(const ColorSpinorParam &param_)
+  {
+    if (param_.Precision() > precision)
+      errorQuda("Cannot create an alias to source with lower precision than the alias");
+    ColorSpinorParam param(param_);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.v = V();
+
+    return ColorSpinorField(param);
+  }
+
   ColorSpinorField *ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
   {
     if (param_.Precision() > precision)

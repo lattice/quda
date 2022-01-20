@@ -766,6 +766,16 @@ namespace quda
        precisions, but do not need them simultaneously.  Use this functionality with caution.
        @param[in] param Parameters for the alias field
     */
+    ColorSpinorField create_alias(const ColorSpinorParam &param);
+
+    /**
+       @brief Create a field that aliases this field's storage.  The
+       alias field can use a different precision than this field,
+       though it cannot be greater.  This functionality is useful for
+       the case where we have multiple temporaries in different
+       precisions, but do not need them simultaneously.  Use this functionality with caution.
+       @param[in] param Parameters for the alias field
+    */
     ColorSpinorField *CreateAlias(const ColorSpinorParam &param);
 
     /**
