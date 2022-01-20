@@ -13,1161 +13,1405 @@ extern int Z[4];
 extern int V;
 extern int Vh;
 
-
-#define CADD(a,b,c) { (c).real = (a).real + (b).real;	\
-	(c).imag = (a).imag + (b).imag; }
-#define CMUL(a,b,c) { (c).real = (a).real*(b).real - (a).imag*(b).imag; \
-		      (c).imag = (a).real*(b).imag + (a).imag*(b).real; }
-#define CSUM(a,b) { (a).real += (b).real; (a).imag += (b).imag; }
+#define CADD(a, b, c)                                                                                                  \
+  {                                                                                                                    \
+    (c).real = (a).real + (b).real;                                                                                    \
+    (c).imag = (a).imag + (b).imag;                                                                                    \
+  }
+#define CMUL(a, b, c)                                                                                                  \
+  {                                                                                                                    \
+    (c).real = (a).real * (b).real - (a).imag * (b).imag;                                                              \
+    (c).imag = (a).real * (b).imag + (a).imag * (b).real;                                                              \
+  }
+#define CSUM(a, b)                                                                                                     \
+  {                                                                                                                    \
+    (a).real += (b).real;                                                                                              \
+    (a).imag += (b).imag;                                                                                              \
+  }
 
 /* c = a* * b */
-#define CMULJ_(a,b,c) { (c).real = (a).real*(b).real + (a).imag*(b).imag; \
-		        (c).imag = (a).real*(b).imag - (a).imag*(b).real; }
+#define CMULJ_(a, b, c)                                                                                                \
+  {                                                                                                                    \
+    (c).real = (a).real * (b).real + (a).imag * (b).imag;                                                              \
+    (c).imag = (a).real * (b).imag - (a).imag * (b).real;                                                              \
+  }
 
 /* c = a * b* */
-#define CMUL_J(a,b,c) { (c).real = (a).real*(b).real + (a).imag*(b).imag; \
-	  	        (c).imag = (a).imag*(b).real - (a).real*(b).imag; }
+#define CMUL_J(a, b, c)                                                                                                \
+  {                                                                                                                    \
+    (c).real = (a).real * (b).real + (a).imag * (b).imag;                                                              \
+    (c).imag = (a).imag * (b).real - (a).real * (b).imag;                                                              \
+  }
 
-#define CONJG(a,b) { (b).real = (a).real; (b).imag = -(a).imag; }
+#define CONJG(a, b)                                                                                                    \
+  {                                                                                                                    \
+    (b).real = (a).real;                                                                                               \
+    (b).imag = -(a).imag;                                                                                              \
+  }
 
-typedef struct {   
-    float real;	   
-    float imag; 
-} fcomplex;  
+typedef struct {
+  float real;
+  float imag;
+} fcomplex;
 
 /* specific for double complex */
 typedef struct {
-    double real;
-    double imag;
+  double real;
+  double imag;
 } dcomplex;
 
-typedef struct { fcomplex e[3][3]; } fsu3_matrix;
-typedef struct { fcomplex c[3]; } fsu3_vector;
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-typedef struct { dcomplex c[3]; } dsu3_vector;
+typedef struct {
+  fcomplex e[3][3];
+} fsu3_matrix;
+typedef struct {
+  fcomplex c[3];
+} fsu3_vector;
+typedef struct {
+  dcomplex e[3][3];
+} dsu3_matrix;
+typedef struct {
+  dcomplex c[3];
+} dsu3_vector;
 
-typedef struct { 
-    fcomplex m01,m02,m12; 
-    float m00im,m11im,m22im; 
-    float space; 
+typedef struct {
+  fcomplex m01, m02, m12;
+  float m00im, m11im, m22im;
+  float space;
 } fanti_hermitmat;
 
-typedef struct { 
-    dcomplex m01,m02,m12; 
-    double m00im,m11im,m22im; 
-    double space; 
+typedef struct {
+  dcomplex m01, m02, m12;
+  double m00im, m11im, m22im;
+  double space;
 } danti_hermitmat;
 
-typedef struct { fsu3_vector h[2]; } fhalf_wilson_vector;
-typedef struct { dsu3_vector h[2]; } dhalf_wilson_vector;
+typedef struct {
+  fsu3_vector h[2];
+} fhalf_wilson_vector;
+typedef struct {
+  dsu3_vector h[2];
+} dhalf_wilson_vector;
 
-
-template<typename su3_matrix>
-su3_matrix* get_su3_matrix(int gauge_order, su3_matrix* p, int idx, int dir)
+template <typename su3_matrix> su3_matrix *get_su3_matrix(int gauge_order, su3_matrix *p, int idx, int dir)
 {
-  if(gauge_order == QUDA_MILC_GAUGE_ORDER){
-    return (p + 4*idx + dir);
-  }else if(gauge_order == QUDA_QDP_GAUGE_ORDER){ // This is nasty! 
-    su3_matrix* data = ((su3_matrix**)p)[dir];
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    return (p + 4 * idx + dir);
+  } else if (gauge_order == QUDA_QDP_GAUGE_ORDER) { // This is nasty!
+    su3_matrix *data = ((su3_matrix **)p)[dir];
     return data + idx;
-  }else{
+  } else {
     errorQuda("get_su3_matrix: unsupported ordering scheme!\n");
   }
   return NULL;
 }
 
-template<typename su3_matrix>
-static void  
-su3_adjoint( su3_matrix *a, su3_matrix *b )
+template <typename su3_vector, typename su3_matrix> void su3_projector(su3_vector *a, su3_vector *b, su3_matrix *c)
 {
-    int i,j;
-    for(i=0;i<3;i++)for(j=0;j<3;j++){
-	    CONJG( a->e[j][i], b->e[i][j] );
-	}
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++) CMUL_J(a->c[i], b->c[j], c->e[i][j]);
 }
-
-template<typename su3_matrix>
-static void  
-adjoint_su3_matrix( su3_matrix *a)
-{
-  su3_matrix b;
-  int i,j;
-  for(i=0;i<3;i++)for(j=0;j<3;j++){
-      CONJG( a->e[j][i], b.e[i][j] );
-    }
-
-  *a = b;
-}
-
-template<typename su3_matrix, typename anti_hermitmat>
-static void
-make_anti_hermitian( su3_matrix *m3, anti_hermitmat *ah3 ) 
-{
-    auto temp =	(m3->e[0][0].imag + m3->e[1][1].imag + m3->e[2][2].imag)*0.33333333333333333;
-    ah3->m00im = m3->e[0][0].imag - temp;
-    ah3->m11im = m3->e[1][1].imag - temp;
-    ah3->m22im = m3->e[2][2].imag - temp;
-    ah3->m01.real = (m3->e[0][1].real - m3->e[1][0].real)*0.5;
-    ah3->m02.real = (m3->e[0][2].real - m3->e[2][0].real)*0.5;
-    ah3->m12.real = (m3->e[1][2].real - m3->e[2][1].real)*0.5;
-    ah3->m01.imag = (m3->e[0][1].imag + m3->e[1][0].imag)*0.5;
-    ah3->m02.imag = (m3->e[0][2].imag + m3->e[2][0].imag)*0.5;
-    ah3->m12.imag = (m3->e[1][2].imag + m3->e[2][1].imag)*0.5;
-    
-}
-
-template <typename anti_hermitmat, typename su3_matrix>
-static void
-uncompress_anti_hermitian(anti_hermitmat *mat_antihermit,
-			  su3_matrix *mat_su3 )
-{
-    typename std::remove_reference<decltype(mat_antihermit->m00im)>::type temp1;
-    mat_su3->e[0][0].imag=mat_antihermit->m00im;
-    mat_su3->e[0][0].real=0.;
-    mat_su3->e[1][1].imag=mat_antihermit->m11im;
-    mat_su3->e[1][1].real=0.;
-    mat_su3->e[2][2].imag=mat_antihermit->m22im;
-    mat_su3->e[2][2].real=0.;
-    mat_su3->e[0][1].imag=mat_antihermit->m01.imag;
-    temp1=mat_antihermit->m01.real;
-    mat_su3->e[0][1].real=temp1;
-    mat_su3->e[1][0].real= -temp1;
-    mat_su3->e[1][0].imag=mat_antihermit->m01.imag;
-    mat_su3->e[0][2].imag=mat_antihermit->m02.imag;
-    temp1=mat_antihermit->m02.real;
-    mat_su3->e[0][2].real=temp1;
-    mat_su3->e[2][0].real= -temp1;
-    mat_su3->e[2][0].imag=mat_antihermit->m02.imag;
-    mat_su3->e[1][2].imag=mat_antihermit->m12.imag;
-    temp1=mat_antihermit->m12.real;
-    mat_su3->e[1][2].real=temp1;
-    mat_su3->e[2][1].real= -temp1;
-    mat_su3->e[2][1].imag=mat_antihermit->m12.imag;    
-}
-
-template <typename su3_matrix, typename Float>
-static void
-scalar_mult_sub_su3_matrix(su3_matrix *a,su3_matrix *b, Float s, su3_matrix *c)
-{    
-    int i,j;
-    for(i=0;i<3;i++){
-	for(j=0;j<3;j++){	    
-	    c->e[i][j].real = a->e[i][j].real - s*b->e[i][j].real;
-	    c->e[i][j].imag = a->e[i][j].imag - s*b->e[i][j].imag;
-	}
-    }
-}
-
-template <typename su3_matrix, typename Float>
-static void
-scalar_mult_add_su3_matrix(su3_matrix *a,su3_matrix *b, Float s, su3_matrix *c)
-{
-    int i,j;
-    for(i=0;i<3;i++){
-	for(j=0;j<3;j++){	    
-	    c->e[i][j].real = a->e[i][j].real + s*b->e[i][j].real;
-	    c->e[i][j].imag = a->e[i][j].imag + s*b->e[i][j].imag;
-	}
-    }    
-}
-template <typename su3_matrix, typename Float>
-static void
-scale_su3_matrix(su3_matrix *a,  Float s)
-{
-  int i,j;
-  for(i=0;i<3;i++){
-    for(j=0;j<3;j++){	    
-      a->e[i][j].real = a->e[i][j].real * s;
-      a->e[i][j].imag = a->e[i][j].imag * s;
-    }
-  }    
-}
-
-template<typename su3_matrix, typename su3_vector>
-static void
-mult_su3_mat_vec( su3_matrix *a, su3_vector *b, su3_vector *c  )
-{
-    int i,j;
-    typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
-    for(i=0;i<3;i++){
-	x.real=x.imag=0.0;
-	for(j=0;j<3;j++){
-	    CMUL( a->e[i][j] , b->c[j] , y );
-	    CSUM( x , y );
-	}
-	c->c[i]=x;
-    }
-}
-template<typename su3_matrix, typename su3_vector>
-static void
-mult_adj_su3_mat_vec( su3_matrix *a, su3_vector *b, su3_vector *c )
-{
-    int i,j;
-    typename std::remove_reference<decltype(a->e[0][0])>::type x,y,z;
-    for(i=0;i<3;i++){
-	x.real=x.imag=0.0;
-	for(j=0;j<3;j++){
-	    CONJG( a->e[j][i], z );
-	    CMUL( z , b->c[j], y );
-	    CSUM( x , y );
-	}
-	c->c[i] = x;
-    }
-}
-
-template<typename su3_vector, typename su3_matrix>
-static void
-su3_projector( su3_vector *a, su3_vector *b, su3_matrix *c )
-{
-    int i,j;
-    for(i=0;i<3;i++)for(j=0;j<3;j++){
-	    CMUL_J( a->c[i], b->c[j], c->e[i][j] );
-	}
-}
-
-template<typename su3_vector, typename Real>
-static void 
-scalar_mult_add_su3_vector(su3_vector *a, su3_vector *b, Real s,
-			   su3_vector *c)
-{    
-    int i;
-    for(i=0;i<3;i++){
-	c->c[i].real = a->c[i].real + s*b->c[i].real;
-	c->c[i].imag = a->c[i].imag + s*b->c[i].imag;
-    }    
-}
-
-
-
-template < typename su3_matrix>
-static void
-print_su3_matrix(su3_matrix *a)
-{
-    int i, j;
-    for(i=0;i < 3; i++){
-	for(j=0;j < 3;j++){
-	    printf("(%f %f)\t", a->e[i][j].real, a->e[i][j].imag);
-	}
-	printf("\n");
-    }
-    
-}
-
-
-
-// Add a matrix multiplication function
-template<typename su3_matrix>
-static void
-matrix_mult_nn(su3_matrix* a, su3_matrix* b, su3_matrix* c){
-  // c = a*b
-  typename std::remove_reference<decltype(c->e[0][0])>::type x;
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++){	
-      c->e[i][j].real = 0.;
-      c->e[i][j].imag = 0.;
-      for(int k=0; k<3; k++){	
-	CMUL(a->e[i][k],b->e[k][j],x);
-	c->e[i][j].real += x.real;
-	c->e[i][j].imag += x.imag;
-      } 	
-    }	
-  }
-  return;
-}
-
-
-template<typename su3_matrix>
-static void
-matrix_mult_an(su3_matrix* a, su3_matrix* b, su3_matrix* c){
-  // c = (a^{\dagger})*b
-  typename std::remove_reference<decltype(c->e[0][0])>::type x;
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++){	
-      c->e[i][j].real = 0.;
-      c->e[i][j].imag = 0.;
-      for(int k=0; k<3; k++){	
-	CMULJ_(a->e[k][i],b->e[k][j],x);
-	c->e[i][j].real += x.real;
-	c->e[i][j].imag += x.imag;
-      } 	
-    }	
-  }
-  return;
-}
-
-
-
-template<typename su3_matrix>
-static void
-matrix_mult_na(su3_matrix* a, su3_matrix* b, su3_matrix* c){
-  // c = a*b^{\dagger}
-  typename std::remove_reference<decltype(c->e[0][0])>::type x;
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++){
-      c->e[i][j].real = 0.; c->e[i][j].imag = 0.;
-      for(int k=0; k<3; k++){
-        CMUL_J(a->e[i][k],b->e[j][k],x);
-	c->e[i][j].real += x.real;
-	c->e[i][j].imag += x.imag;
-      }
-    }
-  }
-  return;
-}
-
-template<typename su3_matrix>
-static void
-matrix_mult_aa(su3_matrix* a, su3_matrix* b, su3_matrix* c){
-  
-  su3_matrix a_adjoint;
-  su3_adjoint(a, &a_adjoint);
-  matrix_mult_na(&a_adjoint, b, c);
-}
-
-template <typename su3_matrix, typename anti_hermitmat, typename Float>
-static void
-update_mom(anti_hermitmat* momentum, int dir, su3_matrix* sitelink,
-	   su3_matrix* staple, Float eb3)
-{
-    int i;
-    for(i=0;i <V; i++){
-	su3_matrix tmat1;
-	su3_matrix tmat2;
-	su3_matrix tmat3;
-
-	su3_matrix* lnk = sitelink + 4*i+dir;
-	su3_matrix* stp = staple + i;
-	anti_hermitmat* mom = momentum + 4*i+dir;
-	
-	mult_su3_na(lnk, stp, &tmat1);
-	uncompress_anti_hermitian(mom, &tmat2);
-	
-	scalar_mult_sub_su3_matrix(&tmat2, &tmat1, eb3, &tmat3);
-	make_anti_hermitian(&tmat3, mom);
-	
-    }
-    
-}
-
-
-template<typename half_wilson_vector, typename su3_matrix>
-static void 
-u_shift_hw(half_wilson_vector *src, half_wilson_vector *dest, int dir, su3_matrix* sitelink ) 
-{
-    int i ;
-    int dx[4];
-    
-    dx[3]=dx[2]=dx[1]=dx[0]=0;
-    
-    if(GOES_FORWARDS(dir)){	
-	dx[dir]=1;	
-	for(i=0;i < V; i++){
-	    int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-	    half_wilson_vector* hw = src + nbr_idx;
-	    su3_matrix* link = sitelink + i*4 + dir;
-	    mult_su3_mat_vec(link, &hw->h[0], &dest[i].h[0]);
-	    mult_su3_mat_vec(link, &hw->h[1], &dest[i].h[1]);	    
-	}	
-    }else{
-	dx[OPP_DIR(dir)]=-1;
-	for(i=0;i < V; i++){
-	    int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-	    half_wilson_vector* hw = src + nbr_idx;
-	    su3_matrix* link = sitelink + nbr_idx*4 + OPP_DIR(dir);
-	    mult_adj_su3_mat_vec(link, &hw->h[0], &dest[i].h[0]);
-	    mult_adj_su3_mat_vec(link, &hw->h[1], &dest[i].h[1]);	   
-	}	
-    }
-}
-
-
-
-template<typename half_wilson_vector, typename su3_matrix>
-static void 
-shifted_outer_prod(half_wilson_vector *src, su3_matrix* dest, int dir)
-{
-    
-    int i;
-    int dx[4];
-    
-    dx[3]=dx[2]=dx[1]=dx[0]=0;
-    
-    if(GOES_FORWARDS(dir)){	
-	dx[dir]=1;	
-    }else{ dx[OPP_DIR(dir)]=-1; }
-
-    for(i=0;i < V; i++){
-      int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      half_wilson_vector* hw = src + nbr_idx;
-      su3_projector( &src[i].h[0], &(hw->h[0]), &dest[i]);
-    }	
-}
-
-
-template<typename half_wilson_vector, typename su3_matrix>
-static void 
-forward_shifted_outer_prod(half_wilson_vector *src, su3_matrix* dest, int dir)
-{
-
-  int i;
-  int dx[4];
-    
-  dx[3]=dx[2]=dx[1]=dx[0]=0;
-    
-  if(GOES_FORWARDS(dir)){	
-    dx[dir]=1;	
-  }else{ dx[OPP_DIR(dir)]=-1; }
-
-  for(i=0;i < V; i++){
-    int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-    half_wilson_vector* hw = src + nbr_idx;
-    //su3_projector( &src[i].h[0], &(hw->h[0]), &dest[i]);
-    su3_projector( &(hw->h[0]), &src[i].h[0], &dest[i]);
-  }	
-
-  return;
-}
-
-
-
-
 
 template <typename half_wilson_vector, typename su3_matrix>
-static void
-computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix* dest, int gauge_order)
+void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, int gauge_order)
 {
   int dx[4];
-  for(int i=0; i<V; ++i){
-    for(int dir=0; dir<4; ++dir){
-      dx[3]=dx[2]=dx[1]=dx[0]=0;
+  for (int i = 0; i < V; ++i) {
+    for (int dir = 0; dir < 4; dir++) {
+      dx[3] = dx[2] = dx[1] = dx[0] = 0;
       dx[dir] = 1;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      half_wilson_vector* hw = src + nbr_idx;
-      su3_matrix* p = get_su3_matrix(gauge_order, dest, i, dir);
-      su3_projector( &(hw->h[0]), &src[i].h[0], p);
+      half_wilson_vector *hw = src + nbr_idx;
+      su3_matrix *p = get_su3_matrix(gauge_order, dest, i, dir);
+      su3_projector(&(hw->h[0]), &src[i].h[0], p);
     } // dir
-  } // i
-  return;
+  }   // i
 }
-
 
 template <typename half_wilson_vector, typename su3_matrix>
-static void
-computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix* dest, size_t nhops, int gauge_order)
+void computeLinkOrderedOuterProduct(half_wilson_vector *src, su3_matrix *dest, size_t nhops, int gauge_order)
 {
   int dx[4];
-  for(int i=0; i<V; ++i){
-    for(int dir=0; dir<4; ++dir){
-      dx[3]=dx[2]=dx[1]=dx[0]=0;
+  for (int i = 0; i < V; ++i) {
+    for (int dir = 0; dir < 4; ++dir) {
+      dx[3] = dx[2] = dx[1] = dx[0] = 0;
       dx[dir] = nhops;
       int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      half_wilson_vector* hw = src + nbr_idx;
-      su3_matrix* p = get_su3_matrix(gauge_order, dest, i, dir);
-      su3_projector( &(hw->h[0]), &src[i].h[0], p);
+      half_wilson_vector *hw = src + nbr_idx;
+      su3_matrix *p = get_su3_matrix(gauge_order, dest, i, dir);
+      su3_projector(&(hw->h[0]), &src[i].h[0], p);
     } // dir
-  } // i
-  return;
+  }   // i
 }
-
-
-
 
 void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, int gauge_order)
 {
-  if(precision == QUDA_SINGLE_PRECISION){
-    computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst, gauge_order);
-  }else{
-    computeLinkOrderedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dst, gauge_order);
+  if (precision == QUDA_SINGLE_PRECISION) {
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst, gauge_order);
+  } else {
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst, gauge_order);
   }
-  return;
 }
 
 void computeLinkOrderedOuterProduct(void *src, void *dst, QudaPrecision precision, size_t nhops, int gauge_order)
 {
-  if(precision == QUDA_SINGLE_PRECISION){
-    computeLinkOrderedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dst, nhops, gauge_order);
-  }else{
-    computeLinkOrderedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dst, nhops, gauge_order);
-  }
-  return;
-}
-
-
-
-template<typename half_wilson_vector, typename su3_matrix> 
-static void shiftedOuterProduct(half_wilson_vector *src, su3_matrix* dest){
-  for(int dir=0; dir<4; dir++){
-    shifted_outer_prod(src, &dest[dir*V], OPP_DIR(dir));
+  if (precision == QUDA_SINGLE_PRECISION) {
+    computeLinkOrderedOuterProduct((fhalf_wilson_vector *)src, (fsu3_matrix *)dst, nhops, gauge_order);
+  } else {
+    computeLinkOrderedOuterProduct((dhalf_wilson_vector *)src, (dsu3_matrix *)dst, nhops, gauge_order);
   }
 }
 
-template<typename half_wilson_vector, typename su3_matrix> 
-static void forwardShiftedOuterProduct(half_wilson_vector *src, su3_matrix* dest){
-  for(int dir=0; dir<4; dir++){
-    forward_shifted_outer_prod(src, &dest[dir*V], dir);
-  }
-}
+#define RETURN_IF_ERR                                                                                                  \
+  if (err) return;
 
+extern int gauge_order;
+extern int Vh;
+extern int Vh_ex;
 
-void computeHisqOuterProduct(void* src, void* dest, QudaPrecision precision){
-  if(precision == QUDA_SINGLE_PRECISION){
-    forwardShiftedOuterProduct((fhalf_wilson_vector*)src,(fsu3_matrix*)dest);	
-  }else{
-    forwardShiftedOuterProduct((dhalf_wilson_vector*)src,(dsu3_matrix*)dest);	
-  }
-}
+template <int N> struct Sign {
+  static const int result = 1;
+};
 
+template <> struct Sign<1> {
+  static const int result = -1;
+};
 
-// Note that the hisq routines do not involve half-wilson vectors, 
-// but instead require colour matrix shifts
+template <class T, class U> struct Promote {
+  typedef T Type;
+};
 
+template <> struct Promote<int, float> {
+  typedef float Type;
+};
 
-template<typename su3_matrix> 
-static void 
-u_shift_mat(su3_matrix *src, su3_matrix *dest, int dir, su3_matrix* sitelink)
+template <> struct Promote<float, int> {
+  typedef float Type;
+};
+
+template <> struct Promote<int, double> {
+  typedef double Type;
+};
+
+template <> struct Promote<double, int> {
+  typedef double Type;
+};
+
+template <> struct Promote<float, double> {
+  typedef double Type;
+};
+
+template <> struct Promote<double, float> {
+  typedef double Type;
+};
+
+template <> struct Promote<int, std::complex<float>> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<std::complex<float>, int> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<float, std::complex<float>> {
+  typedef std::complex<float> Type;
+};
+
+template <> struct Promote<int, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, int> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<float, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, float> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<double, std::complex<double>> {
+  typedef std::complex<double> Type;
+};
+
+template <> struct Promote<std::complex<double>, double> {
+  typedef std::complex<double> Type;
+};
+
+template <int N, class T> class Matrix
 {
-  int i;
-  int dx[4];
-  dx[3]=dx[2]=dx[1]=dx[0]=0;
+private:
+  T data[N][N];
 
-  if(GOES_FORWARDS(dir)){
-    dx[dir]=1;
-    for(i=0; i<V; i++){
-      int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      su3_matrix* mat = src+nbr_idx; // No need for a factor of 4 here, the colour matrices do not have a Lorentz index
-      su3_matrix* link = sitelink + i*4 + dir;
-      matrix_mult_nn(link, mat, &dest[i]);	
-    }	
-  }else{
-    dx[OPP_DIR(dir)]=-1;
-    for(i=0; i<V; i++){
-      int nbr_idx = neighborIndexFullLattice(i, dx[3], dx[2], dx[1], dx[0]);
-      su3_matrix* mat = src+nbr_idx; // No need for a factor of 4 here, the colour matrices do not have a Lorentz index
-      su3_matrix* link = sitelink + nbr_idx*4 + OPP_DIR(dir);
-      matrix_mult_an(link, mat, &dest[i]);
+public:
+  Matrix(); // default constructor
+  Matrix(const Matrix<N, T> &) = default;
+  Matrix(Matrix<N, T> &&) = default;
+  Matrix &operator=(const Matrix<N, T> &) = default;
+  Matrix &operator=(Matrix<N, T> &&) = default;
+  Matrix &operator+=(const Matrix<N, T> &mat);
+  Matrix &operator-=(const Matrix<N, T> &mat);
+  const T &operator()(int i, int j) const;
+  T &operator()(int i, int j);
+};
+
+template <int N, class T> Matrix<N, T>::Matrix()
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] = static_cast<T>(0); }
+  }
+}
+
+template <int N, class T> T &Matrix<N, T>::operator()(int i, int j) { return data[i][j]; }
+
+template <int N, class T> const T &Matrix<N, T>::operator()(int i, int j) const { return data[i][j]; }
+
+template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator+=(const Matrix<N, T> &mat)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] += mat.data[i][j]; }
+  }
+  return *this;
+}
+
+template <int N, class T> Matrix<N, T> &Matrix<N, T>::operator-=(const Matrix<N, T> &mat)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { data[i][j] -= mat.data[i][j]; }
+  }
+  return *this;
+}
+
+template <int N, class T> Matrix<N, T> operator+(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result(a);
+  result += b;
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> operator-(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result(a);
+  result -= b;
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> operator*(const Matrix<N, T> &a, const Matrix<N, T> &b)
+{
+  Matrix<N, T> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) {
+      result(i, j) = static_cast<T>(0);
+      for (int k = 0; k < N; ++k) { result(i, j) += a(i, k) * b(k, j); }
     }
   }
-  return;
+  return result;
 }
 
-
-
-
-
-
-
-template <typename half_wilson_vector,
-	  typename anti_hermitmat, typename Real>
-static void 
-add_3f_force_to_mom(half_wilson_vector *back, half_wilson_vector *forw, 
-		    int dir, Real coeff[2], anti_hermitmat* momentum) 
+template <int N, class T> Matrix<N, std::complex<T>> conj(const Matrix<N, std::complex<T>> &mat)
 {
-    Real my_coeff[2] ;
-    Real tmp_coeff[2] ;
-    int mydir;
-    int i;
-    
-    if(GOES_BACKWARDS(dir)){
-	mydir = OPP_DIR(dir);
-	my_coeff[0] = -coeff[0]; 
-	my_coeff[1] = -coeff[1];
-    }else{ 
-	mydir = dir; 
-	my_coeff[0] = coeff[0]; 
-	my_coeff[1] = coeff[1]; 
+  Matrix<N, std::complex<T>> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = std::conj(mat(j, i)); }
+  }
+  return result;
+}
+
+template <int N, class T> Matrix<N, T> transpose(const Matrix<N, std::complex<T>> &mat)
+{
+  Matrix<N, T> result;
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = mat(j, i); }
+  }
+  return result;
+}
+
+template <int N, class T, class U>
+Matrix<N, typename Promote<T, U>::Type> operator*(const Matrix<N, T> &mat, const U &scalar)
+{
+  typedef typename Promote<T, U>::Type return_type;
+  Matrix<N, return_type> result;
+
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { result(i, j) = scalar * mat(i, j); }
+  }
+  return result;
+}
+
+template <int N, class T, class U>
+Matrix<N, typename Promote<T, U>::Type> operator*(const U &scalar, const Matrix<N, T> &mat)
+{
+  return mat * scalar;
+}
+
+template <int N, class T> struct Identity {
+  Matrix<N, T> operator()() const
+  {
+    Matrix<N, T> id;
+    for (int i = 0; i < N; ++i) { id(i, i) = static_cast<T>(1); }
+    return id;
+  } // operator()
+};
+
+template <int N, class T> struct Zero {
+  // the default constructor zeros all matrix elements
+  Matrix<N, T> operator()() const { return Matrix<N, T>(); }
+};
+
+template <int N, class T> std::ostream &operator<<(std::ostream &os, const Matrix<N, T> &m)
+{
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) { os << m(i, j) << " "; }
+    if (i < N - 1) os << std::endl;
+  }
+  return os;
+}
+
+template <class Real> class LoadStore
+{
+private:
+  const int volume;
+  const int half_volume;
+
+public:
+  LoadStore(int vol) : volume(vol), half_volume(vol / 2) { }
+
+  void loadMatrixFromField(const Real *const field, int oddBit, int half_lattice_index,
+                           Matrix<3, std::complex<Real>> *const mat) const;
+
+  void loadMatrixFromField(const Real *const field, int oddBit, int dir, int half_lattice_index,
+                           Matrix<3, std::complex<Real>> *const mat) const;
+
+  void storeMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
+                          Real *const field) const;
+
+  void addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index, Real coeff,
+                        Real *const) const;
+
+  void addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir, int half_lattice_index,
+                        Real coeff, Real *const) const;
+
+  void storeMatrixToMomentumField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir, int half_lattice_index,
+                                  Real coeff, Real *const) const;
+  Real getData(const Real *const field, int idx, int dir, int oddBit, int offset, int hfv) const;
+  void addData(Real *const field, int idx, int dir, int oddBit, int offset, Real, int hfv) const;
+  int half_idx_conversion_ex2normal(int half_lattice_index, const int *dim, int oddBit) const;
+  int half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const;
+};
+
+template <class Real>
+int LoadStore<Real>::half_idx_conversion_ex2normal(int half_lattice_index_ex, const int *dim, int oddBit) const
+{
+  int X1 = dim[0];
+  int X2 = dim[1];
+  int X3 = dim[2];
+  // int X4=dim[3];
+
+  int E1 = dim[0] + 4;
+  int E2 = dim[1] + 4;
+  int E3 = dim[2] + 4;
+  // int E4=dim[3]+4;
+  int E1h = E1 / 2;
+
+  int sid = half_lattice_index_ex;
+
+  int za = sid / E1h;
+  int x1h = sid - za * E1h;
+  int zb = za / E2;
+  int x2 = za - zb * E2;
+  int x4 = zb / E3;
+  int x3 = zb - x4 * E3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2 * x1h + x1odd;
+
+  int idx = ((x4 - 2) * X3 * X2 * X1 + (x3 - 2) * X2 * X1 + (x2 - 2) * X1 + (x1 - 2)) / 2;
+  return idx;
+}
+
+template <class Real>
+int LoadStore<Real>::half_idx_conversion_normal2ex(int half_lattice_index, const int *dim, int oddBit) const
+{
+  int X1 = dim[0];
+  int X2 = dim[1];
+  int X3 = dim[2];
+  // int X4=dim[3];
+  int X1h = X1 / 2;
+
+  int E1 = dim[0] + 4;
+  int E2 = dim[1] + 4;
+  int E3 = dim[2] + 4;
+  // int E4=dim[3]+4;
+  // int E1h=E1/2;
+
+  int sid = half_lattice_index;
+
+  int za = sid / X1h;
+  int x1h = sid - za * X1h;
+  int zb = za / X2;
+  int x2 = za - zb * X2;
+  int x4 = zb / X3;
+  int x3 = zb - x4 * X3;
+  int x1odd = (x2 + x3 + x4 + oddBit) & 1;
+  int x1 = 2 * x1h + x1odd;
+
+  int idx = ((x4 + 2) * E3 * E2 * E1 + (x3 + 2) * E2 * E1 + (x2 + 2) * E1 + (x1 + 2)) / 2;
+
+  return idx;
+}
+
+template <class Real>
+Real LoadStore<Real>::getData(const Real *const field, int idx, int dir, int oddBit, int offset, int hfv) const
+{
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    return field[(4 * hfv * oddBit + 4 * idx + dir) * 18 + offset];
+  } else { // QDP format
+    return ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset];
+  }
+}
+template <class Real>
+void LoadStore<Real>::addData(Real *const field, int idx, int dir, int oddBit, int offset, Real v, int hfv) const
+{
+  if (gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    field[(4 * hfv * oddBit + 4 * idx + dir) * 18 + offset] += v;
+  } else { // QDP format
+    ((Real **)field)[dir][(hfv * oddBit + idx) * 18 + offset] += v;
+  }
+}
+
+template <class Real>
+void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, int half_lattice_index,
+                                          Matrix<3, std::complex<Real>> *const mat) const
+{
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
+
+  int offset = 0;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      (*mat)(i, j) = (*(field + (oddBit * hfv + half_lattice_index) * 18 + offset++));
+      (*mat)(i, j) += std::complex<Real>(0, *(field + (oddBit * hfv + half_lattice_index) * 18 + offset++));
     }
-    
-    for(i=0;i < V;i++){
-	if (i < Vh){
-	    tmp_coeff[0] = my_coeff[0];
-	    tmp_coeff[1] = my_coeff[1];
-	}else{
-	    tmp_coeff[0] = -my_coeff[0];
-	    tmp_coeff[1] = -my_coeff[1] ;	
-	}
-	
-	if (sizeof(Real) == sizeof(float)){
-	    fsu3_matrix tmat;
-	    fsu3_matrix mom_matrix;
-	    anti_hermitmat* mom = momentum+ 4* i + mydir;
-	    uncompress_anti_hermitian(mom, &mom_matrix);
-	    su3_projector( &back[i].h[0], &forw[i].h[0], &tmat);
-	    scalar_mult_add_su3_matrix(&mom_matrix, &tmat,  tmp_coeff[0], &mom_matrix );
-	    make_anti_hermitian(&mom_matrix, mom);
-	}else{
-	    dsu3_matrix tmat;
-	    dsu3_matrix mom_matrix;
-	    anti_hermitmat* mom = momentum+ 4* i + mydir;
-	    uncompress_anti_hermitian(mom, &mom_matrix);
-	    su3_projector( &back[i].h[0], &forw[i].h[0], &tmat);
-	    scalar_mult_add_su3_matrix(&mom_matrix, &tmat,  tmp_coeff[0], &mom_matrix );
-	    make_anti_hermitian(&mom_matrix, mom);
-	}
-    }    
+  }
 }
 
-
-template<typename Real, typename half_wilson_vector, typename anti_hermitmat>
-  static void 
-side_link_3f_force(int mu, int nu, Real coeff[2], half_wilson_vector *Path   , 
-    half_wilson_vector *Path_nu, half_wilson_vector *Path_mu, 
-    half_wilson_vector *Path_numu, anti_hermitmat* mom) 
+template <class Real>
+void LoadStore<Real>::loadMatrixFromField(const Real *const field, int oddBit, int dir, int half_lattice_index,
+                                          Matrix<3, std::complex<Real>> *const mat) const
 {
-  Real m_coeff[2] ;
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
 
-  m_coeff[0] = -coeff[0] ;
-  m_coeff[1] = -coeff[1] ;
-
-  if(GOES_FORWARDS(mu)){
-    if(GOES_FORWARDS(nu)){
-      add_3f_force_to_mom(Path_numu, Path, mu, coeff, mom) ;
-    }else{
-      add_3f_force_to_mom(Path,Path_numu,OPP_DIR(mu),m_coeff, mom);
+  // const Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
+  int offset = 0;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      (*mat)(i, j) = (getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
+      (*mat)(i, j) += std::complex<Real>(0, getData(field, half_lattice_index, dir, oddBit, offset++, hfv));
     }
   }
-  else{
-    if(GOES_FORWARDS(nu))
-      add_3f_force_to_mom(Path_nu, Path_mu, mu, m_coeff, mom);
-    else
-      add_3f_force_to_mom(Path_mu, Path_nu, OPP_DIR(mu), coeff, mom) ;
-  }
 }
 
-
-template<typename Real, typename su3_matrix, typename anti_hermitmat>
-  static void
-add_force_to_momentum(su3_matrix *back, su3_matrix *forw,
-    int dir, Real coeff, anti_hermitmat* momentum)
+template <class Real>
+void LoadStore<Real>::storeMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
+                                         Real *const field) const
 {
-  Real my_coeff;
-  Real tmp_coeff;
-  int mydir;
-  int i;
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
 
-  if(GOES_BACKWARDS(dir)){
-    mydir = OPP_DIR(dir);
-    my_coeff = -coeff;
-  }else{
-    mydir = dir;
-    my_coeff = coeff;	
-  }
-
-
-  for(i=0; i<V; i++){
-    if(i<Vh){ tmp_coeff = my_coeff; }
-    else{ tmp_coeff = -my_coeff; }
-
-
-    su3_matrix tmat;
-    su3_matrix mom_matrix;
-    anti_hermitmat* mom = momentum + 4*i + mydir;
-    uncompress_anti_hermitian(mom, &mom_matrix);
-    matrix_mult_na(&back[i], &forw[i], &tmat);
-    scalar_mult_add_su3_matrix(&mom_matrix, &tmat, tmp_coeff, &mom_matrix);  
-
-    make_anti_hermitian(&mom_matrix, mom);	
-  }
-  return;
-}
-
-
-template<typename Real, typename su3_matrix, typename anti_hermitmat>
-static void 
-side_link_force(int mu, int nu, Real coeff, su3_matrix *Path,
-		su3_matrix *Path_nu, su3_matrix *Path_mu,
-		su3_matrix *Path_numu, anti_hermitmat* mom)
-{
-  Real m_coeff;
-  m_coeff = -coeff;
-
-  if(GOES_FORWARDS(mu)){
-    if(GOES_FORWARDS(nu)){
-      add_force_to_momentum(Path_numu, Path, mu, coeff, mom); 
-      // In the example below:
-      // add_force_to_momentum(P7rho, Qnumu, rho, coeff, mom)
-    }else{
-      add_force_to_momentum(Path, Path_numu, OPP_DIR(mu), m_coeff, mom);	
-      // add_force_to_momentum(Qnumu, P7rho, -Qnumu, rho, m_coeff, mom)
-    }	
-  }
-  else { // if (GOES_BACKWARDS(mu))
-    if(GOES_FORWARDS(nu)){
-      add_force_to_momentum(Path_nu, Path_mu, mu, m_coeff, mom);
-      // add_force_to_momentum(P7, Qrhonumu, rho, m_coeff, mom) 
-    }else{
-      add_force_to_momentum(Path_mu, Path_nu, OPP_DIR(mu), coeff, mom);	
-      // add_force_to_momentum(Qrhonumu, P7, rho, coeff, mom)
+  int offset = 0;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      *(field + (oddBit * hfv + half_lattice_index) * 18 + offset++) = (mat)(i, j).real();
+      *(field + (oddBit * hfv + half_lattice_index) * 18 + offset++) = (mat)(i, j).imag();
     }
   }
-  return; 
 }
 
-
-
-
-#define Pmu          tempmat[0]
-#define Pnumu        tempmat[1]
-#define Prhonumu     tempmat[2]
-#define P7	     tempmat[3]
-#define P7rho	     tempmat[4]
-#define P5           tempmat[5]
-#define P3           tempmat[6]
-#define P5nu	     tempmat[3]
-#define P3mu         tempmat[3]
-#define Popmu        tempmat[4]
-#define Pmumumu      tempmat[4]
-
-#define Qmu          tempmat[7]
-#define Qnumu        tempmat[8]
-#define Qrhonumu     tempmat[2] // same as Prhonumu
-
-
-
-
-
-template<typename su3_matrix>
-static void set_identity_matrix(su3_matrix* mat)
+template <class Real>
+void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int half_lattice_index,
+                                       Real coeff, Real *const field) const
 {
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++){
-      mat->e[i][j].real=0;
-      mat->e[i][j].imag=0;		
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
+  Real *const local_field = field + (oddBit * hfv + half_lattice_index) * 18;
+
+  int offset = 0;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      local_field[offset++] += coeff * mat(i, j).real();
+      local_field[offset++] += coeff * mat(i, j).imag();
     }
-    mat->e[i][i].real=1;		
-  }
-} 
-
-
-template<typename su3_matrix> 
-static void set_identity(su3_matrix* matrices, int num_dirs){
-  for(int i=0; i<V*num_dirs; i++){
-    set_identity_matrix(&matrices[i]);	
   }
 }
 
-
-template <typename Real, typename su3_matrix, typename anti_hermitmat>
-void do_color_matrix_hisq_force_reference(Real eps, Real weight, 
-			   su3_matrix* temp_xx, Real* act_path_coeff,
-			   su3_matrix* sitelink, anti_hermitmat* mom)
+template <class Real>
+void LoadStore<Real>::addMatrixToField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir,
+                                       int half_lattice_index, Real coeff, Real *const field) const
 {
-  int i;
-  int mu, nu, rho, sig;
-  Real coeff;
-  Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
-//  Real Naik;
-  Real mLepage, mFiveSt, mThreeSt, mSevenSt;    
 
-  su3_matrix* tempmat[9];
-  int sites_on_node = V;
-  //int DirectLinks[8] ;
- 
-  Real ferm_epsilon;
-  ferm_epsilon = 2.0*weight*eps;
-  OneLink = act_path_coeff[0]*ferm_epsilon ; 
-//  Naik    = act_path_coeff[1]*ferm_epsilon ; mNaik    = -Naik;
-  ThreeSt = act_path_coeff[2]*ferm_epsilon ; mThreeSt = -ThreeSt;
-  FiveSt  = act_path_coeff[3]*ferm_epsilon ; mFiveSt  = -FiveSt;
-  SevenSt = act_path_coeff[4]*ferm_epsilon ; mSevenSt = -SevenSt;
-  Lepage  = act_path_coeff[5]*ferm_epsilon ; mLepage  = -Lepage;
+#ifdef MULTI_GPU
+  int hfv = Vh_ex;
+#else
+  int hfv = Vh;
+#endif
 
-//  for(mu=0;mu<8;mu++){
-//    DirectLinks[mu] = 0 ;
-//  }
+  // Real* const local_field = field + ((oddBit*half_volume + half_lattice_index)*4 + dir)*18;
+  int offset = 0;
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      // local_field[offset++] += coeff*mat(i,j).real();
+      addData(field, half_lattice_index, dir, oddBit, offset++, coeff * mat(i, j).real(), hfv);
 
-  for(mu=0; mu<9; mu++){	
-    tempmat[mu] = (su3_matrix *)malloc( sites_on_node*sizeof(su3_matrix) );  
+      // local_field[offset++] += coeff*mat(i,j).imag();
+      addData(field, half_lattice_index, dir, oddBit, offset++, coeff * mat(i, j).imag(), hfv);
+    }
+  }
+}
+
+template <class Real>
+void LoadStore<Real>::storeMatrixToMomentumField(const Matrix<3, std::complex<Real>> &mat, int oddBit, int dir,
+                                                 int half_lattice_index, Real coeff, Real *const field) const
+{
+  Real *const mom_field = field + ((oddBit * half_volume + half_lattice_index) * 4 + dir) * 10;
+  mom_field[0] = (mat(0, 1).real() - mat(1, 0).real()) * 0.5 * coeff;
+  mom_field[1] = (mat(0, 1).imag() + mat(1, 0).imag()) * 0.5 * coeff;
+
+  mom_field[2] = (mat(0, 2).real() - mat(2, 0).real()) * 0.5 * coeff;
+  mom_field[3] = (mat(0, 2).imag() + mat(2, 0).imag()) * 0.5 * coeff;
+
+  mom_field[4] = (mat(1, 2).real() - mat(2, 1).real()) * 0.5 * coeff;
+  mom_field[5] = (mat(1, 2).imag() + mat(2, 1).imag()) * 0.5 * coeff;
+
+  const Real temp = (mat(0, 0).imag() + mat(1, 1).imag() + mat(2, 2).imag()) * 0.3333333333333333333;
+  mom_field[6] = (mat(0, 0).imag() - temp) * coeff;
+  mom_field[7] = (mat(1, 1).imag() - temp) * coeff;
+  mom_field[8] = (mat(2, 2).imag() - temp) * coeff;
+  mom_field[9] = 0.0;
+}
+
+template <int oddBit> struct Locator {
+private:
+  int local_dim[4];
+  int volume;
+  int half_index;
+  int full_index;
+  int full_coord[4];
+  void getCoordsFromHalfIndex(int half_index, int coord[4]);
+  void getCoordsFromFullIndex(int full_index, int coord[4]);
+  void cache(int half_lattice_index); // caches the half-lattice index, full-lattice index,
+                                      // and full-lattice coordinates
+
+public:
+  Locator(const int dim[4]);
+  int getFullFromHalfIndex(int half_lattice_index);
+  int getNeighborFromFullIndex(int full_lattice_index, int dir, int *err = NULL);
+};
+
+template <int oddBit> Locator<oddBit>::Locator(const int dim[4]) : half_index(-1), full_index(-1)
+{
+  volume = 1;
+  for (int dir = 0; dir < 4; ++dir) {
+    local_dim[dir] = dim[dir];
+    volume *= local_dim[dir];
+  }
+}
+
+// Store the half_lattice index, works out and stores the full lattice index
+// and the coordinates.
+template <int oddBit> void Locator<oddBit>::getCoordsFromHalfIndex(int half_lattice_index, int coord[4])
+{
+#ifdef MULTI_GPU
+  int E1 = local_dim[0] + 4;
+  int E2 = local_dim[1] + 4;
+  int E3 = local_dim[2] + 4;
+  // int E4 = local_dim[3]+4;
+  int E1h = E1 / 2;
+
+  int z1 = half_lattice_index / E1h;
+  int x1h = half_lattice_index - z1 * E1h;
+  int z2 = z1 / E2;
+  coord[1] = z1 - z2 * E2;
+  coord[3] = z2 / E3;
+  coord[2] = z2 - coord[3] * E3;
+  int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
+  coord[0] = 2 * x1h + x1odd;
+#else
+  int half_dim_0 = local_dim[0] / 2;
+  int z1 = half_lattice_index / half_dim_0;
+  int x1h = half_lattice_index - z1 * half_dim_0;
+  int z2 = z1 / local_dim[1];
+  coord[1] = z1 - z2 * local_dim[1];
+  coord[3] = z2 / local_dim[2];
+  coord[2] = z2 - coord[3] * local_dim[2];
+  int x1odd = (coord[1] + coord[2] + coord[3] + oddBit) & 1;
+  coord[0] = 2 * x1h + x1odd;
+#endif
+}
+
+template <int oddBit> void Locator<oddBit>::getCoordsFromFullIndex(int full_lattice_index, int coord[4])
+{
+#ifdef MULTI_GPU
+  int D1 = local_dim[0] + 4;
+  int D2 = local_dim[1] + 4;
+  int D3 = local_dim[2] + 4;
+  // int D4=local_dim[3]+4;
+  // int D1h=D1/2;
+#else
+  int D1 = local_dim[0];
+  int D2 = local_dim[1];
+  int D3 = local_dim[2];
+  // int D4=local_dim[3];
+  // int D1h=D1/2;
+#endif
+
+  int z1 = full_lattice_index / D1;
+  coord[0] = full_lattice_index - z1 * D1;
+  int z2 = z1 / D2;
+  coord[1] = z1 - z2 * D2;
+  coord[3] = z2 / D3;
+  coord[2] = z2 - coord[3] * D3;
+}
+
+template <int oddBit> void Locator<oddBit>::cache(int half_lattice_index)
+{
+  half_index = half_lattice_index;
+  getCoordsFromHalfIndex(half_lattice_index, full_coord);
+  int x1odd = (full_coord[1] + full_coord[2] + full_coord[3] + oddBit) & 1;
+  full_index = 2 * half_lattice_index + x1odd;
+}
+
+template <int oddBit> int Locator<oddBit>::getFullFromHalfIndex(int half_lattice_index)
+{
+  if (half_index != half_lattice_index) cache(half_lattice_index);
+  return full_index;
+}
+
+// From full index return the neighbouring full index
+template <int oddBit> int Locator<oddBit>::getNeighborFromFullIndex(int full_lattice_index, int dir, int *err)
+{
+  if (err) *err = 0;
+
+  int coord[4];
+  int neighbor_index;
+  getCoordsFromFullIndex(full_lattice_index, coord);
+#ifdef MULTI_GPU
+  int E1 = local_dim[0] + 4;
+  int E2 = local_dim[1] + 4;
+  int E3 = local_dim[2] + 4;
+  int E4 = local_dim[3] + 4;
+  switch (dir) {
+  case 0: //+X
+    neighbor_index = full_lattice_index + 1;
+    if (err && (coord[0] == E1 - 1)) *err = 1;
+    break;
+  case 1: //+Y
+    neighbor_index = full_lattice_index + E1;
+    if (err && (coord[1] == E2 - 1)) *err = 1;
+    break;
+  case 2: //+Z
+    neighbor_index = full_lattice_index + E2 * E1;
+    if (err && (coord[2] == E3 - 1)) *err = 1;
+    break;
+  case 3: //+T
+    neighbor_index = full_lattice_index + E3 * E2 * E1;
+    if (err && (coord[3] == E4 - 1)) *err = 1;
+    break;
+  case 7: //-X
+    neighbor_index = full_lattice_index - 1;
+    if (err && (coord[0] == 0)) *err = 1;
+    break;
+  case 6: //-Y
+    neighbor_index = full_lattice_index - E1;
+    if (err && (coord[1] == 0)) *err = 1;
+    break;
+  case 5: //-Z
+    neighbor_index = full_lattice_index - E2 * E1;
+    if (err && (coord[2] == 0)) *err = 1;
+    break;
+  case 4: //-T
+    neighbor_index = full_lattice_index - E3 * E2 * E1;
+    if (err && (coord[3] == 0)) *err = 1;
+    break;
+  default:
+    errorQuda("Neighbor index could not be determined\n");
+    exit(1);
+    break;
+  } // switch(dir)
+
+#else
+  switch (dir) {
+  case 0:
+    neighbor_index = (coord[0] == local_dim[0] - 1) ? full_lattice_index + 1 - local_dim[0] : full_lattice_index + 1;
+    break;
+  case 1:
+    neighbor_index = (coord[1] == local_dim[1] - 1) ? full_lattice_index + local_dim[0] * (1 - local_dim[1]) :
+                                                      full_lattice_index + local_dim[0];
+    break;
+  case 2:
+    neighbor_index = (coord[2] == local_dim[2] - 1) ?
+      full_lattice_index + local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
+      full_lattice_index + local_dim[0] * local_dim[1];
+    break;
+  case 3:
+    neighbor_index = (coord[3] == local_dim[3] - 1) ?
+      full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
+      full_lattice_index + local_dim[0] * local_dim[1] * local_dim[2];
+    break;
+  case 7: neighbor_index = (coord[0] == 0) ? full_lattice_index - 1 + local_dim[0] : full_lattice_index - 1; break;
+  case 6:
+    neighbor_index
+      = (coord[1] == 0) ? full_lattice_index - local_dim[0] * (1 - local_dim[1]) : full_lattice_index - local_dim[0];
+    break;
+  case 5:
+    neighbor_index = (coord[2] == 0) ? full_lattice_index - local_dim[0] * local_dim[1] * (1 - local_dim[2]) :
+                                       full_lattice_index - local_dim[0] * local_dim[1];
+    break;
+  case 4:
+    neighbor_index = (coord[3] == 0) ?
+      full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2] * (1 - local_dim[3]) :
+      full_lattice_index - local_dim[0] * local_dim[1] * local_dim[2];
+    break;
+  default:
+    errorQuda("Neighbor index could not be determined\n");
+    exit(1);
+    break;
+  } // switch(dir)
+  if (err) *err = 0;
+#endif
+  return neighbor_index;
+}
+
+// Can't typedef a template
+template <class Real> struct ColorMatrix {
+  typedef Matrix<3, std::complex<Real>> Type;
+};
+
+template <class Real, int oddBit>
+void computeOneLinkSite(
+#ifdef MULTI_GPU
+  const int dim[4],
+#else
+  const int[],
+#endif
+  int half_lattice_index, const Real *const oprod, int sig, Real coeff, const LoadStore<Real> &ls, Real *const output)
+{
+  if (GOES_FORWARDS(sig)) {
+    typename ColorMatrix<Real>::Type colorMatW;
+#ifdef MULTI_GPU
+    int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+#else
+    int idx = half_lattice_index;
+#endif
+    ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatW);
+    ls.addMatrixToField(colorMatW, oddBit, sig, idx, coeff, output);
+  }
+}
+
+template <class Real>
+void computeOneLinkField(const int dim[4], const Real *const oprod, int sig, Real coeff, Real *const output)
+{
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
+  const int half_volume = volume / 2;
+  LoadStore<Real> ls(volume);
+  for (int site = 0; site < half_volume; ++site) {
+    computeOneLinkSite<Real, 0>(dim, site, oprod, sig, coeff, ls, output);
+  }
+  // Loop over odd lattice sites
+  for (int site = 0; site < half_volume; ++site) {
+    computeOneLinkSite<Real, 1>(dim, site, oprod, sig, coeff, ls, output);
+  }
+}
+
+// middleLinkKernel compiles for now, but lots of debugging to be done
+template <class Real, int oddBit>
+void computeMiddleLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
+                           const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+                           int sig, int mu, Real coeff,
+                           const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
+                           Real *const Pmu, Real *const P3, Real *const Qmu, Real *const newOprod)
+{
+  const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
+  const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
+
+  Locator<oddBit> locator(dim);
+  int point_b, point_c, point_d;
+  int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
+  int X = locator.getFullFromHalfIndex(half_lattice_index);
+
+  int err;
+  int new_mem_idx = locator.getNeighborFromFullIndex(X, OPP_DIR(mu), &err);
+  RETURN_IF_ERR;
+  point_d = new_mem_idx >> 1;
+  // getNeighborFromFullIndex will work on any site on the lattice, odd or even
+  new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx, sig, &err);
+  RETURN_IF_ERR;
+  point_c = new_mem_idx >> 1;
+
+  new_mem_idx = locator.getNeighborFromFullIndex(X, sig);
+  RETURN_IF_ERR;
+  point_b = new_mem_idx >> 1;
+
+  ad_link_nbr_idx = (mu_positive) ? point_d : half_lattice_index;
+  bc_link_nbr_idx = (mu_positive) ? point_c : point_b;
+  ab_link_nbr_idx = (sig_positive) ? half_lattice_index : point_b;
+
+  typename ColorMatrix<Real>::Type ab_link, bc_link, ad_link;
+  typename ColorMatrix<Real>::Type colorMatW, colorMatX, colorMatY, colorMatZ;
+
+  if (sig_positive) {
+    ls.loadMatrixFromField(link, oddBit, sig, ab_link_nbr_idx, &ab_link);
+  } else {
+    ls.loadMatrixFromField(link, 1 - oddBit, OPP_DIR(sig), ab_link_nbr_idx, &ab_link);
   }
 
+  if (mu_positive) {
+    ls.loadMatrixFromField(link, oddBit, mu, bc_link_nbr_idx, &bc_link);
+  } else {
+    ls.loadMatrixFromField(link, 1 - oddBit, OPP_DIR(mu), bc_link_nbr_idx, &bc_link);
+  }
 
-  su3_matrix* id;
-  id = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
-  //su3_matrix* id4;
-  //id4 = (su3_matrix *)malloc(sites_on_node*4*sizeof(su3_matrix) ); 
+  if (Qprev == NULL) {
+    if (sig_positive) {
+      ls.loadMatrixFromField(oprod, 1 - oddBit, sig, point_d, &colorMatY);
+    } else {
+      ls.loadMatrixFromField(oprod, oddBit, OPP_DIR(sig), point_c, &colorMatY);
+      colorMatY = conj(colorMatY);
+    }
+  } else { // Qprev != NULL
+    ls.loadMatrixFromField(oprod, oddBit, point_c, &colorMatY);
+  }
 
- // su3_matrix* temp_mat;
-//  temp_mat = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
+  colorMatW = (!mu_positive) ? bc_link * colorMatY : conj(bc_link) * colorMatY;
+  if (Pmu) ls.storeMatrixToField(colorMatW, 1 - oddBit, point_b, Pmu);
 
+  colorMatY = (sig_positive) ? ab_link * colorMatW : conj(ab_link) * colorMatW;
+  ls.storeMatrixToField(colorMatY, oddBit, half_lattice_index, P3);
 
-  //  su3_matrix* temp_xx;
-  //  temp_xx = (su3_matrix *)malloc(sites_on_node*8*sizeof(su3_matrix) );
-  //  shiftedOuterProduct(temp_x, temp_xx);
+  if (mu_positive) {
+    ls.loadMatrixFromField(link, 1 - oddBit, mu, ad_link_nbr_idx, &ad_link);
+  } else {
+    ls.loadMatrixFromField(link, oddBit, OPP_DIR(mu), ad_link_nbr_idx, &ad_link);
+    ad_link = conj(ad_link);
+  }
 
-  // initialise id so that it is the identity matrix on each lattice site
-  set_identity(id,1);
+  if (Qprev == NULL) {
+    if (sig_positive) colorMatY = colorMatW * ad_link;
+    if (Qmu) ls.storeMatrixToField(ad_link, oddBit, half_lattice_index, Qmu);
+  } else { // Qprev != NULL
+    if (Qmu || sig_positive) {
+      ls.loadMatrixFromField(Qprev, 1 - oddBit, point_d, &colorMatY);
+      colorMatX = colorMatY * ad_link;
+    }
+    if (Qmu) ls.storeMatrixToField(colorMatX, oddBit, half_lattice_index, Qmu);
+    if (sig_positive) colorMatY = colorMatW * colorMatX;
+  }
 
-  printf("Calling modified hisq\n");
-  return;
+  if (sig_positive) ls.addMatrixToField(colorMatY, oddBit, sig, half_lattice_index, coeff, newOprod);
+} // computeMiddleLinkSite
 
+template <class Real>
+void computeMiddleLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+                            int sig, int mu, Real coeff, Real *const Pmu, Real *const P3, Real *const Qmu,
+                            Real *const newOprod)
+{
 
-  for(sig=0; sig < 8; sig++){
-    // One-link term - don't have the savings here that we get when working with the 
-    // half-wilson vectors
-    if(GOES_FORWARDS(sig)){
-      u_shift_mat(&temp_xx[OPP_DIR(sig)*V], Pmu, sig, sitelink);
-      add_force_to_momentum(Pmu, id, sig, OneLink, mom); // I could optimise functions which 
-      // involve id
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
+#ifdef MULTI_GPU
+  const int loop_count = Vh_ex;
+#else
+  const int loop_count = volume / 2;
+#endif
+  // loop over the lattice volume
+  // To keep the code as close to the GPU code as possible, we'll
+  // loop over the even sites first and then the odd sites
+  LoadStore<Real> ls(volume);
+  for (int site = 0; site < loop_count; ++site) {
+    computeMiddleLinkSite<Real, 0>(site, dim, oprod, Qprev, link, sig, mu, coeff, ls, Pmu, P3, Qmu, newOprod);
+  }
+  // Loop over odd lattice sites
+  for (int site = 0; site < loop_count; ++site) {
+    computeMiddleLinkSite<Real, 1>(site, dim, oprod, Qprev, link, sig, mu, coeff, ls, Pmu, P3, Qmu, newOprod);
+  }
+}
+
+template <class Real, int oddBit>
+void computeSideLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
+                         const int dim[4], const Real *const P3,
+                         const Real *const Qprod, // why?
+                         const Real *const link, int sig, int mu, Real coeff, Real accumu_coeff,
+                         const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
+                         Real *const shortP, Real *const newOprod)
+{
+
+  const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
+  const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
+
+  Locator<oddBit> locator(dim);
+  int point_d;
+  int ad_link_nbr_idx;
+  int X = locator.getFullFromHalfIndex(half_lattice_index);
+
+  int err;
+  int new_mem_idx = locator.getNeighborFromFullIndex(X, OPP_DIR(mu), &err);
+  RETURN_IF_ERR;
+  point_d = new_mem_idx >> 1;
+  ad_link_nbr_idx = (mu_positive) ? point_d : half_lattice_index;
+
+  typename ColorMatrix<Real>::Type ad_link;
+  typename ColorMatrix<Real>::Type colorMatW, colorMatX, colorMatY;
+
+  ls.loadMatrixFromField(P3, oddBit, half_lattice_index, &colorMatY);
+
+  if (shortP) {
+    if (mu_positive) {
+      ad_link_nbr_idx = point_d;
+      ls.loadMatrixFromField(link, 1 - oddBit, mu, ad_link_nbr_idx, &ad_link);
+    } else {
+      ad_link_nbr_idx = half_lattice_index;
+      ls.loadMatrixFromField(link, oddBit, OPP_DIR(mu), ad_link_nbr_idx, &ad_link);
+    }
+    colorMatW = (mu_positive) ? ad_link * colorMatY : conj(ad_link) * colorMatY;
+    ls.addMatrixToField(colorMatW, 1 - oddBit, point_d, accumu_coeff, shortP);
+  } // if(shortP)
+
+  Real mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
+
+  if (Qprod) {
+    ls.loadMatrixFromField(Qprod, 1 - oddBit, point_d, &colorMatX);
+    if (mu_positive) {
+      colorMatW = colorMatY * colorMatX;
+      if (!oddBit) { mycoeff = -mycoeff; }
+      ls.addMatrixToField(colorMatW, 1 - oddBit, mu, point_d, mycoeff, newOprod);
+    } else {
+      colorMatW = conj(colorMatX) * conj(colorMatY);
+      if (oddBit) { mycoeff = -mycoeff; }
+      ls.addMatrixToField(colorMatW, oddBit, OPP_DIR(mu), half_lattice_index, mycoeff, newOprod);
+    }
+  }
+
+  if (!Qprod) {
+    if (mu_positive) {
+      if (!oddBit) { mycoeff = -mycoeff; }
+      ls.addMatrixToField(colorMatY, 1 - oddBit, mu, point_d, mycoeff, newOprod);
+    } else {
+      if (oddBit) { mycoeff = -mycoeff; }
+      colorMatW = conj(colorMatY);
+      ls.addMatrixToField(colorMatW, oddBit, OPP_DIR(mu), half_lattice_index, mycoeff, newOprod);
+    }
+  } // if !(Qprod)
+
+} // computeSideLinkSite
+
+// Maybe change to computeSideLinkField
+template <class Real>
+void computeSideLinkField(const int dim[4], const Real *const P3,
+                          const Real *const Qprod, // why?
+                          const Real *const link, int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP,
+                          Real *const newOprod)
+{
+  // Need some way of setting half_volume
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
+#ifdef MULTI_GPU
+  const int loop_count = Vh_ex;
+#else
+  const int loop_count = volume / 2;
+#endif
+  LoadStore<Real> ls(volume);
+
+  for (int site = 0; site < loop_count; ++site) {
+    computeSideLinkSite<Real, 0>(site, dim, P3, Qprod, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
+  }
+
+  for (int site = 0; site < loop_count; ++site) {
+    computeSideLinkSite<Real, 1>(site, dim, P3, Qprod, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
+  }
+}
+
+template <class Real, int oddBit>
+void computeAllLinkSite(int half_lattice_index, // half_lattice_index to better match the GPU code.
+                        const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+                        int sig, int mu, Real coeff, Real accumu_coeff,
+                        const LoadStore<Real> &ls, // pass a function object to read from and write to matrix fields
+                        Real *const shortP, Real *const newOprod)
+{
+
+  const bool mu_positive = (GOES_FORWARDS(mu)) ? true : false;
+  const bool sig_positive = (GOES_FORWARDS(sig)) ? true : false;
+
+  typename ColorMatrix<Real>::Type ab_link, bc_link, ad_link;
+  typename ColorMatrix<Real>::Type colorMatW, colorMatX, colorMatY, colorMatZ;
+
+  int ab_link_nbr_idx, point_b, point_c, point_d;
+
+  Locator<oddBit> locator(dim);
+  int X = locator.getFullFromHalfIndex(half_lattice_index);
+
+  int err;
+  int new_mem_idx = locator.getNeighborFromFullIndex(X, OPP_DIR(mu), &err);
+  RETURN_IF_ERR;
+  point_d = new_mem_idx >> 1;
+
+  new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx, sig, &err);
+  RETURN_IF_ERR;
+  point_c = new_mem_idx >> 1;
+
+  new_mem_idx = locator.getNeighborFromFullIndex(X, sig, &err);
+  RETURN_IF_ERR;
+  point_b = new_mem_idx >> 1;
+  ab_link_nbr_idx = (sig_positive) ? half_lattice_index : point_b;
+
+  Real mycoeff = ((sig_positive && oddBit) || (!sig_positive && !oddBit)) ? coeff : -coeff;
+
+  if (mu_positive) {
+    ls.loadMatrixFromField(Qprev, 1 - oddBit, point_d, &colorMatX);
+    ls.loadMatrixFromField(link, 1 - oddBit, mu, point_d, &ad_link);
+    // compute point_c
+    ls.loadMatrixFromField(oprod, oddBit, point_c, &colorMatY);
+    ls.loadMatrixFromField(link, oddBit, mu, point_c, &bc_link);
+    colorMatZ = conj(bc_link) * colorMatY; // okay
+
+    if (sig_positive) {
+      colorMatY = colorMatX * ad_link;
+      colorMatW = colorMatZ * colorMatY;
+      ls.addMatrixToField(colorMatW, oddBit, sig, half_lattice_index, Sign<oddBit>::result * mycoeff, newOprod);
     }
 
+    if (sig_positive) {
+      ls.loadMatrixFromField(link, oddBit, sig, ab_link_nbr_idx, &ab_link);
+    } else {
+      ls.loadMatrixFromField(link, 1 - oddBit, OPP_DIR(sig), ab_link_nbr_idx, &ab_link);
+    }
+    colorMatY = (sig_positive) ? ab_link * colorMatZ : conj(ab_link) * colorMatZ; // okay
+    colorMatW = colorMatY * colorMatX;
+    ls.addMatrixToField(colorMatW, 1 - oddBit, mu, point_d, -Sign<oddBit>::result * mycoeff, newOprod);
+    colorMatW = ad_link * colorMatY;
+    ls.addMatrixToField(colorMatW, 1 - oddBit, point_d, accumu_coeff, shortP); // Warning! Need to check this!
+  } else {                                                                     // negative mu
+    mu = OPP_DIR(mu);
+    ls.loadMatrixFromField(Qprev, 1 - oddBit, point_d, &colorMatX);
+    ls.loadMatrixFromField(link, oddBit, mu, half_lattice_index, &ad_link);
+    ls.loadMatrixFromField(oprod, oddBit, point_c, &colorMatY);
+    ls.loadMatrixFromField(link, 1 - oddBit, mu, point_b, &bc_link);
 
+    if (sig_positive) colorMatW = colorMatX * conj(ad_link);
+    colorMatZ = bc_link * colorMatY;
+    if (sig_positive) {
+      colorMatY = colorMatZ * colorMatW;
+      ls.addMatrixToField(colorMatY, oddBit, sig, half_lattice_index, Sign<oddBit>::result * mycoeff, newOprod);
+    }
 
-    for(mu = 0; mu < 8; mu++){
-      if ( (mu == sig) || (mu == OPP_DIR(sig))){
-        continue;
-      }
-      //     3 link path 
-      //	 sig
-      //    A  _______
-      //      |       |
-      //  mu /|\     \|/
-      //      |       |
-      //
-      //
-      u_shift_mat(&temp_xx[OPP_DIR(sig)*V], Pmu, OPP_DIR(mu), sitelink); // temp_xx[sig] stores |X(x)><X(x-sig)|
-      u_shift_mat(id, Qmu, OPP_DIR(mu), sitelink); // This returns the path less the outer-product of quark fields at the end 
-                                                   // Qmu = U[mu]	
+    if (sig_positive) {
+      ls.loadMatrixFromField(link, oddBit, sig, ab_link_nbr_idx, &ab_link);
+    } else {
+      ls.loadMatrixFromField(link, 1 - oddBit, OPP_DIR(sig), ab_link_nbr_idx, &ab_link);
+    }
 
+    colorMatY = (sig_positive) ? ab_link * colorMatZ : conj(ab_link) * colorMatZ; // 611
+    colorMatW = conj(colorMatX) * conj(colorMatY);
 
-      u_shift_mat(Pmu, P3, sig, sitelink); // P3 is U[sig](X)U[-mu](X+sig) temp_xx
-      if (GOES_FORWARDS(sig)){
-        // add contribution from middle link
-        add_force_to_momentum(P3, Qmu, sig, mThreeSt, mom); 
-        // matrix_mult_na(P3[x],Qmu[x],tmp);
-        // mom[sig][x] += mThreeSt*tmp; 
-      }
-      for(nu=0; nu < 8; nu++){
-        if (nu == sig || nu == OPP_DIR(sig)
-            || nu == mu || nu == OPP_DIR(mu)){
-          continue;
-        }
+    ls.addMatrixToField(colorMatW, oddBit, mu, half_lattice_index, Sign<oddBit>::result * mycoeff, newOprod);
+    colorMatW = conj(ad_link) * colorMatY;
+    ls.addMatrixToField(colorMatW, 1 - oddBit, point_d, accumu_coeff, shortP);
+  } // end mu
+} // allLinkKernel
 
-	/*
-         5 link path
-        
-                sig
-            A ________
-             |        |
-            /|\      \|/
-             |        |
-              \	       \
-               \        \
-	*/
+template <class Real>
+void computeAllLinkField(const int dim[4], const Real *const oprod, const Real *const Qprev, const Real *const link,
+                         int sig, int mu, Real coeff, Real accumu_coeff, Real *const shortP, Real *const newOprod)
+{
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
+#ifdef MULTI_GPU
+  const int loop_count = Vh_ex;
+#else
+  const int loop_count = volume / 2;
+#endif
 
-        u_shift_mat(Pmu, Pnumu, OPP_DIR(nu), sitelink);
-        u_shift_mat(Qmu, Qnumu, OPP_DIR(nu), sitelink);
+  LoadStore<Real> ls(volume);
+  for (int site = 0; site < loop_count; ++site) {
 
-        u_shift_mat(Pnumu, P5, sig, sitelink);
-        if (GOES_FORWARDS(sig)){
-          add_force_to_momentum(P5, Qnumu, sig, FiveSt, mom);
-        } // seems to do what I think it should
-        for(rho =0; rho < 8; rho++){
-          if (rho == sig || rho == OPP_DIR(sig)
-              || rho == mu || rho == OPP_DIR(mu)
-              || rho == nu || rho == OPP_DIR(nu)){
+    computeAllLinkSite<Real, 0>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
+  }
+
+  for (int site = 0; site < loop_count; ++site) {
+    computeAllLinkSite<Real, 1>(site, dim, oprod, Qprev, link, sig, mu, coeff, accumu_coeff, ls, shortP, newOprod);
+  }
+}
+
+#define Pmu tempmat[0]
+#define P3 tempmat[1]
+#define P5 tempmat[2]
+#define Pnumu tempmat[3]
+#define Qmu tempmat[4]
+#define Qnumu tempmat[5]
+
+template <class Real> struct PathCoefficients {
+  Real one;
+  Real three;
+  Real five;
+  Real seven;
+  Real naik;
+  Real lepage;
+};
+
+template <class Real>
+void doHisqStaplesForceCPU(const int dim[4], PathCoefficients<double> staple_coeff, Real *oprod, Real *link,
+                           Real **tempmat, Real *newOprod)
+{
+  Real OneLink, ThreeSt, FiveSt, SevenSt, Lepage, coeff;
+
+  OneLink = staple_coeff.one;
+  ThreeSt = staple_coeff.three;
+  FiveSt = staple_coeff.five;
+  SevenSt = staple_coeff.seven;
+  Lepage = staple_coeff.lepage;
+
+  for (int sig = 0; sig < 4; ++sig) { computeOneLinkField(dim, oprod, sig, OneLink, newOprod); }
+
+  // sig labels the net displacement of the staple
+  for (int sig = 0; sig < 8; ++sig) {
+    for (int mu = 0; mu < 8; ++mu) {
+      if (mu == sig || mu == OPP_DIR(sig)) continue;
+
+      computeMiddleLinkField<Real>(dim, oprod, NULL, link, sig, mu, -ThreeSt, Pmu, P3, Qmu, newOprod);
+
+      for (int nu = 0; nu < 8; ++nu) {
+        if (nu == mu || nu == OPP_DIR(mu) || nu == sig || nu == OPP_DIR(sig)) continue;
+
+        computeMiddleLinkField<Real>(dim, Pmu, Qmu, link, sig, nu, staple_coeff.five, Pnumu, P5, Qnumu, newOprod);
+
+        for (int rho = 0; rho < 8; ++rho) {
+          if (rho == sig || rho == OPP_DIR(sig) || rho == mu || rho == OPP_DIR(mu) || rho == nu || rho == OPP_DIR(nu)) {
             continue;
           }
 
-          //7 link path
-          u_shift_mat(Pnumu, Prhonumu, OPP_DIR(rho), sitelink);
-          u_shift_mat(Prhonumu, P7, sig, sitelink);
+          if (FiveSt != 0)
+            coeff = SevenSt / FiveSt;
+          else
+            coeff = 0;
+          computeAllLinkField<Real>(dim, Pnumu, Qnumu, link, sig, rho, staple_coeff.seven, coeff, P5, newOprod);
 
-          // Prhonumu = tempmat[2] is not needed again
-          // => store Qrhonumu in the same memory
-          u_shift_mat(Qnumu, Qrhonumu, OPP_DIR(rho), sitelink);
+        } // rho
 
+        // 5-staple: side link
+        if (ThreeSt != 0)
+          coeff = FiveSt / ThreeSt;
+        else
+          coeff = 0;
+        computeSideLinkField<Real>(dim, P5, Qmu, link, sig, nu, -FiveSt, coeff, P3, newOprod);
 
-          if(GOES_FORWARDS(sig)){
-            add_force_to_momentum(P7, Qrhonumu, sig, mSevenSt, mom) ;	
-          }
-             u_shift_mat(P7, P7rho, rho, sitelink);
-             side_link_force(rho, sig, SevenSt, Qnumu, P7, Qrhonumu, P7rho, mom);		    
-             if(FiveSt != 0)coeff = SevenSt/FiveSt ; else coeff = 0;
-             for(i=0; i<V; i++){
-             scalar_mult_add_su3_matrix(&P5[i], &P7rho[i], coeff, &P5[i]);
-             } // end loop over volume
-        } // end loop over rho	
+      } // nu
 
+      // lepage
+      if (staple_coeff.lepage != 0.) {
+        computeMiddleLinkField<Real>(dim, Pmu, Qmu, link, sig, mu, Lepage, NULL, P5, NULL, newOprod);
 
-           u_shift_mat(P5, P5nu, nu, sitelink);	
-           side_link_force(nu,sig,mFiveSt,Qmu,P5,Qnumu,P5nu,mom); // I believe this should do what I want it to
-        // check this!
-        if(ThreeSt != 0)coeff	= FiveSt/ThreeSt; else coeff = 0;
+        if (ThreeSt != 0)
+          coeff = Lepage / ThreeSt;
+        else
+          coeff = 0;
+        computeSideLinkField<Real>(dim, P5, Qmu, link, sig, mu, -Lepage, coeff, P3, newOprod);
+      } // lepage != 0
 
-        for(i=0; i<V; i++){
-        scalar_mult_add_su3_matrix(&P3[i], &P5nu[i], coeff, &P3[i]);
-        } // end loop over volume
-      } // end loop over nu
+      computeSideLinkField<Real>(dim, P3, NULL, link, sig, mu, ThreeSt, 0., NULL, newOprod);
+    } // mu
+  }   // sig
 
-      // Lepage term 
-      u_shift_mat(Pmu, Pnumu, OPP_DIR(mu), sitelink);
-      u_shift_mat(Qmu, Qnumu, OPP_DIR(mu), sitelink);
-
-      u_shift_mat(Pnumu, P5, sig, sitelink);
-      if(GOES_FORWARDS(sig)){
-      add_force_to_momentum(P5, Qnumu, sig, Lepage, mom); 
-      }
-
-      u_shift_mat(P5, P5nu, mu, sitelink);
-      side_link_force(mu, sig, mLepage, Qmu, P5, Qnumu, P5nu, mom);
-
-
-      if(ThreeSt != 0)coeff = Lepage/ThreeSt; else coeff = 0;
-
-      for(i=0; i<V; i++){
-      scalar_mult_add_su3_matrix(&P3[i], &P5nu[i], coeff, &P3[i]);
-      }
-
-      if(GOES_FORWARDS(mu)){
-      u_shift_mat(P3, P3mu, mu, sitelink);
-      }
-      side_link_force(mu, sig, ThreeSt, id, P3, Qmu, P3mu, mom);
-    } // end loop over mu
-  } // end loop over sig
-} // modified hisq_force_reference
-
-
-
-
-
-
-// This version of the test routine uses 
-// half-wilson vectors instead of color matrices.
-template <typename Real, typename su3_matrix, typename anti_hermitmat, typename half_wilson_vector>
-void do_halfwilson_hisq_force_reference(Real eps, Real weight, 
-			   half_wilson_vector* temp_x, Real* act_path_coeff,
-			   su3_matrix* sitelink, anti_hermitmat* mom)
-{
-  int i;
-  int mu, nu, rho, sig;
-  Real coeff;
-  Real OneLink, Lepage, FiveSt, ThreeSt, SevenSt;
-  //Real Naik;
-  Real mLepage, mFiveSt, mThreeSt, mSevenSt;    
-
-  su3_matrix* tempmat[9];
-  int sites_on_node = V;
-//  int DirectLinks[8] ;
- 
-  Real ferm_epsilon;
-  ferm_epsilon = 2.0*weight*eps;
-  OneLink = act_path_coeff[0]*ferm_epsilon ; 
-//  Naik    = act_path_coeff[1]*ferm_epsilon ; 
-  ThreeSt = act_path_coeff[2]*ferm_epsilon ; mThreeSt = -ThreeSt;
-  FiveSt  = act_path_coeff[3]*ferm_epsilon ; mFiveSt  = -FiveSt;
-  SevenSt = act_path_coeff[4]*ferm_epsilon ; mSevenSt = -SevenSt;
-  Lepage  = act_path_coeff[5]*ferm_epsilon ; mLepage  = -Lepage;
-   
- 
-//  for(mu=0;mu<8;mu++){
-//    DirectLinks[mu] = 0 ;
-//  }
-
-  for(mu=0; mu<9; mu++){	
-    tempmat[mu] = (su3_matrix *)malloc( sites_on_node*sizeof(su3_matrix) );  
-  }
-
-
-  su3_matrix* id;
-  id = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
-  su3_matrix* id4;
-  id4 = (su3_matrix *)malloc(sites_on_node*4*sizeof(su3_matrix) ); 
-
-  su3_matrix* temp_mat;
-  temp_mat = (su3_matrix *)malloc(sites_on_node*sizeof(su3_matrix) ); 
-
-  // initialise id so that it is the identity matrix on each lattice site
-  set_identity(id,1);
-
-  printf("Calling hisq reference routine\n");
-  for(sig=0; sig < 8; sig++){
-    shifted_outer_prod(temp_x, temp_mat, OPP_DIR(sig));
-
-    // One-link term - don't have the savings here that we get when working with the 
-    // half-wilson vectors
-    if(GOES_FORWARDS(sig)){
-      u_shift_mat(temp_mat, Pmu, sig, sitelink);
-       add_force_to_momentum(Pmu, id, sig, OneLink, mom); 
-    }
-
-    for(mu = 0; mu < 8; mu++){
-      if ( (mu == sig) || (mu == OPP_DIR(sig))){
-		continue;
-      }
-      // 3 link path 
-      //	 sig
-      //    A  _______
-      //      |       |
-      //  mu /|\     \|/
-      //      |       |
-      //
-      //
-      u_shift_mat(temp_mat, Pmu, OPP_DIR(mu), sitelink); // temp_xx[sig] stores |X(x)><X(x-sig)|
-      u_shift_mat(id, Qmu, OPP_DIR(mu), sitelink);       // This returns the path less the outer-product of quark fields at the end 
-						         // Qmu = U[mu]	
-	
-
-      u_shift_mat(Pmu, P3, sig, sitelink); // P3 is U[sig](X)U[-mu](X+sig) temp_xx
-      if (GOES_FORWARDS(sig)){
-	  // add contribution from middle link
-        add_force_to_momentum(P3, Qmu, sig, mThreeSt, mom); // matrix_mult_na(P3[x],Qmu[x],tmp);
-							    // mom[sig][x] += mThreeSt*tmp; 
-      }
-      for(nu=0; nu < 8; nu++){
-        if (nu == sig || nu == OPP_DIR(sig)
-	 || nu == mu || nu == OPP_DIR(mu)){
-	 continue;
-        }
-
-	/*	
-	 5 link path
-        
-	        sig
-	    A ________
-	     |        |
-	    /|\      \|/
-	     |        |
-	      \        \
-	       \        \
-	*/
-
-	u_shift_mat(Pmu, Pnumu, OPP_DIR(nu), sitelink);
-	u_shift_mat(Qmu, Qnumu, OPP_DIR(nu), sitelink);
-
-        u_shift_mat(Pnumu, P5, sig, sitelink);
-        if (GOES_FORWARDS(sig)){
-	  add_force_to_momentum(P5, Qnumu, sig, FiveSt, mom);
-        } // seems to do what I think it should
-
-	for(rho =0; rho < 8; rho++){
-	  if (rho == sig || rho == OPP_DIR(sig)
-	    || rho == mu || rho == OPP_DIR(mu)
-	    || rho == nu || rho == OPP_DIR(nu)){
-	       continue;
-	   }
-		    
-           //7 link path
-	  u_shift_mat(Pnumu, Prhonumu, OPP_DIR(rho), sitelink);
-	  u_shift_mat(Prhonumu, P7, sig, sitelink);
-	  
-	  // Prhonumu = tempmat[2] is not needed again
-	  // => store Qrhonumu in the same memory
-	  u_shift_mat(Qnumu, Qrhonumu, OPP_DIR(rho), sitelink);
-	
-
-          if(GOES_FORWARDS(sig)){
-	    add_force_to_momentum(P7, Qrhonumu, sig, mSevenSt, mom) ;	
-	  }
-
-	  u_shift_mat(P7, P7rho, rho, sitelink);
-	  side_link_force(rho, sig, SevenSt, Qnumu, P7, Qrhonumu, P7rho, mom);		    
-	  if(FiveSt != 0)coeff = SevenSt/FiveSt ; else coeff = 0;
-	  for(i=0; i<V; i++){
-	    scalar_mult_add_su3_matrix(&P5[i], &P7rho[i], coeff, &P5[i]);
-	  } // end loop over volume
-	} // end loop over rho	
-
-
-        u_shift_mat(P5, P5nu, nu, sitelink);	
-	side_link_force(nu,sig,mFiveSt,Qmu,P5,Qnumu,P5nu,mom); // I believe this should do what I want it to
-							       // check this!
-	if(ThreeSt != 0)coeff	= FiveSt/ThreeSt; else coeff = 0;
-	
-        for(i=0; i<V; i++){
-	  scalar_mult_add_su3_matrix(&P3[i], &P5nu[i], coeff, &P3[i]);
-	} // end loop over volume
-      } // end loop over nu
-
-      // Lepage term 
-      u_shift_mat(Pmu, Pnumu, OPP_DIR(mu), sitelink);
-      u_shift_mat(Qmu, Qnumu, OPP_DIR(mu), sitelink);
-	
-      u_shift_mat(Pnumu, P5, sig, sitelink);
-      if(GOES_FORWARDS(sig)){
-        add_force_to_momentum(P5, Qnumu, sig, Lepage, mom); 
-      }
-
-      u_shift_mat(P5, P5nu, mu, sitelink);
-      side_link_force(mu, sig, mLepage, Qmu, P5, Qnumu, P5nu, mom);
-
-
-      if(ThreeSt != 0)coeff = Lepage/ThreeSt; else coeff = 0;
-
-      for(i=0; i<V; i++){
-	scalar_mult_add_su3_matrix(&P3[i], &P5nu[i], coeff, &P3[i]);
-      }
-   
-      if(GOES_FORWARDS(mu)){
-	u_shift_mat(P3, P3mu, mu, sitelink);
-      }
-      side_link_force(mu, sig, ThreeSt, id, P3, Qmu, P3mu, mom);
-    } // end loop over mu
-  } // end loop over sig
-
-  for(mu=0; mu<9; mu++){	
-    free(tempmat[mu]);
-  }
-  
-  free(id);
-  free(id4);
-  free(temp_mat);
+  // Need also to compute the one-link contribution
 }
 
 #undef Pmu
-#undef Pnumu
-#undef Prhonumu
 #undef P3
-#undef P3mu
 #undef P5
-#undef P5nu
-#undef P7
-#undef P7rho
-#undef P7rhonu
-
-#undef Popmu
-#undef Pmumumu
-
+#undef Pnumu
 #undef Qmu
 #undef Qnumu
-#undef Qrhonumu
 
-
-
-
-
-
-void halfwilson_hisq_force_reference(float eps, float weight, 
-			  void* act_path_coeff, void* temp_x,
-			  void* sitelink, void* mom)
+void hisqStaplesForceCPU(const double *path_coeff, const QudaGaugeParam &param, cpuGaugeField &oprod,
+                         cpuGaugeField &link, cpuGaugeField *newOprod)
 {
- do_halfwilson_hisq_force_reference((float)eps, (float)weight,
-			  (fhalf_wilson_vector*) temp_x, (float*)act_path_coeff,
-			  (fsu3_matrix*)sitelink, (fanti_hermitmat*)mom);
- return;
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= param.X[dir];
+
+#ifdef MULTI_GPU
+  int len = Vh_ex * 2;
+#else
+  int len = volume;
+#endif
+  // allocate memory for temporary fields
+  void *tempmat[6];
+  for (int i = 0; i < 6; i++) { tempmat[i] = safe_malloc(len * 18 * param.cpu_prec); }
+
+  PathCoefficients<double> act_path_coeff;
+  act_path_coeff.one = path_coeff[0];
+  act_path_coeff.naik = path_coeff[1];
+  act_path_coeff.three = path_coeff[2];
+  act_path_coeff.five = path_coeff[3];
+  act_path_coeff.seven = path_coeff[4];
+  act_path_coeff.lepage = path_coeff[5];
+
+  if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+    doHisqStaplesForceCPU<double>(param.X, act_path_coeff, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(),
+                                  (double **)tempmat, (double *)newOprod->Gauge_p());
+
+  } else if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    doHisqStaplesForceCPU<float>(param.X, act_path_coeff, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(),
+                                 (float **)tempmat, (float *)newOprod->Gauge_p());
+  } else {
+    errorQuda("Unsupported precision");
+  }
+
+  for (int i = 0; i < 6; ++i) { host_free(tempmat[i]); }
 }
 
-
-
-void halfwilson_hisq_force_reference(double eps, double weight, 
-			  void* act_path_coeff, void* temp_x,
-			  void* sitelink, void* mom)
+template <class Real, int oddBit>
+void computeLongLinkSite(int half_lattice_index, const int dim[4], const Real *const oprod, const Real *const link,
+                         int sig, Real coeff, const LoadStore<Real> &ls, Real *const output)
 {
- do_halfwilson_hisq_force_reference((double)eps, (double)weight,
-			  (dhalf_wilson_vector*) temp_x, (double*)act_path_coeff,
-			  (dsu3_matrix*)sitelink, (danti_hermitmat*)mom);
- return;
+  if (GOES_FORWARDS(sig)) {
+
+    Locator<oddBit> locator(dim);
+
+    typename ColorMatrix<Real>::Type ab_link, bc_link, de_link, ef_link;
+    typename ColorMatrix<Real>::Type colorMatU, colorMatV, colorMatW, colorMatX, colorMatY, colorMatZ;
+
+    int point_a, point_b, point_c, point_d, point_e;
+#ifdef MULTI_GPU
+    int idx = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+#else
+    int idx = half_lattice_index;
+#endif
+
+    int X = locator.getFullFromHalfIndex(idx);
+    point_c = idx;
+
+    int new_mem_idx = locator.getNeighborFromFullIndex(X, sig);
+    point_d = new_mem_idx >> 1;
+
+    new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx, sig);
+    point_e = new_mem_idx >> 1;
+
+    new_mem_idx = locator.getNeighborFromFullIndex(X, OPP_DIR(sig));
+    point_b = new_mem_idx >> 1;
+
+    new_mem_idx = locator.getNeighborFromFullIndex(new_mem_idx, OPP_DIR(sig));
+    point_a = new_mem_idx >> 1;
+
+    ls.loadMatrixFromField(link, oddBit, sig, point_a, &ab_link);
+    ls.loadMatrixFromField(link, 1 - oddBit, sig, point_b, &bc_link);
+    ls.loadMatrixFromField(link, 1 - oddBit, sig, point_d, &de_link);
+    ls.loadMatrixFromField(link, oddBit, sig, point_e, &ef_link);
+
+    ls.loadMatrixFromField(oprod, oddBit, sig, point_c, &colorMatZ);
+    ls.loadMatrixFromField(oprod, 1 - oddBit, sig, point_b, &colorMatY);
+    ls.loadMatrixFromField(oprod, oddBit, sig, point_a, &colorMatX);
+
+    colorMatV = de_link * ef_link * colorMatZ - de_link * colorMatY * bc_link + colorMatX * ab_link * bc_link;
+
+    ls.addMatrixToField(colorMatV, oddBit, sig, point_c, coeff, output);
+  }
 }
 
-
-
-void color_matrix_hisq_force_reference(float eps, float weight, 
-			  void* act_path_coeff, void* temp_xx,
-			  void* sitelink, void* mom)
+template <class Real>
+void computeLongLinkField(const int dim[4], const Real *const oprod, const Real *const link, int sig, Real coeff,
+                          Real *const output)
 {
- do_color_matrix_hisq_force_reference((float)eps, (float)weight,
-			  (fsu3_matrix*) temp_xx, (float*)act_path_coeff,
-			  (fsu3_matrix*)sitelink, (fanti_hermitmat*)mom);
-  return;
+  int volume = 1;
+  for (int dir = 0; dir < 4; ++dir) volume *= dim[dir];
+  const int half_volume = volume / 2;
+
+  LoadStore<Real> ls(volume);
+  for (int site = 0; site < half_volume; ++site) {
+    computeLongLinkSite<Real, 0>(site, dim, oprod, link, sig, coeff, ls, output);
+  }
+  // Loop over odd lattice sites
+  for (int site = 0; site < half_volume; ++site) {
+    computeLongLinkSite<Real, 1>(site, dim, oprod, link, sig, coeff, ls, output);
+  }
 }
 
+void hisqLongLinkForceCPU(double coeff, const QudaGaugeParam &param, cpuGaugeField &oprod, cpuGaugeField &link,
+                          cpuGaugeField *newOprod)
+{
+  for (int sig = 0; sig < 4; ++sig) {
+    if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      computeLongLinkField<float>(param.X, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, coeff,
+                                  (float *)newOprod->Gauge_p());
+    } else if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+      computeLongLinkField<double>(param.X, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig, coeff,
+                                   (double *)newOprod->Gauge_p());
+    } else {
+      errorQuda("Unrecognised precision\n");
+    }
+  } // sig
+}
 
+template <class Real, int oddBit>
+void completeForceSite(int half_lattice_index,
+#ifdef MULTI_GPU
+                       const int dim[4],
+#else
+                       const int[],
+#endif
+                       const Real *const oprod, const Real *const link, int sig, const LoadStore<Real> &ls,
+                       Real *const mom)
+{
 
+  typename ColorMatrix<Real>::Type colorMatX, colorMatY, linkW;
+
+#ifdef MULTI_GPU
+  int half_lattice_index_ex = ls.half_idx_conversion_normal2ex(half_lattice_index, dim, oddBit);
+  int idx = half_lattice_index_ex;
+#else
+  int idx = half_lattice_index;
+#endif
+  ls.loadMatrixFromField(link, oddBit, sig, idx, &linkW);
+  ls.loadMatrixFromField(oprod, oddBit, sig, idx, &colorMatX);
+
+  const Real coeff = (oddBit) ? -1 : 1;
+  colorMatY = linkW * colorMatX;
+
+  ls.storeMatrixToMomentumField(colorMatY, oddBit, sig, half_lattice_index, coeff, mom);
+}
+
+template <class Real>
+void completeForceField(const int dim[4], const Real *const oprod, const Real *const link, int sig, Real *const mom)
+{
+  int volume = dim[0] * dim[1] * dim[2] * dim[3];
+  const int half_volume = volume / 2;
+  LoadStore<Real> ls(volume);
+
+  for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 0>(site, dim, oprod, link, sig, ls, mom); }
+  for (int site = 0; site < half_volume; ++site) { completeForceSite<Real, 1>(site, dim, oprod, link, sig, ls, mom); }
+}
+
+void hisqCompleteForceCPU(const QudaGaugeParam &param, cpuGaugeField &oprod, cpuGaugeField &link, cpuGaugeField *mom)
+{
+  for (int sig = 0; sig < 4; ++sig) {
+    if (param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      completeForceField<float>(param.X, (float *)oprod.Gauge_p(), (float *)link.Gauge_p(), sig, (float *)mom->Gauge_p());
+    } else if (param.cpu_prec == QUDA_DOUBLE_PRECISION) {
+      completeForceField<double>(param.X, (double *)oprod.Gauge_p(), (double *)link.Gauge_p(), sig,
+                                 (double *)mom->Gauge_p());
+    } else {
+      errorQuda("Unrecognised precision\n");
+    }
+  } // loop over sig
+}

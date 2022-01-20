@@ -1,4 +1,5 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 
@@ -80,14 +81,14 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracClover::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
+  void DiracClover::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				   double kappa, double mass, double mu, double mu_factor) const {
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
+                                   double mu_factor, bool) const
+  {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 
@@ -108,7 +109,7 @@ namespace quda {
     DiracClover(param)
   {
     // For the preconditioned operator, we need to check that the inverse of the clover term is present
-    if (!clover->cloverInv) errorQuda("Clover inverse required for DiracCloverPC");
+    if (!clover->cloverInv && !clover::dynamic_inverse()) errorQuda("Clover inverse required for DiracCloverPC");
   }
 
   DiracCloverPC::DiracCloverPC(const DiracCloverPC &dirac) : DiracClover(dirac) { }
@@ -294,8 +295,9 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-				     double kappa, double mass, double mu, double mu_factor) const {
+  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double, double mu,
+                                     double mu_factor, bool) const
+  {
     if (T.getTransferType() != QUDA_TRANSFER_AGGREGATE)
       errorQuda("Wilson-type operators only support aggregation coarsening");
 

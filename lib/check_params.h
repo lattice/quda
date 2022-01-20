@@ -41,6 +41,13 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #if defined INIT_PARAM
   P(location, QUDA_CPU_FIELD_LOCATION);
 #else
@@ -152,6 +159,13 @@ void printQudaEigParam(QudaEigParam *param) {
   printfQuda("QUDA Eig Parameters:\n");
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaEigParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #if defined INIT_PARAM
   P(use_eigen_qr, QUDA_BOOLEAN_FALSE);
   P(use_poly_acc, QUDA_BOOLEAN_FALSE);
@@ -252,6 +266,13 @@ void printQudaCloverParam(QudaInvertParam *param)
 {
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaInvertParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
 #if defined INIT_PARAM
   P(clover_location, QUDA_CPU_FIELD_LOCATION);
 #else
@@ -282,12 +303,14 @@ void printQudaCloverParam(QudaInvertParam *param)
 #endif
 
 #ifdef INIT_PARAM
-    P(compute_clover_trlog, 0);
+    P(compute_clover_trlog, 1);
     P(compute_clover, 0);
     P(compute_clover_inverse, 0);
     P(return_clover, 0);
     P(return_clover_inverse, 0);
     P(clover_rho, 0.0);
+    P(clover_coeff, 0.0);
+    P(clover_csw, 0.0);
 #else
   P(compute_clover_trlog, QUDA_INVALID_PRECISION);
   P(compute_clover, QUDA_INVALID_PRECISION);
@@ -295,11 +318,11 @@ void printQudaCloverParam(QudaInvertParam *param)
   P(return_clover, QUDA_INVALID_PRECISION);
   P(return_clover_inverse, QUDA_INVALID_PRECISION);
   P(clover_rho, INVALID_DOUBLE);
+  P(clover_coeff, INVALID_DOUBLE);
+  P(clover_csw, INVALID_DOUBLE);
 #endif
     P(clover_order, QUDA_INVALID_CLOVER_ORDER);
-    P(cl_pad, INVALID_INT);
 
-    P(clover_coeff, INVALID_DOUBLE);
 #ifndef INIT_PARAM
   }
 #endif
@@ -319,6 +342,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   printfQuda("QUDA Inverter Parameters:\n");
 #endif
 
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaInvertParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
+#endif
+
   P(dslash_type, QUDA_INVALID_DSLASH);
   P(inv_type, QUDA_INVALID_INVERTER);
 
@@ -328,6 +358,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(m5, INVALID_DOUBLE);
   P(Ls, INVALID_INT);
   P(mu, INVALID_DOUBLE);
+  P(epsilon, INVALID_DOUBLE);
+  P(tm_rho, 0.0);
   P(twist_flavor, QUDA_TWIST_INVALID);
   P(laplace3D, INVALID_INT);
 #else
@@ -345,10 +377,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }
-  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (param->dslash_type == QUDA_TWISTED_MASS_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     P(mu, INVALID_DOUBLE);
     P(twist_flavor, QUDA_TWIST_INVALID);
   }
+  if (param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { P(tm_rho, INVALID_DOUBLE); }
+  if (param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) { P(epsilon, INVALID_DOUBLE); }
 #endif
 
   P(tol, INVALID_DOUBLE);
@@ -485,7 +519,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(gamma_basis, QUDA_INVALID_GAMMA_BASIS);
   P(dirac_order, QUDA_INVALID_DIRAC_ORDER);
-  P(sp_pad, INVALID_INT);
 
 #if defined INIT_PARAM
   P(Nsteps, INVALID_INT);
@@ -519,7 +552,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
-      || param->inv_type_precondition == QUDA_MR_INVERTER) {
+      || param->inv_type_precondition == QUDA_CA_CG_INVERTER || param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
@@ -559,6 +592,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
       P(ca_lambda_max, INVALID_DOUBLE);
+    }
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(ca_basis_precondition, QUDA_POWER_BASIS);
+  P(ca_lambda_min_precondition, 0.0);
+  P(ca_lambda_max_precondition, -1.0);
+#else
+  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+    P(ca_basis_precondition, QUDA_INVALID_BASIS);
+    if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      P(ca_lambda_min_precondition, INVALID_DOUBLE);
+      P(ca_lambda_max_precondition, INVALID_DOUBLE);
     }
   }
 #endif
@@ -644,6 +691,16 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+#ifdef NVSHMEM_COMMS
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_FALSE);
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_TRUE);
+#endif
+#else
+  P(use_mobius_fused_kernel, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 }
@@ -657,6 +714,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #else
 void printQudaMultigridParam(QudaMultigridParam *param) {
   printfQuda("QUDA Multigrid Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+   if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+     errorQuda("Unexpected QudaMultigridParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+     P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -738,8 +802,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 #ifdef INIT_PARAM
     P(n_block_ortho[i], 1);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_TRUE);
 #else
     P(n_block_ortho[i], INVALID_INT);
+    P(block_ortho_two_pass[i], QUDA_BOOLEAN_INVALID);
 #endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
@@ -874,13 +940,25 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-#if (CUDA_VERSION >= 10010 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef QUDA_MMA_AVAILABLE
   P(use_mma, QUDA_BOOLEAN_TRUE);
 #else
   P(use_mma, QUDA_BOOLEAN_FALSE);
 #endif
 #else
   P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(allow_truncation, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_truncation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_FALSE);
+#else
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
@@ -892,7 +970,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #ifdef INIT_PARAM
   return ret;
 #endif
-
 }
 
 #if defined INIT_PARAM
@@ -906,6 +983,13 @@ static void checkGaugeObservableParam(QudaGaugeObservableParam *param)
 void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 {
   printfQuda("QUDA Gauge-Observable Parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaGaugeObervableParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -937,6 +1021,13 @@ static void checkBLASParam(QudaBLASParam *param)
 void printQudaBLASParam(QudaBLASParam *param)
 {
   printfQuda("QUDA blas parameters:\n");
+#endif
+
+#if defined CHECK_PARAM
+  if (param->struct_size != (size_t)INVALID_INT && param->struct_size != sizeof(*param))
+    errorQuda("Unexpected QudaBLASParam struct size %lu, expected %lu", param->struct_size, sizeof(*param));
+#else
+  P(struct_size, (size_t)INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

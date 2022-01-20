@@ -5,12 +5,13 @@
 
 #include <transfer.h>
 #include <multigrid.h>
+#include <tune_quda.h>
 #include <malloc_quda.h>
 
 #include <iostream>
 #include <algorithm>
 #include <vector>
-
+#include <limits>
 
 namespace quda {
 
@@ -18,11 +19,13 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
-                     QudaPrecision null_precision, const QudaTransferType transfer_type, TimeProfile &profile) :
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, bool block_ortho_two_pass,
+                     int *geo_bs, int spin_bs, QudaPrecision null_precision, const QudaTransferType transfer_type,
+                     TimeProfile &profile) :
     B(B),
     Nvec(Nvec),
     NblockOrtho(n_block_ortho),
+    blockOrthoTwoPass(block_ortho_two_pass),
     null_precision(null_precision),
     V_h(nullptr),
     V_d(nullptr),
@@ -80,7 +83,7 @@ namespace quda {
     }
 
     // Various consistency checks for optimized KD "transfers"
-    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       // Aggregation size is "technically" 1 for optimized KD
       if (total_block_size != 1)
@@ -89,6 +92,15 @@ namespace quda {
       // The number of coarse dof is technically fineColor for optimized KD
       if (Nvec != B[0]->Ncolor())
         errorQuda("Invalid Nvec %d for optimized-kd aggregation, must be fine color %d", Nvec, B[0]->Ncolor());
+
+    } else {
+      int aggregate_size = total_block_size * B[0]->Ncolor();
+      if (spin_bs == 0)
+        aggregate_size /= 2; // effective spin_bs of 0.5 (fine spin / coarse spin)
+      else
+        aggregate_size *= spin_bs;
+      if (Nvec > aggregate_size)
+        errorQuda("Requested coarse space %d larger than aggregate size %d", Nvec, aggregate_size);
     }
 
     std::string block_str = std::to_string(geo_bs[0]);
@@ -149,21 +161,18 @@ namespace quda {
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
-
-      // These never get accessed, `nullptr` on its own leads to an error in texture binding
-      param.v = (void *)std::numeric_limits<uint64_t>::max();
-      param.norm = (void *)std::numeric_limits<uint64_t>::max();
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
-      V_d = ColorSpinorField::Create(param);
+      V_d = new ColorSpinorField(param);
       enable_gpu = true;
     } else {
-      V_h = ColorSpinorField::Create(param);
+      V_h = new ColorSpinorField(param);
       enable_cpu = true;
     }
     postTrace();
@@ -172,7 +181,8 @@ namespace quda {
   void Transfer::createTmp(QudaFieldLocation location) const
   {
     // The CPU temporaries are needed for creating geometry mappings.
-    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD)
+    if ((transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+         || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
         && location != QUDA_CPU_FIELD_LOCATION) {
       return;
     }
@@ -186,10 +196,10 @@ namespace quda {
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       if (fine_tmp_d && coarse_tmp_d) return;
-      fine_tmp_d = ColorSpinorField::Create(param);
+      fine_tmp_d = new ColorSpinorField(param);
       coarse_tmp_d = fine_tmp_d->CreateCoarse(geo_bs, spin_bs, Nvec);
     } else {
-      fine_tmp_h = ColorSpinorField::Create(param);
+      fine_tmp_h = new ColorSpinorField(param);
       coarse_tmp_h = fine_tmp_h->CreateCoarse(geo_bs, spin_bs, Nvec);
     }
     postTrace();
@@ -210,8 +220,8 @@ namespace quda {
       createTmp(location);
       fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
       break;
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
@@ -227,19 +237,22 @@ namespace quda {
   {
     postTrace();
 
-    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) { return; }
+    if (transfer_type == QUDA_TRANSFER_COARSE_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+        || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
+      return;
+    }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: block orthogonalizing\n");
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
-      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho);
+      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_cpu) {
         *V_h = *V_d;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
       }
     } else {
       if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
-      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho);
+      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho, blockOrthoTwoPass);
       if (enable_gpu) { // if the GPU fields has been initialized then we need to update
         *V_d = *V_h;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");
@@ -324,8 +337,8 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), cudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
     }
 
   }
@@ -358,7 +371,7 @@ namespace quda {
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredProlongate(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
 
@@ -422,7 +435,7 @@ namespace quda {
     if (transfer_type == QUDA_TRANSFER_COARSE_KD) {
       StaggeredRestrict(*output, *input, fine_to_coarse, spin_map, parity);
       flops_ += 0; // it's only a permutation
-    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+    } else if (transfer_type == QUDA_TRANSFER_OPTIMIZED_KD || transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
 
       if (out.SiteSubset() != QUDA_FULL_SITE_SUBSET) errorQuda("Optimized KD op only supports full-parity spinors");
 

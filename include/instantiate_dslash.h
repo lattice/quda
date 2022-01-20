@@ -18,7 +18,7 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
             typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
 #if QUDA_RECONSTRUCT & 4
@@ -51,7 +51,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (in.Ncolor() == 3) {
       instantiate<Apply, Recon, Float, 3>(out, in, U, args...);
@@ -68,7 +68,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&...args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -100,7 +100,7 @@ namespace quda
   }
 
   /**
-     @brief This instantiatePrecondtiioner function is used to
+     @brief This instantiatePrecondtioner function is used to
      instantiate the precisions for a preconditioner.  This is the
      same as the instantiate helper above, except it only handles half
      and quarter precision.
@@ -109,9 +109,10 @@ namespace quda
      @param[in] U Gauge field
      @param[in] args Additional arguments for different dslash kernels
   */
+#if (QUDA_PRECISION & 2) || (QUDA_PRECISION & 1)
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
   inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                                        Args &&... args)
+                                        Args &&...args)
   {
     if (U.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
@@ -129,5 +130,18 @@ namespace quda
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
+#else
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
+  inline void instantiatePreconditioner(ColorSpinorField &, const ColorSpinorField &, const GaugeField &U, Args &&...)
+  {
+    if (U.Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+    } else if (U.Precision() == QUDA_QUARTER_PRECISION) {
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
+#endif
 
 } // namespace quda

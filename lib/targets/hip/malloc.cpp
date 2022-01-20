@@ -5,6 +5,7 @@
 #include <unistd.h>   // for getpagesize()
 #include <execinfo.h> // for backtrace
 #include <quda_internal.h>
+#include <device.h>
 
 #ifdef USE_QDPJIT
 #include "qdp_quda.h"
@@ -42,20 +43,11 @@ namespace quda
 #endif
     }
 
-    MemAlloc &operator=(const MemAlloc &a)
-    {
-      if (&a != this) {
-        func = a.func;
-        file = a.file;
-        line = a.line;
-        size = a.size;
-        base_size = a.base_size;
-#ifdef QUDA_BACKWARDSCPP
-        st = a.st;
-#endif
-      }
-      return *this;
-    }
+    MemAlloc(const MemAlloc &) = default;
+    MemAlloc(MemAlloc &&) = default;
+    virtual ~MemAlloc() = default;
+    MemAlloc &operator=(const MemAlloc &) = default;
+    MemAlloc &operator=(MemAlloc &&) = default;
   };
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
@@ -168,7 +160,7 @@ namespace quda
         warningQuda("Using managed memory for HIP allocations");
         managed = true;
 
-        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+        if (!device::managed_memory_supported()) warningQuda("Target device does not report supporting managed memory");
       }
 
       init = true;

@@ -1,74 +1,71 @@
 #include <quda_internal.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-
-#include <jitify_helper.cuh>
-#include <kernels/gauge_ape.cuh>
+#include <tunable_nd.h>
 #include <instantiate.h>
+#include <kernels/gauge_ape.cuh>
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPE : TunableVectorYZ
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPE : TunableKernel3D
   {
     static constexpr int apeDim = 3; // apply APE in space only
-    GaugeAPEArg<Float,nColor,recon, apeDim> arg;
-    const GaugeField &meta;
+    GaugeField &out;
+    const GaugeField &in;
+    const Float alpha;
+    unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
-
-public:
+  public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
     GaugeAPE(GaugeField &out, const GaugeField &in, double alpha) :
-      TunableVectorYZ(2, apeDim),
-      arg(out, in, alpha),
-      meta(in)
+      TunableKernel3D(in, 2, apeDim),
+      out(out),
+      in(in),
+      alpha(static_cast<Float>(alpha))
     {
-      strcpy(aux, meta.AuxString());
       strcat(aux, comm_dim_partitioned_string());
-#ifdef JITIFY
-      create_jitify_program("kernels/gauge_ape.cuh");
-#endif
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-      using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeAPEStep").instantiate(Type<decltype(arg)>())
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-      qudaLaunchKernel(computeAPEStep<decltype(arg)>, tp, stream, arg);
-#endif
+      launch<APE>(tp, stream, GaugeAPEArg<Float,nColor,recon, apeDim>(out, in, alpha));
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    void preTune() { out.backup(); } // defensive measure in case they alias
+    void postTune() { out.restore(); }
 
-    void preTune() { arg.out.save(); } // defensive measure in case they alias
-    void postTune() { arg.out.load(); }
+    long long flops() const
+    {
+      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
+      return (2 + (apeDim - 1) * 4) * mat_flops * apeDim * in.LocalVolume();
+    }
 
-    long long flops() const { return apeDim * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return ((1 + 6 * apeDim) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
+    long long bytes() const // 6 links per dim, 1 in, 1 out.
+    {
+      return ((1 + (apeDim - 1) * 6) * in.Reconstruct() * in.Precision() +
+              out.Reconstruct() * out.Precision()) * apeDim * in.LocalVolume();
+    }
+
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, GaugeField& in, double alpha) {
 #ifdef GPU_GAUGE_TOOLS
+  void APEStep(GaugeField &out, GaugeField& in, double alpha)
+  {
     checkPrecision(out, in);
     checkReconstruct(out, in);
+    checkNative(out, in);
 
-    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
-    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
-    
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeAPE>(out, in, alpha);
     out.exchangeExtendedGhost(out.R(), false);
-    
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void APEStep(GaugeField &, GaugeField &, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

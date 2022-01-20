@@ -49,9 +49,10 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   }
 
   comm_init(nDim, commDims, rank_from_coords, map_data);
+  globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split)
+Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
 {
   user_set_comm_handle = false;
 
@@ -122,7 +123,7 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
 
 int Communicator::comm_rank(void) { return rank; }
 
-int Communicator::comm_size(void) { return size; }
+size_t Communicator::comm_size(void) { return size; }
 
 /**
  * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
@@ -325,6 +326,14 @@ void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
   double *recvbuf = new double[size];
   MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
+  memcpy(data, recvbuf, size * sizeof(double));
+  delete[] recvbuf;
+}
+
+void Communicator::comm_allreduce_min_array(double *data, size_t size)
+{
+  double *recvbuf = new double[size];
+  MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
   memcpy(data, recvbuf, size * sizeof(double));
   delete[] recvbuf;
 }

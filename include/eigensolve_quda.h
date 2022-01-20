@@ -2,6 +2,7 @@
 
 #include <quda.h>
 #include <quda_internal.h>
+#include <timer.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
@@ -15,7 +16,7 @@ namespace quda
   {
     using range = std::pair<int, int>;
 
-protected:
+  protected:
     const DiracMatrix &mat;
     QudaEigParam *eig_param;
     TimeProfile &profile;
@@ -236,7 +237,8 @@ protected:
        @param[in] je End of j index
        @param[in] offset Position of extra vectors in kSpace
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+                     blockType b_type);
 
     /**
        @brief Rotate part of kSpace
@@ -290,7 +292,7 @@ protected:
       // FIXME add support for mixed-precison dot product to avoid this copy
       if (src.Precision() != evecs[0]->Precision() && !tmp1) {
         ColorSpinorParam param(*evecs[0]);
-        tmp1 = ColorSpinorField::Create(param);
+        tmp1 = new ColorSpinorField(param);
       }
       ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias
@@ -327,7 +329,7 @@ protected:
       // FIXME add support for mixed-precison dot product to avoid this copy
       if (src.Precision() != evecs[0]->Precision() && !tmp1) {
         ColorSpinorParam param(*evecs[0]);
-        tmp1 = ColorSpinorField::Create(param);
+        tmp1 = new ColorSpinorField(param);
       }
       ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias

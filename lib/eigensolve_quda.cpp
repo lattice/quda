@@ -4,13 +4,16 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cfloat>
 
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
+#include <random_quda.h>
 #include <qio_field.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 #include <util_quda.h>
+#include <tune_quda.h>
 #include <vector_io.h>
 #include <eigen_helper.h>
 
@@ -103,7 +106,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating IR Arnoldi eigensolver\n");
       eig_solver = new IRAM(mat, eig_param, profile);
       break;
-    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented");
+    case QUDA_EIG_BLK_IR_ARNOLDI: errorQuda("Block IR Arnoldi not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(mat, eig_param, profile);
@@ -144,11 +147,9 @@ namespace quda
       }
     } else {
       RNG *rng = new RNG(*kSpace[0], 1234);
-      rng->Init();
       for (int b = 0; b < block_size; b++) {
         if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
-      rng->Release();
       delete rng;
     }
     bool orthed = false;
@@ -181,9 +182,9 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     // Increase Krylov space to n_kr+block_size vectors, create residual
     kSpace.reserve(n_kr + block_size);
-    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
     csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
+    for (int i = n_conv; i < n_kr + block_size; i++) kSpace.push_back(new ColorSpinorField(csParamClone));
+    for (int b = 0; b < block_size; b++) { r.push_back(new ColorSpinorField(csParamClone)); }
     // Increase evals space to n_ev
     evals.reserve(n_kr);
     for (int i = n_conv; i < n_kr; i++) evals.push_back(0.0);
@@ -216,18 +217,10 @@ namespace quda
   {
     double eps = 0.0;
     switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      eps = DBL_EPSILON;
-      break;
-    case QUDA_SINGLE_PRECISION:
-      eps = FLT_EPSILON;
-      break;
-    case QUDA_HALF_PRECISION:
-      eps = 2e-3;
-      break;
-    case QUDA_QUARTER_PRECISION:
-      eps = 5e-2;
-      break;
+    case QUDA_DOUBLE_PRECISION: eps = DBL_EPSILON; break;
+    case QUDA_SINGLE_PRECISION: eps = FLT_EPSILON; break;
+    case QUDA_HALF_PRECISION: eps = 2e-3; break;
+    case QUDA_QUARTER_PRECISION: eps = 5e-2; break;
     default: errorQuda("Invalid precision %d", prec);
     }
     return eps;
@@ -306,8 +299,8 @@ namespace quda
   {
     if (!tmp1 || !tmp2) {
       ColorSpinorParam param(in);
-      if (!tmp1) tmp1 = ColorSpinorField::Create(param);
-      if (!tmp2) tmp2 = ColorSpinorField::Create(param);
+      if (!tmp1) tmp1 = new ColorSpinorField(param);
+      if (!tmp2) tmp2 = new ColorSpinorField(param);
     }
     mat(out, in, *tmp1, *tmp2);
 
@@ -346,11 +339,8 @@ namespace quda
     // C_1 is the current 'out' vector.
 
     // Clone 'in' to two temporary vectors.
-    ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
-    ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
-
-    blas::copy(*tmp1, in);
-    blas::copy(*tmp2, out);
+    auto tmp1 = std::make_unique<ColorSpinorField>(in);
+    auto tmp2 = std::make_unique<ColorSpinorField>(out);
 
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
@@ -369,18 +359,12 @@ namespace quda
       // mat*C_{m}(x)
       matVec(mat, out, *tmp2);
 
-      Complex d1c(d1, 0.0);
-      Complex d2c(d2, 0.0);
-      Complex d3c(d3, 0.0);
-      blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
+      blas::axpbypczw(d3, *tmp1, d2, *tmp2, d1, out, *tmp1);
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;
     }
     blas::copy(out, *tmp2);
-
-    delete tmp1;
-    delete tmp2;
 
     // Save Chebyshev tuning
     saveTuneCache();
@@ -393,9 +377,7 @@ namespace quda
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
       RNG *rng = new RNG(in, 1234);
-      rng->Init();
       spinorNoise(in, *rng, QUDA_NOISE_UNIFORM);
-      rng->Release();
       delete rng;
     }
 
@@ -416,11 +398,11 @@ namespace quda
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
 
-    // Increase final result by 10% for safety
-    return result * 1.10;
-
     // Save Chebyshev Max tuning
     saveTuneCache();
+
+    // Increase final result by 10% for safety
+    return result * 1.10;
   }
 
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
@@ -438,7 +420,7 @@ namespace quda
 
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
-        auto cnorm = H[i*size + j];
+        auto cnorm = H[i * size + j];
         if (j != i) {
           if (abs(cnorm) > 5.0 * epsilon) {
             if (getVerbosity() >= QUDA_SUMMARIZE)
@@ -728,12 +710,14 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evecs.size())
+      errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
-    temp.push_back(ColorSpinorField::Create(csParamClone));
+    temp.push_back(new ColorSpinorField(csParamClone));
 
     for (int i = 0; i < size; i++) {
       // r = A * v_i
@@ -842,7 +826,7 @@ namespace quda
     // the kSpace passed to the function.
     ColorSpinorParam csParam(*kSpace[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r.push_back(ColorSpinorField::Create(csParam));
+    r.push_back(new ColorSpinorField(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -958,9 +942,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", n_kr + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
@@ -1000,7 +982,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(new ColorSpinorField(csParamClone));
         }
       }
 
@@ -1102,9 +1084,7 @@ namespace quda
         csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + keep);
         kSpace.reserve(offset + keep);
-        for (int i = kSpace.size(); i < offset + keep; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
-        }
+        for (int i = kSpace.size(); i < offset + keep; i++) { kSpace.push_back(new ColorSpinorField(csParamClone)); }
       }
 
       // Pointers to the relevant vectors
@@ -1143,7 +1123,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(new ColorSpinorField(csParamClone));
         }
       }
 

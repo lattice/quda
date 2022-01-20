@@ -29,7 +29,7 @@ extern "C" {
    * interpretation of the gauge field by various Dirac operators
    */
   typedef struct QudaGaugeParam_s {
-
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
     QudaFieldLocation location; /**< The location of the gauge field */
 
     int X[4];             /**< The local space-time dimensions (without checkboarding) */
@@ -77,7 +77,8 @@ extern "C" {
 
     int overlap; /**< Width of overlapping domains */
 
-    int overwrite_mom; /**< When computing momentum, should we overwrite it or accumulate to to */
+    int overwrite_gauge; /**< When computing gauge, should we overwrite it or accumulate to it */
+    int overwrite_mom;   /**< When computing momentum, should we overwrite it or accumulate to it */
 
     int use_resident_gauge;  /**< Use the resident gauge field as input */
     int use_resident_mom;    /**< Use the resident momentum field as input*/
@@ -89,7 +90,6 @@ extern "C" {
     size_t gauge_offset; /**< Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t mom_offset; /**< Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
     size_t site_size; /**< Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER) */
-
   } QudaGaugeParam;
 
 
@@ -97,6 +97,9 @@ extern "C" {
    * Parameters relating to the solver and the choice of Dirac operator.
    */
   typedef struct QudaInvertParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaFieldLocation input_location; /**< The location of the input field */
     QudaFieldLocation output_location; /**< The location of the output field */
@@ -127,6 +130,7 @@ extern "C" {
     double mq3;
 
     double mu;    /**< Twisted mass parameter */
+    double tm_rho;  /**< Hasenbusch mass shift applied like twisted mass to diagonal (but not inverse) */
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
@@ -254,6 +258,7 @@ extern "C" {
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
+    double clover_csw;                     /**< Csw coefficient of the clover term */
     double clover_coeff;                   /**< Coefficient of the clover term */
     double clover_rho;                     /**< Real number added to the clover diagonal (not to inverse) */
 
@@ -266,9 +271,6 @@ extern "C" {
     int return_clover_inverse;             /**< Whether to copy back the inverted clover matrix field */
 
     QudaVerbosity verbosity;               /**< The verbosity setting to use in the solver */
-
-    int sp_pad;                            /**< The padding to use for the fermion fields */
-    int cl_pad;                            /**< The padding to use for the clover fields */
 
     int iter;                              /**< The number of iterations performed by the solver */
     double gflops;                         /**< The Gflops rate of the solver */
@@ -330,6 +332,15 @@ extern "C" {
 
     /** Maximum eigenvalue for Chebyshev CA basis */
     double ca_lambda_max;
+
+    /** Basis for CA algorithms in a preconditioned solver */
+    QudaCABasis ca_basis_precondition;
+
+    /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_min_precondition;
+
+    /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_max_precondition;
 
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
@@ -401,10 +412,15 @@ extern "C" {
     /** Whether to use the platform native or generic BLAS / LAPACK */
     QudaBoolean native_blas_lapack;
 
+    /** Whether to use fused kernels for mobius */
+    QudaBoolean use_mobius_fused_kernel;
+
   } QudaInvertParam;
 
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     // EIGENSOLVER PARAMS
     //-------------------------------------------------
@@ -540,10 +556,12 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
-
   } QudaEigParam;
 
   typedef struct QudaMultigridParam_s {
+
+    /** Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct size */
+    size_t struct_size;
 
     QudaInvertParam *invert_param;
 
@@ -566,6 +584,9 @@ extern "C" {
 
     /** Number of times to repeat Gram-Schmidt in block orthogonalization */
     int n_block_ortho[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to do passes at block orthogonalize in fixed point for improved accuracy */
+    QudaBoolean block_ortho_two_pass[QUDA_MAX_MG_LEVEL];
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
@@ -723,15 +744,21 @@ extern "C" {
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
 
+    /** Whether or not to let MG coarsening drop improvements, for ex dropping long links in small aggregation dimensions */
+    QudaBoolean allow_truncation;
+
+    /** Whether or not to use the dagger approximation for the KD preconditioned operator */
+    QudaBoolean staggered_kd_dagger_approximation;
+
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;
 
     /** Whether to do a full (false) or thin (true) update in the context of updateMultigridQuda */
     QudaBoolean thin_update_only;
-
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
     QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
     QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
     double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
@@ -743,6 +770,7 @@ extern "C" {
   } QudaGaugeObservableParam;
 
   typedef struct QudaBLASParam_s {
+    size_t struct_size; /**< Size of this struct in bytes.  Used to ensure that the host application and QUDA see the same struct*/
 
     QudaBLASOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */
     QudaBLASOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */
@@ -766,7 +794,6 @@ extern "C" {
 
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
-
   } QudaBLASParam;
 
   /*
@@ -1200,8 +1227,7 @@ extern "C" {
    * @param parity The source and destination parity of the field
    * @param inverse Whether to apply the inverse of the clover term
    */
-  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-                  QudaParity parity, int inverse);
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int inverse);
 
   /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
@@ -1244,21 +1270,36 @@ extern "C" {
   void momResidentQuda(void *mom, QudaGaugeParam *param);
 
   /**
-   * Compute the gauge force and update the mometum field
+   * Compute the gauge force and update the momentum field
    *
-   * @param mom The momentum field to be updated
-   * @param sitelink The gauge field from which we compute the force
-   * @param input_path_buf[dim][num_paths][path_length]
-   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
-   * @param loop_coeff Coefficients of the different loops in the Symanzik action
-   * @param num_paths How many contributions from path_length different "staples"
-   * @param max_length The maximum number of non-zero of links in any path in the action
-   * @param dt The integration step size (for MILC this is dt*beta/3)
-   * @param param The parameters of the external fields and the computation settings
+   * @param[in,out] mom The momentum field to be updated
+   * @param[in] sitelink The gauge field from which we compute the force
+   * @param[in] input_path_buf[dim][num_paths][path_length]
+   * @param[in] path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] num_paths How many contributions from path_length different "staples"
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] dt The integration step size (for MILC this is dt*beta/3)
+   * @param[in] param The parameters of the external fields and the computation settings
    */
-  int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
-			    double* loop_coeff, int num_paths, int max_length, double dt,
-			    QudaGaugeParam* qudaGaugeParam);
+  int computeGaugeForceQuda(void *mom, void *sitelink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                            int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
+
+  /**
+   * Compute the product of gauge links along a path and add to/overwrite the output field
+   *
+   * @param[in,out] out The output field to be updated
+   * @param[in] sitelink The gauge field from which we compute the products of gauge links
+   * @param[in] input_path_buf[dim][num_paths][path_length]
+   * @param[in] path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param[in] loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param[in] num_paths How many contributions from path_length different "staples"
+   * @param[in] max_length The maximum number of non-zero of links in any path in the action
+   * @param[in] dt The integration step size (for MILC this is dt*beta/3)
+   * @param[in] param The parameters of the external fields and the computation settings
+   */
+  int computeGaugePathQuda(void *out, void *sitelink, int ***input_path_buf, int *path_length, double *loop_coeff,
+                           int num_paths, int max_length, double dt, QudaGaugeParam *qudaGaugeParam);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -1371,8 +1412,8 @@ extern "C" {
    * @param gauge_param Gauge field meta data
    * @param invert_param Dirac and solver meta data
    */
-  void computeStaggeredForceQuda(void* mom, double dt, double delta, void *gauge, void **x,
-				 QudaGaugeParam *gauge_param, QudaInvertParam *invert_param);
+  void computeStaggeredForceQuda(void *mom, double dt, double delta, void *gauge, void **x, QudaGaugeParam *gauge_param,
+                                 QudaInvertParam *invert_param);
 
   /**
    * Compute the fermion force for the HISQ quark action and integrate the momentum.
@@ -1423,10 +1464,9 @@ extern "C" {
 
   /**
    * Performs a deep copy from the internal extendedGaugeResident field.
-   * @param Pointer to externalGaugeResident cudaGaugeField
-   * @param Location of gauge field
+   * @param Pointer to externally allocated GaugeField
    */
-  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  void copyExtendedResidentGaugeQuda(void *resident_gauge);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field
@@ -1503,9 +1543,10 @@ extern "C" {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
+   * iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */
@@ -1523,7 +1564,7 @@ extern "C" {
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when
    * iteration reachs the maximum number of steps defined by Nsteps
-   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] stopWtheta, 0 for MILC criterion and 1 to use the theta value
    * @param[in] param The parameters of the external fields and the computation settings
    * @param[out] timeinfo
    */

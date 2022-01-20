@@ -23,8 +23,8 @@ namespace quda
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct twistedMass : dslash_default {
 
-    Arg &arg;
-    constexpr twistedMass(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr twistedMass(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -33,11 +33,10 @@ namespace quda
        Note this routine only exists in xpay form.
     */
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ __forceinline__ void operator()(int idx, int s, int parity)
+    __device__ __host__ __forceinline__ void operator()(int idx, int, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
-      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = mykernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)

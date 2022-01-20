@@ -20,7 +20,12 @@ namespace quda
     using Dslash = Dslash<wilson, Arg>;
 
   public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
+    {
+      if(in.Ndim() == 5) {
+        TunableKernel3D::resizeVector(in.X(4), arg.nParity);
+      }
+    }
 
     void apply(const qudaStream_t &stream)
     {
@@ -39,24 +44,25 @@ namespace quda
       WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
       Wilson<decltype(arg)> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(
-        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
-      policy.apply(0);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 
   // Apply the Wilson operator
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the a normalization for the Wilson operator.
+#ifdef GPU_WILSON_DIRAC
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
                    const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_WILSON_DIRAC
     instantiate<WilsonApply, WilsonReconstruct>(out, in, U, a, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Wilson dslash has not been built");
-#endif // GPU_WILSON_DIRAC
   }
+#else
+  void ApplyWilson(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, double,
+                   const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Wilson dslash has not been built");
+  }
+#endif // GPU_WILSON_DIRAC
 
 } // namespace quda

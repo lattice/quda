@@ -6,19 +6,9 @@ StaggeredDslashTestWrapper dslash_test_wrapper;
 
 bool gauge_loaded = false;
 
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *recon_str[] = {"r18", "r13", "r9"};
-
-void init(int precision, QudaReconstructType link_recon, int partition)
-{
-  dslash_test_wrapper.init_ctest(precision, link_recon, partition);
-}
-
-void end() { dslash_test_wrapper.end(); }
-
 void display_test_info(int precision, QudaReconstructType link_recon)
 {
-  auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
+  auto prec = getPrecision(precision);
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
@@ -73,23 +63,20 @@ public:
 
     if (skip()) GTEST_SKIP();
 
-    int value = ::testing::get<2>(GetParam());
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
-        commDimPartitionedSet(j);
-      }
-
+    int partition = ::testing::get<2>(GetParam());
+    for (int j = 0; j < 4; j++) {
+      if (partition & (1 << j)) { commDimPartitionedSet(j); }
     }
     updateR();
 
-    init(prec, recon, value);
+    dslash_test_wrapper.init_ctest(prec, link_recon);
     display_test_info(prec, recon);
   }
 
   virtual void TearDown()
   {
     if (skip()) GTEST_SKIP();
-    end();
+    dslash_test_wrapper.end();
   }
 
   static void SetUpTestCase() { initQuda(device_ordinal); }
@@ -105,6 +92,7 @@ TEST_P(StaggeredDslashTest, verify)
   double deviation = 1.0;
   double tol = getTolerance(dslash_test_wrapper.inv_param.cuda_prec);
   // check for skip_kernel
+  dslash_test_wrapper.staggeredDslashRef();
   if (dslash_test_wrapper.spinorRef != nullptr) {
     dslash_test_wrapper.run_test(2);
     deviation = dslash_test_wrapper.verify();
@@ -171,26 +159,19 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (dtest_type != dslash_test_type::Mat) {
-      errorQuda("Test type %s is not supported for the Laplace operator.\n", get_string(dtest_type_map, dtest_type).c_str());
+      errorQuda("Test type %s is not supported for the Laplace operator.\n",
+                get_string(dtest_type_map, dtest_type).c_str());
     }
   }
 
-    // return result of RUN_ALL_TESTS
-    int test_rc = RUN_ALL_TESTS();
+  // return result of RUN_ALL_TESTS
+  int test_rc = RUN_ALL_TESTS();
 
-    // Clean up loaded gauge field
-    for (int dir = 0; dir < 4; dir++) {
-      if (dslash_test_wrapper.qdp_inlink[dir] != nullptr) {
-        free(dslash_test_wrapper.qdp_inlink[dir]);
-        dslash_test_wrapper.qdp_inlink[dir] = nullptr;
-      }
-    }
+  dslash_test_wrapper.end_ctest_once();
 
-    dslash_test_wrapper.end_ctest_once();
+  finalizeComms();
 
-    finalizeComms();
-
-    return test_rc;
+  return test_rc;
 }
 
   std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
@@ -199,7 +180,7 @@ int main(int argc, char **argv)
    const int part = ::testing::get<2>(param.param);
    std::stringstream ss;
    // ss << get_dslash_str(dslash_type) << "_";
-   ss << prec_str[prec];
+   ss << get_prec_str(getPrecision(prec));
    ss << "_r" << recon;
    ss << "_partition" << part;
    return ss.str();

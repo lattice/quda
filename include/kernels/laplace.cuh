@@ -45,11 +45,11 @@ namespace quda
       out(out),
       in(in),
       in_pack(in),
-      U(U),
-      dir(dir),
       x(x),
+      U(U),
       a(a),
-      b(b)
+      b(b),
+      dir(dir)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in, x);        // check all orders match
@@ -75,12 +75,13 @@ namespace quda
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
-                                               int idx, int thread_dim, bool &active)
+                                               int, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
+#pragma unroll
     for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       if (d != dir) {
         {
@@ -136,8 +137,8 @@ namespace quda
   // out(x) = M*in
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
-    Arg &arg;
-    constexpr laplace(Arg &arg) : arg(arg) {}
+    const Arg &arg;
+    constexpr laplace(const Arg &arg) : arg(arg) {}
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>

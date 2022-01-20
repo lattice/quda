@@ -1,4 +1,5 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 
@@ -124,21 +125,19 @@ namespace quda {
     sol = &x;  
   }
 
-  void DiracImprovedStaggered::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				   const QudaSolutionType solType) const
+  void DiracImprovedStaggered::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
-  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa,
-                                              double mass, double mu, double mu_factor) const
+  void DiracImprovedStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
+                                              double, double, bool allow_truncation) const
   {
-    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
 
-    // nullptr == no Kahler-Dirac Xinv
-    const cudaGaugeField *XinvKD = nullptr;
-    StaggeredCoarseOp(Y, X, T, *fatGauge, XinvKD, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_truncation, QUDA_ASQTAD_DIRAC,
+                      QUDA_MATPC_INVALID);
   }
 
   void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
@@ -205,7 +204,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracImprovedStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     errorQuda("MdagM is no longer defined for DiracImprovedStaggeredPC. Use M instead.\n");
     /*
@@ -286,6 +285,16 @@ namespace quda {
     } else {
       errorQuda("MatPCType %d not valid for DiracStaggeredPC", matpcType);
     }
+  }
+
+  void DiracImprovedStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass,
+                                                double, double, bool allow_truncation) const
+  {
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+      errorQuda("The optimized improved Kahler-Dirac operator is not built through createCoarseOp");
+
+    StaggeredCoarseOp(Y, X, T, *fatGauge, *longGauge, *fatGauge, mass, allow_truncation, QUDA_ASQTADPC_DIRAC,
+                      QUDA_MATPC_INVALID);
   }
 
 } // namespace quda

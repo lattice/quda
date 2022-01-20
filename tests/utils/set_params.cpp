@@ -30,6 +30,8 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = 0;
   gauge_param.mom_ga_pad = 0;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
@@ -60,6 +62,8 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
@@ -102,6 +106,8 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
+
+  gauge_param.struct_size = sizeof(gauge_param);
 }
 
 void setInvertParam(QudaInvertParam &inv_param)
@@ -157,9 +163,16 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
-    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
   // General parameter setup
@@ -218,6 +231,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
@@ -234,15 +250,17 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.verbosity = verbosity;
 
   inv_param.extlib_type = solver_ext_lib;
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  // Whether or not use fused kernels for Mobius
+  inv_param.use_mobius_fused_kernel = use_mobius_fused_kernel ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 // Parameters defining the eigensolver
@@ -305,6 +323,8 @@ void setEigParam(QudaEigParam &eig_param)
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  eig_param.struct_size = sizeof(eig_param);
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param)
@@ -316,9 +336,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.Ls = 1;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
@@ -328,22 +345,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
-    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
-  }
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
-
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
@@ -351,6 +352,29 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
   }
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
+  }
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.dslash_type = dslash_type;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -401,6 +425,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
+    mg_param.block_ortho_two_pass[i]
+      = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -541,6 +567,14 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  // whether or not to let MG coarsening drop improvements
+  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
@@ -550,6 +584,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  mg_param.struct_size = sizeof(mg_param);
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -561,14 +597,19 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  // Use kappa * csw or supplied clover_coeff
+  inv_param.clover_csw = clover_csw;
+  if (clover_coeff == 0.0) {
+    inv_param.clover_coeff = clover_csw * inv_param.kappa;
+  } else {
+    inv_param.clover_coeff = clover_coeff;
+  }
 }
 
 void setMultigridInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -580,21 +621,6 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
-    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-  }
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
-
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
@@ -602,6 +628,29 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
     inv_param.kappa = kappa;
     inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
   }
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    // Use kappa * csw or supplied clover_coeff
+    inv_param.clover_csw = clover_csw;
+    if (clover_coeff == 0.0) {
+      inv_param.clover_coeff = clover_csw * inv_param.kappa;
+    } else {
+      inv_param.clover_coeff = clover_coeff;
+    }
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
+  }
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.dslash_type = dslash_type;
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
@@ -614,8 +663,6 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
       exit(0);
     }
   }
-
-  inv_param.clover_coeff = clover_coeff;
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
@@ -655,13 +702,18 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.omega = 1.0;
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 // Parameters defining the eigensolver
@@ -717,14 +769,13 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.save_prec = mg_eig_save_prec[level];
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
+
+  mg_eig_param.struct_size = sizeof(mg_eig_param);
 }
 
 void setContractInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
@@ -739,6 +790,8 @@ void setContractInvertParam(QudaInvertParam &inv_param)
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
@@ -751,7 +804,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.pipeline = pipeline;
 
   inv_param.Ls = 1;
@@ -795,9 +848,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
   // these can be set individually
   for (int i = 0; i < inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
@@ -813,6 +863,8 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
@@ -890,10 +942,10 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  inv_param.sp_pad = 0;
-
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
@@ -904,9 +956,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
 
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -935,6 +984,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i = 0; i < mg_param.n_level; i++) {
@@ -960,10 +1016,12 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i];                 // default to 64 vectors if not set
-    mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
-    mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
+    mg_param.n_vec[i] = nvec[i] == 0 ? 64 : nvec[i]; // default to 64 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
+    mg_param.block_ortho_two_pass[i]
+      = block_ortho_two_pass[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; // whether to use a two-pass block ortho
+    mg_param.precision_null[i] = prec_null;                               // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
     mg_param.nu_post[i] = nu_post[i];
     mg_param.mu_factor[i] = mu_factor[i];
@@ -1087,7 +1145,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
-  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+      || staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 
@@ -1123,14 +1182,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setDeflatedInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -1148,7 +1206,10 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_eigensolver = cuda_prec_eigensolver;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.compute_clover_trlog = compute_clover_trlog ? 1 : 0;
   }
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
@@ -1175,7 +1236,13 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     }
   }
 
-  inv_param.clover_coeff = clover_coeff;
+  // Use kappa * csw or supplied clover_coeff
+  inv_param.clover_csw = clover_csw;
+  if (clover_coeff == 0.0) {
+    inv_param.clover_coeff = clover_csw * inv_param.kappa;
+  } else {
+    inv_param.clover_coeff = clover_coeff;
+  }
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;
@@ -1232,7 +1299,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = precon_schwarz_type;
@@ -1245,6 +1312,8 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
   // Whether or not to use native BLAS LAPACK
   inv_param.native_blas_lapack = (native_blas_lapack ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE);
+
+  inv_param.struct_size = sizeof(inv_param);
 }
 
 void setDeflationParam(QudaEigParam &df_param)

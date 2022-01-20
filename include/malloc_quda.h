@@ -10,24 +10,44 @@ namespace quda {
   void assertAllMemFree();
 
   /**
+     @return device memory allocated
+   */
+  size_t device_allocated();
+
+  /**
+     @return pinned memory allocated
+   */
+  size_t pinned_allocated();
+
+  /**
+     @return mapped memory allocated
+   */
+  size_t mapped_allocated();
+
+  /**
+     @return host memory allocated
+   */
+  size_t host_allocated();
+
+  /**
      @return peak device memory allocated
    */
-  long device_allocated_peak();
+  size_t device_allocated_peak();
 
   /**
      @return peak pinned memory allocated
    */
-  long pinned_allocated_peak();
+  size_t pinned_allocated_peak();
 
   /**
      @return peak mapped memory allocated
    */
-  long mapped_allocated_peak();
+  size_t mapped_allocated_peak();
 
   /**
      @return peak host memory allocated
    */
-  long host_allocated_peak();
+  size_t host_allocated_peak();
 
   /**
      @return are we using managed memory for device allocations
@@ -55,12 +75,8 @@ namespace quda {
   void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void managed_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
-
-  // strip path from __FILE__
-  inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
-  inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
-  inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
-  inline constexpr const char* file_name(const char* str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes);
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr);
 
   QudaFieldLocation get_pointer_location(const void *ptr);
 
@@ -93,7 +109,10 @@ namespace quda {
   quda::device_comms_pinned_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define managed_free(ptr) quda::managed_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) quda::host_free_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
-#define get_mapped_device_pointer(ptr) quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define get_mapped_device_pointer(ptr)                                                                                 \
+  quda::get_mapped_device_pointer_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
+#define register_pinned(ptr, bytes) quda::register_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr, bytes)
+#define unregister_pinned(size) quda::unregister_pinned_(__func__, quda::file_name(__FILE__), __LINE__, ptr)
 
 namespace quda {
 

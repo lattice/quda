@@ -6,7 +6,6 @@
 #include <communicator_quda.h>
 #include <comm_quda.h>
 
-
 char *comm_hostname(void)
 {
   static bool cached = false;
@@ -44,27 +43,7 @@ double comm_drand(void)
 MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line, void *buffer, int dim, int dir,
                                        size_t nbytes)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(nbytes);
-    try {
-      std::copy(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, static_cast<char *>(tmp));
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
-                 nbytes);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = device_malloc(nbytes);
-    qudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -78,23 +57,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line, void *buffer, int dim, int dir,
                                           size_t nbytes)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      std::fill(static_cast<char *>(buffer), static_cast<char *>(buffer) + nbytes, 0);
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir,
-                 nbytes);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset(buffer, 0, nbytes);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -108,30 +71,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *file, int line, void *buffer, int dim,
                                                int dir, size_t blksize, int nblocks, size_t stride)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by doing a memcpy from it
-    void *tmp = safe_malloc(blksize * nblocks);
-    try {
-      for (int i = 0; i < nblocks; i++)
-        std::copy(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize,
-                  static_cast<char *>(tmp));
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
-                 line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-    host_free(tmp);
-  } else {
-    // test this memory allocation is ok by doing a memcpy from it
-
-    void *tmp = device_malloc(blksize*nblocks);
-    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    device_free(tmp);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -145,24 +85,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *file, int line, void *buffer, int dim,
                                                   int dir, size_t blksize, int nblocks, size_t stride)
 {
-#ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
-
-  if (isHost(buffer)) {
-    // test this memory allocation is ok by filling it
-    try {
-      for (int i = 0; i < nblocks; i++)
-        std::fill(static_cast<char *>(buffer) + i * stride, static_cast<char *>(buffer) + i * stride + blksize, 0);
-    } catch (std::exception &e) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file,
-                 line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting");
-    }
-  } else {
-    // test this memory allocation is ok by doing a memset
-    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
-  }
-#endif
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("%s called (%s:%d in %s())\n", __func__, file, line, func);
 
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
@@ -174,7 +97,7 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
 {
   if (ndim > QUDA_MAX_DIM) { errorQuda("ndim exceeds QUDA_MAX_DIM"); }
 
-  Topology *topo = (Topology *)safe_malloc(sizeof(Topology));
+  Topology *topo = new Topology;
 
   topo->ndim = ndim;
 
@@ -184,8 +107,8 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
     nodes *= dims[i];
   }
 
-  topo->ranks = (int *)safe_malloc(nodes * sizeof(int));
-  topo->coords = (int(*)[QUDA_MAX_DIM])safe_malloc(nodes * sizeof(int[QUDA_MAX_DIM]));
+  topo->ranks = new int[nodes];
+  topo->coords = (int(*)[QUDA_MAX_DIM]) new int[QUDA_MAX_DIM * nodes];
 
   int x[QUDA_MAX_DIM];
   for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;

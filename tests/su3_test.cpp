@@ -17,6 +17,15 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+double stout_smear_rho = 0.1;
+double stout_smear_epsilon = -0.25;
+double ape_smear_rho = 0.6;
+int smear_steps = 50;
+double wflow_epsilon = 0.01;
+int wflow_steps = 100;
+QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
+int measurement_interval = 5;
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -61,40 +70,34 @@ void display_test_info()
   return;
 }
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
 
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
 
-  gauge_param.cpu_prec = cpu_prec;
+  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
 
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
+  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
 
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
 
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  opgroup->add_option("--su3-wflow-steps", wflow_steps,
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
 
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  ;
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }
 
 int main(int argc, char **argv)
@@ -115,19 +118,18 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
-    link_recon_sloppy = link_recon;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
-  setGaugeParam(gauge_param);
+  setWilsonGaugeParam(gauge_param);
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   setDims(gauge_param.X);
 
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device_ordinal);
@@ -157,7 +159,7 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * data_size;
-  void *qDensity = malloc(array_size);
+  void *qDensity = safe_malloc(array_size);
   // start the timer
   double time0 = -((double)clock());
   QudaGaugeObservableParam param = newQudaGaugeObservableParam();
@@ -179,6 +181,9 @@ int main(int argc, char **argv)
   } else {
     for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
+
+  // release memory
+  host_free(qDensity);
 
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
@@ -244,14 +249,13 @@ int main(int argc, char **argv)
 
   if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
 
+  for (int dir = 0; dir < 4; dir++) {
+    host_free(gauge[dir]);
+    host_free(new_gauge[dir]);
+  }
+
   freeGaugeQuda();
   endQuda();
-
-  // release memory
-  for (int dir = 0; dir < 4; dir++) {
-    free(gauge[dir]);
-    free(new_gauge[dir]);
-  }
 
   finalizeComms();
   return 0;

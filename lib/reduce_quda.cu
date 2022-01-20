@@ -1,80 +1,24 @@
 #include <blas_quda.h>
-#include <tune_quda.h>
 #include <color_spinor_field_order.h>
-#include <jitify_helper.cuh>
+#include <tunable_reduction.h>
 #include <kernels/reduce_core.cuh>
 
 namespace quda {
 
   namespace blas {
 
-    qudaStream_t* getStream();
-
-    template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size!=32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (tp.block.x == block_size)
-        return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
-      else
-        return launch<block_size - 32, real, len>(arg, tp, stream);
-    }
-
-    template <int block_size, typename real, int len, typename Arg>
-    typename std::enable_if<block_size==32, qudaError_t>::type launch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream)
-    {
-      if (block_size != tp.block.x) errorQuda("Unexpected block size %d\n", tp.block.x);
-      return qudaLaunchKernel(reduceKernel<block_size, real, len, Arg>, tp, stream, arg);
-    }
-
-#ifdef QUDA_FAST_COMPILE_REDUCE
-    constexpr static unsigned int max_block_size() { return 32; }
-#else
-    constexpr static unsigned int max_block_size() { return 1024; }
-#endif
-
-   /**
-       Generic reduction kernel launcher
-    */
-    template <typename host_reduce_t, typename real, int len, typename Arg>
-    auto reduceLaunch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
-    {
-      using device_reduce_t = typename Arg::Reducer::reduce_t;
-      if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-        errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
-
-#ifdef JITIFY
-      using namespace jitify::reflection;
-      tunable.jitifyError() = program->kernel("quda::blas::reduceKernel")
-                                  .instantiate((int)tp.block.x, Type<real>(), len, Type<Arg>())
-                                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                  .launch(arg);
-      arg.launch_error = tunable.jitifyError() == CUDA_SUCCESS ? QUDA_SUCCESS : QUDA_ERROR;
-#else
-      arg.launch_error = launch<max_block_size(), real, len>(arg, tp, stream);
-#endif
-
-      host_reduce_t result;
-      ::quda::zero(result);
-      if (!commAsyncReduction()) arg.complete(result, stream);
-      return result;
-    }
-
     template <template <typename ReducerType, typename real> class Reducer,
               typename store_t, typename y_store_t, int nSpin, typename coeff_t>
-    class Reduce : public Tunable
+    class Reduce : public TunableReduction2D<1>
     {
       using real = typename mapper<y_store_t>::type;
       using host_reduce_t = typename Reducer<double, real>::reduce_t;
       Reducer<device_reduce_t, real> r;
       const int nParity; // for composite fields this includes the number of composites
-      host_reduce_t &result;
 
       const coeff_t &a, &b;
       ColorSpinorField &x, &y, &z, &w, &v;
-      QudaFieldLocation location;
-
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      host_reduce_t &result;
 
       bool advanceSharedBytes(TuneParam &param) const
       {
@@ -87,11 +31,12 @@ namespace quda {
         return false;
       }
 
-      unsigned int maxBlockSize(const TuneParam &param) const { return max_block_size(); }
+      unsigned int maxBlockSize(const TuneParam &) const { return device::max_reduce_block_size(); }
 
     public:
-      Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &c, ColorSpinorField &x, ColorSpinorField &y,
+      Reduce(const coeff_t &a, const coeff_t &b, const coeff_t &, ColorSpinorField &x, ColorSpinorField &y,
              ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, host_reduce_t &result) :
+        TunableReduction2D(x),
         r(a, b),
         nParity((x.IsComposite() ? x.CompositeDim() : 1) * (x.SiteSubset())),
         a(a),
@@ -101,9 +46,9 @@ namespace quda {
         z(z),
         w(w),
         v(v),
-        result(result),
-        location(checkLocation(x, y, z, w, v))
+        result(result)
       {
+        checkLocation(x, y, z, w, v);
         checkLength(x, y, z, w, v);
         auto x_prec = checkPrecision(x, z, w, v);
         auto y_prec = y.Precision();
@@ -113,29 +58,18 @@ namespace quda {
         if (sizeof(y_store_t) != y_prec) errorQuda("Expected precision %lu but received %d", sizeof(y_store_t), y_prec);
         if (x_prec == y_prec && x_order != y_order) errorQuda("Orders %d %d do not match", x_order, y_order);
 
-        strcpy(aux, x.AuxString());
         if (x_prec != y_prec) {
           strcat(aux, ",");
           strcat(aux, y.AuxString());
         }
-        strcat(aux, nParity == 2 ? ",nParity=2" : ",nParity=1");
-        if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",CPU");
-        if (commAsyncReduction()) strcat(aux, ",async");
 
-#ifdef JITIFY
-        ::quda::create_jitify_program("kernels/reduce_core.cuh");
-#endif
-
-        apply(*(blas::getStream()));
+        apply(device::get_default_stream());
 
         blas::bytes += bytes();
         blas::flops += flops();
-
-        const int Nreduce = sizeof(host_reduce_t) / sizeof(double);
-        reduceDoubleArray((double *)&result, Nreduce);
       }
 
-      TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(r).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(r).name(), aux); }
 
       void apply(const qudaStream_t &stream)
       {
@@ -156,10 +90,10 @@ namespace quda {
           constexpr int N = n_vector<device_store_t, true, nSpin, site_unroll>();
           constexpr int Ny = n_vector<device_y_store_t, true, nSpin, site_unroll>();
           constexpr int M = site_unroll ? (nSpin == 4 ? 24 : 6) : N; // real numbers per thread
-          const int length = x.Length() / (nParity * M);
+          const int length = x.Length() / M;
 
-          ReductionArg<device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity, tp);
-          result = reduceLaunch<host_reduce_t, device_real_t, M>(arg, tp, stream, *this);
+          ReductionArg<device_real_t, M, device_store_t, N, device_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          launch<Reduce_>(result, tp, stream, arg);
         } else {
           if (checkOrder(x, y, z, w, v) != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
             warningQuda("CPU Blas functions expect AoS field order");
@@ -176,10 +110,10 @@ namespace quda {
           constexpr int N = n_vector<host_store_t, false, nSpin, site_unroll>();
           constexpr int Ny = n_vector<host_y_store_t, false, nSpin, site_unroll>();
           constexpr int M = N; // if site unrolling then M=N will be 24/6, e.g., full AoS
-          const int length = x.Length() / (nParity * M);
+          const int length = x.Length() / M;
 
-          ReductionArg<host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity, tp);
-          result = reduceCPU<host_real_t, M>(arg);
+          ReductionArg<host_real_t, M, host_store_t, N, host_y_store_t, Ny, decltype(r_)> arg(x, y, z, w, v, r_, length, nParity);
+          launch_host<Reduce_>(result, tp, stream, arg);
         }
       }
 
@@ -201,21 +135,6 @@ namespace quda {
         if (r.write.V) v.restore();
       }
 
-      bool advanceTuneParam(TuneParam &param) const
-      {
-        return location == QUDA_CPU_FIELD_LOCATION ? false : Tunable::advanceTuneParam(param);
-      }
-
-      void initTuneParam(TuneParam &param) const
-      {
-        Tunable::initTuneParam(param);
-      }
-
-      void defaultTuneParam(TuneParam &param) const
-      {
-        Tunable::defaultTuneParam(param);
-      }
-
       long long flops() const { return r.flops() * x.Length(); }
 
       long long bytes() const
@@ -231,8 +150,7 @@ namespace quda {
     auto instantiateReduce(Args &&... args)
     {
       using host_reduce_t = typename Functor<double, double>::reduce_t;
-      host_reduce_t value;
-      ::quda::zero(value); // no default constructor so we need to explicitly zero
+      host_reduce_t value = ::quda::zero<host_reduce_t>();
       instantiate<Functor, Reduce, mixed>(args..., value);
       return value;
     }

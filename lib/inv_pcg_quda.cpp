@@ -19,11 +19,13 @@ namespace quda
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
     inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20;                            // no reliable updates within the inner solver
+    inner.delta = 1e-20; // no reliable updates within the inner solver
 
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
-      = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
+      = (outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) ?
+      outer.precision_sloppy :
+      outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -42,8 +44,11 @@ namespace quda
     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
       inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+      inner.ca_basis = outer.ca_basis_precondition;
+      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
+      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
     } else {
       inner.Nsteps = outer.precondition_cycle;
     }
@@ -59,6 +64,15 @@ namespace quda
     inner.sloppy_converge = true;
   }
 
+  // extract parameters determined while running the inner solver
+  static void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  {
+    // extract a_max, which may have been determined via power iterations
+    if (outer.inv_type_precondition == QUDA_CA_CG_INVERTER && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
+    }
+  }
+
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(0), Kparam(param)
@@ -70,6 +84,8 @@ namespace quda
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
       K = new CG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
+    } else if (param.inv_type_precondition == QUDA_CA_CG_INVERTER) {
+      K = new CACG(matPrecon, matPrecon, matPrecon, matEig, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
@@ -82,6 +98,7 @@ namespace quda
   PreconCG::~PreconCG()
   {
     profile.TPSTART(QUDA_PROFILE_FREE);
+    extractInnerSolverParam(param, Kparam);
 
     if (K) delete K;
     destroyDeflationSpace();
@@ -122,17 +139,17 @@ namespace quda
       }
     }
 
-    cudaColorSpinorField *minvrPre = NULL;
-    cudaColorSpinorField *rPre = NULL;
-    cudaColorSpinorField *minvr = NULL;
-    cudaColorSpinorField *minvrSloppy = NULL;
-    cudaColorSpinorField *p = NULL;
+    ColorSpinorField *minvrPre = nullptr;
+    ColorSpinorField *rPre = nullptr;
+    ColorSpinorField *minvr = nullptr;
+    ColorSpinorField *minvrSloppy = nullptr;
+    ColorSpinorField *p = nullptr;
 
     ColorSpinorParam csParam(b);
-    cudaColorSpinorField r(b);
-    if (K) minvr = new cudaColorSpinorField(b);
+    ColorSpinorField r(b);
+    if (K) minvr = new ColorSpinorField(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b, csParam);
+    ColorSpinorField y(csParam);
 
     csParam.setPrecision(param.precision_sloppy);
 
@@ -176,25 +193,29 @@ namespace quda
       r2 = blas::xmyNorm(b, r);
     }
 
-    cudaColorSpinorField Ap(x, csParam);
+    ColorSpinorField Ap(csParam);
 
-    cudaColorSpinorField *r_sloppy;
+    ColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
       minvrSloppy = minvr;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(r, csParam);
-      if (K) minvrSloppy = new cudaColorSpinorField(*minvr, csParam);
+      csParam.field = &r;
+      r_sloppy = new ColorSpinorField(csParam);
+      if (K) {
+        csParam.field = minvr;
+        minvrSloppy = new ColorSpinorField(csParam);
+      }
     }
 
-    cudaColorSpinorField *x_sloppy;
+    ColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &static_cast<cudaColorSpinorField &>(x);
+      x_sloppy = &x;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x, csParam);
+      csParam.field = &x;
+      x_sloppy = new ColorSpinorField(csParam);
     }
 
     ColorSpinorField &xSloppy = *x_sloppy;
@@ -208,14 +229,15 @@ namespace quda
     if (K) {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.setPrecision(Kparam.precision);
-      rPre = new cudaColorSpinorField(rSloppy, csParam);
+      csParam.field = r_sloppy;
+      rPre = new ColorSpinorField(csParam);
       // Create minvrPre
-      minvrPre = new cudaColorSpinorField(*rPre);
+      minvrPre = new ColorSpinorField(*rPre);
       (*K)(*minvrPre, *rPre);
       *minvrSloppy = *minvrPre;
-      p = new cudaColorSpinorField(*minvrSloppy);
+      p = new ColorSpinorField(*minvrSloppy);
     } else {
-      p = new cudaColorSpinorField(rSloppy);
+      p = new ColorSpinorField(rSloppy);
     }
 
     profile.TPSTOP(QUDA_PROFILE_INIT);

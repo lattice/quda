@@ -1,5 +1,6 @@
 #pragma once
 #include <color_spinor.h> // vector container
+#include <math_helper.cuh>
 
 /**
    @file linalg.cuh
@@ -45,7 +46,9 @@ namespace quda {
 	 @brief Constructor that computes the Cholesky decomposition
 	 @param[in] A Input matrix we are decomposing
       */
-      __device__ __host__ inline Cholesky(const Mat<T,N> &A) {
+
+      template <typename matrix_t> __device__ __host__ inline Cholesky(const matrix_t &A)
+      {
 	const Mat<T,N> &L = L_;
 
 #pragma unroll
@@ -67,10 +70,11 @@ namespace quda {
 		s.y -= L(i,k).real()*L(j,k).imag();
 	      }
 	    }
+            complex<T> A_ij(A(i, j));
 	    if (!fast) { // traditional Cholesky with sqrt and division
-	      L_(i,j) = (i == j) ? sqrt((A(i,i)-s).real()) : (A(i,j) - s) / L(j,j).real();
+	      L_(i, j) = (i == j) ? sqrt((A_ij - s).real()) : (A_ij - s) / L(j,j).real();
 	    } else { // optimized - since fwd/back subsitition only need inverse diagonal elements, avoid division and use rsqrt
-	      L_(i,j) = (i == j) ? rsqrt((A(i,i)-s).real()) : (A(i,j)-s) * L(j,j).real();
+	      L_(i, j) = (i == j) ? quda::rsqrt((A_ij - s).real()) : (A_ij - s) * L(j, j).real();
 	    }
 	  }
 	}
@@ -88,7 +92,7 @@ namespace quda {
       }
 
       /**
-	 @brief Forward substition to solve Lx = b
+	 @brief Forward substitution to solve Lx = b
 	 @tparam Vector The Vector container class, e.g., quda::colorspinor
 	 @param[in] b Source vector
 	 @return solution vector
@@ -114,7 +118,7 @@ namespace quda {
       }
 
       /**
-	 @brief Backward substition to solve L^dagger x = b
+	 @brief Backward substitution to solve L^dagger x = b
 	 @tparam Vector The Vector container class, e.g., quda::colorspinor
 	 @param[in] b Source vector
 	 @return solution vector
@@ -140,12 +144,39 @@ namespace quda {
       }
 
       /**
+         @brief Solve Ax = b using the Cholesky factorization.  This
+         is just a wrapper around the forward and backward
+         substitution functions with the ability to change precision
+         in the solve.
+	 @tparam Vector The Vector container class, e.g., quda::colorspinor
+	 @param[in] b Source vector
+	 @return solution vector
+      */
+      template <class Vector>
+      __device__ __host__ inline Vector solve(const Vector &b)
+      {
+        // copy source vector into factorization precision
+	ColorSpinor<T,1,N> b_;
+#pragma unroll
+        for (int i = 0; i < N; i++) b_(i) = b(i);
+
+        auto x_ = backward(forward(b_));
+
+        // copy solution vector into desired precision
+        Vector x;
+#pragma unroll
+        for (int i = 0; i < N; i++) x(i) = x_(i);
+
+        return x;
+      }
+
+      /**
 	 @brief Compute the inverse of A (the matrix used to construct the Cholesky decomposition).
 	 @return Matrix inverse
       */
-      __device__ __host__ inline Mat<T,N> invert() {
+      template <typename matrix_t> __device__ __host__ inline matrix_t invert() {
 	const Mat<T,N> &L = L_;
-	Mat<T,N> Ainv;
+	matrix_t Ainv;
 	ColorSpinor<T,1,N> v;
 
 #pragma unroll

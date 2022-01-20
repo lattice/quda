@@ -68,10 +68,7 @@ namespace quda
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
             QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
-    instantiateApply(G &U, Args &&... args)
-    {
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
-    }
+    instantiateApply(G &, Args &&...) { errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon); }
   };
 
   /**
@@ -131,7 +128,11 @@ namespace quda
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
-  constexpr void instantiate(G &U, Args &&... args)
+#if (QUDA_PRECISION & 8) || (QUDA_PRECISION & 4)
+  constexpr void instantiate(G &U, Args &&...args)
+#else
+  constexpr void instantiate(G &U, Args &&...)
+#endif
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
 #if QUDA_PRECISION & 8
@@ -150,9 +151,30 @@ namespace quda
     }
   }
 
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#define constexpr
+  /**
+     @brief This instantiate2 function is used to instantiate the
+     precisions, with double precision always enabled.  This is a
+     temporary addition until we fuse this with the original function
+     above when we enforce C++17
+     @param[in] U Gauge field
+     @param[in,out] args Any additional arguments required for the computation at hand
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+            typename... Args>
+  constexpr void instantiate2(G &U, Args &&...args)
+  {
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+      instantiate<Apply, Recon, double>(U, args...);
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      instantiate<Apply, Recon, float>(U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
+  }
 
   /**
      @brief This instantiate function is used to instantiate the clover precision
@@ -163,28 +185,12 @@ namespace quda
   constexpr void instantiate(C &c, Args &&... args)
   {
     if (c.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
       Apply<double>(c, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
     } else if (c.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
       Apply<float>(c, args...);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
-#endif
-    } else if (c.Precision() == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
-      Apply<short>(c, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
-#endif
-    } else if (c.Precision() == QUDA_QUARTER_PRECISION) {
-#if QUDA_PRECISION & 1
-      Apply<int8_t>(c, args...);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
 #endif
     } else {
       errorQuda("Unsupported precision %d\n", c.Precision());
@@ -196,9 +202,8 @@ namespace quda
      @param[in] field LatticeField we wish to instantiate
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int> class Apply, typename store_t, typename F,
-            typename... Args>
-  constexpr void instantiate(F &field, Args &&... args)
+  template <template <typename, int> class Apply, typename store_t, typename F, typename... Args>
+  constexpr void instantiate(F &field, Args &&...args)
   {
     if (field.Ncolor() == 3) {
       Apply<store_t, 3>(field, args...);
@@ -206,11 +211,6 @@ namespace quda
       errorQuda("Unsupported number of colors %d\n", field.Ncolor());
     }
   }
-
-#if defined(__CUDA_ARCH__) && __CUDACC_VER_MAJOR__ <= 9
-#undef constexpr
-#define constexpr constexpr
-#endif
 
   /**
      @brief This instantiate function is used to instantiate the
@@ -262,7 +262,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecision(F &field, Args &&...args)
+  constexpr void instantiatePrecision(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -307,7 +307,7 @@ namespace quda
      computation at hand
   */
   template <template <typename, typename> class Apply, typename T, typename F, typename... Args>
-  constexpr void instantiatePrecision2(F &field, Args &&...args)
+  constexpr void instantiatePrecision2(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
       // always instantiate double precision
@@ -343,7 +343,7 @@ namespace quda
      computation at hand
   */
   template <template <typename> class Apply, typename F, typename... Args>
-  constexpr void instantiatePrecisionMG(F &field, Args &&...args)
+  constexpr void instantiatePrecisionMG(F &field, Args &&... args)
   {
     if (field.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE

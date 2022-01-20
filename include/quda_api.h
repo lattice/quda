@@ -1,13 +1,7 @@
 #pragma once
 
-#ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
-
-extern cudaDeviceProp deviceProp;
-using qudaStream_t = cudaStream_t;
-
+#include <quda_define.h>
+#include <string>
 #include <enum_quda.h>
 
 /**
@@ -17,34 +11,26 @@ using qudaStream_t = cudaStream_t;
    profile and switch between using the CUDA runtime and driver APIs.
  */
 
+enum qudaMemcpyKind {
+  qudaMemcpyHostToHost,
+  qudaMemcpyHostToDevice,
+  qudaMemcpyDeviceToHost,
+  qudaMemcpyDeviceToDevice,
+  qudaMemcpyDefault
+};
+
 namespace quda
 {
 
   class TuneParam;
 
-  /**
-     @brief Wrapper around cudaLaunchKernel
-     @param[in] func Device function symbol
-     @param[in] tp TuneParam containing the launch parameters
-     @param[in] args Arguments
-     @param[in] stream Stream identifier
-  */
-  qudaError_t qudaLaunchKernel(const void *func, const TuneParam &tp, void **args, qudaStream_t stream);
+  struct qudaStream_t {
+    int idx;
+  };
 
-  /**
-     @brief Templated wrapper around qudaLaunchKernel which can accept
-     a templated kernel, and expects a kernel with a single Arg argument
-     @param[in] func Device function symbol
-     @param[in] tp TuneParam containing the launch parameters
-     @param[in] args Arguments
-     @param[in] stream Stream identifier
-  */
-  template <typename T, typename... Arg>
-  qudaError_t qudaLaunchKernel(T *func, const TuneParam &tp, qudaStream_t stream, const Arg &...arg)
-  {
-    const void *args[] = {&arg...};
-    return qudaLaunchKernel(reinterpret_cast<const void *>(func), tp, const_cast<void **>(args), stream);
-  }
+  struct qudaEvent_t {
+    void *event;
+  };
 
   /**
      @brief Wrapper around cudaMemcpy or driver API equivalent
@@ -53,7 +39,7 @@ namespace quda
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func, const char *file,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
                    const char *line);
 
   /**
@@ -64,36 +50,18 @@ namespace quda
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent for peer-to-peer copies
      @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch in bytes
      @param[in] src Source pointer
-     @param[in] spitch Source pitch in bytes
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] kind Type of memory copy
-  */
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     cudaMemcpyKind kind, const char *func, const char *file, const char *line);
-
-  /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch in bytes
-     @param[in] src Source pointer
-     @param[in] spitch Source pitch in bytes
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] kind Type of memory copy
+     @param[in] count Size of transfer
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line);
+  void qudaMemcpyP2PAsync_(void *dst, const void *src, size_t count, const qudaStream_t &stream, const char *func,
+                           const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemset or driver API equivalent
@@ -147,11 +115,32 @@ namespace quda
                              const char *func, const char *file, const char *line);
 
   /**
+     @brief Return instance of an event.
+  */
+  qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return instance of an event that can be used for timing.
+  */
+  qudaEvent_t qudaChronoEventCreate_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Return elapsed time in seconds between two events
+  */
+  float qudaEventElapsedTime_(const qudaEvent_t &start, const qudaEvent_t &stop, const char *func, const char *file,
+                              const char *line);
+
+  /**
+     @brief Destroy the event
+  */
+  void qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaEventQuery or cuEventQuery with built-in error checking
      @param[in] event Event we are querying
      @return true if event has been reached
    */
-  bool qudaEventQuery_(cudaEvent_t &event, const char *func, const char *file, const char *line);
+  bool qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord with
@@ -159,7 +148,7 @@ namespace quda
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  void qudaEventRecord_(cudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
+  void qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaStreamWaitEvent or cuStreamWaitEvent
@@ -168,7 +157,7 @@ namespace quda
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
-  void qudaStreamWaitEvent_(qudaStream_t stream, cudaEvent_t event, unsigned int flags, const char *func,
+  void qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func,
                             const char *file, const char *line);
 
   /**
@@ -176,20 +165,42 @@ namespace quda
      with built-in error checking
      @param[in] event Event which we are synchronizing with respect to
    */
-  void qudaEventSynchronize_(cudaEvent_t &event, const char *func, const char *file, const char *line);
+  void qudaEventSynchronize_(const qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaStreamSynchronize or
      cuStreamSynchronize with built-in error checking
      @param[in] stream Stream which we are synchronizing
   */
-  void qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+  void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaDeviceSynchronize or
      cuDeviceSynchronize with built-in error checking
    */
   void qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaGetSymbolAddress with built in error
+     checking.  Returns the address of symbol on the device; symbol
+     is a variable that resides in global memory space.
+
+     @param[in] symbol Global variable or string symbol to search for
+     @return Return device pointer associated with symbol
+  */
+  void *qudaGetSymbolAddress_(const char *symbol, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Get the last error recorded by the target runtime.  By
+     calling this, we reset the last error.
+  */
+  qudaError_t qudaGetLastError();
+
+  /**
+     @brief Get the error string associated with the last error that
+     was thrown by the target runtime
+  */
+  std::string qudaGetLastErrorString();
 
   /**
      @brief Print out the timer profile for CUDA API calls
@@ -207,13 +218,8 @@ namespace quda
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
-#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
-  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
-                        __STRINGIFY__(__LINE__))
-
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
-  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
-                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+#define qudaMemcpyP2PAsync(dst, src, count, stream)                                                                    \
+  ::quda::qudaMemcpyP2PAsync_(dst, src, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
@@ -232,6 +238,17 @@ namespace quda
   ::quda::qudaMemPrefetchAsync_(ptr, count, mem_space, stream, __func__, quda::file_name(__FILE__),                    \
                                 __STRINGIFY__(__LINE__))
 
+#define qudaEventCreate() ::quda::qudaEventCreate_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaChronoEventCreate()                                                                                        \
+  ::quda::qudaChronoEventCreate_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventElapsedTime(start, stop)                                                                              \
+  ::quda::qudaEventElapsedTime_(start, stop, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaEventDestroy(event)                                                                                        \
+  ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
 #define qudaEventQuery(event)                                                                                          \
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
 
@@ -249,3 +266,6 @@ namespace quda
 
 #define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))
+
+#define qudaGetSymbolAddress(symbol)                                                                                   \
+  ::quda::qudaGetSymbolAddress_(symbol, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__))

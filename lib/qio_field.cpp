@@ -28,10 +28,12 @@ std::ostream &operator<<(std::ostream &out, const QIO_Layout &layout)
   return out;
 }
 
+static int vlen;
+
 // for matrix fields this order implies [color][color][complex]
 // for vector fields this order implies [spin][color][complex]
 // templatized version to allow for precision conversion
-template <typename oFloat, typename iFloat, int len> void vput(char *s1, size_t index, int count, void *s2)
+template <typename oFloat, typename iFloat> void vput(char *s1, size_t index, int count, void *s2)
 {
   oFloat **field = (oFloat **)s2;
   iFloat *src = (iFloat *)s1;
@@ -40,23 +42,23 @@ template <typename oFloat, typename iFloat, int len> void vput(char *s1, size_t 
   // from the read buffer to an array of fields
 
   for (int i = 0; i < count; i++) {
-    oFloat *dest = field[i] + len * index;
-    for (int j = 0; j < len; j++) dest[j] = src[i * len + j];
+    oFloat *dest = field[i] + vlen * index;
+    for (int j = 0; j < vlen; j++) dest[j] = src[i * vlen + j];
   }
 }
 
 // for vector fields this order implies [spin][color][complex]
 // templatized version of vget_M to allow for precision conversion
-template <typename oFloat, typename iFloat, int len> void vget(char *s1, size_t index, int count, void *s2)
+template <typename oFloat, typename iFloat> void vget(char *s1, size_t index, int count, void *s2)
 {
   iFloat **field = (iFloat **)s2;
   oFloat *dest = (oFloat *)s1;
 
   /* For the site specified by "index", move an array of "count" data
      from the array of fields to the write buffer */
-  for (int i = 0; i < count; i++, dest += len) {
-    iFloat *src = field[i] + len * index;
-    for (int j = 0; j < len; j++) dest[j] = src[j];
+  for (int i = 0; i < count; i++, dest += vlen) {
+    iFloat *src = field[i] + vlen * index;
+    for (int j = 0; j < vlen; j++) dest[j] = src[j];
   }
 }
 
@@ -122,9 +124,8 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
   return outfile;
 }
 
-template <int len>
-int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset subset,
-               QudaParity parity, int nSpin, int nColor)
+int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset, QudaParity,
+               int nSpin, int nColor, int len)
 {
   // Get the QIO record and string
   char dummy[100] = "";
@@ -164,28 +165,26 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
   // Print the XML string.
   // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
-  // Tracked on github via #936 
+  // Tracked on github via #936
   if (len != 18 && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
 
   // Get total size. Could probably check the filesize better, but tbd.
   size_t rec_size = file_prec * count * len;
 
+  vlen = len;
+
   /* Read the field record and convert to cpu precision*/
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_read(infile, rec_info, xml_record_in, vput<double, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
-                        field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, double>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
     } else {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<double, float, len>, rec_size, QUDA_SINGLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<float, double, len>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_in);
     } else {
-      status
-        = QIO_read(infile, rec_info, xml_record_in, vput<float, float, len>, rec_size, QUDA_SINGLE_PRECISION, field_in);
+      status = QIO_read(infile, rec_info, xml_record_in, vput<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_in);
     }
   }
 
@@ -198,7 +197,7 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
 
 int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
 {
-  return read_field<18>(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9);
+  return read_field(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9, 18);
 }
 
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
@@ -246,7 +245,7 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
   layout.number_of_nodes = QMP_get_number_of_nodes();
 }
 
-void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
+void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -266,27 +265,8 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   printfQuda("%s: Closed file for reading\n",__func__);
 }
 
-// count is the number of vectors
-// Ninternal is the size of the "inner struct" (24 for Wilson spinor)
-int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], QudaPrecision cpu_prec,
-               QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor)
-{
-  int status = 0;
-  switch (Ninternal) {
-  case 6: status = read_field<6>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  case 24: status = read_field<24>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  case 96: status = read_field<96>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  case 128: status = read_field<128>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  case 256: status = read_field<256>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  case 384: status = read_field<384>(infile, count, field_in, cpu_prec, subset, parity, nSpin, nColor); break;
-  default:
-    errorQuda("Undefined %d", Ninternal);
-  }
-  return status;
-}
-
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                       QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
+                       QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -298,7 +278,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
 
   /* Read the spinor field record */
   printfQuda("%s: reading %d vector fields\n", __func__, Nvec); fflush(stdout);
-  int status = read_field(infile, 2 * nSpin * nColor, Nvec, V, precision, subset, parity, nSpin, nColor);
+  int status = read_field(infile, Nvec, V, precision, subset, parity, nSpin, nColor, 2 * nSpin * nColor);
   if (status) { errorQuda("read_spinor_fields failed %d\n", status); }
 
   /* Close the file */
@@ -306,9 +286,8 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
   printfQuda("%s: Closed file for reading\n",__func__);
 }
 
-template <int len>
 int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec,
-                QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, const char *type)
+                QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, int len, const char *type)
 {
   // Prepare a string.
   std::string xml_record = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><quda";
@@ -316,11 +295,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
   case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  case 96:
-  case 128:
-  case 256:
-  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  default: errorQuda("Invalid element length for QIO writing."); break;
+  default: xml_record += "MGColorSpinorField>"; break;       // MG color spinor vector
   }
   xml_record += "<version>BETA</version>";
   xml_record += "<type>" + std::string(type) + "</type><info>";
@@ -352,11 +327,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
   case 18: xml_record += "GaugeFieldFile>"; break;           // SU(3) gauge field
   case 24: xml_record += "WilsonColorSpinorField>"; break;   // SU(3) Wilson
-  case 96:
-  case 128:
-  case 256:
-  case 384: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-  default: errorQuda("Invalid element length for QIO writing."); break;
+  default: xml_record += "MGColorSpinorField>";              // MG color spinor vector
   }
 
   int status;
@@ -380,22 +351,23 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   QIO_string_set(xml_record_out, xml_record.c_str());
 
   /* Write the field record converting to desired file precision*/
+  vlen = len;
   size_t rec_size = file_prec*count*len;
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<double, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
-                         field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<double, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<double, float, len>, rec_size, QUDA_SINGLE_PRECISION,
-                         field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<double, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<float, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
-                         field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<float, double>, rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vget<float, float, len>, rec_size, QUDA_SINGLE_PRECISION,
-                         field_out);
+      status
+        = QIO_write(outfile, rec_info, xml_record_out, vget<float, float>, rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   }
 
@@ -410,11 +382,11 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
     QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
 {
-  return write_field<18>(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0,
-                         3, type);
+  return write_field(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3,
+                     18, type);
 }
 
-void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
+void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -439,39 +411,8 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
   printfQuda("%s: Closed file for writing\n", __func__);
 }
 
-// count is the number of vectors
-// Ninternal is the size of the "inner struct" (24 for Wilson spinor)
-int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[], QudaPrecision file_prec,
-                QudaPrecision cpu_prec, QudaSiteSubset subset, QudaParity parity, int nSpin, int nColor, const char *type)
-{
-  int status = 0;
-  switch (Ninternal) {
-  case 6:
-    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  case 24:
-    status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  case 96:
-    status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  case 128:
-    status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  case 256:
-    status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  case 384:
-    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
-    break;
-  default:
-    errorQuda("Undefined %d", Ninternal);
-  }
-  return status;
-}
-
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
-                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
+                        QudaParity parity, int nColor, int nSpin, int Nvec, int, char *[])
 {
   quda_this_node = QMP_get_node_number();
 
@@ -489,7 +430,7 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
   /* Read the spinor field record */
   printfQuda("%s: writing %d vector fields\n", __func__, Nvec); fflush(stdout);
   int status
-    = write_field(outfile, 2 * nSpin * nColor, Nvec, V, precision, precision, subset, parity, nSpin, nColor, type);
+    = write_field(outfile, Nvec, V, precision, precision, subset, parity, nSpin, nColor, 2 * nSpin * nColor, type);
   if (status) { errorQuda("write_spinor_fields failed %d\n", status); }
 
   /* Close the file */

@@ -21,6 +21,8 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
+     integer(8) :: struct_size  ! Size of this struct in bytes
+
      QudaFieldLocation :: location !The location of the gauge field
 
      integer(4), dimension(4) :: x
@@ -64,8 +66,12 @@ module quda_fortran
      integer(4) :: overlap ! width of domain overlap
 
      ! When computing momentum, should we overwrite it or accumulate
-     ! to it (only presenty support in gauge-force)
+     ! to it (only presently used in gauge-force)
      integer(4) :: overwrite_mom
+
+     ! When computing products of gauge links, should we overwrite the output or accumulate
+     ! to it? (only presently used in gauge-path)
+     integer(4) :: overwrite_gauge
 
      integer(4) :: use_resident_gauge  ! Use the resident gauge field
      integer(4) :: use_resident_mom    ! Use the resident momentume field
@@ -77,11 +83,12 @@ module quda_fortran
      integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
      integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
-
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
   type quda_invert_param
+
+     integer(8) :: struct_size  ! Size of this struct in bytes
 
      QudaFieldLocation :: input_location  ! The location of the input field
      QudaFieldLocation :: output_location ! The location of the output field
@@ -98,8 +105,15 @@ module quda_fortran
      complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
      complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
 
-     real(8) :: mu    ! Twisted mass parameter
-     real(8) :: epsilon ! Twisted mass parameter
+     real(8) :: eofa_shift; ! EOFA parameter
+     integer(4) :: eofa_pm; ! EOFA parameter
+     real(8) :: mq1; ! EOFA parameter
+     real(8) :: mq2; ! EOFA parameter
+     real(8) :: mq3; ! EOFA parameter
+
+     real(8) :: mu    ! Chiral twisted mass parameter
+     real(8) :: epsilon ! Flavor twisted mass parameter
+     real(8) :: tm_rho ! Chiral twisted mass shift used for Hasenbusch mass preconditioning for twisted clover
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
      integer(4) :: laplace3D    ! direction to omit in Laplace
@@ -124,6 +138,10 @@ module quda_fortran
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
      integer(4) :: num_src ! Number of sources in the multiple source solver
+     integer(4) :: num_src_per_sub_partition ! Number of sources in the multiple source solver, but per sub-partition
+
+     integer(4), dimension(QUDA_MAX_DIM) :: split_grid ! The grid of sub-partition according to which the processor grid will be partitioned
+
      integer(4) :: overlap ! width of domain overlaps
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
@@ -183,6 +201,7 @@ module quda_fortran
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
 
+     real(8) :: clover_csw   ! Csw coefficient of the clover term
      real(8) :: clover_coeff ! Coefficient of the clover term
      real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
@@ -194,9 +213,6 @@ module quda_fortran
      integer(4) :: return_clover_inverse             ! Whether to copy back the inverted clover matrix field
 
      QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
-
-     integer(4) :: sp_pad
-     integer(4) :: cl_pad
 
      integer(4) :: iter
      real(8) :: gflops
@@ -253,6 +269,15 @@ module quda_fortran
      ! Maximum eigenvalue for Chebyshev CA basis
      real(8) :: ca_lambda_max
 
+     ! Basis for CA algorithms in preconditioner solvers
+     QudaCABasis :: ca_basis_precondition
+
+     ! Minimum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_min_precondition
+
+     ! Maximum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_max_precondition
+
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle
 
@@ -300,6 +325,9 @@ module quda_fortran
 
      ! Whether to use the platform native or generic BLAS / LAPACK */
      QudaBoolean :: native_blas_lapack;
+
+     ! Whether to use the fused kernels for Mobius/DWF-4D dslash
+     QudaBoolean :: use_mobius_fused_kernel
 
   end type quda_invert_param
 

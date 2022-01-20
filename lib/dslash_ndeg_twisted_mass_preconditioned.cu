@@ -36,12 +36,12 @@ namespace quda
     }
 
   public:
-    NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
+  NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+    Dslash(arg, out, in),
       shared(arg.asymmetric || !arg.dagger)
     {
-      TunableVectorYZ::resizeVector(2, arg.nParity);
-      if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
+      TunableKernel3D::resizeVector(2, arg.nParity);
+      if (shared) TunableKernel3D::resizeStep(2, 1); // this will force flavor to be contained in the block
     }
 
     void apply(const qudaStream_t &stream)
@@ -82,6 +82,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
@@ -102,18 +103,12 @@ namespace quda
         NdegTwistedMassArg<Float, nColor, nDim, recon, true> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-        policy.apply(0);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       } else {
         NdegTwistedMassArg<Float, nColor, nDim, recon, false> arg(out, in, U, a, b, c, xpay, x, parity, dagger, comm_override);
         NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
-        policy.apply(0);
+        dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       }
     }
   };
@@ -121,21 +116,21 @@ namespace quda
   // Apply the non-degenerate twisted-mass Dslash operator
   // out(x) = M*in = a*(1 + i*b*gamma_5*tau_3 + c*tau_1)*D + x
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
   void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
       double a, double b, double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
       const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    // with symmetric dagger operator we must use kernel packing
-    if (dagger && !asymmetric) pushKernelPackT(true);
-
     instantiate<NdegTwistedMassPreconditionedApply>(
         out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override, profile);
-
-    if (dagger && !asymmetric) popKernelPackT();
-#else
-    errorQuda("Non-degenerate twisted-mass dslash has not been built");
-#endif // GPU_NDEG_TWISTED_MASS_DIRAC
   }
+#else
+  void ApplyNdegTwistedMassPreconditioned(ColorSpinorField &, const ColorSpinorField &, const GaugeField &,
+                                          double, double, double, bool, const ColorSpinorField &, int, bool, bool,
+                                          const int *, TimeProfile &)
+  {
+    errorQuda("Non-degenerate preconditioned twisted-mass dslash has not been built");
+  }
+#endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
 } // namespace quda

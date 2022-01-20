@@ -1,12 +1,20 @@
-#ifndef _UTIL_QUDA_H
-#define _UTIL_QUDA_H
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <enum_quda.h>
 #include <comm_quda.h>
 #include <tune_key.h>
+#include <malloc_quda.h>
 
+namespace quda
+{
+  // strip path from __FILE__
+  constexpr const char *str_end(const char *str) { return *str ? str_end(str + 1) : str; }
+  constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
+  constexpr const char *r_slant(const char *str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }
+  constexpr const char *file_name(const char *str) { return str_slant(str) ? r_slant(str_end(str)) : str; }
+} // namespace quda
 
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
@@ -60,10 +68,14 @@ char *getPrintBuffer();
 */
 char* getOmpThreadStr();
 
-namespace quda {
-  // forward declaration
-  void saveTuneCache(bool error);
-}
+void errorQuda_(const char *func, const char *file, int line, ...);
+
+#define errorQuda(...)                                                                                                 \
+  do {                                                                                                                 \
+    fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \
+    fprintf(getOutputFile(), __VA_ARGS__);                                                                             \
+    errorQuda_(__func__, quda::file_name(__FILE__), __LINE__, __VA_ARGS__);                                            \
+  } while (0)
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
 		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\
@@ -83,19 +95,6 @@ namespace quda {
     fflush(getOutputFile());                           \
   }                                                    \
 } while (0)
-
-#define errorQuda(...)                                                                                                 \
-  do {                                                                                                                 \
-    fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());                                                          \
-    fprintf(getOutputFile(), __VA_ARGS__);                                                                             \
-    fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", comm_rank_global(), comm_hostname(),    \
-            __LINE__, __func__);                                                                                       \
-    fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", getOutputPrefix(),        \
-            getLastTuneKey().name, getLastTuneKey().volume, getLastTuneKey().aux);                                     \
-    fflush(getOutputFile());                                                                                           \
-    quda::saveTuneCache(true);                                                                                         \
-    comm_abort(1);                                                                                                     \
-  } while (0)
 
 #define warningQuda(...) do {                                   \
   if (getVerbosity() > QUDA_SILENT) {				\
@@ -117,18 +116,6 @@ namespace quda {
   fflush(getOutputFile());                           \
 } while (0)
 
-#define errorQuda(...) do {						     \
-  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());		     \
-  fprintf(getOutputFile(), __VA_ARGS__);				     \
-  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",		     \
-	  __LINE__, __func__);						     \
-  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
-	  getOutputPrefix(), getLastTuneKey().name,			     \
-	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
-  quda::saveTuneCache(true);						\
-  comm_abort(1);							     \
-} while (0)
-
 #define warningQuda(...) do {                                 \
   if (getVerbosity() > QUDA_SILENT) {			      \
     fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
@@ -139,34 +126,3 @@ namespace quda {
 } while (0)
 
 #endif // MULTI_GPU
-
-
-#define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error))  \
-    ;\
-} while (0)
-
-
-#ifdef HOST_DEBUG
-
-#define checkCudaError() do {  \
-  cudaDeviceSynchronize();     \
-  checkCudaErrorNoSync();      \
-} while (0)
-
-#else
-
-#define checkCudaError() checkCudaErrorNoSync()
-
-#endif // HOST_DEBUG
-
-#ifdef __CUDA_ARCH__
-// hide from device code
-#undef errorQuda
-#define errorQuda(...)
-
-#endif
-
-#endif // _UTIL_QUDA_H

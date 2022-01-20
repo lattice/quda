@@ -58,9 +58,10 @@ Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from
   is_qmp_handle_default = true; // the QMP handle is the default one.
 
   comm_init(nDim, commDims, rank_from_coords, map_data);
+  globalReduce.push(true);
 }
 
-Communicator::Communicator(Communicator &other, const int *comm_split)
+Communicator::Communicator(Communicator &other, const int *comm_split) : globalReduce(other.globalReduce)
 {
   user_set_comm_handle = false;
 
@@ -168,12 +169,12 @@ void Communicator::comm_init(int ndim, const int *dims, QudaCommsMap rank_from_c
 
 int Communicator::comm_rank(void) { return QMP_comm_get_node_number(QMP_COMM_HANDLE); }
 
-int Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
+size_t Communicator::comm_size(void) { return QMP_comm_get_number_of_nodes(QMP_COMM_HANDLE); }
 
 /**
  * Declare a message handle for sending `nbytes` to the `rank` with `tag`.
  */
-MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
+MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int, size_t nbytes)
 {
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -189,7 +190,7 @@ MsgHandle *Communicator::comm_declare_send_rank(void *buffer, int rank, int tag,
 /**
  * Declare a message handle for receiving `nbytes` from the `rank` with `tag`.
  */
-MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int tag, size_t nbytes)
+MsgHandle *Communicator::comm_declare_recv_rank(void *buffer, int rank, int, size_t nbytes)
 {
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
@@ -338,8 +339,12 @@ void Communicator::comm_allreduce_array(double *data, size_t size)
 
 void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
-
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data + i)); }
+}
+
+void Communicator::comm_allreduce_min_array(double *data, size_t size)
+{
+  for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data + i)); }
 }
 
 void Communicator::comm_allreduce_int(int *data) { QMP_CHECK(QMP_comm_sum_int(QMP_COMM_HANDLE, data)); }

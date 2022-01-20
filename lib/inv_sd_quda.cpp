@@ -33,12 +33,12 @@ namespace quda {
 
   void SD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    commGlobalReductionSet(param.global_reduction);
+    commGlobalReductionPush(param.global_reduction);
 
-    if(!init){
-      r = new cudaColorSpinorField(b);
-      Ar = new cudaColorSpinorField(b);
-      y = new cudaColorSpinorField(b);
+    if (!init) {
+      r = new ColorSpinorField(b);
+      Ar = new ColorSpinorField(b);
+      y = new ColorSpinorField(b);
       init = true;
     }
 
@@ -50,8 +50,7 @@ namespace quda {
     double3 rAr;
 
     int k=0;
-    while(k < param.maxiter-1){
-
+    while (k < param.maxiter - 1) {
       mat(*Ar, *r, *y);
       rAr = cDotProductNormA(*r, *Ar);
       alpha = rAr.z/rAr.x;
@@ -65,7 +64,6 @@ namespace quda {
 
       ++k;
     }
-
 
     rAr = cDotProductNormA(*r, *Ar);
     alpha = rAr.z/rAr.x;
@@ -84,8 +82,7 @@ namespace quda {
       printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
     } // >= QUDA_DEBUG_VERBOSITY
 
-    commGlobalReductionSet(true);
-    return;
+    commGlobalReductionPop();
   }
 
 } // namespace quda

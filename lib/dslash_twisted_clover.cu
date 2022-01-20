@@ -39,6 +39,7 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
       default: break; // all clover flops are in the interior kernel
       }
@@ -52,6 +53,7 @@ namespace quda
       long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
+      case UBER_KERNEL:
       case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
       default: break;
       }
@@ -70,25 +72,26 @@ namespace quda
       WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
       TwistedClover<decltype(arg)> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(
-        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
-      policy.apply(0);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };
 
   // Apply the twisted-mass Dslash operator
   // out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
+#ifdef GPU_TWISTED_CLOVER_DIRAC
   void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
                           double a, double b, const ColorSpinorField &x, int parity, bool dagger,
                           const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_TWISTED_CLOVER_DIRAC
     instantiate<TwistedCloverApply>(out, in, U, C, a, b, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Twisted-clover dslash has not been built");
-#endif // GPU_TWISTED_CLOVEr_DIRAC
   }
+#else
+  void ApplyTwistedClover(ColorSpinorField &, const ColorSpinorField &, const GaugeField &, const CloverField &,
+                          double, double, const ColorSpinorField &, int, bool, const int *, TimeProfile &)
+  {
+    errorQuda("Twisted-clover dslash has not been built");
+  }
+#endif // GPU_TWISTED_CLOVEr_DIRAC
 
 } // namespace quda

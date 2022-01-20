@@ -15,34 +15,15 @@
 
 #include <qio_field.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 #define XUP 0
 #define YUP 1
 #define ZUP 2
 #define TUP 3
 
-using namespace std;
+template <typename T> using complex = std::complex<T>;
 
 // Staggered gauge field utils
 //------------------------------------------------------
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
-                                           void *milc_longlink, QudaGaugeParam &gauge_param)
-{
-
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-
-  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
-  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuFat = GaugeField::Create(cpuFatParam);
-
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
-  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLong = GaugeField::Create(cpuLongParam);
-}
-
 void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv, bool &gauge_loaded)
@@ -182,7 +163,7 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       // incorporate non-trivial phase into long links
       const double phase = (M_PI * rand()) / RAND_MAX;
-      const complex<double> z = polar(1.0, phase);
+      const complex<double> z = std::polar(1.0, phase);
       for (int dir = 0; dir < 4; ++dir) {
         for (int i = 0; i < V; ++i) {
           for (int j = 0; j < gauge_site_size; j += 2) {
@@ -229,9 +210,7 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
 
   int fat_pad = pad_size;
@@ -271,7 +250,6 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 template <typename su3_matrix, typename Float>
 void computeLongLinkCPU(void **longlink, su3_matrix **sitelink, Float *act_path_coeff)
 {
-
   su3_matrix temp;
   for (int dir = XUP; dir <= TUP; ++dir) {
     int dx[4] = {0, 0, 0, 0};
@@ -355,8 +333,7 @@ void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, vo
   // Prepare various things
   QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
   // Needed for unitarization, following "unitarize_link_test.cpp"
-  quda::GaugeFieldParam gParam(0, qudaGaugeParam);
-  gParam.pad = 0;
+  quda::GaugeFieldParam gParam(qudaGaugeParam);
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER; // must be true!
@@ -696,6 +673,7 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   bool pc = isPCSolution(inv_param->solution_type);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
+  cs_param->pc_type = QUDA_4D_PC;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
   // Lattice vector data properties
@@ -769,10 +747,7 @@ void reorderMILCtoQDP(void **qdp_out, void *milc_in, int V, int siteSize, QudaPr
 
 template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type)
 {
-
   if (type == 3) applyGaugeFieldScaling_long((Float **)res, Vh, param, QUDA_STAGGERED_DSLASH);
-
-  return;
 }
 
 template <typename Float>
@@ -860,6 +835,10 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
     }
   }
 }
+
+// explicit instantiations so we can call from a different unit
+template void applyGaugeFieldScaling_long<>(double **, int, QudaGaugeParam *, QudaDslashType);
+template void applyGaugeFieldScaling_long<>(float **, int, QudaGaugeParam *, QudaDslashType);
 
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
                                  QudaPrecision local_prec)

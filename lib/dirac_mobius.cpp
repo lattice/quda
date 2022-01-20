@@ -1,6 +1,9 @@
 #include <iostream>
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
+
+#include <dslash_mdw_fused.hpp>
 
 namespace quda {
 
@@ -46,13 +49,13 @@ namespace quda {
     flops += 1320LL * (long long)in.Volume();
   }
 
-  void DiracMobius::Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracMobius::Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -61,13 +64,13 @@ namespace quda {
   }
 
   // Unlike DWF-4d, the Mobius variant here applies the full M5 operator and not just D5
-  void DiracMobius::Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracMobius::Dslash5(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -88,31 +91,31 @@ namespace quda {
     flops += 1320LL * (long long)in.Volume();
   }
 
-  void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                   const ColorSpinorField &x, const double &k) const
+  void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                   const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS_PRE);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
 
-    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += (72LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
-  void DiracMobius::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                const ColorSpinorField &x, const double &k) const
+  void DiracMobius::Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, Dslash5Type::DSLASH5_MOBIUS);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -134,14 +137,14 @@ namespace quda {
     bool reset = newTmp(&tmp, in);
 
     if (dagger == QUDA_DAG_NO) {
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(*tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
     } else {
       // the third term is added, not multiplied, so we only need to swap the first two in the dagger
       ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(*tmp, out, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
+      ApplyDslash5(*tmp, out, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS);
     }
     blas::axpy(-mobius_kappa_b, *tmp, out);
 
@@ -178,7 +181,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracMobius::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracMobius::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
@@ -208,39 +211,170 @@ namespace quda {
     return *this;
   }
 
-  void DiracMobiusPC::Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  void DiracMobiusPC::M5inv(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
-
-    if (0) {
-      // M5 = 1 + 0.5*kappa_b/kappa_c * D5
-      using namespace blas;
-      cudaColorSpinorField A(out);
-      Dslash5(A, out, parity);
-      printfQuda("Dslash5Xpay = %e M5inv = %e in = %e\n", norm2(A), norm2(out), norm2(in));
-      exit(0);
-    }
+    ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger,
+                 zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
-  void DiracMobiusPC::Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                     const ColorSpinorField &x, const double &k) const
+  void DiracMobiusPC::M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                                const double &k) const
   {
     checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
+    ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger,
+                 zMobius ? Dslash5Type::M5_INV_ZMOBIUS : Dslash5Type::M5_INV_MOBIUS);
 
     long long Ls = in.X(4);
     flops += (144LL * Ls + 48LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
+  }
+
+  void DiracMobiusPC::Dslash4M5invM5pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5invM5pre(out, in, *gauge, 0.0, m5, b_5, c_5, in, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5pre
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+  }
+
+  void DiracMobiusPC::Dslash4M5preM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5preM5inv(out, in, *gauge, 0.0, m5, b_5, c_5, in, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5pre
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+  }
+
+  void DiracMobiusPC::Dslash4M5invXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5inv(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5pre(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5pre
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4XpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                       const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5mob(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5mob
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5preXpayM5mob(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                            const ColorSpinorField &x, const double &a) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5preM5mob(out, in, *gauge, a, m5, b_5, c_5, x, out, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5pre
+    long long Ls = in.X(4);
+    long long bulk = (Ls - 2) * (in.Volume() / Ls);
+    long long wall = 2 * in.Volume() / Ls;
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // M5mob
+    flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    // xpay
+    flops += 48LL * (long long)in.Volume();
+  }
+
+  void DiracMobiusPC::Dslash4M5invXpayM5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                                            const ColorSpinorField &x, const double &a, ColorSpinorField &y) const
+  {
+    checkDWF(in, out);
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyDomainWall4DM5invM5inv(out, in, *gauge, a, m5, b_5, c_5, x, y, parity, dagger, commDim, mass, profile);
+
+    // D4
+    flops += 1320LL * (long long)in.Volume();
+    // M5inv
+    long long Ls = in.X(4);
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // M5inv
+    flops += 144LL * (long long)in.Volume() * Ls + 3LL * Ls * (Ls - 1LL);
+    // xpay
+    flops += 48LL * (long long)in.Volume();
   }
 
   // Apply the even-odd preconditioned mobius DWF operator
@@ -256,33 +390,56 @@ namespace quda {
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     // QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
-      Dslash4pre(*tmp1, in, parity[1]);
-      Dslash4(out, *tmp1, parity[0]);
-      Dslash5inv(*tmp1, out, parity[0]);
-      Dslash4pre(out, *tmp1, parity[0]);
-      Dslash4(*tmp1, out, parity[1]);
-      Dslash5invXpay(out, *tmp1, parity[1], in, -1.0);
+      Dslash4pre(*tmp1, in);
+      if (this->use_mobius_fused_kernel) {
+        Dslash4M5invM5pre(out, *tmp1, parity[0]);
+        Dslash4M5invXpay(*tmp1, out, parity[1], in, -1.0);
+        out = *tmp1;
+      } else {
+        Dslash4(out, *tmp1, parity[0]);
+        M5inv(*tmp1, out);
+        Dslash4pre(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        M5invXpay(out, *tmp1, in, -1.0);
+      }
     } else if (symmetric && dagger) {
-      Dslash5inv(*tmp1, in, parity[1]);
-      Dslash4(out, *tmp1, parity[0]);
-      Dslash4pre(*tmp1, out, parity[0]);
-      Dslash5inv(out, *tmp1, parity[0]);
-      Dslash4(*tmp1, out, parity[1]);
-      Dslash4preXpay(out, *tmp1, parity[1], in, -1.0);
+      if (this->use_mobius_fused_kernel) {
+        M5inv(out, in);
+        Dslash4M5preM5inv(*tmp1, out, parity[0]);
+        Dslash4M5preXpay(out, *tmp1, parity[1], in, -1.0);
+      } else {
+        M5inv(*tmp1, in);
+        Dslash4(out, *tmp1, parity[0]);
+        Dslash4pre(*tmp1, out);
+        M5inv(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        Dslash4preXpay(out, *tmp1, in, -1.0);
+      }
     } else if (!symmetric && !dagger) {
-      Dslash4pre(*tmp1, in, parity[1]);
-      Dslash4(out, *tmp1, parity[0]);
-      Dslash5inv(*tmp1, out, parity[0]);
-      Dslash4pre(out, *tmp1, parity[0]);
-      Dslash4(*tmp1, out, parity[1]);
-      Dslash5Xpay(out, in, parity[1], *tmp1, -1.0);
+      if (this->use_mobius_fused_kernel) {
+        Dslash4pre(out, in);
+        Dslash4M5invM5pre(*tmp1, out, parity[0]);
+        Dslash4XpayM5mob(out, *tmp1, parity[1], in, -1.0);
+      } else {
+        Dslash4pre(*tmp1, in);
+        Dslash4(out, *tmp1, parity[0]);
+        M5inv(*tmp1, out);
+        Dslash4pre(out, *tmp1);
+        Dslash4(*tmp1, out, parity[1]);
+        Dslash5Xpay(out, in, *tmp1, -1.0);
+      }
     } else if (!symmetric && dagger) {
-      Dslash4(*tmp1, in, parity[0]);
-      Dslash4pre(out, *tmp1, parity[0]);
-      Dslash5inv(*tmp1, out, parity[0]);
-      Dslash4(out, *tmp1, parity[1]);
-      Dslash4pre(*tmp1, out, parity[1]);
-      Dslash5Xpay(out, in, parity[1], *tmp1, -1.0);
+      if (this->use_mobius_fused_kernel) {
+        Dslash4M5preM5inv(*tmp1, in, parity[0]);
+        Dslash4M5preXpayM5mob(out, *tmp1, parity[1], in, -1.0);
+      } else {
+        Dslash4(*tmp1, in, parity[0]);
+        Dslash4pre(out, *tmp1);
+        M5inv(*tmp1, out);
+        Dslash4(out, *tmp1, parity[1]);
+        Dslash4pre(*tmp1, out);
+        Dslash5Xpay(out, in, *tmp1, -1.0);
+      }
     }
 
     deleteTmp(&tmp1, reset1);
@@ -290,9 +447,28 @@ namespace quda {
 
   void DiracMobiusPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
+    if (symmetric && this->use_mobius_fused_kernel) {
+      int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+      QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+      bool reset1 = newTmp(&tmp1, in);
+
+      Dslash4pre(*tmp2, in);
+      Dslash4M5invM5pre(*tmp1, *tmp2, parity[0]);
+      Dslash4M5invXpayM5inv(out, *tmp1, parity[1], in, -1.0, *tmp2);
+
+      dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
+
+      Dslash4M5preM5inv(*tmp1, out, parity[0]);
+      Dslash4M5preXpay(out, *tmp1, parity[1], *tmp2, -1.0);
+
+      dagger = dagger == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES;
+      deleteTmp(&tmp1, reset1);
+    } else {
+      M(*tmp2, in);
+      Mdag(out, *tmp2);
+    }
     deleteTmp(&tmp2, reset);
   }
 
@@ -310,31 +486,31 @@ namespace quda {
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
         src = &(x.Odd());
-        Dslash5inv(*tmp1, b.Odd(), QUDA_ODD_PARITY);
-        Dslash4pre(*src, *tmp1, QUDA_ODD_PARITY);
+        M5inv(*tmp1, b.Odd());
+        Dslash4pre(*src, *tmp1);
         Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), 1.0);
-        Dslash5inv(*src, *tmp1, QUDA_EVEN_PARITY);
+        M5inv(*src, *tmp1);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
         // src = b_o + k D4_oe * D4pre * D5inv b_e
         src = &(x.Even());
-        Dslash5inv(*tmp1, b.Even(), QUDA_EVEN_PARITY);
-        Dslash4pre(*src, *tmp1, QUDA_EVEN_PARITY);
+        M5inv(*tmp1, b.Even());
+        Dslash4pre(*src, *tmp1);
         Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), 1.0);
-        Dslash5inv(*src, *tmp1, QUDA_ODD_PARITY);
+        M5inv(*src, *tmp1);
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo * D4pre * D5inv b_o
         src = &(x.Odd());
-        Dslash5inv(*src, b.Odd(), QUDA_ODD_PARITY);
-        Dslash4pre(*tmp1, *src, QUDA_ODD_PARITY);
+        M5inv(*src, b.Odd());
+        Dslash4pre(*tmp1, *src);
         Dslash4Xpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), 1.0);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D4_oe * D4pre * D5inv b_e
         src = &(x.Even());
-        Dslash5inv(*src, b.Even(), QUDA_EVEN_PARITY);
-        Dslash4pre(*tmp1, *src, QUDA_EVEN_PARITY);
+        M5inv(*src, b.Even());
+        Dslash4pre(*tmp1, *src);
         Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), 1.0);
         sol = &(x.Odd());
       } else {
@@ -357,14 +533,14 @@ namespace quda {
     checkFullSpinor(x, b);
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // psi_o = M5^-1 (b_o + k_b D4_oe D4pre x_e)
-      Dslash4pre(x.Odd(), x.Even(), QUDA_EVEN_PARITY);
+      Dslash4pre(x.Odd(), x.Even());
       Dslash4Xpay(*tmp1, x.Odd(), QUDA_ODD_PARITY, b.Odd(), 1.0);
-      Dslash5inv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
+      M5inv(x.Odd(), *tmp1);
     } else if (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // psi_e = M5^-1 (b_e + k_b D4_eo D4pre x_o)
-      Dslash4pre(x.Even(), x.Odd(), QUDA_ODD_PARITY);
+      Dslash4pre(x.Even(), x.Odd());
       Dslash4Xpay(*tmp1, x.Even(), QUDA_EVEN_PARITY, b.Even(), 1.0);
-      Dslash5inv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
+      M5inv(x.Even(), *tmp1);
     } else {
       errorQuda("MatPCType %d not valid for DiracMobiusPC", matpcType);
     }
@@ -385,9 +561,7 @@ namespace quda {
       shift2[d] = comm_dim_partitioned(d) ? 2 : 0;
     }
 
-    if (extended_gauge == nullptr) {
-      extended_gauge = createExtendedGauge(*gauge, shift2, profile, true);
-    }
+    if (extended_gauge == nullptr) { extended_gauge = createExtendedGauge(*gauge, shift2, profile, true); }
 
     checkDWF(in, out);
     // checkParitySpinor(in, out);
@@ -530,7 +704,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -551,7 +725,7 @@ namespace quda {
     a *= mobius_kappa_b * mobius_kappa_b; // a = a * kappa_b^2
     // The kernel will actually do (m5 * in - kappa_b^2 * x)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
 
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
@@ -575,15 +749,15 @@ namespace quda {
     bool reset = newTmp(&tmp, in);
 
     if (dagger == QUDA_DAG_NO) {
-      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       ApplyDomainWall4D(*tmp, out, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     } else {
       ApplyDomainWall4D(out, in, *gauge, 0.0, m5, b_5, c_5, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-      ApplyDslash5(*tmp, out, out, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
+      ApplyDslash5(*tmp, out, out, mass, m5, b_5, c_5, 0.0, dagger, Dslash5Type::DSLASH5_MOBIUS_PRE);
       mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                                 eofa_y, sherman_morrison_fac, dagger, M5_EOFA);
+                                 eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5_EOFA);
     }
     blas::axpy(-mobius_kappa_b, *tmp, out);
 
@@ -622,7 +796,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracMobiusEofa::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracMobiusEofa::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
@@ -638,7 +812,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     mobius_eofa::apply_dslash5(out, in, in, mass, m5, b_5, c_5, 0., eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5INV_EOFA);
 
     long long Ls = in.X(4);
     flops += (192LL * Ls + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
@@ -656,7 +830,7 @@ namespace quda {
     a *= mobius_kappa_b * mobius_kappa_b; // a = a * kappa_b^2
     // The kernel will actually do (x - kappa_b^2 * m5inv * in)
     mobius_eofa::apply_dslash5(out, in, x, mass, m5, b_5, c_5, a, eofa_pm, m5inv_fac, mobius_kappa, eofa_u, eofa_x,
-                               eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
+                               eofa_y, sherman_morrison_fac, dagger, Dslash5Type::M5INV_EOFA);
 
     long long Ls = in.X(4);
     flops += (192LL * Ls + 48LL + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
@@ -674,32 +848,32 @@ namespace quda {
     // QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     // QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     if (symmetric && !dagger) {
-      Dslash4pre(*tmp1, in, parity[1]);
+      Dslash4pre(*tmp1, in);
       Dslash4(out, *tmp1, parity[0]);
       m5inv_eofa(*tmp1, out);
-      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4pre(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
       m5inv_eofa_xpay(out, *tmp1, in, -1.);
     } else if (symmetric && dagger) {
       m5inv_eofa(*tmp1, in);
       Dslash4(out, *tmp1, parity[0]);
-      Dslash4pre(*tmp1, out, parity[0]);
+      Dslash4pre(*tmp1, out);
       m5inv_eofa(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
-      Dslash4preXpay(out, *tmp1, parity[1], in, -1.);
+      Dslash4preXpay(out, *tmp1, in, -1.);
     } else if (!symmetric && !dagger) {
-      Dslash4pre(*tmp1, in, parity[1]);
+      Dslash4pre(*tmp1, in);
       Dslash4(out, *tmp1, parity[0]);
       m5inv_eofa(*tmp1, out);
-      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4pre(out, *tmp1);
       Dslash4(*tmp1, out, parity[1]);
       m5_eofa_xpay(out, in, *tmp1, -1.);
     } else if (!symmetric && dagger) {
       Dslash4(*tmp1, in, parity[0]);
-      Dslash4pre(out, *tmp1, parity[0]);
+      Dslash4pre(out, *tmp1);
       m5inv_eofa(*tmp1, out);
       Dslash4(out, *tmp1, parity[1]);
-      Dslash4pre(*tmp1, out, parity[1]);
+      Dslash4pre(*tmp1, out);
       m5_eofa_xpay(out, in, *tmp1, -1.);
     }
 
@@ -720,7 +894,7 @@ namespace quda {
         // src = D5^-1 (b_e + k D4_eo * D4pre * D5^-1 b_o)
         src = &(x.Odd());
         m5inv_eofa(*tmp1, b.Odd());
-        Dslash4pre(*src, *tmp1, QUDA_ODD_PARITY);
+        Dslash4pre(*src, *tmp1);
         Dslash4Xpay(*tmp1, *src, QUDA_EVEN_PARITY, b.Even(), 1.0);
         m5inv_eofa(*src, *tmp1);
         sol = &(x.Even());
@@ -728,7 +902,7 @@ namespace quda {
         // src = b_o + k D4_oe * D4pre * D5inv b_e
         src = &(x.Even());
         m5inv_eofa(*tmp1, b.Even());
-        Dslash4pre(*src, *tmp1, QUDA_EVEN_PARITY);
+        Dslash4pre(*src, *tmp1);
         Dslash4Xpay(*tmp1, *src, QUDA_ODD_PARITY, b.Odd(), 1.0);
         m5inv_eofa(*src, *tmp1);
         sol = &(x.Odd());
@@ -736,14 +910,14 @@ namespace quda {
         // src = b_e + k D4_eo * D4pre * D5inv b_o
         src = &(x.Odd());
         m5inv_eofa(*src, b.Odd());
-        Dslash4pre(*tmp1, *src, QUDA_ODD_PARITY);
+        Dslash4pre(*tmp1, *src);
         Dslash4Xpay(*src, *tmp1, QUDA_EVEN_PARITY, b.Even(), 1.0);
         sol = &(x.Even());
       } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D4_oe * D4pre * D5inv b_e
         src = &(x.Even());
         m5inv_eofa(*src, b.Even());
-        Dslash4pre(*tmp1, *src, QUDA_EVEN_PARITY);
+        Dslash4pre(*tmp1, *src);
         Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), 1.0);
         sol = &(x.Odd());
       } else {
@@ -765,12 +939,12 @@ namespace quda {
     checkFullSpinor(x, b);
     if (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // psi_o = M5^-1 (b_o + k_b D4_oe D4pre x_e)
-      Dslash4pre(x.Odd(), x.Even(), QUDA_EVEN_PARITY);
+      Dslash4pre(x.Odd(), x.Even());
       Dslash4Xpay(*tmp1, x.Odd(), QUDA_ODD_PARITY, b.Odd(), 1.0);
       m5inv_eofa(x.Odd(), *tmp1);
     } else if (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // psi_e = M5^-1 (b_e + k_b D4_eo D4pre x_o)
-      Dslash4pre(x.Even(), x.Odd(), QUDA_ODD_PARITY);
+      Dslash4pre(x.Even(), x.Odd());
       Dslash4Xpay(*tmp1, x.Even(), QUDA_EVEN_PARITY, b.Even(), 1.0);
       m5inv_eofa(x.Even(), *tmp1);
     } else {
@@ -798,27 +972,24 @@ namespace quda {
     if (!dagger) {
       // Even
       m5_eofa(*tmp1, in.Even());
-      Dslash4pre(*tmp2, in.Odd(), QUDA_ODD_PARITY);
+      Dslash4pre(*tmp2, in.Odd());
       Dslash4Xpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1.);
       // Odd
       m5_eofa(*tmp1, in.Odd());
-      Dslash4pre(*tmp2, in.Even(), QUDA_EVEN_PARITY);
+      Dslash4pre(*tmp2, in.Even());
       Dslash4Xpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1.);
     } else {
       printfQuda("Quda EOFA full dslash dagger=yes\n");
       // Even
       m5_eofa(*tmp1, in.Even());
       Dslash4(*tmp2, in.Odd(), QUDA_EVEN_PARITY);
-      Dslash4preXpay(out.Even(), *tmp2, QUDA_EVEN_PARITY, *tmp1, -1. / mobius_kappa_b);
+      Dslash4preXpay(out.Even(), *tmp2, *tmp1, -1. / mobius_kappa_b);
       // Odd
       m5_eofa(*tmp1, in.Odd());
       Dslash4(*tmp2, in.Even(), QUDA_ODD_PARITY);
-      Dslash4preXpay(out.Odd(), *tmp2, QUDA_ODD_PARITY, *tmp1, -1. / mobius_kappa_b);
+      Dslash4preXpay(out.Odd(), *tmp2, *tmp1, -1. / mobius_kappa_b);
     }
     deleteTmp(&tmp1, reset1);
     deleteTmp(&tmp2, reset2);
   }
 } // namespace quda
-#include <iostream>
-#include <dirac_quda.h>
-#include <blas_quda.h>

@@ -1,8 +1,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
-#include <kernels/copy_field_offset.cuh>
 #include <instantiate.h>
+#include "copy_field_offset.hpp"
 
 namespace quda
 {

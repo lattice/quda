@@ -1,4 +1,5 @@
 #include <dirac_quda.h>
+#include <dslash_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
 
@@ -121,22 +122,22 @@ namespace quda {
     sol = &x;  
   }
 
-  void DiracStaggered::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				   const QudaSolutionType solType) const
+  void DiracStaggered::reconstruct(ColorSpinorField &, const ColorSpinorField &, const QudaSolutionType) const
   {
     // do nothing
   }
 
-  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-           double kappa, double mass, double mu, double mu_factor) const {
-    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD)
+  void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
+                                      double, bool) const
+  {
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
       errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
-    // nullptr == no Kahler-Dirac Xinv
-    const cudaGaugeField *XinvKD = nullptr;
-    StaggeredCoarseOp(Y, X, T, *gauge, XinvKD, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
-  }
+    // Irrelevant for naive staggered operator
+    constexpr bool allow_truncation = false;
 
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);
+  }
 
   DiracStaggeredPC::DiracStaggeredPC(const DiracParam &param)
     : DiracStaggered(param)
@@ -195,7 +196,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracStaggeredPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracStaggeredPC::MdagM(ColorSpinorField &, const ColorSpinorField &) const
   {
     errorQuda("MdagM is no longer defined for DiracStaggeredPC. Use M instead.\n");
     /*
@@ -278,6 +279,17 @@ namespace quda {
 
   }
 
+  void DiracStaggeredPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double, double mass, double,
+                                        double, bool) const
+  {
+    if (T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD || T.getTransferType() == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG)
+      errorQuda("The optimized Kahler-Dirac operator is not built through createCoarseOp");
 
+    // Irrelevant for naive staggered operator
+    constexpr bool allow_truncation = false;
+
+    StaggeredCoarseOp(Y, X, T, *gauge, *gauge, *gauge, mass, allow_truncation, QUDA_STAGGEREDPC_DIRAC,
+                      QUDA_MATPC_INVALID);
+  }
 
 } // namespace quda

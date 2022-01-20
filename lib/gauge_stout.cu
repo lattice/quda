@@ -1,138 +1,97 @@
-#include <quda_internal.h>
-#include <tune_quda.h>
 #include <gauge_field.h>
-
-#include <jitify_helper.cuh>
-#include <kernels/gauge_stout.cuh>
+#include <tunable_nd.h>
 #include <instantiate.h>
+#include <kernels/gauge_stout.cuh>
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeSTOUT : TunableVectorYZ
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeSTOUT : TunableKernel3D
   {
-    static constexpr int stoutDim = 3; // apply stouting in space only
-    GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
-    const GaugeField &meta;
+    GaugeField &out;
+    const GaugeField &in;
+    const bool improved;
+    const Float rho;
+    const Float epsilon;
+    const int stoutDim;
+    unsigned int minThreads() const { return in.LocalVolumeCB(); }
 
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
-
-public:
+  public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeSTOUT(GaugeField &out, const GaugeField &in, double rho) :
-      TunableVectorYZ(2, stoutDim),
-      arg(out, in, rho),
-      meta(in)
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, bool improved, double rho, double epsilon = 0.0) :
+      TunableKernel3D(in, 2, improved ? 4 : 3),
+      out(out),
+      in(in),
+      improved(improved),
+      rho(static_cast<Float>(rho)),
+      epsilon(static_cast<Float>(epsilon)),
+      stoutDim(improved ? 4 : 3)
     {
-      strcpy(aux, meta.AuxString());
+      if (improved) strcat(aux, ",improved");
       strcat(aux, comm_dim_partitioned_string());
-#ifdef JITIFY
-      create_jitify_program("kernels/gauge_stout.cuh");
-#endif
-      apply(0);
-      qudaDeviceSynchronize();
+      apply(device::get_default_stream());
     }
 
     void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-      using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeSTOUTStep").instantiate(Type<decltype(arg)>())
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
-#else
-      qudaLaunchKernel(computeSTOUTStep<decltype(arg)>, tp, stream, arg);
-#endif
+      if (!improved) {
+        launch<STOUT>(tp, stream, STOUTArg<Float, nColor, recon, 3>(out, in, rho));
+      } else if (improved) {
+        launch<OvrImpSTOUT>(tp, stream, STOUTArg<Float, nColor, recon, 4>(out, in, rho, epsilon));
+      }
     }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    void preTune() { if (out.Gauge_p() == in.Gauge_p()) out.backup(); }
+    void postTune() { if (out.Gauge_p() == in.Gauge_p()) out.restore(); }
 
-    void preTune() { arg.out.save(); } // defensive measure in case they alias
-    void postTune() { arg.out.load(); }
+    long long flops() const // just counts matrix multiplication
+    {
+      auto mat_flops = in.Ncolor() * in.Ncolor() * (8ll * in.Ncolor() - 2ll);
+      return (2 + (stoutDim - 1) * (improved ? 28 : 4)) * mat_flops * stoutDim * in.LocalVolume();
+    }
 
-    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return ((1 + stoutDim * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
-  }; // GaugeSTOUT
-  
+    long long bytes() const // 6 links per dim, 1 in, 1 out.
+    {
+      return ((1 + (stoutDim - 1) * (improved ? 24 : 6)) * in.Reconstruct() * in.Precision() +
+              out.Reconstruct() * out.Precision()) * stoutDim * in.LocalVolume();    }
+  };
+
+#ifdef GPU_GAUGE_TOOLS
   void STOUTStep(GaugeField &out, GaugeField &in, double rho)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
-
-    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
-    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+    checkNative(out, in);
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
-    instantiate<GaugeSTOUT>(out, in, rho);
-    out.exchangeExtendedGhost(out.R(), false);    
-#else
-    errorQuda("Gauge tools are not built");
-#endif
+    instantiate<GaugeSTOUT>(out, in, false, rho);
+    out.exchangeExtendedGhost(out.R(), false);
   }
-
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeOvrImpSTOUT : TunableVectorYZ
-  {
-    static constexpr int stoutDim = 4; // apply stouting in all dims
-    GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
-    const GaugeField &meta;
-
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
-
-public:
-    GaugeOvrImpSTOUT(GaugeField &out, const GaugeField &in, double rho, double epsilon) :
-      TunableVectorYZ(2, stoutDim),
-      arg(out, in, rho, epsilon),
-      meta(in)
-    {
-      strcpy(aux, meta.AuxString());
-      strcat(aux, comm_dim_partitioned_string());
-#ifdef JITIFY
-      create_jitify_program("kernels/gauge_stout.cuh");
-#endif
-      apply(0);
-      qudaDeviceSynchronize();
-    }
-
-    void apply(const qudaStream_t &stream)
-    {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef JITIFY
-      using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeOvrImpSTOUTStep").instantiate(Type<decltype(arg)>())
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      qudaLaunchKernel(computeOvrImpSTOUTStep<decltype(arg)>, tp, stream, arg);
+  void STOUTStep(GaugeField &, GaugeField &, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
 #endif
-    }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
-    void preTune() { arg.out.save(); } // defensive measure in case they alias
-    void postTune() { arg.out.load(); }
-
-    long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return ((1 + stoutDim * 24) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } //24 links per dim, 1 in, 1 out
-  }; // GaugeOvrImpSTOUT
-
+#ifdef GPU_GAUGE_TOOLS
   void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
   {
-#ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
-
-    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
-    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+    checkNative(out, in);
 
     copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
     in.exchangeExtendedGhost(in.R(), false);
-    instantiate<GaugeOvrImpSTOUT>(out, in, rho, epsilon);
+    instantiate<GaugeSTOUT>(out, in, true, rho, epsilon);
     out.exchangeExtendedGhost(out.R(), false);
-    
-#else
-    errorQuda("Gauge tools are not built");
-#endif
   }
+#else
+  void OvrImpSTOUTStep(GaugeField &, GaugeField &, double, double)
+  {
+    errorQuda("Gauge tools are not built");
+  }
+#endif
+
 }

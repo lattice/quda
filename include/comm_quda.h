@@ -1,5 +1,9 @@
 #pragma once
 #include <cstdint>
+#include <quda_constants.h>
+#include <quda_api.h>
+
+using namespace quda;
 
 #ifdef __cplusplus
 extern "C" {
@@ -179,7 +183,7 @@ extern "C" {
   /**
      @return Number of processes
   */
-  int comm_size(void);
+  size_t comm_size(void);
 
   /**
      @return GPU id associated with this process
@@ -211,6 +215,65 @@ extern "C" {
      @param hostname_buf Array that holds all process hostnames
    */
   void comm_peer2peer_init(const char *hostname_recv_buf);
+
+  /**
+     @brief Query if peer-to-peer communication is possible between two GPUs
+     @param[in] local_gpuid GPU associated with this process
+     @param[in] neighbor_gpuid GPU associated with neighboring process
+     (assumed on same node)
+     @return True/false if peer-to-peer is possible
+  */
+  bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid);
+
+  /**
+     @brief Query the performance of peer-to-peer communication between two GPUs
+     @param[in] local_gpuid GPU associated with this process
+     @param[in] neighbor_gpuid GPU associated with neighboring process
+     (assumed on same node)
+     @return Relative performance ranking between this pair of GPUs
+  */
+  int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid);
+
+  /**
+    @brief Symmetric exchange of local memory addresses between
+    logically neighboring processes on the lattice.  The remote
+    addresses that are returned are directly addressable by the local
+    process and can be read or written to by a kernel, or can be
+    copied to and from.  This exchange is only defined between
+    devices that are peer-to-peer enabled.
+    @param[out] remote Array of remote memory pointers to neighboring
+    pointers
+    @param[in] local The process-local memory pointer to be exchanged
+    from this process
+  */
+  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local);
+
+  /**
+     @brief Deallocate the remote addresses to logically neighboring
+     processes on the on the lattice.
+     @param[in] remote Array of remote memory pointers to neighboring
+     pointers
+   */
+  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2]);
+
+  /**
+     @brief Create unique events shared between each logical pair of
+     neighboring processes, e.g., the event in the forwards direction
+     in a given dimension on a given process aliases the event in the
+     backward direction in the same dimension, and is unique
+     between that process pair. This exchange is only defined between
+     devices that are peer-to-peer enabled.
+     @param[out] remote Array of remote events to neighboring processes
+     @param[in] local Array of local event to neighboring processes
+   */
+  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+
+  /**
+     @brief Destroy the coupled events
+     @param[out] remote Array of remote events to neighboring processes
+     @param[in] local Array of local event to neighboring processes
+   */
+  void comm_destroy_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on
@@ -322,6 +385,7 @@ extern "C" {
   void comm_allreduce_min(double* data);
   void comm_allreduce_array(double* data, size_t size);
   void comm_allreduce_max_array(double* data, size_t size);
+  void comm_allreduce_min_array(double *data, size_t size);
   void comm_allreduce_int(int* data);
   void comm_allreduce_xor(uint64_t *data);
   void comm_broadcast(void *data, size_t nbytes);
@@ -344,7 +408,8 @@ extern "C" {
    */
   void commDimPartitionedReset();
   bool commGlobalReduction();
-  void commGlobalReductionSet(bool global_reduce);
+  void commGlobalReductionPush(bool global_reduce);
+  void commGlobalReductionPop();
 
   bool commAsyncReduction();
   void commAsyncReductionSet(bool global_reduce);

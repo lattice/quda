@@ -1,7 +1,6 @@
 #pragma once
 
-#include <limits.h>
-#define QUDA_INVALID_ENUM INT_MIN
+#define QUDA_INVALID_ENUM (-0x7fffffff - 1)
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,7 +109,6 @@ typedef enum QudaInverterType_s {
   QUDA_MR_INVERTER,
   QUDA_MPBICGSTAB_INVERTER,
   QUDA_SD_INVERTER,
-  QUDA_XSD_INVERTER,
   QUDA_PCG_INVERTER,
   QUDA_MPCG_INVERTER,
   QUDA_EIGCG_INVERTER,
@@ -255,6 +253,7 @@ typedef enum QudaCloverFieldOrder_s {
   QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
   QUDA_FLOAT2_CLOVER_ORDER = 2, // even-odd float2 ordering
   QUDA_FLOAT4_CLOVER_ORDER = 4, // even-odd float4 ordering
+  QUDA_FLOAT8_CLOVER_ORDER = 8, // even-odd float8 ordering
   QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
   QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
   QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
@@ -291,9 +290,9 @@ typedef enum QudaDiracType_s {
   QUDA_WILSON_DIRAC,
   QUDA_WILSONPC_DIRAC,
   QUDA_CLOVER_DIRAC,
+  QUDA_CLOVERPC_DIRAC,
   QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC,
   QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC,
-  QUDA_CLOVERPC_DIRAC,
   QUDA_DOMAIN_WALL_DIRAC,
   QUDA_DOMAIN_WALLPC_DIRAC,
   QUDA_DOMAIN_WALL_4D_DIRAC,
@@ -399,7 +398,6 @@ typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QU
 typedef enum QudaTwistFlavorType_s {
   QUDA_TWIST_SINGLET = 1,
   QUDA_TWIST_NONDEG_DOUBLET = +2,
-  QUDA_TWIST_DEG_DOUBLET = -2,
   QUDA_TWIST_NO = 0,
   QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
 } QudaTwistFlavorType;
@@ -453,6 +451,7 @@ typedef enum QudaTransferType_s {
   QUDA_TRANSFER_AGGREGATE,
   QUDA_TRANSFER_COARSE_KD,
   QUDA_TRANSFER_OPTIMIZED_KD,
+  QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG,
   QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
 } QudaTransferType;
 
@@ -501,6 +500,7 @@ typedef enum QudaFieldGeometry_s {
   QUDA_VECTOR_GEOMETRY = 4,
   QUDA_TENSOR_GEOMETRY = 6,
   QUDA_COARSE_GEOMETRY = 8,
+  QUDA_KDINVERSE_GEOMETRY = 16, // Decomposition of Kahler-Dirac block
   QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
 } QudaFieldGeometry;
 

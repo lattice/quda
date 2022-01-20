@@ -196,10 +196,9 @@ namespace quda {
     int n_update; 
 
   public:
-    BiCGstabLUpdate(ColorSpinorField* x, std::vector<ColorSpinorField*>& r, std::vector<ColorSpinorField*>& u,
-        Complex* alpha, Complex* beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
-      x(x), r(r), u(u), alpha(alpha), beta(beta), j_max(j_max),
-      n_update(n_update)
+    BiCGstabLUpdate(ColorSpinorField *x, std::vector<ColorSpinorField *> &r, std::vector<ColorSpinorField *> &u,
+                    Complex *alpha, Complex *beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+      x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max), n_update(n_update)
     {
       
     }
@@ -210,7 +209,7 @@ namespace quda {
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
-    void apply(const qudaStream_t &stream)
+    void apply(const qudaStream_t = device::get_default_stream())
     {
       static int count = 0;
 
