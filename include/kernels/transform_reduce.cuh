@@ -46,7 +46,8 @@ namespace quda {
 
     static constexpr bool do_sum = Arg::reducer::do_sum;
 
-    __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return arg.r(a, b); }
+    //__device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return arg.r(a, b); }
+    __device__ __host__ inline reduce_t operator()(reduce_t a, reduce_t b) const { return reducer_t::red(a,b); }
 
     __device__ __host__ inline reduce_t operator()(reduce_t &value, count_t i, int, int j)
     {

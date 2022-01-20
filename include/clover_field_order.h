@@ -527,7 +527,8 @@ namespace quda {
         {
           commGlobalReductionPush(global);
           double absmax
-            = accessor.scale() * accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
+            //= accessor.scale() * accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<Float>());
+            = accessor.scale() * accessor.transform_reduce(location, abs_max_<Float, Float>(), 0.0, maximum<double>());
           commGlobalReductionPop();
           return absmax;
         }
@@ -542,7 +543,8 @@ namespace quda {
           commGlobalReductionPush(global);
           double absmin = accessor.scale()
             * accessor.transform_reduce(location, abs_min_<Float, Float>(), std::numeric_limits<double>::max(),
-                                        minimum<Float>());
+                                        //minimum<Float>());
+                                        minimum<double>());
           commGlobalReductionPop();
           return absmin;
         }

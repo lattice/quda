@@ -75,6 +75,7 @@ namespace quda
     static constexpr bool do_sum = true;
     using reducer_t = plus<T>;
     __device__ __host__ inline T operator()(T a, T b) const { return a + b; }
+    __device__ __host__ static inline T red(T a, T b) { return a + b; }
   };
 
   /**
@@ -84,6 +85,7 @@ namespace quda
     static constexpr bool do_sum = false;
     using reducer_t = maximum<T>;
     __device__ __host__ inline T operator()(T a, T b) const { return quda::max(a, b); }
+    __device__ __host__ static inline T red(T a, T b) { return quda::max(a, b); }
   };
 
   /**
@@ -93,6 +95,7 @@ namespace quda
     static constexpr bool do_sum = false;
     using reducer_t = minimum<T>;
     __device__ __host__ inline T operator()(T a, T b) const { return quda::min(a, b); }
+    __device__ __host__ static inline T red(T a, T b) { return quda::min(a, b); }
   };
 
   /**
