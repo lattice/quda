@@ -15,6 +15,7 @@
 #include <eigen_helper.h>
 
 #include <reliable_updates.h>
+#include <invert_x_update.h>
 
 namespace quda {
 
@@ -325,18 +326,6 @@ namespace quda {
     ColorSpinorField &rSloppy = *rSloppyp;
     ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
-    {
-      ColorSpinorParam csParam(r);
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-
-      if (Np != (int)p.size()) {
-	      for (auto &pi : p) delete pi;
-	      p.resize(Np);
-	      for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
-      }
-    }
-
     const double u = precisionEpsilon(param.precision_sloppy);
     const double uhigh = precisionEpsilon(); // solver precision
 
@@ -383,18 +372,9 @@ namespace quda {
     if (&x != &xSloppy) blas::zero(xSloppy);
     blas::copy(rSloppy,r);
 
-    if (Np != (int)p.size()) {
-      for (auto &pi : p) delete pi;
-      p.resize(Np);
-      ColorSpinorParam csParam(rSloppy);
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      for (auto &pi : p) {
-        csParam.field = p_init ? p_init : &rSloppy;
-        pi = ColorSpinorField::Create(csParam);
-      }
-    } else {
-      for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
-    }
+    ColorSpinorParam csParam(rSloppy);
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+    XUpdateBatch x_update_batch(Np, p_init ? *p_init : rSloppy, csParam);
 
     double r2_old = 0.0;
     if (r2_old_init != 0.0 and p_init) {
@@ -440,7 +420,6 @@ namespace quda {
     }
 
     int k = 0;
-    int j = 0;
 
     PrintStats("CG", k, r2, b2, heavy_quark_res);
 
@@ -463,25 +442,25 @@ namespace quda {
     ReliableUpdates ru(ru_params, r2);
 
     while ( !converged && k < param.maxiter ) {
-      matSloppy(Ap, *p[j], tmp, tmp2);  // tmp as tmp
+      matSloppy(Ap, x_update_batch.get_current_field(), tmp, tmp2);  // tmp as tmp
       double sigma;
 
       bool breakdown = false;
       if (advanced_feature && param.pipeline) {
         double Ap2;
         if(alternative_reliable){
-          double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, *p[j]);
+          double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
           r2 = quadruple.x; Ap2 = quadruple.y; pAp = quadruple.z;
           ru.update_ppnorm(quadruple.w);
         } else {
-          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, *p[j]);
+          double3 triplet = blas::tripleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
           r2 = triplet.x; Ap2 = triplet.y; pAp = triplet.z;
         }
         r2_old = r2;
-        alpha[j] = r2 / pAp;
-        sigma = alpha[j]*(alpha[j] * Ap2 - pAp);
+        x_update_batch.get_current_alpha() = r2 / pAp;
+        sigma = x_update_batch.get_current_alpha() * (x_update_batch.get_current_alpha() * Ap2 - pAp);
         if (sigma < 0.0 || ru.steps_since_reliable == 0) { // sigma condition has broken down
-          r2 = blas::axpyNorm(-alpha[j], Ap, rSloppy);
+          r2 = blas::axpyNorm(-x_update_batch.get_current_alpha(), Ap, rSloppy);
           sigma = r2;
           breakdown = true;
         }
@@ -492,17 +471,17 @@ namespace quda {
 
         // alternative reliable updates,
         if (advanced_feature && alternative_reliable) {
-          double3 pAppp = blas::cDotProductNormA(*p[j],Ap);
+          double3 pAppp = blas::cDotProductNormA(x_update_batch.get_current_field(), Ap);
           pAp = pAppp.x;
           ru.update_ppnorm(pAppp.z);
         } else {
-          pAp = blas::reDotProduct(*p[j], Ap);
+          pAp = blas::reDotProduct(x_update_batch.get_current_field(), Ap);
         }
 
-        alpha[j] = r2 / pAp;
+        x_update_batch.get_current_alpha() = r2 / pAp;
 
         // here we are deploying the alternative beta computation
-        Complex cg_norm = blas::axpyCGNorm(-alpha[j], Ap, rSloppy);
+        Complex cg_norm = blas::axpyCGNorm(-x_update_batch.get_current_alpha(), Ap, rSloppy);
         r2 = real(cg_norm);  // (r_new, r_new)
         sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2;  // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
@@ -528,24 +507,22 @@ namespace quda {
         if (advanced_feature && param.pipeline && !breakdown) {
 
           if (Np == 1) {
-            blas::tripleCGUpdate(alpha[j], beta, Ap, xSloppy, rSloppy, *p[j]);
+            blas::tripleCGUpdate(x_update_batch.get_current_alpha(), beta, Ap, xSloppy, rSloppy, x_update_batch.get_current_field());
           } else {
             errorQuda("Not implemented pipelined CG with Np > 1");
           }
         } else {
           if (Np == 1) {
             // with Np=1 we just run regular fusion between x and p updates
-            blas::axpyZpbx(alpha[k%Np], *p[k%Np], xSloppy, rSloppy, beta);
+            blas::axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), xSloppy, rSloppy, beta);
           } else {
 
-            if ( (j+1)%Np == 0 ) {
-              std::vector<ColorSpinorField*> x_;
-              x_.push_back(&xSloppy);
-              blas::axpy(alpha.get(), p, x_);
+            if (x_update_batch.is_container_full()) {
+              x_update_batch.accumulate_x(xSloppy);
             }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
-            blas::xpayz(rSloppy, beta, *p[j], *p[(j + 1) % Np]);
+            blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
           }
         }
 
@@ -561,17 +538,12 @@ namespace quda {
 
         // alternative reliable updates
         if (advanced_feature) {
-          ru.accumulate_norm(alpha[j]);
+          ru.accumulate_norm(x_update_batch.get_current_alpha());
         }
       } else {
 
-        {
-          std::vector<ColorSpinorField*> x_;
-          x_.push_back(&xSloppy);
-          std::vector<ColorSpinorField*> p_;
-          for (int i=0; i<=j; i++) p_.push_back(p[i]);
-          blas::axpy(alpha.get(), p_, x_);
-        }
+        x_update_batch.accumulate_x(xSloppy);
+        x_update_batch.reset_next();
 
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -609,15 +581,16 @@ namespace quda {
 
         if (use_heavy_quark_res and heavy_quark_restart) {
           // perform a restart
-          blas::copy(*p[0], rSloppy);
+          x_update_batch.reset();
+          blas::copy(x_update_batch.get_current_field(), rSloppy);
           heavy_quark_restart = false;
         } else {
           // explicitly restore the orthogonality of the gradient vector
-          Complex rp = blas::cDotProduct(rSloppy, *p[j]) / (r2);
-          blas::caxpy(-rp, rSloppy, *p[j]);
+          Complex rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
+          blas::caxpy(-rp, rSloppy, x_update_batch.get_current_field());
 
           beta = r2 / r2_old;
-          blas::xpayz(rSloppy, beta, *p[j], *p[0]);
+          blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
         }
 
         ru.reset(r2);
@@ -642,15 +615,15 @@ namespace quda {
       }
 
       // if we have converged and need to update any trailing solutions
-      if (converged && ru.steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-        std::vector<ColorSpinorField*> x_;
-        x_.push_back(&xSloppy);
-        std::vector<ColorSpinorField*> p_;
-        for (int i=0; i<=j; i++) p_.push_back(p[i]);
-        blas::axpy(alpha.get(), p_, x_);
+      if (converged && ru.steps_since_reliable > 0 && !x_update_batch.is_container_full()) {
+        x_update_batch.accumulate_x(xSloppy);
       }
 
-      j = ru.steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
+      if (ru.steps_since_reliable == 0) {
+        x_update_batch.reset();
+      } else {
+        ++x_update_batch;
+      }
     }
 
     blas::copy(x, xSloppy);
