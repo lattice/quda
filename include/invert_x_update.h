@@ -1,3 +1,5 @@
+#pragma once
+
 #include <color_spinor_field.h>
 
 /**

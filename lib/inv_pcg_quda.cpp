@@ -421,8 +421,6 @@ namespace quda
 
           beta = r2 / r2_old;
         } 
-        // p_next = minvrSloppy + beta * p
-        // Here p_next = 0 since we have just performed a reliable update
         xpayz(K ? *minvrSloppy : rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
       }
 
