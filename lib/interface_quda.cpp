@@ -5468,7 +5468,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
 void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type)
 {
     // creating an empty array of QudaGaugeObservableParam
-    QudaGaugeObservableParam* param = new QudaGaugeObservableParam[n_steps+1];
+    QudaGaugeObservableParam* param = new QudaGaugeObservableParam[n_steps/meas_interval+1];
     for (unsigned int i=0;i<n_steps+1; i++){ // initializing for all 'i'
       param[i] = newQudaGaugeObservableParam();
       param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
@@ -5477,6 +5477,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     performWFlownStep_param(n_steps, step_size, meas_interval, wflow_type, param);
     delete param;
 }
+
 void performWFlownStep_param(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
 QudaGaugeObservableParam *param)
 {
@@ -5498,8 +5499,9 @@ QudaGaugeObservableParam *param)
   GaugeField *in = gaugeSmeared;
   GaugeField *out = gaugeAux;
   
+  gaugeObservables(*in, param[0], profileWFlow);
+
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    gaugeObservables(*in, param[0], profileWFlow);
     printfQuda("flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
     printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param[0].plaquette[0], param[0].energy[0], param[0].energy[1],
                param[0].energy[2], param[0].qcharge);
@@ -5513,11 +5515,12 @@ QudaGaugeObservableParam *param)
 
     WFlowStep(*out, *gaugeTemp, *in, step_size, wflow_type);
     profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-    if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
+    if ((i + 1) % meas_interval == 0){ 
       gaugeObservables(*out, param[i+1], profileWFlow);
-      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param[i+1].plaquette[0], param[i+1].energy[0],
-                 param[i+1].energy[1], param[i+1].energy[2], param[i+1].qcharge);
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param[i+1].plaquette[0], param[i+1].energy[0],
+                   param[i+1].energy[1], param[i+1].energy[2], param[i+1].qcharge);
+      }
     }
   }
 
