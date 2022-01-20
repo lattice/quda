@@ -98,13 +98,14 @@ namespace quda
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Generating Null Space Vectors ... \n"); }
     spinorNoise(null_b, rng, QUDA_NOISE_GAUSS);
 
+    std::vector<ColorSpinorField *> B(16);
     csParam.setPrecision(prec_precondition);
-    std::vector<ColorSpinorField> B(16, csParam);
+    for (auto &pB : B) { pB = new ColorSpinorField(csParam); }
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    for (auto &b: B) { blas::ax(5e3 / sqrt(blas::norm2(b)), b); }
+    for (auto pb: B) { blas::ax(5e3 / sqrt(blas::norm2(*pb)), *pb); }
 
     saveTuneCache();
 
@@ -118,10 +119,10 @@ namespace quda
 
     double residual = 0.0;
     int count = 0;
-    for (auto &phi: B) {
-      residual += blas::norm2(phi);
+    for (auto phi: B) {
+      residual += blas::norm2(*phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
-        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(phi));
+        printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(*phi));
       }
       count++;
     }
@@ -168,10 +169,10 @@ namespace quda
       double chi2 = 0.0;
       std::array<double, 5> a = {};
 
-      for (auto &phi: B) {
-        chi2 += cost(ref, base, chi, phi);
+      for (auto phi: B) {
+        chi2 += cost(ref, base, chi, *phi);
         // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh(*forward_tmp, phi, device_param, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
         pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
         popVerbosity();
@@ -187,10 +188,10 @@ namespace quda
         // d1 = A * T * phi -x- M * chi
         madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
         // d2 = A * T * M * phi -x- phi
-        madwf_ml::tensor_5d_hh(ATMchi, phi, d2);
+        madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
 
         axpby(D, 2.0f, d1, 2.0f, d2);
-        if (tune_suppressor) { dmu += 2.0 * blas::reDotProduct(Mchi, phi); }
+        if (tune_suppressor) { dmu += 2.0 * blas::reDotProduct(Mchi, *phi); }
       }
 
       axpby(P, (b - 1), P, (1 - b), D);
@@ -198,13 +199,13 @@ namespace quda
 
       chi2 = 0.0;
       // line search
-      for (auto &phi: B) {
+      for (auto phi: B) {
 
-        double ind_chi2 = cost(ref, base, chi, phi);
+        double ind_chi2 = cost(ref, base, chi, *phi);
         chi2 += ind_chi2;
 
         // ATx(ATphi, *phi, T);
-        madwf_ml::transfer_5d_hh(*forward_tmp, phi, device_param, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
         pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
         popVerbosity();
@@ -213,7 +214,7 @@ namespace quda
         madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
 
         // ATx(ADphi, *phi, P);
-        madwf_ml::transfer_5d_hh(*forward_tmp, phi, P, false);
+        madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
         pushVerbosity(QUDA_SILENT);
         base(ADphi, *forward_tmp);
         popVerbosity();
@@ -222,7 +223,7 @@ namespace quda
         madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);
         // theta
         blas::axpy(1.0, theta, tmp);
-        if (tune_suppressor) { blas::axpy(pmu, phi, tmp); }
+        if (tune_suppressor) { blas::axpy(pmu, *phi, tmp); }
 
         ref(theta, tmp);
 
@@ -269,14 +270,16 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
     count = 0;
-    for (auto &phi: B) {
-      double ind_chi2 = cost(ref, base, chi, phi);
-      double phi2 = blas::norm2(phi);
+    for (auto phi: B) {
+      double ind_chi2 = cost(ref, base, chi, *phi);
+      double phi2 = blas::norm2(*phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
       }
       count++;
     }
+
+    for (auto pb: B) { delete pb; }
 
     // Broadcast the trained parameters
     host_param = device_param.to_host();
