@@ -556,7 +556,6 @@ typedef enum QudaWFlowType_s {
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
   QUDA_EIGEN_EXTLIB,
-  QUDA_MAGMA_EXTLIB,
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 

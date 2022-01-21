@@ -377,10 +377,7 @@ namespace quda
       // mat*C_{m}(x)
       matVec(mat, out, *tmp2);
 
-      Complex d1c(d1, 0.0);
-      Complex d2c(d2, 0.0);
-      Complex d3c(d3, 0.0);
-      blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
+      blas::axpbypczw(d3, *tmp1, d2, *tmp2, d1, out, *tmp1);
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;

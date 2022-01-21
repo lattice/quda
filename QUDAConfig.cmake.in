@@ -5,7 +5,6 @@ include(CMakeFindDependencyMacro)
 set(QUDA_QMP @QUDA_QMP@)
 set(QUDA_MPI @QUDA_MPI@)
 set(QUDA_QIO @QUDA_QIO@)
-set(QUDA_MAGMA @QUDA_MAGMA@)
 set(QUDA_OPENMP @QUDA_OPENMP@)
 
 if( QUDA_QMP AND QUDA_MPI )
@@ -29,9 +28,6 @@ if( QUDA_OPENMP )
 	find_dependency(OpenMP REQUIRED)
 endif()
 
-if( QUDA_MAGMA )
-  find_dependency(MAGMA REQUIRED)
-endif()
 
 enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
