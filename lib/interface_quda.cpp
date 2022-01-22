@@ -103,7 +103,7 @@ CloverField *cloverEigensolver = nullptr;
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
 
-std::vector<ColorSpinorField *> solutionResident;
+std::vector<ColorSpinorField> solutionResident;
 
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
@@ -1393,7 +1393,6 @@ void endQuda(void)
 
   for (int i = 0; i < QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
 
-  for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
 
   if(momResident) delete momResident;
@@ -2749,7 +2748,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  ColorSpinorField *x = nullptr;
   ColorSpinorField *in = nullptr;
   ColorSpinorField *out = nullptr;
 
@@ -2770,24 +2768,22 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorField b(cudaParam);
 
   // now check if we need to invalidate the solutionResident vectors
+  ColorSpinorField *x = nullptr;
   bool invalidate = false;
   if (param->use_resident_solution == 1) {
-    for (auto v : solutionResident)
-      if (b.Precision() != v->Precision() || b.SiteSubset() != v->SiteSubset()) {
+    for (auto &v : solutionResident)
+      if (b.Precision() != v.Precision() || b.SiteSubset() != v.SiteSubset()) {
         invalidate = true;
         break;
       }
 
-    if (invalidate) {
-      for (auto v : solutionResident) if (v) delete v;
-      solutionResident.clear();
-    }
+    if (invalidate) solutionResident.clear();
 
     if (!solutionResident.size()) {
       cudaParam.create = QUDA_NULL_FIELD_CREATE;
-      solutionResident.push_back(new ColorSpinorField(cudaParam)); // solution
+      solutionResident = std::vector<ColorSpinorField>(1, cudaParam);
     }
-    x = solutionResident[0];
+    x = &solutionResident[0];
   } else {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
     x = new ColorSpinorField(cudaParam);
@@ -3088,7 +3084,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.TPSTART(QUDA_PROFILE_FREE);
 
   if (param->use_resident_solution && !param->make_resident_solution) {
-    for (auto v: solutionResident) if (v) delete v;
     solutionResident.clear();
   } else if (!param->make_resident_solution) {
     delete x;
@@ -3608,10 +3603,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   dirac.prefetch(QUDA_CUDA_FIELD_LOCATION);
   diracSloppy.prefetch(QUDA_CUDA_FIELD_LOCATION);
 
-  std::vector<ColorSpinorField*> x;  // Cuda Solutions
-  x.resize(param->num_offset);
-  std::vector<ColorSpinorField*> p;
-  std::unique_ptr<double[]> r2_old(new double[param->num_offset]);
+  std::vector<double> r2_old(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
   const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ?
@@ -3649,26 +3641,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // Create the solution fields filled with zero
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  // now check if we need to invalidate the solutionResident vectors
+  // now check if we need to invalidate the solution vectors
   bool invalidate = false;
-  for (auto v : solutionResident) {
-    if (cudaParam.Precision() != v->Precision()) {
+  for (auto &v : solutionResident) {
+    if (cudaParam.Precision() != v.Precision()) {
       invalidate = true;
       break;
     }
   }
+  if (invalidate) solutionResident.clear();
 
-  if (invalidate) {
-    for (auto v : solutionResident) delete v;
-    solutionResident.clear();
-  }
+  // grow/shirnk resident solutions to be correct size
+  size_t old_size = solutionResident.size();
+  solutionResident.resize(param->num_offset);
+  for (int i = old_size; i < param->num_offset; i++) solutionResident[i] = ColorSpinorField(cudaParam);
 
-  // grow resident solutions to be big enough
-  for (int i=solutionResident.size(); i < param->num_offset; i++) {
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding vector %d to solutionsResident\n", i);
-    solutionResident.push_back(new ColorSpinorField(cudaParam));
-  }
-  for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
+  std::vector<ColorSpinorField> &x = solutionResident;
+  std::vector<ColorSpinorField> p;
+
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
 
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
@@ -3677,9 +3667,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   double nb = blas::norm2(b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
-  if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = blas::norm2(h_b);
-    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
+  } else if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Source: %g\n", nb);
   }
 
   // rescale the source vector to help prevent the onset of underflow
@@ -3707,7 +3698,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   SolverParam solverParam(*param);
   {
     MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
-    cg_m(x, b, p, r2_old.get());
+    cg_m(x, b, p, r2_old);
   }
   solverParam.updateInvertParam(*param);
 
@@ -3797,11 +3788,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
             z[j] = new ColorSpinorField(cudaParam);
           }
 
-          *z[0] = *x[0]; // zero solution already solved
+          *z[0] = x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
-	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
+	  for (int j=1; j<nRefine; j++) *z[j] = x[j];
 #else
-	  for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
+	  for (int j=1; j<nRefine; j++) *z[j] = x[param->num_offset-j];
 #endif
 
           bool orthogonal = true;
@@ -3809,7 +3800,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
           blas::copy(tmp, b);
-          mre(*x[i], tmp, z, q);
+          mre(x[i], tmp, z, q);
 
 	  for(int j=0; j < nRefine; j++) {
 	    delete q[j];
@@ -3827,9 +3818,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         {
           CG cg(*m, *mSloppy, *mSloppy, *mSloppy, solverParam, profileMulti);
           if (i==0)
-            cg(*x[i], b, p[i], r2_old[i]);
+            cg(x[i], b, &p[i], r2_old[i]);
           else
-            cg(*x[i], b);
+            cg(x[i], b);
         }
 
         solverParam.true_res_offset[i] = solverParam.true_res;
@@ -3857,31 +3848,25 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (param->compute_action) {
     Complex action(0);
-    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, *x[i]);
+    for (int i = 0; i < param->num_offset; i++) action += param->residue[i] * blas::cDotProduct(b, x[i]);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }
 
   for(int i=0; i < param->num_offset; i++) {
     if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { // rescale the solution
-      blas::ax(sqrt(nb), *x[i]);
+      blas::ax(sqrt(nb), x[i]);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = blas::norm2(*x[i]);
-      printfQuda("Solution %d = %g\n", i, nx);
-    }
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution %d = %g\n", i, blas::norm2(x[i]));
 
-    if (!param->make_resident_solution) *h_x[i] = *x[i];
+    if (!param->make_resident_solution) *h_x[i] = x[i];
   }
   profileMulti.TPSTOP(QUDA_PROFILE_D2H);
 
   profileMulti.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-  if (!param->make_resident_solution) {
-    for (auto v: solutionResident) if (v) delete v;
-    solutionResident.clear();
-  }
+  if (!param->make_resident_solution) solutionResident.clear();
 
   profileMulti.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
@@ -3896,7 +3881,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   delete dSloppy;
   delete dPre;
   delete dRefine;
-  for (auto& pp : p) delete pp;
 
   profileMulti.TPSTOP(QUDA_PROFILE_FREE);
 
@@ -4456,7 +4440,7 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   for (int i=0; i<nvector; i++) {
     ColorSpinorField &x = *(X[i]);
 
-    if (inv_param->use_resident_solution) x.Even() = *(solutionResident[i]);
+    if (inv_param->use_resident_solution) x.Even() = solutionResident[i];
     else errorQuda("%s requires resident solution", __func__);
 
     // set the odd solution component
@@ -4467,10 +4451,7 @@ void computeStaggeredForceQuda(void *h_mom, double dt, double delta, void *, voi
   profileStaggeredForce.TPSTART(QUDA_PROFILE_FREE);
 
 #if 0
-  if (inv_param->use_resident_solution) {
-    for (auto v : solutionResident) if (v) delete solutionResident[i];
-    solutionResident.clear();
-  }
+  if (inv_param->use_resident_solution) solutionResident.clear();
 #endif
   delete dirac;
 
@@ -4879,7 +4860,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
       profileCloverForce.TPSTART(QUDA_PROFILE_COMPUTE);
       gamma5(x.Even(), x.Even());
     } else {
-      x.Even() = *(solutionResident[i]);
+      x.Even() = solutionResident[i];
     }
 
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
@@ -4942,10 +4923,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **, double 
   }
 
 #if 0
-  if (inv_param->use_resident_solution) {
-    for (auto v : solutionResident) if (v) delete v;
-    solutionResident.clear();
-  }
+  if (inv_param->use_resident_solution) solutionResident.clear();
 #endif
   delete dirac;
   profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);

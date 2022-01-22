@@ -516,6 +516,13 @@ namespace quda {
     virtual bool hermitian() = 0;
 
     /**
+       @brief Generic solver setup and parameter checking
+       @param[in] x Solution vector
+       @param[in] b Source vector
+     */
+    void create(const ColorSpinorField &x, const ColorSpinorField &b);
+
+    /**
        @brief Solver factory
     */
     static Solver *create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
@@ -944,9 +951,9 @@ namespace quda {
      */
     int n_krylov;
 
-    Complex *alpha;
-    Complex **beta;
-    double *gamma;
+    std::vector<Complex> alpha;
+    std::vector<Complex> beta;
+    std::vector<double> gamma;
 
     /**
        Solver uses lazy allocation: this flag to determine whether we have allocated.
@@ -961,6 +968,13 @@ namespace quda {
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
     std::vector<ColorSpinorField*> Ap; // mat * direction vectors
 
+    void computeBeta(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k);
+    void updateAp(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int begin, int size, int k);
+    void orthoDir(std::vector<Complex> &beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline);
+    void backSubs(const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
+                  const std::vector<double> &gamma, std::vector<Complex> &delta, int n);
+    void updateSolution(ColorSpinorField &x, const std::vector<Complex> &alpha, const std::vector<Complex> &beta,
+                        std::vector<double> &gamma, int k, std::vector<ColorSpinorField *> p);
   public:
     GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
         SolverParam &param, TimeProfile &profile);
@@ -979,22 +993,27 @@ namespace quda {
 
   class MR : public Solver {
 
-  private:
-    ColorSpinorField *rp;
-    ColorSpinorField *r_sloppy;
-    ColorSpinorField *Arp;
-    ColorSpinorField *tmpp;
-    ColorSpinorField *tmp_sloppy;
-    ColorSpinorField *x_sloppy;
+    ColorSpinorField r;
+    ColorSpinorField r_sloppy;
+    ColorSpinorField Ar;
+    ColorSpinorField tmp;
+    ColorSpinorField tmp_sloppy;
+    ColorSpinorField x_sloppy;
     bool init;
+
+    /**
+       @brief Allocate persistent fields and parameter checking
+       @param[in] x Solution vector
+       @param[in] b Source vector
+     */
+    void create(const ColorSpinorField &x, const ColorSpinorField &b);
 
   public:
     MR(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~MR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual bool hermitian() { return false; } /** MR is for any linear system */
+    bool hermitian() { return false; } /** MR is for any linear system */
   };
 
   /**
@@ -1256,26 +1275,46 @@ public:
     SolverParam &param;
     TimeProfile &profile;
 
+    /**
+       @brief Generic solver setup and parameter checking
+       @param[in] x Solution vectors
+       @param[in] b Source vector
+     */
+    void create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b);
+
   public:
     MultiShiftSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-      mat(mat), matSloppy(matSloppy), param(param), profile(profile)
-    {
-      ;
-    }
-    virtual ~MultiShiftSolver() { ; }
+      mat(mat), matSloppy(matSloppy), param(param), profile(profile) { }
 
-    virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
-    bool convergence(const double *r2, const double *r2_tol, int n) const;
+    virtual void operator()(std::vector<ColorSpinorField> &out, ColorSpinorField &in) = 0;
+    bool convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const;
   };
 
-/**
- * @brief Multi-Shift Conjugate Gradient Solver.
- */
+  /**
+   * @brief Multi-Shift Conjugate Gradient Solver.
+   */
   class MultiShiftCG : public MultiShiftSolver {
+
+    bool init;
+    bool mixed; // whether we will be using mixed precision
+    bool reliable; // whether we will be using reliable updates or not
+    bool group_update; // whether we will be using solution group updates
+    int num_offset;
+    ColorSpinorField r;
+    ColorSpinorField r_sloppy;
+    ColorSpinorField Ap;
+    std::vector<ColorSpinorField> x_sloppy;
+
+    ColorSpinorField tmp1; // high precision temporary
+    ColorSpinorField tmp1_sloppy; // sloppy precision alias
+    ColorSpinorField tmp2; // high precision temporary for Wilson-like kernels
+    ColorSpinorField tmp2_sloppy; // sloppy precision alias
+
+    void create(std::vector<ColorSpinorField> &x, const ColorSpinorField &b, std::vector<ColorSpinorField> &p);
 
   public:
     MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~MultiShiftCG();
+
     /**
      * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
      *
@@ -1284,7 +1323,8 @@ public:
      * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
      * @param r2_old_array pointer to last values of r2_old for old shifts. Needs to be large enough to hold r2_old for all shifts.
      */
-    void operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b, std::vector<ColorSpinorField*> &p, double* r2_old_array );
+    void operator()(std::vector<ColorSpinorField> &x, ColorSpinorField &b,
+                    std::vector<ColorSpinorField> &p, std::vector<double> &r2_old_array);
 
     /**
      * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
@@ -1292,13 +1332,12 @@ public:
      * @param out std::vector of pointer to solutions for all the shifts.
      * @param in right-hand side.
      */
-    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in){
-      std::unique_ptr<double[]> r2_old(new double[QUDA_MAX_MULTI_SHIFT]);
-      std::vector<ColorSpinorField*> p;
+    void operator()(std::vector<ColorSpinorField> &out, ColorSpinorField &in)
+    {
+      std::vector<double> r2_old(out.size());
+      std::vector<ColorSpinorField> p;
 
-      (*this)(out, in, p, r2_old.get());
-
-      for (auto &pp : p) delete pp;
+      (*this)(out, in, p, r2_old);
     }
 
   };
@@ -1333,7 +1372,7 @@ public:
        @param[in] q Search direction vectors with the operator applied
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
-    void solve(Complex *psi_, std::vector<ColorSpinorField*> &p,
+    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField*> &p,
                std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian);
 
   public:
@@ -1344,7 +1383,6 @@ public:
        @profile Timing profile to use
     */
     MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile);
-    virtual ~MinResExt();
 
     /**
        @param x The optimum for the solution vector.
@@ -1352,7 +1390,7 @@ public:
        @param basis Vector of pairs storing the basis (p,Ap)
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
-		    std::vector<std::pair<ColorSpinorField*,ColorSpinorField*> > basis);
+		    std::vector<std::pair<ColorSpinorField*,ColorSpinorField*> > &basis);
 
     /**
        @param x The optimum for the solution vector.
@@ -1361,8 +1399,8 @@ public:
        @param q The basis vectors multiplied by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
-		    std::vector<ColorSpinorField*> p,
-		    std::vector<ColorSpinorField*> q);
+		    std::vector<ColorSpinorField*> &p,
+		    std::vector<ColorSpinorField*> &q);
   };
 
   using ColorSpinorFieldSet = ColorSpinorField;

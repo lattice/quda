@@ -38,6 +38,12 @@ namespace quda {
     }
   }
 
+  void Solver::create(const ColorSpinorField &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x, b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
+  }
+
   // solver factory
   Solver *Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                          const DiracMatrix &matPrecon, const DiracMatrix &matEig, TimeProfile &profile)
@@ -416,8 +422,14 @@ namespace quda {
     return eps;
   }
 
-  bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
+  void MultiShiftSolver::create(const std::vector<ColorSpinorField> &x, const ColorSpinorField &b)
+  {
+    if (checkPrecision(x[0], b) != param.precision)
+      errorQuda("Precision mismatch %d %d", checkPrecision(x[0],b), param.precision);
+  }
 
+  bool MultiShiftSolver::convergence(const std::vector<double> &r2, const std::vector<double> &r2_tol, int n) const
+  {
     // check the L2 relative residual norm if necessary
     if ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) || (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) {
       for (int i = 0; i < n; i++) {
