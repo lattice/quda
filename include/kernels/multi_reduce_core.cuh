@@ -56,8 +56,8 @@ namespace quda
       const int length_cb;
       const int nParity;
 
-      MultiReduceArg(std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                     std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
+      template <typename V>
+      MultiReduceArg(std::vector<V> &x, std::vector<V> &y, std::vector<V> &z, std::vector<V> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
         ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
@@ -69,13 +69,13 @@ namespace quda
         if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
-          this->X[i] = *x[i];
-          if (Reducer::use_z) this->Z[i] = *z[i];
+          this->X[i] = static_cast<ColorSpinorField&>(x[i]);
+          if (Reducer::use_z) this->Z[i] = static_cast<ColorSpinorField&>(z[i]);
         }
 
         for (int i = 0; i < NYW; ++i) {
-          this->Y[i] = *y[i];
-          if (Reducer::use_w) this->W[i] = *w[i];
+          this->Y[i] = static_cast<ColorSpinorField&>(y[i]);
+          if (Reducer::use_w) this->W[i] = static_cast<ColorSpinorField&>(w[i]);
         }
       }
 

@@ -10,6 +10,9 @@
 namespace quda
 {
 
+  using csfield_ref = std::reference_wrapper<ColorSpinorField>;
+  using csfield_ref_vec = std::vector<csfield_ref>;
+
   namespace colorspinor
   {
 
