@@ -155,7 +155,7 @@ namespace quda
         
         const int volume = is_time_slice ? in.VolumeCB() / in.X(3) : in.VolumeCB();
         
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, parity, dir, dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, t0, is_time_slice, parity, dir, dagger, comm_override);
         
         if (is_time_slice) { arg.resetThreads(volume); }
         

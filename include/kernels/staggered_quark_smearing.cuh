@@ -34,8 +34,11 @@ namespace quda
     const F in_pack; /** input vector field used in packing to be able to independently resetGhost */
     const G U;    /** the gauge field */
     int dir;      /** The direction from which to omit the derivative */
+    int t0;
+    bool ts_compute;
+    int t0_offset;
 
-    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir, 
+    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool ts_compute, int parity, int dir, 
                bool dagger, const int *comm_override) :
 
       DslashArg<Float, nDim>(in, U, parity, dagger, false, 3, false, comm_override),
@@ -43,7 +46,10 @@ namespace quda
       in(in, 3),
       in_pack(in, 3),
       U(U),
-      dir(dir)
+      dir(dir),
+      t0(t0),
+      ts_compute(ts_compute),
+      t0_offset(ts_compute ? in.VolumeCB() / in.X(3) : 0)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in);        // check all orders match
@@ -132,7 +138,7 @@ namespace quda
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     template <KernelType mykernel_type = kernel_type>
-    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int s, int parity)//Kernel3D_impl
     {
       using real = typename mapper<typename Arg::Float>::type;
       using Vector = ColorSpinor<real, Arg::nColor, 1>;
@@ -142,6 +148,8 @@ namespace quda
 
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
+      
+      idx += t0_offset; //nop for the whole lattice
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim);
 
