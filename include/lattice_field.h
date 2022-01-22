@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <functional>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <util_quda.h>
@@ -821,18 +822,24 @@ namespace quda {
     virtual void copy_from_buffer(void *buffer) = 0;
   };
   
+  template <typename T, class U> struct unwrap_impl { using type = U; };
+  template <typename T, class U> struct unwrap_impl<std::reference_wrapper<T>, U> { using type = T; };
+  template <typename T> using unwrap_t = typename unwrap_impl<std::decay_t<T>, T>::type;
+
   /**
      @brief Helper function for determining if the location of the fields is the same.
      @param[in] a Input field
      @param[in] b Input field
      @return If location is unique return the location
    */
-  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
-				     const LatticeField &a, const LatticeField &b) {
+  template <typename T1, typename T2>
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_) {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
+
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations %d %d do not match  (%s:%d in %s())\n",
-		   a.Location(), b.Location(), file, line, func);
+    else errorQuda("Locations %d %d do not match  (%s:%d in %s())", a.Location(), b.Location(), file, line, func);
     return location;
   }
 
@@ -843,9 +850,10 @@ namespace quda {
      @param[in] args List of additional fields to check location on
      @return If location is unique return the location
    */
-  template <typename... Args>
+  template <typename T1, typename T2, typename... Args>
   inline QudaFieldLocation Location_(const char *func, const char *file, int line,
-				     const LatticeField &a, const LatticeField &b, const Args &... args) {
+                                     const T1 &a, const T2 &b, const Args &... args)
+  {
     return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
 
@@ -857,12 +865,14 @@ namespace quda {
      @param[in] b Input field
      @return If precision is unique return the precision
    */
-  inline QudaPrecision Precision_(const char *func, const char *file, int line,
-				  const LatticeField &a, const LatticeField &b) {
+  template <typename T1, typename T2>
+  inline QudaPrecision Precision_(const char *func, const char *file, int line, const T1 &a_, const T2 &b_)
+  {
+    const unwrap_t<T1> &a(a_);
+    const unwrap_t<T2> &b(b_);
     QudaPrecision precision = QUDA_INVALID_PRECISION;
     if (a.Precision() == b.Precision()) precision = a.Precision();
-    else errorQuda("Precisions %d %d do not match (%s:%d in %s())\n",
-		   a.Precision(), b.Precision(), file, line, func);
+    else errorQuda("Precisions %d %d do not match (%s:%d in %s())", a.Precision(), b.Precision(), file, line, func);
     return precision;
   }
 
@@ -873,10 +883,9 @@ namespace quda {
      @param[in] args List of additional fields to check precision on
      @return If precision is unique return the precision
    */
-  template <typename... Args>
-  inline QudaPrecision Precision_(const char *func, const char *file, int line,
-				  const LatticeField &a, const LatticeField &b,
-				  const Args &... args) {
+  template <typename T1, typename T2, typename... Args>
+  inline QudaPrecision Precision_(const char *func, const char *file, int line, const T1 &a, const T2 &b, const Args &... args)
+  {
     return static_cast<QudaPrecision>(Precision_(func,file,line,a,b) & Precision_(func,file,line,a,args...));
   }
 
@@ -887,9 +896,11 @@ namespace quda {
      @param[in] a Input field
      @return true if field is in native order
    */
-  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a)
+  template <typename T>
+  inline bool Native_(const char *func, const char *file, int line, const T &a_)
   {
-    if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())\n", file, line, func);
+    const unwrap_t<T> &a(a_);
+    if (!a.isNative()) errorQuda("Non-native field detected (%s:%d in %s())", file, line, func);
     return true;
   }
 
@@ -899,8 +910,8 @@ namespace quda {
      @param[in] args List of additional fields to check
      @return true if all fields are in native order
    */
-  template <typename... Args>
-  inline bool Native_(const char *func, const char *file, int line, const LatticeField &a, const Args &... args)
+  template <typename T, typename... Args>
+  inline bool Native_(const char *func, const char *file, int line, const T &a, const Args &... args)
   {
     return (Native_(func, file, line, a) & Native_(func, file, line, args...));
   }
