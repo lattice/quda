@@ -797,6 +797,20 @@ extern "C" {
     QudaBLASDataType data_type;   /**< Specifies if using S(C) or D(Z) BLAS type */
     QudaBLASDataOrder data_order; /**< Specifies if using Row or Column major */
   } QudaBLASParam;
+  
+  typedef struct QudaSmearParam_s {
+       /** */
+     double a;
+
+     /** */
+     double b;
+
+     /** */
+     int t0;
+
+     /** */
+     QudaBoolean time_slice_exec;
+  }QudaSmearParam;
 
   /*
    * Interface functions, found in interface_quda.cpp

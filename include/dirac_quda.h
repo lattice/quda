@@ -235,7 +235,7 @@ namespace quda {
        smearing.
     */    
     virtual void SmearOp(ColorSpinorField &, const ColorSpinorField &, 
-                         const double &, const double &, const QudaParity parity = QUDA_INVALID_PARITY) const 
+                         const QudaSmearParam &param, const QudaParity parity = QUDA_INVALID_PARITY) const 
     {
       errorQuda("Not implemented!\n");
     }
@@ -1297,7 +1297,7 @@ public:
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
                         double mu_factor = 0., bool allow_truncation = false) const;
 
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const QudaSmearParam &param, const QudaParity parity = QUDA_INVALID_PARITY) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1529,7 +1529,7 @@ public:
     */
     virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = device::get_default_stream()) const;
     
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const;    
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const QudaSmearParam &param, const QudaParity parity = QUDA_INVALID_PARITY) const;    
   };
 
   // Even-odd preconditioned staggered
@@ -1940,7 +1940,7 @@ public:
 			     const QudaSolutionType) const;
     virtual bool hermitian() const { return true; }
 
-    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b, const QudaParity parity = QUDA_INVALID_PARITY) const;
+    void SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const QudaSmearParam &param, const QudaParity parity = QUDA_INVALID_PARITY) const;
     
     virtual QudaDiracType getDiracType() const { return QUDA_GAUGE_LAPLACE_DIRAC; }
   };

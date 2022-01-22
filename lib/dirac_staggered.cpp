@@ -140,9 +140,13 @@ namespace quda {
   }
   
   void DiracStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const double &a, const double &b, const QudaParity parity) const
+                             const QudaSmearParam &param, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
+    
+    int t0 = param.t0;
+    
+    bool is_time_slice = param.time_slice_exec == QUDA_BOOLEAN_TRUE ? true : false;
 
     int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
@@ -151,7 +155,7 @@ namespace quda {
       if (laplace3D == i) comm_dim[i] = 0;
     }
 
-    ApplyStaggeredQSmear(out, in, *gauge, parity, laplace3D, dagger, comm_dim, profile);
+    ApplyStaggeredQSmear(out, in, *gauge, t0, is_time_slice, parity, laplace3D, dagger, comm_dim, profile);
     flops += 1368ll*in.Volume(); // FIXME
   }  
   

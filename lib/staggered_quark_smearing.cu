@@ -144,7 +144,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
-    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir,
+    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_time_slice, int parity, int dir,
                         bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
@@ -152,11 +152,17 @@ namespace quda
 #if defined(GPU_STAGGERED_DIRAC) // && defined(GPU_LAPLACE) => GPU_QSMEARING
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
+        
+        const int volume = is_time_slice ? in.VolumeCB() / in.X(3) : in.VolumeCB();
+        
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, parity, dir, dagger, comm_override);
+        
+        if (is_time_slice) { arg.resetThreads(volume); }
+        
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
-          staggered_qsmear, in, in.VolumeCB(),
+          staggered_qsmear, in, volume,
           in.GhostFaceCB(), profile);
 #else
         errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash and laplace to be enabled", in.Nspin());
@@ -168,9 +174,7 @@ namespace quda
   };
 
   // Apply the StaggeredQSmear operator
-  // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
-  // Omits direction 'dir' from the operator.
-  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int dir,
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_time_slice, int parity, int dir,
                     bool dagger, const int *comm_override, TimeProfile &profile)
   {
     instantiate<StaggeredQSmearApply>(out, in, U, parity, dir, dagger, comm_override, profile);
