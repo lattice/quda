@@ -552,7 +552,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
-      || param->inv_type_precondition == QUDA_MR_INVERTER) {
+      || param->inv_type_precondition == QUDA_CA_CG_INVERTER || param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
@@ -592,6 +592,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
       P(ca_lambda_max, INVALID_DOUBLE);
+    }
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(ca_basis_precondition, QUDA_POWER_BASIS);
+  P(ca_lambda_min_precondition, 0.0);
+  P(ca_lambda_max_precondition, -1.0);
+#else
+  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+    P(ca_basis_precondition, QUDA_INVALID_BASIS);
+    if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      P(ca_lambda_min_precondition, INVALID_DOUBLE);
+      P(ca_lambda_max_precondition, INVALID_DOUBLE);
     }
   }
 #endif

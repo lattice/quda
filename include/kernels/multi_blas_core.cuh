@@ -177,6 +177,31 @@ namespace quda
     };
 
     /**
+       Functor to perform the operation w = a * x + y
+    */
+    template <typename real>
+    struct multiaxpyz_ : public MultiBlasFunctor<real> {
+      static constexpr memory_access<1, 1, 0, 0> read{ };
+      static constexpr memory_access<0, 0, 0, 1> write{ };
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      static constexpr int NXZ_max = 0;
+      using MultiBlasFunctor<real>::a;
+      multiaxpyz_(int NXZ, int NYW) : MultiBlasFunctor<real>(NXZ, NYW) {}
+
+      template <typename T> __device__ __host__ inline void operator()(T &x, T &y, T &, T &w, int i, int j) const
+      {
+#pragma unroll
+        for (int k = 0; k < x.size(); k++) {
+          if (j == 0) w[k] = y[k];
+          w[k] = a(j, i) * x[k] + w[k];
+        }
+      }
+
+      constexpr int flops() const { return 2; }         //! flops per real element
+    };
+
+    /**
        Functor to perform the operation w = a * x + y  (complex-valued)
     */
     template <typename real>

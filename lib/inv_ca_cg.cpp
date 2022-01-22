@@ -235,10 +235,10 @@ namespace quda {
         profile.TPSTART(QUDA_PROFILE_INIT);
       }
 
-      Q_AQandg = new Complex[param.Nkrylov*(param.Nkrylov+1)];
-      Q_AS = new Complex[param.Nkrylov*param.Nkrylov];
-      alpha = new Complex[param.Nkrylov];
-      beta = new Complex[param.Nkrylov*param.Nkrylov];
+      Q_AQandg = new double[param.Nkrylov * (param.Nkrylov + 1)];
+      Q_AS = new double[param.Nkrylov * param.Nkrylov];
+      alpha = new double[param.Nkrylov];
+      beta = new double[param.Nkrylov * param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
       bool use_source = false; // need to preserve source for residual computation
@@ -294,11 +294,10 @@ namespace quda {
   }
 
   // template!
-  template <int N>
-  void compute_alpha_N(Complex* Q_AQandg, Complex* alpha)
+  template <int N> void compute_alpha_N(double *Q_AQandg, double *alpha)
   {
-    typedef Matrix<Complex, N, N, RowMajor> matrix;
-    typedef Matrix<Complex, N, 1> vector;
+    typedef Matrix<double, N, N, RowMajor> matrix;
+    typedef Matrix<double, N, 1> vector;
 
     matrix matQ_AQ(N,N);
     vector vecg(N);
@@ -341,8 +340,8 @@ namespace quda {
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
 #endif
     default: // failsafe
-      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
-      typedef Matrix<Complex, Dynamic, 1> vector;
+      typedef Matrix<double, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<double, Dynamic, 1> vector;
 
       const int N = Q.size();
       matrix matQ_AQ(N, N);
@@ -368,10 +367,9 @@ namespace quda {
   }
 
   // template!
-  template <int N>
-  void compute_beta_N(Complex* Q_AQandg, Complex* Q_AS, Complex* beta)
+  template <int N> void compute_beta_N(double *Q_AQandg, double *Q_AS, double *beta)
   {
-    typedef Matrix<Complex, N, N, RowMajor> matrix;
+    typedef Matrix<double, N, N, RowMajor> matrix;
 
     matrix matQ_AQ(N,N);
     for (int i=0; i<N; i++) {
@@ -413,7 +411,7 @@ namespace quda {
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
 #endif
     default: // failsafe
-      typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
+      typedef Matrix<double, Dynamic, Dynamic, RowMajor> matrix;
 
       const int N = Q.size();
       matrix matQ_AQ(N, N);
@@ -504,7 +502,7 @@ namespace quda {
       }
     }
 
-    // compute intitial residual depending on whether we have an initial guess or not
+    // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);
       //r = b - Ax0
@@ -627,86 +625,92 @@ namespace quda {
 
         if (n_krylov > 1) {
           // S_1 = m AS_0 + b S_0
-          Complex facs1[] = { m_map, b_map };
-          std::vector<ColorSpinorField*> recur1{AS[0],S[0]};
-          std::vector<ColorSpinorField*> S1{S[1]};
-          blas::zero(*S[1]);
-          blas::caxpy(facs1,recur1,S1);
+          blas::axpbyz(m_map, *AS[0], b_map, *S[0], *S[1]);
           matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
 
           // Enter recursion relation
           if (n_krylov > 2) {
             // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            Complex factors[] = { 2.*m_map, 2.*b_map, -1 };
             for (int k = 2; k < n_krylov; k++) {
-              std::vector<ColorSpinorField*> recur2{AS[k-1],S[k-1],S[k-2]};
-              std::vector<ColorSpinorField*> Sk{S[k]};
-              blas::zero(*S[k]);
-              blas::caxpy(factors, recur2, Sk);
+              blas::axpbypczw(2. * m_map, *AS[k - 1], 2. * b_map, *S[k - 1], -1., *S[k - 2], *S[k]);
               matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
             }
           }
         }
       }
 
-      // first iteration, copy S and AS into Q and AQ
-      if (total_iter == 0) {
-        // first iteration Q = S
-        for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
-        for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
-
-      } else {
-
-
-        // Compute the beta coefficients for updating Q, AQ
-        // 1. compute matrix Q_AS = -Q^\dagger AS
-        // 2. Solve Q_AQ beta = Q_AS
-        std::vector<ColorSpinorField*> R;
-        for (int i = 0; i < n_krylov; i++) R.push_back(S[i]);
-        blas::cDotProduct(Q_AS, AQ, R);
-        for (int i = 0; i < param.Nkrylov*param.Nkrylov; i++) { Q_AS[i] = real(Q_AS[i]); }
-
-        compute_beta();
-
-        // update direction vectors
-        blas::caxpyz(beta, Q, R, Qtmp);
-        for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
-
-        blas::caxpyz(beta, AQ, AS, Qtmp);
-        for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
-      }
-
-      // compute the alpha coefficients
-      // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
-      // 2. Solve Q_AQ alpha = g
-      {
-        std::vector<ColorSpinorField*> Q2;
-        for (int i = 0; i < n_krylov; i++) Q2.push_back(AQ[i]);
-        Q2.push_back(S[0]);
-        blas::cDotProduct(Q_AQandg, Q, Q2);
-
-        for (int i = 0; i < param.Nkrylov*(param.Nkrylov+1); i++) { Q_AQandg[i] = real(Q_AQandg[i]); }
-
-        compute_alpha();
-      }
-
-      // update the solution vector
-      std::vector<ColorSpinorField*> X;
-      X.push_back(&x);
-      blas::caxpy(alpha, Q, X);
-
-      // no need to compute residual vector if only doing a single fixed iteration
-      // perhaps we could save the mat-vec here if we compute "Ap"
-      // vectors when we update p?
+      // we can greatly simplify the workflow for fixed iterations
       if (!fixed_iteration) {
+        // first iteration, copy S and AS into Q and AQ
+        if (total_iter == 0) {
+          // first iteration Q = S
+          for (int i = 0; i < n_krylov; i++) *Q[i] = *S[i];
+          for (int i = 0; i < n_krylov; i++) *AQ[i] = *AS[i];
+
+        } else {
+
+          // Compute the beta coefficients for updating Q, AQ
+          // 1. compute matrix Q_AS = -Q^\dagger AS
+          // 2. Solve Q_AQ beta = Q_AS
+          std::vector<ColorSpinorField *> R(n_krylov);
+          for (int i = 0; i < n_krylov; i++) R[i] = S[i];
+          blas::reDotProduct(Q_AS, AQ, R);
+
+          compute_beta();
+
+          // update direction vectors
+          blas::axpyz(beta, Q, R, Qtmp);
+          for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
+
+          blas::axpyz(beta, AQ, AS, Qtmp);
+          for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
+        }
+
+        // compute the alpha coefficients
+        // 1. Compute Q_AQ = Q^\dagger AQ and g = Q^dagger r = Q^dagger S[0]
+        // 2. Solve Q_AQ alpha = g
+        {
+          std::vector<ColorSpinorField *> Q2(n_krylov + 1);
+          for (int i = 0; i < n_krylov; i++) Q2[i] = AQ[i];
+          Q2[n_krylov] = S[0];
+          blas::reDotProduct(Q_AQandg, Q, Q2);
+
+          compute_alpha();
+        }
+
+        // update the solution vector
+        std::vector<ColorSpinorField *> X = {&x};
+        blas::axpy(alpha, Q, X);
+
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
         std::vector<ColorSpinorField*> S0{S[0]};
 
         // Can we fuse these? We don't need this reduce in all cases...
-        blas::caxpy(alpha, AQ, S0);
+        blas::axpy(alpha, AQ, S0);
         //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
-        /*else*/ r2 = real(Q_AQandg[param.Nkrylov]); // actually the old r2... so we do one more iter than needed...
+        /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
+      } else {
+        // fixed iterations
+        // On the first pass, Q = S; AQ = AQ. We can just skip that.
 
+        // We don't compute beta on the first iteration
+
+        // We do compute the alpha coefficients: this is the same code as above
+        // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
+        // 2. Solve "Q_AQ" alpha = g
+        std::vector<ColorSpinorField *> S2(n_krylov + 1);
+        for (int i = 0; i < n_krylov; i++) S2[i] = AS[i];
+        S2[n_krylov] = S[0];
+        blas::reDotProduct(Q_AQandg, S, S2);
+
+        compute_alpha();
+
+        // update the solution vector
+        std::vector<ColorSpinorField *> X = {&x};
+        blas::axpy(alpha, S, X);
+
+        // no need to update AS
+        r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       }
 
       // NOTE: Because we always carry around the residual from an iteration before, we
@@ -722,6 +726,7 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every n_krylov steps
       // Note: this won't reliable update when the norm _increases_.
       if (total_iter>=param.maxiter || (r2 < stop && !l2_converge) || reliable(rNorm, maxrr, rUpdate, r2, delta)) {
+
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
