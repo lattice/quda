@@ -85,19 +85,23 @@ namespace quda {
       getCoords(x, x_cb, arg.X, parity);
       for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-      if (arg.group && arg.sigma == 0.0) {
+      if (arg.group and arg.sigma == 0.0) {
         // if sigma = 0 then we just set the output matrix to the identity and finish
         Link I;
         setIdentity(&I);
         for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
+      } else if (not arg.group and arg.sigma == 0.0) {
+        // if sigma = 0 then we just set the output matrix to the zero and finish
+        Link O;
+        setZero(&O);
+        for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = O;
       } else {
         for (int mu = 0; mu < 4; mu++) {
           RNGState localState = arg.rng[parity * arg.threads.x + x_cb];
 
           // generate Gaussian distributed su(n) fiueld
-          Link u = gauss_su3<real, Link>(localState);
+          Link u = arg.sigma * gauss_su3<real, Link>(localState);
           if (arg.group) {
-            u = arg.sigma * u;
             expsu3<real>(u);
           }
           arg.U(mu, linkIndex(x, arg.E), parity) = u;
