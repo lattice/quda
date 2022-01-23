@@ -177,6 +177,6 @@ namespace quda
   void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_time_slice, int parity, int dir,
                     bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<StaggeredQSmearApply>(out, in, U, parity, dir, dagger, comm_override, profile);
+    instantiate<StaggeredQSmearApply>(out, in, U, t0, is_time_slice, parity, dir, dagger, comm_override, profile);
   }
 } // namespace quda

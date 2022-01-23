@@ -128,14 +128,12 @@ namespace quda {
     // do nothing
   }
   
-  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const QudaSmearParam &param, const QudaParity parity) const
+  void DiracImprovedStaggered::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, const double &a, const double &b,
+                             const int &t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
     
-    int t0 = param.t0;
-    
-    bool is_time_slice = param.time_slice_exec == QUDA_BOOLEAN_TRUE ? true : false;
+    bool is_time_slice = t0 >= 0 && t0 < in.X(3) ? true : false;
 
     int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative

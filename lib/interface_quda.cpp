@@ -5519,12 +5519,11 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::ax(1e6, *in);
-  
-  QudaSmearParam smp;
 
   double alpha = - (omega * omega) / (4 * n_steps);  
-  smp.a = -alpha;
-  smp.b = (6.0*alpha + 1.0);  
+  const double a = -alpha;
+  const double b = (6.0*alpha + 1.0);
+  const int t0 = -1;  
 
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
@@ -5532,7 +5531,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
     // out(x) = b * in(x) - a * \sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
     // Which gives the use finer control over the operation that DslashXpay and
     // allows us to omit a vector rescaling.
-    laplace_op.Expose()->SmearOp(*out, *in, smp);
+    laplace_op.Expose()->SmearOp(*out, *in, a, b, t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
@@ -5565,7 +5564,7 @@ void performGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int
   saveTuneCache();
 }
 
-void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0)
+void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, const int n_steps, const double width, const int compute_2link, const int t0 /*=-1*/)
 {
   if(n_steps == 0) return;
   
@@ -5669,19 +5668,16 @@ void performTwoLinkGaussianSmearNStep(void *h_in, QudaInvertParam *inv_param, co
   // Scale up the source to prevent underflow
   profileGaussianSmear.TPSTART(QUDA_PROFILE_COMPUTE);
   
-  QudaSmearParam smp;
-  
   const double msq     = 1. / ftmp;  
   const double a       = 6.0 + msq;
-  smp.t0 = t0; 
-  smp.time_slice_exec = QUDA_BOOLEAN_FALSE;
+  const double b       = 0.0;
   
   for (int i = 0; i < n_steps; i++) {
     if (i > 0) std::swap(in, out);
     blas::ax(ftmp, *in); //
     blas::axpy(a, *in, *temp1); //
     
-    qsmear_op.Expose()->SmearOp(*out, *in, smp);
+    qsmear_op.Expose()->SmearOp(*out, *in, a, 0.0, t0);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(*out);
       printfQuda("Step %d, vector norm %e\n", i, norm);

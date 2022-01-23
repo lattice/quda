@@ -51,12 +51,9 @@ namespace quda {
   }
 
   void GaugeLaplace::SmearOp(ColorSpinorField &out, const ColorSpinorField &in, 
-                             const QudaSmearParam &param, const QudaParity parity) const
+                             const double &a, const double &b, const int &t0, const QudaParity parity) const
   {
     checkSpinorAlias(in, out);
-    
-    const double a = param.a;
-    const double b = param.b;
 
     int comm_dim[4] = {};
     // only switch on comms needed for directions with a derivative
