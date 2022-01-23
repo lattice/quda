@@ -177,7 +177,6 @@ namespace quda
   template <typename T, int block_size_x, int block_size_y = 1, int block_size_z = 1, bool batched = false>
   class BlockReduce
   {
-    //using param_t = block_reduce_param<block_size_x, block_size_y, block_size_z, batched>;
     static constexpr int batch_size = !batched ? 1 : block_size_z;
     const int batch;
 

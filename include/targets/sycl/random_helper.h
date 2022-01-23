@@ -3,14 +3,14 @@
 #include <random_quda.h>
 #include <oneapi/mkl/rng/device.hpp>
 
-//#if defined(XORWOW)
-//#elif defined(MRG32k3a)
 namespace drng = oneapi::mkl::rng::device;
 
 namespace quda {
 
   struct RNGState {
     drng::mrg32k3a<1> state;
+    //double next_gauss;
+    //bool next_valid;
   };
 
   /**
@@ -24,8 +24,22 @@ namespace quda {
 			  unsigned long long offset, RNGState &state)
   {
     //curand_init(seed, sequence, offset, &state.state);
-    std::initializer_list<std::uint64_t> num_to_skip = {offset, 8*sequence};
-    state.state = drng::mrg32k3a<1>(seed, num_to_skip);
+    std::array<std::uint32_t, 6> init;
+    for(int i=0; i<6; i++) { init[i] = 12345; }
+    if(seed != 0) {
+      double d1 = 12345.0 * (((unsigned int)seed) ^ 0x55555555);
+      double d2 = 12345.0 * ((seed >> 32) ^ 0xaaaaaaaa);
+      init[0] = fmod(d1, 4294967087.0);
+      init[1] = fmod(d2, 4294967087.0);
+      init[2] = fmod(d1, 4294967087.0);
+      init[3] = fmod(d2, 4294944443.0);
+      init[4] = fmod(d1, 4294944443.0);
+      init[5] = fmod(d2, 4294944443.0);
+    }
+    auto seed_list = {init[0],init[1],init[2],init[3],init[4],init[5]};
+    std::initializer_list<std::uint64_t> num_to_skip = {offset, (1<<12)*sequence};
+    state.state = drng::mrg32k3a<1>(seed_list, num_to_skip);
+    //state.next_valid = false;
   }
 
   template<class Real>
@@ -98,8 +112,22 @@ namespace quda {
     static inline float rand(RNGState &state)
     {
       //curand_normal(&state.state);
+#if 0
+      float x = 0;
+      if(state.next_valid) {
+	x = state.next_gauss;
+	state.next_valid = false;
+      } else {
+	drng::gaussian<float> distr;
+	x = generate(distr, state.state);
+	state.next_gauss = generate(distr, state.state);
+	state.next_valid = true;
+      }
+      return x;
+#else
       drng::gaussian<float> distr;
       return generate(distr, state.state);
+#endif
     }
   };
 
@@ -112,8 +140,22 @@ namespace quda {
     static inline double rand(RNGState &state)
     {
       //curand_normal_double(&state.state);
+#if 0
+      double x = 0;
+      if(state.next_valid) {
+	x = state.next_gauss;
+	state.next_valid = false;
+      } else {
+	drng::gaussian<double> distr;
+	x = generate(distr, state.state);
+	state.next_gauss = generate(distr, state.state);
+	//state.next_valid = true;
+      }
+      return x;
+#else
       drng::gaussian<double> distr;
       return generate(distr, state.state);
+#endif
     }
   };
 
