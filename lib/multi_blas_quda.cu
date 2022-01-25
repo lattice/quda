@@ -309,13 +309,60 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
-    void axpy(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y) {
+    void axpy(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y)
+    {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
+      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 0);
+    }
+
+    void axpy(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
     }
 
-    void axpy_U(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y) {
+    void axpy_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
+      axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
+    }
+
+    void axpy_U_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
+      //                                         which lets us skip some tiles.
+      if (x.size() != y.size())
+      {
+        errorQuda("An optimal block axpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
+      }
+      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 1);
+    }
+
+    void axpy_L_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
+      //                                         which lets us skip some tiles.
+      if (x.size() != y.size())
+      {
+        errorQuda("An optimal block axpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
+      }
+      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), -1);
+    }
+
+    void caxpy_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
+      axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 0);
+    }
+
+    void caxpy_U_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
       //                                         which lets us skip some tiles.
@@ -325,7 +372,8 @@ namespace quda {
       axpy_recurse<multicaxpy_>(a, x, y, range(0,x.size()), range(0,y.size()), 1);
     }
 
-    void axpy_L(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y) {
+    void caxpy_L_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
       //                                         which lets us skip some tiles.
@@ -391,12 +439,12 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
-    void axpyz(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void axpyz_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
     }
 
-    void axpyz_U(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void axpyz_U_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
@@ -408,7 +456,7 @@ namespace quda {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void axpyz_L(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void axpyz_L_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
@@ -420,12 +468,12 @@ namespace quda {
       axpyz_recurse<multiaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1);
     }
 
-    void axpyz(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void caxpyz_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
     }
 
-    void axpyz_U(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void caxpyz_U_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block caxpyz_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
@@ -437,7 +485,7 @@ namespace quda {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void axpyz_L(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z)
+    void axpyz_L_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z)
     {
       if (x.size() != y.size()) {
         errorQuda("An optimal block caxpyz_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
@@ -449,8 +497,8 @@ namespace quda {
       axpyz_recurse<multicaxpyz_>(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, -1);
     }
 
-    void axpyBzpcx(const std::vector<double> &a, csfield_ref_vec &x_, csfield_ref_vec &y_,
-                   const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
+    void axpyBzpcx_impl(const std::vector<double> &a, csfield_ref_vec &&x_, csfield_ref_vec &&y_,
+                        const std::vector<double> &b, ColorSpinorField &z_, const std::vector<double> &c)
     {
       if (y_.size() <= (size_t)max_N_multi_1d()) {
         // swizzle order since we are writing to x_ and y_, but the
@@ -477,8 +525,8 @@ namespace quda {
       }
     }
 
-    void caxpyBxpz(const std::vector<Complex> &a, csfield_ref_vec &x_, ColorSpinorField &y_,
-		   const std::vector<Complex> &b, ColorSpinorField &z_)
+    void caxpyBxpz_impl(const std::vector<Complex> &a, csfield_ref_vec &&x_, ColorSpinorField &y_,
+                        const std::vector<Complex> &b, ColorSpinorField &z_)
     {
       if (x_.size() <= (size_t)max_N_multi_1d() && is_valid_NXZ(x_.size(), false)) // only split if we have to.
       {
@@ -503,37 +551,6 @@ namespace quda {
         caxpyBxpz(a_.first, x.first, y_, b_.first, z_);
         caxpyBxpz(a_.second, x.second, y_, b_.second, z_);
       }
-    }
-
-    void axpy(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y)
-    {
-      // Enter a recursion.
-      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
-      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 0);
-    }
-
-    void axpy_U(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y)
-    {
-      // Enter a recursion.
-      // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
-      //                                         which lets us skip some tiles.
-      if (x.size() != y.size())
-      {
-        errorQuda("An optimal block axpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
-      }
-      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), 1);
-    }
-
-    void axpy_L(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y)
-    {
-      // Enter a recursion.
-      // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
-      //                                         which lets us skip some tiles.
-      if (x.size() != y.size())
-      {
-        errorQuda("An optimal block axpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
-      }
-      axpy_recurse<multiaxpy_>(a, x, y, range(0, x.size()), range(0, y.size()), -1);
     }
 
     // temporary wrappers
@@ -587,7 +604,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpy_U(a_, x_, y_);
+      caxpy_U_impl(a_, std::move(x_), std::move(y_));
     }
 
     void caxpy_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -597,7 +614,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpy_L(a_, x_, y_);
+      caxpy_L_impl(a_, std::move(x_), std::move(y_));
     }
 
     void axpyz(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -611,7 +628,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       std::vector<std::reference_wrapper<ColorSpinorField>> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      axpyz(a_, x_, y_, z_);
+      axpyz_impl(a_, std::move(x_), std::move(y_), std::move(z_));
     }
 
     void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
@@ -625,7 +642,7 @@ namespace quda {
       for (auto &yi : y) y_.push_back(*yi);
       std::vector<std::reference_wrapper<ColorSpinorField>> z_;
       for (auto &zi : z) z_.push_back(*zi);
-      axpyz(a_, x_, y_, z_);
+      caxpyz_impl(a_, std::move(x_), std::move(y_), std::move(z_));
     }
 
     void axpyBzpcx(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
@@ -642,7 +659,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      axpyBzpcx(a_, x_, y_, b_, z, c_);
+      axpyBzpcx_impl(a_, std::move(x_), std::move(y_), b_, z, c_);
     }
 
     void caxpyBxpz(const Complex *a, std::vector<ColorSpinorField*> &x, ColorSpinorField &y,
@@ -655,11 +672,11 @@ namespace quda {
 
       std::vector<std::reference_wrapper<ColorSpinorField>> x_;
       for (auto &xi : x) x_.push_back(*xi);
-      caxpyBxpz(a_, x_, y, b_, z);
+      caxpyBxpz_impl(a_, std::move(x_), y, b_, z);
     }
 
     // Composite field version
-    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
+    void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y){ caxpy(a, x.Components(), y.Components()); }
     void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_U(a, x.Components(), y.Components()); }
     void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_L(a, x.Components(), y.Components()); }
 

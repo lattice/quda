@@ -117,9 +117,22 @@ namespace quda {
               The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
        @param a[in] Matrix of real coefficients
        @param x[in] vector of input ColorSpinorFields
-      @param y[in,out] vector of input/output ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void axpy_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
+
+    /**
+       @brief Overloaded version of block axpy that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void axpy(const std::vector<double> &a, T1 &&x, T2 &&y)
+    {
+      axpy_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
 
     /**
        @brief Compute the block "axpy_U" with over the set of
@@ -133,7 +146,20 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_U(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void axpy_U_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
+
+    /**
+       @brief Wrapper function for block axpy_U that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void axpy_U(const std::vector<double> &a, T1 &&x, T2 &&y)
+    {
+      axpy_U_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
 
     /**
        @brief Compute the block "axpy_L" with over the set of
@@ -147,10 +173,24 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_L(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void axpy_L_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
 
     /**
-       @brief Compute the block "caxpy" with over the set of
+       @brief Wrapper function for block axpy_L that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void axpy_L(const std::vector<double> &a, T1 &&x, T2 &&y)
+    {
+      axpy_L_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
+
+    /**
+       @brief Compute the block "caxpy" with over the s
+et of
        ColorSpinorFields.  E.g., it computes
 
        y = x * a + y
@@ -162,7 +202,20 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void caxpy_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
+
+    /**
+       @brief Wrapper function for block caxpy that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void caxpy(const std::vector<Complex> &a, T1 &&x, T2 &&y)
+    {
+      caxpy_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
 
     /**
        @brief Compute the block "caxpy_U" with over the set of
@@ -176,7 +229,20 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_U(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void caxpy_U_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
+
+    /**
+       @brief Wrapper function for block caxpy_U that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void caxpy_U(const std::vector<Complex> &a, T1 &&x, T2 &&y)
+    {
+      caxpy_U_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
 
     /**
        @brief Compute the block "caxpy_L" with over the set of
@@ -190,7 +256,20 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_L(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y);
+    void caxpy_L_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y);
+
+    /**
+       @brief Wrapper function for block caxpy_L that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void caxpy_L(const std::vector<Complex> &a, T1 &&x, T2 &&y)
+    {
+      caxpy_L_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()});
+    }
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -207,7 +286,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz(const std::vector<double> &a, csfield_ref_vec&x, csfield_ref_vec&y, csfield_ref_vec&z);
+    void axpyz_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block axpyz that allows us to call
+       with any or all arguments being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void axpyz(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      axpyz_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+                 csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -222,7 +316,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec&z);
+    void axpyz_U_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block axpyz_U that allows us to call
+       with any or all arguments being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void axpyz_U(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      axpyz_U_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+              csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -237,7 +346,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z);
+    void axpyz_L_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block axpyz_L that allows us to call
+       with any or all arguments being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void axpyz_L(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      axpyz_L_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+              csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -254,7 +378,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z);
+    void caxpyz_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block caxpyz that allows us to call
+       with any or all arguments being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void caxpyz(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      caxpyz_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+             csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -269,7 +408,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_U(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z);
+    void caxpyz_U_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block caxpyz_U that allows us to call
+       with any or all arguments being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void caxpyz_U(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      caxpyz_U_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+               csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the block "caxpyz" with over the set of
@@ -284,7 +438,22 @@ namespace quda {
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_L(const std::vector<Complex> &a, csfield_ref_vec &x, csfield_ref_vec &y, csfield_ref_vec &z);
+    void caxpyz_L_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, csfield_ref_vec &&y, csfield_ref_vec &&z);
+
+    /**
+       @brief Wrapper function for block caxpyz_L that allows us to call
+       with any or all arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2, typename T3>
+    void caxpyz_L(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
+    {
+      caxpyz_L_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()},
+               csfield_ref_vec{z.begin(), z.end()});
+    }
 
     /**
        @brief Compute the vectorized "axpyBzpcx" with over the set of
@@ -304,8 +473,23 @@ namespace quda {
        @param z[in] input ColorSpinorField
        @param c[in] Array of coefficients
     */
-    void axpyBzpcx(const std::vector<double> &a, csfield_ref_vec &x, csfield_ref_vec &y,
+    void axpyBzpcx_impl(const std::vector<double> &a, csfield_ref_vec &&x, csfield_ref_vec &&y,
 		   const std::vector<double> &b, ColorSpinorField &z, const std::vector<double> &c);
+
+    /**
+       @brief Wrapper function for axpyBzpcx that allows us to call
+       with either x or y, or both arguments, being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void axpyBzpcx(const std::vector<double> &a, T1 &&x, T2 &&y, const std::vector<double> &b,
+                   ColorSpinorField &z, const std::vector<double> &c)
+    {
+      axpyBzpcx_impl(a, csfield_ref_vec{x.begin(), x.end()}, csfield_ref_vec{y.begin(), y.end()}, b, z, c);
+    }
 
     /**
        @brief Compute the vectorized "caxpyBxpz" over the set of
@@ -324,9 +508,24 @@ namespace quda {
        @param y[in,out] input ColorSpinorField
        @param z[in,out] input ColorSpinorField
     */
-    void caxpyBxpz(const std::vector<Complex> &a_, csfield_ref_vec &x_, ColorSpinorField &y_,
-		   const std::vector<Complex> &b_, ColorSpinorField &z_);
+    void caxpyBxpz_impl(const std::vector<Complex> &a, csfield_ref_vec &&x, ColorSpinorField &y,
+		   const std::vector<Complex> &b, ColorSpinorField &z);
 
+
+    /**
+       @brief Wrapper function for axpyBxpz that allows us to call
+       with the x argument being std::vector<ColorSpinorField>.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    template <typename T>
+    void caxpyBxpz(const std::vector<Complex> &a, T &&x, ColorSpinorField &y,
+                  const std::vector<Complex> &b, ColorSpinorField &z)
+    {
+      caxpyBxpz_impl(a, csfield_ref_vec{x.begin(), x.end()}, y, b, z);
+    }
 
     // multi-reduce kernels - defined in multi_reduce.cu
 
@@ -337,7 +536,21 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void reDotProduct(std::vector<double> &result, csfield_ref_vec &a, csfield_ref_vec &b);
+    void reDotProduct_impl(std::vector<double> &result, csfield_ref_vec &&a, csfield_ref_vec &&b);
+
+    /**
+       @brief Wrapper function for reDotProduct that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void reDotProduct(std::vector<double> &result, T1 &&a, T2 &&b)
+    {
+      reDotProduct_impl(result, csfield_ref_vec{a.begin(), a.end()}, csfield_ref_vec{b.begin(), b.end()});
+    }
 
     /**
        @brief Computes the matrix of inner products between the vector set a and the vector set b
@@ -346,7 +559,21 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void cDotProduct(std::vector<Complex> &result, csfield_ref_vec &a, csfield_ref_vec &b);
+    void cDotProduct_impl(std::vector<Complex> &result, csfield_ref_vec &&a, csfield_ref_vec &&b);
+
+    /**
+       @brief Wrapper function for cDotProduct that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void cDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
+    {
+      cDotProduct_impl(result, csfield_ref_vec{a.begin(), a.end()}, csfield_ref_vec{b.begin(), b.end()});
+    }
 
     /**
        @brief Computes the matrix of inner products between the vector
@@ -358,9 +585,23 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct(std::vector<Complex> &result, csfield_ref_vec &a, csfield_ref_vec &b);
-
+    void hDotProduct_impl(std::vector<Complex> &result, csfield_ref_vec &&a, csfield_ref_vec &&b);
+ 
     /**
+       @brief Wrapper function for hDotProduct that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void hDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
+    {
+      hDotProduct_impl(result, csfield_ref_vec{a.begin(), a.end()}, csfield_ref_vec{b.begin(), b.end()});
+    }
+
+   /**
        @brief Computes the matrix of inner products between the vector
        set a and the vector set b.  This routine is specifically for
        the case where the result matrix is guarantted to be Hermitian.
@@ -372,7 +613,21 @@ namespace quda {
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct_Anorm(Complex* result, std::vector<ColorSpinorField*>& a, std::vector<ColorSpinorField*>& b);
+    void hDotProduct_Anorm(std::vector<Complex> &result, csfield_ref_vec &&a, csfield_ref_vec &&b);
+
+    /**
+       @brief Wrapper function for hDotProduct_Anorm that allows us to call
+       with either, or both arguments, being std::vector<ColorSpinorField>.
+
+       @param result[out] Matrix of inner product result[i][j] = (a[j],b[i])
+       @param a[in] set of input ColorSpinorFields
+       @param b[in] set of input ColorSpinorFields
+    */
+    template <typename T1, typename T2>
+    void hDotProduct_Anorm(std::vector<Complex> &result, T1 &&a, T2 &&b)
+    {
+      hDotProduct_Anorm(result, csfield_ref_vec{a.begin(), a.end()}, csfield_ref_vec{b.begin(), b.end()});
+    }
 
     // compatibility wrappers until we switch to
     // std::vector<ColorSpinorField> and

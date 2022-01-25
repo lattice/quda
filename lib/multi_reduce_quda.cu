@@ -601,7 +601,7 @@ namespace quda {
       void postTune() {} // FIXME - use write to determine what needs to be saved
     };
 
-    void reDotProduct(std::vector<double> &result, csfield_ref_vec &x, csfield_ref_vec &y)
+    void reDotProduct_impl(std::vector<double> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -652,7 +652,7 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void cDotProduct(std::vector<Complex> &result, csfield_ref_vec &x, csfield_ref_vec &y)
+    void cDotProduct_impl(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
     {
       auto &x0 = x[0].get();
       auto &y0 = y[0].get();
@@ -703,7 +703,7 @@ namespace quda {
       result = transpose(result_tmp, y.size(), x.size());
     }
 
-    void hDotProduct(std::vector<Complex> &result, csfield_ref_vec &x, csfield_ref_vec &y)
+    void hDotProduct_impl(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
@@ -727,7 +727,7 @@ namespace quda {
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
-    void hDotProduct_Anorm(std::vector<Complex> &result, csfield_ref_vec &x, csfield_ref_vec &y)
+    void hDotProduct_Anorm_impl(std::vector<Complex> &result, csfield_ref_vec &&x, csfield_ref_vec &&y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
@@ -757,7 +757,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      reDotProduct(result_, x_, y_);
+      reDotProduct_impl(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(double));
     }
 
@@ -768,7 +768,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      cDotProduct(result_, x_, y_);
+      cDotProduct_impl(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
     }
 
@@ -779,7 +779,7 @@ namespace quda {
       for (auto &xi : x) x_.push_back(*xi);
       std::vector<std::reference_wrapper<ColorSpinorField>> y_;
       for (auto &yi : y) y_.push_back(*yi);
-      hDotProduct(result_, x_, y_);
+      hDotProduct_impl(result_, std::move(x_), std::move(y_));
       memcpy(result, result_.data(), x.size() * y.size() * sizeof(Complex));
     }
 
