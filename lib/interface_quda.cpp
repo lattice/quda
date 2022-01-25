@@ -108,7 +108,7 @@ std::vector<ColorSpinorField> solutionResident;
 // vector of spinors used for forecasting solutions in HMC
 #define QUDA_MAX_CHRONO 12
 // each entry is one p
-std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
+std::vector< std::vector<ColorSpinorField> > chronoResident(QUDA_MAX_CHRONO);
 
 // Mapped memory buffer used to hold unitarization failures
 static int *num_failures_h = nullptr;
@@ -1374,12 +1374,7 @@ void flushChronoQuda(int i)
   if (i >= QUDA_MAX_CHRONO)
     errorQuda("Requested chrono index %d is outside of max %d\n", i, QUDA_MAX_CHRONO);
 
-  auto &basis = chronoResident[i];
-
-  for (auto v : basis) {
-    if (v)  delete v;
-  }
-  basis.clear();
+  chronoResident[i].clear();
 }
 
 void endQuda(void)
@@ -2913,18 +2908,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       auto &basis = chronoResident[param->chrono_index];
 
-      ColorSpinorParam cs_param(*basis[0]);
-      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
-      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
-      std::vector<ColorSpinorField*> Ap;
-      for (unsigned int k=0; k < basis.size(); k++) {
-        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
-      }
+      ColorSpinorParam cs_param(basis[0]);
+      ColorSpinorField tmp(cs_param);
+      ColorSpinorField tmp2 = out->create_alias(cs_param);
+      std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+        for (unsigned int j=0; j<basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
@@ -2935,14 +2927,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool hermitian = false;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
 
-      blas::copy(*tmp, *in);
-      mre(*out, *tmp, basis, Ap);
-
-      for (auto ap: Ap) {
-        if (ap) delete (ap);
-      }
-      delete tmp;
-      if (tmp2 != out) delete tmp2;
+      blas::copy(tmp, *in);
+      mre(*out, tmp, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -2961,18 +2947,15 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       auto &basis = chronoResident[param->chrono_index];
 
-      ColorSpinorParam cs_param(*basis[0]);
-      std::vector<ColorSpinorField*> Ap;
-      ColorSpinorField *tmp = ColorSpinorField::Create(cs_param);
-      ColorSpinorField *tmp2 = (param->chrono_precision == out->Precision()) ? out : ColorSpinorField::Create(cs_param);
-      for (unsigned int k=0; k < basis.size(); k++) {
-        Ap.emplace_back((ColorSpinorField::Create(cs_param)));
-      }
+      ColorSpinorParam cs_param(basis[0]);
+      std::vector<ColorSpinorField> Ap(basis.size(), cs_param);
+      ColorSpinorField tmp(cs_param);
+      ColorSpinorField tmp2 = out->create_alias(cs_param);
 
       if (param->chrono_precision == param->cuda_prec) {
-        for (unsigned int j=0; j<basis.size(); j++) m(*Ap[j], *basis[j], *tmp, *tmp2);
+        for (unsigned int j=0; j<basis.size(); j++) m(Ap[j], basis[j], tmp, tmp2);
       } else if (param->chrono_precision == param->cuda_prec_sloppy) {
-        for (unsigned int j=0; j<basis.size(); j++) mSloppy(*Ap[j], *basis[j], *tmp, *tmp2);
+        for (unsigned int j=0; j<basis.size(); j++) mSloppy(Ap[j], basis[j], tmp, tmp2);
       } else {
         errorQuda("Unexpected precision %d for chrono vectors (doesn't match outer %d or sloppy precision %d)",
                   param->chrono_precision, param->cuda_prec, param->cuda_prec_sloppy);
@@ -2983,14 +2966,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       bool hermitian = true;
       MinResExt mre(m, orthogonal, apply_mat, hermitian, profileInvert);
 
-      blas::copy(*tmp, *in);
-      mre(*out, *tmp, basis, Ap);
-
-      for (auto ap: Ap) {
-        if (ap) delete(ap);
-      }
-      delete tmp;
-      if (tmp2 != out) delete tmp2;
+      blas::copy(tmp, *in);
+      mre(*out, tmp, basis, Ap);
 
       profileInvert.TPSTOP(QUDA_PROFILE_CHRONO);
     }
@@ -3042,15 +3019,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       if ((int)basis.size() < param->chrono_max_dim) {
         ColorSpinorParam cs_param(*out);
         cs_param.setPrecision(param->chrono_precision);
-        basis.emplace_back(ColorSpinorField::Create(cs_param));
+        basis.emplace_back(cs_param);
       }
 
       // shuffle every entry down one and bring the last to the front
-      ColorSpinorField *tmp = basis[basis.size()-1];
-      for (unsigned int j=basis.size()-1; j>0; j--) basis[j] = basis[j-1];
-        basis[0] = tmp;
+      std::rotate(basis.begin(), basis.end() - 1, basis.end());
     }
-    *(basis[0]) = *out; // set first entry to new solution
+    basis[0] = *out; // set first entry to new solution
   }
   dirac.reconstruct(*x, b, param->solution_type);
 
@@ -3776,23 +3751,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  const int nRefine = param->num_offset - i + 1;
 #endif
 
-          std::vector<ColorSpinorField *> q;
-          q.resize(nRefine);
-          std::vector<ColorSpinorField *> z;
-          z.resize(nRefine);
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
+          std::vector<ColorSpinorField> q(nRefine, cudaParam);
+          std::vector<ColorSpinorField> z(nRefine, cudaParam);
           ColorSpinorField tmp(cudaParam);
 
-          for (int j = 0; j < nRefine; j++) {
-            q[j] = new ColorSpinorField(cudaParam);
-            z[j] = new ColorSpinorField(cudaParam);
-          }
-
-          *z[0] = x[0]; // zero solution already solved
+          z[0] = x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
-	  for (int j=1; j<nRefine; j++) *z[j] = x[j];
+	  for (int j=1; j<nRefine; j++) z[j] = x[j];
 #else
-	  for (int j=1; j<nRefine; j++) *z[j] = x[param->num_offset-j];
+	  for (int j=1; j<nRefine; j++) z[j] = x[param->num_offset-j];
 #endif
 
           bool orthogonal = true;
@@ -3801,11 +3769,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
           blas::copy(tmp, b);
           mre(x[i], tmp, z, q);
-
-	  for(int j=0; j < nRefine; j++) {
-	    delete q[j];
-	    delete z[j];
-	  }
         }
 
         SolverParam solverParam(refineparam);

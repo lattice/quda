@@ -1372,8 +1372,8 @@ public:
        @param[in] q Search direction vectors with the operator applied
        @param[in] hermitian Whether the linear system is Hermitian or not
     */
-    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField*> &p,
-               std::vector<ColorSpinorField*> &q, ColorSpinorField &b, bool hermitian);
+    void solve(std::vector<Complex> &psi_, std::vector<ColorSpinorField> &p,
+               std::vector<ColorSpinorField> &q, ColorSpinorField &b, bool hermitian);
 
   public:
     /**
@@ -1386,21 +1386,13 @@ public:
 
     /**
        @param x The optimum for the solution vector.
-       @param b The source vector in the equation to be solved. This is not preserved and is overwritten by the new residual.
-       @param basis Vector of pairs storing the basis (p,Ap)
-    */
-    void operator()(ColorSpinorField &x, ColorSpinorField &b,
-		    std::vector<std::pair<ColorSpinorField*,ColorSpinorField*> > &basis);
-
-    /**
-       @param x The optimum for the solution vector.
        @param b The source vector in the equation to be solved. This is not preserved.
        @param p The basis vectors in which we are building the guess
        @param q The basis vectors multiplied by A
     */
     void operator()(ColorSpinorField &x, ColorSpinorField &b,
-		    std::vector<ColorSpinorField*> &p,
-		    std::vector<ColorSpinorField*> &q);
+		    std::vector<ColorSpinorField> &p,
+		    std::vector<ColorSpinorField> &q);
   };
 
   using ColorSpinorFieldSet = ColorSpinorField;
