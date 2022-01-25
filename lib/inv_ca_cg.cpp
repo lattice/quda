@@ -461,6 +461,8 @@ namespace quda {
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
+
     const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
@@ -805,6 +807,8 @@ namespace quda {
     }
 
     PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda
