@@ -149,7 +149,7 @@ namespace quda {
     //   ApplyStaggeredQSmear(out.Even(), in.Even(), *gauge, QUDA_EVEN_PARITY, laplace3D, dagger, comm_dim, profile);
     //   ApplyStaggeredQSmear(out.Odd(), in.Odd(), *gauge, QUDA_ODD_PARITY, laplace3D, dagger, comm_dim, profile);    
     // }
-    ApplyStaggeredQSmear(out, in, *gauge, QUDA_INVALID_PARITY, t0, is_time_slice, laplace3D, dagger, comm_dim, profile); // parity is not used
+    ApplyStaggeredQSmear(out, in, *gauge, t0, is_time_slice, QUDA_INVALID_PARITY, laplace3D, dagger, comm_dim, profile); // parity is not used
 
     flops += 1368ll*in.Volume(); // FIXME
   }  
