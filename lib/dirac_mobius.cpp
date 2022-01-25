@@ -563,7 +563,11 @@ namespace quda {
 
     if (extended_gauge == nullptr) { extended_gauge = createExtendedGauge(*gauge, shift2, profile, true); }
 
-    checkDWF(in, out);
+    if (in.Ndim() != 5 || out.Ndim() != 5) {
+      errorQuda("Wrong number of dimensions: in = %d, out = %d.\n", in.Ndim(), out.Ndim());
+    }
+    if (in.X(4) != out.X(4)) { errorQuda("Ls mismatch: in = %d, out = %d.\n", in.X(4), out.X(4)); }
+    // checkDWF(in, out);
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 

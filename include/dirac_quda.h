@@ -182,7 +182,7 @@ namespace quda {
   public:
     Dirac(const DiracParam &param);       // construct from params
     Dirac(const Dirac &dirac);            // Copy construct
-    virtual ~Dirac();                     // virtual destructor as this is a base classe
+    virtual ~Dirac();                     // virtual destructor as this is a base class
     Dirac &operator=(const Dirac &dirac); // assignment
 
     /**

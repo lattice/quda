@@ -10,6 +10,8 @@
 #include <vector>
 #include <memory>
 
+#include <madwf_param.h>
+
 namespace quda {
 
   /**
@@ -223,6 +225,9 @@ namespace quda {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    /** The type of accelerator type to use for preconditioner */
+    QudaAcceleratorType accelerator_type_precondition;
+
     /**< The time taken by the solver */
     double secs;
 
@@ -253,6 +258,12 @@ namespace quda {
         (used internally in MG) or of multigrid_solver (used in the
         interface)*/
     bool mg_instance;
+
+    MadwfParam madwf_param;
+
+    /** Whether to perform advanced features in a preconditioning inversion,
+        including reliable updates, pipelining, and mixed precision. */
+    bool precondition_no_advanced_feature;
 
     /** Which external lib to use in the solver */
     QudaExtLibType extlib_type;
@@ -325,6 +336,7 @@ namespace quda {
       ca_lambda_min_precondition(param.ca_lambda_min_precondition),
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
+      accelerator_type_precondition(param.accelerator_type_precondition),
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
@@ -340,6 +352,7 @@ namespace quda {
       is_preconditioner(false),
       global_reduction(true),
       mg_instance(false),
+      precondition_no_advanced_feature(param.schwarz_type == QUDA_ADDITIVE_SCHWARZ),
       extlib_type(param.extlib_type)
     {
       if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
@@ -353,6 +366,16 @@ namespace quda {
           && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
+
+      madwf_param.madwf_diagonal_suppressor = param.madwf_diagonal_suppressor;
+      madwf_param.madwf_ls = param.madwf_ls;
+      madwf_param.madwf_null_miniter = param.madwf_null_miniter;
+      madwf_param.madwf_null_tol = param.madwf_null_tol;
+      madwf_param.madwf_train_maxiter = param.madwf_train_maxiter;
+      madwf_param.madwf_param_load = param.madwf_param_load == QUDA_BOOLEAN_TRUE;
+      madwf_param.madwf_param_save = param.madwf_param_save == QUDA_BOOLEAN_TRUE;
+      strcpy(madwf_param.madwf_param_infile, param.madwf_param_infile);
+      strcpy(madwf_param.madwf_param_outfile, param.madwf_param_outfile);
     }
 
     SolverParam(const SolverParam &param) :
@@ -403,6 +426,7 @@ namespace quda {
       ca_lambda_min_precondition(param.ca_lambda_min_precondition),
       ca_lambda_max_precondition(param.ca_lambda_max_precondition),
       schwarz_type(param.schwarz_type),
+      accelerator_type_precondition(param.accelerator_type_precondition),
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.precision_ritz),
@@ -418,6 +442,8 @@ namespace quda {
       is_preconditioner(param.is_preconditioner),
       global_reduction(param.global_reduction),
       mg_instance(param.mg_instance),
+      madwf_param(param.madwf_param),
+      precondition_no_advanced_feature(param.precondition_no_advanced_feature),
       extlib_type(param.extlib_type)
     {
       for (int i=0; i<num_offset; i++) {
@@ -505,9 +531,18 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
-    const DiracMatrix &M() { return mat; }
-    const DiracMatrix &Msloppy() { return matSloppy; }
-    const DiracMatrix &Mprecon() { return matPrecon; }
+    virtual void train_param(Solver &, ColorSpinorField &) {
+      // Do nothing
+    }
+
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
+
+    void set_tol(double tol) { param.tol = tol; }
+    void set_maxiter(int maxiter) { param.maxiter = maxiter; }
+
+    const DiracMatrix& M() { return mat; }
+    const DiracMatrix& Msloppy() { return matSloppy; }
+    const DiracMatrix& Mprecon() { return matPrecon; }
     const DiracMatrix &Meig() { return matEig; }
 
     /**
@@ -809,7 +844,7 @@ namespace quda {
 
   class PreconCG : public Solver {
     private:
-      Solver *K;
+      std::shared_ptr<Solver> K;
       SolverParam Kparam; // parameters for preconditioner solve
 
     public:
@@ -831,7 +866,15 @@ namespace quda {
 
       virtual ~PreconCG();
 
-      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in)
+      {
+        std::vector<ColorSpinorField *> v_r(0);
+        this->solve_and_collect(out, in, v_r, 0, 0);
+      }
+
+      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in,
+                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_col);
+
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };
 
