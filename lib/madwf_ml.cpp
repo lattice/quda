@@ -34,9 +34,7 @@ namespace quda
   void MadwfAcc::apply(Solver &base, ColorSpinorField &out, const ColorSpinorField &in)
   {
     madwf_ml::transfer_5d_hh(*forward_tmp, in, device_param, false);
-    pushVerbosity(QUDA_SILENT);
     base(*backward_tmp, *forward_tmp);
-    popVerbosity();
     madwf_ml::transfer_5d_hh(out, *backward_tmp, device_param, true);
 
     blas::axpy(mu, const_cast<ColorSpinorField &>(in), out);

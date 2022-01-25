@@ -36,8 +36,6 @@ namespace quda {
   void DiracDomainWall::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
-    if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
   }
 
   void DiracDomainWall::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
