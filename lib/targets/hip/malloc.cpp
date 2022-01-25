@@ -89,9 +89,9 @@ namespace quda
     const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
-    for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
-      void *ptr = entry->first;
-      MemAlloc a = entry->second;
+    for (auto entry : alloc[type]) {
+      void *ptr = entry.first;
+      MemAlloc a = entry.second;
       printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
                  a.file.c_str(), a.line);
     }
@@ -163,6 +163,16 @@ namespace quda
     return managed;
   }
 
+
+  bool use_qdp_managed()
+  {
+#if defined(QDP_USE_CUDA_MANAGED_MEMORY) || defined(QDP_ENABLE_MANAGED_MEMORY)
+    return true;
+#else
+    return false;
+#endif
+  }
+
   bool is_prefetch_enabled()
   {
     static bool prefetch = false;
@@ -193,7 +203,6 @@ namespace quda
   {
     if (use_managed_memory()) return managed_malloc_(func, file, line, size);
 
-#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -215,10 +224,6 @@ namespace quda
 #endif
 
     return ptr;
-#else
-    // when QDP uses managed memory we can bypass the QDP memory manager
-    return device_pinned_malloc_(func, file, line, size);
-#endif
   }
 
   /**
@@ -381,7 +386,6 @@ namespace quda
       return;
     }
 
-#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
@@ -398,9 +402,6 @@ namespace quda
 #endif
 
     track_free(DEVICE, ptr);
-#else
-    device_pinned_free_(func, file, line, ptr);
-#endif
   }
 
   /**
@@ -546,6 +547,22 @@ namespace quda
                 func);
     }
     return device;
+  }
+
+  void register_pinned_(const char *func, const char *file, int line, void *ptr, size_t bytes)
+  {
+    auto error = hipHostRegister(ptr, bytes, hipHostRegisterDefault);
+    if (error != hipSuccess) {
+      errorQuda("hipHostRegister failed with error %s (%s:%d in %s()", hipGetErrorString(error), file, line, func);
+    }
+  }
+
+  void unregister_pinned_(const char *func, const char *file, int line, void *ptr)
+  {
+    auto error = hipHostUnregister(ptr);
+    if (error != hipSuccess) {
+      errorQuda("hipHostUnregister failed with error %s (%s:%d in %s()", hipGetErrorString(error), file, line, func);
+    }
   }
 
   namespace pool

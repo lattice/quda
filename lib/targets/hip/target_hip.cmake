@@ -97,6 +97,7 @@ target_compile_options(
   PRIVATE -Wall
           -Wextra
           -Wno-unknown-pragmas
+				  -Wno-unused-result
           $<$<CONFIG:STRICT>:-Werror
           -Wno-error=pass-failed>
           $<$<CONFIG:SANITIZE>:-fsanitize=address

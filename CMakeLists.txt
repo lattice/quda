@@ -707,5 +707,6 @@ write_basic_package_version_file(
 	VERSION ${PACKAGE_VERSION}
 	COMPATIBILITY AnyNewerVersion)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfigVersion.cmake ${CMAKE_CURRENT_BINARY_DIR}/QUDAConfig.cmake
 	DESTINATION lib/cmake/QUDA)
+

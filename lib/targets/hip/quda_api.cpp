@@ -55,6 +55,7 @@ namespace quda {
           errorQuda("%s returned %s\n (%s:%s in %s())\n", api_func, last_error_str.c_str(), file, line, func);
         }
         else hipGetLastError(); // Clear the error 
+				
 
       }
 
