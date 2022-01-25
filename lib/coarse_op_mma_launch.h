@@ -243,6 +243,7 @@ namespace quda
       return -1;
     }
 
+    // note --- currently unused, may be revisited in the future
     template <bool query_max = false, class Arg, class Tunable>
     std::enable_if_t<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
@@ -287,7 +288,6 @@ namespace quda
       return -1;
     }
 
-    // note --- currently unused, may be revisited in the future
     template <bool query_max = false, class Arg, class Tunable>
     std::enable_if_t<Arg::fineColor == 96 && Arg::coarseColor == 96 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)
@@ -527,6 +527,7 @@ namespace quda
       return -1;
     }
 
+    // note --- currently unused, may be revisited in the future
     template <bool query_max = false, class Arg, class Tunable>
     std::enable_if_t<Arg::fineColor == 64 && Arg::coarseColor == 64 && Arg::fineSpin == 2 && Arg::coarseSpin == 2, int>
     launch_compute_vuv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const qudaStream_t &stream, Tunable &tunable)

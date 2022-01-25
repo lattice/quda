@@ -100,7 +100,10 @@ namespace quda {
         if (d < V.Ndim() - 1) strcat(aux, "x");
       }
 
-      if (aggregate_size == 1) errorQuda("Invalid MG aggregate size %d", aggregate_size);
+      if (aggregate_size == 1) errorQuda("Invalid MG aggregate size %d, cannot be 1", aggregate_size);
+      if (aggregate_size % 2 != 0) errorQuda("Invalid MG aggregate size %d, must be even", aggregate_size);
+      if (aggregate_size > 1024) errorQuda("Invalid MG aggregate size %d, must be <= 1024", aggregate_size);
+
       nBlock = (V.Volume()/aggregate_size) * chiral_blocks;
 
       strcat(aux, ",n_block_ortho=");

@@ -330,6 +330,15 @@ extern "C" {
     /** Maximum eigenvalue for Chebyshev CA basis */
     double ca_lambda_max;
 
+    /** Basis for CA algorithms in a preconditioned solver */
+    QudaCABasis ca_basis_precondition;
+
+    /** Minimum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_min_precondition;
+
+    /** Maximum eigenvalue for Chebyshev CA basis in a preconditioner solver */
+    double ca_lambda_max_precondition;
+
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
 
@@ -394,7 +403,7 @@ extern "C" {
     /** Precision to store the chronological basis in */
     QudaPrecision chrono_precision;
 
-    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    /** Which external library to use in the linear solvers (Eigen) */
     QudaExtLibType extlib_type;
 
     /** Whether to use the platform native or generic BLAS / LAPACK */
@@ -541,7 +550,7 @@ extern "C" {
     /**< The time taken by the eigensolver setup */
     double secs;
 
-    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
   } QudaEigParam;
@@ -731,6 +740,12 @@ extern "C" {
 
     /** Boolean for aggregation type, implies staggered or not */
     QudaTransferType transfer_type[QUDA_MAX_MG_LEVEL];
+
+    /** Whether or not to let MG coarsening drop improvements, for ex dropping long links in small aggregation dimensions */
+    QudaBoolean allow_truncation;
+
+    /** Whether or not to use the dagger approximation for the KD preconditioned operator */
+    QudaBoolean staggered_kd_dagger_approximation;
 
     /** Whether to use tensor cores (if available) */
     QudaBoolean use_mma;
@@ -1571,13 +1586,6 @@ extern "C" {
    */
   void flushChronoQuda(int index);
 
-  /**
-  * Open/Close MAGMA library
-  *
-  **/
-  void openMagma();
-
-  void closeMagma();
 
   /**
   * Create deflation solver resources.

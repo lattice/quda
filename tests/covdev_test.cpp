@@ -30,7 +30,7 @@ cpuGaugeField *cpuLink = nullptr;
 std::unique_ptr<ColorSpinorField> spinor, spinorOut, spinorRef;
 std::unique_ptr<ColorSpinorField> cudaSpinor, cudaSpinorOut;
 
-ColorSpinorField *tmp;
+std::unique_ptr<ColorSpinorField> tmp;
 
 void *links[4];
 
@@ -106,7 +106,6 @@ void init(int argc, char **argv)
   printfQuda("Sending fields to GPU...");
 
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  csParam.pad = inv_param.sp_pad;
   csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   csParam.location = QUDA_CUDA_FIELD_LOCATION;
 

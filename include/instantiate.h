@@ -21,8 +21,8 @@ namespace quda
 #endif
 
   struct ReconstructFull {
-    static constexpr std::array<QudaReconstructType, 5> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8};
+    static constexpr std::array<QudaReconstructType, 6> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8, QUDA_RECONSTRUCT_10};
   };
 
   struct ReconstructWilson {
