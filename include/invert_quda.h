@@ -910,7 +910,7 @@ namespace quda {
     /**
        Internal routine for performing the MR part of BiCGstab-L
      */
-    void computeMR(ColorSpinorField &x_sloppy);
+    void computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration);
 
     /**
        Legacy routines that encapsulate the original pipelined Gram-Schmit.

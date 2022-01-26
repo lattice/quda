@@ -16,7 +16,7 @@
 namespace quda {
 
   // Compute the MR portion of BiCGstab-L
-  void BiCGstabL::computeMR(ColorSpinorField &x_sloppy)
+  void BiCGstabL::computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration)
   {
     using matrix = Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>;
     using vector = Matrix<std::complex<double>, Dynamic, 1>;
@@ -68,33 +68,49 @@ namespace quda {
 
     Complex gamma_[n_krylov];
 
-    // update u
+    if (!fixed_iteration)
     {
-      // u = u[0] - \sum_{j=1}^L \gamma_L u_L
-      for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
 
-      std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
-      std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+      // update u
+      {
+        // u = u[0] - \sum_{j=1}^L \gamma_L u_L
+        for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma(i); }
 
-      blas::caxpy(gamma_, u_, u0);
+        std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
+        std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
+
+        blas::caxpy(gamma_, u_, u0);
+      }
+
+      // update x and r
+      {
+        // x = x[0] + \sum_{j=1}^L \gamma_L r_{L-1}
+        // r = r[0] - \sum_{j=1}^L \gamma_L r_L
+        // we see that if we're a bit clever with zero padding we can
+        // reuse r between the two updates.
+        Complex gamma_for_x[n_krylov + 1];
+        for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
+        gamma_for_x[n_krylov] = 0; // do not want to update with last r
+
+        Complex gamma_for_r[n_krylov + 1];
+        gamma_for_r[0] = 0; // do not want to update with first r
+        for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
+
+        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
+      }
+    } else {
+      // fixed iteration, only need to update x
+      for (int i = 0; i < n_krylov; i++) {
+        gamma_[i] = gamma(i);
+      }
+
+      std::vector<ColorSpinorField*> r_(r.begin(), r.end() - 1);
+      std::vector<ColorSpinorField*> x_sloppy_(1);
+      x_sloppy_[0] = &x_sloppy;
+
+      blas::caxpy(gamma_, r_, x_sloppy_);
     }
 
-    // update x and r
-    {
-      // x = x[0] + \sum_{j=1}^L \gamma_L r_{L-1}
-      // r = r[0] - \sum_{j=1}^L \gamma_L r_L
-      // we see that if we're a bit clever with zero padding we can
-      // reuse r between the two updates.
-      Complex gamma_for_x[n_krylov + 1];
-      for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
-      gamma_for_x[n_krylov] = 0; // do not want to update with last r
-
-      Complex gamma_for_r[n_krylov + 1];
-      gamma_for_r[0] = 0; // do not want to update with first r
-      for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
-
-      blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
-    }
   }
 
   // Utility functions for Gram-Schmidt. Based on GCR functions.
@@ -493,7 +509,9 @@ namespace quda {
       init = true; 
     }
     
-    double b2 = blas::norm2(b); // norm sq of source.
+    // compute b2, but only if we need to
+    bool fixed_iteration = param.sloppy_converge && n_krylov == param.maxiter && !param.compute_true_res;
+    double b2 = !fixed_iteration ? blas::norm2(b) : 1.0; // norm sq of source.
     double r2;                  // norm sq of residual
     
     ColorSpinorField &r_full = *r_fullp;
@@ -534,8 +552,13 @@ namespace quda {
     // Compute initial residual depending on whether we have an initial guess or not.
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_full, x, y); // r[0] = Ax
-      r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
-      blas::copy(y, x);
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r_full); // r = b - Ax, return norm.
+      } else {
+        blas::xpay(b, -1.0, r_full);
+        r2 = b2; // dummy setting
+      }
+      blas::copy(y, x); // we accumulate into y
     } else {
       blas::copy(r_full, b); // r[0] = b
       r2 = b2;
@@ -549,13 +572,13 @@ namespace quda {
 
       // Compute r_defl = RHS - A * LHS
       mat(r_full, x, temp);
-      //if (!fixed_iteration) {
+      if (!fixed_iteration) {
         r2 = blas::xmyNorm(b, r_full);
-        blas::copy(y, x);
-      //} else {
-      //  blas::xpay(b, -1.0, r_full);
-      //  r2 = b2; // dummy setting
-      //}
+      } else {
+        blas::xpay(b, -1.0, r_full);
+        r2 = b2; // dummy setting
+      }
+      blas::copy(y, x);
     }
     
     // Check to see that we're not trying to invert on a zero-field source
@@ -628,7 +651,7 @@ namespace quda {
     alpha = 0.0;
     omega = 1.0;
     
-    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver.
+    double stop = !fixed_iteration ? stopping(param.tol, b2, param.residual_type) : 0.0; // stopping condition of solver.
     
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -650,7 +673,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     
     // count iteration counts
-    int k = 0; 
+    int total_iter = 0; 
     
     // Various variables related to reliable updates.
     int rUpdate = 0; // count reliable updates. 
@@ -659,8 +682,8 @@ namespace quda {
     double maxrr = rNorm; // The maximum residual norm since the last reliable update.
     double maxrx = rNorm; // The same. Would be different if we did 'x' reliable updates.
     
-    PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res); 
-    while(!convergence(r2, 0.0, stop, 0.0) && k < param.maxiter) {
+    PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res); 
+    while(!convergence(r2, 0.0, stop, 0.0) && total_iter < param.maxiter) {
       
       // rho0 = -omega*rho0;
       rho0 *= -omega;
@@ -712,32 +735,35 @@ namespace quda {
         
         // r[j+1] = A r[j], x = x + alpha*u[0]
         matSloppy(*r[j+1], *r[j], temp);
-	dslash::aux_worker = NULL;
+        dslash::aux_worker = NULL;
 
       } // End BiCG part.
 
       // Perform the MR portion of BiCGstab-L
-      computeMR(x_sloppy);
+      // if we're doing a fixed number of iterations, we only need to update x
+      computeMR(x_sloppy, fixed_iteration);
 
       // Legacy version matching the BiCGstab-L paper which performs
       // an explicit Gram-Schmidt for the MR portion
       // legacyComputeMR(x_sloppy);
 
-      // sigma[0] = r_0^2
-      sigma[0] = blas::norm2(*r[0]);
-      r2 = sigma[0];
-      
-      // Check the heavy quark residual if we need to.
-      if (use_heavy_quark_res && k%heavy_quark_check==0) {
-        if (&x != &x_sloppy)
-        {
-          blas::copy(temp,y);
-          heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, *r[0]).z);
-        }
-        else
-        {
-           blas::copy(r_full, *r[0]);
-           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r_full).z);
+      if (!fixed_iteration) {
+        // sigma[0] = r_0^2
+        sigma[0] = blas::norm2(*r[0]);
+        r2 = sigma[0];
+        
+        // Check the heavy quark residual if we need to.
+        if (use_heavy_quark_res && total_iter % heavy_quark_check==0) {
+          if (&x != &x_sloppy)
+          {
+            blas::copy(temp,y);
+            heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x_sloppy, temp, *r[0]).z);
+          }
+          else
+          {
+             blas::copy(r_full, *r[0]);
+             heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r_full).z);
+          }
         }
       }
       
@@ -747,14 +773,16 @@ namespace quda {
       // updated (depending on if you're using pipelining or not). In BiCGstab-L, there's only
       // one place (for now) to get the updated residual, so we just do away with 'updateR'.
       // Further remark: "reliable" updates rNorm, maxrr, maxrx!! 
-      if (reliable(rNorm, maxrx, maxrr, r2, delta))
+      if (total_iter >= param.maxiter || r2 < stop || reliable(rNorm, maxrx, maxrr, r2, delta))
       {
+        if ((r2 < stop || total_iter >= param.maxiter) && param.sloppy_converge) break;
+       
         if (x.Precision() != x_sloppy.Precision())
         {
           blas::copy(x, x_sloppy);
         }
-        
-        blas::xpy(x, y); // swap these around? (copied from bicgstab)
+
+        blas::xpy(x, y);
         
         // Don't do aux work!
         dslash::aux_worker = NULL;
@@ -782,8 +810,8 @@ namespace quda {
       }
       
       // Check convergence.
-      k += n_krylov;
-      PrintStats(solver_name.c_str(), k, r2, b2, heavy_quark_res);
+      total_iter += n_krylov;
+      PrintStats(solver_name.c_str(), total_iter, r2, b2, heavy_quark_res);
     } // Done iterating.
     
     if (x.Precision() != x_sloppy.Precision())
@@ -791,18 +819,20 @@ namespace quda {
       blas::copy(x, x_sloppy);
     }
     
+
     blas::xpy(y, x);
-    
+
+    // otherwise we're only doing 
     // Done with compute, begin the epilogue.
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matEig.flops())*1e-9;
     param.gflops = gflops;
-    param.iter += k;
+    param.iter += total_iter;
 
-    if (k >= param.maxiter) // >= if n_krylov doesn't divide max iter.
+    if (total_iter >= param.maxiter) // >= if n_krylov doesn't divide max iter.
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // Print number of reliable updates.
@@ -835,7 +865,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
     
     // ...yup...
-    PrintSummary(solver_name.c_str(), k, r2, b2, stop, param.tol_hq);
+    PrintSummary(solver_name.c_str(), total_iter, r2, b2, stop, param.tol_hq);
     
     // Done!
     profile.TPSTOP(QUDA_PROFILE_FREE);
