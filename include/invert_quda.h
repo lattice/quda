@@ -531,10 +531,20 @@ namespace quda {
 
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
+    /**
+      @brief a virtual method that performs the necessary training/preparation at the beginning of a solve.
+        The default here is a no-op.
+      @param Solver the solver to be used to collect the null space vectors.
+      @param ColorSpinorField the vector used to perform the training.
+     */
     virtual void train_param(Solver &, ColorSpinorField &) {
       // Do nothing
     }
 
+    /**
+      @brief a virtual method that performs the inversion and collect some vectors.
+        The default here is a no-op and should not be called.
+     */
     virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
 
     void set_tol(double tol) { param.tol = tol; }
@@ -859,8 +869,16 @@ namespace quda {
         this->solve_and_collect(out, in, v_r, 0, 0);
       }
 
+      /**
+        @brief a virtual method that performs the inversion and collect the r vectors in PCG.
+        @param out the output vector
+        @param in the input vector
+        @param v_r the series of vectors that is to be collected
+        @param collect_miniter minimal iteration start from which the r vectors are to be collected
+        @param collect_tol maxiter tolerance start from which the r vectors are to be collected 
+       */
       virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in,
-                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_col);
+                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_tol);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };

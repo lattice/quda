@@ -171,17 +171,13 @@ namespace quda
         chi2 += cost(ref, base, chi, *phi);
         // ATx(ATphi, *phi, T);
         madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-        pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
-        popVerbosity();
 
         ref(Mchi, chi);
 
         // ATx(ATMchi, Mchi, T);
         madwf_ml::transfer_5d_hh(*forward_tmp, Mchi, device_param, false);
-        pushVerbosity(QUDA_SILENT);
         base(ATMchi, *forward_tmp);
-        popVerbosity();
 
         // d1 = A * T * phi -x- M * chi
         madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
@@ -204,18 +200,14 @@ namespace quda
 
         // ATx(ATphi, *phi, T);
         madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
-        pushVerbosity(QUDA_SILENT);
         base(ATphi, *forward_tmp);
-        popVerbosity();
 
         // D' * A * T * phi
         madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
 
         // ATx(ADphi, *phi, P);
         madwf_ml::transfer_5d_hh(*forward_tmp, *phi, P, false);
-        pushVerbosity(QUDA_SILENT);
         base(ADphi, *forward_tmp);
-        popVerbosity();
 
         // T' * A * D * phi
         madwf_ml::transfer_5d_hh(tmp, ADphi, device_param, true);

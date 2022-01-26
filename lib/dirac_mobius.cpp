@@ -37,6 +37,19 @@ namespace quda {
     if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
   }
 
+  void DiracMobius::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if (zMobius) {
+      if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
+      if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
+    } else {
+      if (in.X(4) != out.X(4)) {
+        errorQuda("5th dimension size mismatch: in.X(4) = %d, out.X(4) = %d", in.X(4), out.X(4));
+      }
+    }
+  }
+
   // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobius::Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
@@ -563,12 +576,7 @@ namespace quda {
 
     if (extended_gauge == nullptr) { extended_gauge = createExtendedGauge(*gauge, shift2, profile, true); }
 
-    if (in.Ndim() != 5 || out.Ndim() != 5) {
-      errorQuda("Wrong number of dimensions: in = %d, out = %d.\n", in.Ndim(), out.Ndim());
-    }
-    if (in.X(4) != out.X(4)) { errorQuda("Ls mismatch: in = %d, out = %d.\n", in.X(4), out.X(4)); }
-    // checkDWF(in, out);
-    // checkParitySpinor(in, out);
+    checkDWF(in, out);
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
@@ -698,6 +706,13 @@ namespace quda {
     }
     m5inv_fac = 0.5 / (1. + factor);                           // 0.5 for the spin project factor
     sherman_morrison_fac = -0.5 / (1. + sherman_morrison_fac); // 0.5 for the spin project factor
+  }
+
+  void DiracMobiusEofa::checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if (in.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, in.X(4));
+    if (out.X(4) != Ls) errorQuda("Expected Ls = %d, not %d\n", Ls, out.X(4));
   }
 
   void DiracMobiusEofa::m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
