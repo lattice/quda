@@ -66,7 +66,7 @@ namespace quda {
     // Update omega for the next BiCG iteration
     omega = gamma(n_krylov-1);
 
-    Complex gamma_[n_krylov];
+    std::vector<Complex> gamma_(n_krylov);
 
     if (!fixed_iteration)
     {
@@ -79,7 +79,7 @@ namespace quda {
         std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
         std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
 
-        blas::caxpy(gamma_, u_, u0);
+        blas::caxpy(gamma_.data(), u_, u0);
       }
 
       // update x and r
@@ -88,15 +88,15 @@ namespace quda {
         // r = r[0] - \sum_{j=1}^L \gamma_L r_L
         // we see that if we're a bit clever with zero padding we can
         // reuse r between the two updates.
-        Complex gamma_for_x[n_krylov + 1];
+        std::vector<Complex> gamma_for_x(n_krylov + 1);
         for (int i = 0; i < n_krylov; i++) gamma_for_x[i] = gamma(i);
         gamma_for_x[n_krylov] = 0; // do not want to update with last r
 
-        Complex gamma_for_r[n_krylov + 1];
+        std::vector<Complex> gamma_for_r(n_krylov + 1);
         gamma_for_r[0] = 0; // do not want to update with first r
         for (int i = 0; i < n_krylov; i++) gamma_for_r[i+1] = -gamma(i);
 
-        blas::caxpyBxpz(gamma_for_x, r, x_sloppy, gamma_for_r, *r[0]);
+        blas::caxpyBxpz(gamma_for_x.data(), r, x_sloppy, gamma_for_r.data(), *r[0]);
       }
     } else {
       // fixed iteration, only need to update x
@@ -108,7 +108,7 @@ namespace quda {
       std::vector<ColorSpinorField*> x_sloppy_(1);
       x_sloppy_[0] = &x_sloppy;
 
-      blas::caxpy(gamma_, r_, x_sloppy_);
+      blas::caxpy(gamma_.data(), r_, x_sloppy_);
     }
 
   }
@@ -118,7 +118,7 @@ namespace quda {
 
   void BiCGstabL::computeTau(int begin, int size, int j)
   {
-    Complex *Tau = new Complex[size];
+    std::vector<Complex> Tau(size);
     std::vector<ColorSpinorField*> a(size), b(1);
     for (int k=0; k<size; k++)
     {
@@ -126,29 +126,27 @@ namespace quda {
       Tau[k] = 0;
     }
     b[0] = r[j];
-    blas::cDotProduct(Tau, a, b); // vectorized dot product
+    blas::cDotProduct(Tau.data(), a, b); // vectorized dot product
 
     for (int k=0; k<size; k++)
     {
-      tau[begin+k][j] = Tau[k]/sigma[begin+k];
+      tau[(begin + k) * (n_krylov + 1) + j] = Tau[k]/sigma[begin+k];
     }
-    delete []Tau;
   }
   
   void BiCGstabL::updateR(int begin, int size, int j)
   {
-    Complex *tau_ = new Complex[size];
+    std::vector<Complex> tau_(size);
     for (int i=0; i<size; i++)
     {
-      tau_[i] = -tau[i+begin][j];
+      tau_[i] = -tau[(i+begin) * (n_krylov + 1) + j];
     }
 
     std::vector<ColorSpinorField*> r_(r.begin() + begin, r.begin() + begin + size);
     std::vector<ColorSpinorField*> rj(r.begin() + j, r.begin() + j + 1);
 
-    blas::caxpy(tau_, r_, rj);
+    blas::caxpy(tau_.data(), r_, rj);
 
-    delete[] tau_;
   }
 
   /**
@@ -179,8 +177,8 @@ namespace quda {
           case 0: // no kernel fusion
             for (int i=1; i<j; i++) // 5 (j-2) memory transactions here. Start at 1 b/c bicgstabl convention.
             { 
-              tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
-              blas::caxpy(-tau[i][j], *r[i], *r[j]);
+              tau[i * (n_krylov + 1) + j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
+              blas::caxpy(-tau[i * (n_krylov + 1) + j], *r[i], *r[j]);
             }
             break;
           case 1: // basic kernel fusion
@@ -188,12 +186,12 @@ namespace quda {
             {
               break;
             }
-            tau[1][j] = blas::cDotProduct(*r[1], *r[j])/sigma[1];
+            tau[1 * (n_krylov + 1) + j] = blas::cDotProduct(*r[1], *r[j])/sigma[1];
             for (int i=1; i<j-1; i++) // 4 (j-2) memory transactions here. start at 1.
             {
-              tau[i+1][j] = blas::caxpyDotzy(-tau[i][j], *r[i], *r[j], *r[i+1])/sigma[i+1];
+              tau[(i+1) * (n_krylov + 1) + j] = blas::caxpyDotzy(-tau[i * (n_krylov + 1) + j], *r[i], *r[j], *r[i+1])/sigma[i+1];
             }
-            blas::caxpy(-tau[j-1][j], *r[j-1], *r[j]);
+            blas::caxpy(-tau[(j-1) * (n_krylov + 1) + j], *r[j-1], *r[j]);
             break;
         default:
             {
@@ -242,14 +240,14 @@ namespace quda {
     for (int j = n_krylov - 1; j > 0; j--) {
       // Internal def: gamma[j] = gamma'_j - \sum_{i = j+1 to n_krylov} tau_ji gamma_i
       gamma[j] = gamma_prime[j];
-      for (int i = j + 1; i <= n_krylov; i++) { gamma[j] = gamma[j] - tau[j][i] * gamma[i]; }
+      for (int i = j + 1; i <= n_krylov; i++) { gamma[j] = gamma[j] - tau[j * (n_krylov + 1) + i] * gamma[i]; }
     }
 
     // gamma'' = T S gamma. Check paper for defn of S.
     for (int j = 1; j < n_krylov; j++) {
       gamma_prime_prime[j] = gamma[j+1];
       for (int i = j + 1; i < n_krylov; i++) {
-        gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j][i]*gamma[i+1];
+        gamma_prime_prime[j] = gamma_prime_prime[j] + tau[j * (n_krylov + 1) + i]*gamma[i+1];
       }
     }
 
@@ -259,15 +257,13 @@ namespace quda {
     // formerly updateUEnd
     {
       // for (j = 0; j < n_krylov; j++) { caxpy(-gamma[j], *u[j+1], *u[0]); }
-      Complex *gamma_ = new Complex[n_krylov];
+      std::vector<Complex> gamma_(n_krylov);
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
 
       std::vector<ColorSpinorField*> u_(u.begin() + 1, u.end());
       std::vector<ColorSpinorField*> u0(u.begin(), u.begin() + 1);
 
-      blas::caxpy(gamma_, u_, u0);
-
-      delete[] gamma_;
+      blas::caxpy(gamma_.data(), u_, u0);
     }
 
     // formerly updateXREnd
@@ -283,8 +279,8 @@ namespace quda {
       // the alternative way would be un-fusing some calls, which would require
       // loading and saving x twice. In a solve where the sloppy precision is lower than
       // the full precision, this can be a killer.
-      Complex *gamma_prime_prime_ = new Complex[n_krylov + 1];
-      Complex *gamma_prime_ = new Complex[n_krylov + 1];
+      std::vector<Complex> gamma_prime_prime_(n_krylov + 1);
+      std::vector<Complex> gamma_prime_(n_krylov + 1);
       gamma_prime_prime_[0] = gamma[1];
       gamma_prime_prime_[n_krylov] = 0.0; // x never gets updated with r[n_krylov]
       gamma_prime_[0] = 0.0; // r[0] never gets updated with r[0]... obvs.
@@ -293,10 +289,7 @@ namespace quda {
         gamma_prime_prime_[i] = gamma_prime_prime[i];
         gamma_prime_[i] = -gamma_prime[i];
       }
-      blas::caxpyBxpz(gamma_prime_prime_, r, x_sloppy, gamma_prime_, *r[0]);
-      
-      delete[] gamma_prime_prime_;
-      delete[] gamma_prime_;
+      blas::caxpyBxpz(gamma_prime_prime_.data(), r, x_sloppy, gamma_prime_.data(), *r[0]);
 
     }
   }
@@ -327,8 +320,8 @@ namespace quda {
     std::vector<ColorSpinorField*> &r;
     std::vector<ColorSpinorField*> &u;
 
-    Complex* alpha;
-    Complex* beta;
+    Complex& alpha;
+    Complex& beta;
     
     BiCGstabLUpdateType update_type;
     
@@ -347,7 +340,7 @@ namespace quda {
 
   public:
     BiCGstabLUpdate(ColorSpinorField *x, std::vector<ColorSpinorField *> &r, std::vector<ColorSpinorField *> &u,
-                    Complex *alpha, Complex *beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
+                    Complex &alpha, Complex &beta, BiCGstabLUpdateType update_type, int j_max, int n_update) :
       x(x), r(r), u(u), alpha(alpha), beta(beta), update_type(update_type), j_max(j_max), n_update(n_update)
     {
       
@@ -368,20 +361,20 @@ namespace quda {
       {
         for (int i= (count*j_max)/n_update; i<((count+1)*j_max)/n_update && i<j_max; i++)
         {
-          blas::caxpby(1.0, *r[i], -*beta, *u[i]);
+          blas::caxpby(1.0, *r[i], -beta, *u[i]);
         }
       }
       else // (update_type == BICGSTABL_UPDATE_R)
       {
         if (count == 0)
         {
-          blas::caxpy(*alpha, *u[0], *x); 
+          blas::caxpy(alpha, *u[0], *x); 
         }
         if (j_max > 0)
         {
           for (int i= (count*j_max)/n_update; i<((count+1)*j_max)/n_update && i<j_max; i++)
           {
-            blas::caxpy(-*alpha, *u[i+1], *r[i]);
+            blas::caxpy(-alpha, *u[i+1], *r[i]);
           }
         }
       }
@@ -403,13 +396,12 @@ namespace quda {
     r.resize(n_krylov + 1);
     u.resize(n_krylov + 1);
 
-    gamma = new Complex[n_krylov + 1];
-    gamma_prime = new Complex[n_krylov + 1];
-    gamma_prime_prime = new Complex[n_krylov + 1];
-    sigma = new double[n_krylov + 1];
+    gamma.resize(n_krylov + 1);
+    gamma_prime.resize(n_krylov + 1);
+    gamma_prime_prime.resize(n_krylov + 1);
+    sigma.resize(n_krylov + 1);
 
-    tau = new Complex *[n_krylov + 1];
-    for (int i = 0; i < n_krylov + 1; i++) { tau[i] = new Complex[n_krylov + 1]; }
+    tau.resize((n_krylov + 1) * (n_krylov + 1));
 
     std::stringstream ss;
     ss << "BiCGstab-" << n_krylov;
@@ -418,14 +410,7 @@ namespace quda {
 
   BiCGstabL::~BiCGstabL() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-    delete[] gamma;
-    delete[] gamma_prime;
-    delete[] gamma_prime_prime;
-    delete[] sigma;
 
-    for (int i = 0; i < n_krylov + 1; i++) { delete[] tau[i]; }
-    delete[] tau; 
-    
     if (init) {
       delete r_sloppy_saved_p;
       delete u[0];
@@ -665,7 +650,7 @@ namespace quda {
     pipeline = param.pipeline;
     
     // Create the worker class for updating non-critical r, u vectors.
-    BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, &alpha, &beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps() );
+    BiCGstabLUpdate bicgstabl_update(&x_sloppy, r, u, alpha, beta, BICGSTABL_UPDATE_U, 0, matSloppy.getStencilSteps() );
 
     
     // done with preamble, begin computing.
