@@ -871,6 +871,9 @@ namespace quda {
     virtual bool hermitian() { return false; } /** BiCGStab is for any linear system */
   };
 
+  /**
+   * @brief Optimized version of the BiCGstabL solver described in
+   */
   class BiCGstabL : public Solver {
 
   private:
@@ -903,12 +906,15 @@ namespace quda {
     ColorSpinorField* r_sloppy_saved_p; //! Current residual, in BiCG language.
 
     /**
-       Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
+     @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
     int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);    
 
     /**
-       Internal routine for performing the MR part of BiCGstab-L
+     * @brief Internal routine for performing the MR part of BiCGstab-L
+     *
+     * @param x_sloppy [out] sloppy accumulator for x
+     * @param fixed_iteration [in] whether or not this is for a fixed iteration solver
      */
     void computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration);
 
@@ -919,8 +925,33 @@ namespace quda {
        lost in the noise, and the fused nature of computeMR wins in terms of
        time to solution.
      */
+
+    /**
+     * @brief Internal routine that comptues the "tau" matrix as described in
+     *        the original BiCGstab-L paper, supporting pipelining
+     * 
+     * @param begin [in] begin offset for pipelining
+     * @param size [in] length of pipelining
+     * @param j [in] row of tau being computed
+     */
     void computeTau(int begin, int size, int j);
+
+    /**
+     * @brief Internal routine that updates R as described in
+     *        the original BiCGstab-L paper, supporting pipelining.
+     * 
+     * @param begin [in] begin offset for pipelining
+     * @param size [in] length of pipelining
+     * @param j [in] row of tau being computed
+     */
     void updateR(int begin, int size, int j);
+
+    /**
+     * @brief Internal legacy routine for performing the MR part of BiCGstab-L
+     *        which more closely matches the paper
+     *
+     * @param x_sloppy [out] sloppy accumulator for x
+     */
     void legacyComputeMR(ColorSpinorField &x_sloppy);
 
     /**
