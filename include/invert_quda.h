@@ -873,6 +873,7 @@ namespace quda {
 
   /**
    * @brief Optimized version of the BiCGstabL solver described in
+   * https://etna.math.kent.edu/vol.1.1993/pp11-32.dir/pp11-32.pdf
    */
   class BiCGstabL : public Solver {
 
