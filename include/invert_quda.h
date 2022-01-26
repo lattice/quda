@@ -1058,11 +1058,11 @@ namespace quda {
     std::vector<double> alpha;    // QAQ^{-1} g
     std::vector<double> beta;     // QAQ^{-1} QpolyS
 
-    ColorSpinorField *rp;
-    ColorSpinorField *tmpp;
-    ColorSpinorField *tmpp2;
-    ColorSpinorField *tmp_sloppy;
-    ColorSpinorField *tmp_sloppy2;
+    std::unique_ptr<ColorSpinorField> rp;
+    std::unique_ptr<ColorSpinorField> tmpp;
+    std::unique_ptr<ColorSpinorField> tmpp2;
+    std::unique_ptr<ColorSpinorField> tmp_sloppy;
+    std::unique_ptr<ColorSpinorField> tmp_sloppy2;
 
     std::vector<ColorSpinorField*> S;  // residual vectors
     std::vector<ColorSpinorField*> AS; // mat * residual vectors. Can be replaced by a single temporary.
