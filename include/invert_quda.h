@@ -1021,10 +1021,10 @@ namespace quda {
     bool lambda_init;
     QudaCABasis basis;
 
-    double *Q_AQandg; // Fused inner product matrix
-    double *Q_AS;     // inner product matrix
-    double *alpha;    // QAQ^{-1} g
-    double *beta;     // QAQ^{-1} QpolyS
+    std::vector<double> Q_AQandg; // Fused inner product matrix
+    std::vector<double> Q_AS;     // inner product matrix
+    std::vector<double> alpha;    // QAQ^{-1} g
+    std::vector<double> beta;     // QAQ^{-1} QpolyS
 
     ColorSpinorField *rp;
     ColorSpinorField *tmpp;
