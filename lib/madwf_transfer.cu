@@ -37,7 +37,7 @@ namespace quda
         strcat(aux, ",");
         i32toa(in_str, in.X(4));
         strcat(aux, in_str);
-        strcat(aux, "->");
+        strcat(aux, ",");
         i32toa(out_str, out.X(4));
         strcat(aux, out_str);
         strcat(aux, ",transfer_5D");

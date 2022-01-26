@@ -289,6 +289,7 @@ namespace quda
   }
 
   void MadwfAcc::save_parameter(int Ls, int Ls_base) {
+    if (comm_rank() != 0) { errorQuda("Only rank zero writes out to disk"); } // Only rank zero write out to the disk
     std::vector<transfer_float> host_param = device_param.to_host();
 
     std::string save_param_path(param.madwf_param_outfile);

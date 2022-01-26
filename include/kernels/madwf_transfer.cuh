@@ -51,9 +51,9 @@ namespace quda
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
 
-      using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
+      using F = typename colorspinor_mapper<storage_t, nSpin, nColor>::type;
       using real = typename mapper<storage_t>::type;
-      using Vector = ColorSpinor<real, 3, 4>;
+      using Vector = ColorSpinor<real, nColor, nSpin>;
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, nSpin, nColor, MadwfAcc::transfer_t>::type;
 
       static constexpr bool dagger = dagger_;
