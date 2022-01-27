@@ -40,6 +40,7 @@ namespace quda {
       if (!use_source) delete S[0];
       for (int i = 0; i < param.Nkrylov; i++) {
         delete AS[i];
+        // in the power basis we can alias AS[k] to S[k+1]
         if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) { delete S[i]; }
         delete Q[i];
         delete Qtmp[i];
