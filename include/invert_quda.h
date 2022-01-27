@@ -537,7 +537,8 @@ namespace quda {
       @param Solver the solver to be used to collect the null space vectors.
       @param ColorSpinorField the vector used to perform the training.
      */
-    virtual void train_param(Solver &, ColorSpinorField &) {
+    virtual void train_param(Solver &, ColorSpinorField &)
+    {
       // Do nothing
     }
 
@@ -545,14 +546,17 @@ namespace quda {
       @brief a virtual method that performs the inversion and collect some vectors.
         The default here is a no-op and should not be called.
      */
-    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double) { errorQuda("NOT implemented."); }
+    virtual void solve_and_collect(ColorSpinorField &, ColorSpinorField &, std::vector<ColorSpinorField *> &, int, double)
+    {
+      errorQuda("NOT implemented.");
+    }
 
     void set_tol(double tol) { param.tol = tol; }
     void set_maxiter(int maxiter) { param.maxiter = maxiter; }
 
-    const DiracMatrix& M() { return mat; }
-    const DiracMatrix& Msloppy() { return matSloppy; }
-    const DiracMatrix& Mprecon() { return matPrecon; }
+    const DiracMatrix &M() { return mat; }
+    const DiracMatrix &Msloppy() { return matSloppy; }
+    const DiracMatrix &Mprecon() { return matPrecon; }
     const DiracMatrix &Meig() { return matEig; }
 
     /**
@@ -875,10 +879,10 @@ namespace quda {
         @param in the input vector
         @param v_r the series of vectors that is to be collected
         @param collect_miniter minimal iteration start from which the r vectors are to be collected
-        @param collect_tol maxiter tolerance start from which the r vectors are to be collected 
+        @param collect_tol maxiter tolerance start from which the r vectors are to be collected
        */
-      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in,
-                                     std::vector<ColorSpinorField *> &v_r, int collect_miniter, double collect_tol);
+      virtual void solve_and_collect(ColorSpinorField &out, ColorSpinorField &in, std::vector<ColorSpinorField *> &v_r,
+                                     int collect_miniter, double collect_tol);
 
       virtual bool hermitian() { return true; } /** MPCG is only Hermitian system */
   };

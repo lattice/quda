@@ -564,11 +564,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef INIT_PARAM
   if (param->accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
 #endif
-  P(madwf_diagonal_suppressor, INVALID_DOUBLE);
-  P(madwf_ls, INVALID_INT);
-  P(madwf_null_miniter, INVALID_INT);
-  P(madwf_null_tol, INVALID_DOUBLE);
-  P(madwf_train_maxiter, INVALID_INT);
+    P(madwf_diagonal_suppressor, INVALID_DOUBLE);
+    P(madwf_ls, INVALID_INT);
+    P(madwf_null_miniter, INVALID_INT);
+    P(madwf_null_tol, INVALID_DOUBLE);
+    P(madwf_train_maxiter, INVALID_INT);
 #ifndef INIT_PARAM
   }
 #endif

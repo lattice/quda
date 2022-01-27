@@ -26,8 +26,9 @@ namespace quda
     };
 
     template <bool dagger, class real, int nSpin, int nColor>
-    __device__ __host__ inline void
-    matrix_vector_multiply(ColorSpinor<real, nColor, nSpin> &out, const Matrix<complex<real>, nSpin> &m, const ColorSpinor<real, nColor, nSpin> &v)
+    __device__ __host__ inline void matrix_vector_multiply(ColorSpinor<real, nColor, nSpin> &out,
+                                                           const Matrix<complex<real>, nSpin> &m,
+                                                           const ColorSpinor<real, nColor, nSpin> &v)
     {
 #pragma unroll
       for (int color = 0; color < nColor; color++) {

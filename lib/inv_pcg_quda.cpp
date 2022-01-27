@@ -28,8 +28,9 @@ namespace quda
     // most preconditioners are uni-precision solvers, with CG being an exception
     inner.precision
       = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER)
-        && !outer.precondition_no_advanced_feature) ?
-        outer.precision_sloppy : outer.precision_precondition;
+         && !outer.precondition_no_advanced_feature) ?
+      outer.precision_sloppy :
+      outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -100,7 +101,7 @@ namespace quda
   }
 
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,
-                            int collect_miniter, double collect_tol)
+                                   int collect_miniter, double collect_tol)
   {
     K->train_param(*this, b);
 
@@ -355,12 +356,12 @@ namespace quda
         }
 
         if (Np == 1) {
-          axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), xSloppy, K ? *minvrSloppy : rSloppy, beta);
+          axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), xSloppy,
+                   K ? *minvrSloppy : rSloppy, beta);
         } else {
-          if (x_update_batch.is_container_full()) {
-            x_update_batch.accumulate_x(xSloppy);
-          }
-          blas::xpayz(K ? *minvrSloppy : rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
+          if (x_update_batch.is_container_full()) { x_update_batch.accumulate_x(xSloppy); }
+          blas::xpayz(K ? *minvrSloppy : rSloppy, beta, x_update_batch.get_current_field(),
+                      x_update_batch.get_next_field());
         }
 
         ru.accumulate_norm(x_update_batch.get_current_alpha());
@@ -420,7 +421,7 @@ namespace quda
           axpy(-rp, rSloppy, x_update_batch.get_current_field());
 
           beta = r2 / r2_old;
-        } 
+        }
         xpayz(K ? *minvrSloppy : rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
       }
 

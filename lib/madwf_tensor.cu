@@ -66,7 +66,8 @@ namespace quda
 
       if (x.Ndim() != 5 || y.Ndim() != 5) { errorQuda("we need a 5 dimensional field for this."); }
       if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("x.nSpin = %d, y.nSpin = %d not supported", x.Nspin(), y.Nspin());
-      if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("x.nColor = %d, y.nColor = %d, not supported", x.Ncolor(), y.Ncolor());
+      if (x.Ncolor() != 3 || y.Ncolor() != 3)
+        errorQuda("x.nColor = %d, y.nColor = %d, not supported", x.Ncolor(), y.Ncolor());
 
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, 4, 3, MadwfAcc::transfer_t>::type;
 

@@ -19,8 +19,8 @@
   @param uhigh the higher precision tolerance, only relevant for the second approach
   @param Anorm The normal of the underlying operator that is to be used to estimate the lower precision inaccuracy,
     only relevant for the second approach
-  @param maxResIncrease number of consecutive residual increases between reliable updates allowed: should only matter for
-    the first approach
+  @param maxResIncrease number of consecutive residual increases between reliable updates allowed: should only matter
+  for the first approach
   @param maxResIncreaseTotal total number of residual increases between reliable updates allowed: should only matter for
     the first approach
   @param use_heavy_quark_res whether or not using heavy quark residual
@@ -46,7 +46,6 @@ struct ReliableUpdatesParams {
 
   int hqmaxresIncrease;
   int hqmaxresRestartTotal; // this limits the number of heavy quark restarts we can do
-
 };
 
 struct ReliableUpdates {
@@ -182,7 +181,8 @@ struct ReliableUpdates {
       xnorm = 0; // sqrt(norm2(x));
       pnorm = 0; // pnorm + alpha * sqrt(norm2(p));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("New dinit: %e (r %e , y %e)\n", dinit, params.uhigh * sqrt(r2), params.uhigh * params.Anorm * sqrt(y2));
+        printfQuda("New dinit: %e (r %e , y %e)\n", dinit, params.uhigh * sqrt(r2),
+                   params.uhigh * params.Anorm * sqrt(y2));
       d_new = dinit;
     } else {
       rNorm = sqrt(r2);

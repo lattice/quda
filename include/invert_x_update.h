@@ -30,25 +30,24 @@ struct XUpdateBatch {
     @param init the ColorSpinorField used to initialize the first vector in the container
     @param csParam the ColorSpinorParam used to initialize the rest of the vectors
    */
-  XUpdateBatch(int Np_, const ColorSpinorField &init, ColorSpinorParam csParam): _Np(Np_), _j(0), _next((_j + 1) % _Np), _ps(_Np), _alphas(_Np) {
+  XUpdateBatch(int Np_, const ColorSpinorField &init, ColorSpinorParam csParam) :
+    _Np(Np_), _j(0), _next((_j + 1) % _Np), _ps(_Np), _alphas(_Np)
+  {
     _ps[0] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(init));
-    for (int j = 1; j < _Np; j++) {
-      _ps[j] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(csParam));
-    }
+    for (int j = 1; j < _Np; j++) { _ps[j] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(csParam)); }
   }
 
   /**
     @brief return whether or not the container is full
    */
-  bool is_container_full() {
-    return (_j + 1) % _Np == 0;
-  }
+  bool is_container_full() { return (_j + 1) % _Np == 0; }
 
   /**
     @brief use the vectors currently stored and add to the given output field
     @param x the output field to add to
    */
-  void accumulate_x(ColorSpinorField &x) {
+  void accumulate_x(ColorSpinorField &x)
+  {
     std::vector<ColorSpinorField *> vx(1, &x);
     std::vector<ColorSpinorField *> psj(_j + 1);
     for (int i = 0; i <= _j; i++) { psj[i] = _ps[i].get(); }
@@ -58,49 +57,38 @@ struct XUpdateBatch {
   /**
     @brief Get the current vector
    */
-  ColorSpinorField &get_current_field() {
-    return *_ps[_j];
-  }
+  ColorSpinorField &get_current_field() { return *_ps[_j]; }
 
   /**
     @brief Get the current vector
    */
-  const ColorSpinorField &get_current_field() const {
-    return *_ps[_j];
-  }
+  const ColorSpinorField &get_current_field() const { return *_ps[_j]; }
 
   /**
     @brief Get the next vector
    */
-  ColorSpinorField &get_next_field() {
-    return *_ps[_next];
-  }
+  ColorSpinorField &get_next_field() { return *_ps[_next]; }
 
   /**
     @brief Get the next vector
    */
-  const ColorSpinorField &get_next_field() const {
-    return *_ps[_next];
-  }
+  const ColorSpinorField &get_next_field() const { return *_ps[_next]; }
 
   /**
     @brief Get the current alpha
    */
-  double &get_current_alpha() {
-    return _alphas[_j];
-  }
+  double &get_current_alpha() { return _alphas[_j]; }
 
   /**
     @brief Get the current alpha
    */
-  const double &get_current_alpha() const {
-    return _alphas[_j];
-  }
+  const double &get_current_alpha() const { return _alphas[_j]; }
 
   /**
     @brief increase the counter by one (modulo _Np)
    */
-  XUpdateBatch &operator++() {
+  XUpdateBatch &operator++()
+  {
     _j = (_j + 1) % _Np;
     _next = (_j + 1) % _Np;
     return *this;
@@ -109,11 +97,14 @@ struct XUpdateBatch {
   /**
     @brief reset the counter (typically used after reliable update is performed)
    */
-  void reset() { _j = 0; _next = (_j + 1) % _Np; }
+  void reset()
+  {
+    _j = 0;
+    _next = (_j + 1) % _Np;
+  }
 
   /**
     @brief reset the next counter (typically used after reliable update is performed)
    */
   void reset_next() { _next = 0; }
-
 };

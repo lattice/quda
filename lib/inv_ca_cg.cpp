@@ -36,26 +36,38 @@ namespace quda {
                          // param.precision == param.precision_sloppy &&
                          // param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
+      // printf("5\n");
+
       if (!use_source) delete S[0];
+      // printf("6\n");
       for (int i = 0; i < param.Nkrylov; i++) {
         delete AS[i];
+        // printf("7\n");
         // in the power basis we can alias AS[k] to S[k+1]
-        if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) {
-          delete S[i];
-        }
+        if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) { delete S[i]; }
+        // printf("8\n");
         delete Q[i];
+      //printf("9\n");
         delete Qtmp[i];
+      //printf("0\n");
         delete AQ[i];
+      //printf("11\n");
       }
 
       if (tmp_sloppy) delete tmp_sloppy;
+      //printf("12\n");
       if (tmp_sloppy2) delete tmp_sloppy2;
+      //printf("13\n");
       if (tmpp) delete tmpp;
+      //printf("14\n");
       if (tmpp2) delete tmpp2;
+      //printf("15\n");
       if (rp) delete rp;
+      //printf("16\n");
     }
 
     destroyDeflationSpace();
+      // printf("17\n");
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -219,7 +231,6 @@ namespace quda {
       mdagm.Expose()->M(*bp, x);
       blas::axpby(-1.0, *bp, 1.0, b);
     }
-
   }
 
   void CACG::create(ColorSpinorField &b)
@@ -433,7 +444,7 @@ namespace quda {
       maxrr = rNorm;
     }
 
-    //printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
+    // printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
 
     return updateR;
   }
@@ -674,7 +685,7 @@ namespace quda {
 
         // Can we fuse these? We don't need this reduce in all cases...
         blas::axpy(alpha.data(), AQ, S0);
-        //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
+        // if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
         /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       } else {
         // fixed iterations

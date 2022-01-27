@@ -103,7 +103,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_INIT);
     null.solve_and_collect(null_x, null_b, B, param.madwf_null_miniter, param.madwf_null_tol);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    for (auto pb: B) { blas::ax(5e3 / sqrt(blas::norm2(*pb)), *pb); }
+    for (auto pb : B) { blas::ax(5e3 / sqrt(blas::norm2(*pb)), *pb); }
 
     saveTuneCache();
 
@@ -117,7 +117,7 @@ namespace quda
 
     double residual = 0.0;
     int count = 0;
-    for (auto phi: B) {
+    for (auto phi : B) {
       residual += blas::norm2(*phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("reference dslash norm %03d = %8.4e\n", count, blas::norm2(*phi));
@@ -167,7 +167,7 @@ namespace quda
       double chi2 = 0.0;
       std::array<double, 5> a = {};
 
-      for (auto phi: B) {
+      for (auto phi : B) {
         chi2 += cost(ref, base, chi, *phi);
         // ATx(ATphi, *phi, T);
         madwf_ml::transfer_5d_hh(*forward_tmp, *phi, device_param, false);
@@ -193,7 +193,7 @@ namespace quda
 
       chi2 = 0.0;
       // line search
-      for (auto phi: B) {
+      for (auto phi : B) {
 
         double ind_chi2 = cost(ref, base, chi, *phi);
         chi2 += ind_chi2;
@@ -260,7 +260,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Training finished ...\n"); }
     count = 0;
-    for (auto phi: B) {
+    for (auto phi : B) {
       double ind_chi2 = cost(ref, base, chi, *phi);
       double phi2 = blas::norm2(*phi);
       if (getVerbosity() >= QUDA_VERBOSE) {
@@ -269,7 +269,7 @@ namespace quda
       count++;
     }
 
-    for (auto pb: B) { delete pb; }
+    for (auto pb : B) { delete pb; }
 
     // Broadcast the trained parameters
     host_param = device_param.to_host();
@@ -285,10 +285,10 @@ namespace quda
       comm_barrier();
       profile.TPSTOP(QUDA_PROFILE_IO);
     }
-
   }
 
-  void MadwfAcc::save_parameter(int Ls, int Ls_base) {
+  void MadwfAcc::save_parameter(int Ls, int Ls_base)
+  {
     if (comm_rank() != 0) { errorQuda("Only rank zero writes out to disk"); } // Only rank zero write out to the disk
     std::vector<transfer_float> host_param = device_param.to_host();
 
@@ -302,14 +302,13 @@ namespace quda
     fclose(fp);
     if (fwrite_count != host_param.size()) {
       errorQuda("Unable to write trained parameters to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
-          host_param.size());
+                host_param.size());
     }
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str());
-    }
+    if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Trained parameters saved to %s ...\n", save_param_path.c_str()); }
   }
 
-  void MadwfAcc::load_parameter(int Ls, int Ls_base) {
+  void MadwfAcc::load_parameter(int Ls, int Ls_base)
+  {
     constexpr int complex_matrix_size = static_cast<int>(transfer_t); // spin by spin
     size_t param_size = Ls * Ls_base * complex_matrix_size * 2;
     std::vector<transfer_float> host_param(param_size);
@@ -332,7 +331,7 @@ namespace quda
       fclose(fp);
       if (fread_count != host_param.size()) {
         errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
-            host_param.size());
+                  host_param.size());
       }
       host_training_param_cache.insert({param_file_name_str, host_param});
       printf("Rank %05d: Training params loaded from FILE %s ... \n", comm_rank(), save_param_path.c_str());

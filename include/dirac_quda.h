@@ -737,7 +737,7 @@ namespace quda {
      */
     virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
-public:
+  public:
     DiracDomainWall(const DiracParam &param);
     DiracDomainWall(const DiracDomainWall &dirac);
     virtual ~DiracDomainWall();
