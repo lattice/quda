@@ -243,6 +243,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # QUDA FEATURES
+if(QUDA_NCCL)
+  target_compile_definitions(quda PUBLIC QUDA_ENABLE_NCCL)
+endif(QUDA_NCCL)
+
 if(QUDA_DIRAC_WILSON)
   target_compile_definitions(quda PUBLIC GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_WILSON)
@@ -369,6 +373,12 @@ if(QUDA_QMP)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC QMP::qmp)
   target_link_libraries(quda PUBLIC MPI::MPI_CXX)
+endif()
+
+if(QUDA_NCCL)
+  target_compile_definitions(quda PUBLIC QUDA_ENABLE_NCCL)
+  target_include_directories(quda PUBLIC ${NCCL_INCLUDE_DIRS})
+  target_link_libraries(quda PUBLIC ${NCCL_LIBRARIES})
 endif()
 
 if(QUDA_QIO)

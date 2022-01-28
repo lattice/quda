@@ -120,7 +120,7 @@ namespace quda
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
   template <typename Dslash>
-  inline void issueRecv(ColorSpinorField &input, const Dslash &dslash, bool gdr)
+  inline void issueRecv(ColorSpinorField &input, const Dslash &dslash, bool gdr, bool nccl = false)
   {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
@@ -255,13 +255,17 @@ namespace quda
    */
   template <typename Dslash>
   inline bool commsComplete(ColorSpinorField &in, const Dslash &, int dim, int dir, bool gdr_send,
-                            bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1)
+                            bool gdr_recv, bool zero_copy_recv, int scatterIndex = -1, bool nccl_send_recv = false)
   {
-    PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
+    PROFILE(int comms_test = dslash_comms ? in.commsQuery(2*dim+dir, device::get_stream(2*dim+dir), gdr_send, gdr_recv, nccl_send_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
       // now we are receive centric
       int dir2 = 1-dir;
-
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl_send_recv) {
+        // no-op
+      } else
+#endif
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
 	PROFILE(qudaStreamWaitEvent(device::get_default_stream(), in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -646,6 +650,82 @@ namespace quda
             // Query if comms has finished
             if (!pattern.commsCompleted[2 * i + dir]) {
               if (commsComplete(*in, dslash, i, dir, true, true, false)) {
+                ;
+                pattern.commsCompleted[2 * i + dir] = 1;
+                pattern.completeSum++;
+              }
+            }
+
+          } // dir=0,1
+
+          if (!pattern.dslashCompleted[2 * i] && pattern.dslashCompleted[pattern.previousDir[2 * i + 1]]
+              && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
+            dslashParam.kernel_type = static_cast<KernelType>(i);
+            dslashParam.threads = dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
+
+            // all faces use this stream
+            PROFILE(if (dslash_exterior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+            pattern.dslashCompleted[2 * i] = 1;
+          }
+        }
+      }
+
+      completeDslash(*in, dslashParam);
+      in->bufferIndex = (1 - in->bufferIndex);
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+    }
+  };
+
+/**
+   Dslash parallelization with NCCL for send and receive
+ */
+  template <typename Dslash> struct DslashNCCL : DslashPolicyImp<Dslash> {
+
+    void operator()(
+        Dslash &dslash, ColorSpinorField *in, const int volume, const int *faceVolumeCB, TimeProfile &profile)
+    {
+
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
+
+      auto &dslashParam = dslash.dslashParam;
+      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.threads = volume;
+      dslash.setShmem(0);
+
+      issueRecv(*in, dslash, true, true); // Prepost receives
+
+      bool pack_event = false;
+      for (int p2p = 0; p2p < 2; p2p++) { // schedule non-p2p traffic first, then do p2p
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
+
+          if (!pack_event) {
+            qudaEventSynchronize(packEnd[in->bufferIndex]);
+            pack_event = true;
+          }
+
+          for (int dir = 1; dir >= 0; dir--) {
+            if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
+              PROFILE(if (dslash_comms) in->sendStart(2 * i + dir,
+                                                      device::get_stream(2 * i + dir),
+                                                      true, dslashParam.remote_write, true),
+                  profile, QUDA_PROFILE_COMMS_START);
+            } // is p2p?
+          }   // dir
+        }     // i
+      }       // p2p
+
+      DslashCommsPattern pattern(dslashParam.commDim, true);
+      while (pattern.completeSum < pattern.commDimTotal) {
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
+
+          for (int dir = 1; dir >= 0; dir--) {
+
+            // Query if comms has finished
+            if (!pattern.commsCompleted[2 * i + dir]) {
+              if (commsComplete(*in, dslash, i, dir, true, true, false, -1, true)) {
                 ;
                 pattern.commsCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
@@ -1649,6 +1729,8 @@ namespace quda
     QUDA_FUSED_DSLASH,
     QUDA_GDR_DSLASH,
     QUDA_FUSED_GDR_DSLASH,
+    QUDA_NCCL_DSLASH,
+    QUDA_FUSED_NCCL_DSLASH,
     QUDA_GDR_RECV_DSLASH,
     QUDA_FUSED_GDR_RECV_DSLASH,
     QUDA_ZERO_COPY_PACK_DSLASH,
@@ -1712,6 +1794,7 @@ namespace quda
       case QudaDslashPolicy::QUDA_FUSED_DSLASH: return std::make_unique<DslashFusedExterior<Dslash>>();
       case QudaDslashPolicy::QUDA_GDR_DSLASH: return std::make_unique<DslashGDR<Dslash>>();
       case QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH: return std::make_unique<DslashFusedGDR<Dslash>>();
+      case QudaDslashPolicy::QUDA_NCCL_DSLASH: return std::make_unique<DslashNCCL<Dslash>>();
       case QudaDslashPolicy::QUDA_GDR_RECV_DSLASH: return std::make_unique<DslashGDRRecv<Dslash>>();
       case QudaDslashPolicy::QUDA_FUSED_GDR_RECV_DSLASH: return std::make_unique<DslashFusedGDRRecv<Dslash>>();
       case QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH: return std::make_unique<DslashZeroCopyPack<Dslash>>();

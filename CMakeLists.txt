@@ -145,6 +145,9 @@ option(QUDA_QIO "build QIO code for binary I/O" OFF)
 option(QUDA_QMP "build the QMP multi-GPU code" OFF)
 option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 
+# NCCL
+option(QUDA_NCCL "Use NCCL library" OFF)
+
 # ARPACK
 option(QUDA_ARPACK "build arpack interface" OFF)
 option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
@@ -392,6 +395,21 @@ else()
     )
   endif()
   target_include_directories(Eigen SYSTEM INTERFACE ${EIGEN_INCLUDE_DIRS})
+endif()
+
+# ######################################################################################################################
+# NCCL
+# ######################################################################################################################
+if(QUDA_NCCL)
+  add_library(NCCL INTERFACE IMPORTED)
+  # fall back to using find_package
+  find_package(NCCL)
+  if(NOT NCCL_FOUND)
+    message(
+      FATAL_ERROR
+        "QUDA requires NCCL"
+    )
+  endif()
 endif()
 
 # ######################################################################################################################

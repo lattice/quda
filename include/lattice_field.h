@@ -382,6 +382,14 @@ namespace quda {
     /** Remote copy of event used for peer-to-peer synchronization */
     static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
+    static qudaEvent_t nccl_send_event_back[2][QUDA_MAX_DIM];
+
+    static qudaEvent_t nccl_send_event_fwd[2][QUDA_MAX_DIM];
+
+    static qudaEvent_t nccl_recv_event_back[2][QUDA_MAX_DIM];
+
+    static qudaEvent_t nccl_recv_event_fwd[2][QUDA_MAX_DIM];
+
     /** Whether we have initialized communication for this field */
     bool initComms;
 
@@ -697,7 +705,7 @@ namespace quda {
 
     virtual void commsStart(int, const qudaStream_t &, bool, bool) { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int, const qudaStream_t &, bool, bool)
+    virtual int commsQuery(int, const qudaStream_t &, bool, bool, bool)
     {
       errorQuda("Not implemented");
       return 0;

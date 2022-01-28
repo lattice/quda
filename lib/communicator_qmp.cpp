@@ -19,10 +19,6 @@
     }                                                                                                                  \
   } while (0)
 
-struct MsgHandle_s {
-  QMP_msgmem_t mem;
-  QMP_msghandle_t handle;
-};
 
 // While we can emulate an all-gather using QMP reductions, this
 // scales horribly as the number of nodes increases, so for
@@ -218,6 +214,10 @@ MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int dis
 
   mh->handle = QMP_comm_declare_send_to(QMP_COMM_HANDLE, mh->mem, rank, 0);
   if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  mh->buffer = buffer;
+  mh->nbytes = nbytes;
+  mh->rank = rank;
 
   return mh;
 }

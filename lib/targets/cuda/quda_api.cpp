@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <device.h>
 #include <quda_cuda_api.h>
+#include <nccl.h>
 
 // if this macro is defined then we use the driver API, else use the
 // runtime API.  Typically the driver API has 10-20% less overhead
@@ -558,5 +559,39 @@ namespace quda
     apiTimer.Print();
 #endif
   }
+
+#ifdef QUDA_ENABLE_NCCL
+  qudaNcclComm_t qudaNcclCommCreate(int my_rank, int n_ranks)
+  {
+    ncclUniqueId id;
+    if (my_rank == 0) ncclGetUniqueId(&id);
+    comm_broadcast(&id, sizeof(id));
+
+    ncclComm_t nccl_comm;
+    ncclCommInitRank(&nccl_comm, n_ranks, id, my_rank);
+
+    qudaNcclComm_t quda_nccl_comm;
+    quda_nccl_comm.comm = reinterpret_cast<void *>(nccl_comm);
+    return quda_nccl_comm;
+  }
+
+  void qudaNcclCommDestroy(qudaNcclComm_t quda_nccl_comm)
+  {
+    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
+    ncclCommDestroy(nccl_comm);
+  }
+
+  void qudaNcclSend(const void* sendbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream)
+  {
+    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
+    ncclResult_t nccl_error = ncclSend(sendbuff, count, ncclChar, peer, nccl_comm, get_stream(stream));
+  }
+
+  void qudaNcclRecv(void* recvbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream)
+  {
+    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
+    ncclResult_t nccl_error = ncclSend(recvbuff, count, ncclChar, peer, nccl_comm, get_stream(stream));
+  }
+#endif
 
 } // namespace quda

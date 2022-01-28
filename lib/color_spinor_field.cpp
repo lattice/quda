@@ -5,6 +5,8 @@
 #include <color_spinor_field.h>
 #include <dslash_quda.h>
 
+#include <communicator_quda.h>
+
 static bool zeroCopy = false;
 
 namespace quda
@@ -1093,7 +1095,7 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::recvStart(int d, const qudaStream_t &, bool gdr)
+  void ColorSpinorField::recvStart(int d, const qudaStream_t &stream, bool gdr, bool nccl)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     // note this is scatter centric, so dir=0 (1) is send backwards
@@ -1106,6 +1108,13 @@ namespace quda
 
     if (dir == 0) { // receive from forwards
       // receive from the processor in the +1 direction
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl) {
+        auto mh = mh_recv_rdma_fwd[bufferIndex][dim];
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
+        qudaEventRecord(nccl_recv_event_fwd[bufferIndex][dim], stream);
+      } else
+#endif
       if (comm_peer2peer_enabled(1, dim)) {
         comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr) {
@@ -1115,6 +1124,13 @@ namespace quda
       }
     } else { // receive from backwards
       // receive from the processor in the -1 direction
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl) {
+        auto mh = mh_recv_rdma_back[bufferIndex][dim];
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
+        qudaEventRecord(nccl_recv_event_back[bufferIndex][dim], stream);
+      } else
+#endif
       if (comm_peer2peer_enabled(0, dim)) {
         comm_start(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr) {
@@ -1125,7 +1141,7 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::sendStart(int d, const qudaStream_t &stream, bool gdr, bool remote_write)
+  void ColorSpinorField::sendStart(int d, const qudaStream_t &stream, bool gdr, bool remote_write, bool nccl)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     // note this is scatter centric, so dir=0 (1) is send backwards
@@ -1136,6 +1152,19 @@ namespace quda
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
+#ifdef QUDA_ENABLE_NCCL
+    if (nccl) {
+      if (dir == 0) {
+        auto mh = mh_send_rdma_back[bufferIndex][dim];
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
+        qudaEventRecord(nccl_send_event_back[bufferIndex][dim], stream);
+      } else {
+        auto mh = mh_send_rdma_fwd[bufferIndex][dim];
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
+        qudaEventRecord(nccl_send_event_fwd[bufferIndex][dim], stream);
+      }
+    } else
+#endif
     if (!comm_peer2peer_enabled(dir, dim)) {
       if (dir == 0)
         if (gdr)
@@ -1181,7 +1210,7 @@ namespace quda
   static bool complete_send_fwd[QUDA_MAX_DIM] = {};
   static bool complete_send_back[QUDA_MAX_DIM] = {};
 
-  int ColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
+  int ColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv, bool nccl_send_recv)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
     // note this is scatter centric, so dir=0 (1) is send backwards
@@ -1196,6 +1225,11 @@ namespace quda
     if (dir == 0) {
 
       // first query send to backwards
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl_send_recv) {
+        if (!complete_send_back[dim]) complete_send_back[dim] = qudaEventQuery(nccl_send_event_back[bufferIndex][dim]);
+      } else
+#endif
       if (comm_peer2peer_enabled(0, dim)) {
         if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
       } else if (gdr_send) {
@@ -1205,6 +1239,11 @@ namespace quda
       }
 
       // second query receive from forwards
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl_send_recv) {
+        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = qudaEventQuery(nccl_recv_event_fwd[bufferIndex][dim]);
+      } else
+#endif
       if (comm_peer2peer_enabled(1, dim)) {
         if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr_recv) {
@@ -1222,6 +1261,11 @@ namespace quda
     } else { // dir == 1
 
       // first query send to forwards
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl_send_recv) {
+        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = qudaEventQuery(nccl_send_event_fwd[bufferIndex][dim]);
+      } else
+#endif
       if (comm_peer2peer_enabled(1, dim)) {
         if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
       } else if (gdr_send) {
@@ -1231,6 +1275,11 @@ namespace quda
       }
 
       // second query receive from backwards
+#ifdef QUDA_ENABLE_NCCL
+      if (nccl_send_recv) {
+        if (!complete_recv_back[dim]) complete_recv_back[dim] = qudaEventQuery(nccl_recv_event_back[bufferIndex][dim]);
+      } else
+#endif
       if (comm_peer2peer_enabled(0, dim)) {
         if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr_recv) {

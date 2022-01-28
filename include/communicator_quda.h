@@ -22,6 +22,10 @@
 #include <qmp.h>
 #endif
 
+#ifdef QUDA_ENABLE_NCCL
+#include <quda_api.h>
+#endif
+
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 namespace backward
@@ -29,6 +33,50 @@ namespace backward
   static backward::SignalHandling sh;
 } // namespace backward
 #endif
+
+struct MsgHandle_s {
+
+#ifdef MPI_COMMS
+  /**
+    The persistant MPI communicator handle that is created with
+    MPI_Send_init / MPI_Recv_init.
+   */
+  MPI_Request request;
+
+  /**
+    To create a strided communicator, a MPI_Vector datatype has to be
+    created.  This is where it is stored.
+   */
+  MPI_Datatype datatype;
+
+  /**
+    Whether a custom datatype has been created or not.  Used to
+    determine whether we need to free the datatype or not.
+   */
+  bool custom;
+#endif
+
+#ifdef QMP_COMMS
+  QMP_msgmem_t mem;
+
+  QMP_msghandle_t handle;
+#endif
+  /**
+    The underlying buffer to send or receive with
+   */
+  void *buffer;
+
+  /**
+    The underlying number of bytes to send or receive with
+   */
+  size_t nbytes;
+
+  /**
+    The underlying source or destination ranks to send to or receive from
+   */
+  int rank;
+
+};
 
 struct Topology_s {
   int ndim;
@@ -396,6 +444,11 @@ struct Communicator {
     Topology *topo = comm_default_topology();
     comm_destroy_topology(topo);
     comm_set_default_topology(NULL);
+#ifdef QUDA_ENABLE_NCCL
+    if (nccl_comm_init) {
+      qudaNcclCommDestroy(quda_nccl_comm);
+    }
+#endif
   }
 
   char partition_string[16];          /** string that contains the job partitioning */
@@ -667,6 +720,20 @@ struct Communicator {
 
 #if defined(QMP_COMMS) || defined(MPI_COMMS)
   MPI_Comm MPI_COMM_HANDLE;
+#endif
+
+#ifdef QUDA_ENABLE_NCCL
+  qudaNcclComm_t quda_nccl_comm;
+
+  bool nccl_comm_init = false;
+
+  qudaNcclComm_t get_nccl_comm() {
+    if (!nccl_comm_init) {
+      quda_nccl_comm = qudaNcclCommCreate(rank, size);
+      nccl_comm_init = true;
+    }
+    return quda_nccl_comm;
+  }
 #endif
 
 #if defined(QMP_COMMS)

@@ -22,6 +22,11 @@ namespace quda {
   qudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   qudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
+  qudaEvent_t LatticeField::nccl_send_event_back[2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::nccl_send_event_fwd[2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::nccl_recv_event_back[2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::nccl_recv_event_fwd[2][QUDA_MAX_DIM];
+
   void *LatticeField::ghost_pinned_send_buffer_h[2] = {nullptr, nullptr};
   void *LatticeField::ghost_pinned_send_buffer_hd[2] = {nullptr, nullptr};
 
@@ -373,6 +378,18 @@ namespace quda {
 
     } // loop over dimension
 
+#ifdef QUDA_ENABLE_NCCL
+    for (int dim = 0; dim < 4; dim++) {
+      if (!commDimPartitioned(dim)) continue;
+      for (int b = 0; b < 2; b++) {
+        nccl_send_event_back[b][dim] = qudaEventCreate();
+        nccl_recv_event_back[b][dim] = qudaEventCreate();
+        nccl_send_event_fwd[b][dim] = qudaEventCreate();
+        nccl_recv_event_fwd[b][dim] = qudaEventCreate();
+      }
+    }
+#endif
+
     initComms = true;
   }
 
@@ -402,6 +419,18 @@ namespace quda {
       // local take down complete - now synchronize to ensure globally complete
       qudaDeviceSynchronize();
       comm_barrier();
+
+#ifdef QUDA_ENABLE_NCCL
+      for (int dim = 0; dim < 4; dim++) {
+        if (!commDimPartitioned(dim)) continue;
+        for (int b = 0; b < 2; b++) {
+          qudaEventDestroy(nccl_send_event_back[b][dim]);
+          qudaEventDestroy(nccl_recv_event_back[b][dim]);
+          qudaEventDestroy(nccl_send_event_fwd[b][dim]);
+          qudaEventDestroy(nccl_recv_event_fwd[b][dim]);
+        }
+      }
+#endif
 
       initComms = false;
     }

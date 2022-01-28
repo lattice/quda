@@ -12,26 +12,6 @@
     }                                                                                                                  \
   } while (0)
 
-struct MsgHandle_s {
-  /**
-     The persistant MPI communicator handle that is created with
-     MPI_Send_init / MPI_Recv_init.
-   */
-  MPI_Request request;
-
-  /**
-     To create a strided communicator, a MPI_Vector datatype has to be
-     created.  This is where it is stored.
-   */
-  MPI_Datatype datatype;
-
-  /**
-     Whether a custom datatype has been created or not.  Used to
-     determine whether we need to free the datatype or not.
-   */
-  bool custom;
-};
-
 Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
                            bool user_set_comm_handle_, void *user_comm)
 {
@@ -165,6 +145,9 @@ MsgHandle *Communicator::comm_declare_send_displaced(void *buffer, const int dis
   tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  mh->buffer = buffer;
+  mh->nbytes = nbytes;
+  mh->rank = rank;
   MPI_CHECK(MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
   mh->custom = false;
 
@@ -187,6 +170,9 @@ MsgHandle *Communicator::comm_declare_receive_displaced(void *buffer, const int 
   tag = tag >= 0 ? tag : 2 * pow(4 * max_displacement, ndim) + tag;
 
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+  mh->buffer = buffer;
+  mh->nbytes = nbytes;
+  mh->rank = rank;
   MPI_CHECK(MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_HANDLE, &(mh->request)));
   mh->custom = false;
 

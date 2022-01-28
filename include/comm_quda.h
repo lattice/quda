@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
   typedef struct MsgHandle_s MsgHandle;
+
   typedef struct Topology_s Topology;
 
   /* defined in quda.h; redefining here to avoid circular references */
@@ -413,6 +414,10 @@ extern "C" {
 
   bool commAsyncReduction();
   void commAsyncReductionSet(bool global_reduce);
+
+#ifdef QUDA_ENABLE_NCCL
+  qudaNcclComm_t get_nccl_comm();
+#endif
 
 #ifdef __cplusplus
 }

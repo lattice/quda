@@ -550,7 +550,7 @@ namespace quda
        the scatter-centric direction (0=backwards,1=forwards)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int dir, const qudaStream_t &stream, bool gdr = false);
+    void recvStart(int dir, const qudaStream_t &stream, bool gdr = false, bool nccl = false);
 
     /**
        @brief Initiate halo communication sending
@@ -561,7 +561,7 @@ namespace quda
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false);
+    void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false, bool nccl = false);
 
     /**
        @brief Initiate halo communication
@@ -581,7 +581,7 @@ namespace quda
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false);
+    int commsQuery(int d, const qudaStream_t &stream, bool gdr_send = false, bool gdr_recv = false, bool nccl_recv_send = false);
 
     /**
        @brief Wait on halo communication to complete

@@ -32,6 +32,10 @@ namespace quda
     void *event;
   };
 
+  struct qudaNcclComm_t {
+    void *comm;
+  };
+
   /**
      @brief Wrapper around cudaMemcpy or driver API equivalent
      @param[out] dst Destination pointer
@@ -206,6 +210,16 @@ namespace quda
      @brief Print out the timer profile for CUDA API calls
    */
   void printAPIProfile();
+
+#ifdef QUDA_ENABLE_NCCL
+  qudaNcclComm_t qudaNcclCommCreate(int my_rank, int n_ranks);
+
+  void qudaNcclCommDestroy(qudaNcclComm_t quda_nccl_comm);
+
+  void qudaNcclSend(const void* sendbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream);
+
+  void qudaNcclRecv(void* recvbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream);
+#endif
 
 } // namespace quda
 
