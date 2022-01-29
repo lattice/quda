@@ -38,6 +38,7 @@ namespace quda {
                                       "init",
                                       "preamble",
                                       "compute",
+                                      "training",
                                       "comms",
                                       "epilogue",
                                       "free",

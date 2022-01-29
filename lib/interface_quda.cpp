@@ -70,32 +70,6 @@ static bool redundant_comms = false;
 
 #include <blas_lapack.h>
 
-//for MAGMA lib:
-#include <blas_magma.h>
-
-static bool InitMagma = false;
-
-void openMagma() {
-
-  if (!InitMagma) {
-    OpenMagma();
-    InitMagma = true;
-  } else {
-    printfQuda("\nMAGMA library was already initialized..\n");
-  }
-
-}
-
-void closeMagma(){
-
-  if (InitMagma) {
-    CloseMagma();
-    InitMagma = false;
-  } else {
-    printfQuda("\nMAGMA library was not initialized..\n");
-  }
-
-}
 
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
@@ -1925,8 +1899,8 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1945,10 +1919,13 @@ namespace quda {
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracRefineParam(diracRefParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER ||
-		       param.eig_param || param.split_grid_eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
+    //bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER ||
+    //param.eig_param || param.split_grid_eig_param) ? true : false;
+    //setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
 
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
+    
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
     dPre = Dirac::create(diracPreParam);
@@ -1966,10 +1943,18 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER ||
-		       param.eig_param || param.split_grid_eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    setDiracEigParam(diracEigParam, &param, pc_solve, comms_flag);
+    //<<<<<<< HEAD
+    //bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER ||
+    //param.eig_param || param.split_grid_eig_param) ? true : false;
+    //setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
+    //setDiracEigParam(diracEigParam, &param, pc_solve, comms_flag);
+    //=======
+    bool pre_comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
+    setDiracPreParam(diracPreParam, &param, pc_solve, pre_comms_flag);
+    bool eig_comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER ||
+			   param.eig_param || param.split_grid_eig_param) ? true : false;
+    setDiracEigParam(diracEigParam, &param, pc_solve, eig_comms_flag);
+    //>>>>>>> origin
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -3135,9 +3120,6 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
 
 void* newDeflationQuda(QudaEigParam *eig_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-#ifdef MAGMA_LIB
-  openMagma();
-#endif
   auto *defl = new deflated_solver(*eig_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -3148,9 +3130,6 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 }
 
 void destroyDeflationQuda(void *df) {
-#ifdef MAGMA_LIB
-  closeMagma();
-#endif
   delete static_cast<deflated_solver*>(df);
 }
 

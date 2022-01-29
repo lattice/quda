@@ -348,6 +348,41 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
+    /** The type of accelerator type to use for preconditioner */
+    QudaAcceleratorType accelerator_type_precondition;
+
+    /**
+     * The following parameters are the ones used to perform the adaptive MADWF in MSPCG
+     * See section 3.3 of [arXiv:2104.05615]
+     */
+
+    /** The diagonal constant to suppress the low modes when performing 5D transfer */
+    double madwf_diagonal_suppressor;
+
+    /** The target MADWF Ls to be used in the accelerator */
+    int madwf_ls;
+
+    /** The minimum number of iterations after which to generate the null vectors for MADWF */
+    int madwf_null_miniter;
+
+    /** The maximum tolerance after which to generate the null vectors for MADWF */
+    double madwf_null_tol;
+
+    /** The maximum number of iterations for the training iterations */
+    int madwf_train_maxiter;
+
+    /** Whether to load the MADWF parameters from the file system */
+    QudaBoolean madwf_param_load;
+
+    /** Whether to save the MADWF parameters to the file system */
+    QudaBoolean madwf_param_save;
+
+    /** Path to load from the file system */
+    char madwf_param_infile[256];
+
+    /** Path to save to the file system */
+    char madwf_param_outfile[256];
+
     /**
      * Whether to use the L2 relative residual, Fermilab heavy-quark
      * residual, or both to determine convergence.  To require that both
@@ -406,7 +441,7 @@ extern "C" {
     /** Precision to store the chronological basis in */
     QudaPrecision chrono_precision;
 
-    /** Which external library to use in the linear solvers (MAGMA or Eigen) */
+    /** Which external library to use in the linear solvers (Eigen) */
     QudaExtLibType extlib_type;
 
     /** Whether to use the platform native or generic BLAS / LAPACK */
@@ -553,7 +588,7 @@ extern "C" {
     /**< The time taken by the eigensolver setup */
     double secs;
 
-    /** Which external library to use in the deflation operations (MAGMA or Eigen) */
+    /** Which external library to use in the deflation operations (Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
   } QudaEigParam;
@@ -1589,13 +1624,6 @@ extern "C" {
    */
   void flushChronoQuda(int index);
 
-  /**
-  * Open/Close MAGMA library
-  *
-  **/
-  void openMagma();
-
-  void closeMagma();
 
   /**
   * Create deflation solver resources.

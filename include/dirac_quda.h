@@ -180,7 +180,7 @@ namespace quda {
   public:
     Dirac(const DiracParam &param);       // construct from params
     Dirac(const Dirac &dirac);            // Copy construct
-    virtual ~Dirac();                     // virtual destructor as this is a base classe
+    virtual ~Dirac();                     // virtual destructor as this is a base class
     Dirac &operator=(const Dirac &dirac); // assignment
 
     /**
@@ -731,9 +731,13 @@ namespace quda {
     double m5;
     double kappa5;
     int Ls; // length of the fifth dimension
-    void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
-public:
+    /**
+      @brief Check whether the input and output are valid 5D fields.
+     */
+    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+
+  public:
     DiracDomainWall(const DiracParam &param);
     DiracDomainWall(const DiracDomainWall &dirac);
     virtual ~DiracDomainWall();
@@ -848,6 +852,12 @@ public:
       double mobius_kappa_c;
       double mobius_kappa;
 
+      /**
+        @brief Check whether the input and output are valid 5D fields. If zMobius, we require that they
+        have the same 5th dimension as the one in record.
+       */
+      virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
+
     public:
       DiracMobius(const DiracParam &param);
       // DiracMobius(const DiracMobius &dirac);
@@ -931,6 +941,12 @@ public:
     double eofa_u[QUDA_MAX_DWF_LS];
     double eofa_x[QUDA_MAX_DWF_LS];
     double eofa_y[QUDA_MAX_DWF_LS];
+
+    /**
+      @brief Check whether the input and output are valid 5D fields, and we require that they
+      have the same 5th dimension as the one in record.
+     */
+    virtual void checkDWF(const ColorSpinorField &out, const ColorSpinorField &in) const;
 
   public:
     DiracMobiusEofa(const DiracParam &param);

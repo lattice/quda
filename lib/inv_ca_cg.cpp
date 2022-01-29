@@ -18,10 +18,6 @@ namespace quda {
     init(false),
     lambda_init(false),
     basis(param.ca_basis),
-    Q_AQandg(nullptr),
-    Q_AS(nullptr),
-    alpha(nullptr),
-    beta(nullptr),
     rp(nullptr),
     tmpp(nullptr),
     tmpp2(nullptr),
@@ -34,24 +30,22 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (init) {
-      if (Q_AQandg) delete []Q_AQandg;
-      if (Q_AS) delete []Q_AS;
-      if (alpha) delete []alpha;
-      if (beta) delete []beta;
 
       bool use_source = false; // needed for explicit residual recompute
                          // (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
                          // param.precision == param.precision_sloppy &&
                          // param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
-      if (basis == QUDA_POWER_BASIS) {
-        for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete S[i];
-      } else {
-        for (int i=0; i<param.Nkrylov; i++) if (i>0 || !use_source) delete S[i];
-        for (int i=0; i<param.Nkrylov; i++) delete AS[i];
+
+
+      if (!use_source) delete S[0];
+      for (int i = 0; i < param.Nkrylov; i++) {
+        delete AS[i];
+        // in the power basis we can alias AS[k] to S[k+1]
+        if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) { delete S[i]; }
+        delete Q[i];
+        delete Qtmp[i];
+        delete AQ[i];
       }
-      for (int i=0; i<param.Nkrylov; i++) delete Q[i];
-      for (int i=0; i<param.Nkrylov; i++) delete Qtmp[i];
-      for (int i=0; i<param.Nkrylov; i++) delete AQ[i];
 
       if (tmp_sloppy) delete tmp_sloppy;
       if (tmp_sloppy2) delete tmp_sloppy2;
@@ -224,7 +218,6 @@ namespace quda {
       mdagm.Expose()->M(*bp, x);
       blas::axpby(-1.0, *bp, 1.0, b);
     }
-
   }
 
   void CACG::create(ColorSpinorField &b)
@@ -235,10 +228,10 @@ namespace quda {
         profile.TPSTART(QUDA_PROFILE_INIT);
       }
 
-      Q_AQandg = new double[param.Nkrylov * (param.Nkrylov + 1)];
-      Q_AS = new double[param.Nkrylov * param.Nkrylov];
-      alpha = new double[param.Nkrylov];
-      beta = new double[param.Nkrylov * param.Nkrylov];
+      Q_AQandg.resize(param.Nkrylov * (param.Nkrylov + 1));
+      Q_AS.resize(param.Nkrylov * param.Nkrylov);
+      alpha.resize(param.Nkrylov);
+      beta.resize(param.Nkrylov * param.Nkrylov);
 
       bool mixed = param.precision != param.precision_sloppy;
       bool use_source = false; // need to preserve source for residual computation
@@ -256,32 +249,22 @@ namespace quda {
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
 
-      if (basis == QUDA_POWER_BASIS) {
-        // in power basis AS[k] = S[k+1], so we don't need a separate array
-        S.resize(param.Nkrylov+1);
-        AS.resize(param.Nkrylov);
-        Q.resize(param.Nkrylov);
-        AQ.resize(param.Nkrylov);
-        Qtmp.resize(param.Nkrylov); // for pointer swap
-        for (int i=0; i<param.Nkrylov+1; i++) {
-          S[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
-          if (i>0) AS[i-1] = S[i];
+      S.resize(param.Nkrylov);
+      AS.resize(param.Nkrylov);
+      Q.resize(param.Nkrylov);
+      AQ.resize(param.Nkrylov);
+      Qtmp.resize(param.Nkrylov); // only used as an intermediate for pointer swaps
+      S[0] = (use_source) ? &b : ColorSpinorField::Create(csParam);
+      for (int i = 0; i < param.Nkrylov; i++) {
+        AS[i] = ColorSpinorField::Create(csParam);
+        // in the power basis we can alias AS[k] to S[k+1]
+        if (i > 0) {
+          S[i] = (basis == QUDA_POWER_BASIS) ? AS[i-1] : ColorSpinorField::Create(csParam);
         }
-      } else {
-        S.resize(param.Nkrylov);
-        AS.resize(param.Nkrylov);
-        Q.resize(param.Nkrylov);
-        AQ.resize(param.Nkrylov);
-        Qtmp.resize(param.Nkrylov);
-        for (int i=0; i<param.Nkrylov; i++) {
-          S[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
-          AS[i] = ColorSpinorField::Create(csParam);
-        }
+        Q[i] = ColorSpinorField::Create(csParam);
+        Qtmp[i] = ColorSpinorField::Create(csParam);
+        AQ[i] = ColorSpinorField::Create(csParam);
       }
-
-      for (int i=0; i<param.Nkrylov; i++) Q[i] = ColorSpinorField::Create(csParam);
-      for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
-      for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
 
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -294,7 +277,7 @@ namespace quda {
   }
 
   // template!
-  template <int N> void compute_alpha_N(double *Q_AQandg, double *alpha)
+  template <int N> void compute_alpha_N(const std::vector<double>& Q_AQandg, std::vector<double>& alpha)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
     typedef Matrix<double, N, 1> vector;
@@ -307,7 +290,7 @@ namespace quda {
         matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
       }
     }
-    Map<vector> vecalpha(alpha,N);
+    Map<vector> vecalpha(alpha.data(),N);
 
     vecalpha = matQ_AQ.fullPivLu().solve(vecg);
 
@@ -350,7 +333,7 @@ namespace quda {
         vecg(i) = Q_AQandg[i * (N + 1) + N];
         for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
       }
-      Map<vector> vecalpha(alpha, N);
+      Map<vector> vecalpha(alpha.data(), N);
 
       vecalpha = matQ_AQ.fullPivLu().solve(vecg);
 
@@ -367,7 +350,7 @@ namespace quda {
   }
 
   // template!
-  template <int N> void compute_beta_N(double *Q_AQandg, double *Q_AS, double *beta)
+  template <int N> void compute_beta_N(const std::vector<double>& Q_AQandg, std::vector<double>& Q_AS, std::vector<double>& beta)
   {
     typedef Matrix<double, N, N, RowMajor> matrix;
 
@@ -377,7 +360,7 @@ namespace quda {
         matQ_AQ(i,j) = Q_AQandg[i*(N+1)+j];
       }
     }
-    Map<matrix> matQ_AS(Q_AS,N,N), matbeta(beta,N,N);
+    Map<matrix> matQ_AS(Q_AS.data(),N,N), matbeta(beta.data(),N,N);
 
     matQ_AQ = -matQ_AQ;
     matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
@@ -418,7 +401,7 @@ namespace quda {
       for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) { matQ_AQ(i, j) = Q_AQandg[i * (N + 1) + j]; }
       }
-      Map<matrix> matQ_AS(Q_AS, N, N), matbeta(beta, N, N);
+      Map<matrix> matQ_AS(Q_AS.data(), N, N), matbeta(beta.data(), N, N);
 
       matQ_AQ = -matQ_AQ;
       matbeta = matQ_AQ.fullPivLu().solve(matQ_AS);
@@ -448,7 +431,7 @@ namespace quda {
       maxrr = rNorm;
     }
 
-    //printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
+    // printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
 
     return updateR;
   }
@@ -461,6 +444,8 @@ namespace quda {
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
+
     const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
@@ -654,15 +639,15 @@ namespace quda {
           // 2. Solve Q_AQ beta = Q_AS
           std::vector<ColorSpinorField *> R(n_krylov);
           for (int i = 0; i < n_krylov; i++) R[i] = S[i];
-          blas::reDotProduct(Q_AS, AQ, R);
+          blas::reDotProduct(Q_AS.data(), AQ, R);
 
           compute_beta();
 
           // update direction vectors
-          blas::axpyz(beta, Q, R, Qtmp);
+          blas::axpyz(beta.data(), Q, R, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(Q[i], Qtmp[i]);
 
-          blas::axpyz(beta, AQ, AS, Qtmp);
+          blas::axpyz(beta.data(), AQ, AS, Qtmp);
           for (int i = 0; i < n_krylov; i++) std::swap(AQ[i], Qtmp[i]);
         }
 
@@ -673,21 +658,21 @@ namespace quda {
           std::vector<ColorSpinorField *> Q2(n_krylov + 1);
           for (int i = 0; i < n_krylov; i++) Q2[i] = AQ[i];
           Q2[n_krylov] = S[0];
-          blas::reDotProduct(Q_AQandg, Q, Q2);
+          blas::reDotProduct(Q_AQandg.data(), Q, Q2);
 
           compute_alpha();
         }
 
         // update the solution vector
         std::vector<ColorSpinorField *> X = {&x};
-        blas::axpy(alpha, Q, X);
+        blas::axpy(alpha.data(), Q, X);
 
         for (int i = 0; i < param.Nkrylov; i++) { alpha[i] = -alpha[i]; }
         std::vector<ColorSpinorField*> S0{S[0]};
 
         // Can we fuse these? We don't need this reduce in all cases...
-        blas::axpy(alpha, AQ, S0);
-        //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
+        blas::axpy(alpha.data(), AQ, S0);
+        // if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
         /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       } else {
         // fixed iterations
@@ -699,15 +684,15 @@ namespace quda {
         // 1. Compute "Q_AQ" = S^\dagger AS and g = S^dagger r = S^dagger S[0]
         // 2. Solve "Q_AQ" alpha = g
         std::vector<ColorSpinorField *> S2(n_krylov + 1);
-        for (int i = 0; i < n_krylov; i++) S2[i] = AS[i];
+        for (int i = 0; i < n_krylov; i++) { S2[i] = AS[i]; }
         S2[n_krylov] = S[0];
-        blas::reDotProduct(Q_AQandg, S, S2);
+        blas::reDotProduct(Q_AQandg.data(), S, S2);
 
         compute_alpha();
 
         // update the solution vector
         std::vector<ColorSpinorField *> X = {&x};
-        blas::axpy(alpha, S, X);
+        blas::axpy(alpha.data(), S, X);
 
         // no need to update AS
         r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
@@ -805,6 +790,8 @@ namespace quda {
     }
 
     PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda
