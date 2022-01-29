@@ -257,6 +257,11 @@ namespace quda {
       printfQuda("  Arg: %s\n", typeid(Arg).name());
       //fflush(stdout);
     }
+    //if (localSize[0]>arg.threads.x) {
+    //  localSize[0] = arg.threads.x;
+    //  printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
+    //	 str(localSize).c_str(), str(arg.threads).c_str());
+    //}
     try {
       q.submit([&](sycl::handler& h) {
 	//h.parallel_for<struct Kernel3Da>
@@ -303,6 +308,15 @@ namespace quda {
       printfQuda("  Functor: %s\n", typeid(Functor<Arg>).name());
       printfQuda("  Arg: %s\n", typeid(Arg).name());
     }
+    //if (localSize[0]>arg.threads.x) {
+    //  localSize[0] = arg.threads.x;
+    //  printfQuda("  global: %s  local: %s  threads: %s\n", str(globalSize).c_str(),
+    //	 str(localSize).c_str(), str(arg.threads).c_str());
+    //}
+    //while(true) {
+    //  auto nl = localSize[0] * localSize[1] * localSize[2];
+    //  if(nl<QUDA_WARP_SIZE) {
+    //localSize[1]
     //warningQuda("allocating kernel args");
     //auto p = device_malloc(sizeof(arg));
     //q.memcpy(p, &arg, sizeof(arg));

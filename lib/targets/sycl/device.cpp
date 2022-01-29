@@ -201,7 +201,7 @@ namespace quda
         //streams[i] = sycl::queue(ctx, myDevice, props);
         streams[i] = sycl::queue(ctx, myDevice, exception_handler, props);
       }
-      streams[Nstream-1] = sycl::queue(ctx, myDevice, props);
+      streams[Nstream-1] = sycl::queue(ctx, myDevice, exception_handler, props);
       printfQuda(" done\n");
       printfQuda("Testing submit...");
       auto q = streams[Nstream-1];

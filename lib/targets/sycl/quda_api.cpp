@@ -172,7 +172,7 @@ namespace quda
           //qudaMemcpy(dst, src, count, kind);
 	  auto q = device::get_target_stream(stream);
 	  q.memcpy(dst, src, count);
-	  q.wait();
+	  q.wait_and_throw();
         }
       } else {
         if (async) {
@@ -183,7 +183,7 @@ namespace quda
           //qudaMemset(dst, value, count);
 	  auto q = device::get_target_stream(stream);
 	  q.memset(dst, value, count);
-	  q.wait();
+	  q.wait_and_throw();
 	}
       }
     }
@@ -245,7 +245,7 @@ namespace quda
       d += dpitch;
       s += spitch;
     }
-    q.wait();
+    q.wait_and_throw();
   }
 
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
@@ -309,7 +309,7 @@ namespace quda
       q.memset(p, value, width);
       p += pitch;
     }
-    q.wait();
+    q.wait_and_throw();
   }
 
   void qudaMemset2DAsync_(void *ptr, size_t pitch, int value, size_t width,
@@ -367,7 +367,7 @@ namespace quda
                             const char *file, const char *line)
   {
     auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
-    (*pe).wait();
+    (*pe).wait_and_throw();
   }
 
   qudaEvent_t qudaEventCreate_(const char *func, const char *file, const char *line)
@@ -391,8 +391,8 @@ namespace quda
   {
     auto pe0 = reinterpret_cast<sycl::event *>(start.event);
     auto pe1 = reinterpret_cast<sycl::event *>(stop.event);
-    (*pe1).wait();
-    (*pe0).wait();
+    (*pe1).wait_and_throw();
+    (*pe0).wait_and_throw();
     auto t0 = (*pe0).get_profiling_info<sycl::info::event_profiling::command_end>();
     auto t1 = (*pe1).get_profiling_info<sycl::info::event_profiling::command_start>();
     auto elapsed_time = 1e-9*(t1-t0);
@@ -409,7 +409,7 @@ namespace quda
   void qudaEventSynchronize_(const qudaEvent_t &quda_event, const char *func, const char *file, const char *line)
   {
     auto pe = reinterpret_cast<sycl::event *>(quda_event.event);
-    (*pe).wait();
+    (*pe).wait_and_throw();
   }
 
   void qudaStreamSynchronize_(const qudaStream_t &stream, const char *func, const char *file, const char *line)
