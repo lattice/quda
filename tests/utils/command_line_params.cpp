@@ -48,6 +48,7 @@ int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
 int maxiter_precondition = 10;
+QudaVerbosity verbosity_precondition = QUDA_SUMMARIZE;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
@@ -66,6 +67,18 @@ bool inv_deflate = false;
 bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
+QudaAcceleratorType precon_accelerator_type = QUDA_INVALID_ACCELERATOR;
+
+double madwf_diagonal_suppressor = 0.0;
+int madwf_ls = 4;
+int madwf_null_miniter = niter;
+double madwf_null_tol = tol;
+int madwf_train_maxiter = niter;
+bool madwf_param_load = false;
+bool madwf_param_save = false;
+char madwf_param_infile[256] = "";
+char madwf_param_outfile[256] = "";
+
 int precon_schwarz_cycle = 1;
 int multishift = 1;
 bool verify_results = true;
@@ -100,6 +113,9 @@ QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
+
+int max_res_increase = 1;
+int max_res_increase_total = 10;
 
 quda::mgarray<QudaFieldLocation> solver_location = {};
 quda::mgarray<QudaFieldLocation> setup_location = {};
@@ -323,6 +339,9 @@ namespace
                                                          {"additive", QUDA_ADDITIVE_SCHWARZ},
                                                          {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
+  CLI::TransformPairs<QudaAcceleratorType> accelerator_type_map {{"invalid", QUDA_INVALID_ACCELERATOR},
+                                                                 {"madwf", QUDA_MADWF_ACCELERATOR}};
+
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
                                                            {"mat-pc", QUDA_MATPC_SOLUTION},
@@ -477,10 +496,18 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--max-res-increase", max_res_increase,
+                       "The number of consecutive true residual incrases allowed (default 1)");
+  quda_app->add_option("--max-res-increase-total", max_res_increase_total,
+                       "The total number of true residual incrases allowed (default 10)");
   quda_app->add_option("--native-blas-lapack", native_blas_lapack,
                        "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
+  quda_app
+    ->add_option("--verbosity-precondition", verbosity_precondition,
+                 "The the verbosity of the preconditioner (default summarize)")
+    ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 
@@ -510,6 +537,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->add_option("--precon-schwarz-type", precon_schwarz_type,
                  "The type of Schwarz preconditioning to use (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app
+    ->add_option("--precon-accelerator-type", precon_accelerator_type,
+                 "The type of Schwarz preconditioning to use (default=invalid)")
+    ->transform(CLI::QUDACheckedTransformer(accelerator_type_map));
+
   quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle,
                        "The number of Schwarz cycles to apply per smoother application (default=1)");
 
@@ -958,6 +990,26 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
+}
+
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("MADWF", "Options controlling MADWF parameteres");
+
+  opgroup->add_option("--madwf-diagonal-suppressor", madwf_diagonal_suppressor,
+                      "Set the digonal suppressor for MADWF (default 0)");
+  opgroup->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
+
+  opgroup->add_option("--madwf-null-miniter", madwf_null_miniter,
+                      "Min iteration after which to generate null vectors for MADWF");
+  opgroup->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
+  opgroup->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
+
+  opgroup->add_option("--madwf-param-load", madwf_param_load, "Whether or not load trained parameters for MADWF");
+  opgroup->add_option("--madwf-param-save", madwf_param_save, "Whether or not save trained parameters for MADWF");
+
+  opgroup->add_option("--madwf-param-infile", madwf_param_infile, "Where to load trained parameters for MADWF from");
+  opgroup->add_option("--madwf-param-outfile", madwf_param_outfile, "Where to save trained parameters for MADWF to");
 }
 
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app)
