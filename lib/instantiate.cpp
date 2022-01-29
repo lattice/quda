@@ -11,7 +11,7 @@ namespace quda
 {
 
   // declared in instantiate.h
-  constexpr std::array<QudaReconstructType, 5> ReconstructFull::recon;
+  constexpr std::array<QudaReconstructType, 6> ReconstructFull::recon;
   constexpr std::array<QudaReconstructType, 3> ReconstructWilson::recon;
   constexpr std::array<QudaReconstructType, 3> ReconstructStaggered::recon;
   constexpr std::array<QudaReconstructType, 2> ReconstructNo12::recon;

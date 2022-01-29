@@ -47,11 +47,11 @@ namespace quda {
 
     void axpyZpbx(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, double b);
     void axpyBzpcx(double a, ColorSpinorField& x, ColorSpinorField& y, double b, ColorSpinorField& z, double c);
+    void axpbypczw(double a, ColorSpinorField &x, double b, ColorSpinorField &y, double c, ColorSpinorField &z,
+                   ColorSpinorField &w);
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
-    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, const Complex &c,
-                    ColorSpinorField &z, ColorSpinorField &w);
     void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
     void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
     void caxpyBzpx(const Complex &, ColorSpinorField &, ColorSpinorField &, const Complex &, ColorSpinorField &);
@@ -261,6 +261,95 @@ namespace quda {
        @param y[in,out] Computed output matrix
     */
     void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "axpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
+
+       The dimensions of a can be rectangular, e.g., the width of x
+       and y need not be same, though the maximum width for both is
+       16.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    void axpyz(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+               std::vector<ColorSpinorField *> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "axpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void axpyz(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    /**
+       @brief Compute the block "axpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
+
+       Where 'a' is assumed to be upper triangular.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    void axpyz_U(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                 std::vector<ColorSpinorField *> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "axpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void axpyz_U(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
+
+    /**
+       @brief Compute the block "axpyz" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       z = x * a + y
+
+       Where 'a' is assumed to be lower triangular
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in] vector of input ColorSpinorFields
+       @param z[out] vector of output ColorSpinorFields
+    */
+    void axpyz_L(const double *a, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                 std::vector<ColorSpinorField *> &z);
+
+    /**
+       @brief This is a wrapper for calling the block "axpyz" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       z = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in] Computed output matrix
+       @param z[out] vector of input/output ColorSpinorFields
+    */
+    void axpyz_L(const double *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     /**
        @brief Compute the block "caxpyz" with over the set of
