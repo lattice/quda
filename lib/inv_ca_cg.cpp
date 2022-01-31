@@ -40,9 +40,7 @@ namespace quda {
       for (int i = 0; i < param.Nkrylov; i++) {
         delete AS[i];
         // in the power basis we can alias AS[k] to S[k+1]
-        if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) {
-          delete S[i];
-        }
+        if (i > 0 && basis == QUDA_CHEBYSHEV_BASIS) { delete S[i]; }
         delete Q[i];
         delete Qtmp[i];
         delete AQ[i];
@@ -213,7 +211,6 @@ namespace quda {
       mdagm.Expose()->M(*bp, x);
       blas::axpby(-1.0, *bp, 1.0, b);
     }
-
   }
 
   void CACG::create(ColorSpinorField &b)
@@ -427,7 +424,7 @@ namespace quda {
       maxrr = rNorm;
     }
 
-    //printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
+    // printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
 
     return updateR;
   }
@@ -440,6 +437,8 @@ namespace quda {
   */
   void CACG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (param.is_preconditioner) commGlobalReductionPush(param.global_reduction);
+
     const int n_krylov = param.Nkrylov;
 
     if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
@@ -666,7 +665,7 @@ namespace quda {
 
         // Can we fuse these? We don't need this reduce in all cases...
         blas::axpy(alpha.data(), AQ, S0);
-        //if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
+        // if (getVerbosity() >= QUDA_VERBOSE) r2 = blas::norm2(*S[0]);
         /*else*/ r2 = Q_AQandg[param.Nkrylov]; // actually the old r2... so we do one more iter than needed...
       } else {
         // fixed iterations
@@ -784,6 +783,8 @@ namespace quda {
     }
 
     PrintSummary("CA-CG", total_iter, r2, b2, stop, param.tol_hq);
+
+    if (param.is_preconditioner) commGlobalReductionPop();
   }
 
 } // namespace quda
