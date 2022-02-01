@@ -1139,20 +1139,19 @@ namespace quda {
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
     bool init;
-    const bool use_source; // whether we can reuse the source vector
 
     // Basis. Currently anything except POWER_BASIS causes a warning
     // then swap to POWER_BASIS.
     QudaCABasis basis;
 
-    Complex *alpha; // Solution coefficient vectors
+    std::vector<Complex> alpha; // Solution coefficient vectors
 
-    ColorSpinorField *rp;
-    ColorSpinorField *tmpp;
-    ColorSpinorField *tmp_sloppy;
+    ColorSpinorField r;
+    ColorSpinorField tmp;
+    ColorSpinorField tmp_sloppy;
 
-    std::vector<ColorSpinorField*> p;  // GCR direction vectors
-    std::vector<ColorSpinorField*> q;  // mat * direction vectors
+    std::vector<ColorSpinorField> p;  // GCR direction vectors
+    std::vector<ColorSpinorField> q;  // mat * direction vectors
 
     /**
        @brief Initiate the fields needed by the solver
@@ -1169,7 +1168,7 @@ namespace quda {
        @param[in] q Search direction vectors with the operator applied
        @param[in] b Source vector against which we are solving
     */
-    void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
+    void solve(std::vector<Complex> &psi, std::vector<ColorSpinorField> &q, ColorSpinorField &b);
 
 public:
   CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,

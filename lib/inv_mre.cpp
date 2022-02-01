@@ -23,8 +23,6 @@ namespace quda {
 
     // form the a Nx(N+1) matrix using only a single reduction - this
     // presently requires forgoing the matrix symmetry, but the improvement is well worth it
-    csfield_ref_vec Q{q.begin(), q.end()};
-    Q.push_back(b);
 
     std::vector<Complex> A_(N * (N + 1));
 
@@ -32,12 +30,12 @@ namespace quda {
       // linear system is Hermitian, solve directly
       // compute rhs vector phi = P* b = (q_i, b) and construct the matrix
       // P* Q = P* A P = (p_i, q_j) = (p_i, A p_j)
-      blas::cDotProduct(A_, p, Q);
+      blas::cDotProduct(A_, p, make_set(q, b));
     } else {
       // linear system is not Hermitian, solve the normal system
       // compute rhs vector phi = Q* b = (q_i, b) and construct the matrix
       // Q* Q = (A P)* (A P) = (q_i, q_j) = (A p_i, A p_j)
-      blas::cDotProduct(A_, q, Q);
+      blas::cDotProduct(A_, q, make_set(q, b));
     }
 
     for (int i=0; i<N; i++) {
@@ -86,9 +84,6 @@ namespace quda {
       return;
     }
 
-    // Solution coefficient vectors
-    std::vector<Complex> alpha(N);
-
     double b2 = getVerbosity() >= QUDA_SUMMARIZE ? blas::norm2(b) : 0.0;
 
     // Orthonormalise the vector basis
@@ -99,14 +94,14 @@ namespace quda {
         if (!apply_mat) blas::ax(1 / sqrt(p2), q[i]);
 
         if (i + 1 < N) {
-          std::vector<Complex> alpha_{alpha.begin() + i + 1, alpha.end()};
-          blas::cDotProduct(alpha_, csfield_ref_vec{p[i]}, csfield_ref_vec{p.begin() + i + 1, p.end()});
+          std::vector<Complex> alpha(N - (i + 1));
+          blas::cDotProduct(alpha, p[i], make_range(p.begin() + i + 1, p.end()));
           for (int j = i + 1; j < N; j++) alpha[j] = -alpha[j];
-          blas::caxpy(alpha_, csfield_ref_vec{p[i]}, csfield_ref_vec{p.begin() + i + 1, p.end()});
+          blas::caxpy(alpha, p[i], make_range(p.begin() + i + 1, p.end()));
 
           if (!apply_mat) {
             // if not applying the matrix below then orthogonalize q
-            blas::caxpy(alpha_, csfield_ref_vec{q[i]}, csfield_ref_vec{q.begin() + i + 1, q.end()});
+            blas::caxpy(alpha, q[i], make_range(q.begin() + i + 1, q.end()));
           }
         }
       }
@@ -115,15 +110,17 @@ namespace quda {
     // if operator hasn't already been applied then apply
     if (apply_mat) for (int i = 0; i < N; i++) mat(q[i], p[i]);
 
+    // Solution coefficient vectors
+    std::vector<Complex> alpha(N);
     solve(alpha, p, q, b, hermitian);
 
     blas::zero(x);
-    blas::caxpy(alpha, p, csfield_ref_vec{x});
+    blas::caxpy(alpha, p, x);
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       // compute the residual only if we're going to print it
       for (int i = 0; i < N; i++) alpha[i] = -alpha[i];
-      blas::caxpy(alpha, q, csfield_ref_vec{b});
+      blas::caxpy(alpha, q, b);
       printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, sqrt(blas::norm2(b) / b2));
     }
 

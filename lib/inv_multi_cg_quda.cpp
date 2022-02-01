@@ -93,17 +93,21 @@ namespace quda {
     void apply(const qudaStream_t = device::get_default_stream())
     {
       static int count = 0;
-
       auto n_upper = std::min(((count + 1) * n_shift ) / n_update + 1, n_shift);
       auto n_lower = (count * n_shift) / n_update + 1;
-      auto n = n_upper - n_lower;
-      std::vector<ColorSpinorField*> P(n), X(n);
+
       for (int j = n_lower; j < n_upper; j++) {
-	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
-	P[j - n_lower] = &p[j];
-	X[j - n_lower] = &x[j];
+        beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
       }
-      if (P.size()) blas::axpyBzpcx(&alpha[n_lower], P, X, &zeta[n_lower], r, &beta[n_lower]);
+
+      if (n_upper > n_lower)
+        blas::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper},
+                        make_range(p.begin() + n_lower, p.begin() + n_upper),
+                        make_range(x.begin() + n_lower, x.begin() + n_upper),
+                        {zeta.begin() + n_lower, zeta.begin() + n_upper},
+                        r,
+                        {beta.begin() + n_lower, beta.begin() + n_upper});
+
       if (++count == n_update) count = 0;
     }
   };
@@ -155,8 +159,7 @@ namespace quda {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       r_sloppy = mixed ? ColorSpinorField(csParam) : r.create_alias(csParam);
 
-      p.resize(num_offset);
-      for (int i = 0; i < num_offset; i++) p[i] = ColorSpinorField(r_sloppy);
+      p.resize(num_offset, ColorSpinorField(r_sloppy));
 
       csParam.create = QUDA_NULL_FIELD_CREATE;
       Ap = ColorSpinorField(csParam);

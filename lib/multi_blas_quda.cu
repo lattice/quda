@@ -7,6 +7,8 @@ namespace quda {
 
   namespace blas {
 
+    using csfield_ref_vec = std::vector<ColorSpinorField_ref>;
+
     template <template <typename ...> class Functor, typename store_t, typename y_store_t, int nSpin, typename T>
     class MultiBlas : public TunableGridStrideKernel3D
     {
