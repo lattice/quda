@@ -160,18 +160,8 @@ namespace quda {
     // Can take this from 'orthoDir' in inv_gcr_quda.cpp, hard code pipelining up to l = 8.
     for (int j = 1; j <= n_krylov; j++) {
 
-      // Formerly orthoDir
+      // Perform a (pipelined) orthogonalization of r_j against r_{1 ... j-1}
       { 
-        // This becomes a fused operator below.
-        /*for (int i = 1; i < j; i++)
-        {
-          // tau_ij = <r_i,r_j>/sigma_i.
-          tau[i][j] = blas::cDotProduct(*r[i], *r[j])/sigma[i];
-          
-          // r_j = r_j - tau_ij r_i;
-          blas::caxpy(-tau[i][j], *r[i], *r[j]);
-        }*/
-
         switch (pipeline)
         {
           case 0: // no kernel fusion
@@ -221,11 +211,6 @@ namespace quda {
       
       
       // sigma_j = r_j^2, gamma'_j = <r_0, r_j>/sigma_j
-      
-      // This becomes a fused operator below.
-      //sigma[j] = blas::norm2(*r[j]);
-      //gamma_prime[j] = blas::cDotProduct(*r[j], *r[0])/sigma[j];
-      
       // rjr.x = Re(<r[j],r[0]), rjr.y = Im(<r[j],r[0]>), rjr.z = <r[j],r[j]>
       double3 rjr = blas::cDotProductNormA(*r[j], *r[0]); 
       sigma[j] = rjr.z;
@@ -254,9 +239,8 @@ namespace quda {
     // Update x, r, u.
     // x = x+ gamma_1 r_0, r_0 = r_0 - gamma'_l r_l, u_0 = u_0 - gamma_l u_l, where l = n_krylov.
     
-    // formerly updateUEnd
+    // Update U
     {
-      // for (j = 0; j < n_krylov; j++) { caxpy(-gamma[j], *u[j+1], *u[0]); }
       std::vector<Complex> gamma_(n_krylov);
       for (int i = 0; i < n_krylov; i++) { gamma_[i] = -gamma[i + 1]; }
 
@@ -266,15 +250,8 @@ namespace quda {
       blas::caxpy(gamma_.data(), u_, u0);
     }
 
-    // formerly updateXREnd
+    // Update X and R, which has opportunities for reuse
     {
-      // blas::caxpy(gamma[1], *r[0], x_sloppy);
-      // blas::caxpy(-gamma_prime[n_krylov], *r[n_krylov], *r[0]);
-      // for (j = 1; j < n_krylov; j++) {
-      //  blas::caxpy(gamma_gamma_prime[j], *r[j], x_sloppy);
-      //  blas::caxpy(-gamma_prime[j], *r[j], *r[0]);
-      //}
-
       // This does two "wasted" caxpys (so 2*n_krylov+2 instead of 2*n_kKrylov), but
       // the alternative way would be un-fusing some calls, which would require
       // loading and saving x twice. In a solve where the sloppy precision is lower than
@@ -683,10 +660,6 @@ namespace quda {
         
         // for i = 0 .. j, u[i] = r[i] - beta*u[i]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        /*for (int i = 0; i <= j; i++)
-        {
-          blas::caxpby(1.0, *r[i], -beta, *u[i]);
-        }*/
         blas::caxpby(1.0, *r[j], -beta, *u[j]);
         if (j > 0)
         {
@@ -708,10 +681,6 @@ namespace quda {
 
         // for i = 0 .. j, r[i] = r[i] - alpha u[i+1]
         // All but i = j is hidden in Dslash auxillary work (overlapping comms and compute).
-        /*for (int i = 0; i <= j; i++)
-        { 
-          blas::caxpy(-alpha, *u[i+1], *r[i]);
-        }*/
         blas::caxpy(-alpha, *u[j+1], *r[j]);
         // We can always at least update x.
         dslash::aux_worker = &bicgstabl_update;
