@@ -13,8 +13,16 @@
 #include <util_quda.h>
 #include <eigen_helper.h>
 
+// Use an implementation of the MinRes portion of BiCGstab-L which explicitly
+// matches what's described in the original paper --- the non-legacy (default)
+// path uses a BLAS-3 approach to MinRes which is empirically a bit less
+// stable (in terms of iteration count) but more than compensates for that
+// with improved time-to-solution
+// #define LEGACY_MR
+
 namespace quda {
 
+#ifndef LEGACY_MR
   // Compute the MR portion of BiCGstab-L
   void BiCGstabL::computeMR(ColorSpinorField &x_sloppy, bool fixed_iteration)
   {
@@ -113,9 +121,27 @@ namespace quda {
 
   }
 
+  void BiCGstabL::computeTau(int, int, int) {
+    errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
+  }
+
+  void BiCGstabL::updateR(int, int, int) {
+    errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
+  }
+
+  void BiCGstabL::legacyComputeMR(ColorSpinorField&) {
+    errorQuda("Legacy MR path in BiCGstab-L called with a non-legacy compile");
+  }
+
+#else
+
+  void BiCGstabL::computeMR(ColorSpinorField&, bool)
+  {
+    errorQuda("Non-legacy MR path in BiCGstab-L called with a legacy compile");
+  }
+
   // Utility functions for Gram-Schmidt. Based on GCR functions.
   // Big change is we need to go from 1 to n_krylov, not 0 to n_krylov-1.
-
   void BiCGstabL::computeTau(int begin, int size, int j)
   {
     std::vector<Complex> Tau(size);
@@ -270,6 +296,9 @@ namespace quda {
 
     }
   }
+
+
+#endif // ifndef LEGACY_MR
   
   /**
      The following code is based on Kate's worker class in Multi-CG.
@@ -693,13 +722,15 @@ namespace quda {
 
       } // End BiCG part.
 
+#ifndef LEGACY_MR
       // Perform the MR portion of BiCGstab-L
       // if we're doing a fixed number of iterations, we only need to update x
       computeMR(x_sloppy, fixed_iteration);
-
+#else
       // Legacy version matching the BiCGstab-L paper which performs
       // an explicit Gram-Schmidt for the MR portion
-      // legacyComputeMR(x_sloppy);
+      legacyComputeMR(x_sloppy);
+#endif
 
       if (!fixed_iteration) {
         // sigma[0] = r_0^2
