@@ -1290,17 +1290,34 @@ struct mgInputStruct {
   bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
   bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
-  // Setup
-  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
+  /**
+   * Setup:
+   * There is no near-null vector generation on the first and last (coarsest) level.
+   * - The second level is the KD preconditioned staggered/HISQ operator, which is not a coarsening of the fine operator
+   * - By definition there is no coarsening of the coarsest level
+   * For this reason most of these variables are ignored on the first and last level.
+   * We do reuse `nvec` on the coarsest level to specify the size of coarsest-level deflation basis
+   * For reference: geo_block_size[0] does get defined internally (1 1 1 1 for optimized, 2 2 2 2 for coarse KD)
+   */
+  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, reused for deflation size on last level
   QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
   double setup_tol[QUDA_MAX_MG_LEVEL];           // ignored on first and last level
   double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
   int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];    // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first (1 1 1 1 for optimized, 2 2 2 2 for coarse KD) and last level
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (values on first level are prescribed)
 
-  // Solve
+  /**
+   * Solve:
+   * The coarse solver parameters are ignored on the first level because it is
+   * the outer solver, and as such we reuse values specified in MILC (tolerance, max iterations)
+   * Some of these are fixed (for now) and will be exposed in the future:
+   * - Solve type (for now fixed to full operator, will eventually expose Schur operator)
+   * - Solver (for now fixed to GCR, will eventually expose PCG for Schur operator)
+   * The smoother types are ignored for the coarsest level because, by definition, there is no
+   * still coarser operator to smooth
+   */
   QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
   QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
   double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
@@ -1441,7 +1458,7 @@ struct mgInputStruct {
     coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
     coarse_solver_tol[3] = 0.25;
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
-    coarse_solver_ca_basis_size[3] = 16; // generally unused
+    coarse_solver_ca_basis_size[3] = 16; // ignored for non-CA solvers
 
     /* Misc */
     mg_verbosity[0] = QUDA_SUMMARIZE;
