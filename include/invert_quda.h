@@ -959,22 +959,22 @@ namespace quda {
 
     // pointers to fields to avoid multiple creation overhead
     // full precision fields
-    std::unique_ptr<ColorSpinorField> r_fullp;   //! Full precision residual.
-    std::unique_ptr<ColorSpinorField> yp;        //! Full precision temporary.
+    std::unique_ptr<ColorSpinorField> r_fullp; //! Full precision residual.
+    std::unique_ptr<ColorSpinorField> yp;      //! Full precision temporary.
     // sloppy precision fields
-    std::unique_ptr<ColorSpinorField> tempp;          //! Sloppy temporary vector.
+    std::unique_ptr<ColorSpinorField> tempp; //! Sloppy temporary vector.
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
 
     // Saved, preallocated vectors. (may or may not get used depending on precision.)
     ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
     ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
-    ColorSpinorField* r_sloppy_saved_p; //! Current residual, in BiCG language.
+    ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
 
     /**
      @brief Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
-    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);    
+    int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
     /**
      * @brief Internal routine for performing the MR part of BiCGstab-L
@@ -995,7 +995,7 @@ namespace quda {
     /**
      * @brief Internal routine that comptues the "tau" matrix as described in
      *        the original BiCGstab-L paper, supporting pipelining
-     * 
+     *
      * @param begin [in] begin offset for pipelining
      * @param size [in] length of pipelining
      * @param j [in] row of tau being computed
@@ -1005,7 +1005,7 @@ namespace quda {
     /**
      * @brief Internal routine that updates R as described in
      *        the original BiCGstab-L paper, supporting pipelining.
-     * 
+     *
      * @param begin [in] begin offset for pipelining
      * @param size [in] length of pipelining
      * @param j [in] row of tau being computed
@@ -1028,7 +1028,8 @@ namespace quda {
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals n_krylov.
 
   public:
-    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
+    BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matEig, SolverParam &param,
+              TimeProfile &profile);
     virtual ~BiCGstabL();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);

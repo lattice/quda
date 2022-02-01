@@ -299,8 +299,8 @@ namespace quda {
       case QUDA_GAUGE_LAPLACEPC_DIRAC:
         steps = 2;
         break;
-         default:
-           errorQuda("Unsupported Dslash type %d.\n", type);
+      default:
+        errorQuda("Unsupported Dslash type %d.\n", type);
         steps = 0;
         break;
     }
