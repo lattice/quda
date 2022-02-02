@@ -102,8 +102,8 @@ namespace quda {
 
       if (n_upper > n_lower)
         blas::axpyBzpcx({alpha.begin() + n_lower, alpha.begin() + n_upper},
-                        make_range(p.begin() + n_lower, p.begin() + n_upper),
-                        make_range(x.begin() + n_lower, x.begin() + n_upper),
+                        {p.begin() + n_lower, p.begin() + n_upper},
+                        {x.begin() + n_lower, x.begin() + n_upper},
                         {zeta.begin() + n_lower, zeta.begin() + n_upper},
                         r,
                         {beta.begin() + n_lower, beta.begin() + n_upper});

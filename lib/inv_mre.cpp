@@ -95,13 +95,13 @@ namespace quda {
 
         if (i + 1 < N) {
           std::vector<Complex> alpha(N - (i + 1));
-          blas::cDotProduct(alpha, p[i], make_range(p.begin() + i + 1, p.end()));
+          blas::cDotProduct(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
           for (int j = i + 1; j < N; j++) alpha[j] = -alpha[j];
-          blas::caxpy(alpha, p[i], make_range(p.begin() + i + 1, p.end()));
+          blas::caxpy(alpha, {p[i]}, {p.begin() + i + 1, p.end()});
 
           if (!apply_mat) {
             // if not applying the matrix below then orthogonalize q
-            blas::caxpy(alpha, q[i], make_range(q.begin() + i + 1, q.end()));
+            blas::caxpy(alpha, {q[i]}, {q.begin() + i + 1, q.end()});
           }
         }
       }

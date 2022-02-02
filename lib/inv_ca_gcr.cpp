@@ -262,7 +262,7 @@ namespace quda {
       solve(alpha, q, p[0]);
 
       // need to make sure P is only length n_krylov
-      blas::caxpy(alpha, make_subset(p, 0, n_krylov), x);
+      blas::caxpy(alpha, {p.begin(), p.begin() + n_krylov}, {x});
 
       // no need to compute residual vector if not returning
       // residual vector and only doing a single fixed iteration
