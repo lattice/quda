@@ -265,20 +265,23 @@ namespace quda {
     int steps = 0;
     switch (type)
     {
-      case QUDA_COARSE_DIRAC: // single fused operator
-      case QUDA_GAUGE_LAPLACE_DIRAC:
-      case QUDA_GAUGE_COVDEV_DIRAC:
-	steps = 1;
-	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
-      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
-      case QUDA_STAGGERED_DIRAC:
-      case QUDA_ASQTAD_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC:
       case QUDA_TWISTED_CLOVER_DIRAC:
       case QUDA_TWISTED_MASS_DIRAC:
+      case QUDA_STAGGERED_DIRAC:
+      case QUDA_ASQTAD_DIRAC:
+      case QUDA_STAGGEREDKD_DIRAC:
+      case QUDA_ASQTADKD_DIRAC:
+      case QUDA_COARSE_DIRAC:
+      case QUDA_GAUGE_LAPLACE_DIRAC:
+      case QUDA_GAUGE_COVDEV_DIRAC:
+        steps = 1; // single fused operator
+        break;
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC: // implemented as separate even, odd
         steps = 2; // For D_{eo} and D_{oe} piece.
         break;
       case QUDA_WILSONPC_DIRAC:
@@ -287,6 +290,7 @@ namespace quda {
       case QUDA_DOMAIN_WALLPC_DIRAC:
       case QUDA_DOMAIN_WALL_4DPC_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:
+      case QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC:
       case QUDA_STAGGEREDPC_DIRAC:
       case QUDA_ASQTADPC_DIRAC:
       case QUDA_TWISTED_CLOVERPC_DIRAC:
@@ -295,13 +299,13 @@ namespace quda {
       case QUDA_GAUGE_LAPLACEPC_DIRAC:
         steps = 2;
         break;
-	  default:
-	    errorQuda("Unsupported Dslash type %d.\n", type);
+      default:
+        errorQuda("Unsupported Dslash type %d.\n", type);
         steps = 0;
         break;
     }
-    
-    return steps; 
+
+    return steps;
   }
 
   void Dirac::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const

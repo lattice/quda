@@ -36,7 +36,6 @@ namespace quda {
                          // param.precision == param.precision_sloppy &&
                          // param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
-
       if (!use_source) delete S[0];
       for (int i = 0; i < param.Nkrylov; i++) {
         delete AS[i];
@@ -46,12 +45,6 @@ namespace quda {
         delete Qtmp[i];
         delete AQ[i];
       }
-
-      if (tmp_sloppy) delete tmp_sloppy;
-      if (tmp_sloppy2) delete tmp_sloppy2;
-      if (tmpp) delete tmpp;
-      if (tmpp2) delete tmpp2;
-      if (rp) delete rp;
     }
 
     destroyDeflationSpace();
@@ -242,9 +235,9 @@ namespace quda {
       csParam.create = QUDA_NULL_FIELD_CREATE;
 
       // Source needs to be preserved if we're computing the true residual
-      rp = (mixed && !use_source) ? ColorSpinorField::Create(csParam) : nullptr;
-      tmpp = ColorSpinorField::Create(csParam);
-      tmpp2 = ColorSpinorField::Create(csParam);
+      rp = std::unique_ptr<ColorSpinorField>((mixed && !use_source) ? ColorSpinorField::Create(csParam) : nullptr);
+      tmpp = std::unique_ptr<ColorSpinorField>(ColorSpinorField::Create(csParam));
+      tmpp2 = std::unique_ptr<ColorSpinorField>(ColorSpinorField::Create(csParam));
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
@@ -267,8 +260,8 @@ namespace quda {
       }
 
       //sloppy temporary for mat-vec
-      tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
-      tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+      tmp_sloppy = std::unique_ptr<ColorSpinorField>(mixed ? ColorSpinorField::Create(csParam) : nullptr);
+      tmp_sloppy2 = std::unique_ptr<ColorSpinorField>(mixed ? ColorSpinorField::Create(csParam) : nullptr);
 
       if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
 
