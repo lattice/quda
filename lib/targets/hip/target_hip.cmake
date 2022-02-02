@@ -1,8 +1,4 @@
 # ######################################################################################################################
-# CUDA target -- PARENT_SCOPE will make it visible in top-level CMakeLists.txt to allow substitution in  QUDAConfig.cmake
-set(QUDA_TARGET_HIP ON PARENT_SCOPE)
-
-# ######################################################################################################################
 # CUDA specific part of CMakeLists
 
 include(CheckLanguage)
@@ -32,7 +28,10 @@ set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
     CACHE STRING "set the GPU architecture (gfx906 gfx908 gfx90a)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS gfx906 gfx908 gfx90a)
-mark_as_advanced(CMAKE_CUDA_ARCHITECTURES)
+
+set(CMAKE_HIP_ARCHITECTURES ${QUDA_GPU_ARCH})
+mark_as_advanced(CMAKE_HIP_ARCHITECTURES)
+
 
 # ######################################################################################################################
 # define CUDA flags

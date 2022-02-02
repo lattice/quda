@@ -86,6 +86,14 @@ if(TARGET_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
+### Dependent option 
+if( QUDA_TARGET_TYPE STREQUAL "CUDA" )
+  set(QUDA_TARGET_CUDA ON)
+elseif( QUDA_TARGET_TYPE STREQUAL "HIP" )
+  set(QUDA_TARGET_HIP ON)
+endif()
+
+
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} show

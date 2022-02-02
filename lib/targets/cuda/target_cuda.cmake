@@ -1,8 +1,4 @@
 # ######################################################################################################################
-# CUDA target - Parent Scope makes it visible in toplevel CMakeLists.txt for substituion into QUDAConfig.cmake 
-set(QUDA_TARGET_CUDA ON PARENT_SCOPE)
-
-# ######################################################################################################################
 # CUDA specific part of CMakeLists
 
 find_package(CUDAToolkit REQUIRED)
