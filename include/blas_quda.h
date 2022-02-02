@@ -119,8 +119,8 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                   std::vector<ColorSpinorField_ref> &&y);
+    void axpy(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+              std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Overloaded version of block axpy that allows us to call
@@ -130,7 +130,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-    void axpy(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy_impl(a, make_set(x), make_set(y)); }
+    void axpy(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "axpy_U" with over the set of
@@ -144,8 +144,8 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_U_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                     std::vector<ColorSpinorField_ref> &&y);
+    void axpy_U(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+                std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Wrapper function for block axpy_U that allows us to call
@@ -155,7 +155,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-    void axpy_U(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy_U_impl(a, make_set(x), make_set(y)); }
+    void axpy_U(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy_U(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "axpy_L" with over the set of
@@ -169,8 +169,8 @@ namespace quda {
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void axpy_L_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                     std::vector<ColorSpinorField_ref> &&y);
+    void axpy_L(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+                std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Wrapper function for block axpy_L that allows us to call
@@ -180,7 +180,7 @@ namespace quda {
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-    void axpy_L(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy_L_impl(a, make_set(x), make_set(y)); }
+    void axpy_L(const std::vector<double> &a, T1 &&x, T2 &&y) { axpy_L(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "caxpy" with over the s
@@ -196,8 +196,8 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                    std::vector<ColorSpinorField_ref> &&y);
+    void caxpy(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+               std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Wrapper function for block caxpy that allows us to call
@@ -207,7 +207,7 @@ et of
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-      void caxpy(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy_impl(a, make_set(x), make_set(y)); }
+    void caxpy(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "caxpy_U" with over the set of
@@ -221,8 +221,8 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_U_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                      std::vector<ColorSpinorField_ref> &&y);
+    void caxpy_U(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+                 std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Wrapper function for block caxpy_U that allows us to call
@@ -232,7 +232,7 @@ et of
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-    void caxpy_U(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy_U_impl(a, make_set(x), make_set(y)); }
+    void caxpy_U(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy_U(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "caxpy_L" with over the set of
@@ -246,8 +246,8 @@ et of
        @param x[in] vector of input ColorSpinorFields
        @param y[in,out] vector of input/output ColorSpinorFields
     */
-    void caxpy_L_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                      std::vector<ColorSpinorField_ref> &&y);
+    void caxpy_L(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+                 std::vector<ColorSpinorField_ref> &&y);
 
     /**
        @brief Wrapper function for block caxpy_L that allows us to call
@@ -257,7 +257,7 @@ et of
        @param y[in,out] vector of input/output ColorSpinorFields
     */
     template <typename T1, typename T2>
-    void caxpy_L(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy_L_impl(a, make_set(x), make_set(y)); }
+    void caxpy_L(const std::vector<Complex> &a, T1 &&x, T2 &&y) { caxpy_L(a, make_set(x), make_set(y)); }
 
     /**
        @brief Compute the block "axpyz" with over the set of
@@ -274,8 +274,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                    std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
+    void axpyz(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+               std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
        @brief Wrapper function for block axpyz that allows us to call
@@ -288,7 +288,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void axpyz(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz_impl(a, make_set(x), make_set(y), make_set(z));
+      axpyz(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -304,8 +304,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_U_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                      std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
+    void axpyz_U(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+                 std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
        @brief Wrapper function for block axpyz_U that allows us to call
@@ -318,7 +318,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void axpyz_U(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz_U_impl(a, make_set(x), make_set(y), make_set(z));
+      axpyz_U(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -334,7 +334,7 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void axpyz_L_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+    void axpyz_L(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
                       std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
@@ -348,7 +348,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void axpyz_L(const std::vector<double> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      axpyz_L_impl(a, make_set(x), make_set(y), make_set(z));
+      axpyz_L(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -366,8 +366,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                     std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
+    void caxpyz(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+                std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
        @brief Wrapper function for block caxpyz that allows us to call
@@ -380,7 +380,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void caxpyz(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz_impl(a, make_set(x), make_set(y), make_set(z));
+      caxpyz(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -396,8 +396,8 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_U_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                       std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
+    void caxpyz_U(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+                  std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
        @brief Wrapper function for block caxpyz_U that allows us to call
@@ -410,7 +410,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void caxpyz_U(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz_U_impl(a, make_set(x), make_set(y), make_set(z));
+      caxpyz_U(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -426,7 +426,7 @@ et of
        @param y[in] vector of input ColorSpinorFields
        @param z[out] vector of output ColorSpinorFields
     */
-    void caxpyz_L_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+    void caxpyz_L(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
                        std::vector<ColorSpinorField_ref> &&y, std::vector<ColorSpinorField_ref> &&z);
 
     /**
@@ -440,7 +440,7 @@ et of
     template <typename T1, typename T2, typename T3>
     void caxpyz_L(const std::vector<Complex> &a, T1 &&x, T2 &&y, T3 &&z)
     {
-      caxpyz_L_impl(a, make_set(x), make_set(y), make_set(z));
+      caxpyz_L(a, make_set(x), make_set(y), make_set(z));
     }
 
     /**
@@ -461,9 +461,9 @@ et of
        @param z[in] input ColorSpinorField
        @param c[in] Array of coefficients
     */
-    void axpyBzpcx_impl(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
-                        std::vector<ColorSpinorField_ref> &&y, const std::vector<double> &b,
-                        ColorSpinorField &z, const std::vector<double> &c);
+    void axpyBzpcx(const std::vector<double> &a, std::vector<ColorSpinorField_ref> &&x,
+                   std::vector<ColorSpinorField_ref> &&y, const std::vector<double> &b,
+                   ColorSpinorField &z, const std::vector<double> &c);
 
     /**
        @brief Wrapper function for axpyBzpcx that allows us to call
@@ -477,7 +477,7 @@ et of
     void axpyBzpcx(const std::vector<double> &a, T1 &&x, T2 &&y, const std::vector<double> &b,
                    ColorSpinorField &z, const std::vector<double> &c)
     {
-      axpyBzpcx_impl(a, make_set(x), make_set(y), b, z, c);
+      axpyBzpcx(a, make_set(x), make_set(y), b, z, c);
     }
 
     /**
@@ -497,8 +497,8 @@ et of
        @param y[in,out] input ColorSpinorField
        @param z[in,out] input ColorSpinorField
     */
-    void caxpyBxpz_impl(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
-                        ColorSpinorField &y, const std::vector<Complex> &b, ColorSpinorField &z);
+    void caxpyBxpz(const std::vector<Complex> &a, std::vector<ColorSpinorField_ref> &&x,
+                   ColorSpinorField &y, const std::vector<Complex> &b, ColorSpinorField &z);
 
 
     /**
@@ -511,9 +511,9 @@ et of
     */
     template <typename T>
     void caxpyBxpz(const std::vector<Complex> &a, T &&x, ColorSpinorField &y,
-                  const std::vector<Complex> &b, ColorSpinorField &z)
+                   const std::vector<Complex> &b, ColorSpinorField &z)
     {
-      caxpyBxpz_impl(a, make_set(x), y, b, z);
+      caxpyBxpz(a, make_set(x), y, b, z);
     }
 
     // multi-reduce kernels - defined in multi_reduce.cu
@@ -525,8 +525,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void reDotProduct_impl(std::vector<double> &result, std::vector<ColorSpinorField_ref> &&a,
-                           std::vector<ColorSpinorField_ref> &&b);
+    void reDotProduct(std::vector<double> &result, std::vector<ColorSpinorField_ref> &&a,
+                      std::vector<ColorSpinorField_ref> &&b);
 
     /**
        @brief Wrapper function for reDotProduct that allows us to call
@@ -539,7 +539,7 @@ et of
     template <typename T1, typename T2>
     void reDotProduct(std::vector<double> &result, T1 &&a, T2 &&b)
     {
-      reDotProduct_impl(result, make_set(a), make_set(b));
+      reDotProduct(result, make_set(a), make_set(b));
     }
 
     /**
@@ -549,8 +549,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void cDotProduct_impl(std::vector<Complex> &result, std::vector<ColorSpinorField_ref> &&a,
-                          std::vector<ColorSpinorField_ref> &&b);
+    void cDotProduct(std::vector<Complex> &result, std::vector<ColorSpinorField_ref> &&a,
+                     std::vector<ColorSpinorField_ref> &&b);
 
     /**
        @brief Wrapper function for cDotProduct that allows us to call
@@ -563,7 +563,7 @@ et of
     template <typename T1, typename T2>
     void cDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
     {
-      cDotProduct_impl(result, make_set(a), make_set(b));
+      cDotProduct(result, make_set(a), make_set(b));
     }
 
     /**
@@ -576,8 +576,8 @@ et of
        @param a[in] set of input ColorSpinorFields
        @param b[in] set of input ColorSpinorFields
     */
-    void hDotProduct_impl(std::vector<Complex> &result, std::vector<ColorSpinorField_ref> &&a,
-                          std::vector<ColorSpinorField_ref> &&b);
+    void hDotProduct(std::vector<Complex> &result, std::vector<ColorSpinorField_ref> &&a,
+                     std::vector<ColorSpinorField_ref> &&b);
  
     /**
        @brief Wrapper function for hDotProduct that allows us to call
@@ -590,7 +590,7 @@ et of
     template <typename T1, typename T2>
     void hDotProduct(std::vector<Complex> &result, T1 &&a, T2 &&b)
     {
-      hDotProduct_impl(result, make_set(a), make_set(b));
+      hDotProduct(result, make_set(a), make_set(b));
     }
 
    /**
