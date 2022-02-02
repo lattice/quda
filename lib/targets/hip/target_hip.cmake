@@ -1,6 +1,6 @@
 # ######################################################################################################################
-# CUDA target
-set(QUDA_TARGET_HIP ON)
+# CUDA target -- PARENT_SCOPE will make it visible in top-level CMakeLists.txt to allow substitution in  QUDAConfig.cmake
+set(QUDA_TARGET_HIP ON PARENT_SCOPE)
 
 # ######################################################################################################################
 # CUDA specific part of CMakeLists
