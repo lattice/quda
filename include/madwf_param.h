@@ -33,8 +33,6 @@ namespace quda
 
     /** Path to save to the file system */
     char madwf_param_outfile[256];
-
   };
 
-}
-
+} // namespace quda

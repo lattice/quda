@@ -26,8 +26,9 @@ namespace quda
     };
 
     template <bool dagger, class real, int nSpin, int nColor>
-    __device__ __host__ inline void
-    matrix_vector_multiply(ColorSpinor<real, nColor, nSpin> &out, const Matrix<complex<real>, nSpin> &m, const ColorSpinor<real, nColor, nSpin> &v)
+    __device__ __host__ inline void matrix_vector_multiply(ColorSpinor<real, nColor, nSpin> &out,
+                                                           const Matrix<complex<real>, nSpin> &m,
+                                                           const ColorSpinor<real, nColor, nSpin> &v)
     {
 #pragma unroll
       for (int color = 0; color < nColor; color++) {
@@ -51,9 +52,9 @@ namespace quda
       static constexpr int nSpin = nSpin_;
       static constexpr int nColor = nColor_;
 
-      using F = typename colorspinor_mapper<storage_t, 4, 3>::type;
+      using F = typename colorspinor_mapper<storage_t, nSpin, nColor>::type;
       using real = typename mapper<storage_t>::type;
-      using Vector = ColorSpinor<real, 3, 4>;
+      using Vector = ColorSpinor<real, nColor, nSpin>;
       using matrix_t = typename transfer_5D_mapper<MadwfAcc::transfer_float, nSpin, nColor, MadwfAcc::transfer_t>::type;
 
       static constexpr bool dagger = dagger_;

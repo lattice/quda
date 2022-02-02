@@ -278,11 +278,11 @@ namespace quda {
       csParam.setPrecision(param.precision_sloppy);
       App = ColorSpinorField::Create(csParam);
       if(param.precision != param.precision_sloppy) {
-	      rSloppyp = ColorSpinorField::Create(csParam);
-	      xSloppyp = ColorSpinorField::Create(csParam);
+        rSloppyp = ColorSpinorField::Create(csParam);
+        xSloppyp = ColorSpinorField::Create(csParam);
       } else {
-	      rSloppyp = rp;
-	      param.use_sloppy_partial_accumulator = false;
+        rSloppyp = rp;
+        param.use_sloppy_partial_accumulator = false;
       }
 
       // temporary fields
@@ -292,8 +292,7 @@ namespace quda {
         tmp2p = ColorSpinorField::Create(csParam);
         // additional high-precision temporary if Wilson and mixed-precision
         csParam.setPrecision(param.precision);
-        tmp3p = (param.precision != param.precision_sloppy) ?
-          ColorSpinorField::Create(csParam) : tmpp;
+        tmp3p = (param.precision != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : tmpp;
       } else {
         tmp3p = tmp2p = tmpp;
       }
@@ -442,7 +441,7 @@ namespace quda {
     ReliableUpdates ru(ru_params, r2);
 
     while ( !converged && k < param.maxiter ) {
-      matSloppy(Ap, x_update_batch.get_current_field(), tmp, tmp2);  // tmp as tmp
+      matSloppy(Ap, x_update_batch.get_current_field(), tmp, tmp2); // tmp as tmp
       double sigma;
 
       bool breakdown = false;
@@ -450,7 +449,9 @@ namespace quda {
         double Ap2;
         if(alternative_reliable){
           double4 quadruple = blas::quadrupleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
-          r2 = quadruple.x; Ap2 = quadruple.y; pAp = quadruple.z;
+          r2 = quadruple.x;
+          Ap2 = quadruple.y;
+          pAp = quadruple.z;
           ru.update_ppnorm(quadruple.w);
         } else {
           double3 triplet = blas::tripleCGReduction(rSloppy, Ap, x_update_batch.get_current_field());
@@ -492,7 +493,7 @@ namespace quda {
       if (advanced_feature) {
         ru.evaluate(r2_old);
         // force a reliable update if we are within target tolerance (only if doing reliable updates)
-        if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol ) ru.set_updateX();
+        if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) ru.set_updateX();
 
         if (use_heavy_quark_res and L2breakdown
             and (convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) or (r2 / b2) < hq_res_stall_check)
@@ -501,25 +502,25 @@ namespace quda {
         }
       }
 
-      if ( !ru.trigger() ) {
+      if (!ru.trigger()) {
         beta = sigma / r2_old;  // use the alternative beta computation
 
         if (advanced_feature && param.pipeline && !breakdown) {
 
           if (Np == 1) {
-            blas::tripleCGUpdate(x_update_batch.get_current_alpha(), beta, Ap, xSloppy, rSloppy, x_update_batch.get_current_field());
+            blas::tripleCGUpdate(x_update_batch.get_current_alpha(), beta, Ap, xSloppy, rSloppy,
+                                 x_update_batch.get_current_field());
           } else {
             errorQuda("Not implemented pipelined CG with Np > 1");
           }
         } else {
           if (Np == 1) {
             // with Np=1 we just run regular fusion between x and p updates
-            blas::axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), xSloppy, rSloppy, beta);
+            blas::axpyZpbx(x_update_batch.get_current_alpha(), x_update_batch.get_current_field(), xSloppy, rSloppy,
+                           beta);
           } else {
 
-            if (x_update_batch.is_container_full()) {
-              x_update_batch.accumulate_x(xSloppy);
-            }
+            if (x_update_batch.is_container_full()) { x_update_batch.accumulate_x(xSloppy); }
 
             // p[(k+1)%Np] = r + beta * p[k%Np]
             blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_next_field());
@@ -537,9 +538,7 @@ namespace quda {
         }
 
         // alternative reliable updates
-        if (advanced_feature) {
-          ru.accumulate_norm(x_update_batch.get_current_alpha());
-        }
+        if (advanced_feature) { ru.accumulate_norm(x_update_batch.get_current_alpha()); }
       } else {
 
         x_update_batch.accumulate_x(xSloppy);
@@ -565,9 +564,7 @@ namespace quda {
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
 
-        if (advanced_feature) {
-          ru.update_norm(r2, y);
-        }
+        if (advanced_feature) { ru.update_norm(r2, y); }
 
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
@@ -577,7 +574,9 @@ namespace quda {
         }
 
         // if L2 broke down already we turn off reliable updates and restart the CG
-        if(ru.reliable_heavy_quark_break(L2breakdown, heavy_quark_res, heavy_quark_res_old, heavy_quark_restart)) { break; }
+        if (ru.reliable_heavy_quark_break(L2breakdown, heavy_quark_res, heavy_quark_res_old, heavy_quark_restart)) {
+          break;
+        }
 
         if (use_heavy_quark_res and heavy_quark_restart) {
           // perform a restart
@@ -610,7 +609,8 @@ namespace quda {
         // L2 is converged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-        bool HQdone = (ru.steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
+        bool HQdone = (ru.steps_since_reliable == 0 and param.delta > 0)
+          and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
         converged = L2done and HQdone;
       }
 
@@ -641,8 +641,7 @@ namespace quda {
       if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("CG: Reliable updates = %d\n", ru.rUpdate);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CG: Reliable updates = %d\n", ru.rUpdate);
 
     if (advanced_feature && param.compute_true_res) {
       // compute the true residuals
@@ -1541,7 +1540,8 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
         // L2 is concverged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
-        bool HQdone = (ru.steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2(i,i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
+        bool HQdone = (ru.steps_since_reliable == 0 and param.delta > 0)
+          and convergenceHQ(r2(i, i).real(), heavy_quark_res[i], stop[i], param.tol_hq);
         converged[i] = L2done and HQdone;
       }
     }

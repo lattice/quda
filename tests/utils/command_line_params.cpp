@@ -484,13 +484,17 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
-  quda_app->add_option("--max-res-increase", max_res_increase, "The number of consecutive true residual incrases allowed (default 1)");
-  quda_app->add_option("--max-res-increase-total", max_res_increase_total, "The total number of true residual incrases allowed (default 10)");
+  quda_app->add_option("--max-res-increase", max_res_increase,
+                       "The number of consecutive true residual incrases allowed (default 1)");
+  quda_app->add_option("--max-res-increase-total", max_res_increase_total,
+                       "The total number of true residual incrases allowed (default 10)");
   quda_app->add_option("--native-blas-lapack", native_blas_lapack,
                        "Use the native or generic BLAS LAPACK implementation (default true)");
   quda_app->add_option("--maxiter-precondition", maxiter_precondition,
                        "The number of iterations to perform for any preconditioner (default 10)");
-  quda_app->add_option("--verbosity-precondition", verbosity_precondition, "The the verbosity of the preconditioner (default summarize)")
+  quda_app
+    ->add_option("--verbosity-precondition", verbosity_precondition,
+                 "The the verbosity of the preconditioner (default summarize)")
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
@@ -961,7 +965,8 @@ void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Set the digonal suppressor for MADWF (default 0)");
   opgroup->add_option("--madwf-ls", madwf_ls, "Set the reduced Ls for MADWF (default 4)");
 
-  opgroup->add_option("--madwf-null-miniter", madwf_null_miniter, "Min iteration after which to generate null vectors for MADWF");
+  opgroup->add_option("--madwf-null-miniter", madwf_null_miniter,
+                      "Min iteration after which to generate null vectors for MADWF");
   opgroup->add_option("--madwf-null-tol", madwf_null_tol, "Stopping condition for null vector generation for MADWF");
   opgroup->add_option("--madwf-train-maxiter", madwf_train_maxiter, "Max iteration for parameter training for MADWF");
 

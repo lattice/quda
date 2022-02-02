@@ -66,7 +66,8 @@ namespace quda
     /**
       @brief Set device_output_async_buffer
     */
-    void set_output_async_buffer(T *ptr) {
+    void set_output_async_buffer(T *ptr)
+    {
       if (!commAsyncReduction()) {
         errorQuda("When setting the asynchronous buffer the commAsyncReduction option must be set.");
       }
