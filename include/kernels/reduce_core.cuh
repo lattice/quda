@@ -438,8 +438,8 @@ namespace quda
        so-called heavy quark norm as used by MILC: 1 / N * \sum_i (r,
        r)_i / (x, x)_i, where i is site index and N is the number of
        sites.  We must enforce that each thread updates an entire
-       lattice hence the site_unroll template parameter must be set
-       true.
+       lattice site hence the site_unroll template parameter must be
+       set true.
     */
     template <typename real_reduce_t, typename real>
     struct HeavyQuarkResidualNorm_ {
@@ -483,8 +483,8 @@ namespace quda
       solution, with the third being the residual vector.  This
       removes the need an additional xpy call in the solvers,
       improving performance.  We must enforce that each thread updates
-      an entire lattice hence the site_unroll template parameter must
-      be set true.
+      an entire lattice site hence the site_unroll template parameter
+      must be set true.
     */
     template <typename real_reduce_t, typename real>
     struct xpyHeavyQuarkResidualNorm_ {

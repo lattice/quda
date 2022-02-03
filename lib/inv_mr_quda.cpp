@@ -20,7 +20,7 @@ namespace quda {
     }
   }
 
-  void MR::create(const ColorSpinorField &x, const ColorSpinorField &b)
+  void MR::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
     Solver::create(x, b);
 

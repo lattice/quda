@@ -20,8 +20,10 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void CAGCR::create(ColorSpinorField &b)
+  void CAGCR::create(ColorSpinorField &x, const ColorSpinorField &b)
   {
+    Solver::create(x, b);
+
     if (!init) {
       if (!param.is_preconditioner) {
         blas::flops = 0;
@@ -132,15 +134,12 @@ namespace quda {
   {
     const int n_krylov = param.Nkrylov;
 
-    if (checkPrecision(x,b) != param.precision) errorQuda("Precision mismatch %d %d", checkPrecision(x,b), param.precision);
-    if (param.return_residual && param.preserve_source == QUDA_PRESERVE_SOURCE_YES) errorQuda("Cannot preserve source and return the residual");
-
     if (param.maxiter == 0 || n_krylov == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
     }
 
-    create(b);
+    create(x, b);
 
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
