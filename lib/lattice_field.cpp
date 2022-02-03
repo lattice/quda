@@ -207,6 +207,66 @@ namespace quda {
     create(param);
   }
 
+  LatticeField::LatticeField(LatticeField &&field) :
+    volume(std::exchange(field.volume, 0)),
+    volumeCB(std::exchange(field.volumeCB, 0)),
+    localVolume(std::exchange(field.localVolume, 0)),
+    localVolumeCB(std::exchange(field.localVolumeCB, 0)),
+    stride(std::exchange(field.stride, 0)),
+    pad(std::exchange(field.pad, 0)),
+    total_bytes(std::exchange(field.total_bytes, 0)),
+    nDim(std::exchange(field.nDim, 0)),
+    location(std::exchange(field.location, QUDA_INVALID_FIELD_LOCATION)),
+    precision(std::exchange(field.precision, QUDA_INVALID_PRECISION)),
+    ghost_precision(std::exchange(field.ghost_precision, QUDA_INVALID_PRECISION)),
+    ghost_precision_reset(false),
+    scale(std::exchange(field.scale, 0.0)),
+    siteSubset(std::exchange(field.siteSubset, QUDA_INVALID_SITE_SUBSET)),
+    ghostExchange(std::exchange(field.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID)),
+    nDimComms(std::exchange(field.nDimComms, 0)),
+    ghost_bytes(0),
+    ghost_bytes_old(0),
+    ghost_face_bytes {},
+    ghost_face_bytes_aligned {},
+    ghost_offset(),
+    my_face_h {},
+    my_face_hd {},
+    my_face_d {},
+    my_face_dim_dir_h {},
+    my_face_dim_dir_hd {},
+    my_face_dim_dir_d {},
+    from_face_h {},
+    from_face_hd {},
+    from_face_d {},
+    from_face_dim_dir_h {},
+    from_face_dim_dir_hd {},
+    from_face_dim_dir_d {},
+    mh_recv_fwd {},
+    mh_recv_back {},
+    mh_send_fwd {},
+    mh_send_back {},
+    mh_recv_rdma_fwd {},
+    mh_recv_rdma_back {},
+    mh_send_rdma_fwd {},
+    mh_send_rdma_back {},
+    initComms(false),
+    mem_type(std::exchange(field.mem_type, QUDA_MEMORY_INVALID)),
+    backup_h(std::exchange(field.backup_h, nullptr)),
+    backup_norm_h(std::exchange(field.backup_norm_h, nullptr)),
+    backed_up(std::exchange(field.backed_up, false))
+  {
+    memcpy(x, field.x, sizeof(x));
+    memcpy(r, field.r, sizeof(r));
+    memcpy(local_x, field.local_x, sizeof(local_x));
+    memcpy(surface, field.surface, sizeof(surface));
+    memcpy(surfaceCB, field.surfaceCB, sizeof(surfaceCB));
+    memcpy(local_surface, field.local_surface, sizeof(local_surface));
+    memcpy(local_surfaceCB, field.local_surfaceCB, sizeof(local_surfaceCB));
+
+    memcpy(vol_string, field.vol_string, sizeof(vol_string));
+    memcpy(aux_string, field.aux_string, sizeof(aux_string));
+  }
+
   LatticeField::~LatticeField()
   {
     destroyComms();
@@ -226,7 +286,7 @@ namespace quda {
   LatticeField &LatticeField::operator=(LatticeField &&src)
   {
     if (&src != this) {
-      // when we move a field, we lose all comms allocations
+      // FIXME: when we move a field, we lose all comms allocations
       destroyComms();
       src.destroyComms();
 
@@ -255,7 +315,6 @@ namespace quda {
       nDimComms = std::exchange(src.nDimComms, 0);
 
 #if 0
-      // these should never be set by definition for an rvalue reference
       ghost_bytes = 0;
       ghost_bytes_old = 0;
       memset(ghost_face_bytes, '0', sizeof(ghost_face_bytes));

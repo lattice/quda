@@ -411,7 +411,7 @@ namespace quda
        @brief Move constructor for creating a ColorSpinorField from another ColorSpinorField
        @param[in] field Instance of ColorSpinorField from which we are moving
     */
-    //ColorSpinorField(ColorSpinorField &&field);
+    ColorSpinorField(ColorSpinorField &&field);
 
     /**
        @brief Constructor for creating a ColorSpinorField from a ColorSpinorParam

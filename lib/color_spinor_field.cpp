@@ -99,6 +99,38 @@ namespace quda
     copy(field);
   }
 
+  ColorSpinorField::ColorSpinorField(ColorSpinorField &&field) :
+    LatticeField(std::move(field)),
+    init(std::exchange(field.init, false)),
+    alloc(std::exchange(field.alloc, false)),
+    reference(std::exchange(field.reference, false)),
+    ghost_precision_allocated(QUDA_INVALID_PRECISION),
+    nColor(std::exchange(field.nColor, 0)),
+    nSpin(std::exchange(field.nSpin, 0)),
+    nVec(std::exchange(field.nVec, 0)),
+    twistFlavor(std::exchange(field.twistFlavor, QUDA_TWIST_INVALID)),
+    pc_type(std::exchange(field.pc_type, QUDA_PC_INVALID)),
+    suggested_parity(std::exchange(field.suggested_parity, QUDA_INVALID_PARITY)),
+    length(std::exchange(field.length, 0)),
+    v(std::exchange(field.v, nullptr)),
+    v_h(std::exchange(field.v_h, nullptr)),
+    norm_offset(std::exchange(field.norm_offset, 0)),
+    ghost(),
+    ghostNorm(),
+    ghostFace(),
+    ghost_buf{ },
+    dslash_constant(std::exchange(field.dslash_constant, nullptr)),
+    bytes(std::exchange(field.bytes, 0)),
+    bytes_raw(std::exchange(field.bytes_raw, 0)),
+    siteOrder(std::exchange(field.siteOrder, QUDA_INVALID_SITE_ORDER)),
+    fieldOrder(std::exchange(field.fieldOrder, QUDA_INVALID_FIELD_ORDER)),
+    gammaBasis(std::exchange(field.gammaBasis, QUDA_INVALID_GAMMA_BASIS)),
+    even(std::exchange(field.even, nullptr)),
+    odd(std::exchange(field.odd, nullptr)),
+    composite_descr(std::exchange(field.composite_descr, CompositeColorSpinorFieldDescriptor())),
+    components(std::move(field.components))
+  { }
+
   ColorSpinorField::~ColorSpinorField()
   {
     destroy();
@@ -127,10 +159,28 @@ namespace quda
     return *this;
   }
 
+  static bool are_compatible(ColorSpinorField &a, ColorSpinorField &b)
+  {
+    bool rtn = true;
+    if (a.Precision() != b.Precision()   ||
+        a.FieldOrder() != b.FieldOrder() ||
+        a.SiteSubset() != b.SiteSubset() ||
+        a.VolumeCB() != b.VolumeCB()     ||
+        a.Ncolor() != b.Ncolor()         ||
+        a.Nspin() != b.Nspin()           ||
+        a.Nvec() != b.Nvec()             ||
+        a.TwistFlavor() != b.TwistFlavor())
+      rtn = false;
+
+    return rtn;
+  }
+
   ColorSpinorField &ColorSpinorField::operator=(ColorSpinorField &&src)
   {
     if (&src != this) {
-      if (!init) { // if field not already initialized then move the field
+      // if field not already initialized then move the field
+      if (!init || are_compatible(*this, src)) {
+        if (init) destroy();
         LatticeField::operator=(std::move(src));
 
         init = std::exchange(src.init, false);
@@ -166,7 +216,7 @@ namespace quda
         composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
         components = std::move(src.components);
       } else {
-        // for now simply error if the field is initialized (do we want to copy or move the field?)
+        // we error if the field is not compatible with this
         errorQuda("Moving to already created field");
       }
     }
@@ -754,7 +804,6 @@ namespace quda
     }
   }
 
-  // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b)
   {
     if (a.SiteSubset() != b.SiteSubset())
