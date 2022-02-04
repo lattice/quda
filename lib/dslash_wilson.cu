@@ -43,7 +43,6 @@ namespace quda
       constexpr int nDim = 4;
       WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
       Wilson<decltype(arg)> wilson(arg, out, in);
-
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, in, in.VolumeCB(), in.GhostFaceCB(), profile);
     }
   };

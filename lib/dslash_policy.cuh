@@ -3,6 +3,7 @@
 #include <index_helper.cuh>
 #include <timer.h>
 #include <dslash_quda.h>
+#include <targets/cuda/quda_cuda_api.h>
 
 namespace quda
 {
@@ -701,17 +702,12 @@ namespace quda
       PROFILE(if (dslash_interior_compute) dslash.apply(device::get_default_stream()), profile, QUDA_PROFILE_DSLASH_KERNEL);
       if (aux_worker) aux_worker->apply(device::get_default_stream());
 
-      bool pack_event = false;
       for (int i = 3; i >= 0; i--) {
         if (!dslashParam.commDim[i]) continue;
 
-        if (!pack_event) {
-          qudaEventSynchronize(packEnd[in->bufferIndex]);
-          pack_event = true;
-        }
-
         for (int dir = 1; dir >= 0; dir--) {
           int d = 2 * i + dir;
+          qudaStreamWaitEvent(device::get_stream(d), packEnd[in->bufferIndex], 0);
           qudaNcclGroupStart();
           in->recvStart(d, device::get_stream(d), true, true);
           in->sendStart(d, device::get_stream(d), true, dslashParam.remote_write, true);
@@ -2055,18 +2051,55 @@ namespace quda
    {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-     if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
-     if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
+     if (activeTuning() == false && static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_NCCL_DSLASH && false) {
+      cudaGraph_t graph;
+      cudaGraphExec_t instance;
 
-     bool p2p_enabled = comm_peer2peer_enabled_global();
-     if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
-     dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
+      cudaStreamBeginCapture(target::cuda::get_stream(device::get_default_stream()), cudaStreamCaptureModeThreadLocal);
+       if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
+       if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
 
-     auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
-     (*dslashImp)(dslash, &in, volume, ghostFace, profile);
+       bool p2p_enabled = comm_peer2peer_enabled_global();
+       if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
+       dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
 
-     // restore p2p state
-     comm_enable_peer2peer(p2p_enabled);
+       auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+       (*dslashImp)(dslash, &in, volume, ghostFace, profile);
+
+       // restore p2p state
+       comm_enable_peer2peer(p2p_enabled);
+      cudaStreamEndCapture(target::cuda::get_stream(device::get_default_stream()), &graph);
+
+      cudaGraphNode_t* nodes = NULL;
+      size_t numNodes;
+      cudaGraphGetNodes(graph, nodes, &numNodes);
+      nodes = new cudaGraphNode_t[numNodes];
+      cudaGraphGetNodes(graph, nodes, &numNodes);
+      printfQuda("%2lu nodes:\n", numNodes);
+      for (size_t i = 0; i < numNodes; i++) {
+        cudaGraphNodeType pType;
+        cudaGraphNodeGetType(nodes[i], &pType );
+        printfQuda("%2lu: type %d\n", i, static_cast<int>(pType));
+      }
+
+      cudaGraphInstantiate(&instance, graph, NULL, NULL, 0);
+      cudaGraphLaunch(instance, target::cuda::get_stream(device::get_default_stream()));
+      delete [] nodes;
+
+     } else {
+       if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");
+       if (static_cast<QudaDslashPolicy>(tp.aux.x) == QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED)  errorQuda("Requested policy is disabled");
+
+       bool p2p_enabled = comm_peer2peer_enabled_global();
+       if (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_DEFAULT) comm_enable_peer2peer(false); // disable p2p if using default policy
+       dslashParam.remote_write = (p2p_policies[tp.aux.y] == QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE ? 1 : 0); // set whether we are using remote packing writes or copy engines
+
+       auto dslashImp = DslashFactory<Dslash>::create(static_cast<QudaDslashPolicy>(tp.aux.x));
+       (*dslashImp)(dslash, &in, volume, ghostFace, profile);
+
+       // restore p2p state
+       comm_enable_peer2peer(p2p_enabled);
+     }
    }
 
    int tuningIter() const { return 20; }
