@@ -1352,8 +1352,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
                      QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
                      double _Complex *b5, double _Complex *c5)
 {
-  int R[4];
-
+  lat_dim_t R;
   for (int d = 0; d < 4; d++) { R[d] = comm_dim_partitioned(d) ? 2 : 0; }
 
   cpuGaugeField *padded_gauge = createExtendedGauge(gauge, gauge_param, R);
@@ -1384,7 +1383,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
     for (int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++) {
       // calculate padded_index_cb_4d
       int x[4];
-      coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
+      coordinate_from_shrinked_index(x, index_cb_4d, Z, R.data, 0); // parity = 0
       int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
       // copy data
       memcpy(&padded_in[spinor_site_size * precision * (s * padded_Vh + padded_index_cb_4d)],
@@ -1427,7 +1426,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
     for (int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++) {
       // calculate padded_index_cb_4d
       int x[4];
-      coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
+      coordinate_from_shrinked_index(x, index_cb_4d, Z, R.data, 0); // parity = 0
       int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
       // copy data
       memcpy(&out_alias[spinor_site_size * precision * (s * Vh + index_cb_4d)],

@@ -130,12 +130,12 @@ namespace quda {
     std::unique_ptr<GaugeField> xInvMilcOrder(nullptr);
     {
       const int ndim = 4;
-      int xc[QUDA_MAX_DIM];
+      lat_dim_t xc;
       for (int i = 0; i < ndim; i++) { xc[i] = gauge.X()[i]/2; }
       const int Nc_c = gauge.Ncolor() * 8; // 24
       const int Ns_c = 2; // staggered parity
       GaugeFieldParam gParam;
-      memcpy(gParam.x, xc, QUDA_MAX_DIM*sizeof(int));
+      gParam.x = xc;
       gParam.nColor = Nc_c*Ns_c;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.order = QUDA_MILC_GAUGE_ORDER;

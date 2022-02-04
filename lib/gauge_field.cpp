@@ -112,16 +112,14 @@ namespace quda {
 
   void GaugeField::setTuningString() {
     LatticeField::setTuningString();
-    int aux_string_n = TuneKey::aux_n / 2;
-    int check = (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) ?
-      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d,r=%d%d%d%d", volume, stride,
-               precision, geometry, nColor, r[0], r[1], r[2], r[3]) :
-      snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride, precision,
-               geometry, nColor);
-    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    std::stringstream aux_ss;
+    aux_ss << "vol=" << volume << "stride=" << stride << "precision=" << precision << "geometry=" << geometry << "Nc=" << nColor;
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) aux_ss << "r=" << r[0] << r[1] << r[2] << r[3];
+    aux_string = aux_ss.str();
+      if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
 
-  void GaugeField::createGhostZone(const int *R, bool no_comms_fill, bool bidir) const
+  void GaugeField::createGhostZone(const lat_dim_t &R, bool no_comms_fill, bool bidir) const
   {
     if (typeid(*this) == typeid(cpuGaugeField)) return;
 
@@ -366,8 +364,8 @@ namespace quda {
   }
 
   // helper for creating extended gauge fields
-  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile, bool redundant_comms,
-                                      QudaReconstructType recon)
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const lat_dim_t &R, TimeProfile &profile,
+                                      bool redundant_comms, QudaReconstructType recon)
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
     GaugeFieldParam gParamEx(in);
@@ -398,7 +396,7 @@ namespace quda {
   }
 
   // helper for creating extended (cpu) gauge fields
-  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R)
   {
     GaugeFieldParam gauge_field_param(gauge_param, gauge);
     cpuGaugeField cpu(gauge_field_param);

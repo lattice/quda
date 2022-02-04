@@ -66,7 +66,7 @@ namespace quda {
     int nDim;
 
     /** Array storing the length of dimension */
-    int x[QUDA_MAX_DIM];
+    lat_dim_t x;
 
     int pad;
 
@@ -78,7 +78,7 @@ namespace quda {
     QudaGhostExchange ghostExchange;
 
     /** The extended field radius (if applicable) */
-    int r[QUDA_MAX_DIM];
+    lat_dim_t r;
 
     /** For fixed-point fields that need a global scaling factor */
     double scale;
@@ -111,7 +111,7 @@ namespace quda {
        @param[in] precision Field Precision
        @param[in] ghostExchange Type of ghost exchange
     */
-    LatticeFieldParam(int nDim, const int *x, int pad, QudaFieldLocation location,
+    LatticeFieldParam(int nDim, const lat_dim_t &x, int pad, QudaFieldLocation location,
                       QudaPrecision precision, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
       location(location),
       precision(precision),
@@ -185,25 +185,25 @@ namespace quda {
     int nDim;
 
     /** Array storing the length of dimension */
-    int x[QUDA_MAX_DIM];
+    lat_dim_t x;
 
     /** The extended lattice radius (if applicable) */
-    int r[QUDA_MAX_DIM];
+    lat_dim_t r;
 
     /** Array storing the local dimensions (x - 2 * r) */
-    int local_x[QUDA_MAX_DIM];
+    lat_dim_t local_x;
 
     /** Array storing the surface size in each dimension */
-    int surface[QUDA_MAX_DIM];
+    lat_dim_t surface;
 
     /** Array storing the checkerboarded surface size in each dimension */
-    int surfaceCB[QUDA_MAX_DIM];
+    lat_dim_t surfaceCB;
 
     /** Array storing the local surface size in each dimension */
-    int local_surface[QUDA_MAX_DIM];
+    lat_dim_t local_surface;
 
     /** Array storing the local surface size in each dimension */
-    int local_surfaceCB[QUDA_MAX_DIM];
+    lat_dim_t local_surfaceCB;
 
     /** Location of the field */
     QudaFieldLocation location;
@@ -416,10 +416,10 @@ namespace quda {
     static bool initIPCComms;
 
     /** Used as a label in the autotuner */
-    char vol_string[TuneKey::volume_n];
+    std::string vol_string;
 
     /** used as a label in the autotuner */
-    char aux_string[TuneKey::aux_n];
+    std::string aux_string;
 
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
@@ -576,17 +576,17 @@ namespace quda {
     /**
        @return The pointer to the lattice-dimension array
     */
-    const int* X() const { return x; }
+    const auto& X() const { return x; }
 
     /**
        @return Extended field radius
     */
-    const int *R() const { return r; }
+    const auto& R() const { return r; }
 
     /**
        @return Local checkboarded lattice dimensions
     */
-    const int *LocalX() const { return local_x; }
+    const auto& LocalX() const { return local_x; }
 
     /**
       @return The pointer to the **full** lattice-dimension array
@@ -617,7 +617,7 @@ namespace quda {
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
     */
-    const int* SurfaceCB() const { return surfaceCB; }
+    const auto& SurfaceCB() const { return surfaceCB; }
     
     /**
        @param i The dimension of the requested surface 
@@ -626,10 +626,9 @@ namespace quda {
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
 
     /**
-       @param i The dimension of the requested local surface
-       @return The single-parity local surface of dimension i
+       @return The single-parity local surface array
     */
-    const int *LocalSurfaceCB() const { return local_surfaceCB; }
+    const auto& LocalSurfaceCB() const { return local_surfaceCB; }
 
     /**
        @param i The dimension of the requested local surface
@@ -778,10 +777,10 @@ namespace quda {
     virtual void scatter(int, const qudaStream_t &) { errorQuda("Not implemented"); }
 
     /** Return the volume string used by the autotuner */
-    inline const char *VolString() const { return vol_string; }
+    inline const char *VolString() const { return vol_string.c_str(); }
 
     /** Return the aux string used by the autotuner */
-    inline const char *AuxString() const { return aux_string; }
+    inline const char *AuxString() const { return aux_string.c_str(); }
 
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }

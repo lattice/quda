@@ -119,7 +119,7 @@ namespace quda {
     if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 1; // sending forwards only
-    const int R[] = {nFace, nFace, nFace, nFace};
+    const lat_dim_t R = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = true; // dslash kernels presently require this
     const bool bidir = false; // communication is only ever done in one direction at once
     createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
@@ -208,7 +208,7 @@ namespace quda {
     if (nFace == 0) errorQuda("nFace = 0");
 
     const int dir = 0; // sending backwards only
-    const int R[] = {nFace, nFace, nFace, nFace};
+    const lat_dim_t R = {nFace, nFace, nFace, nFace};
     const bool no_comms_fill = false; // injection never does no_comms_fill
     const bool bidir = false; // communication is only ever done in one direction at once
     createComms(R, true, bidir); // always need to allocate space for non-partitioned dimension for copyGenericGauge
@@ -288,13 +288,13 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir) const
+  void cudaGaugeField::allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir) const
   {
     createGhostZone(R, no_comms_fill, bidir);
     LatticeField::allocateGhostBuffer(ghost_bytes);
   }
 
-  void cudaGaugeField::createComms(const int *R, bool no_comms_fill, bool bidir)
+  void cudaGaugeField::createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir)
   {
     allocateGhostBuffer(R, no_comms_fill, bidir); // allocate the ghost buffer if not yet allocated
 
@@ -415,7 +415,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill)
+  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill)
   {
     const int b = bufferIndex;
     void *send_d[QUDA_MAX_DIM], *recv_d[QUDA_MAX_DIM];
@@ -484,7 +484,7 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+  void cudaGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill) {
     profile.TPSTART(QUDA_PROFILE_COMMS);
     exchangeExtendedGhost(R, no_comms_fill);
     profile.TPSTOP(QUDA_PROFILE_COMMS);

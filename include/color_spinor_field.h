@@ -182,7 +182,7 @@ namespace quda
 
     // used to create cpu params
 
-    ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
+    ColorSpinorParam(void *V, QudaInvertParam &inv_param, const lat_dim_t &X, const bool pc_solution,
                      QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
       LatticeFieldParam(4, X, 0, location, inv_param.cpu_prec),
       nColor(3),
@@ -467,7 +467,7 @@ namespace quda
     int Nvec() const { return nVec; }
     QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }
     int Ndim() const { return nDim; }
-    const int *X() const { return x; }
+    const int *X() const { return x.data; }
     int X(int d) const { return x[d]; }
     size_t Length() const { return length; }
     size_t Bytes() const { return bytes; }

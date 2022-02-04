@@ -64,7 +64,7 @@ void checkBLASParam(QudaBLASParam &param) { checkBLASParam(&param); }
 
 using namespace quda;
 
-static int R[4] = {0, 0, 0, 0};
+static lat_dim_t R = { };
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
 
@@ -723,7 +723,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // create an extended preconditioning field
   cudaGaugeField* extended = nullptr;
   if (param->overlap){
-    int R[4]; // domain-overlap widths in different directions
+    lat_dim_t R; // domain-overlap widths in different directions
     for (int i=0; i<4; ++i) R[i] = param->overlap*commDimPartitioned(i);
     extended = createExtendedGauge(*precondition, R, profileGauge);
   }
@@ -2259,7 +2259,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
-  const int *X = cudaGauge->X();
+  const auto X = cudaGauge->X();
   ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   // create wrappers around application vector set
@@ -2747,7 +2747,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorField *in = nullptr;
   ColorSpinorField *out = nullptr;
 
-  const int *X = cudaGauge->X();
+  const auto X = cudaGauge->X();
 
   // wrap CPU host side pointers
   ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
@@ -3220,7 +3220,7 @@ void callMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param, // col
     bool pc_solution
       = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
 
-    const int *X = gauge_param->X;
+    lat_dim_t X = {gauge_param->X[0], gauge_param->X[1], gauge_param->X[2], gauge_param->X[3]};
     ColorSpinorParam cpuParam(_hp_b[0], *param, X, pc_solution, param->input_location);
     std::vector<ColorSpinorField *> _h_b(param->num_src);
     for (int i = 0; i < param->num_src; i++) {
@@ -3582,7 +3582,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   std::vector<double> r2_old(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
-  const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ?
+  const auto X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ?
     gaugeFatPrecise->X() : gaugePrecise->X();
 
   // This creates a ColorSpinorParam struct, from the host data
@@ -4232,7 +4232,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
   QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
   // for clover we optimize to only send depth 1 halos in y/z/t (FIXME - make work for x, make robust in general)
-  int R[4];
+  lat_dim_t R;
   for (int d=0; d<4; d++) R[d] = (d==0 ? 2 : 1) * (redundant_comms || commDimPartitioned(d));
   cudaGaugeField *gauge = extendedGaugeResident ? extendedGaugeResident : createExtendedGauge(*gaugePrecise, R, profileClover, false, recon);
 
@@ -4537,7 +4537,8 @@ void computeHISQForceQuda(void* const milc_momentum,
   param.link_type = QUDA_GENERAL_LINKS;
   param.setPrecision(gParam->cpu_prec, true);
 
-  int R[4] = { 2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1), 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3) };
+  lat_dim_t R = {2*comm_dim_partitioned(0), 2*comm_dim_partitioned(1),
+                 2*comm_dim_partitioned(2), 2*comm_dim_partitioned(3)};
   for (int dir=0; dir<4; ++dir) {
     param.x[dir] += 2*R[dir];
     param.r[dir] = R[dir];
@@ -4671,7 +4672,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
-  cudaGauge->exchangeExtendedGhost(R,profileHISQForce,true);
+  cudaGauge->exchangeExtendedGhost(R, profileHISQForce,true);
 
   // Compute Fat7-staple term
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -5613,7 +5614,8 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTART(QUDA_PROFILE_INIT);
 
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam((void *)hp_x, *param, X, false, param->input_location);
+  lat_dim_t X_ = {X[0], X[1], X[2], X[3]};
+  ColorSpinorParam cpuParam((void *)hp_x, *param, X_, false, param->input_location);
   ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
 
   cpuParam.v = (void *)hp_y;

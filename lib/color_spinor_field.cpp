@@ -413,30 +413,14 @@ namespace quda
 
   void ColorSpinorField::setTuningString()
   {
-    {
-      // LatticeField::setTuningString(); // FIXME - LatticeField needs correct dims for single-parity
-      char vol_tmp[TuneKey::volume_n];
-      int check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
-      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-      for (int d = 1; d < nDim; d++) {
-        strcpy(vol_tmp, vol_string);
-        check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
-        if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-      }
-    }
-
-    {
-      constexpr int aux_string_n = TuneKey::aux_n / 2;
-      char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%lu,precision=%d,order=%d,Ns=%d,Nc=%d", volume, precision,
-                           fieldOrder, nSpin, nColor);
-      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-      if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
-        strcpy(aux_tmp, aux_string);
-        check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
-        if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
-      }
-    }
+    LatticeField::setTuningString();
+    std::stringstream aux_ss;
+    aux_ss << "vol=" << volume << "precision=" << precision << "order=" << fieldOrder <<
+      "Ns=" << nSpin << "Nc=" << nColor;
+    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
+      aux_ss << "TwistFlavor=" << twistFlavor;
+    aux_string = aux_ss.str();
+    if (aux_string.size() >= TuneKey::aux_n / 2) errorQuda("Aux string too large %lu", aux_string.size());
   }
 
   void ColorSpinorField::createGhostZone(int nFace, bool spin_project) const
@@ -881,8 +865,7 @@ namespace quda
   */
   void ColorSpinorField::LatticeIndex(int *y, int i) const
   {
-    int z[QUDA_MAX_DIM];
-    memcpy(z, x, QUDA_MAX_DIM * sizeof(int));
+    auto z = x;
 
     // parity is the slowest running dimension
     int parity = 0;
@@ -912,8 +895,7 @@ namespace quda
   void ColorSpinorField::OffsetIndex(int &i, int *y) const
   {
     int parity = 0;
-    int z[QUDA_MAX_DIM];
-    memcpy(z, x, QUDA_MAX_DIM * sizeof(int));
+    auto z = x;
     int savey0 = y[0];
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {

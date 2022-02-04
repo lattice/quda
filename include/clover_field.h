@@ -157,7 +157,7 @@ namespace quda {
     {
     }
 
-    CloverFieldParam(const QudaInvertParam &inv_param, const int *x) :
+    CloverFieldParam(const QudaInvertParam &inv_param, const lat_dim_t &x) :
       LatticeFieldParam(),
       reconstruct(clover::reconstruct()),
       inverse(true),
@@ -173,7 +173,7 @@ namespace quda {
       rho(inv_param.clover_rho)
     {
       siteSubset = QUDA_FULL_SITE_SUBSET;
-      for (int i = 0; i < nDim; i++) this->x[i] = x[i];
+      this->x = x;
     }
 
     CloverFieldParam(const CloverField &field);

@@ -216,6 +216,13 @@ namespace quda {
     pad(std::exchange(field.pad, 0)),
     total_bytes(std::exchange(field.total_bytes, 0)),
     nDim(std::exchange(field.nDim, 0)),
+    x(std::exchange(field.x, lat_dim_t())),
+    r(std::exchange(field.r, lat_dim_t())),
+    local_x(std::exchange(field.local_x, lat_dim_t())),
+    surface(std::exchange(field.surface, lat_dim_t())),
+    surfaceCB(std::exchange(field.surfaceCB, lat_dim_t())),
+    local_surface(std::exchange(field.local_surface, lat_dim_t())),
+    local_surfaceCB(std::exchange(field.local_surfaceCB, lat_dim_t())),
     location(std::exchange(field.location, QUDA_INVALID_FIELD_LOCATION)),
     precision(std::exchange(field.precision, QUDA_INVALID_PRECISION)),
     ghost_precision(std::exchange(field.ghost_precision, QUDA_INVALID_PRECISION)),
@@ -250,21 +257,13 @@ namespace quda {
     mh_send_rdma_fwd {},
     mh_send_rdma_back {},
     initComms(false),
+    vol_string(std::exchange(field.vol_string, "")),
+    aux_string(std::exchange(field.aux_string, "")),
     mem_type(std::exchange(field.mem_type, QUDA_MEMORY_INVALID)),
     backup_h(std::exchange(field.backup_h, nullptr)),
     backup_norm_h(std::exchange(field.backup_norm_h, nullptr)),
     backed_up(std::exchange(field.backed_up, false))
   {
-    memcpy(x, field.x, sizeof(x));
-    memcpy(r, field.r, sizeof(r));
-    memcpy(local_x, field.local_x, sizeof(local_x));
-    memcpy(surface, field.surface, sizeof(surface));
-    memcpy(surfaceCB, field.surfaceCB, sizeof(surfaceCB));
-    memcpy(local_surface, field.local_surface, sizeof(local_surface));
-    memcpy(local_surfaceCB, field.local_surfaceCB, sizeof(local_surfaceCB));
-
-    memcpy(vol_string, field.vol_string, sizeof(vol_string));
-    memcpy(aux_string, field.aux_string, sizeof(aux_string));
   }
 
   LatticeField::~LatticeField()
@@ -298,13 +297,13 @@ namespace quda {
       pad = std::exchange(src.pad, 0);
       total_bytes = std::exchange(src.total_bytes, 0);
       nDim = std::exchange(src.nDim, 0);
-      memcpy(x, src.x, sizeof(x));
-      memcpy(r, src.r, sizeof(r));
-      memcpy(local_x, src.local_x, sizeof(local_x));
-      memcpy(surface, src.surface, sizeof(surface));
-      memcpy(surfaceCB, src.surfaceCB, sizeof(surfaceCB));
-      memcpy(local_surface, src.local_surface, sizeof(local_surface));
-      memcpy(local_surfaceCB, src.local_surfaceCB, sizeof(local_surfaceCB));
+      x = std::exchange(src.x, lat_dim_t());
+      r = std::exchange(src.r, lat_dim_t());
+      local_x = std::exchange(src.local_x, lat_dim_t());
+      surface = std::exchange(src.surface, lat_dim_t());
+      surfaceCB = std::exchange(src.surfaceCB, lat_dim_t());
+      local_surface = std::exchange(src.local_surface, lat_dim_t());
+      local_surfaceCB = std::exchange(src.local_surfaceCB, lat_dim_t());
       location = std::exchange(src.location, QUDA_INVALID_FIELD_LOCATION);
       precision = std::exchange(src.precision, QUDA_INVALID_PRECISION);
       ghost_precision = std::exchange(src.ghost_precision, QUDA_INVALID_PRECISION);
@@ -322,9 +321,13 @@ namespace quda {
       memset(ghost_offset, '0', sizeof(ghost_offset));
 #endif
 
-      memcpy(vol_string, src.vol_string, sizeof(vol_string));
-      memcpy(aux_string, src.aux_string, sizeof(aux_string));
+      vol_string = std::exchange(src.vol_string, "");
+      aux_string = std::exchange(src.aux_string, "");
       mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
+
+      backup_h = std::exchange(src.backup_h, nullptr);
+      backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
+      backed_up = std::exchange(src.backed_up, false);
     }
     return *this;
   }
@@ -387,12 +390,12 @@ namespace quda {
     param.precision = precision;
     param.ghost_precision = ghost_precision;
     param.nDim = nDim;
-    memcpy(param.x, x, sizeof(x));
+    param.x = x;
     param.pad = pad;
     param.siteSubset = siteSubset;
     param.mem_type = mem_type;
     param.ghostExchange = ghostExchange;
-    memcpy(param.r, r, sizeof(r));
+    param.r = r;
     param.scale = scale;
   }
 
@@ -716,15 +719,13 @@ namespace quda {
 
   void *LatticeField::remoteFace_r() const { return ghost_recv_buffer_d[bufferIndex]; }
 
-  void LatticeField::setTuningString() {
-    char vol_tmp[TuneKey::volume_n];
-    int check  = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
-    if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-    for (int d=1; d<nDim; d++) {
-      strcpy(vol_tmp, vol_string);
-      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
-      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
-    }
+  void LatticeField::setTuningString()
+  {
+    std::stringstream vol_ss;
+    vol_ss << x[0];
+    for (int d = 1; d < nDim; d++) vol_ss << "x" << x[d];
+    vol_string = vol_ss.str();
+    if (vol_string.size() >= TuneKey::volume_n) errorQuda("Vol string too large %lu", vol_string.size());
   }
 
   void LatticeField::checkField(const LatticeField &a) const {

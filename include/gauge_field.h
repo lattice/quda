@@ -105,8 +105,8 @@ namespace quda {
 
     GaugeFieldParam(const GaugeField &u);
 
-    GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct, const int pad,
-                    const QudaFieldGeometry geometry, const QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
+    GaugeFieldParam(const lat_dim_t &x, QudaPrecision precision, QudaReconstructType reconstruct, int pad,
+                    QudaFieldGeometry geometry, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_PAD) :
       LatticeFieldParam(4, x, pad, QUDA_INVALID_FIELD_LOCATION, precision, ghostExchange),
       nColor(3),
       nFace(0),
@@ -262,7 +262,7 @@ namespace quda {
          @param[in] bidir Is this a bi-directional exchange - if not
          then we alias the fowards and backwards offsetss
       */
-      void createGhostZone(const int *R, bool no_comms_fill, bool bidir = true) const;
+      void createGhostZone(const lat_dim_t &R, bool no_comms_fill, bool bidir = true) const;
 
       /**
          @brief Set the vol_string and aux_string for use in tuning
@@ -323,7 +323,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    virtual void exchangeExtendedGhost(const int *R, bool no_comms_fill = false) = 0;
+    virtual void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill = false) = 0;
 
     /**
        @brief This routine will populate the border / halo region
@@ -334,7 +334,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    virtual void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill = false) = 0;
+    virtual void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill = false) = 0;
 
     void checkField(const LatticeField &) const;
 
@@ -482,7 +482,7 @@ namespace quda {
        allow for simultaneous bi-directional exchange.  If false, then
        the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(const int *R, bool no_comms_fill, bool bidir=true);
+    void createComms(const lat_dim_t &R, bool no_comms_fill, bool bidir=true);
 
     /**
        @brief Allocate the ghost buffers
@@ -492,7 +492,7 @@ namespace quda {
        then we alias the fowards and backwards offsetss
        region in non-partitioned dimensions
     */
-    void allocateGhostBuffer(const int *R, bool no_comms_fill, bool bidir=true) const;
+    void allocateGhostBuffer(const lat_dim_t &R, bool no_comms_fill, bool bidir=true) const;
 
     /**
        @brief Start the receive communicators
@@ -524,7 +524,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill=false);
 
     /**
        @brief This does routine will populate the border / halo region
@@ -535,7 +535,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill=false);
 
     /**
      * Generic gauge field copy
@@ -661,7 +661,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimenions
     */
-    void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill=false);
 
     /**
        @brief This does routine will populate the border / halo region
@@ -672,7 +672,7 @@ namespace quda {
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
     */
-    void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
+    void exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill=false);
 
     /**
      * Generic gauge field copy
@@ -783,7 +783,7 @@ namespace quda {
      @param recon The reconsturction type
      @return the pointer to the extended gauge field
   */
-  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const lat_dim_t &R, TimeProfile &profile,
                                       bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
 
   /**
@@ -793,7 +793,7 @@ namespace quda {
      @param R By how many do we want to extend the gauge field in each direction
      @return the pointer to the extended gauge field
   */
-  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const lat_dim_t &R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
@@ -819,7 +819,7 @@ namespace quda {
      @param ghost The array where we want to pack/unpack the ghost zone into/from
      @param extract Whether we are extracting into ghost or injecting from ghost
   */
-  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, void **ghost, bool extract);
+  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const lat_dim_t &R, void **ghost, bool extract);
 
   /**
      Apply the staggered phase factor to the gauge field.

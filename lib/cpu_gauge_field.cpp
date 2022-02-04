@@ -190,7 +190,7 @@ namespace quda {
     for (int d=0; d<nDim; d++) host_free(recv[d]);
   }
 
-  void cpuGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
+  void cpuGaugeField::exchangeExtendedGhost(const lat_dim_t &R, bool no_comms_fill) {
     
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
@@ -251,7 +251,7 @@ namespace quda {
 
   }
 
-  void cpuGaugeField::exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill) {
+  void cpuGaugeField::exchangeExtendedGhost(const lat_dim_t &R, TimeProfile &profile, bool no_comms_fill) {
     profile.TPSTART(QUDA_PROFILE_COMMS);
     exchangeExtendedGhost(R, no_comms_fill);
     profile.TPSTOP(QUDA_PROFILE_COMMS);

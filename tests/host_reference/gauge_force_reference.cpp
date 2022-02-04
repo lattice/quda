@@ -407,7 +407,7 @@ void gauge_force_reference(void *refMom, double eb3, void **sitelink, QudaPrecis
                            void *loop_coeff, int num_paths, bool compute_force)
 {
   // created extended field
-  int R[4];
+  lat_dim_t R;
   for (int d = 0; d < 4; d++) R[d] = 2 * comm_dim_partitioned(d);
   QudaGaugeParam param = newQudaGaugeParam();
   setGaugeParam(param);

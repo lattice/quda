@@ -10,14 +10,14 @@ namespace quda {
     unsigned int size;
     const GaugeField &u;
     const int dim;
-    const int *R;
+    const lat_dim_t &R;
     void **ghost;
     const bool extract;
 
     unsigned int minThreads() const { return size; }
 
   public:
-    ExtractGhostEx(const GaugeField &u, int dim, const int *R, void **ghost, bool extract) :
+    ExtractGhostEx(const GaugeField &u, int dim, const lat_dim_t &R, void **ghost, bool extract) :
       TunableKernel3D(u, 2, 2),
       u(u),
       dim(dim),
@@ -57,7 +57,7 @@ namespace quda {
 
   /** This is the template driver for extractGhost */
   template <typename Float> struct GhostExtractEx {
-    GhostExtractEx(const GaugeField &u, int dim, const int *R, void **ghost, bool extract)
+    GhostExtractEx(const GaugeField &u, int dim, const lat_dim_t &R, void **ghost, bool extract)
     {
       const int length = 18;
 
@@ -149,7 +149,7 @@ namespace quda {
     }
   };
 
-  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R,
+  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const lat_dim_t &R,
 				 void **ghost, bool extract)
   {
     instantiatePrecision<GhostExtractEx>(u, dim, R, ghost, extract);
