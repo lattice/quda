@@ -445,8 +445,10 @@ struct Communicator {
     comm_destroy_topology(topo);
     comm_set_default_topology(NULL);
 #ifdef QUDA_ENABLE_NCCL
-    if (nccl_comm_init) {
-      qudaNcclCommDestroy(quda_nccl_comm);
+    for (int d = 0; d < 8; d++) {
+      if (nccl_comm_init[d]) {
+        qudaNcclCommDestroy(quda_nccl_comm[d]);
+      }
     }
 #endif
   }
@@ -723,16 +725,16 @@ struct Communicator {
 #endif
 
 #ifdef QUDA_ENABLE_NCCL
-  qudaNcclComm_t quda_nccl_comm;
+  qudaNcclComm_t quda_nccl_comm[8];
 
-  bool nccl_comm_init = false;
+  bool nccl_comm_init[8] = {false};
 
-  qudaNcclComm_t get_nccl_comm() {
-    if (!nccl_comm_init) {
-      quda_nccl_comm = qudaNcclCommCreate(rank, size);
-      nccl_comm_init = true;
+  qudaNcclComm_t get_nccl_comm(int d) {
+    if (!nccl_comm_init[d]) {
+      quda_nccl_comm[d] = qudaNcclCommCreate(rank, size);
+      nccl_comm_init[d] = true;
     }
-    return quda_nccl_comm;
+    return quda_nccl_comm[d];
   }
 #endif
 

@@ -1111,8 +1111,7 @@ namespace quda
 #ifdef QUDA_ENABLE_NCCL
       if (nccl) {
         auto mh = mh_recv_rdma_fwd[bufferIndex][dim];
-        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
-        qudaEventRecord(nccl_recv_event_fwd[bufferIndex][dim], stream);
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
       } else
 #endif
       if (comm_peer2peer_enabled(1, dim)) {
@@ -1127,8 +1126,7 @@ namespace quda
 #ifdef QUDA_ENABLE_NCCL
       if (nccl) {
         auto mh = mh_recv_rdma_back[bufferIndex][dim];
-        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
-        qudaEventRecord(nccl_recv_event_back[bufferIndex][dim], stream);
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
       } else
 #endif
       if (comm_peer2peer_enabled(0, dim)) {
@@ -1140,6 +1138,52 @@ namespace quda
       }
     }
   }
+
+  void ColorSpinorField::sendRecord(int d, const qudaStream_t &stream, bool nccl)
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+
+#ifdef QUDA_ENABLE_NCCL
+    if (nccl) {
+      if (dir == 0) {
+        qudaEventRecord(nccl_send_event_back[bufferIndex][dim], stream);
+        // Let the exterior kernel wait for this event
+        qudaStreamWaitEvent(device::get_default_stream(), nccl_send_event_back[bufferIndex][dim], 0);
+      } else {
+        qudaEventRecord(nccl_send_event_fwd[bufferIndex][dim], stream);
+        // Let the exterior kernel wait for this event
+        qudaStreamWaitEvent(device::get_default_stream(), nccl_send_event_fwd[bufferIndex][dim], 0);
+      }
+    }
+#endif
+	}
+
+  void ColorSpinorField::recvRecord(int d, const qudaStream_t &stream, bool nccl)
+  {
+    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
+
+    int dim = d / 2;
+    int dir = d % 2;
+    if (!commDimPartitioned(dim)) return;
+
+#ifdef QUDA_ENABLE_NCCL
+    if (nccl) {
+      if (dir == 0) {
+        qudaEventRecord(nccl_recv_event_fwd[bufferIndex][dim], stream);
+        // Let the exterior kernel wait for this event
+        qudaStreamWaitEvent(device::get_default_stream(), nccl_recv_event_fwd[bufferIndex][dim], 0);
+      } else {
+        qudaEventRecord(nccl_recv_event_back[bufferIndex][dim], stream);
+        // Let the exterior kernel wait for this event
+        qudaStreamWaitEvent(device::get_default_stream(), nccl_recv_event_back[bufferIndex][dim], 0);
+      }
+    }
+#endif
+	}
 
   void ColorSpinorField::sendStart(int d, const qudaStream_t &stream, bool gdr, bool remote_write, bool nccl)
   {
@@ -1156,12 +1200,10 @@ namespace quda
     if (nccl) {
       if (dir == 0) {
         auto mh = mh_send_rdma_back[bufferIndex][dim];
-        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
-        qudaEventRecord(nccl_send_event_back[bufferIndex][dim], stream);
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
       } else {
         auto mh = mh_send_rdma_fwd[bufferIndex][dim];
-        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
-        qudaEventRecord(nccl_send_event_fwd[bufferIndex][dim], stream);
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
       }
     } else
 #endif

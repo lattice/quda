@@ -563,6 +563,10 @@ namespace quda
     */
     void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false, bool nccl = false);
 
+    void recvRecord(int d, const qudaStream_t &stream, bool nccl);
+
+    void sendRecord(int d, const qudaStream_t &stream, bool nccl);
+
     /**
        @brief Initiate halo communication
        @param[in] d d=[2*dim+dir], where dim is dimension and dir is

@@ -219,6 +219,10 @@ namespace quda
   void qudaNcclSend(const void* sendbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream);
 
   void qudaNcclRecv(void* recvbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream);
+
+  void qudaNcclGroupStart();
+
+  void qudaNcclGroupEnd();
 #endif
 
 } // namespace quda

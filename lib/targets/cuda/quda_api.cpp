@@ -572,25 +572,45 @@ namespace quda
 
     qudaNcclComm_t quda_nccl_comm;
     quda_nccl_comm.comm = reinterpret_cast<void *>(nccl_comm);
+
+    qudaDeviceSynchronize();
+    comm_barrier();
+
     return quda_nccl_comm;
   }
 
   void qudaNcclCommDestroy(qudaNcclComm_t quda_nccl_comm)
   {
-    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
+    ncclComm_t nccl_comm = reinterpret_cast<ncclComm_t>(quda_nccl_comm.comm);
     ncclCommDestroy(nccl_comm);
   }
 
   void qudaNcclSend(const void* sendbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream)
   {
-    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
+    ncclComm_t nccl_comm = reinterpret_cast<ncclComm_t>(quda_nccl_comm.comm);
     ncclResult_t nccl_error = ncclSend(sendbuff, count, ncclChar, peer, nccl_comm, get_stream(stream));
+    if (nccl_error != ncclSuccess) {
+      errorQuda("qudaNcclSend throws %d error code.\n", static_cast<int>(nccl_error));
+    }
   }
 
   void qudaNcclRecv(void* recvbuff, size_t count, int peer, qudaNcclComm_t quda_nccl_comm, const qudaStream_t &stream)
   {
-    ncclComm_t &nccl_comm = reinterpret_cast<ncclComm_t &>(quda_nccl_comm.comm);
-    ncclResult_t nccl_error = ncclSend(recvbuff, count, ncclChar, peer, nccl_comm, get_stream(stream));
+    ncclComm_t nccl_comm = reinterpret_cast<ncclComm_t>(quda_nccl_comm.comm);
+    ncclResult_t nccl_error = ncclRecv(recvbuff, count, ncclChar, peer, nccl_comm, get_stream(stream));
+    if (nccl_error != ncclSuccess) {
+      errorQuda("qudaNcclRecv throws %d error code.\n", static_cast<int>(nccl_error));
+    }
+  }
+
+  void qudaNcclGroupStart()
+  {
+    ncclGroupStart();
+  }
+
+  void qudaNcclGroupEnd()
+  {
+    ncclGroupEnd();
   }
 #endif
 

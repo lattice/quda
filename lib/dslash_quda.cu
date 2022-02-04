@@ -122,6 +122,7 @@ namespace quda {
       packEnd[i] = qudaEventCreate();
       dslashStart[i] = qudaEventCreate();
     }
+
 #ifdef NVSHMEM_COMMS
     sync_arr = static_cast<shmem_sync_t *>(device_comms_pinned_malloc(2 * QUDA_MAX_DIM * sizeof(shmem_sync_t)));
 
@@ -181,6 +182,7 @@ namespace quda {
       qudaEventDestroy(packEnd[i]);
       qudaEventDestroy(dslashStart[i]);
     }
+
 #ifdef NVSHMEM_COMMS
     device_comms_pinned_free(sync_arr);
     device_pinned_free(_retcount_intra);

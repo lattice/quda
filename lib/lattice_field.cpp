@@ -378,18 +378,6 @@ namespace quda {
 
     } // loop over dimension
 
-#ifdef QUDA_ENABLE_NCCL
-    for (int dim = 0; dim < 4; dim++) {
-      if (!commDimPartitioned(dim)) continue;
-      for (int b = 0; b < 2; b++) {
-        nccl_send_event_back[b][dim] = qudaEventCreate();
-        nccl_recv_event_back[b][dim] = qudaEventCreate();
-        nccl_send_event_fwd[b][dim] = qudaEventCreate();
-        nccl_recv_event_fwd[b][dim] = qudaEventCreate();
-      }
-    }
-#endif
-
     initComms = true;
   }
 
@@ -419,18 +407,6 @@ namespace quda {
       // local take down complete - now synchronize to ensure globally complete
       qudaDeviceSynchronize();
       comm_barrier();
-
-#ifdef QUDA_ENABLE_NCCL
-      for (int dim = 0; dim < 4; dim++) {
-        if (!commDimPartitioned(dim)) continue;
-        for (int b = 0; b < 2; b++) {
-          qudaEventDestroy(nccl_send_event_back[b][dim]);
-          qudaEventDestroy(nccl_recv_event_back[b][dim]);
-          qudaEventDestroy(nccl_send_event_fwd[b][dim]);
-          qudaEventDestroy(nccl_recv_event_fwd[b][dim]);
-        }
-      }
-#endif
 
       initComms = false;
     }
@@ -474,6 +450,21 @@ namespace quda {
       }
     }
 
+#ifdef QUDA_ENABLE_NCCL
+    for (int dim = 0; dim < 4; dim++) {
+      if (!commDimPartitioned(dim)) continue;
+      for (int dir = 0; dir < 2; dir++) {
+        get_nccl_comm(dim * 2 + dir);
+      }
+      for (int b = 0; b < 2; b++) {
+        nccl_send_event_back[b][dim] = qudaEventCreate();
+        nccl_recv_event_back[b][dim] = qudaEventCreate();
+        nccl_send_event_fwd[b][dim] = qudaEventCreate();
+        nccl_recv_event_fwd[b][dim] = qudaEventCreate();
+      }
+    }
+#endif
+
     initIPCComms = true;
     ghost_field_reset = false;
   }
@@ -508,6 +499,18 @@ namespace quda {
         }
       } // buffer
     } // iterate over dim
+
+#ifdef QUDA_ENABLE_NCCL
+    for (int dim = 0; dim < 4; dim++) {
+      if (!commDimPartitioned(dim)) continue;
+      for (int b = 0; b < 2; b++) {
+        qudaEventDestroy(LatticeField::nccl_send_event_back[b][dim]);
+        qudaEventDestroy(LatticeField::nccl_recv_event_back[b][dim]);
+        qudaEventDestroy(LatticeField::nccl_send_event_fwd[b][dim]);
+        qudaEventDestroy(LatticeField::nccl_recv_event_fwd[b][dim]);
+      }
+    }
+#endif
 
     // local take down complete - now synchronize to ensure globally complete
     qudaDeviceSynchronize();

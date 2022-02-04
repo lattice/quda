@@ -128,7 +128,7 @@ bool comm_gdr_blacklist() { return get_current_communicator().comm_gdr_blacklist
 bool comm_nvshmem_enabled() { return get_current_communicator().comm_nvshmem_enabled(); }
 
 #ifdef QUDA_ENABLE_NCCL
-qudaNcclComm_t get_nccl_comm() { return get_current_communicator().get_nccl_comm(); }
+qudaNcclComm_t get_nccl_comm(int d) { return get_current_communicator().get_nccl_comm(d); }
 #endif
 
 MsgHandle *comm_declare_send_rank(void *buffer, int rank, int tag, size_t nbytes)
