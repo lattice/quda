@@ -149,7 +149,7 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
       
-      idx = idx + arg.t0*arg.t0_offset; //nop for the whole lattice
+      if((mykernel_type == INTERIOR_KERNEL) && arg.ts_compute )idx += arg.t0*arg.t0_offset; //nop for the whole lattice
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim);
 
