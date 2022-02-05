@@ -1290,20 +1290,39 @@ struct mgInputStruct {
   bool allow_truncation;     // allow dropping the long links for small (less than three) aggregate directions
   bool dagger_approximation; // use the dagger approximation to Xinv, which is X^dagger
 
-  // Setup
-  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
+  /**
+   * Setup:
+   * There is no near-null vector generation on the first and last (coarsest) level.
+   * - The second level is the KD preconditioned staggered/HISQ operator, which is not a coarsening of the fine operator
+   * - By definition there is no coarsening of the coarsest level
+   * For this reason most of these variables are ignored on the first and last level.
+   * We do reuse `nvec` on the coarsest level to specify the size of coarsest-level deflation basis
+   * For reference: geo_block_size[0] does get defined internally (1 1 1 1 for optimized, 2 2 2 2 for coarse KD)
+   */
+  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, reused for deflation size on last level
   QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
   double setup_tol[QUDA_MAX_MG_LEVEL];           // ignored on first and last level
   double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
+  int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];    // ignored on first and last level
   char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
   char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first (1 1 1 1 for optimized, 2 2 2 2 for coarse KD) and last level
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (values on first level are prescribed)
 
-  // Solve
+  /**
+   * Solve:
+   * The coarse solver parameters are ignored on the first level because it is
+   * the outer solver, and as such we reuse values specified in MILC (tolerance, max iterations)
+   * Some of these are fixed (for now) and will be exposed in the future:
+   * - Solve type (for now fixed to full operator, will eventually expose Schur operator)
+   * - Solver (for now fixed to GCR, will eventually expose PCG for Schur operator)
+   * The smoother types are ignored for the coarsest level because, by definition, there is no
+   * still coarser operator to smooth
+   */
   QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // ignored on first and second level
   QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];  // ignored on first level
   double coarse_solver_tol[QUDA_MAX_MG_LEVEL];        // ignored on first level
   int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first level
+  int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL]; // only used last level
   QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];  // all but last level
   int nu_pre[QUDA_MAX_MG_LEVEL];                      // all but last level
   int nu_post[QUDA_MAX_MG_LEVEL];                     // all but last level
@@ -1331,6 +1350,7 @@ struct mgInputStruct {
       setup_inv[i] = QUDA_CGNR_INVERTER;
       setup_tol[i] = 1e-5;
       setup_maxiter[i] = 500;
+      setup_ca_basis_size[i] = 4;
       mg_vec_infile[i][0] = 0;
       mg_vec_outfile[i][0] = 0;
       for (int d = 0; d < 4; d++) { geo_block_size[i][d] = 2; }
@@ -1339,6 +1359,7 @@ struct mgInputStruct {
       coarse_solver[i] = QUDA_GCR_INVERTER;
       coarse_solver_tol[i] = 0.25;
       coarse_solver_maxiter[i] = 16;
+      coarse_solver_ca_basis_size[i] = 16;
       smoother_type[i] = QUDA_CA_GCR_INVERTER;
       nu_pre[i] = 0;
       nu_post[i] = 2;
@@ -1394,6 +1415,7 @@ struct mgInputStruct {
     setup_inv[1] = QUDA_CGNR_INVERTER;
     setup_tol[1] = 1e-5;
     setup_maxiter[1] = 500;
+    setup_ca_basis_size[1] = 4;
     mg_vec_infile[1][0] = 0;
     mg_vec_outfile[1][0] = 0;
 
@@ -1401,6 +1423,7 @@ struct mgInputStruct {
     setup_inv[2] = QUDA_CGNR_INVERTER;
     setup_tol[2] = 1e-5;
     setup_maxiter[2] = 500;
+    setup_ca_basis_size[2] = 4;
     mg_vec_infile[2][0] = 0;
     mg_vec_outfile[2][0] = 0;
 
@@ -1415,6 +1438,7 @@ struct mgInputStruct {
     coarse_solver[1] = QUDA_GCR_INVERTER;
     coarse_solver_tol[1] = 5e-2;
     coarse_solver_maxiter[1] = 4;
+    coarse_solver_ca_basis_size[1] = 4; // generally unused b/c not coarsest level
     smoother_type[1] = QUDA_CA_GCR_INVERTER;
     nu_pre[1] = 0;
     nu_post[1] = 2;
@@ -1424,6 +1448,7 @@ struct mgInputStruct {
     coarse_solver[2] = QUDA_GCR_INVERTER;
     coarse_solver_tol[2] = 0.25;
     coarse_solver_maxiter[2] = 4;
+    coarse_solver_ca_basis_size[2] = 4; // generally unused b/c not coarsest level
     smoother_type[2] = QUDA_CA_GCR_INVERTER;
     nu_pre[2] = 0;
     nu_post[2] = 2;
@@ -1433,6 +1458,7 @@ struct mgInputStruct {
     coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
     coarse_solver_tol[3] = 0.25;
     coarse_solver_maxiter[3] = 16; // use larger for non-deflated
+    coarse_solver_ca_basis_size[3] = 16; // ignored for non-CA solvers
 
     /* Misc */
     mg_verbosity[0] = QUDA_SUMMARIZE;
@@ -1461,8 +1487,14 @@ struct mgInputStruct {
       return QUDA_CGNR_INVERTER;
     } else if (strcmp(name, "cgne") == 0) {
       return QUDA_CGNE_INVERTER;
+    } else if (strcmp(name, "ca-cgnr") == 0) {
+      return QUDA_CA_CGNR_INVERTER;
+    } else if (strcmp(name, "ca-cgne") == 0) {
+      return QUDA_CA_CGNE_INVERTER;
     } else if (strcmp(name, "bicgstab") == 0) {
       return QUDA_BICGSTAB_INVERTER;
+    } else if (strcmp(name, "bicgstab-l") == 0) {
+      return QUDA_BICGSTABL_INVERTER;
     } else if (strcmp(name, "ca-gcr") == 0) {
       return QUDA_CA_GCR_INVERTER;
     } else {
@@ -1618,6 +1650,13 @@ struct mgInputStruct {
         setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
       }
 
+    } else if (strcmp(input_line[0].c_str(), "setup_ca_basis_size") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        setup_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
+
     } else if (strcmp(input_line[0].c_str(), "mg_vec_infile") == 0) {
       if (input_line.size() < 3) {
         error_code = 1;
@@ -1659,6 +1698,13 @@ struct mgInputStruct {
         error_code = 1;
       } else {
         coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
+
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver_ca_basis_size") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solver_ca_basis_size[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
       }
 
     } else if (strcmp(input_line[0].c_str(), "smoother_type") == 0) {
@@ -1980,10 +2026,14 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
 
     // Basis to use for CA-CGN(E/R) setup
-    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
+    if (input_struct.setup_inv[i] == QUDA_CA_CGNR_INVERTER || input_struct.setup_inv[i] == QUDA_CA_CGNE_INVERTER) {
+      mg_param.setup_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
+    } else {
+      mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+    }
 
     // Basis size for CACG setup
-    mg_param.setup_ca_basis_size[i] = 4; // setup_ca_basis_size[i];
+    mg_param.setup_ca_basis_size[i] = input_struct.setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
     mg_param.setup_ca_lambda_min[i] = 0.0;  // setup_ca_lambda_min[i];
@@ -2017,10 +2067,18 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.coarse_solver_maxiter[i] = input_struct.coarse_solver_maxiter[i];
 
     // Basis to use for CA-CGN(E/R) coarse solver
-    mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+    if (input_struct.coarse_solver[i] == QUDA_CA_CGNR_INVERTER || input_struct.coarse_solver[i] == QUDA_CA_CGNE_INVERTER) {
+      mg_param.coarse_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
+    } else {
+      mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+    }
 
-    // Basis size for CACG coarse solver/
-    mg_param.coarse_solver_ca_basis_size[i] = 16; // coarse_solver_ca_basis_size[i];
+    // Basis size for CACG coarse solver
+    if (input_struct.coarse_solver_ca_basis_size[i] > input_struct.coarse_solver_maxiter[i]) {
+      mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_maxiter[i];
+    } else {
+      mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_ca_basis_size[i];
+    }
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
     mg_param.coarse_solver_ca_lambda_min[i] = 0.0;  // coarse_solver_ca_lambda_min[i];

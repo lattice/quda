@@ -252,6 +252,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_madwf_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_heatbath_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_propagator_option_group(std::shared_ptr<QUDAApp> quda_app);
@@ -306,6 +307,7 @@ extern int Nsrc;
 extern int Msrc;
 extern int niter;
 extern int maxiter_precondition;
+extern QudaVerbosity verbosity_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
@@ -324,6 +326,18 @@ extern bool inv_deflate;
 extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern QudaSchwarzType precon_schwarz_type;
+extern QudaAcceleratorType precon_accelerator_type;
+
+extern double madwf_diagonal_suppressor;
+extern int madwf_ls;
+extern int madwf_null_miniter;
+extern double madwf_null_tol;
+extern int madwf_train_maxiter;
+extern bool madwf_param_load;
+extern bool madwf_param_save;
+extern char madwf_param_infile[256];
+extern char madwf_param_outfile[256];
+
 extern int precon_schwarz_cycle;
 extern int multishift;
 extern bool verify_results;
@@ -365,6 +379,9 @@ extern bool gauge_smear;
 extern QudaGaugeSmearType gauge_smear_type;
 
 extern int mg_levels;
+
+extern int max_res_increase;
+extern int max_res_increase_total;
 
 extern quda::mgarray<QudaFieldLocation> solver_location;
 extern quda::mgarray<QudaFieldLocation> setup_location;

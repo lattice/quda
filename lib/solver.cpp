@@ -108,7 +108,7 @@ namespace quda {
       break;
     case QUDA_BICGSTABL_INVERTER:
       report("BICGSTABL");
-      solver = new BiCGstabL(mat, matSloppy, param, profile);
+      solver = new BiCGstabL(mat, matSloppy, matEig, param, profile);
       break;
     case QUDA_EIGCG_INVERTER:
       report("EIGCG");

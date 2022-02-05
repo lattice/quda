@@ -47,6 +47,7 @@ set (QUDA_OBJS
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_gamma_helper.cu dslash_clover_helper.cu
   staggered_kd_build_xinv.cu staggered_kd_reorder_xinv.cu staggered_kd_apply_xinv.cu
+  madwf_transfer.cu madwf_tensor.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu reduce_helper.cu
   contract.cu comm_common.cpp communicator_stack.cpp
@@ -74,6 +75,7 @@ set (QUDA_OBJS
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
   tune.cpp
+  device_vector.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_fft.cu gauge_fix_ovr.cu
@@ -81,6 +83,7 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   deflation.cpp checksum.cu transform_reduce.cu
   dslash5_mobius_eofa.cu make_4d_prop_quda.cpp
+  madwf_ml.cpp
   instantiate.cpp version.cpp )
 # cmake-format: on
 

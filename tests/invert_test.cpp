@@ -106,6 +106,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   add_eofa_option_group(app);
+  add_madwf_option_group(app);
   add_multigrid_option_group(app);
   add_comms_option_group(app);
   try {
