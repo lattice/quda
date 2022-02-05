@@ -377,10 +377,10 @@ namespace quda {
     double r2_old = 0.0;
     if (r2_old_init != 0.0 and p_init) {
       r2_old = r2_old_init;
-      Complex rp = blas::cDotProduct(rSloppy, *p_init) / (r2);
-      blas::caxpy(-rp, rSloppy, *p_init);
+      Complex rp = blas::cDotProduct(rSloppy, x_update_batch.get_current_field()) / (r2);
+      blas::caxpy(-rp, rSloppy, x_update_batch.get_current_field());
       beta = r2 / r2_old;
-      blas::xpayz(rSloppy, beta, *p_init, *p_init);
+      blas::xpayz(rSloppy, beta, x_update_batch.get_current_field(), x_update_batch.get_current_field());
     }
 
     const bool use_heavy_quark_res =
