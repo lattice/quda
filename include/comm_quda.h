@@ -416,7 +416,7 @@ extern "C" {
   void commAsyncReductionSet(bool global_reduce);
 
 #ifdef QUDA_ENABLE_NCCL
-  qudaNcclComm_t get_nccl_comm(int d);
+  qudaNcclComm_t get_nccl_comm();
 #endif
 
 #ifdef __cplusplus

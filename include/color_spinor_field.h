@@ -563,9 +563,7 @@ namespace quda
     */
     void sendStart(int d, const qudaStream_t &stream, bool gdr = false, bool remote_write = false, bool nccl = false);
 
-    void recvRecord(int d, const qudaStream_t &stream, bool nccl);
-
-    void sendRecord(int d, const qudaStream_t &stream, bool nccl);
+    void ncclRecord(const qudaStream_t &stream);
 
     /**
        @brief Initiate halo communication

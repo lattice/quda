@@ -67,6 +67,8 @@ namespace quda {
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finis
     Worker *aux_worker;
+
+    bool dslash_use_graph;
   }
 
   template <typename T>
@@ -167,6 +169,8 @@ namespace quda {
         static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED), QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
     strcat(policy_string, ",pol=");
+
+    dslash_use_graph = false;
   }
 
   void destroyDslashEvents()

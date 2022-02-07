@@ -1111,7 +1111,7 @@ namespace quda
 #ifdef QUDA_ENABLE_NCCL
       if (nccl) {
         auto mh = mh_recv_rdma_fwd[bufferIndex][dim];
-        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
       } else
 #endif
       if (comm_peer2peer_enabled(1, dim)) {
@@ -1126,7 +1126,7 @@ namespace quda
 #ifdef QUDA_ENABLE_NCCL
       if (nccl) {
         auto mh = mh_recv_rdma_back[bufferIndex][dim];
-        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
+        qudaNcclRecv(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
       } else
 #endif
       if (comm_peer2peer_enabled(0, dim)) {
@@ -1139,49 +1139,14 @@ namespace quda
     }
   }
 
-  void ColorSpinorField::sendRecord(int d, const qudaStream_t &stream, bool nccl)
+  void ColorSpinorField::ncclRecord(const qudaStream_t &stream)
   {
     if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
 
-    int dim = d / 2;
-    int dir = d % 2;
-    if (!commDimPartitioned(dim)) return;
-
 #ifdef QUDA_ENABLE_NCCL
-    if (nccl) {
-      if (dir == 0) {
-        qudaEventRecord(nccl_send_event_back[bufferIndex][dim], stream);
-        // Let the exterior kernel wait for this event
-        qudaStreamWaitEvent(device::get_default_stream(), nccl_send_event_back[bufferIndex][dim], 0);
-      } else {
-        qudaEventRecord(nccl_send_event_fwd[bufferIndex][dim], stream);
-        // Let the exterior kernel wait for this event
-        qudaStreamWaitEvent(device::get_default_stream(), nccl_send_event_fwd[bufferIndex][dim], 0);
-      }
-    }
-#endif
-	}
-
-  void ColorSpinorField::recvRecord(int d, const qudaStream_t &stream, bool nccl)
-  {
-    if (Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Host field not supported");
-
-    int dim = d / 2;
-    int dir = d % 2;
-    if (!commDimPartitioned(dim)) return;
-
-#ifdef QUDA_ENABLE_NCCL
-    if (nccl) {
-      if (dir == 0) {
-        qudaEventRecord(nccl_recv_event_fwd[bufferIndex][dim], stream);
-        // Let the exterior kernel wait for this event
-        qudaStreamWaitEvent(device::get_default_stream(), nccl_recv_event_fwd[bufferIndex][dim], 0);
-      } else {
-        qudaEventRecord(nccl_recv_event_back[bufferIndex][dim], stream);
-        // Let the exterior kernel wait for this event
-        qudaStreamWaitEvent(device::get_default_stream(), nccl_recv_event_back[bufferIndex][dim], 0);
-      }
-    }
+    qudaEventRecord(nccl_event, stream);
+    // Let the exterior kernel wait for this event
+    qudaStreamWaitEvent(device::get_default_stream(), nccl_event, 0);
 #endif
 	}
 
@@ -1200,10 +1165,10 @@ namespace quda
     if (nccl) {
       if (dir == 0) {
         auto mh = mh_send_rdma_back[bufferIndex][dim];
-        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
       } else {
         auto mh = mh_send_rdma_fwd[bufferIndex][dim];
-        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(d), stream);
+        qudaNcclSend(mh->buffer, mh->nbytes, mh->rank, get_nccl_comm(), stream);
       }
     } else
 #endif
@@ -1267,11 +1232,6 @@ namespace quda
     if (dir == 0) {
 
       // first query send to backwards
-#ifdef QUDA_ENABLE_NCCL
-      if (nccl_send_recv) {
-        if (!complete_send_back[dim]) complete_send_back[dim] = qudaEventQuery(nccl_send_event_back[bufferIndex][dim]);
-      } else
-#endif
       if (comm_peer2peer_enabled(0, dim)) {
         if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
       } else if (gdr_send) {
@@ -1281,11 +1241,6 @@ namespace quda
       }
 
       // second query receive from forwards
-#ifdef QUDA_ENABLE_NCCL
-      if (nccl_send_recv) {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = qudaEventQuery(nccl_recv_event_fwd[bufferIndex][dim]);
-      } else
-#endif
       if (comm_peer2peer_enabled(1, dim)) {
         if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
       } else if (gdr_recv) {
@@ -1303,11 +1258,6 @@ namespace quda
     } else { // dir == 1
 
       // first query send to forwards
-#ifdef QUDA_ENABLE_NCCL
-      if (nccl_send_recv) {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = qudaEventQuery(nccl_send_event_fwd[bufferIndex][dim]);
-      } else
-#endif
       if (comm_peer2peer_enabled(1, dim)) {
         if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
       } else if (gdr_send) {
@@ -1317,11 +1267,6 @@ namespace quda
       }
 
       // second query receive from backwards
-#ifdef QUDA_ENABLE_NCCL
-      if (nccl_send_recv) {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = qudaEventQuery(nccl_recv_event_back[bufferIndex][dim]);
-      } else
-#endif
       if (comm_peer2peer_enabled(0, dim)) {
         if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
       } else if (gdr_recv) {
