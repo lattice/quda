@@ -16,12 +16,10 @@ namespace quda {
     MomActionArg(const GaugeField &mom) :
       ReduceArg<double>(dim3(mom.VolumeCB(), 2, 1)),
       mom(mom) { }
-
-    __device__ __host__ double init() const { return 0.0; }
   };
 
-  template <typename Arg> struct MomAction : plus<double> {
-    using reduce_t = double;
+  template <typename Arg> struct MomAction : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr MomAction(const Arg &arg) : arg(arg) {}
@@ -50,7 +48,7 @@ namespace quda {
         local_sum += mom(1,2).imag() * mom(1,2).imag();
 	local_sum -= 4.0;
 
-	action = plus::operator()(action, local_sum);
+	action = operator()(action, local_sum);
       }
       return action;
     }
@@ -59,7 +57,6 @@ namespace quda {
   template<typename Float_, int nColor_, QudaReconstructType recon_>
   struct UpdateMomArg : ReduceArg<array<double, 2>>
   {
-    using reduce_t = array<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
@@ -82,12 +79,10 @@ namespace quda {
         border[dir] = force.R()[dir];
       }
     }
-
-    __device__ __host__ reduce_t init() const{ return reduce_t{0.0, 0.0}; }
   };
 
-  template <typename Arg> struct MomUpdate : maximum<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct MomUpdate : maximum<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using maximum<reduce_t>::operator();
     const Arg &arg;
     constexpr MomUpdate(const Arg &arg) : arg(arg) {}

@@ -46,7 +46,7 @@ namespace quda
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -123,7 +123,7 @@ namespace quda
 
     if (j >= arg.threads.z) return;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, k, j);

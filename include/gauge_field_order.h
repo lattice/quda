@@ -390,18 +390,18 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
         int ndim = (dim == -1 ? geometry : 1);
-        std::vector<double> result(ndim);
+        std::vector<typename reducer::reduce_t> result(ndim);
         std::vector<complex<storeFloat> *> v(ndim);
         for (int d = 0; d < ndim; d++) v[d] = u[d + lower];
-        ::quda::transform_reduce(location, result, v, 2 * volumeCB * nColor * nColor, h, init, r);
-        double total = init;
-        for (auto &res : result) total = r(total, res);
+        ::quda::transform_reduce<reducer>(location, result, v, 2 * volumeCB * nColor * nColor, h);
+        auto total = reducer::init();
+        for (auto &res : result) total = reducer::apply(total, res);
         return total;
       }
     };
@@ -497,17 +497,18 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = dim == -1 ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
-        std::vector<double> result = {init, init};
+	auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
                                       u + (1 * geometry + start) * volumeCB * nColor * nColor};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -620,16 +621,17 @@ namespace quda {
         atomic_fetch_add(u2, val_);
       }
 
-      template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      template <typename reducer, typename helper>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h) const
       {
         if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
         auto start = (dim == -1) ? 0 : dim;
         auto count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
-        std::vector<double> result = {init, init};
+	auto init = reducer::init();
+        std::vector<decltype(init)> result = {init, init};
         std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
-        ::quda::transform_reduce(location, result, v, count, h, init, r);
-        return r(result[0], result[1]);
+        ::quda::transform_reduce<reducer>(location, result, v, count, h);
+        return reducer::apply(result[0], result[1]);
       }
     };
 
@@ -843,8 +845,7 @@ namespace quda {
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
           commGlobalReductionPush(global);
-          double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm1 = accessor.template transform_reduce<plus<double>>(location, dim, abs_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm1;
         }
@@ -857,8 +858,7 @@ namespace quda {
         __host__ double norm2(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
-                                                  plus<double>());
+          double nrm2 = accessor.template transform_reduce<plus<double>>(location, dim, square_<double, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return nrm2;
         }
@@ -871,8 +871,7 @@ namespace quda {
         __host__ double abs_max(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmax = accessor.transform_reduce(location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv), 0.0,
-                                                    maximum<Float>());
+          double absmax = accessor.template transform_reduce<maximum<Float>>(location, dim, abs_max_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmax;
         }
@@ -885,8 +884,7 @@ namespace quda {
         __host__ double abs_min(int dim = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin = accessor.transform_reduce(location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv),
-                                                    std::numeric_limits<double>::max(), minimum<Float>());
+          double absmin = accessor.template transform_reduce<minimum<Float>>(location, dim, abs_min_<Float, storeFloat>(accessor.scale_inv));
           commGlobalReductionPop();
           return absmin;
         }
