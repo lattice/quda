@@ -182,28 +182,28 @@ namespace quda {
     siteSubset(std::exchange(field.siteSubset, QUDA_INVALID_SITE_SUBSET)),
     ghostExchange(std::exchange(field.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID)),
     nDimComms(std::exchange(field.nDimComms, 0)),
-    ghost_bytes(0),
-    ghost_bytes_old(0),
-    ghost_face_bytes {},
-    ghost_face_bytes_aligned {},
-    ghost_offset(),
-    my_face_h {},
-    my_face_hd {},
-    my_face_d {},
-    my_face_dim_dir_h {},
-    my_face_dim_dir_hd {},
-    my_face_dim_dir_d {},
-    from_face_h {},
-    from_face_hd {},
-    from_face_d {},
-    from_face_dim_dir_h {},
-    from_face_dim_dir_hd {},
-    from_face_dim_dir_d {},
-    mh_recv {},
-    mh_send {},
-    mh_recv_rdma {},
-    mh_send_rdma {},
-    initComms(false),
+    ghost_bytes(std::exchange(field.ghost_bytes, 0)),
+    ghost_bytes_old(std::exchange(field.ghost_bytes_old, 0)),
+    ghost_face_bytes(std::exchange(field.ghost_face_bytes, { })),
+    ghost_face_bytes_aligned(std::exchange(field.ghost_face_bytes_aligned, { })),
+    ghost_offset(std::exchange(field.ghost_offset, { })),
+    my_face_h(std::exchange(field.my_face_h, { })),
+    my_face_hd(std::exchange(field.my_face_hd, { })),
+    my_face_d(std::exchange(field.my_face_d, { })),
+    my_face_dim_dir_h(std::exchange(field.my_face_dim_dir_h, { })),
+    my_face_dim_dir_hd(std::exchange(field.my_face_dim_dir_hd, { })),
+    my_face_dim_dir_d(std::exchange(field.my_face_dim_dir_d, { })),
+    from_face_h(std::exchange(field.from_face_h, { })),
+    from_face_hd(std::exchange(field.from_face_hd, { })),
+    from_face_d(std::exchange(field.from_face_d, { })),
+    from_face_dim_dir_h(std::exchange(field.from_face_dim_dir_h, { })),
+    from_face_dim_dir_hd(std::exchange(field.from_face_dim_dir_hd, { })),
+    from_face_dim_dir_d(std::exchange(field.from_face_dim_dir_d, { })),
+    mh_recv(std::exchange(field.mh_recv, { })),
+    mh_send(std::exchange(field.mh_send, { })),
+    mh_recv_rdma(std::exchange(field.mh_recv_rdma, { })),
+    mh_send_rdma(std::exchange(field.mh_send_rdma, { })),
+    initComms(std::exchange(field.initComms, false)),
     vol_string(std::exchange(field.vol_string, { })),
     aux_string(std::exchange(field.aux_string, { })),
     mem_type(std::exchange(field.mem_type, QUDA_MEMORY_INVALID)),
@@ -233,8 +233,6 @@ namespace quda {
   {
     if (&src != this) {
       destroyComms();
-      src.destroyComms(); // FIXME: when we move a field, we lose all comms allocations
-
       volume = std::exchange(src.volume, 0);
       volumeCB = std::exchange(src.volumeCB, 0);
       localVolume = std::exchange(src.localVolume, 0);
@@ -258,8 +256,6 @@ namespace quda {
       siteSubset = std::exchange(src.siteSubset, QUDA_INVALID_SITE_SUBSET);
       ghostExchange = std::exchange(src.ghostExchange, QUDA_GHOST_EXCHANGE_INVALID);
       nDimComms = std::exchange(src.nDimComms, 0);
-
-#if 0
       ghost_bytes = std::exchange(src.ghost_bytes, 0);
       ghost_bytes_old = std::exchange(src.ghost_bytes_old, { });
       ghost_face_bytes = std::exchange(src.ghost_face_bytes, { });
@@ -277,12 +273,14 @@ namespace quda {
       from_face_dim_dir_h = std::exchange(src.from_face_dim_dir_h, { });
       from_face_dim_dir_hd = std::exchange(src.from_face_dim_dir_hd, { });
       from_face_dim_dir_d = std::exchange(src.from_face_dim_dir_d, { });
-#endif
-
+      mh_recv = std::exchange(src.mh_recv, { });
+      mh_send = std::exchange(src.mh_send, { });
+      mh_recv_rdma = std::exchange(src.mh_recv_rdma, { });
+      mh_send_rdma = std::exchange(src.mh_send_rdma, { });
+      initComms = std::exchange(src.initComms, false);
       vol_string = std::exchange(src.vol_string, { });
       aux_string = std::exchange(src.aux_string, { });
       mem_type = std::exchange(src.mem_type, QUDA_MEMORY_INVALID);
-
       backup_h = std::exchange(src.backup_h, nullptr);
       backup_norm_h = std::exchange(src.backup_norm_h, nullptr);
       backed_up = std::exchange(src.backed_up, false);

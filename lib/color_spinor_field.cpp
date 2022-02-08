@@ -112,10 +112,10 @@ namespace quda
     v(std::exchange(field.v, nullptr)),
     v_h(std::exchange(field.v_h, nullptr)),
     norm_offset(std::exchange(field.norm_offset, 0)),
-    ghost(),
-    ghostFace(),
-    ghostFaceCB(),
-    ghost_buf{ },
+    ghost(std::exchange(field.ghost, { })),
+    ghostFace(std::exchange(field.ghostFace, { })),
+    ghostFaceCB(std::exchange(field.ghostFaceCB, { })),
+    ghost_buf(std::exchange(field.ghost_buf, { })),
     dslash_constant(std::exchange(field.dslash_constant, nullptr)),
     bytes(std::exchange(field.bytes, 0)),
     bytes_raw(std::exchange(field.bytes_raw, 0)),
@@ -183,9 +183,7 @@ namespace quda
         init = std::exchange(src.init, false);
         alloc = std::exchange(src.alloc, false);
         reference = std::exchange(src.reference, false);
-
         ghost_precision_allocated = QUDA_INVALID_PRECISION;
-
         nColor = std::exchange(src.nColor, 0);
         nSpin = std::exchange(src.nSpin, 0);
         nVec = std::exchange(src.nVec, 0);
@@ -193,23 +191,21 @@ namespace quda
         pc_type = std::exchange(src.pc_type, QUDA_PC_INVALID);
         suggested_parity = std::exchange(src.suggested_parity, QUDA_INVALID_PARITY);
         length = std::exchange(src.length, 0);
-
         v = std::exchange(src.v, nullptr);
         v_h = std::exchange(src.v_h, nullptr);
         norm_offset = std::exchange(src.norm_offset, 0);
-
+        ghost = std::exchange(src.ghost, { });
+        ghostFace = std::exchange(src.ghostFace, { });
+        ghostFaceCB = std::exchange(src.ghostFaceCB, { });
+        ghost_buf = std::exchange(src.ghost_buf, { });
         dslash_constant = std::exchange(src.dslash_constant, nullptr);
-
         bytes = std::exchange(src.bytes, 0);
         bytes_raw = std::exchange(src.bytes_raw, 0);
-
         siteOrder = std::exchange(src.siteOrder, QUDA_INVALID_SITE_ORDER);
         fieldOrder = std::exchange(src.fieldOrder, QUDA_INVALID_FIELD_ORDER);
         gammaBasis = std::exchange(src.gammaBasis, QUDA_INVALID_GAMMA_BASIS);
-
         even = std::exchange(src.even, nullptr);
         odd = std::exchange(src.odd, nullptr);
-
         composite_descr = std::exchange(src.composite_descr, CompositeColorSpinorFieldDescriptor());
         components = std::move(src.components);
       } else {
