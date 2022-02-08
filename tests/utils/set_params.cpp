@@ -597,8 +597,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i].c_str());
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i].c_str());
     if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
@@ -1186,8 +1186,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i].c_str());
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i].c_str());
     if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }

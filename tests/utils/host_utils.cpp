@@ -137,9 +137,6 @@ void setQudaDefaultMgTestParams()
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
-
-    strcpy(mg_vec_infile[i], "");
-    strcpy(mg_vec_outfile[i], "");
   }
 }
 
