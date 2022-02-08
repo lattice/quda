@@ -42,13 +42,10 @@ static int Vs[4], Vsh[4];
 #include "gauge_field.h"
 // extern void setup_dims_in_gauge(int *XX);
 
-static void
-setup_dims(int* X)
+static void setup_dims(lat_dim_t &X)
 {
   V = 1;
-  for (int d=0; d< 4; d++) {
-    V *= X[d];
-  }
+  for (int d=0; d< 4; d++) V *= X[d];
 
   Vs[0] = Vs_x = X[1]*X[2]*X[3];
   Vs[1] = Vs_y = X[0]*X[2]*X[3];
@@ -62,7 +59,8 @@ setup_dims(int* X)
 }
 
 template <typename Float>
-void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace, int* X) {
+void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostFwd, int nFace, lat_dim_t &X)
+{
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
   int volumeCB = X[0]*X[1]*X[2]*X[3]/2;
@@ -171,7 +169,8 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
 
 
 void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** cpuGhostStapleFwd,
-				int nFace, QudaPrecision precision, int* X) {
+				int nFace, QudaPrecision precision, lat_dim_t &X)
+{
   if (precision == QUDA_DOUBLE_PRECISION) {
     packGhostAllStaples((double*)staple, (double**)cpuGhostStapleBack, (double**) cpuGhostStapleFwd, nFace, X);
   } else {
@@ -179,7 +178,7 @@ void pack_ghost_all_staples_cpu(void *staple, void **cpuGhostStapleBack, void** 
   }
 }
 
-void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec)
+void pack_gauge_diag(void* buf, lat_dim_t &X, void** sitelink, int nu, int mu, int dir1, int dir2, QudaPrecision prec)
 {
   /*
     nu |          |
@@ -244,7 +243,8 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
   routine which uses an enlarged domain instead of a ghost zone.
 */
 template <typename Float>
-void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int dir, int nFace, int* X) {
+void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd, int dir, int nFace, lat_dim_t &X)
+{
   int XY=X[0]*X[1];
   int XYZ=X[0]*X[1]*X[2];
   int volumeCB = X[0]*X[1]*X[2]*X[3]/2;
@@ -351,7 +351,7 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
 
 
 void pack_ghost_all_links(void **cpuLink, void **cpuGhostBack, void** cpuGhostFwd,
-			  int dir, int nFace, QudaPrecision precision, int *X) {
+			  int dir, int nFace, QudaPrecision precision, lat_dim_t &X) {
   if (precision == QUDA_DOUBLE_PRECISION) {
     packGhostAllLinks((double**)cpuLink, (double**)cpuGhostBack, (double**) cpuGhostFwd, dir,  nFace, X);
   } else {
@@ -380,7 +380,7 @@ void exchange_llfat_init(QudaPrecision prec)
 
 
 template<typename Float>
-void exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_diag, int optflag)
+void exchange_sitelink_diag(lat_dim_t &X, Float** sitelink,  Float** ghost_sitelink_diag, int optflag)
 {
   /*
     nu |          |
@@ -448,9 +448,8 @@ void exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_di
 
 
 template<typename Float>
-void
-exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost_sitelink_diag, 
-		  Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf, int optflag)
+void exchange_sitelink(lat_dim_t &X, Float** sitelink, Float** ghost_sitelink, Float** ghost_sitelink_diag, 
+                       Float** sitelink_fwd_sendbuf, Float** sitelink_back_sendbuf, int optflag)
 {
 
   int nFace =1;
@@ -498,7 +497,7 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 //this function is used for link fattening computation
 //@optflag: if this flag is set, we only communicate in directions that are partitioned
 //          if not set, then we communicate in all directions regradless of partitions
-void exchange_cpu_sitelink(int *X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
+void exchange_cpu_sitelink(lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
                            QudaPrecision gPrecision, QudaGaugeParam *, int optflag)
 {  
   setup_dims(X);
@@ -628,7 +627,7 @@ void exchange_cpu_sitelink(int *X, void **sitelink, void **ghost_sitelink, void 
 
 // gauge_site_size
 
-void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
+void exchange_cpu_sitelink_ex(lat_dim_t &X, lat_dim_t &R, void** sitelink, QudaGaugeFieldOrder cpu_order,
 			      QudaPrecision gPrecision, int optflag, int geometry)
 {
   int E[4];
@@ -913,10 +912,8 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 
 
 template<typename Float>
-void
-do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf, int* X)
+void do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_sendbuf, Float** staple_back_sendbuf, lat_dim_t &X)
 {
-
   int nFace =1;
   pack_ghost_all_staples_cpu(staple, (void**)staple_back_sendbuf, 
 			     (void**)staple_fwd_sendbuf,  nFace, (QudaPrecision)(sizeof(Float)), X);
@@ -960,7 +957,7 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 
 
 //this function is used for link fattening computation
-void exchange_cpu_staple(int* X, void* staple, void** ghost_staple, QudaPrecision gPrecision)
+void exchange_cpu_staple(lat_dim_t &X, void* staple, void** ghost_staple, QudaPrecision gPrecision)
 {  
   setup_dims(X);
 

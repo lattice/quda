@@ -192,11 +192,11 @@ extern "C" {
 #endif
 
 // Implemented in face_gauge.cpp
-void exchange_cpu_sitelink(int *X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
+void exchange_cpu_sitelink(lat_dim_t &X, void **sitelink, void **ghost_sitelink, void **ghost_sitelink_diag,
                            QudaPrecision gPrecision, QudaGaugeParam *param, int optflag);
-void exchange_cpu_sitelink_ex(int *X, int *R, void **sitelink, QudaGaugeFieldOrder cpu_order, QudaPrecision gPrecision,
+void exchange_cpu_sitelink_ex(lat_dim_t &X, lat_dim_t &R, void **sitelink, QudaGaugeFieldOrder cpu_order, QudaPrecision gPrecision,
                               int optflag, int geometry);
-void exchange_cpu_staple(int *X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
+void exchange_cpu_staple(lat_dim_t &X, void *staple, void **ghost_staple, QudaPrecision gPrecision);
 void exchange_llfat_init(QudaPrecision prec);
 void exchange_llfat_cleanup(void);
 

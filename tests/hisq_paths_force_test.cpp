@@ -156,9 +156,9 @@ void total_staple_io_flops(QudaPrecision prec, QudaReconstructType recon, double
 }
 
 #ifdef MULTI_GPU
-static int R[4] = {2, 2, 2, 2};
+static lat_dim_t R = {2, 2, 2, 2};
 #else
-static int R[4] = {0, 0, 0, 0};
+static lat_dim_t R = {0, 0, 0, 0};
 #endif
 
 // allocate memory

@@ -305,7 +305,6 @@ namespace quda
 
   class ColorSpinorField : public LatticeField
   {
-
   private:
     void create(const ColorSpinorParam &param);
     void destroy();
@@ -339,14 +338,10 @@ namespace quda
     size_t norm_offset; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-
-    void *ghost[2][QUDA_MAX_DIM];     // pointers to the ghost regions - NULL by default
-    void *ghostNorm[2][QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
-
-    mutable int ghostFace[QUDA_MAX_DIM];   // the size of each face
-    mutable int ghostFaceCB[QUDA_MAX_DIM]; // the size of each checkboarded face
-
-    mutable void *ghost_buf[2 * QUDA_MAX_DIM]; // wrapper that points to current ghost zone
+    array<array<void*, QUDA_MAX_DIM>, 2> ghost;     // pointers to the ghost regions - NULL by default
+    mutable lat_dim_t ghostFace;   // the size of each face
+    mutable lat_dim_t ghostFaceCB; // the size of each checkboarded face
+    mutable array<void*, 2 * QUDA_MAX_DIM> ghost_buf; // wrapper that points to current ghost zone
 
     mutable DslashConstant *dslash_constant; // constants used by dslash and packing kernels
 
@@ -694,8 +689,8 @@ namespace quda
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    const int *GhostFace() const { return ghostFace; }
-    const int *GhostFaceCB() const { return ghostFaceCB; }
+    const int *GhostFace() const { return ghostFace.data; }
+    const int *GhostFaceCB() const { return ghostFaceCB.data; }
 
     /**
        Return the offset in bytes to the start of the ghost zone in a
@@ -706,6 +701,7 @@ namespace quda
     size_t GhostOffset(const int dim, const int dir) const { return ghost_offset[dim][dir]; }
 
     const void *Ghost2() const;
+
     /**
        Return array of pointers to the ghost zones (ordering dim*2+dir)
      */

@@ -111,8 +111,8 @@ int main(int argc, char **argv)
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
-    int y[4];
-    int R[4] = {0,0,0,0};
+    lat_dim_t y;
+    lat_dim_t R = {0,0,0,0};
     for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
     for(int dir=0; dir<4; ++dir) y[dir] = gauge_param.X[dir] + 2 * R[dir];
     GaugeFieldParam gParamEx(y, prec, link_recon,

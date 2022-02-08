@@ -212,12 +212,13 @@ static void llfat_test()
       }
     }
 
-    exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
+    lat_dim_t X = {qudaGaugeParam.X[0], qudaGaugeParam.X[1], qudaGaugeParam.X[2], qudaGaugeParam.X[3]};
+    exchange_cpu_sitelink(X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
     llfat_reference_mg(fat_reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
   
     {
-      int R[4] = {2,2,2,2};
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
+      lat_dim_t R = {2,2,2,2};
+      exchange_cpu_sitelink_ex(X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
       computeLongLinkCPU(long_reflink, sitelink_ex, qudaGaugeParam.cpu_prec, coeff);
     }
 #else

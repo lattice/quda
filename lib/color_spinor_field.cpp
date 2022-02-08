@@ -21,7 +21,6 @@ namespace quda
     v(nullptr),
     norm_offset(0),
     ghost(),
-    ghostNorm(),
     ghostFace(),
     ghost_buf{ },
     dslash_constant(nullptr),
@@ -43,7 +42,6 @@ namespace quda
     v(nullptr),
     norm_offset(0),
     ghost(),
-    ghostNorm(),
     ghostFace(),
     ghost_buf{ },
     dslash_constant(nullptr),
@@ -81,7 +79,6 @@ namespace quda
     v(nullptr),
     norm_offset(0),
     ghost(),
-    ghostNorm(),
     ghostFace(),
     ghost_buf{ },
     dslash_constant(nullptr),
@@ -116,8 +113,8 @@ namespace quda
     v_h(std::exchange(field.v_h, nullptr)),
     norm_offset(std::exchange(field.norm_offset, 0)),
     ghost(),
-    ghostNorm(),
     ghostFace(),
+    ghostFaceCB(),
     ghost_buf{ },
     dslash_constant(std::exchange(field.dslash_constant, nullptr)),
     bytes(std::exchange(field.bytes, 0)),
@@ -648,7 +645,6 @@ namespace quda
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const
   {
-
     // FIXME: use LatticeField MsgHandles
     MsgHandle *mh_send_fwd[4];
     MsgHandle *mh_from_back[4];
@@ -842,7 +838,7 @@ namespace quda
     return *(components[idx]);
   }
 
-  void *const *ColorSpinorField::Ghost() const { return ghost_buf; }
+  void *const *ColorSpinorField::Ghost() const { return ghost_buf.data; }
 
   const void *ColorSpinorField::Ghost2() const
   {
@@ -1086,9 +1082,6 @@ namespace quda
         if (commDimPartitioned(i)) {
           for (int b = 0; b < 2; b++) {
             ghost[b][i] = static_cast<char *>(ghost_recv_buffer_d[b]) + ghost_offset[i][0];
-            if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION)
-              ghostNorm[b][i] = static_cast<char *>(ghost[b][i])
-                + nFace * surface[i] * (nSpin / (spin_project ? 2 : 1)) * nColor * 2 * ghost_precision;
           }
         }
       }
@@ -1206,24 +1199,12 @@ namespace quda
     if (!commDimPartitioned(dim)) return;
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) { // receive from forwards
-      // receive from the processor in the +1 direction
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_fwd[bufferIndex][dim]);
-      }
-    } else { // receive from backwards
-      // receive from the processor in the -1 direction
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_start(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr) {
-        comm_start(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_start(mh_recv_back[bufferIndex][dim]);
-      }
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_start(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (gdr) {
+      comm_start(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_start(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
@@ -1239,15 +1220,8 @@ namespace quda
     if (gdr && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
     if (!comm_peer2peer_enabled(dir, dim)) {
-      if (dir == 0)
-        if (gdr)
-          comm_start(mh_send_rdma_back[bufferIndex][dim]);
-        else
-          comm_start(mh_send_back[bufferIndex][dim]);
-      else if (gdr)
-        comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
-      else
-        comm_start(mh_send_fwd[bufferIndex][dim]);
+      if (gdr) comm_start(mh_send_rdma[bufferIndex][dim][dir]);
+      else     comm_start(mh_send[bufferIndex][dim][dir]);
     } else { // doing peer-to-peer
 
       // if not using copy engine then the packing kernel will remotely write the halos
@@ -1259,16 +1233,10 @@ namespace quda
         qudaMemcpyP2PAsync(ghost_dst, my_face_dim_dir_d[bufferIndex][dim][dir], ghost_face_bytes[dim], stream);
       } // remote_write
 
-      if (dir == 0) {
         // record the event
-        qudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], stream);
-        // send to the processor in the -1 direction
-        comm_start(mh_send_p2p_back[bufferIndex][dim]);
-      } else {
-        qudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], stream);
-        // send to the processor in the +1 direction
-        comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
-      }
+      qudaEventRecord(ipcCopyEvent[bufferIndex][dim][dir], stream);
+      // send to the processor in the -1 direction
+      comm_start(mh_send_p2p[bufferIndex][dim][dir]);
     }
   }
 
@@ -1278,10 +1246,8 @@ namespace quda
     sendStart(dir, stream, gdr_send);
   }
 
-  static bool complete_recv_fwd[QUDA_MAX_DIM] = {};
-  static bool complete_recv_back[QUDA_MAX_DIM] = {};
-  static bool complete_send_fwd[QUDA_MAX_DIM] = {};
-  static bool complete_send_back[QUDA_MAX_DIM] = {};
+  static bool complete_recv[QUDA_MAX_DIM][2] = {};
+  static bool complete_send[QUDA_MAX_DIM][2] = {};
 
   int ColorSpinorField::commsQuery(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
   {
@@ -1295,60 +1261,31 @@ namespace quda
     if (!commDimPartitioned(dim)) return 1;
     if ((gdr_send || gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) {
-
-      // first query send to backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_p2p_back[bufferIndex][dim]);
-      } else if (gdr_send) {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-        if (!complete_send_back[dim]) complete_send_back[dim] = comm_query(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second query receive from forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_recv) {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        if (!complete_recv_fwd[dim]) complete_recv_fwd[dim] = comm_query(mh_recv_fwd[bufferIndex][dim]);
-      }
-
-      if (complete_recv_fwd[dim] && complete_send_back[dim]) {
-        complete_send_back[dim] = false;
-        complete_recv_fwd[dim] = false;
-        return 1;
-      }
-
-    } else { // dir == 1
-
-      // first query send to forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_p2p_fwd[bufferIndex][dim]);
-      } else if (gdr_send) {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-        if (!complete_send_fwd[dim]) complete_send_fwd[dim] = comm_query(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second query receive from backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_p2p_back[bufferIndex][dim]);
-      } else if (gdr_recv) {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        if (!complete_recv_back[dim]) complete_recv_back[dim] = comm_query(mh_recv_back[bufferIndex][dim]);
-      }
-
-      if (complete_recv_back[dim] && complete_send_fwd[dim]) {
-        complete_send_fwd[dim] = false;
-        complete_recv_back[dim] = false;
-        return 1;
-      }
+    // first query send to backwards
+    if (comm_peer2peer_enabled(dir, dim)) {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_p2p[bufferIndex][dim][dir]);
+    } else if (gdr_send) {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send_rdma[bufferIndex][dim][dir]);
+    } else {
+      if (!complete_send[dim][dir]) complete_send[dim][dir] = comm_query(mh_send[bufferIndex][dim][dir]);
     }
 
-    return 0;
+    // second query receive from forwards
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+    } else if (gdr_recv) {
+      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      if (!complete_recv[dim][1 - dir]) complete_recv[dim][1 - dir] = comm_query(mh_recv[bufferIndex][dim][1 - dir]);
+    }
+
+    if (complete_recv[dim][1 - dir] && complete_send[dim][dir]) {
+      complete_send[dim][dir] = false;
+      complete_recv[dim][1 - dir] = false;
+      return 1;
+    } else {
+      return 0;
+    }
   }
 
   void ColorSpinorField::commsWait(int d, const qudaStream_t &, bool gdr_send, bool gdr_recv)
@@ -1363,49 +1300,24 @@ namespace quda
     if (!commDimPartitioned(dim)) return;
     if ((gdr_send && gdr_recv) && !comm_gdr_enabled()) errorQuda("Requesting GDR comms but GDR is not enabled");
 
-    if (dir == 0) {
-
-      // first wait on send to backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_send) {
-        comm_wait(mh_send_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_send_back[bufferIndex][dim]);
-      }
-
-      // second wait on receive from forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_recv) {
-        comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_recv_fwd[bufferIndex][dim]);
-      }
-
+    // first wait on send to "dir"
+    if (comm_peer2peer_enabled(dir, dim)) {
+      comm_wait(mh_send_p2p[bufferIndex][dim][dir]);
+      qudaEventSynchronize(ipcCopyEvent[bufferIndex][dim][dir]);
+    } else if (gdr_send) {
+      comm_wait(mh_send_rdma[bufferIndex][dim][dir]);
     } else {
+      comm_wait(mh_send[bufferIndex][dim][dir]);
+    }
 
-      // first wait on send to forwards
-      if (comm_peer2peer_enabled(1, dim)) {
-        comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-        qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
-      } else if (gdr_send) {
-        comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_send_fwd[bufferIndex][dim]);
-      }
-
-      // second wait on receive from backwards
-      if (comm_peer2peer_enabled(0, dim)) {
-        comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-        qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
-      } else if (gdr_recv) {
-        comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
-      } else {
-        comm_wait(mh_recv_back[bufferIndex][dim]);
-      }
+    // second wait on receive from "1 - dir"
+    if (comm_peer2peer_enabled(1 - dir, dim)) {
+      comm_wait(mh_recv_p2p[bufferIndex][dim][1 - dir]);
+      qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][dim][1 - dir]);
+    } else if (gdr_recv) {
+      comm_wait(mh_recv_rdma[bufferIndex][dim][1 - dir]);
+    } else {
+      comm_wait(mh_recv[bufferIndex][dim][1 - dir]);
     }
   }
 
@@ -1449,7 +1361,7 @@ namespace quda
 
       packGhostHost(sendbuf, parity, nFace, dagger);
 
-      exchange(ghost_buf, sendbuf, nFace);
+      exchange(ghost_buf.data, sendbuf, nFace);
 
       host_free(sendbuf);
     } else {

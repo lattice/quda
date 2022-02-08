@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <quda_constants.h>
 #include <quda_api.h>
+#include <array.h>
 
 using namespace quda;
 
@@ -246,7 +247,7 @@ extern "C" {
     @param[in] local The process-local memory pointer to be exchanged
     from this process
   */
-  void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local);
+  void comm_create_neighbor_memory(array<array<void *, 2>, QUDA_MAX_DIM> &remote, void * local);
 
   /**
      @brief Deallocate the remote addresses to logically neighboring
@@ -254,7 +255,7 @@ extern "C" {
      @param[in] remote Array of remote memory pointers to neighboring
      pointers
    */
-  void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2]);
+  void comm_destroy_neighbor_memory(array<array<void *, 2>, QUDA_MAX_DIM> &remote);
 
   /**
      @brief Create unique events shared between each logical pair of
@@ -266,14 +267,16 @@ extern "C" {
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
-  void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+  void comm_create_neighbor_event(array<array<qudaEvent_t, 2>, QUDA_MAX_DIM> &remote,
+                                  array<array<qudaEvent_t, 2>, QUDA_MAX_DIM> &local);
 
   /**
      @brief Destroy the coupled events
      @param[out] remote Array of remote events to neighboring processes
      @param[in] local Array of local event to neighboring processes
    */
-  void comm_destroy_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM]);
+  void comm_destroy_neighbor_event(array<array<qudaEvent_t, 2>, QUDA_MAX_DIM> &remote,
+                                   array<array<qudaEvent_t, 2>, QUDA_MAX_DIM> &local);
 
   /**
      @brief Returns true if any peer-to-peer capability is present on

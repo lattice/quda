@@ -192,7 +192,7 @@ protected:
         gauge_field_param.setPrecision(param.cuda_prec, true);
 
         if (comm_partitioned()) {
-          int R[4] = {0, 0, 0, 0};
+          lat_dim_t R = {0, 0, 0, 0};
           for (int d = 0; d < 4; d++)
             if (comm_dim_partitioned(d)) R[d] = 2;
           static TimeProfile GaugeFix("GaugeFix");

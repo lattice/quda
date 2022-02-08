@@ -240,47 +240,47 @@ namespace quda {
     /**
        Double buffered static GPU halo send buffer
     */
-    static void *ghost_send_buffer_d[2];
+    inline static array<void *, 2> ghost_send_buffer_d = { };
 
     /**
        Double buffered static GPU halo receive buffer
      */
-    static void *ghost_recv_buffer_d[2];
+    inline static array<void *, 2> ghost_recv_buffer_d = { };
 
     /**
        Double buffered static pinned send buffers
     */
-    static void *ghost_pinned_send_buffer_h[2];
+    inline static array<void *, 2> ghost_pinned_send_buffer_h = { };
 
     /**
        Double buffered static pinned recv buffers
     */
-    static void *ghost_pinned_recv_buffer_h[2];
+    inline static array<void *, 2> ghost_pinned_recv_buffer_h = { };
 
     /**
        Mapped version of pinned send buffers
     */
-    static void *ghost_pinned_send_buffer_hd[2];
+    inline static array<void *, 2> ghost_pinned_send_buffer_hd = { };
 
     /**
        Mapped version of pinned recv buffers
     */
-    static void *ghost_pinned_recv_buffer_hd[2];
+    inline static array<void *, 2> ghost_pinned_recv_buffer_hd = { };
 
     /**
        Remove ghost pointer for sending to
     */
-    static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
+    inline static array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> ghost_remote_send_buffer_d;
 
     /**
        The current size of the static ghost allocation
     */
-    static size_t ghostFaceBytes;
+    inline static size_t ghostFaceBytes = 0;
 
     /**
        Whether the ghost buffers have been initialized
     */
-    static bool initGhostFaceBuffer;
+    inline static bool initGhostFaceBuffer = false;
 
     /**
        Size in bytes of this ghost field
@@ -295,136 +295,161 @@ namespace quda {
     /**
        Size in bytes of the ghost in each dimension
     */
-    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes;
 
     /**
        Actual allocated size in bytes of the ghost in each dimension
     */
-    mutable size_t ghost_face_bytes_aligned[QUDA_MAX_DIM];
+    mutable array<size_t, QUDA_MAX_DIM> ghost_face_bytes_aligned;
 
     /**
        Byte offsets to each ghost zone
     */
-    mutable size_t ghost_offset[QUDA_MAX_DIM][2];
+    mutable array<array<size_t, 2>, QUDA_MAX_DIM> ghost_offset;
 
     /**
        Pinned memory buffer used for sending messages
     */
-    void *my_face_h[2];
+    array<void *, 2> my_face_h;
 
     /**
        Mapped version of my_face_h
     */
-    void *my_face_hd[2];
+    array<void *, 2> my_face_hd;
 
     /**
        Device memory buffer for sending messages
      */
-    void *my_face_d[2];
+    array<void *, 2> my_face_d;
 
-    /** Local pointers to the pinned my_face buffer */
-    void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the pinned my_face buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_h;
 
-    /** Local pointers to the mapped my_face buffer */
-    void *my_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the mapped my_face buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_hd;
 
-    /** Local pointers to the device ghost_send buffer */
-    void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the device ghost_send buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_d;
 
     /**
        Memory buffer used for receiving all messages
     */
-    void *from_face_h[2];
+    array<void *, 2> from_face_h;
 
     /**
        Mapped version of from_face_h
     */
-    void *from_face_hd[2];
+    array<void *, 2> from_face_hd;
 
     /**
        Device memory buffer for receiving messages
      */
-    void *from_face_d[2];
+    array<void *, 2> from_face_d;
 
-    /** Local pointers to the pinned from_face buffer */
-    void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the pinned from_face buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_h;
 
-    /** Local pointers to the mapped from_face buffer */
-    void *from_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the mapped from_face buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_hd;
 
-    /** Local pointers to the device ghost_recv buffer */
-    void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
+    /**
+       Local pointers to the device ghost_recv buffer
+    */
+    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_d;
 
-    /** Message handles for receiving from forwards */
-    MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
+    /**
+       Message handles for receiving
+    */
+    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv;
 
-    /** Message handles for receiving from backwards */
-    MsgHandle *mh_recv_back[2][QUDA_MAX_DIM];
+    /**
+       Message handles for sending
+    */
+    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send;
 
-    /** Message handles for sending forwards */
-    MsgHandle *mh_send_fwd[2][QUDA_MAX_DIM];
+    /**
+       Message handles for receiving
+    */
+    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv_rdma;
 
-    /** Message handles for sending backwards */
-    MsgHandle *mh_send_back[2][QUDA_MAX_DIM];
+    /**
+       Message handles for sending
+    */
+    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send_rdma;
 
-    /** Message handles for rdma receiving from forwards */
-    MsgHandle *mh_recv_rdma_fwd[2][QUDA_MAX_DIM];
+    /**
+       Message handles for receiving
+    */
+    inline static array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv_p2p = { };
 
-    /** Message handles for rdma receiving from backwards */
-    MsgHandle *mh_recv_rdma_back[2][QUDA_MAX_DIM];
+    /**
+       Message handles for sending
+    */
+    inline static array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send_p2p = { };
 
-    /** Message handles for rdma sending to forwards */
-    MsgHandle *mh_send_rdma_fwd[2][QUDA_MAX_DIM];
+    /**
+       Buffer used by peer-to-peer message handler
+    */
+    inline static array<array<array<int, 2>, QUDA_MAX_DIM>, 2> buffer_send_p2p = { };
 
-    /** Message handles for rdma sending to backwards */
-    MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
+    /**
+       Buffer used by peer-to-peer message handler
+    */
+    inline static array<array<array<int, 2>, QUDA_MAX_DIM>, 2> buffer_recv_p2p = { };
 
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle *mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+    /**
+       Local copy of event used for peer-to-peer synchronization
+    */
+    inline static array<array<array<qudaEvent_t, 2>, QUDA_MAX_DIM>, 2> ipcCopyEvent = { };
 
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle *mh_send_p2p_back[2][QUDA_MAX_DIM];
+    /**
+       Remote copy of event used for peer-to-peer synchronization
+    */
+    inline static array<array<array<qudaEvent_t, 2>, QUDA_MAX_DIM>, 2> ipcRemoteCopyEvent = { };
 
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle *mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle *mh_recv_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Buffer used by peer-to-peer message handler */
-    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
-
-    /** Local copy of event used for peer-to-peer synchronization */
-    static qudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
-
-    /** Remote copy of event used for peer-to-peer synchronization */
-    static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
-
-    /** Whether we have initialized communication for this field */
+    /**
+       Whether we have initialized communication for this field
+    */
     bool initComms;
 
-    /** Whether we have initialized peer-to-peer communication */
-    static bool initIPCComms;
+    /**
+       Whether we have initialized peer-to-peer communication
+    */
+    inline static bool initIPCComms = false;
 
-    /** Used as a label in the autotuner */
+    /**
+       Bool which is triggered if the ghost field is reset
+    */
+    inline static bool ghost_field_reset = false;
+
+    /**
+       Used as a label in the autotuner
+    */
     std::string vol_string;
 
-    /** used as a label in the autotuner */
+    /**
+       Used as a label in the autotuner
+    */
     std::string aux_string;
 
-    /** Sets the vol_string for use in tuning */
+    /**
+       Sets the vol_string for use in tuning
+    */
     virtual void setTuningString();
 
-    /** The type of allocation we are going to do for this field */
+    /**
+       The type of allocation we are going to do for this field
+    */
     QudaMemoryType mem_type;
 
     void precisionCheck()
@@ -443,6 +468,11 @@ namespace quda {
     mutable bool backed_up;
 
   public:
+
+    /**
+       Static variable that is determined which ghost buffer we are using
+     */
+    inline static int bufferIndex = 0;
 
     /**
        @brief Default constructor
@@ -557,16 +587,6 @@ namespace quda {
        Handle to remote copy event used for peer-to-peer synchronization
     */
     const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
-
-    /**
-       Static variable that is determined which ghost buffer we are using
-     */
-    static int bufferIndex;
-
-    /**
-       Bool which is triggered if the ghost field is reset
-    */
-    static bool ghost_field_reset;
 
     /**
        @return The dimension of the lattice 
