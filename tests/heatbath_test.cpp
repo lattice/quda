@@ -134,12 +134,12 @@ int main(int argc, char **argv)
     bool  coldstart = heatbath_coldstart;
     double beta_value = heatbath_beta_value;
 
-    printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value, strcmp(latfile,"") ? "loaded" : (coldstart ? "cold" : "hot"));
+    printfQuda("Starting heatbath for beta = %f from a %s start\n", beta_value, latfile.size() > 0 ? "loaded" : (coldstart ? "cold" : "hot"));
     printfQuda("  %d Heatbath hits and %d overrelaxation hits per step\n", nhbsteps, novrsteps);
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile, "")) { // We loaded in a gauge field
+    if (latfile.size() > 0) { // We loaded in a gauge field
       // copy internal extended field to gaugeEx
       copyExtendedResidentGaugeQuda((void *)gaugeEx);
     } else {
@@ -209,9 +209,9 @@ int main(int argc, char **argv)
     }
 
     // Save if output string is specified
-    if (strcmp(gauge_outfile,"")) {
+    if (gauge_outfile.size() > 0) {
 
-      printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+      printfQuda("Saving the gauge field to file %s\n", gauge_outfile.c_str());
 
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
 
       saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
 
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+      write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
 
       for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     } else {
