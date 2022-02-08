@@ -374,8 +374,8 @@ namespace quda {
       madwf_param.madwf_train_maxiter = param.madwf_train_maxiter;
       madwf_param.madwf_param_load = param.madwf_param_load == QUDA_BOOLEAN_TRUE;
       madwf_param.madwf_param_save = param.madwf_param_save == QUDA_BOOLEAN_TRUE;
-      strcpy(madwf_param.madwf_param_infile, param.madwf_param_infile);
-      strcpy(madwf_param.madwf_param_outfile, param.madwf_param_outfile);
+      if (madwf_param.madwf_param_load) strcpy(madwf_param.madwf_param_infile, param.madwf_param_infile);
+      if (madwf_param.madwf_param_save) strcpy(madwf_param.madwf_param_outfile, param.madwf_param_outfile);
     }
 
     SolverParam(const SolverParam &param) :
