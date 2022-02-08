@@ -11,9 +11,6 @@
 
 namespace quda {
 
-  // set the required parameters for the inner solver
-  void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer);
-
   BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                      const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, matEig, param, profile), init(false)
@@ -148,9 +145,6 @@ namespace quda {
     ColorSpinorField &rSloppy = *r_sloppy;
     ColorSpinorField &xSloppy = *x_sloppy;
     ColorSpinorField &r0 = *r_0;
-
-    SolverParam solve_param_inner(param);
-    fillInnerSolveParam(solve_param_inner, param);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 

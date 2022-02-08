@@ -19,8 +19,39 @@ namespace quda
 
   using namespace blas;
 
+  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
+  {
+    fillInnerSolverParam(Kparam, param);
+    // Preconditioners do not need a deflation space,
+    // so we explicily set this here.
+    Kparam.deflate = false;
+
+    K = create_preconditioner(matPrecon, matPrecon, matEig, param, Kparam, profile);
+  }
+
+  PreconCG::PreconCG(const DiracMatrix &mat, Solver& K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
+  {
+    fillInnerSolverParam(Kparam, param);
+
+    K = wrap_external_preconditioner(K_);
+  }
+
+  PreconCG::~PreconCG()
+  {
+    profile.TPSTART(QUDA_PROFILE_FREE);
+    extractInnerSolverParam(param, Kparam);
+
+    destroyDeflationSpace();
+
+    profile.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
   // set the required parameters for the inner solver
-  static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
+  void PreconCG::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
     inner.tol = outer.tol_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
@@ -70,43 +101,12 @@ namespace quda
   }
 
   // extract parameters determined while running the inner solver
-  static void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
+  void PreconCG::extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
   {
     // extract a_max, which may have been determined via power iterations
     if (outer.inv_type_precondition == QUDA_CA_CG_INVERTER && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       outer.ca_lambda_max_precondition = inner.ca_lambda_max;
     }
-  }
-
-  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
-  {
-    fillInnerSolverParam(Kparam, param);
-    // Preconditioners do not need a deflation space,
-    // so we explicily set this here.
-    Kparam.deflate = false;
-
-    K = create_preconditioner(matPrecon, matEig, param, Kparam, profile);
-  }
-
-  PreconCG::PreconCG(const DiracMatrix &mat, Solver& K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                     const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, matEig, param, profile), K(nullptr), Kparam(param)
-  {
-    fillInnerSolverParam(Kparam, param);
-
-    K = wrap_external_preconditioner(K_);
-  }
-
-  PreconCG::~PreconCG()
-  {
-    profile.TPSTART(QUDA_PROFILE_FREE);
-    extractInnerSolverParam(param, Kparam);
-
-    destroyDeflationSpace();
-
-    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,

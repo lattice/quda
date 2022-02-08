@@ -861,6 +861,20 @@ namespace quda {
       std::shared_ptr<Solver> K;
       SolverParam Kparam; // parameters for preconditioner solve
 
+      /**
+      * @brief Set parameters for the inner solver
+      * @param inner[out] Parameters for the preconditioner solver
+      * @param outer[in] Parameters from the outer solver
+      */
+      void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer);
+
+      /**
+      * @brief Extract parameters determined while running the preconditioned solve
+      * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
+      * @param inner[in] Parameters from the preconditioned solver
+      */
+      void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
+
     public:
       PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
                const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
@@ -1055,7 +1069,7 @@ namespace quda {
   private:
     const DiracMdagM matMdagM; // used by the eigensolver
 
-    Solver *K;
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
     /**
@@ -1079,6 +1093,20 @@ namespace quda {
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
     std::vector<ColorSpinorField*> Ap; // mat * direction vectors
+
+    /**
+    * @brief Set parameters for the inner solver
+    * @param inner[out] Parameters for the preconditioner solver
+    * @param outer[in] Parameters from the outer solver
+    */
+    void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer);
+
+    /**
+    * @brief Extract parameters determined while running the preconditioned solve
+    * @param outer[out] Parameters for outer solver which also maintains preconditioned solver info
+    * @param inner[in] Parameters from the preconditioned solver
+    */
+    void extractInnerSolverParam(SolverParam &outer, const SolverParam &inner);
 
   public:
     GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, const DiracMatrix &matEig,
