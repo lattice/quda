@@ -44,23 +44,26 @@ namespace quda {
     return c;
   }
 
-  template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>,T> zero() { return static_cast<T>(0); }
-  template <typename T> constexpr std::enable_if_t<std::is_same_v<T,complex<typename T::value_type>>,T> zero() { return static_cast<T>(0); }
+  template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
+  template <typename T> constexpr std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>, T> zero()
+  {
+    return static_cast<T>(0);
+  }
 
-  template <typename T, typename U> using specialize = std::enable_if_t<std::is_same_v<T,U>,U>;
+  template <typename T, typename U> using specialize = std::enable_if_t<std::is_same_v<T, U>, U>;
 
-  template <typename T> constexpr specialize<T,double2> zero() { return double2 {0.0, 0.0}; }
-  template <typename T> constexpr specialize<T,double3> zero() { return double3 {0.0, 0.0, 0.0}; }
-  template <typename T> constexpr specialize<T,double4> zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double2> zero() { return double2 {0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double3> zero() { return double3 {0.0, 0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double4> zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
 
-  template <typename T> constexpr specialize<T,float2> zero() { return float2 {0.0f, 0.0f}; }
-  template <typename T> constexpr specialize<T,float3> zero() { return float3 {0.0f, 0.0f, 0.0f}; }
-  template <typename T> constexpr specialize<T,float4> zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float2> zero() { return float2 {0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float3> zero() { return float3 {0.0f, 0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float4> zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
 
 #ifdef QUAD_SUM
-  template <typename T> __device__ __host__ inline specialize<T,doubledouble> zero() { return doubledouble(); }
-  template <typename T> __device__ __host__ inline specialize<T,doubledouble2> zero() { return doubledouble2(); }
-  template <typename T> __device__ __host__ inline specialize<T,doubledouble3> zero() { return doubledouble3(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble> zero() { return doubledouble(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble2> zero() { return doubledouble2(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble3> zero() { return doubledouble3(); }
 #endif
 
   template <typename T, int n> __device__ __host__ inline array<T, n> zero()
@@ -71,16 +74,20 @@ namespace quda {
     return v;
   }
 
-  template <typename T> __device__ __host__ inline std::enable_if_t<std::is_same_v<T,array<typename T::value_type, T::N>>,T>
-  zero() { return zero<typename T::value_type, T::N>(); }
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>, T> zero()
+  {
+    return zero<typename T::value_type, T::N>();
+  }
 
   template <typename T> struct low {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>,T> value() { return std::numeric_limits<T>::lowest(); }
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
   };
 
-  template <typename T, int N> struct low<array<T,N>> {
-    static inline __host__ __device__ array<T,N> value() {
-      array<T,N> v;
+  template <typename T, int N> struct low<array<T, N>> {
+    static inline __host__ __device__ array<T, N> value()
+    {
+      array<T, N> v;
 #pragma unroll
       for (int i = 0; i < N; i++) v[i] = low<T>::value();
       return v;
@@ -88,7 +95,7 @@ namespace quda {
   };
 
   template <typename T> struct high {
-    static constexpr std::enable_if_t<std::is_arithmetic_v<T>,T> value() { return std::numeric_limits<T>::max(); }
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
   };
 
   template <typename T> struct RealType {

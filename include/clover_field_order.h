@@ -283,8 +283,7 @@ namespace quda {
       Accessor(const CloverField &, bool = false) { errorQuda("Not implemented for order %d", order); }
       constexpr complex<Float> &operator()(int, int, int, int, int, int) const { return complex<Float>(0.0); }
 
-      template <typename reducer, typename helper>
-      constexpr double transform_reduce(QudaFieldLocation, helper) const
+      template <typename reducer, typename helper> constexpr double transform_reduce(QudaFieldLocation, helper) const
       {
         return 0.0;
       }
@@ -540,8 +539,8 @@ namespace quda {
         __host__ double abs_min(int = -1, bool global = true) const
         {
           commGlobalReductionPush(global);
-          double absmin = accessor.scale()
-            * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>());
+          double absmin
+            = accessor.scale() * accessor.template transform_reduce<minimum<Float>>(location, abs_min_<Float, Float>());
           commGlobalReductionPop();
           return absmin;
         }

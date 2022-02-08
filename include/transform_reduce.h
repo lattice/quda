@@ -28,8 +28,8 @@ namespace quda
      @param[in] reducer Functor that applies the reduction to each transformed element
    */
   template <typename reducer, typename T, typename I, typename transformer>
-  void transform_reduce(QudaFieldLocation location, std::vector<typename reducer::reduce_t> &result, const std::vector<T *> &v,
-			I n_items, transformer h);
+  void transform_reduce(QudaFieldLocation location, std::vector<typename reducer::reduce_t> &result,
+                        const std::vector<T *> &v, I n_items, transformer h);
 
   /**
      @brief QUDA implementation providing thrust::transform_reduce like
@@ -61,7 +61,7 @@ namespace quda
    */
   template <typename reducer, typename T, typename I, typename transformer>
   void reduce(QudaFieldLocation location, std::vector<typename reducer::reduce_t> &result, const std::vector<T *> &v,
-	      I n_items);
+              I n_items);
 
   /**
      @brief QUDA implementation providing thrust::reduce like
