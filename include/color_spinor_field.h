@@ -383,12 +383,12 @@ namespace quda
     void setTuningString();
 
   public:
-    static void *fwdGhostFaceBuffer[QUDA_MAX_DIM];      // cpu memory
-    static void *backGhostFaceBuffer[QUDA_MAX_DIM];     // cpu memory
-    static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM];  // cpu memory
-    static void *backGhostFaceSendBuffer[QUDA_MAX_DIM]; // cpu memory
-    static int initGhostFaceBuffer;
-    static size_t ghostFaceBytes[QUDA_MAX_DIM];
+    inline static void *fwdGhostFaceBuffer[QUDA_MAX_DIM] = { };      // cpu memory
+    inline static void *backGhostFaceBuffer[QUDA_MAX_DIM] = { };     // cpu memory
+    inline static void *fwdGhostFaceSendBuffer[QUDA_MAX_DIM] = { };  // cpu memory
+    inline static void *backGhostFaceSendBuffer[QUDA_MAX_DIM] = { }; // cpu memory
+    inline static int initGhostFaceBuffer = 0;
+    inline static size_t ghostFaceBytes[QUDA_MAX_DIM] = { };
     static void freeGhostBuffer(void);
 
     /**

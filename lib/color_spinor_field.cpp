@@ -1331,13 +1331,6 @@ namespace quda
     unpackGhost(from_face_dim_dir_h[bufferIndex][dim][dir], dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, stream);
   }
 
-  void *ColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM];
-  void *ColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
-  int ColorSpinorField::initGhostFaceBuffer = 0;
-  size_t ColorSpinorField::ghostFaceBytes[QUDA_MAX_DIM] = {};
-
   void ColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger,
                                        const MemoryLocation *pack_destination_, const MemoryLocation *halo_location_,
                                        bool gdr_send, bool gdr_recv, QudaPrecision ghost_precision_) const
