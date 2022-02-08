@@ -214,8 +214,8 @@ extern double madwf_null_tol;
 extern int madwf_train_maxiter;
 extern bool madwf_param_load;
 extern bool madwf_param_save;
-extern char madwf_param_infile[256];
-extern char madwf_param_outfile[256];
+extern std::string madwf_param_infile;
+extern std::string madwf_param_outfile;
 
 extern int precon_schwarz_cycle;
 extern int multishift;

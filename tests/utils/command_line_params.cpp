@@ -76,8 +76,8 @@ double madwf_null_tol = tol;
 int madwf_train_maxiter = niter;
 bool madwf_param_load = false;
 bool madwf_param_save = false;
-char madwf_param_infile[256] = "";
-char madwf_param_outfile[256] = "";
+std::string madwf_param_infile;
+std::string madwf_param_outfile;
 
 int precon_schwarz_cycle = 1;
 int multishift = 1;

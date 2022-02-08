@@ -574,6 +574,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(madwf_param_infile[0], '\0');
+  P(madwf_param_outfile[0], '\0');
+#endif
+
+#ifdef INIT_PARAM
   P(madwf_param_load, QUDA_BOOLEAN_FALSE);
   P(madwf_param_save, QUDA_BOOLEAN_FALSE);
 #else
