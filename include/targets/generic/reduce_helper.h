@@ -29,6 +29,7 @@ namespace quda
      memory
    */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+    using reduce_t = T;
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
