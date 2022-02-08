@@ -241,8 +241,12 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.madwf_param_load = madwf_param_load ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   inv_param.madwf_param_save = madwf_param_save ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  strcpy(inv_param.madwf_param_infile, madwf_param_infile.c_str());
-  strcpy(inv_param.madwf_param_outfile, madwf_param_outfile.c_str());
+  if (madwf_param_infile.size() < 256 && madwf_param_outfile.size() < 256) {
+    strcpy(inv_param.madwf_param_infile, madwf_param_infile.c_str());
+    strcpy(inv_param.madwf_param_outfile, madwf_param_outfile.c_str());
+  } else {
+    errorQuda("madwf_param_<in/out>file is too long: %lu/%lu.", madwf_param_infile.size(), madwf_param_outfile.size());
+  }
 
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
