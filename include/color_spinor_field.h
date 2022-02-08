@@ -338,7 +338,7 @@ namespace quda
     size_t norm_offset; /** offset to the norm (if applicable) */
 
     // multi-GPU parameters
-    array<array<void*, QUDA_MAX_DIM>, 2> ghost;     // pointers to the ghost regions - NULL by default
+    array_2d<void*, 2, QUDA_MAX_DIM> ghost; // pointers to the ghost regions - NULL by default
     mutable lat_dim_t ghostFace;   // the size of each face
     mutable lat_dim_t ghostFaceCB; // the size of each checkboarded face
     mutable array<void*, 2 * QUDA_MAX_DIM> ghost_buf; // wrapper that points to current ghost zone

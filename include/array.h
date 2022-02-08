@@ -1,5 +1,8 @@
 #pragma once
 
+#include <iostream>
+#include <quda_arch.h>
+
 namespace quda
 {
 
@@ -53,5 +56,8 @@ namespace quda
     for (int i = 0; i < N; i++) { result[i] = a[i] < b[i] ? a[i] : b[i]; }
     return result;
   }
+
+  template <typename T, int m, int n> using array_2d = array<array<T, n>, m>;
+  template <typename T, int m, int n, int k> using array_3d = array<array<array<T, k>, n>, m>;
 
 } // namespace quda

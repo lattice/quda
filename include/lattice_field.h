@@ -270,7 +270,7 @@ namespace quda {
     /**
        Remove ghost pointer for sending to
     */
-    inline static array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> ghost_remote_send_buffer_d;
+    inline static array_3d<void *, 2, QUDA_MAX_DIM, 2> ghost_remote_send_buffer_d;
 
     /**
        The current size of the static ghost allocation
@@ -305,7 +305,7 @@ namespace quda {
     /**
        Byte offsets to each ghost zone
     */
-    mutable array<array<size_t, 2>, QUDA_MAX_DIM> ghost_offset;
+    mutable array_2d<size_t, QUDA_MAX_DIM, 2> ghost_offset;
 
     /**
        Pinned memory buffer used for sending messages
@@ -325,17 +325,17 @@ namespace quda {
     /**
        Local pointers to the pinned my_face buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_h;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_h;
 
     /**
        Local pointers to the mapped my_face buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_hd;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_hd;
 
     /**
        Local pointers to the device ghost_send buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> my_face_dim_dir_d;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> my_face_dim_dir_d;
 
     /**
        Memory buffer used for receiving all messages
@@ -355,67 +355,67 @@ namespace quda {
     /**
        Local pointers to the pinned from_face buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_h;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_h;
 
     /**
        Local pointers to the mapped from_face buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_hd;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_hd;
 
     /**
        Local pointers to the device ghost_recv buffer
     */
-    array<array<array<void *, 2>, QUDA_MAX_DIM>, 2> from_face_dim_dir_d;
+    array_3d<void *, 2, QUDA_MAX_DIM, 2> from_face_dim_dir_d;
 
     /**
        Message handles for receiving
     */
-    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv;
 
     /**
        Message handles for sending
     */
-    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send;
 
     /**
        Message handles for receiving
     */
-    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv_rdma;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_rdma;
 
     /**
        Message handles for sending
     */
-    array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send_rdma;
+    array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_rdma;
 
     /**
        Message handles for receiving
     */
-    inline static array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_recv_p2p = { };
+    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_recv_p2p = { };
 
     /**
        Message handles for sending
     */
-    inline static array<array<array<MsgHandle *, 2>, QUDA_MAX_DIM>, 2> mh_send_p2p = { };
+    inline static array_3d<MsgHandle *, 2, QUDA_MAX_DIM, 2> mh_send_p2p = { };
 
     /**
        Buffer used by peer-to-peer message handler
     */
-    inline static array<array<array<int, 2>, QUDA_MAX_DIM>, 2> buffer_send_p2p = { };
+    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_send_p2p = { };
 
     /**
        Buffer used by peer-to-peer message handler
     */
-    inline static array<array<array<int, 2>, QUDA_MAX_DIM>, 2> buffer_recv_p2p = { };
+    inline static array_3d<int, 2, QUDA_MAX_DIM, 2> buffer_recv_p2p = { };
 
     /**
        Local copy of event used for peer-to-peer synchronization
     */
-    inline static array<array<array<qudaEvent_t, 2>, QUDA_MAX_DIM>, 2> ipcCopyEvent = { };
+    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcCopyEvent = { };
 
     /**
        Remote copy of event used for peer-to-peer synchronization
     */
-    inline static array<array<array<qudaEvent_t, 2>, QUDA_MAX_DIM>, 2> ipcRemoteCopyEvent = { };
+    inline static array_3d<qudaEvent_t, 2, QUDA_MAX_DIM, 2> ipcRemoteCopyEvent = { };
 
     /**
        Whether we have initialized communication for this field
