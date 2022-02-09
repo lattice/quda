@@ -341,10 +341,10 @@ extern bool eig_compute_gamma5;
 extern QudaEigSpectrumType eig_spectrum;
 extern QudaEigType eig_type;
 extern bool eig_arpack_check;
-extern char eig_arpack_logfile[256];
+extern std::string eig_arpack_logfile;
 extern char eig_QUDA_logfile[256];
-extern char eig_vec_infile[256];
-extern char eig_vec_outfile[256];
+extern std::string eig_vec_infile;
+extern std::string eig_vec_outfile;
 extern bool eig_io_parity_inflate;
 extern QudaPrecision eig_save_prec;
 

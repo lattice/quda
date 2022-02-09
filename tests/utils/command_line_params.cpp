@@ -217,9 +217,9 @@ bool eig_compute_gamma5 = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
 QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
-char eig_arpack_logfile[256] = "arpack_logfile.log";
-char eig_vec_infile[256] = "";
-char eig_vec_outfile[256] = "";
+std::string eig_arpack_logfile = "arpack_logfile.log";
+std::string eig_vec_infile;
+std::string eig_vec_outfile;
 bool eig_io_parity_inflate = false;
 QudaPrecision eig_save_prec = QUDA_DOUBLE_PRECISION;
 

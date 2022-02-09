@@ -241,12 +241,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.madwf_param_load = madwf_param_load ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   inv_param.madwf_param_save = madwf_param_save ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  if (madwf_param_infile.size() < 256 && madwf_param_outfile.size() < 256) {
-    strcpy(inv_param.madwf_param_infile, madwf_param_infile.c_str());
-    strcpy(inv_param.madwf_param_outfile, madwf_param_outfile.c_str());
-  } else {
-    errorQuda("madwf_param_<in/out>file is too long: %lu/%lu.", madwf_param_infile.size(), madwf_param_outfile.size());
-  }
+  safe_strcpy(inv_param.madwf_param_infile, madwf_param_infile, 256, "madwf_param_infile");
+  safe_strcpy(inv_param.madwf_param_outfile, madwf_param_outfile, 256, "madwf_param_outfile");
 
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
@@ -337,10 +333,10 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.a_max = eig_amax;
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  safe_strcpy(eig_param.arpack_logfile, eig_arpack_logfile, 512, "eig_arpack_logfile");
 
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(eig_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(eig_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -597,18 +593,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    if (mg_vec_infile.size() < 256) {
-      strcpy(mg_param.vec_infile[i], mg_vec_infile[i].c_str());
-    } else {
-      errorQuda("mg_vec_infile[%d] is longer (%lu) than the 256 limit.", i, mg_vec_infile.size());
-    }
-    if (mg_vec_outfile.size() < 256) {
-      strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i].c_str());
-    } else {
-      errorQuda("mg_vec_outfile[%d] is longer (%lu) than the 256 limit.", i, mg_vec_outfile.size());
-    }
-    if (mg_vec_infile.size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (mg_vec_outfile.size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1194,18 +1182,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    if (mg_vec_infile.size() < 256) {
-      strcpy(mg_param.vec_infile[i], mg_vec_infile[i].c_str());
-    } else {
-      errorQuda("mg_vec_infile[%d] is longer (%lu) than the 256 limit.", i, mg_vec_infile.size());
-    }
-    if (mg_vec_outfile.size() < 256) {
-      strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i].c_str());
-    } else {
-      errorQuda("mg_vec_outfile[%d] is longer (%lu) than the 256 limit.", i, mg_vec_outfile.size());
-    }
-    if (mg_vec_infile.size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (mg_vec_outfile.size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1369,8 +1349,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.mem_type_ritz = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, eig_vec_infile);
-  strcpy(df_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(df_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
