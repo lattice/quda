@@ -11,7 +11,6 @@
 #include <util_quda.h>
 #include <reliable_updates.h>
 
-#include <invert_preconditioner.h>
 #include <invert_x_update.h>
 
 namespace quda
@@ -28,7 +27,7 @@ namespace quda
     // so we explicily set this here.
     Kparam.deflate = false;
 
-    K = create_preconditioner(matPrecon, matPrecon, matEig, param, Kparam, profile);
+    K = createPreconditioner(matPrecon, matPrecon, matPrecon, matEig, param, Kparam, profile);
   }
 
   PreconCG::PreconCG(const DiracMatrix &mat, Solver& K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -37,7 +36,7 @@ namespace quda
   {
     fillInnerSolverParam(Kparam, param);
 
-    K = wrap_external_preconditioner(K_);
+    K = wrapExternalPreconditioner(K_);
   }
 
   PreconCG::~PreconCG()
@@ -53,60 +52,12 @@ namespace quda
   // set the required parameters for the inner solver
   void PreconCG::fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
-    inner.tol = outer.tol_precondition;
-    inner.delta = 1e-20; // no reliable updates within the inner solver
+    Solver::fillInnerSolverParam(inner, outer);
 
-    // most preconditioners are uni-precision solvers, with CG being an exception
-    inner.precision
-      = ((outer.inv_type_precondition == QUDA_CG_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER || outer.inv_type_precondition == QUDA_MG_INVERTER)
-         && !outer.precondition_no_advanced_feature) ?
-      outer.precision_sloppy :
-      outer.precision_precondition;
-    inner.precision_sloppy = outer.precision_precondition;
-
-    // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type
-      = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
-
-    inner.iter = 0;
-    inner.gflops = 0;
-    inner.secs = 0;
-
-    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-    inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
-    inner.pipeline = true;
-
-    inner.schwarz_type = outer.schwarz_type;
-    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
-
-    inner.maxiter = outer.maxiter_precondition;
-    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER || outer.inv_type_precondition == QUDA_CA_CG_INVERTER) {
-      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
-      inner.ca_basis = outer.ca_basis_precondition;
-      inner.ca_lambda_min = outer.ca_lambda_min_precondition;
-      inner.ca_lambda_max = outer.ca_lambda_max_precondition;
-    } else {
-      inner.Nsteps = outer.precondition_cycle;
-    }
-
-    if (outer.inv_type == QUDA_PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
+    // custom behavior
+    if (outer.precision_sloppy != outer.precision_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    else
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
-    inner.verbosity_precondition = outer.verbosity_precondition;
-
-    inner.compute_true_res = false;
-    inner.sloppy_converge = true;
-  }
-
-  // extract parameters determined while running the inner solver
-  void PreconCG::extractInnerSolverParam(SolverParam &outer, const SolverParam &inner)
-  {
-    // extract a_max, which may have been determined via power iterations
-    if (outer.inv_type_precondition == QUDA_CA_CG_INVERTER && outer.ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
-      outer.ca_lambda_max_precondition = inner.ca_lambda_max;
-    }
   }
 
   void PreconCG::solve_and_collect(ColorSpinorField &x, ColorSpinorField &b, std::vector<ColorSpinorField *> &v_r,

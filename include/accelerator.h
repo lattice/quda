@@ -55,6 +55,8 @@ namespace quda
       }
     }
 
+    virtual QudaInverterType getInverterType() { return base_solver->getInverterType(); }
+
     virtual bool hermitian() { return base_solver->hermitian(); }
 
     /**

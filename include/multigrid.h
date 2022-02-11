@@ -310,6 +310,11 @@ namespace quda {
     virtual ~MG();
 
     /**
+       @return Is an MG inverter
+      */
+    virtual QudaInverterType getInverterType() { return QUDA_MG_INVERTER; }
+
+    /**
        @return MG can solve non-Hermitian systems
      */
     bool hermitian() { return false; };
