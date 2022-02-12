@@ -33,8 +33,16 @@ struct XUpdateBatch {
   XUpdateBatch(int Np_, const ColorSpinorField &init, ColorSpinorParam csParam) :
     _Np(Np_), _j(0), _next((_j + 1) % _Np), _ps(_Np), _alphas(_Np)
   {
-    _ps[0] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(init));
     for (int j = 1; j < _Np; j++) { _ps[j] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(csParam)); }
+
+    // need to make sure init field is copied in the correct precision
+    if (init.Precision() != csParam.Precision()) {
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.field = const_cast<ColorSpinorField*>(&init);
+      _ps[0] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(csParam));
+    } else {
+      _ps[0] = std::unique_ptr<ColorSpinorField>(new ColorSpinorField(init));
+    }
   }
 
   /**
