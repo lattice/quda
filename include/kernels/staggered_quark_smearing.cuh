@@ -37,6 +37,11 @@ namespace quda
     int t0;
     bool ts_compute;
     int t0_offset;
+    int t0_face_offset[4];
+    int face_size[4];
+    int t0_face_size[4];
+    int threadDimMapUpper_t0[4];
+    int threadDimMapLower_t0[4];
 
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool ts_compute, int parity, int dir, 
                bool dagger, const int *comm_override) :
@@ -58,6 +63,25 @@ namespace quda
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
+
+      for( int i=0; i<4; i++ )
+      {
+        t0_face_offset[i] = ( ts_compute ? (int)(this->dc.face_XYZ[i])/2 : 0 );
+        face_size[i] = 3 * this->dc.ghostFaceCB[i]; // 3=Nface
+        t0_face_size[i] = face_size[i] / in.X(3);
+      }
+
+      // partial replication of dslash::setFusedParam()
+      int prev = -1;
+      for( int i=0; i<4; i++ )
+      {
+        threadDimMapLower_t0[i] = 0;
+        threadDimMapUpper_t0[i] = 0;
+        if( !(this->commDim[i]) ) continue;
+        threadDimMapLower_t0[i] = ( prev>=0 ? threadDimMapUpper_t0[prev] : 0 );
+        threadDimMapUpper_t0[i] = threadDimMapLower_t0[i] + 2 * t0_face_size[i];
+        prev = i;
+      }
     }
   };
 
@@ -148,8 +172,33 @@ namespace quda
 
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
-      
-      if((mykernel_type == INTERIOR_KERNEL) && arg.ts_compute )idx += arg.t0*arg.t0_offset; //nop for the whole lattice
+
+      if( arg.ts_compute )
+      {
+        if( mykernel_type == INTERIOR_KERNEL )
+        {
+          idx += arg.t0*arg.t0_offset;
+        }
+        else if( mykernel_type != EXTERIOR_KERNEL_ALL )
+        {
+          if( idx >= arg.t0_face_size[mykernel_type] ) idx += arg.face_size[mykernel_type] - arg.t0_face_size[mykernel_type];
+          idx += arg.t0*arg.t0_face_offset[mykernel_type];
+        }
+        else // if( mykernel_type == EXTERIOR_KERNEL_ALL )
+        {
+          for( int i=0; i<4; i++ )
+          {
+            if( idx < arg.threadDimMapUpper_t0[i] )
+            {
+              idx -= arg.threadDimMapLower_t0[i];
+              if( idx >= arg.t0_face_size[i] ) idx += arg.face_size[i] - arg.t0_face_size[i];
+              idx += arg.t0*arg.t0_face_offset[i];
+              idx += arg.threadDimMapLower[i];
+              break;
+            }
+          }
+        }
+      }
 
       auto coord = getCoords<QUDA_4D_PC, mykernel_type, Arg, 3>(arg, idx, s, parity, thread_dim);
 

@@ -33,6 +33,22 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
 
+      // reset threadDimMapLower and threadDimMapUpper when t0 is given
+      // partial replacation of dslash::setFusedParam()
+      if( arg.ts_compute )
+      {
+        int prev = -1;
+        for( int i=0; i<4; i++ )
+        {
+          arg.threadDimMapLower[i] = 0;
+          arg.threadDimMapUpper[i] = 0;
+          if( !(arg.commDim[i]) ) continue;
+          arg.threadDimMapLower[i] = ( prev>=0 ? arg.threadDimMapUpper[prev] : 0 );
+          arg.threadDimMapUpper[i] = arg.threadDimMapLower[i] + this->Nface() * (in.GhostFaceCB())[i];
+          prev = i;
+        }
+      }
+
       // operator is Hermitian so do not instantiate dagger
       if (arg.nParity == 1) {
         Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
@@ -157,13 +173,18 @@ namespace quda
         
         StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, t0, is_time_slice, parity, dir, dagger, comm_override);
         
-        if (is_time_slice) { arg.resetThreads(volume); }
-        
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
+
+        int faceVolumeCB[nDim];
+        for( int i=0; i<nDim; i++ )
+        {
+          faceVolumeCB[i] = (in.GhostFaceCB())[i];
+          if( is_time_slice ) faceVolumeCB[i] /= in.X(3);
+        }
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
           staggered_qsmear, in, volume,
-          in.GhostFaceCB(), profile);
+          faceVolumeCB, profile);
 #else
         errorQuda("nSpin=%d StaggeredQSmear operator required staggered dslash and laplace to be enabled", in.Nspin());
 #endif
