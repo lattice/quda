@@ -35,7 +35,7 @@ namespace quda
     const G U;    /** the gauge field */
     int dir;      /** The direction from which to omit the derivative */
     int t0;
-    bool ts_compute;
+    bool is_t0_kernel;
     int t0_offset;
     int t0_face_offset[4];
     int face_size[4];
@@ -43,18 +43,18 @@ namespace quda
     int threadDimMapUpper_t0[4];
     int threadDimMapLower_t0[4];
 
-    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool ts_compute, int parity, int dir, 
+    StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_t0_kernel, int parity, int dir, 
                bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, parity, dagger, false, 3, false, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, is_t0_kernel ? false : true, 3, false, comm_override),//FIXME reuse xpay argument for t0 option
       out(out, 3),
       in(in, 3),
       in_pack(in, 3),
       U(U),
       dir(dir),
       t0(t0),
-      ts_compute(ts_compute),
-      t0_offset(ts_compute ? in.VolumeCB() / in.X(3) : 0)
+      is_t0_kernel(is_t0_kernel),
+      t0_offset(is_t0_kernel ? in.VolumeCB() / in.X(3) : 0)
     {
       if (in.V() == out.V()) errorQuda("Aliasing pointers");
       checkOrder(out, in);        // check all orders match
@@ -66,7 +66,7 @@ namespace quda
 
       for( int i=0; i<4; i++ )
       {
-        t0_face_offset[i] = ( ts_compute ? (int)(this->dc.face_XYZ[i])/2 : 0 );
+        t0_face_offset[i] = ( is_t0_kernel ? (int)(this->dc.face_XYZ[i])/2 : 0 );
         face_size[i] = 3 * this->dc.ghostFaceCB[i]; // 3=Nface
         t0_face_size[i] = face_size[i] / in.X(3);
       }
@@ -97,7 +97,7 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  template <int nParity, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggeredQSmear(Vector &out, Arg &arg, Coord &coord, int parity,
                                                int, int thread_dim, bool &active)
   {
@@ -154,8 +154,8 @@ namespace quda
     }
   }
   
-  // out(x) = M*in
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
+  // WARNING: xpay is reused for t0 kernel tuning : is_t0_kernel non-type templ. par is coorelated with that one from StaggeredQSmear::apply
+  template <int nParity, bool dagger, bool is_t0_kernel, KernelType kernel_type, typename Arg> struct staggered_qsmear : dslash_default {
 
     const Arg &arg;
     constexpr staggered_qsmear(const Arg &arg) : arg(arg) {}
@@ -173,7 +173,7 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      if( arg.ts_compute )
+      if( is_t0_kernel )
       {
         if( mykernel_type == INTERIOR_KERNEL )
         {
@@ -208,10 +208,10 @@ namespace quda
       // case 4 is an operator in all x,y,z,t dimensions
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
-      case 3: applyStaggeredQSmear<nParity, dagger, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
+      case 3: applyStaggeredQSmear<nParity, mykernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active); break;
       case 4:
       default:
-        applyStaggeredQSmear<nParity, dagger, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
+        applyStaggeredQSmear<nParity, mykernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       }
 

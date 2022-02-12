@@ -35,7 +35,7 @@ namespace quda
 
       // reset threadDimMapLower and threadDimMapUpper when t0 is given
       // partial replacation of dslash::setFusedParam()
-      if( arg.ts_compute )
+      if( arg.is_t0_kernel )
       {
         int prev = -1;
         for( int i=0; i<4; i++ )
@@ -51,9 +51,15 @@ namespace quda
 
       // operator is Hermitian so do not instantiate dagger
       if (arg.nParity == 1) {
-        Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+        if(arg.is_t0_kernel) //FIXME we reuse xpay non-type template parameter for t0 option!
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
       } else if (arg.nParity == 2) {
-        Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+        if(arg.is_t0_kernel) //FIXME we reuse xpay non-type template parameter for t0 option!
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
       }
     }
 
@@ -160,7 +166,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct StaggeredQSmearApply {
 
-    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_time_slice, int parity, int dir,
+    inline StaggeredQSmearApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_tslice_kernel, int parity, int dir,
                         bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
@@ -169,9 +175,9 @@ namespace quda
         constexpr int nDim = 4;
         constexpr int nSpin = 1;
         
-        const int volume = is_time_slice ? in.VolumeCB() / in.X(3) : in.VolumeCB();
+        const int volume = is_tslice_kernel ? in.VolumeCB() / in.X(3) : in.VolumeCB();
         
-        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, t0, is_time_slice, parity, dir, dagger, comm_override);
+        StaggeredQSmearArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override);
         
         StaggeredQSmear<decltype(arg)> staggered_qsmear(arg, out, in);
 
@@ -179,7 +185,7 @@ namespace quda
         for( int i=0; i<nDim; i++ )
         {
           faceVolumeCB[i] = (in.GhostFaceCB())[i];
-          if( is_time_slice ) faceVolumeCB[i] /= in.X(3);
+          if( is_tslice_kernel ) faceVolumeCB[i] /= in.X(3);
         }
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(
@@ -195,9 +201,10 @@ namespace quda
   };
 
   // Apply the StaggeredQSmear operator
-  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_time_slice, int parity, int dir,
+  void ApplyStaggeredQSmear(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_tslice_kernel, int parity, int dir,
                     bool dagger, const int *comm_override, TimeProfile &profile)
   {
-    instantiate<StaggeredQSmearApply>(out, in, U, t0, is_time_slice, parity, dir, dagger, comm_override, profile);
+    instantiate<StaggeredQSmearApply>(out, in, U, t0, is_tslice_kernel, parity, dir, dagger, comm_override, profile);
   }
 } // namespace quda
+

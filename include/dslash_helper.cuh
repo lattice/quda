@@ -401,8 +401,7 @@ namespace quda
         exterior_dims = 0;
       }
     }
-    
-    void resetThreads(const int threads_) { threads = threads_;}
+ 
   };
 
   template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
