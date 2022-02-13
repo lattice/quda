@@ -185,7 +185,7 @@ namespace quda
         for( int i=0; i<nDim; i++ )
         {
           faceVolumeCB[i] = (in.GhostFaceCB())[i];
-          if( is_tslice_kernel ) faceVolumeCB[i] /= in.X(3);
+          if( is_tslice_kernel && i<3 ) faceVolumeCB[i] /= in.X(3);
         }
 
         dslash::DslashPolicyTune<decltype(staggered_qsmear)> policy(

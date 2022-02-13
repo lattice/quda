@@ -66,9 +66,9 @@ namespace quda
 
       for( int i=0; i<4; i++ )
       {
-        t0_face_offset[i] = ( is_t0_kernel ? (int)(this->dc.face_XYZ[i])/2 : 0 );
+        t0_face_offset[i] = is_t0_kernel ? (int)(this->dc.face_XYZ[i])/2 : 0;
         face_size[i] = 3 * this->dc.ghostFaceCB[i]; // 3=Nface
-        t0_face_size[i] = face_size[i] / in.X(3);
+        t0_face_size[i] = ( is_t0_kernel && i<3 ) ? face_size[i] / in.X(3) : face_size[i];
       }
 
       // partial replication of dslash::setFusedParam()
@@ -175,6 +175,8 @@ namespace quda
 
       if( is_t0_kernel )
       {
+        if( arg.t0 < 0 ) return ;
+
         if( mykernel_type == INTERIOR_KERNEL )
         {
           idx += arg.t0*arg.t0_offset;
