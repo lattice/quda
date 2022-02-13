@@ -46,7 +46,7 @@ namespace quda
     StaggeredQSmearArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int t0, bool is_t0_kernel, int parity, int dir, 
                bool dagger, const int *comm_override) :
 
-      DslashArg<Float, nDim>(in, U, parity, dagger, is_t0_kernel ? false : true, 3, false, comm_override),//FIXME reuse xpay argument for t0 option
+      DslashArg<Float, nDim>(in, U, parity, dagger, is_t0_kernel, 3, false, comm_override),//FIXME reuse xpay argument for t0 option
       out(out, 3),
       in(in, 3),
       in_pack(in, 3),
