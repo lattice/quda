@@ -123,6 +123,13 @@ namespace quda {
     }
   }
 
+  ColorSpinorField& CAGCR::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    return r;
+  }
+
   /*
     The main CA-GCR algorithm, which consists of three main steps:
     1. Build basis vectors q_k = A p_k for k = 1..Nkrlylov
@@ -343,9 +350,6 @@ namespace quda {
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       param.true_res_hq = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
-      if (param.return_residual) blas::copy(b, r);
-    } else {
-      if (param.return_residual) blas::copy(b, r);
     }
 
     if (!param.is_preconditioner) {

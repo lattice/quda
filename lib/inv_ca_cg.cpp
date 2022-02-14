@@ -54,8 +54,9 @@ namespace quda {
   ColorSpinorField& CACGNE::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
     // CG residual will match the CGNE residual (FIXME: but only with zero initial guess?)
-    return (param.compute_true_res && param.use_init_guess)? xp : CACG::get_residual();
+    return param.use_init_guess? xp : CACG::get_residual();
   }
 
   // CACGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
@@ -88,7 +89,7 @@ namespace quda {
       mmdag.Expose()->Mdag(x, yp);
     }
 
-    if (param.compute_true_res) {
+    if (param.compute_true_res || (param.use_init_guess && param.return_residual)) {
       // compute the true residual
       mmdag.Expose()->M(xp, x);
       blas::xpay(b, -1.0, xp); // xp now holds the residual
@@ -131,6 +132,7 @@ namespace quda {
   ColorSpinorField& CACGNR::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
     return br;
   }
 
@@ -145,7 +147,7 @@ namespace quda {
     create(x, b);
 
     const int iter0 = param.iter;
-    double b2;
+    double b2 = 0.0;
     if (param.compute_true_res) {
       b2 = blas::norm2(b);
       if (b2 == 0.0) { // compute initial residual vector
@@ -385,6 +387,7 @@ namespace quda {
   ColorSpinorField& CACG::get_residual()
   {
     if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
 
     if (param.compute_true_res) {
       // true residual was computed and left in r

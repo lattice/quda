@@ -1320,6 +1320,11 @@ public:
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField& get_residual();
+
     virtual bool hermitian() { return false; } /** GCR is for any linear system */
   };
 
