@@ -1,5 +1,4 @@
 #pragma once
-#include <quda_arch.h>
 #include <enum_quda.h>
 
 namespace quda {
