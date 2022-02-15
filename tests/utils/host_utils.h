@@ -103,7 +103,7 @@ template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, Qud
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                     const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, QudaSolutionType sol_type,
-                                 const int *const x, quda::RNG &rng);
+                                 const int *const x, int nDim, quda::RNG &rng);
 //------------------------------------------------------
 
 // Helper functions
@@ -247,6 +247,24 @@ inline double getTolerance(QudaPrecision prec)
   case QUDA_INVALID_PRECISION: return 1.0;
   }
   return 1.0;
+}
+
+/**
+  @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;
+    if no, give an error based on the given name. The 256 is the C-string length for parameters in
+    QUDA's C interface.
+  @param cstr the destination C-string
+  @param str the input std::string
+  @param limit the limit for the size check
+  @param name the name used for the error message
+ */
+inline void safe_strcpy(char *cstr, const std::string &str, size_t limit, const std::string &name)
+{
+  if (str.size() < limit) {
+    strcpy(cstr, str.c_str());
+  } else {
+    errorQuda("%s is longer (%lu) than the %lu limit.", name.c_str(), str.size(), limit);
+  }
 }
 
 // MG param types
