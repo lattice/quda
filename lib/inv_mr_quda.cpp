@@ -49,6 +49,14 @@ namespace quda {
     } // init
   }
 
+  ColorSpinorField& MR::get_residual()
+  {
+    if (!init) errorQuda("No residual vector present");
+    if (!param.return_residual) errorQuda("SolverParam::return_residual not enabled");
+    if (param.precision != param.precision_sloppy && !param.compute_true_res) blas::copy(r, r_sloppy);
+    return r;
+  }
+
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     pushOutputPrefix("MR: ");
@@ -141,33 +149,21 @@ namespace quda {
       step++;
 
       // FIXME - add over/under relaxation in outer loop
-      if (param.compute_true_res || param.Nsteps > 1) {
+      bool compute_true_res = param.compute_true_res || param.Nsteps > 1;
+      if (compute_true_res) {
 	mat(r, x, tmp);
 	r2 = blas::xmyNorm(b, r);
 	param.true_res = sqrt(r2 / b2);
-
 	converged = (step < param.Nsteps && r2 > stop) ? false : true;
-
-	// if not preserving source and finished then overide source with residual
-	if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && converged) blas::copy(b, r);
-	else blas::copy(r_sloppy, r);
-
-        logQuda(QUDA_SUMMARIZE, "%d cycle, Converged after %d iterations, relative residual: true = %e\n",
-                step, param.maxiter, sqrt(r2));
+        if (!converged) blas::copy(r_sloppy, r);
       } else {
-
 	blas::ax(scale, r_sloppy);
 	r2 = blas::norm2(r_sloppy);
-
 	converged = (step < param.Nsteps) ? false : true;
-
-	// if not preserving source and finished then overide source with residual
-	if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && converged) blas::copy(b, r_sloppy);
-	else blas::copy(r, r_sloppy);
-
-        logQuda(QUDA_SUMMARIZE, "%d cycle, Converged after %d iterations, relative residual: iterated = %e\n",
-                step, param.maxiter, sqrt(r2));
+        if (!converged) blas::copy(r, r_sloppy);
       }
+      logQuda(QUDA_SUMMARIZE, "%d cycle, Converged after %d iterations, relative residual: %s = %e\n",
+              step, param.maxiter, compute_true_res ? "true" : "iterated", sqrt(r2));
 
     }
 

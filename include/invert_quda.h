@@ -1130,6 +1130,11 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField& get_residual();
+
     bool hermitian() { return false; } /** MR is for any linear system */
   };
 
@@ -1178,11 +1183,6 @@ namespace quda {
     void create(ColorSpinorField &x, const ColorSpinorField &b);
 
     /**
-       @return Return the residual vector from the prior solve
-    */
-    ColorSpinorField& get_residual();
-
-    /**
        @brief Compute the alpha coefficients
     */
     void compute_alpha();
@@ -1203,6 +1203,11 @@ namespace quda {
     virtual ~CACG();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField& get_residual();
 
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
@@ -1225,16 +1230,16 @@ namespace quda {
     */
     void create(ColorSpinorField &x, const ColorSpinorField &b);
 
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    ColorSpinorField& get_residual();
-
   public:
     CACGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField& get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };
@@ -1256,16 +1261,16 @@ namespace quda {
     */
     void create(ColorSpinorField &x, const ColorSpinorField &b);
 
-    /**
-       @return Return the residual vector from the prior solve
-    */
-    ColorSpinorField& get_residual();
-
   public:
     CACGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
            const DiracMatrix &matEig, SolverParam &param, TimeProfile &profile);
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       @return Return the residual vector from the prior solve
+    */
+    ColorSpinorField& get_residual();
 
     virtual bool hermitian() { return false; } /** CGNE is for any linear system */
   };

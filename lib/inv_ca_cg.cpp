@@ -5,7 +5,7 @@
 /**
    @file inv_ca_cg.cpp
 
-   Implementation of the communication -avoiding CG algorithm.  Based
+   Implementation of the communication-avoiding CG algorithm.  Based
    on the description here:
    http://research.nvidia.com/sites/default/files/pubs/2016-04_S-Step-and-Communication-Avoiding/nvr-2016-003.pdf
 */
@@ -76,6 +76,7 @@ namespace quda {
       // compute initial residual
       mmdag.Expose()->M(xp, x);
       if (param.compute_true_res && b2 == 0.0) b2 = blas::xmyNorm(b, xp);
+      else blas::xpay(b, -1.0, xp);
 
       // compute solution to residual equation
       CACG::operator()(yp, xp);
@@ -379,8 +380,6 @@ namespace quda {
       maxrr = rNorm;
     }
 
-    // printfQuda("Reliable triggered: %d  %e\n", updateR, rNorm);
-
     return updateR;
   }
 
@@ -487,9 +486,7 @@ namespace quda {
         blas::ax(1.0/sqrt(tmpnrm), Q[0]);
         for (int j = 0; j < 10; j++) {
           matSloppy(AQ[0], Q[0], tmp_sloppy, tmp2_sloppy);
-          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
-            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(AQ[0])));
-          }
+          if (j == 0) logQuda(QUDA_VERBOSE, "Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(AQ[0])));
           std::swap(AQ[0], Q[0]);
         }
       }
@@ -498,7 +495,7 @@ namespace quda {
       blas::ax(1.0/sqrt(tmpnrm), Q[0]);
       matSloppy(AQ[0], Q[0], tmp_sloppy, tmp2_sloppy);
       lambda_max = 1.1*(sqrt(blas::norm2(AQ[0])));
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      logQuda(QUDA_SUMMARIZE, "CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
       lambda_init = true;
 
       if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
@@ -697,7 +694,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // Print number of reliable updates.
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s: Reliable updates = %d\n", "CA-CG", rUpdate);
+    logQuda(QUDA_VERBOSE, "%s: Reliable updates = %d\n", "CA-CG", rUpdate);
 
     if (param.compute_true_res) {
       // Calculate the true residual

@@ -342,7 +342,7 @@ namespace quda {
     if (total_iter>param.maxiter && getVerbosity() >= QUDA_SUMMARIZE)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("CA-GCR: number of restarts = %d\n", restart);
+    logQuda(QUDA_VERBOSE, "CA-GCR: number of restarts = %d\n", restart);
 
     if (param.compute_true_res) {
       // Calculate the true residual
