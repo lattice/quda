@@ -251,28 +251,12 @@ namespace quda {
     if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
 
-      // We use q[0] and q[1] b/c p[0] can alias r. This code breaks if n_krylov == 1, but in that case
-      // we reduce to power iterations and we don't need lambda_min/max anywho.
+      // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
+      // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
+      // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmpSloppy);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
 
-      *q[0] = r; // do power iterations on this
-      // Do 100 iterations, normalize every 10.
-      for (int i = 0; i < 10; i++) {
-        double tmpnrm = blas::norm2(*q[0]);
-        blas::ax(1.0/sqrt(tmpnrm), *q[0]);
-        for (int j = 0; j < 10; j++) {
-          matSloppy(*q[1], *q[0], tmpSloppy);
-          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
-            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*q[1])));
-          }
-          std::swap(q[1], q[0]);
-        }
-      }
-      // Get Rayleigh quotient
-      double tmpnrm = blas::norm2(*q[0]);
-      blas::ax(1.0/sqrt(tmpnrm), *q[0]);
-      matSloppy(*q[1], *q[0], tmpSloppy);
-      lambda_max = 1.1*(sqrt(blas::norm2(*q[1])));
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
       lambda_init = true;
 
       if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }

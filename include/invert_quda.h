@@ -695,6 +695,52 @@ namespace quda {
     void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
     /**
+       @brief Compute power iterations on a Dirac matrix
+       @param[in] diracm Dirac matrix used for power iterations
+       @param[in] start Starting rhs for power iterations; value preserved unless it aliases tempvec1 or tempvec2
+       @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap can be used on ColorSpinorField)
+       @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap can be used on ColorSpinorField)
+       @param[in] niter Total number of power iteration iterations
+       @param[in] normalize_freq Frequency with which intermediate vector gets normalized
+       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
+       @return Norm of final power iteration result
+    */
+    template<typename... Args>
+    static double performPowerIterations(const DiracMatrix& diracm, ColorSpinorField& start, ColorSpinorField* tempvec1, ColorSpinorField* tempvec2,
+      int niter, int normalize_freq, Args &&... args) {
+
+      if (tempvec1 == nullptr || tempvec2 == nullptr)
+        errorQuda("Null pointer in performPowerIterations");
+
+      checkPrecision(*tempvec1, *tempvec2);
+      blas::copy(*tempvec1, start); // no-op if fields alias
+
+      // Do niter iterations, normalize every normalize_freq
+      for (int i = 0; i < niter; i++) {
+        if (normalize_freq > 0 && i % normalize_freq == 0) {
+          double tmpnrm = sqrt(blas::norm2(*tempvec1));
+          blas::ax(1.0 / tmpnrm, *tempvec1);
+        }
+        diracm(*tempvec2, *tempvec1, args...);
+        if (normalize_freq > 0 && i % normalize_freq == 0) {
+          if (getVerbosity() >= QUDA_VERBOSE) {
+            printfQuda("Current Rayleigh Quotient step %d is %e\n", i, sqrt(blas::norm2(*tempvec2)));
+          }
+        }
+        std::swap(tempvec1, tempvec2);
+      }
+      // Get Rayleigh quotient
+      double tmpnrm = sqrt(blas::norm2(*tempvec1));
+      blas::ax(1.0/tmpnrm, *tempvec1);
+      diracm(*tempvec2, *tempvec1, args...);
+      double lambda_max = sqrt(blas::norm2(*tempvec2));
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Power iterations approximate max = %e\n", lambda_max);
+
+      return lambda_max;
+    }
+
+
+    /**
      * @brief Return flops
      * @return flops expended by this operator
      */

@@ -516,25 +516,12 @@ namespace quda {
     if (basis == QUDA_CHEBYSHEV_BASIS && lambda_max < lambda_min && !lambda_init) {
       if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
 
-      *Q[0] = r_; // do power iterations on this
-      // Do 100 iterations, normalize every 10.
-      for (int i = 0; i < 10; i++) {
-        double tmpnrm = blas::norm2(*Q[0]);
-        blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
-        for (int j = 0; j < 10; j++) {
-          matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
-          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
-            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*AQ[0])));
-          }
-          std::swap(AQ[0], Q[0]);
-        }
-      }
-      // Get Rayleigh quotient
-      double tmpnrm = blas::norm2(*Q[0]);
-      blas::ax(1.0/sqrt(tmpnrm), *Q[0]);
-      matSloppy(*AQ[0], *Q[0], tmpSloppy, tmpSloppy2);
-      lambda_max = 1.1*(sqrt(blas::norm2(*AQ[0])));
+      // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
+      // and Q[0]/AQ[0] as temporaries for the power iterations. tmpSloppy/tmpSloppy2 get passed in as temporaries
+      // for matSloppy.
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r_, Q[0], AQ[0], 100, 10, tmpSloppy, tmpSloppy2);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+
       lambda_init = true;
 
       if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
