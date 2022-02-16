@@ -5446,8 +5446,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     QudaGaugeObservableParam* param = new QudaGaugeObservableParam[n_steps/meas_interval+1];
     for (unsigned int i=0;i<n_steps+1; i++){ // initializing for all 'i'
       param[i] = newQudaGaugeObservableParam();
-      param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
-      param[i].compute_qcharge = QUDA_BOOLEAN_TRUE; 
+      param[i].compute_plaquette = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      param[i].compute_qcharge = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; 
     }
     performWFlownStep_param(n_steps, step_size, meas_interval, wflow_type, param);
     delete param;
