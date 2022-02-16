@@ -581,28 +581,8 @@ namespace quda {
     PrintStats("CA-CG", total_iter, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
-      // build up a space of size n_krylov
-      if (basis == QUDA_POWER_BASIS) {
-        for (int k = 0; k < n_krylov; k++) { matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2); }
-      } else { // chebyshev basis
-
-        matSloppy(*AS[0], *S[0], tmpSloppy, tmpSloppy2);
-
-        if (n_krylov > 1) {
-          // S_1 = m AS_0 + b S_0
-          blas::axpbyz(m_map, *AS[0], b_map, *S[0], *S[1]);
-          matSloppy(*AS[1], *S[1], tmpSloppy, tmpSloppy2);
-
-          // Enter recursion relation
-          if (n_krylov > 2) {
-            // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            for (int k = 2; k < n_krylov; k++) {
-              blas::axpbypczw(2. * m_map, *AS[k - 1], 2. * b_map, *S[k - 1], -1., *S[k - 2], *S[k]);
-              matSloppy(*AS[k], *S[k], tmpSloppy, tmpSloppy2);
-            }
-          }
-        }
-      }
+      // build up a space of size n_krylov, assumes S[0] is in place
+      computeCAKrylovSpace(matSloppy, AS, S, n_krylov, basis, m_map, b_map, tmpSloppy, tmpSloppy2);
 
       // we can greatly simplify the workflow for fixed iterations
       if (!fixed_iteration) {

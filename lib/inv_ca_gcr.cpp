@@ -312,27 +312,7 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      if (basis == QUDA_POWER_BASIS) {
-        for (int k = 0; k < n_krylov; k++) { matSloppy(*q[k], *p[k], tmpSloppy); }
-      } else { // chebyshev basis
-
-        matSloppy(*q[0], *p[0], tmpSloppy);
-
-        if (n_krylov > 1) {
-          // p_1 = m Ap_0 + b p_0
-          blas::axpbyz(m_map, *q[0], b_map, *p[0], *p[1]);
-          matSloppy(*q[1], *p[1], tmpSloppy);
-
-          // Enter recursion relation
-          if (n_krylov > 2) {
-            // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
-            for (int k = 2; k < n_krylov; k++) {
-              blas::axpbypczw(2. * m_map, *q[k - 1], 2. * b_map, *p[k - 1], -1., *p[k - 2], *p[k]);
-              matSloppy(*q[k], *p[k], tmpSloppy);
-            }
-          }
-        }
-      }
+      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmpSloppy);
 
       solve(alpha, q, *p[0]);
 

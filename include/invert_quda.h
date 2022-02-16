@@ -739,6 +739,52 @@ namespace quda {
       return lambda_max;
     }
 
+    /**
+       @brief Generate a Krylov space in a given basis
+       @param[in] diracm Dirac matrix used to generate the Krylov space
+       @param[out] Ap dirac matrix times the Krylov basis vectors
+       @param[in,out] p Krylov basis vectors; assumes p[0] is in place
+       @param[in] n_krylov Size of krylov space
+       @param[in] basis Basis type
+       @param[in] m_map Slope mapping for Chebyshev basis; ignored for power basis
+       @param[in] b_map Intercept mapping for Chebyshev basis; ignored for power basis
+       @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
+    */
+    template<typename... Args>
+    static void computeCAKrylovSpace(const DiracMatrix& diracm, std::vector<ColorSpinorField*> Ap, std::vector<ColorSpinorField*> p,
+      int n_krylov, QudaCABasis basis, double m_map, double b_map, Args &&... args) {
+
+      // in some cases p or Ap may be larger
+      if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);
+      if (static_cast<int>(Ap.size()) < n_krylov) errorQuda("Invalid Ap.size() %lu < n_krylov %d", Ap.size(), n_krylov);
+      for (auto p_ : p) { if (p_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace"); }
+      for (auto Ap_ : Ap) { if (Ap_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace"); }
+
+      if (basis == QUDA_POWER_BASIS) {
+        for (int k = 0; k < n_krylov; k++) {
+          diracm(*Ap[k], *p[k], args...);
+          if (k < (n_krylov - 1)) blas::copy(*p[k+1], *Ap[k]); // no op if fields alias, which is often the case
+        }
+      } else { // chebyshev basis
+        diracm(*Ap[0], *p[0], args...);
+
+        if (n_krylov > 1) {
+          // p_1 = m Ap_0 + b p_0
+          blas::axpbyz(m_map, *Ap[0], b_map, *p[0], *p[1]);
+          diracm(*Ap[1], *p[1], args...);
+
+          // Enter recursion relation
+          if (n_krylov > 2) {
+            // p_k = 2 m A[_{k-1} + 2 b p_{k-1} - p_{k-2}
+            for (int k = 2; k < n_krylov; k++) {
+              blas::axpbypczw(2. * m_map, *Ap[k - 1], 2. * b_map, *p[k - 1], -1., *p[k - 2], *p[k]);
+              diracm(*Ap[k], *p[k], args...);
+            }
+          }
+        }
+      }
+    }
+
 
     /**
      * @brief Return flops
