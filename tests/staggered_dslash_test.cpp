@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 
   // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash,
   // and don't ask to build the fat/long links... it doesn't make sense.
-  if (strcmp(latfile,"") && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (latfile.size() > 0 && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda("Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
   }
 

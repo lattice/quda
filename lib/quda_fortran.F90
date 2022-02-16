@@ -269,11 +269,47 @@ module quda_fortran
      ! Maximum eigenvalue for Chebyshev CA basis
      real(8) :: ca_lambda_max
 
+     ! Basis for CA algorithms in preconditioner solvers
+     QudaCABasis :: ca_basis_precondition
+
+     ! Minimum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_min_precondition
+
+     ! Maximum eigenvalue for Chebyshev CA basis in preconditioner solvers
+     real(8) :: ca_lambda_max_precondition
+
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle
 
      ! Whether to use additive or multiplicative Schwarz preconditioning
      QudaSchwarzType :: schwarz_type
+
+     ! The diagonal constant to suppress the low modes when performing 5D transfer
+     real(8):: madwf_diagonal_suppressor
+
+     ! The target MADWF Ls to be used in the accelerator
+     integer(4):: madwf_ls
+
+     ! The minimum number of iterations after which to generate the null vectors for MADWF
+     integer(4):: madwf_null_miniter
+
+     ! The maximum tolerance after which to generate the null vectors for MADWF
+     real(8):: madwf_null_tol
+
+     ! The maximum number of iterations for the training iterations
+     integer(4):: madwf_train_maxiter
+
+     ! Whether to load the MADWF parameters from the file system
+     QudaBoolean:: madwf_param_load
+
+     ! Whether to save the MADWF parameters to the file system
+     QudaBoolean:: madwf_param_save
+
+     ! Path to load from the file system
+     character(len=256):: madwf_param_infile
+
+     ! Path to save to the file system
+     character(len=256):: madwf_param_outfile
 
      ! Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence
      QudaResidualType ::residual_type
@@ -311,7 +347,7 @@ module quda_fortran
      ! Precision to store the chronological basis in
      integer(4)::chrono_precision;
 
-     ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     ! Which external library to use in the linear solvers (Eigen) */
      QudaExtLibType :: extlib_type
 
      ! Whether to use the platform native or generic BLAS / LAPACK */

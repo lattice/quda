@@ -42,6 +42,7 @@ namespace quda
     T *result_d; /** device-mapped host buffer */
     T *result_h; /** host buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
+    T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
   public:
     /**
@@ -61,6 +62,22 @@ namespace quda
 
       if (commAsyncReduction()) result_d = partial;
     }
+
+    /**
+      @brief Set device_output_async_buffer
+    */
+    void set_output_async_buffer(T *ptr)
+    {
+      if (!commAsyncReduction()) {
+        errorQuda("When setting the asynchronous buffer the commAsyncReduction option must be set.");
+      }
+      device_output_async_buffer = ptr;
+    }
+
+    /**
+      @brief Get device_output_async_buffer
+    */
+    __device__ __host__ T *get_output_async_buffer() const { return device_output_async_buffer; }
 
     /**
        @brief Finalize the reduction, returning the computed reduction
@@ -136,7 +153,11 @@ namespace quda
 
       // write out the final reduced value
       if (target::thread_idx().y * block_size_x + target::thread_idx().x == 0) {
-        arg.result_d[idx] = sum;
+        if (arg.get_output_async_buffer()) {
+          arg.get_output_async_buffer()[idx] = sum;
+        } else {
+          arg.result_d[idx] = sum;
+        }
         arg.count[idx] = 0; // set to zero for next time
       }
     }

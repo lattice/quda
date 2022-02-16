@@ -182,10 +182,15 @@ typedef enum QudaMultigridCycleType_s {
 } QudaMultigridCycleType;
 
 typedef enum QudaSchwarzType_s {
-  QUDA_ADDITIVE_SCHWARZ,
-  QUDA_MULTIPLICATIVE_SCHWARZ,
+  QUDA_ADDITIVE_SCHWARZ = 0,
+  QUDA_MULTIPLICATIVE_SCHWARZ = 1,
   QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
 } QudaSchwarzType;
+
+typedef enum QudaAcceleratorType_s {
+  QUDA_MADWF_ACCELERATOR = 0, // Use the MADWF accelerator
+  QUDA_INVALID_ACCELERATOR = QUDA_INVALID_ENUM
+} QudaAcceleratorType;
 
 typedef enum QudaResidualType_s {
   QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
@@ -451,6 +456,7 @@ typedef enum QudaTransferType_s {
   QUDA_TRANSFER_AGGREGATE,
   QUDA_TRANSFER_COARSE_KD,
   QUDA_TRANSFER_OPTIMIZED_KD,
+  QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG,
   QUDA_TRANSFER_INVALID = QUDA_INVALID_ENUM
 } QudaTransferType;
 
@@ -499,6 +505,7 @@ typedef enum QudaFieldGeometry_s {
   QUDA_VECTOR_GEOMETRY = 4,
   QUDA_TENSOR_GEOMETRY = 6,
   QUDA_COARSE_GEOMETRY = 8,
+  QUDA_KDINVERSE_GEOMETRY = 16, // Decomposition of Kahler-Dirac block
   QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
 } QudaFieldGeometry;
 
@@ -553,7 +560,6 @@ typedef enum QudaWFlowType_s {
 typedef enum QudaExtLibType_s {
   QUDA_CUSOLVE_EXTLIB,
   QUDA_EIGEN_EXTLIB,
-  QUDA_MAGMA_EXTLIB,
   QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
 } QudaExtLibType;
 

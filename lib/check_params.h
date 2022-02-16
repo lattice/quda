@@ -549,15 +549,41 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
   P(schwarz_type, QUDA_INVALID_SCHWARZ);
+  P(accelerator_type_precondition, QUDA_INVALID_ACCELERATOR);
   P(precondition_cycle, 1);               // defaults match previous interface behaviour
 #else
   if (param->inv_type_precondition == QUDA_BICGSTAB_INVERTER || param->inv_type_precondition == QUDA_CG_INVERTER
-      || param->inv_type_precondition == QUDA_MR_INVERTER) {
+      || param->inv_type_precondition == QUDA_CA_CG_INVERTER || param->inv_type_precondition == QUDA_MR_INVERTER) {
     P(tol_precondition, INVALID_DOUBLE);
     P(maxiter_precondition, INVALID_INT);
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(precondition_cycle, 0);
   }
+#endif
+
+#ifndef INIT_PARAM
+  if (param->accelerator_type_precondition == QUDA_MADWF_ACCELERATOR) {
+#endif
+    P(madwf_diagonal_suppressor, INVALID_DOUBLE);
+    P(madwf_ls, INVALID_INT);
+    P(madwf_null_miniter, INVALID_INT);
+    P(madwf_null_tol, INVALID_DOUBLE);
+    P(madwf_train_maxiter, INVALID_INT);
+#ifndef INIT_PARAM
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(madwf_param_infile[0], '\0');
+  P(madwf_param_outfile[0], '\0');
+#endif
+
+#ifdef INIT_PARAM
+  P(madwf_param_load, QUDA_BOOLEAN_FALSE);
+  P(madwf_param_save, QUDA_BOOLEAN_FALSE);
+#else
+  P(madwf_param_load, QUDA_BOOLEAN_INVALID);
+  P(madwf_param_save, QUDA_BOOLEAN_INVALID);
 #endif
 
 #if defined(INIT_PARAM)
@@ -592,6 +618,20 @@ void printQudaInvertParam(QudaInvertParam *param) {
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
       P(ca_lambda_max, INVALID_DOUBLE);
+    }
+  }
+#endif
+
+#ifdef INIT_PARAM
+  P(ca_basis_precondition, QUDA_POWER_BASIS);
+  P(ca_lambda_min_precondition, 0.0);
+  P(ca_lambda_max_precondition, -1.0);
+#else
+  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+    P(ca_basis_precondition, QUDA_INVALID_BASIS);
+    if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
+      P(ca_lambda_min_precondition, INVALID_DOUBLE);
+      P(ca_lambda_max_precondition, INVALID_DOUBLE);
     }
   }
 #endif
@@ -933,6 +973,18 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 #else
   P(use_mma, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(allow_truncation, QUDA_BOOLEAN_FALSE);
+#else
+  P(allow_truncation, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_FALSE);
+#else
+  P(staggered_kd_dagger_approximation, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
