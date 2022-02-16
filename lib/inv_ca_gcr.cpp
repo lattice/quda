@@ -11,6 +11,7 @@ namespace quda {
     init(false),
     use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO && param.precision == param.precision_sloppy
                && param.use_init_guess == QUDA_USE_INIT_GUESS_NO && !param.deflate),
+    lambda_init(false),
     basis(param.ca_basis),
     alpha(nullptr),
     rp(nullptr),
@@ -61,11 +62,6 @@ namespace quda {
 
       // now allocate sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-
-      if (basis != QUDA_POWER_BASIS) {
-        warningQuda("CA-GCR does not support any basis besides QUDA_POWER_BASIS. Switching to QUDA_POWER_BASIS...\n");
-        basis = QUDA_POWER_BASIS;
-      }
 
       if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
@@ -248,6 +244,44 @@ namespace quda {
       }
     }
 
+    // Use power iterations to approx lambda_max
+    auto &lambda_min = param.ca_lambda_min;
+    auto &lambda_max = param.ca_lambda_max;
+
+    if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
+      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
+
+      // We use q[0] and q[1] b/c p[0] can alias r. This code breaks if n_krylov == 1, but in that case
+      // we reduce to power iterations and we don't need lambda_min/max anywho.
+
+      *q[0] = r; // do power iterations on this
+      // Do 100 iterations, normalize every 10.
+      for (int i = 0; i < 10; i++) {
+        double tmpnrm = blas::norm2(*q[0]);
+        blas::ax(1.0/sqrt(tmpnrm), *q[0]);
+        for (int j = 0; j < 10; j++) {
+          matSloppy(*q[1], *q[0], tmpSloppy);
+          if (j == 0 && getVerbosity() >= QUDA_VERBOSE) {
+            printfQuda("Current Rayleigh Quotient step %d is %e\n", i*10+1, sqrt(blas::norm2(*q[1])));
+          }
+          std::swap(q[1], q[0]);
+        }
+      }
+      // Get Rayleigh quotient
+      double tmpnrm = blas::norm2(*q[0]);
+      blas::ax(1.0/sqrt(tmpnrm), *q[0]);
+      matSloppy(*q[1], *q[0], tmpSloppy);
+      lambda_max = 1.1*(sqrt(blas::norm2(*q[1])));
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-CG Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      lambda_init = true;
+
+      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
+    }
+
+    // Factors which map linear operator onto [-1,1]
+    double m_map = 2./(lambda_max-lambda_min);
+    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
+
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -294,9 +328,26 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      for (int k = 0; k < n_krylov; k++) {
-        matSloppy(*q[k], *p[k], tmpSloppy);
-        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(*p[k + 1], *q[k]);
+      if (basis == QUDA_POWER_BASIS) {
+        for (int k = 0; k < n_krylov; k++) { matSloppy(*q[k], *p[k], tmpSloppy); }
+      } else { // chebyshev basis
+
+        matSloppy(*q[0], *p[0], tmpSloppy);
+
+        if (n_krylov > 1) {
+          // p_1 = m Ap_0 + b p_0
+          blas::axpbyz(m_map, *q[0], b_map, *p[0], *p[1]);
+          matSloppy(*q[1], *p[1], tmpSloppy);
+
+          // Enter recursion relation
+          if (n_krylov > 2) {
+            // S_k = 2 m AS_{k-1} + 2 b S_{k-1} - S_{k-2}
+            for (int k = 2; k < n_krylov; k++) {
+              blas::axpbypczw(2. * m_map, *q[k - 1], 2. * b_map, *p[k - 1], -1., *p[k - 2], *p[k]);
+              matSloppy(*q[k], *p[k], tmpSloppy);
+            }
+          }
+        }
       }
 
       solve(alpha, q, *p[0]);

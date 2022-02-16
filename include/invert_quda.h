@@ -1227,9 +1227,8 @@ namespace quda {
     bool init;
     const bool use_source; // whether we can reuse the source vector
 
-    // Basis. Currently anything except POWER_BASIS causes a warning
-    // then swap to POWER_BASIS.
-    QudaCABasis basis;
+    bool lambda_init; // whether or not lambda_max has been initialized
+    QudaCABasis basis; // CA basis
 
     Complex *alpha; // Solution coefficient vectors
 
