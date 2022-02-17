@@ -350,9 +350,9 @@ namespace quda
 
     if (param_presmooth->inv_type == QUDA_CA_GCR_INVERTER || param_presmooth->inv_type == QUDA_CA_CG_INVERTER ||
           param_presmooth->inv_type == QUDA_CA_CGNR_INVERTER || param_presmooth->inv_type == QUDA_CA_CGNE_INVERTER) {
-      param_presmooth->ca_basis = QUDA_CHEBYSHEV_BASIS; //QUDA_POWER_BASIS;
-      param_presmooth->ca_lambda_min = 0.;
-      param_presmooth->ca_lambda_max = -1.;
+      param_presmooth->ca_basis = param.mg_global.smoother_solver_ca_basis[param.level];
+      param_presmooth->ca_lambda_min = param.mg_global.smoother_solver_ca_lambda_min[param.level];
+      param_presmooth->ca_lambda_max = param.mg_global.smoother_solver_ca_lambda_max[param.level];
     }
 
     param_presmooth->tol = param.smoother_tol;

@@ -875,6 +875,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     }
 
 #ifdef INIT_PARAM
+    P(smoother_solver_ca_basis[i], QUDA_POWER_BASIS);
+    P(smoother_solver_ca_lambda_min[i], 0.0);
+    P(smoother_solver_ca_lambda_max[i], -1.0);
+#else
+    P(smoother_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(smoother_solver_ca_lambda_min[i], INVALID_DOUBLE);
+    P(smoother_solver_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
     if (i<QUDA_MAX_MG_LEVEL) {
           P(n_vec[i], INVALID_INT);
     }
