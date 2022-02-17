@@ -337,9 +337,9 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
-        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        std::string vec_outfile[QUDA_MAX_MG_LEVEL];
         for (int i=0; i<mg_param.n_level; i++) {
-          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          vec_outfile[i] = std::string(mg_param.vec_outfile[i]);
           sprintf(mg_param.vec_outfile[i], "dump_step_evolve_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
@@ -347,7 +347,7 @@ int main(int argc, char **argv)
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
         for (int i=0; i<mg_param.n_level; i++) {
-          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+          safe_strcpy(mg_param.vec_outfile[i], vec_outfile[i], 256, "mg_vec_outfile"); // restore output file name
         }
       }
     }
@@ -424,9 +424,9 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
-        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        std::string vec_outfile[QUDA_MAX_MG_LEVEL];
         for (int i = 0; i < mg_param.n_level; i++) {
-          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          vec_outfile[i] = std::string(mg_param.vec_outfile[i]);
           sprintf(mg_param.vec_outfile[i], "dump_step_shift_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
         for (int i = 0; i < mg_param.n_level; i++) {
-          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+          safe_strcpy(mg_param.vec_outfile[i], vec_outfile[i], 256, "mg_vec_outfile"); // restore output file name
         }
       }
     }

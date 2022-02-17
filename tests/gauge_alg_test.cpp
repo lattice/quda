@@ -288,7 +288,7 @@ protected:
 
   virtual void save_gauge()
   {
-    printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
+    printfQuda("Saving the gauge field to file %s\n", gauge_outfile.c_str());
 
     QudaGaugeParam gauge_param = newQudaGaugeParam();
     setWilsonGaugeParam(gauge_param);
@@ -310,7 +310,7 @@ protected:
     saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
     // Write to disk
-    write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+    write_gauge_field(gauge_outfile.c_str(), cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
 
     for (int dir = 0; dir < 4; dir++) host_free(cpu_gauge[dir]);
     delete gauge;
@@ -440,8 +440,8 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  gauge_load = strcmp(latfile, "");
-  gauge_store = strcmp(gauge_outfile, "");
+  gauge_load = (latfile.size() > 0);
+  gauge_store = (gauge_outfile.size() > 0);
 
   // If we are passing a gauge field to the test, we must allocate host memory.
   // If no gauge is passed, we generate a quenched field on the device.
