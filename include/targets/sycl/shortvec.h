@@ -93,4 +93,4 @@ typedef vec4<double> double4;
 #define make_double4(a,b,c,d) make_vec4<double>(a,b,c,d)
 
 typedef vec3<unsigned int> dim3;
-
+//constexpr dim3(unsigned int a) { return make_uint3(a,0,0); }

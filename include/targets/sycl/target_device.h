@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef QUDA_WARP_SIZE
-#define QUDA_WARP_SIZE 8
+#define QUDA_WARP_SIZE 16
 #endif
 #ifndef QUDA_MAX_BLOCK_SIZE
 #define QUDA_MAX_BLOCK_SIZE 512

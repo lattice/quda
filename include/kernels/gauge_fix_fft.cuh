@@ -9,7 +9,7 @@
 
 namespace quda {
 
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//UNCOMMENT THIS IF YOU WANT TO USE LESS MEMORY
 #define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x),
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
@@ -151,7 +151,6 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
   struct GaugeFixQualityFFTArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -173,13 +172,12 @@ namespace quda {
       for (int dir = 0; dir < 4; dir++) X[dir] = data.X()[dir];
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction() { return result[0]; }
     double getTheta() { return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityFFT : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct FixQualityFFT : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }

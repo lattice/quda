@@ -14,7 +14,7 @@
 using cudaStream_t = int;
 
 //#include <error.h>
-#include <shortvec.h>
+#include "shortvec.h"
 //#include <stream.h>
 //#include <event.h>
 

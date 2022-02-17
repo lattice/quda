@@ -39,6 +39,7 @@ namespace quda
      memory
    */
   template <typename T, bool use_kernel_arg = true> struct ReduceArg : kernel_param<use_kernel_arg> {
+    using reduce_t = T;
 
     template <int, int, typename Reducer, typename Arg, typename I>
     friend __device__ void reduce(Arg &, const Reducer &, const I &, const int);
@@ -52,6 +53,7 @@ namespace quda
     T *result_d; /** device-mapped host buffer */
     T *result_h; /** host buffer */
     count_t *count; /** count array that is used to track the number of completed thread blocks at a given batch index */
+    T *device_output_async_buffer = nullptr; // Optional device output buffer for the reduction result
 
   public:
     /**
@@ -71,6 +73,22 @@ namespace quda
 
       if (commAsyncReduction()) result_d = partial;
     }
+
+    /**
+      @brief Set device_output_async_buffer
+    */
+    void set_output_async_buffer(T *ptr)
+    {
+      if (!commAsyncReduction()) {
+        errorQuda("When setting the asynchronous buffer the commAsyncReduction option must be set.");
+      }
+      device_output_async_buffer = ptr;
+    }
+
+    /**
+      @brief Get device_output_async_buffer
+    */
+    __device__ __host__ T *get_output_async_buffer() const { return device_output_async_buffer; }
 
     /**
        @brief Finalize the reduction, returning the computed reduction
@@ -151,7 +169,7 @@ namespace quda
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {
       auto i = target::thread_idx().y * block_size_x + target::thread_idx().x;
-      T sum = arg.init();
+      T sum = Reducer::init();
       sycl::atomic_fence(sycl::memory_order::acquire,sycl::memory_scope::device);
       while (i < target::grid_dim().x) {
         sum = r(sum, const_cast<T &>(static_cast<volatile T *>(arg.partial)[idx * target::grid_dim().x + i]));

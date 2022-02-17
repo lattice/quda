@@ -78,8 +78,6 @@ namespace quda
           if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
-
-      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -92,10 +90,10 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<array<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = array<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = array<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
@@ -112,7 +110,7 @@ namespace quda
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
-//#pragma unroll
+#pragma unroll
         for (int l = 0; l < Arg::NXZ; l++) {
           if (arg.f.read.X) arg.X[l].load(x, i, parity);
           if (arg.f.read.Z) arg.Z[l].load(z, i, parity);
@@ -165,7 +163,7 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
-//#pragma unroll
+#pragma unroll
         for (int k=0; k < x.size(); k++) dot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
@@ -196,7 +194,7 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &, int, int) const
       {
-//#pragma unroll
+#pragma unroll
         for (int k=0; k < x.size(); k++) cdot_<reduce_t, real>(sum, x[k], y[k]);
       }
 
@@ -214,7 +212,7 @@ namespace quda
 
       template <typename T> __device__ __host__ inline void operator()(reduce_t &sum, T &x, T &y, T &, T &w, int i, int j) const
       {
-//#pragma unroll
+#pragma unroll
         for (int k = 0; k < x.size(); k++) {
           cdot_<reduce_t, real>(sum, x[k], y[k]);
           if (i == j) w[k] = y[k];

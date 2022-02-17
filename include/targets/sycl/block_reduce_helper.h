@@ -280,6 +280,7 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return Reduced value (defined in logical thread 0 only)
      */
+#if 0
     template <bool async = true, typename U>
     inline T
     ReduceNotSum(const T &value, const quda::maximum<U> &r)
@@ -307,6 +308,28 @@ namespace quda
     {
       return Sum<async>(value);
     }
+#endif
+
+    template <bool async = true, typename R>
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,plus<typename R::reduce_t>>,T>
+    Reduce(const T &value, const R &)
+    {
+      return Sum<async>(value);
+    }
+
+    template <bool async = true, typename R>
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,maximum<typename R::reduce_t>>,T>
+    Reduce(const T &value, const R &)
+    {
+      return Max<async>(value);
+    }
+
+    template <bool async = true, typename R>
+    inline std::enable_if_t<std::is_same_v<typename R::reducer_t,minimum<typename R::reduce_t>>,T>
+    Reduce(const T &value, const R &)
+    {
+      return Min<async>(value);
+    }
 
     /**
        @brief Perform a block-wide custom reduction
@@ -314,13 +337,13 @@ namespace quda
        @param[in] r The reduction operation we want to apply
        @return Reduced value (defined in all threads in the block)
      */
-    template <bool async = true, typename reducer_t>
-    inline T AllReduce(const T &value, const reducer_t &r)
+    template <bool async = true, typename R>
+    inline T AllReduce(const T &value, const R &r)
     {
       static_assert(batch_size == 1, "Cannot do AllReduce with batch_size > 1");
       auto grp = getGroup();
       T result;
-      blockReduce(grp, result, value, r);
+      blockReduce(grp, result, value, r);  // FIXME: not used
       return result;
     }
   };

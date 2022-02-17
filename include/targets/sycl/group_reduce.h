@@ -69,17 +69,14 @@ inline void blockReduceSum(sycl::group<3> grp, array<quda::complex<T>,N> &out,
   blockReduceSum(grp, *outx, *inx);
 }
 
-inline void blockReduceMin(sycl::group<3> grp, double &out, double in)
+template <typename T>
+inline void blockReduceMin(sycl::group<3> grp, T &out, T in)
 {
   out = sycl::reduce_over_group(grp, in, sycl::minimum<>());
 }
 
-inline void blockReduceMax(sycl::group<3> grp, float &out, float in)
-{
-  out = sycl::reduce_over_group(grp, in, sycl::maximum<>());
-}
-
-inline void blockReduceMax(sycl::group<3> grp, double &out, double in)
+template <typename T>
+inline void blockReduceMax(sycl::group<3> grp, T &out, T in)
 {
   out = sycl::reduce_over_group(grp, in, sycl::maximum<>());
 }

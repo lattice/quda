@@ -30,7 +30,7 @@ namespace quda {
     //auto j = threadIdx.y;
     auto j = ndi.get_local_id(1);
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -49,7 +49,8 @@ namespace quda {
     Transformer<Arg> t(const_cast<Arg&>(arg));
     auto idx = ndi.get_global_id(0);
     auto j = ndi.get_local_id(1);
-    auto value = arg.init();
+    //auto value = arg.init();
+    auto value = t.init();
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
       if (grid_stride) idx += ndi.get_global_range(0); else break;
@@ -90,15 +91,18 @@ namespace quda {
     //arg.debug();
 #else
     using reduce_t = typename Transformer<Arg>::reduce_t;
+    using reducer_t = typename Transformer<Arg>::reducer_t;
+    //using reduce_t = typename reducer_t::T;
     auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
-    *result_h = arg.init();
+    //*result_h = arg.init();
+    *result_h = reducer_t::init();
     reduce_t *result_d = result_h;
     if (commAsyncReduction()) {
       result_d = reinterpret_cast<reduce_t *>(quda::reducer::get_device_buffer());
       q.memcpy(result_d, result_h, sizeof(reduce_t));
     }
-    auto red = sycl::reduction(result_d, arg.init(),
-			       typename Transformer<Arg>::reducer_t());
+    //auto red = sycl::reduction(result_d, arg.init(),
+    auto red = sycl::reduction(result_d, *result_h, reducer_t());
     //auto red = sycl::ONEAPI::reduction(result_d, Transformer<Arg>::init(),
     //			       typename Transformer<Arg>::reducer_t());
     //warningQuda("nd: %i\n", nd);
@@ -150,7 +154,7 @@ namespace quda {
 
     if (j >= arg.threads.z) return;
 
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, k, j);
@@ -171,7 +175,7 @@ namespace quda {
     auto j = ndi.get_global_id(1);
     auto k = ndi.get_local_id(2);
     if (j >= arg.threads.y) return;
-    reduce_t value = arg.init();
+    reduce_t value = t.init();
     while (idx < arg.threads.x) {
       value = t(value, idx, j, k);
       if (grid_stride) idx += ndi.get_global_range(0); else break;
@@ -224,9 +228,9 @@ namespace quda {
     if(arg.threads.y==1) {
       using reduce_t = typename Transformer<Arg>::reduce_t;
       auto result_h = reinterpret_cast<reduce_t *>(quda::reducer::get_host_buffer());
-      *result_h = arg.init();
+      *result_h = t.init();
       auto result = reinterpret_cast<reduce_t *>(quda::reducer::get_mapped_buffer());
-      auto red = sycl::reduction(result, arg.init(), typename Transformer<Arg>::reducer_t());
+      auto red = sycl::reduction(result, t.init(), typename Transformer<Arg>::reducer_t());
       sycl::buffer<const char,1>
 	buf{reinterpret_cast<const char*>(&arg), sycl::range(sizeof(arg))};
       q.submit([&](sycl::handler& h) {

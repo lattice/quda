@@ -65,7 +65,7 @@ namespace quda {
     const dim3 block_idx(virtual_block_idx(arg,ndi), ndi.get_group(1), 0);
     const dim3 thread_idx(ndi.get_local_id(0), ndi.get_local_id(1), 0);
     //const int j = blockDim.y*blockIdx.y + threadIdx.y;
-    const int j = ndi.get_global_id(1);
+    const unsigned int j = ndi.get_global_id(1);
     if (j >= arg.threads.y) return;
 
     Transformer<Arg> t(arg);

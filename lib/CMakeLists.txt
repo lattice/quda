@@ -196,6 +196,9 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   target_include_directories(quda PRIVATE ../include/targets/hip)
   set(QUDA_TARGET_HIP ON)
 endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "SYCL")
+  include(targets/sycl/target_sycl.cmake)
+endif()
 
 # make one library
 target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_cpp> $<$<TARGET_EXISTS:quda_pack>:$<TARGET_OBJECTS:quda_pack>>

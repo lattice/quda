@@ -3,7 +3,8 @@
 //#include <quda_cuda_api.h>
 #include <algorithm>
 
-bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
+//bool comm_peer2peer_possible(int local_gpuid, int neighbor_gpuid)
+bool comm_peer2peer_possible(int, int)
 {
   //int canAccessPeer[2];
   //CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer[0], local_gpuid, neighbor_gpuid));
@@ -26,7 +27,8 @@ int comm_peer2peer_performance(int local_gpuid, int neighbor_gpuid)
   return std::max(accessRank[0], accessRank[1]);
 }
 
-void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+//void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
+void comm_create_neighbor_memory(void *[QUDA_MAX_DIM][2], void *)
 {
 #if 0
   // handles for obtained ghost pointers
@@ -75,7 +77,8 @@ void comm_create_neighbor_memory(void *remote[QUDA_MAX_DIM][2], void *local)
 #endif
 }
 
-void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
+//void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
+void comm_destroy_neighbor_memory(void *[QUDA_MAX_DIM][2])
 {
 #if 0
   for (int dim=0; dim<4; ++dim) {
@@ -95,7 +98,8 @@ void comm_destroy_neighbor_memory(void *remote[QUDA_MAX_DIM][2])
 #endif
 }
 
-void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+//void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+void comm_create_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t [2][QUDA_MAX_DIM])
 {
 #if 0
   // handles for obtained events
@@ -148,7 +152,8 @@ void comm_create_neighbor_event(qudaEvent_t remote[2][QUDA_MAX_DIM], qudaEvent_t
 #endif
 }
 
-void comm_destroy_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+//void comm_destroy_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t local[2][QUDA_MAX_DIM])
+void comm_destroy_neighbor_event(qudaEvent_t [2][QUDA_MAX_DIM], qudaEvent_t [2][QUDA_MAX_DIM])
 {
 #if 0
   for (int dim=0; dim<4; ++dim) {
