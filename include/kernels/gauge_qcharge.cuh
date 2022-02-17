@@ -9,7 +9,6 @@ namespace quda
   template <typename Float_, int nColor_, QudaReconstructType recon_, bool density_ = false> struct QChargeArg :
     public ReduceArg<array<double, 3>>
   {
-    using reduce_t = array<double, 3>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -24,13 +23,11 @@ namespace quda
       ReduceArg<reduce_t>(dim3(Fmunu.VolumeCB(), 2, 1)),
       f(Fmunu),
       qDensity(qDensity) { }
-
-    __device__ __host__ auto init() const { return reduce_t{0, 0, 0}; }
   };
 
   // Core routine for computing the topological charge from the field strength
-  template <typename Arg> struct qCharge : plus<array<double, 3>> {
-    using reduce_t = array<double, 3>;
+  template <typename Arg> struct qCharge : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr qCharge(const Arg &arg) : arg(arg) {}
@@ -80,7 +77,7 @@ QUDA_UNROLL
       Q = Q_idx * q_norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads.x] = Q;
 
-      return plus::operator()(E, E_local);
+      return operator()(E, E_local);
     }
 
   };

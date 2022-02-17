@@ -8,7 +8,6 @@ namespace quda
 {
 
   template <typename store_t_, bool twist_> struct CloverInvertArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     using store_t = store_t_;
     using real = typename mapper<store_t>::type;
     static constexpr bool twist = twist_;
@@ -35,12 +34,10 @@ namespace quda
     {
       if (!field.isNative()) errorQuda("Clover field %d order not supported", field.Order());
     }
-
-    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
-  template <typename Arg> struct InvertClover : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct InvertClover : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr InvertClover(const Arg &arg) : arg(arg) {}

@@ -10,7 +10,6 @@ namespace quda {
 
   template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct GaugePlaqArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -34,8 +33,6 @@ namespace quda {
 	R += border[dir];
       }
     }
-
-    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
   };
 
   template<typename Arg>
@@ -56,8 +53,8 @@ namespace quda {
     return getTrace( U1 * U2 * conj(U3) * conj(U4) ).real();
   }
 
-  template <typename Arg> struct Plaquette : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct Plaquette : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr Plaquette(const Arg &arg) : arg(arg) {}
@@ -83,7 +80,7 @@ QUDA_UNROLL
         plaq[1] += plaquette(arg, x, parity, mu, 3);
       }
 
-      return plus::operator()(plaq, value);
+      return operator()(plaq, value);
     }
 
   };

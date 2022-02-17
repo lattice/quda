@@ -78,8 +78,6 @@ namespace quda
           if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
-
-      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -92,10 +90,10 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<array<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = array<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = array<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }

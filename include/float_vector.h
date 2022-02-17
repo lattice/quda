@@ -10,6 +10,8 @@
 #include <complex_quda.h>
 #include <register_traits.h>
 #include <array.h>
+#include <limits>
+#include <type_traits>
 
 namespace quda {
 
@@ -42,19 +44,26 @@ QUDA_UNROLL
     return c;
   }
 
-  template <typename T> constexpr T zero() { return static_cast<T>(0); }
-  template <> constexpr double2 zero() { return double2 {0.0, 0.0}; }
-  template <> constexpr double3 zero() { return double3 {0.0, 0.0, 0.0}; }
-  template <> constexpr double4 zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
+  template <typename T> constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> zero() { return static_cast<T>(0); }
+  template <typename T> constexpr std::enable_if_t<std::is_same_v<T, complex<typename T::value_type>>, T> zero()
+  {
+    return static_cast<T>(0);
+  }
 
-  template <> constexpr float2 zero() { return float2 {0.0f, 0.0f}; }
-  template <> constexpr float3 zero() { return float3 {0.0f, 0.0f, 0.0f}; }
-  template <> constexpr float4 zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
+  template <typename T, typename U> using specialize = std::enable_if_t<std::is_same_v<T, U>, U>;
+
+  template <typename T> constexpr specialize<T, double2> zero() { return double2 {0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double3> zero() { return double3 {0.0, 0.0, 0.0}; }
+  template <typename T> constexpr specialize<T, double4> zero() { return double4 {0.0, 0.0, 0.0, 0.0}; }
+
+  template <typename T> constexpr specialize<T, float2> zero() { return float2 {0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float3> zero() { return float3 {0.0f, 0.0f, 0.0f}; }
+  template <typename T> constexpr specialize<T, float4> zero() { return float4 {0.0f, 0.0f, 0.0f, 0.0f}; }
 
 #ifdef QUAD_SUM
-  template <> __device__ __host__ inline doubledouble zero() { return doubledouble(); }
-  template <> __device__ __host__ inline doubledouble2 zero() { return doubledouble2(); }
-  template <> __device__ __host__ inline doubledouble3 zero() { return doubledouble3(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble> zero() { return doubledouble(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble2> zero() { return doubledouble2(); }
+  template <typename T> __device__ __host__ inline specialize<T, doubledouble3> zero() { return doubledouble3(); }
 #endif
 
   template <typename T, int n> __device__ __host__ inline array<T, n> zero()
@@ -65,18 +74,29 @@ QUDA_UNROLL
     return v;
   }
 
-  template <> __device__ __host__ inline array<double,1> zero<array<double,1>>() { return zero<double,1>(); }
-  template <> __device__ __host__ inline array<double,2> zero<array<double,2>>() { return zero<double,2>(); }
-  template <> __device__ __host__ inline array<double,3> zero<array<double,3>>() { return zero<double,3>(); }
-  template <> __device__ __host__ inline array<double,4> zero<array<double,4>>() { return zero<double,4>(); }
-  template <> __device__ __host__ inline array<double,8> zero<array<double,8>>() { return zero<double,8>(); }
-  template <> __device__ __host__ inline array<double,16> zero<array<double,16>>() { return zero<double,16>(); }
-  template <> __device__ __host__ inline array<double2,1> zero<array<double2,1>>() { return zero<double2,1>(); }
-  template <> __device__ __host__ inline array<double2,2> zero<array<double2,2>>() { return zero<double2,2>(); }
-  template <> __device__ __host__ inline array<double2,3> zero<array<double2,3>>() { return zero<double2,3>(); }
-  template <> __device__ __host__ inline array<double2,4> zero<array<double2,4>>() { return zero<double2,4>(); }
-  template <> __device__ __host__ inline array<double2,8> zero<array<double2,8>>() { return zero<double2,8>(); }
-  template <> __device__ __host__ inline array<double2,16> zero<array<double2,16>>() { return zero<double2,16>(); }
+  template <typename T>
+  __device__ __host__ inline std::enable_if_t<std::is_same_v<T, array<typename T::value_type, T::N>>, T> zero()
+  {
+    return zero<typename T::value_type, T::N>();
+  }
+
+  template <typename T> struct low {
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::lowest(); }
+  };
+
+  template <typename T, int N> struct low<array<T, N>> {
+    static inline __host__ __device__ array<T, N> value()
+    {
+      array<T, N> v;
+QUDA_UNROLL
+      for (int i = 0; i < N; i++) v[i] = low<T>::value();
+      return v;
+    }
+  };
+
+  template <typename T> struct high {
+    static constexpr std::enable_if_t<std::is_arithmetic_v<T>, T> value() { return std::numeric_limits<T>::max(); }
+  };
 
   template <typename T> struct RealType {
   };

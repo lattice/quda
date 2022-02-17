@@ -25,6 +25,7 @@
 #include <sstream>
 #include <cstdint>
 #include <type_traits>
+#include <quda_arch.h> // for double2 / float2
 
 #include <quda_api.h>
 
