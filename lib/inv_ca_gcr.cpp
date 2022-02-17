@@ -1,6 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
+#include <solver.hpp>
 
 namespace quda {
 
