@@ -695,9 +695,6 @@ extern "C" {
     /** Basis to use for CA smoother solvers */
     QudaCABasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
-    /** Basis size for CA smoother solvers */
-    int smoother_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
-
     /** Minimum eigenvalue for Chebyshev CA smoother basis */
     double smoother_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
 
