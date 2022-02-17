@@ -2263,10 +2263,10 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
 
   // create wrappers around application vector set
-  std::vector<ColorSpinorField *> host_evecs_;
+  std::vector<ColorSpinorField *> host_evecs_(eig_param->n_conv);
   for (int i = 0; i < eig_param->n_conv; i++) {
     cpuParam.v = host_evecs[i];
-    host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
+    host_evecs_[i] = ColorSpinorField::Create(cpuParam);
   }
 
   ColorSpinorParam cudaParam(cpuParam);
@@ -2277,8 +2277,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   if (cudaParam.nSpin != 1) cudaParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
   std::vector<Complex> evals(eig_param->n_conv, 0.0);
-  std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->n_conv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
+  std::vector<ColorSpinorField *> kSpace(eig_param->n_conv, ColorSpinorField::Create(cudaParam));
 
   // If you attempt to compute part of the imaginary spectrum of a symmetric matrix,
   // the solver will fail.
@@ -2764,7 +2763,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   ColorSpinorField b(cudaParam);
 
   // now check if we need to invalidate the solutionResident vectors
-  ColorSpinorField *x = nullptr;
+  ColorSpinorField x;
   bool invalidate = false;
   if (param->use_resident_solution == 1) {
     for (auto &v : solutionResident)
@@ -2779,10 +2778,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       cudaParam.create = QUDA_NULL_FIELD_CREATE;
       solutionResident = std::vector<ColorSpinorField>(1, cudaParam);
     }
-    x = &solutionResident[0];
+    x = solutionResident[0].create_alias(cudaParam);
   } else {
     cudaParam.create = QUDA_NULL_FIELD_CREATE;
-    x = new ColorSpinorField(cudaParam);
+    x = ColorSpinorField(cudaParam);
   }
 
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
@@ -2792,9 +2791,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       errorQuda("Initial guess not supported for two-pass solver");
     }
 
-    *x = h_x; // solution
+    x = h_x; // solution
   } else { // zero initial guess
-    blas::zero(*x);
+    blas::zero(x);
   }
 
   // if we're doing a managed memory MG solve and prefetching is
@@ -2815,22 +2814,22 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", blas::norm2(h_b), nb);
     if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(*x));
+      printfQuda("Initial guess: CPU = %g, CUDA copy = %g\n", blas::norm2(h_x), blas::norm2(x));
     }
   } else if (getVerbosity() >= QUDA_VERBOSE) {
     printfQuda("Source: %g\n", nb);
-    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(*x)); }
+    if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { printfQuda("Initial guess: %g\n", blas::norm2(x)); }
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     blas::ax(1.0 / sqrt(nb), b);
-    blas::ax(1.0/sqrt(nb), *x);
+    blas::ax(1.0/sqrt(nb), x);
   }
 
   massRescale(b, *param, false);
 
-  dirac.prepare(in, out, *x, b, param->solution_type);
+  dirac.prepare(in, out, x, b, param->solution_type);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
@@ -2997,7 +2996,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(*x)); }
+  if (getVerbosity() >= QUDA_VERBOSE) { printfQuda("Solution = %g\n", blas::norm2(x)); }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   if (param->chrono_make_resident) {
@@ -3028,42 +3027,38 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     basis[0] = *out; // set first entry to new solution
   }
-  dirac.reconstruct(*x, b, param->solution_type);
+  dirac.reconstruct(x, b, param->solution_type);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
-    blas::ax(sqrt(nb), *x);
+    blas::ax(sqrt(nb), x);
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   if (!param->make_resident_solution) {
     profileInvert.TPSTART(QUDA_PROFILE_D2H);
-    h_x = *x;
+    h_x = x;
     profileInvert.TPSTOP(QUDA_PROFILE_D2H);
   }
 
   profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   if (param->compute_action) {
-    Complex action = blas::cDotProduct(b, *x);
+    Complex action = blas::cDotProduct(b, x);
     param->action[0] = action.real();
     param->action[1] = action.imag();
   }
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(*x), blas::norm2(h_x));
+    printfQuda("Reconstructed solution: CUDA = %g, CPU copy = %g\n", blas::norm2(x), blas::norm2(h_x));
   } else if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Reconstructed solution: %g\n", blas::norm2(*x));
+    printfQuda("Reconstructed solution: %g\n", blas::norm2(x));
   }
   profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   profileInvert.TPSTART(QUDA_PROFILE_FREE);
 
-  if (param->use_resident_solution && !param->make_resident_solution) {
-    solutionResident.clear();
-  } else if (!param->make_resident_solution) {
-    delete x;
-  }
+  if (param->use_resident_solution && !param->make_resident_solution) solutionResident.clear();
 
   delete d;
   delete dSloppy;
@@ -5616,10 +5611,10 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   // wrap CPU host side pointers
   lat_dim_t X_ = {X[0], X[1], X[2], X[3]};
   ColorSpinorParam cpuParam((void *)hp_x, *param, X_, false, param->input_location);
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_x(cpuParam);
 
   cpuParam.v = (void *)hp_y;
-  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField h_y(cpuParam);
 
   // Create device parameter
   ColorSpinorParam cudaParam(cpuParam);
@@ -5630,34 +5625,25 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
 
-  std::vector<ColorSpinorField *> x, y;
-  x.push_back(ColorSpinorField::Create(cudaParam));
-  y.push_back(ColorSpinorField::Create(cudaParam));
+  std::vector<ColorSpinorField> x = { ColorSpinorField(cudaParam) };
+  std::vector<ColorSpinorField> y = { ColorSpinorField(cudaParam) };
 
-  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
+  size_t data_bytes = x[0].Volume() * x[0].Nspin() * x[0].Nspin() * 2 * x[0].Precision();
   void *d_result = pool_device_malloc(data_bytes);
   profileContract.TPSTOP(QUDA_PROFILE_INIT);
 
   profileContract.TPSTART(QUDA_PROFILE_H2D);
-  *x[0] = *h_x;
-  *y[0] = *h_y;
+  x[0] = h_x;
+  y[0] = h_y;
   profileContract.TPSTOP(QUDA_PROFILE_H2D);
 
   profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  contractQuda(*x[0], *y[0], d_result, cType);
+  contractQuda(x[0], y[0], d_result, cType);
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
   qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
-
-  profileContract.TPSTART(QUDA_PROFILE_FREE);
-  pool_device_free(d_result);
-  delete x[0];
-  delete y[0];
-  delete h_y;
-  delete h_x;
-  profileContract.TPSTOP(QUDA_PROFILE_FREE);
 
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
