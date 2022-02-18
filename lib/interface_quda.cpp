@@ -5450,7 +5450,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
       param[i].compute_qcharge = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; 
     }
     performWFlownStep_param(n_steps, step_size, meas_interval, wflow_type, param);
-    delete param;
+    delete[] param;
 }
 
 void performWFlownStep_param(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
