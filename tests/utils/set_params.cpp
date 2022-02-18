@@ -222,16 +222,35 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
-  inv_param.max_res_increase = 1;
+  inv_param.max_res_increase = max_res_increase;
+  inv_param.max_res_increase_total = max_res_increase_total;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
 
   inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
+
+  inv_param.madwf_diagonal_suppressor = madwf_diagonal_suppressor;
+  inv_param.madwf_ls = madwf_ls;
+
+  inv_param.madwf_null_miniter = madwf_null_miniter;
+  inv_param.madwf_null_tol = madwf_null_tol;
+  inv_param.madwf_train_maxiter = madwf_train_maxiter;
+
+  inv_param.madwf_param_load = madwf_param_load ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  inv_param.madwf_param_save = madwf_param_save ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  safe_strcpy(inv_param.madwf_param_infile, madwf_param_infile, 256, "madwf_param_infile");
+  safe_strcpy(inv_param.madwf_param_outfile, madwf_param_outfile, 256, "madwf_param_outfile");
+
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
-  inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
+  inv_param.verbosity_precondition = verbosity_precondition;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.cuda_prec_eigensolver = cuda_prec_eigensolver;
   inv_param.omega = 1.0;
@@ -314,10 +333,10 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.a_max = eig_amax;
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  safe_strcpy(eig_param.arpack_logfile, eig_arpack_logfile, 512, "eig_arpack_logfile");
 
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(eig_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(eig_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   eig_param.save_prec = eig_save_prec;
   eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -564,12 +583,20 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Whether or not to use thin restarts in the evolve tests
   mg_param.thin_update_only = mg_evolve_thin_updates ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
+  // whether or not to let MG coarsening drop improvements
+  // ex: for asqtad, dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -691,9 +718,13 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
+  inv_param.ca_basis_precondition = ca_basis_precondition;
+  inv_param.ca_lambda_min_precondition = ca_lambda_min_precondition;
+  inv_param.ca_lambda_max_precondition = ca_lambda_max_precondition;
   inv_param.omega = 1.0;
 
   // Whether or not to use native BLAS LAPACK
@@ -790,7 +821,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.tol = tol;
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-4;
+  inv_param.reliable_delta = reliable_delta;
   inv_param.pipeline = pipeline;
 
   inv_param.Ls = 1;
@@ -842,6 +873,7 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner is disabled when using MG
   inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -969,6 +1001,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
   mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to allow dropping the long links for aggregation dimensions smaller than 3
+  mg_param.allow_truncation = mg_allow_truncation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // whether or not to use the dagger approximation to Xinv, which is X^dagger
+  mg_param.staggered_kd_dagger_approximation
+    = mg_staggered_kd_dagger_approximation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
@@ -1124,7 +1163,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
-  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD) {
+  if (staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD
+      || staggered_transfer_type == QUDA_TRANSFER_OPTIMIZED_KD_DROP_LONG) {
     mg_param.spin_block_size[1] = 0; // we're coarsening the optimized KD op
   }
 
@@ -1142,10 +1182,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
-    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+    safe_strcpy(mg_param.vec_infile[i], mg_vec_infile[i], 256, "mg_vec_infile[" + std::to_string(i) + "]");
+    safe_strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i], 256, "mg_vec_outfile[" + std::to_string(i) + "]");
+    if (mg_vec_infile[i].size() > 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (mg_vec_outfile[i].size() > 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1277,10 +1317,11 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = 1e-1;
+  inv_param.reliable_delta = reliable_delta;
 
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.accelerator_type_precondition = precon_accelerator_type;
   inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
@@ -1308,8 +1349,8 @@ void setDeflationParam(QudaEigParam &df_param)
   df_param.mem_type_ritz = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, eig_vec_infile);
-  strcpy(df_param.vec_outfile, eig_vec_outfile);
+  safe_strcpy(df_param.vec_infile, eig_vec_infile, 256, "eig_vec_infile");
+  safe_strcpy(df_param.vec_outfile, eig_vec_outfile, 256, "eig_vec_outfile");
   df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 

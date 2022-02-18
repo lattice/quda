@@ -14,6 +14,19 @@ namespace quda
   {
 
     /**
+       @brief Return the batch block size used for multi reductions.
+       For now, we leave this at 1 unless fast-compilation is enabled,
+       since it provides negligible benefit (but substantially longer
+       tuning).  When fast-compilation is enabled, the increased batch
+       count can dramatically improve performance.
+     */
+#ifndef QUDA_FAST_COMPILE_REDUCE
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 1; }
+#else
+    constexpr unsigned int max_n_batch_block_multi_reduce() { return 8; }
+#endif
+
+    /**
        @brief Parameter struct for generic multi-reduce blas kernel.
        @tparam real_ The precision of the calculation
        @tparam n_ The number of real elements per thread
@@ -36,6 +49,7 @@ namespace quda
       static constexpr int n = n_;
       static constexpr int NXZ = NXZ_;
       static constexpr int NYW_max = max_YW_size<NXZ, store_t, y_store_t, Reducer>();
+      static constexpr unsigned int max_n_batch_block = max_n_batch_block_multi_reduce();
       const int NYW;
       Reducer f;
 
@@ -46,7 +60,7 @@ namespace quda
                      std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
                      Reducer f, int NYW, int length, int nParity) :
         // we have NYW * nParity reductions each of length NXZ
-        ReduceArg<reduce_t>(dim3(length, NYW, 1), NYW),
+        ReduceArg<reduce_t>(dim3(length, 1, NYW), NYW),
         NYW(NYW),
         f(f),
         length_cb(length / nParity),
@@ -64,8 +78,6 @@ namespace quda
           if (Reducer::use_w) this->W[i] = *w[i];
         }
       }
-
-      __device__ __host__ auto init() const { return ::quda::zero<typename Reducer_::reduce_t, NXZ>(); }
     };
 
     // strictly required pre-C++17 and can cause link errors otherwise
@@ -78,15 +90,15 @@ namespace quda
     /**
        Generic multi-reduction functor with up to four loads and saves
     */
-    template <typename Arg> struct MultiReduce_ : plus<array<typename Arg::Reducer::reduce_t, Arg::NXZ>> {
-      using vec = array<complex<typename Arg::real>, Arg::n/2>;
-      using reduce_t = array<typename Arg::Reducer::reduce_t, Arg::NXZ>;
+    template <typename Arg> struct MultiReduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
+      using vec = array<complex<typename Arg::real>, Arg::n/2>;
       const Arg &arg;
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
-      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int k, int) const
+      __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int k) const
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;
         unsigned int i = tid - parity * arg.length_cb;

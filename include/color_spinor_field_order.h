@@ -602,7 +602,7 @@ namespace quda
       return conj(static_cast<complex<Float>>(a));
     }
 
-    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order, typename storeFloat = Float,
+    template <typename Float, int nSpin_, int nColor_, int nVec, QudaFieldOrder order, typename storeFloat = Float,
               typename ghostFloat = storeFloat, bool disable_ghost = false, bool block_float = false>
     class FieldOrderCB
     {
@@ -611,6 +611,9 @@ namespace quda
     public:
       /** Does this field type support ghost zones? */
       static constexpr bool supports_ghost_zone = true;
+
+      static constexpr int nSpin = nSpin_;
+      static constexpr int nColor = nColor_;
 
     protected:
       complex<storeFloat> *v;
@@ -624,6 +627,7 @@ namespace quda
         Float scale_inv;
         int norm_offset;
       };
+
 #ifndef DISABLE_GHOST
       mutable complex<ghostFloat> *ghost[8];
       mutable norm_t *ghost_norm[8];
@@ -880,9 +884,9 @@ namespace quda
       __host__ double norm2(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce(v.Location(), this->v,
-                                               v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
+        double nrm2 = ::quda::transform_reduce<plus<double>>(
+          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+          square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -895,9 +899,9 @@ namespace quda
       __host__ double abs_max(const ColorSpinorField &v, bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce(v.Location(), this->v,
-                                                 v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
-                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        double absmax = ::quda::transform_reduce<maximum<Float>>(
+          v.Location(), this->v, v.SiteSubset() * (unsigned int)v.VolumeCB() * nSpin * nColor * nVec,
+          abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
@@ -911,8 +915,8 @@ namespace quda
       __host__ double norm2(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
+        double nrm2 = ::quda::transform_reduce<plus<double>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                                             square_<double, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return nrm2;
       }
@@ -925,8 +929,8 @@ namespace quda
       __host__ double abs_max(bool global = true) const
       {
         commGlobalReductionPush(global);
-        double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
-                                                 abs_max_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        double absmax = ::quda::transform_reduce<maximum<Float>>(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                                                 abs_max_<Float, storeFloat>(scale_inv));
         commGlobalReductionPop();
         return absmax;
       }
