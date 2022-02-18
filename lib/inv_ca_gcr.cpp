@@ -250,22 +250,28 @@ namespace quda {
     auto &lambda_max = param.ca_lambda_max;
 
     if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
-      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_PREAMBLE); profile.TPSTART(QUDA_PROFILE_INIT); }
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+      }
 
       // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
       // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
       // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
       lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmpSloppy);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max/1.1);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
 
       lambda_init = true;
 
-      if (!param.is_preconditioner) { profile.TPSTOP(QUDA_PROFILE_INIT); profile.TPSTART(QUDA_PROFILE_PREAMBLE); }
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      }
     }
 
     // Factors which map linear operator onto [-1,1]
-    double m_map = 2./(lambda_max-lambda_min);
-    double b_map = -(lambda_max+lambda_min)/(lambda_max-lambda_min);
+    double m_map = 2. / (lambda_max - lambda_min);
+    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {

@@ -4,25 +4,28 @@
 #include <blas_quda.h>
 #include <cmath>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief Compute power iterations on a Dirac matrix
      @param[in] diracm Dirac matrix used for power iterations
      @param[in] start Starting rhs for power iterations; value preserved unless it aliases tempvec1 or tempvec2
-     @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap can be used on ColorSpinorField)
-     @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap can be used on ColorSpinorField)
+     @param[in,out] tempvec1 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
+     can be used on ColorSpinorField)
+     @param[in,out] tempvec2 Temporary vector used for power iterations (FIXME: can become a reference when std::swap
+     can be used on ColorSpinorField)
      @param[in] niter Total number of power iteration iterations
      @param[in] normalize_freq Frequency with which intermediate vector gets normalized
      @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
      @return Norm of final power iteration result
   */
-  template<typename... Args>
-  double Solver::performPowerIterations(const DiracMatrix& diracm, ColorSpinorField& start, ColorSpinorField* tempvec1, ColorSpinorField* tempvec2,
-    int niter, int normalize_freq, Args &&... args) {
+  template <typename... Args>
+  double Solver::performPowerIterations(const DiracMatrix &diracm, ColorSpinorField &start, ColorSpinorField *tempvec1,
+                                        ColorSpinorField *tempvec2, int niter, int normalize_freq, Args &&...args)
+  {
 
-    if (tempvec1 == nullptr || tempvec2 == nullptr)
-      errorQuda("Null pointer in performPowerIterations");
+    if (tempvec1 == nullptr || tempvec2 == nullptr) errorQuda("Null pointer in performPowerIterations");
 
     checkPrecision(*tempvec1, *tempvec2);
     blas::copy(*tempvec1, start); // no-op if fields alias
@@ -43,7 +46,7 @@ namespace quda {
     }
     // Get Rayleigh quotient
     double tmpnrm = sqrt(blas::norm2(*tempvec1));
-    blas::ax(1.0/tmpnrm, *tempvec1);
+    blas::ax(1.0 / tmpnrm, *tempvec1);
     diracm(*tempvec2, *tempvec1, args...);
     double lambda_max = sqrt(blas::norm2(*tempvec2));
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Power iterations approximate max = %e\n", lambda_max);
@@ -62,20 +65,26 @@ namespace quda {
      @param[in] b_map Intercept mapping for Chebyshev basis; ignored for power basis
      @param[in] args Parameter pack of ColorSpinorFields used as temporary passed to Dirac
   */
-  template<typename... Args>
-  void Solver::computeCAKrylovSpace(const DiracMatrix& diracm, std::vector<ColorSpinorField*> Ap, std::vector<ColorSpinorField*> p,
-    int n_krylov, QudaCABasis basis, double m_map, double b_map, Args &&... args) {
+  template <typename... Args>
+  void Solver::computeCAKrylovSpace(const DiracMatrix &diracm, std::vector<ColorSpinorField *> Ap,
+                                    std::vector<ColorSpinorField *> p, int n_krylov, QudaCABasis basis, double m_map,
+                                    double b_map, Args &&...args)
+  {
 
     // in some cases p or Ap may be larger
     if (static_cast<int>(p.size()) < n_krylov) errorQuda("Invalid p.size() %lu < n_krylov %d", p.size(), n_krylov);
     if (static_cast<int>(Ap.size()) < n_krylov) errorQuda("Invalid Ap.size() %lu < n_krylov %d", Ap.size(), n_krylov);
-    for (auto p_ : p) { if (p_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace"); }
-    for (auto Ap_ : Ap) { if (Ap_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace"); }
+    for (auto p_ : p) {
+      if (p_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace");
+    }
+    for (auto Ap_ : Ap) {
+      if (Ap_ == nullptr) errorQuda("Null pointer in computeCAKrylovSpace");
+    }
 
     if (basis == QUDA_POWER_BASIS) {
       for (int k = 0; k < n_krylov; k++) {
         diracm(*Ap[k], *p[k], args...);
-        if (k < (n_krylov - 1)) blas::copy(*p[k+1], *Ap[k]); // no op if fields alias, which is often the case
+        if (k < (n_krylov - 1)) blas::copy(*p[k + 1], *Ap[k]); // no op if fields alias, which is often the case
       }
     } else { // chebyshev basis
       diracm(*Ap[0], *p[0], args...);

@@ -414,9 +414,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cheby-basis-eig-max-precondition", ca_lambda_max_precondition,
                        "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers when used as a "
                        "preconditioner (default is to guess with power iterations)");
-  quda_app->add_option(
-    "--cheby-basis-eig-min-precondition", ca_lambda_min_precondition,
-    "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers when used as a preconditioner (default 0)");
+  quda_app->add_option("--cheby-basis-eig-min-precondition", ca_lambda_min_precondition,
+                       "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers when used as a "
+                       "preconditioner (default 0)");
 
   quda_app->add_option("--clover-csw", clover_csw, "Clover Csw coefficient 1.0")->capture_default_str();
   quda_app
@@ -771,10 +771,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-ca-basis-type", coarse_solver_ca_basis,
                          CLI::QUDACheckedTransformer(ca_basis_map),
                          "The basis to use for CA solver setup of multigrid(default power)");
-  quda_app->add_mgoption(opgroup, "--mg-coarse-solver-cheby-basis-eig-max", coarse_solver_ca_lambda_max,
-                         CLI::PositiveNumber,
-                         "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
-                         "(default is to guess with power iterations)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-coarse-solver-cheby-basis-eig-max", coarse_solver_ca_lambda_max, CLI::PositiveNumber,
+    "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
+    "(default is to guess with power iterations)");
   quda_app->add_mgoption(
     opgroup, "--mg-coarse-solver-cheby-basis-eig-min", coarse_solver_ca_lambda_min, CLI::PositiveNumber,
     "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers in setup of multigrid (default 0)");
@@ -890,9 +890,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The basis size to use for CA solver setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
                          "The basis to use for CA solver setup of multigrid(default power)");
-  quda_app->add_mgoption(opgroup, "--mg-setup-cheby-basis-eig-max", setup_ca_lambda_max, CLI::PositiveNumber,
-                         "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
-                         "(default is to guess with power iterations)");
+  quda_app->add_mgoption(
+    opgroup, "--mg-setup-cheby-basis-eig-max", setup_ca_lambda_max, CLI::PositiveNumber,
+    "Conservative estimate of largest eigenvalue for Chebyshev basis CA solvers in setup of multigrid "
+    "(default is to guess with power iterations)");
   quda_app->add_mgoption(
     opgroup, "--mg-setup-cheby-basis-eig-min", setup_ca_lambda_min, CLI::PositiveNumber,
     "Conservative estimate of smallest eigenvalue for Chebyshev basis CA solvers in setup of multigrid (default 0)");
@@ -926,7 +927,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
-  quda_app->add_mgoption(opgroup, "--mg-smoother-ca-basis-type", smoother_solver_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),
+  quda_app->add_mgoption(opgroup, "--mg-smoother-ca-basis-type", smoother_solver_ca_basis,
+                         CLI::QUDACheckedTransformer(ca_basis_map),
                          "The basis to use for CA solver smoothers in multigrid (default power)");
   quda_app->add_mgoption(opgroup, "--mg-smoother-cheby-basis-eig-max", smoother_solver_ca_lambda_max, CLI::PositiveNumber,
                          "Conservative estimate of largest eigenvalue for CA solvers used as a multigrid smoother "
