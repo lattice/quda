@@ -1610,4 +1610,10 @@ public:
    std::vector<Complex> evals;            /** The eigenvalues */
  };
 
+  /**
+    @brief Returns if a solver is CA or not
+    @return true if CA, false otherwise
+  */
+  bool is_ca_solver(QudaInverterType type);
+
 } // namespace quda

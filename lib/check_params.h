@@ -532,10 +532,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(gcrNkrylov, INVALID_INT);
 #else
   if (param->inv_type == QUDA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+      param->inv_type == QUDA_BICGSTABL_INVERTER ||
+      is_ca_solver(param->inv_type)) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -611,9 +609,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
-  if (param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (is_ca_solver(param->inv_type)) {
     P(ca_basis, QUDA_INVALID_BASIS);
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
@@ -627,7 +623,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min_precondition, 0.0);
   P(ca_lambda_max_precondition, -1.0);
 #else
-  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+  if (is_ca_solver(param->inv_type)) {
     P(ca_basis_precondition, QUDA_INVALID_BASIS);
     if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min_precondition, INVALID_DOUBLE);
