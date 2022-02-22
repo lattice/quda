@@ -15,7 +15,6 @@ namespace quda {
    */
   template <typename store_t, QudaReconstructType recon_, int gauge_dir_>
   struct GaugeFixQualityOVRArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     using real = typename mapper<store_t>::type;
     static constexpr QudaReconstructType recon = recon_;
     using Gauge = typename gauge_mapper<store_t, recon>::type;
@@ -37,13 +36,12 @@ namespace quda {
       }
     }
 
-    __device__ __host__ reduce_t init() const { return reduce_t{0, 0}; }
     double getAction(){ return result[0]; }
     double getTheta(){ return result[1]; }
   };
 
-  template <typename Arg> struct FixQualityOVR : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct FixQualityOVR : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     static constexpr const char *filename() { return KERNEL_FILE; }

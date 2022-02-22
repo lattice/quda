@@ -49,15 +49,13 @@ namespace quda
         r(r),
         length_cb(length / nParity),
         nParity(nParity) { }
-
-      __device__ __host__ auto init() const { return ::quda::zero<reduce_t>(); }
     };
 
     /**
        Generic reduction kernel with up to five loads and saves.
     */
-    template <typename Arg> struct Reduce_ : plus<typename Arg::Reducer::reduce_t> {
-      using reduce_t = typename Arg::Reducer::reduce_t;
+    template <typename Arg> struct Reduce_ : plus<typename Arg::reduce_t> {
+      using reduce_t = typename Arg::reduce_t;
       using plus<reduce_t>::operator();
       Arg &arg;
       constexpr Reduce_(const Arg &arg) : arg(const_cast<Arg&>(arg))

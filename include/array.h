@@ -11,6 +11,7 @@ namespace quda
    */
   template <typename T, int n> struct array {
     using value_type = T;
+    static constexpr int N = n;
     T data[n];
 
     constexpr T &operator[](int i) { return data[i]; }

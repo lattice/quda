@@ -1,6 +1,7 @@
 #include <invert_quda.h>
 #include <blas_quda.h>
 #include <eigen_helper.h>
+#include <solver.hpp>
 
 namespace quda {
 
@@ -9,6 +10,7 @@ namespace quda {
     Solver(mat, matSloppy, matPrecon, matEig, param, profile),
     matMdagM(matEig.Expose()),
     init(false),
+    lambda_init(false),
     basis(param.ca_basis)
   {
   }
@@ -37,11 +39,6 @@ namespace quda {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-
-      if (basis != QUDA_POWER_BASIS) {
-        warningQuda("CA-GCR does not support any basis besides QUDA_POWER_BASIS. Switching to QUDA_POWER_BASIS...\n");
-        basis = QUDA_POWER_BASIS;
-      }
 
       if (basis == QUDA_POWER_BASIS) {
         // in power basis q[k] = p[k+1], so we don't need a separate q array
@@ -214,6 +211,34 @@ namespace quda {
       }
     }
 
+    // Use power iterations to approx lambda_max
+    auto &lambda_min = param.ca_lambda_min;
+    auto &lambda_max = param.ca_lambda_max;
+
+    if (basis == QUDA_CHEBYSHEV_BASIS && n_krylov > 1 && lambda_max < lambda_min && !lambda_init) {
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+      }
+
+      // Perform 100 power iterations, normalizing every 10 mat-vecs, using r_ as an initial seed
+      // and q[0]/q[1] as temporaries for the power iterations. tmpSloppy get passed in a temporary
+      // for matSloppy. Technically illegal if n_krylov == 1, but in that case lambda_max isn't used anyway.
+      lambda_max = 1.1 * Solver::performPowerIterations(matSloppy, r, q[0], q[1], 100, 10, tmp_sloppy);
+      logQuda(QUDA_SUMMARIZE, "CA-GCR Approximate lambda max = 1.1 x %e\n", lambda_max / 1.1);
+
+      lambda_init = true;
+
+      if (!param.is_preconditioner) {
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+      }
+    }
+
+    // Factors which map linear operator onto [-1,1]
+    double m_map = 2. / (lambda_max - lambda_min);
+    double b_map = -(lambda_max + lambda_min) / (lambda_max - lambda_min);
+
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       if (param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
@@ -260,10 +285,7 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && total_iter < param.maxiter) {
 
       // build up a space of size n_krylov
-      for (int k = 0; k < n_krylov; k++) {
-        matSloppy(q[k], p[k], tmp_sloppy);
-        if (k < n_krylov - 1 && basis != QUDA_POWER_BASIS) blas::copy(p[k + 1], q[k]);
-      }
+      computeCAKrylovSpace(matSloppy, q, p, n_krylov, basis, m_map, b_map, tmp_sloppy);
 
       solve(alpha, q, p[0]);
 
