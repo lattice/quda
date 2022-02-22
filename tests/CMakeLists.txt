@@ -843,7 +843,7 @@ foreach(prec IN LISTS TEST_PRECS)
     add_test(NAME gauge_alg_${prec}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:gauge_alg_test> ${MPIEXEC_POSTFLAGS}
                      --dim 4 6 8 10 --prec ${prec}
-                     --gtest_output=xml:gauge_arg_test_${prec}.xml)
+                     --gtest_output=xml:gauge_alg_test_${prec}.xml)
   endif()
 
 endforeach(prec)

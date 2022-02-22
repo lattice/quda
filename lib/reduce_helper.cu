@@ -61,9 +61,12 @@ namespace quda
         if (d_reduce) device_free(d_reduce);
         d_reduce = static_cast<device_reduce_t *>(device_malloc(bytes));
 
-        if (h_reduce) host_free(h_reduce);
-        h_reduce = static_cast<device_reduce_t *>(mapped_malloc(bytes));
-        hd_reduce = static_cast<device_reduce_t *>(get_mapped_device_pointer(h_reduce)); // set the matching device pointer
+        //if (h_reduce) host_free(h_reduce);
+        //h_reduce = static_cast<device_reduce_t *>(mapped_malloc(bytes));
+        //hd_reduce = static_cast<device_reduce_t *>(get_mapped_device_pointer(h_reduce)); // set the matching device pointer
+        if (h_reduce) managed_free(h_reduce);
+        h_reduce = static_cast<device_reduce_t *>(managed_malloc(bytes));
+	hd_reduce = h_reduce;
 
         using system_atomic_t = device_reduce_t;
         size_t n_reduce = bytes / sizeof(system_atomic_t);
@@ -102,7 +105,8 @@ namespace quda
         d_reduce = nullptr;
       }
       if (h_reduce) {
-        host_free(h_reduce);
+        //host_free(h_reduce);
+        managed_free(h_reduce);
         h_reduce = nullptr;
       }
       hd_reduce = nullptr;
