@@ -531,11 +531,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
-  if (param->inv_type == QUDA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_GCR_INVERTER ||
-      param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (param->inv_type == QUDA_GCR_INVERTER || param->inv_type == QUDA_BICGSTABL_INVERTER
+      || is_ca_solver(param->inv_type)) {
     P(gcrNkrylov, INVALID_INT);
   }
 #endif
@@ -574,6 +571,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(madwf_param_infile[0], '\0');
+  P(madwf_param_outfile[0], '\0');
+#endif
+
+#ifdef INIT_PARAM
   P(madwf_param_load, QUDA_BOOLEAN_FALSE);
   P(madwf_param_save, QUDA_BOOLEAN_FALSE);
 #else
@@ -606,9 +608,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min, 0.0);
   P(ca_lambda_max, -1.0);
 #else
-  if (param->inv_type == QUDA_CA_CG_INVERTER ||
-      param->inv_type == QUDA_CA_CGNE_INVERTER ||
-      param->inv_type == QUDA_CA_CGNR_INVERTER) {
+  if (is_ca_solver(param->inv_type)) {
     P(ca_basis, QUDA_INVALID_BASIS);
     if (param->ca_basis == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min, INVALID_DOUBLE);
@@ -622,7 +622,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(ca_lambda_min_precondition, 0.0);
   P(ca_lambda_max_precondition, -1.0);
 #else
-  if (param->inv_type_precondition == QUDA_CA_CG_INVERTER) {
+  if (is_ca_solver(param->inv_type)) {
     P(ca_basis_precondition, QUDA_INVALID_BASIS);
     if (param->ca_basis_precondition == QUDA_CHEBYSHEV_BASIS) {
       P(ca_lambda_min_precondition, INVALID_DOUBLE);
@@ -868,6 +868,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
+
+#ifdef INIT_PARAM
+    P(smoother_solver_ca_basis[i], QUDA_POWER_BASIS);
+    P(smoother_solver_ca_lambda_min[i], 0.0);
+    P(smoother_solver_ca_lambda_max[i], -1.0);
+#else
+    P(smoother_solver_ca_basis[i], QUDA_INVALID_BASIS);
+    P(smoother_solver_ca_lambda_min[i], INVALID_DOUBLE);
+    P(smoother_solver_ca_lambda_max[i], INVALID_DOUBLE);
+#endif
 
 #ifdef INIT_PARAM
     if (i<QUDA_MAX_MG_LEVEL) {

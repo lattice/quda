@@ -10,7 +10,6 @@ namespace quda {
 
   template <typename Float, int nColor_, QudaReconstructType recon_, compute_type type_>
   struct KernelArg : public ReduceArg<array<double, 2>> {
-    using reduce_t = array<double, 2>;
     static constexpr int nColor = nColor_;
     static constexpr QudaReconstructType recon = recon_;
     static constexpr compute_type type = type_;
@@ -29,12 +28,10 @@ namespace quda {
         X[dir] = u.X()[dir] - border[dir]*2;
       }
     }
-
-    __device__ __host__ auto init() const { return reduce_t{0, 0}; }
   };
 
-  template <typename Arg> struct DetTrace : plus<array<double, 2>> {
-    using reduce_t = array<double, 2>;
+  template <typename Arg> struct DetTrace : plus<typename Arg::reduce_t> {
+    using reduce_t = typename Arg::reduce_t;
     using plus<reduce_t>::operator();
     const Arg &arg;
     constexpr DetTrace(const Arg &arg) : arg(arg) {}
@@ -58,7 +55,7 @@ namespace quda {
       for (int mu = 0; mu < 4; mu++) {
         Matrix<complex<typename Arg::real>, Arg::nColor> U = arg.u(mu, linkIndex(x, X), parity);
         auto local = Arg::type == compute_type::determinant ? getDeterminant(U) : getTrace(U);
-        value = plus::operator()(value, reduce_t{local.real(), local.imag()});
+        value = operator()(value, reduce_t{local.real(), local.imag()});
       }
 
       return value;

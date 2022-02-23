@@ -254,6 +254,24 @@ inline double getTolerance(QudaPrecision prec)
   return 1.0;
 }
 
+/**
+  @brief Check if the std::string has a size smaller than the limit: if yes, copy it to a C-string;
+    if no, give an error based on the given name. The 256 is the C-string length for parameters in
+    QUDA's C interface.
+  @param cstr the destination C-string
+  @param str the input std::string
+  @param limit the limit for the size check
+  @param name the name used for the error message
+ */
+inline void safe_strcpy(char *cstr, const std::string &str, size_t limit, const std::string &name)
+{
+  if (str.size() < limit) {
+    strcpy(cstr, str.c_str());
+  } else {
+    errorQuda("%s is longer (%lu) than the %lu limit.", name.c_str(), str.size(), limit);
+  }
+}
+
 // MG param types
 void setMultigridParam(QudaMultigridParam &mg_param);
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param);
