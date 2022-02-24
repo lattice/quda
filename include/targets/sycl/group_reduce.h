@@ -70,13 +70,48 @@ inline void blockReduceSum(sycl::group<3> grp, array<quda::complex<T>,N> &out,
 }
 
 template <typename T>
-inline void blockReduceMin(sycl::group<3> grp, T &out, T in)
+inline void blockReduceSum(sycl::group<3> grp, vec2<T> &out, const vec2<T> &in)
 {
-  out = sycl::reduce_over_group(grp, in, sycl::minimum<>());
+  auto inx = reinterpret_cast<const array<T,2>*>(&in);
+  auto outx = reinterpret_cast<array<T,2>*>(&out);
+  blockReduceSum(grp, *outx, *inx);
 }
+
+template <typename T>
+inline void blockReduceSum(sycl::group<3> grp, vec3<T> &out, const vec3<T> &in)
+{
+  auto inx = reinterpret_cast<const array<T,3>*>(&in);
+  auto outx = reinterpret_cast<array<T,3>*>(&out);
+  blockReduceSum(grp, *outx, *inx);
+}
+
+template <typename T>
+inline void blockReduceSum(sycl::group<3> grp, vec4<T> &out, const vec4<T> &in)
+{
+  auto inx = reinterpret_cast<const array<T,4>*>(&in);
+  auto outx = reinterpret_cast<array<T,4>*>(&out);
+  blockReduceSum(grp, *outx, *inx);
+}
+
 
 template <typename T>
 inline void blockReduceMax(sycl::group<3> grp, T &out, T in)
 {
   out = sycl::reduce_over_group(grp, in, sycl::maximum<>());
+}
+
+template <typename T, int N>
+inline std::enable_if_t<(N==1)||(N==2)||(N==3)||(N==4)||(N==8)||(N==16),void>
+blockReduceMax(sycl::group<3> grp, array<T,N> &out, const array<T,N> &in)
+{
+  auto inx = reinterpret_cast<const sycl::vec<T,N>*>(&in);
+  auto outx = sycl::reduce_over_group(grp, *inx, sycl::maximum<>());
+  out = *reinterpret_cast<array<T,N>*>(&outx);
+}
+
+
+template <typename T>
+inline void blockReduceMin(sycl::group<3> grp, T &out, T in)
+{
+  out = sycl::reduce_over_group(grp, in, sycl::minimum<>());
 }
