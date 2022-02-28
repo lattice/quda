@@ -39,12 +39,13 @@ namespace quda {
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
+	  using reducer_t = typename Transformer<Arg>::reducer_t;
     Transformer<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
     auto j = threadIdx.y;
 
-    reduce_t value = arg.init();
+    reduce_t value = reducer_t::init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
@@ -116,6 +117,7 @@ namespace quda {
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
+	  using reducer_t = typename Functor<Arg>::reducer_t;
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -124,7 +126,7 @@ namespace quda {
 
     if (j >= arg.threads.z) return;
 
-    reduce_t value = arg.init();
+    reduce_t value = reducer_t::init();
 
     while (idx < arg.threads.x) {
       value = t(value, idx, k, j);

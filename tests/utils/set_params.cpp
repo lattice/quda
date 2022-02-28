@@ -428,10 +428,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_maxiter[i] = setup_maxiter[i];
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
 
-    // Basis to use for CA-CGN(E/R) setup
+    // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
-    // Basis size for CACG setup
+    // Basis size for CA solver setup
     mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
@@ -459,10 +459,10 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
+    // Basis to use for CA coarse solvers
     mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
 
-    // Basis size for CACG coarse solver/
+    // Basis size for CA coarse solvers
     mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
@@ -486,6 +486,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
+
+    // Basis to use for CA smoothers
+    mg_param.smoother_solver_ca_basis[i] = smoother_solver_ca_basis[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -935,7 +942,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
 
-  // Specify basis for CA-CG, lambda min/max for Chebyshev basis
+  // Specify basis for CA-CG, CA-GCR, lambda min/max for Chebyshev basis
   //   lambda_max < lambda_max . use power iters to generate
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
@@ -1023,10 +1030,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) setup
+    // Basis to use for CA solver setups
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
 
-    // Basis size for CACG setup
+    // Basis size for CA solver setups
     mg_param.setup_ca_basis_size[i] = setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
@@ -1053,10 +1060,10 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.coarse_solver_tol[i] = coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
+    // Basis to use for CA coarse solvers
     mg_param.coarse_solver_ca_basis[i] = coarse_solver_ca_basis[i];
 
-    // Basis size for CACG coarse solver/
+    // Basis size for CA coarse solvers
     mg_param.coarse_solver_ca_basis_size[i] = coarse_solver_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
@@ -1080,6 +1087,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
+
+    // Basis to use for CA smoothers
+    mg_param.smoother_solver_ca_basis[i] = smoother_solver_ca_basis[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = smoother_solver_ca_lambda_max[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
