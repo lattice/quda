@@ -165,4 +165,5 @@ namespace quda {
     return output;
   }
 #endif
+
 }
