@@ -1,4 +1,5 @@
 #pragma once
+
 #include <quda_internal.h>
 #include <timer.h>
 #include <color_spinor_field.h>
