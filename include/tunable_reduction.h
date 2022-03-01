@@ -38,6 +38,16 @@ namespace quda
     }
   };
 
+  template <> struct comm_reduce_max<float> {
+    void operator()(std::vector<float> &v)
+    {
+      std::vector<double> v_(v.size());
+      for (unsigned int i = 0; i < v.size(); i++) v_[i] = v[i];
+      comm_allreduce_max_array(v_.data(), v.size());
+      for (unsigned int i = 0; i < v.size(); i++) v[i] = v_[i];
+    }
+  };
+  
   /**
      comm reducer for doing min inter-process reduction
   */
@@ -49,6 +59,16 @@ namespace quda
     }
   };
 
+  template <> struct comm_reduce_min<float> {
+    void operator()(std::vector<float> &v)
+    {
+      std::vector<double> v_(v.size());
+      for (unsigned int i = 0; i < v.size(); i++) v_[i] = v[i];
+      comm_allreduce_min_array(v_.data(), v.size());
+      for (unsigned int i = 0; i < v.size(); i++) v[i] = v_[i];
+    }
+  };
+  
   /**
      @brief This derived tunable class is for reduction kernels, and
      partners the Reduction2D kernel.  The x threads will
