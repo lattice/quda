@@ -135,7 +135,6 @@ namespace quda {
       int d = j_d / Arg::yhatTileType::N_tiles;
 
       auto max = computeYhat(arg, d, x_cb, parity, i * Arg::yhatTileType::M, j * Arg::yhatTileType::N);
-
       if (Arg::compute_max) atomic_fetch_abs_max(arg.max, max);
     }
   };
