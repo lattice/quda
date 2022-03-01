@@ -1,7 +1,5 @@
 #pragma once
 
-#include <quda_arch.h>
-#include <quda_api.h>
 #include <type_traits>
 #include <algorithm>
 #ifdef _NVHPC_CUDA
