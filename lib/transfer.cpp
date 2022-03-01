@@ -409,9 +409,7 @@ namespace quda {
                   output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
       }
 
-      // printfQuda("P(): Pre-prolongate V=%e  out=%e in=%e \n", blas::norm2(*V), blas::norm2(*output), blas::norm2(*input));
       Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
-      // printfQuda("P(): Post-prolongate V=%e out=%e in=%e \n", blas::norm2(*V), blas::norm2(*output), blas::norm2(*input));
 
       flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
     } else {
@@ -475,7 +473,7 @@ namespace quda {
                   out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
       Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
-      
+
       flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
     } else {
       errorQuda("Invalid transfer type in restrict");

@@ -2,6 +2,8 @@
 #include <blas_lapack.h>
 #include <eigen_helper.h>
 
+//#define _DEBUG
+
 namespace quda
 {
   namespace blas_lapack

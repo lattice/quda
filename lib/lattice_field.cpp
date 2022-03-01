@@ -446,7 +446,6 @@ namespace quda {
 
     initIPCComms = true;
     ghost_field_reset = false;
-
   }
 
   void LatticeField::destroyIPCComms()

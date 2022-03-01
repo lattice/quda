@@ -17,10 +17,6 @@ endif()
 set(TEST_LIBS quda_test)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
-  # adding the linker language here as a workaround -- was not needed for cmake 3.16
-  #if( QUDA_TARGET_CUDA )
-  #  set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
-  #endif()
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
     set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
@@ -715,8 +711,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
         --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
-    # This is fixed precision only and requires tensor cores so only enable 
-    # for Green Team targets
+    # This requires tensor cores so only enable NVIDIA targets
     if( QUDA_TARGET_CUDA )
 	    add_test(NAME dslash_mobius_local-policy${pol2}
 		     COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}

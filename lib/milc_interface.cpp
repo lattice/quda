@@ -53,7 +53,6 @@ static bool initialized = false;
 #ifdef MULTI_GPU
 static int commsGridDim[4];
 #endif
-
 static int localDim[4];
 
 static bool invalidate_quda_gauge = true;

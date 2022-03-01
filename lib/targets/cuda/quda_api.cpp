@@ -558,4 +558,5 @@ namespace quda
     apiTimer.Print();
 #endif
   }
+
 } // namespace quda

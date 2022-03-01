@@ -1,4 +1,3 @@
-#include <cuda_runtime.h>
 #include <complex.h>
 #include <blas_lapack.h>
 #include <timer.h>

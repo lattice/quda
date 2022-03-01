@@ -3,7 +3,6 @@
 #include <util_quda.h>
 #include <quda_internal.h>
 #include <quda_cuda_api.h>
-#include <target_device.h>
 
 #ifdef QUDA_NVML
 #include <nvml.h>
