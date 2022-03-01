@@ -155,6 +155,7 @@ namespace quda {
     QUDA_PROFILE_EVENT_QUERY,        /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT,  /**< stream waiting for event completion */
     QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
+
     QUDA_PROFILE_EVENT_SYNCHRONIZE,  /**< event synchronization */
     QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
     QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */

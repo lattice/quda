@@ -69,7 +69,6 @@ namespace quda
        @brief This is the handle to the shared memory, dynamic specialization
        @return Shared memory pointer
      */
-
     template <typename dummy> struct cache_dynamic<true, dummy> {
       __device__ inline atom_t* operator()()
       {
