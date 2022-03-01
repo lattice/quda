@@ -638,10 +638,10 @@ extern "C" {
     /** Maximum number of iterations for refreshing the null-space vectors */
     int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
 
-    /** Basis to use for CA-CGN(E/R) setup */
+    /** Basis to use for CA solver setup */
     QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
 
-    /** Basis size for CACG setup */
+    /** Basis size for CA solver setup */
     int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA basis */
@@ -668,10 +668,10 @@ extern "C" {
     /** Maximum number of iterations for the solver that wraps around the coarse grid correction and smoother */
     int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
 
-    /** Basis to use for CA-CGN(E/R) coarse solver */
+    /** Basis to use for CA coarse solvers */
     QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
 
-    /** Basis size for CACG coarse solver */
+    /** Basis size for CA coarse solvers */
     int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
 
     /** Minimum eigenvalue for Chebyshev CA basis */
@@ -691,6 +691,15 @@ extern "C" {
 
     /** Number of post-smoother applications on each level */
     int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Basis to use for CA smoother solvers */
+    QudaCABasis smoother_solver_ca_basis[QUDA_MAX_MG_LEVEL];
+
+    /** Minimum eigenvalue for Chebyshev CA smoother basis */
+    double smoother_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
+
+    /** Maximum eigenvalue for Chebyshev CA smoother basis */
+    double smoother_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
 
     /** Over/under relaxation factor for the smoother at each level */
     double omega[QUDA_MAX_MG_LEVEL];

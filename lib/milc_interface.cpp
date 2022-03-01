@@ -9,6 +9,7 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
+#include <invert_quda.h>
 
 #include <vector>
 #include <fstream>
@@ -1976,14 +1977,17 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.setup_tol[i] = input_struct.setup_tol[i];
     mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) setup
-    if (input_struct.setup_inv[i] == QUDA_CA_CGNR_INVERTER || input_struct.setup_inv[i] == QUDA_CA_CGNE_INVERTER) {
-      mg_param.setup_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
+    // Basis to use for CA solver setup --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.setup_inv[i])) {
+      if (input_struct.setup_inv[i] == QUDA_CA_GCR_INVERTER && input_struct.setup_ca_basis_size[i] <= 8)
+        mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.setup_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // setup_ca_basis[i];
     } else {
-      mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+      mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
     }
 
-    // Basis size for CACG setup
+    // Basis size for CA solver setup
     mg_param.setup_ca_basis_size[i] = input_struct.setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
@@ -2017,18 +2021,21 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
     mg_param.coarse_solver_tol[i] = input_struct.coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = input_struct.coarse_solver_maxiter[i];
 
-    // Basis to use for CA-CGN(E/R) coarse solver
-    if (input_struct.coarse_solver[i] == QUDA_CA_CGNR_INVERTER || input_struct.coarse_solver[i] == QUDA_CA_CGNE_INVERTER) {
-      mg_param.coarse_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
-    } else {
-      mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
-    }
-
-    // Basis size for CACG coarse solver
+    // Basis size for CA coarse solvers
     if (input_struct.coarse_solver_ca_basis_size[i] > input_struct.coarse_solver_maxiter[i]) {
       mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_maxiter[i];
     } else {
       mg_param.coarse_solver_ca_basis_size[i] = input_struct.coarse_solver_ca_basis_size[i];
+    }
+
+    // Basis to use for CA basis coarse solvers --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.coarse_solver[i])) {
+      if (input_struct.coarse_solver[i] == QUDA_CA_GCR_INVERTER && mg_param.coarse_solver_ca_basis_size[i] <= 8)
+        mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.coarse_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // coarse_solver_ca_basis[i];
+    } else {
+      mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
     }
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
@@ -2039,6 +2046,20 @@ void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precis
 
     // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
     mg_param.smoother_tol[i] = 1e-10; // smoother_tol[i];
+
+    // Basis to use for CA basis smoothers --- heuristic for CA-GCR is empirical
+    if (is_ca_solver(input_struct.smoother_type[i])) {
+      if (input_struct.smoother_type[i] == QUDA_CA_GCR_INVERTER && mg_param.nu_pre[i] <= 8 && mg_param.nu_post[i] <= 8)
+        mg_param.smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+      else
+        mg_param.smoother_solver_ca_basis[i] = QUDA_CHEBYSHEV_BASIS; // smoother_solver_ca_basis[i];
+    } else {
+      mg_param.smoother_solver_ca_basis[i] = QUDA_POWER_BASIS; // smoother_solver_ca_basis[i];
+    }
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis smoothers
+    mg_param.smoother_solver_ca_lambda_min[i] = 0.0;  // smoother_solver_ca_lambda_min[i];
+    mg_param.smoother_solver_ca_lambda_max[i] = -1.0; // smoother_solver_ca_lambda_max[i];
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
