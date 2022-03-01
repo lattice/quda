@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tune_quda.h>
+
 #ifdef QUDA_MMA_AVAILABLE
 #include <kernels/coarse_op_kernel_mma.cuh>
 #endif
