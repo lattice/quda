@@ -24,6 +24,7 @@ int smear_steps = 50;
 double wflow_epsilon = 0.01;
 int wflow_steps = 100;
 QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
+bool su_project = true;
 int measurement_interval = 5;
 
 void display_test_info()
@@ -98,6 +99,8 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");
+
+  opgroup->add_option("--su3-project", su_project, "Project smeared gauge onto su3 manifold at measurement interval (default true)");
 }
 
 int main(int argc, char **argv)
@@ -210,7 +213,7 @@ int main(int argc, char **argv)
       ape_obs_param[i] = newQudaGaugeObservableParam();
       ape_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       ape_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      ape_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+      ape_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     }
     
     time0 = -((double)clock()); // start the timer
@@ -227,7 +230,7 @@ int main(int argc, char **argv)
       stout_obs_param[i] = newQudaGaugeObservableParam();
       stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      stout_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+      stout_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     }
     
     time0 = -((double)clock()); // start the timer
@@ -247,7 +250,7 @@ int main(int argc, char **argv)
       oi_stout_obs_param[i] = newQudaGaugeObservableParam();
       oi_stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       oi_stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      oi_stout_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+      oi_stout_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     }
 
     time0 = -((double)clock()); // start the timer
@@ -264,7 +267,7 @@ int main(int argc, char **argv)
       wf_obs_param[i] = newQudaGaugeObservableParam();
       wf_obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
       wf_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      wf_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+      wf_obs_param[i].su_project = su_project ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     }
     
     time0 = -((double)clock()); // start the timer
