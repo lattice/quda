@@ -2,16 +2,14 @@
 #include <power_of_two_array.h>
 #include <tunable_block_reduction.h>
 #include <kernels/restrictor.cuh>
-#include <target_device.h>
-#include <power_of_two_array.h>
-#include <blas_quda.h>
 
 namespace quda {
-       struct Aggregates {
-         // List of block sizes we wish to instantiate.  The required block
-         // size is equal to number of fine points per aggregate, rounded
-         // up to a whole power of two.  So for example, 2x2x2x2 and
-         // 3x3x3x1 aggregation would both use the same block size 32
+
+  struct Aggregates {
+    // List of block sizes we wish to instantiate.  The required block
+    // size is equal to number of fine points per aggregate, rounded
+    // up to a whole power of two.  So for example, 2x2x2x2 and
+    // 3x3x3x1 aggregation would both use the same block size 32
 #ifndef QUDA_FAST_COMPILE_REDUCE
     using array_type = PowerOfTwoArray<device::warp_size(), device::max_block_size()>;
 #else
@@ -46,7 +44,7 @@ namespace quda {
     bool tuneSharedBytes() const { return false; }
     bool tuneAuxDim() const { return true; }
     unsigned int minThreads() const { return in.Volume(); } // fine parity is the block y dimension
-    
+
   public:
     RestrictLaunch(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                    const int *fine_to_coarse, const int *coarse_to_fine, int parity) :
@@ -68,7 +66,6 @@ namespace quda {
       if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
         Arg<QUDA_FLOAT2_FIELD_ORDER> arg(out, in, v, fine_to_coarse, coarse_to_fine, parity);
         arg.swizzle_factor = tp.aux.x;
-
         launch<Restrictor, Aggregates>(tp, stream, arg);
       } else {
         errorQuda("Unsupported field order %d", out.FieldOrder());

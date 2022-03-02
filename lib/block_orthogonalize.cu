@@ -7,8 +7,7 @@
 #include <power_of_two_array.h>
 #include <kernels/block_orthogonalize.cuh>
 #include <tunable_block_reduction.h>
-#include <target_device.h>
-#include <power_of_two_array.h>
+
 namespace quda {
 
   struct OrthoAggregates {
@@ -21,13 +20,11 @@ namespace quda {
 #else
     using array_type = PowerOfTwoArray<device::max_block_size(), device::max_block_size()>;
 #endif
-
     static constexpr array_type block = array_type();
 
-
     /**
-     *  @brief Return the first power of two block that is larger than the required size
-     */
+       @brief Return the first power of two block that is larger than the required size
+    */
     static unsigned int block_mapper(unsigned int raw_block)
     {
       for (unsigned int b = 0; b < block.size();  b++) if (raw_block <= block[b]) return block[b];

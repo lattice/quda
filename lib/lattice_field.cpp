@@ -4,11 +4,11 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-#include <quda_api.h>
 
 namespace quda {
 
   bool LatticeField::initIPCComms = false;
+
   int LatticeField::buffer_send_p2p_fwd[2][QUDA_MAX_DIM] { };
   int LatticeField::buffer_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
   int LatticeField::buffer_send_p2p_back[2][QUDA_MAX_DIM] { };
@@ -287,6 +287,7 @@ namespace quda {
   void LatticeField::freeGhostBuffer(void)
   {
     destroyIPCComms();
+
     if (!initGhostFaceBuffer) return;
 
     for (int b=0; b<2; b++) {
