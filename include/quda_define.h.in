@@ -74,13 +74,13 @@
 #endif
 
 /**
- * @def QUDA_BUILD_TYPE_CUDA
+ * @def QUDA_TARGET_CUDA
  * @brief This macro is set by CMake if the CUDA Build Target is selected
  */
 #cmakedefine QUDA_TARGET_CUDA @QUDA_TARGET_CUDA@
 
 /**
- * @def QUDA_BUILD_TYPE_HIP
+ * @def QUDA_TARGET_HIP
  * @brief This macro is set by CMake if the HIP Build target is selected
  */
 #cmakedefine QUDA_TARGET_HIP @QUDA_TARGET_HIP@

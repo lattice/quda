@@ -9,7 +9,6 @@
  */
 
 #include <quda_matrix.h>
-#include <quda_define.h>
 
 namespace quda {
 
