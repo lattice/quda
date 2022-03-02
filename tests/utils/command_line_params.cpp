@@ -1,4 +1,3 @@
-#include "quda_define.h"
 #include "command_line_params.h"
 #include <comm_quda.h>
 
