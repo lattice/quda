@@ -144,7 +144,6 @@ namespace quda
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     //__shared__ bool isLastBlockDone[n_batch_block];
-    //sycl::vec<n_batch_block, bool> isLastBlockDone(false);
     auto glmem = sycl::ext::oneapi::group_local_memory<bool[n_batch_block]>(getGroup());
     bool *isLastBlockDone = *glmem.get();
 
@@ -164,7 +163,6 @@ namespace quda
     }
 
     __syncthreads();
-    //isLastBlockDone = sycl::any_of(getGroup(), isLastBlockDone);
 
     // finish the reduction if last block
     if (isLastBlockDone[target::thread_idx().z]) {

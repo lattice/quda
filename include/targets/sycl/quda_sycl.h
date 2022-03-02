@@ -132,8 +132,9 @@ inline uint getLocalLinearId()
 
 inline void __syncthreads(void)
 {
-  auto ndi = getNdItem();
-  ndi.barrier();
+  //auto ndi = getNdItem();
+  //ndi.barrier();
+  group_barrier(getGroup());
 }
 
 #define gridDim getGridDim()
