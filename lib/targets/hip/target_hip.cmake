@@ -1,10 +1,26 @@
 # ######################################################################################################################
-# CUDA specific part of CMakeLists
-
+# HIP specific part of CMakeLists
 include(CheckLanguage)
 check_language(HIP)
 
-set(GPU_TARGETS ${QUDA_GPU_ARCH} CACHE STRING "The GPU_TARGET" )
+if(DEFINED ENV{QUDA_GPU_ARCH})
+  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
+else()
+  set(QUDA_DEFAULT_GPU_ARCH gfx908)
+endif()
+
+set(QUDA_GPU_ARCH
+    ${QUDA_DEFAULT_GPU_ARCH}
+    CACHE STRING "set the GPU architecture (gfx906 gfx908 gfx90a)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS gfx906 gfx908 gfx90a PARENT_SCOPE)
+
+set(CMAKE_HIP_ARCHITECTURES ${QUDA_GPU_ARCH} PARENT_SCOPE)
+set(GPU_TARGETS ${QUDA_GPU_ARCH} PARENT_SCOPE)
+
+mark_as_advanced(GPU_TARGETS)
+mark_as_advanced(CMAKE_HIP_ARCHITECTURES)
+message(STATUS "Building for GPU Architectures: ${QUDA_GPU_ARCH}")
+
 find_package(HIP)
 find_package(hipfft REQUIRED)
 find_package(hiprand REQUIRED)
@@ -13,24 +29,6 @@ find_package(hipblas REQUIRED)
 find_package(rocblas REQUIRED)
 find_package(hipcub REQUIRED)
 find_package(rocprim REQUIRED)
-
-
-if(DEFINED ENV{QUDA_GPU_ARCH})
-  set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
-else()
-  set(QUDA_DEFAULT_GPU_ARCH gfx908)
-endif()
-if(NOT QUDA_GPU_ARCH)
-  message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
-endif()
-
-set(QUDA_GPU_ARCH
-    ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (gfx906 gfx908 gfx90a)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS gfx906 gfx908 gfx90a)
-
-set(CMAKE_HIP_ARCHITECTURES ${QUDA_GPU_ARCH})
-mark_as_advanced(CMAKE_HIP_ARCHITECTURES)
 
 
 # ######################################################################################################################
