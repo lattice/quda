@@ -1515,27 +1515,34 @@ extern "C" {
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
-   * @param alpha  Alpha coefficient for APE smearing.
+   * @param alpha   Alpha coefficient for APE smearing.
    * @param meas_interval Measure the Q charge every Nth step
    */
-  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
+  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval,
+		       QudaGaugeObservableParam *param);
 
   /**
    * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
+   * @param rho     Rho coefficient for STOUT smearing.
    * @param meas_interval Measure the Q charge every Nth step
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
+  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval,
+			 QudaGaugeObservableParam *param);
 
   /**
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
-   * @param rho    Rho coefficient for STOUT smearing.
+   * @param rho     Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
    * @param meas_interval Measure the Q charge every Nth step
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
    */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval,
+			       QudaGaugeObservableParam *param);
   
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared

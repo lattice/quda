@@ -191,62 +191,85 @@ int main(int argc, char **argv)
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
              param.qcharge - q_charge_check);
 
+  // For the QUDA sUN tests, we perform all measurements. The user may specify
+  // which measurements they wish to perform/omit using the QudaGaugeObservableParam
+  // struct, and whether or not to perform suN projection at each measurement step.
+  // We recommend that users perfrom suN prjection.
+  // A unique observable param struct is constructed for each measurement.
+  
   // Gauge Smearing Routines
   //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1).
-  // Typical APE values are aplha=0.6, rho=0.1 for Stout.
+  // Typical APE values are aplha=0.6, rho=0.1 for Stout.  
   switch (test_type) {
-  case 0:
+  case 0: {
     // APE
-    // start the timer
-    time0 = -((double)clock());
-    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval);
-    // stop the timer
-    time0 += clock();
+    QudaGaugeObservableParam *ape_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
+    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+      ape_obs_param[i] = newQudaGaugeObservableParam();
+      ape_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+      ape_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      ape_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+    }
+    
+    time0 = -((double)clock()); // start the timer
+    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval, ape_obs_param);  
+    time0 += clock();           // stop the timer
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for APE = %g secs\n", time0);
     break;
-  case 1:
+  }
+  case 1: {
     // STOUT
-    // start the timer
-    time0 = -((double)clock());
-    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval);
-    // stop the timer
-    time0 += clock();
+    QudaGaugeObservableParam *stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
+    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+      stout_obs_param[i] = newQudaGaugeObservableParam();
+      stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+      stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      stout_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+    }
+    
+    time0 = -((double)clock()); // start the timer
+    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval, stout_obs_param);
+    time0 += clock();           // stop the timer
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for STOUT = %g secs\n", time0);
     break;
+  }
 
     // Topological charge routines
     //---------------------------------------------------------------------------
-  case 2:
+  case 2: {
     // Over-Improved STOUT
-    // start the timer
-    time0 = -((double)clock());
-    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);
-    // stop the timer
-    time0 += clock();
+    QudaGaugeObservableParam *oi_stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
+    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+      oi_stout_obs_param[i] = newQudaGaugeObservableParam();
+      oi_stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
+      oi_stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      oi_stout_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
+    }
+
+    time0 = -((double)clock()); // start the timer
+    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval, oi_stout_obs_param);
+    time0 += clock();           // stop the timer
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
     break;
+  }
   case 3: {
     // Wilson Flow
     QudaGaugeObservableParam *wf_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    // For the QUDA test, we perform all measurements. The use may specify here
-    // which measurements they wish to perform/omit.    
     for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
       wf_obs_param[i] = newQudaGaugeObservableParam();
       wf_obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
       wf_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
-      wf_obs_param[i].su_project = QUDA_BOOLEAN_FALSE;      
+      wf_obs_param[i].su_project = QUDA_BOOLEAN_TRUE;      
     }
     
-    // Start the timer
-    time0 = -((double)clock());
+    time0 = -((double)clock()); // start the timer
     performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type, wf_obs_param);
-    // stop the timer
-    time0 += clock();
+    time0 += clock();           // stop the timer
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Wilson Flow = %g secs\n", time0);
     break;
