@@ -137,6 +137,10 @@ void setQudaDefaultMgTestParams()
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    smoother_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    smoother_solver_ca_lambda_min[i] = 0.0;
+    smoother_solver_ca_lambda_max[i] = -1.0; // use power iterations
   }
 }
 
