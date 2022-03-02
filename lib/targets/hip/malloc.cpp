@@ -27,7 +27,7 @@ namespace quda
     size_t size;
     size_t base_size;
 
-    MemAlloc() : line(-1), size(0), base_size(0) {}
+    MemAlloc() : line(-1), size(0), base_size(0) { }
 
     MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
     {
@@ -163,7 +163,6 @@ namespace quda
     return managed;
   }
 
-
   bool use_qdp_managed()
   {
 #if defined(QDP_USE_CUDA_MANAGED_MEMORY) || defined(QDP_ENABLE_MANAGED_MEMORY)
@@ -182,9 +181,9 @@ namespace quda
       if (use_managed_memory()) {
         char *enable_managed_prefetch = getenv("QUDA_ENABLE_MANAGED_PREFETCH");
         if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
-	  // BJoo: Managed Memory Prefetch is not supported currently under HIP
-	  warningQuda("HIP Does not currently allow prefetch support for managed memory. Setting prefetch to false");
-	  prefetch = false;
+          // BJoo: Managed Memory Prefetch is not supported currently under HIP
+          warningQuda("HIP Does not currently allow prefetch support for managed memory. Setting prefetch to false");
+          prefetch = false;
         }
       }
 
@@ -214,9 +213,9 @@ namespace quda
     if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
-#else 
+#else
     // QDPJIT version
-     QDP::QDP_get_global_cache().addDeviceStatic( &ptr , size , true );    
+    QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
 #endif
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
@@ -244,7 +243,6 @@ namespace quda
     a.size = a.base_size = size;
     hipError_t err = hipMalloc(&ptr, size);
 
-
     if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -269,7 +267,7 @@ namespace quda
     if (!ptr) { errorQuda("Failed to allocate host memory of size %zu (%s:%d in %s())\n", size, file, line, func); }
     track_malloc(HOST, a, ptr);
 #ifdef HOST_DEBUG
-   //memset(ptr, 0xff, size);
+    // memset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -344,21 +342,21 @@ namespace quda
     return ptr;
   }
 
-  /** 
+  /**
    * Round to the nearest 2MiB
    *
    */
   size_t align2MiB(const size_t size) noexcept
   {
-     constexpr size_t TwoMiB=(1<<21);
-     constexpr size_t LowBits = TwoMiB-1;
-     constexpr size_t HighBits = ~LowBits;
+    constexpr size_t TwoMiB = (1 << 21);
+    constexpr size_t LowBits = TwoMiB - 1;
+    constexpr size_t HighBits = ~LowBits;
 
-     // If there are low bits, round to nearest 2MiB
-     size_t align_remainder = (size & LowBits ) ? TwoMiB : 0;
+    // If there are low bits, round to nearest 2MiB
+    size_t align_remainder = (size & LowBits) ? TwoMiB : 0;
 
-     // Add high bits
-     return  (size & HighBits) + align_remainder;
+    // Add high bits
+    return (size & HighBits) + align_remainder;
   }
 
   /**
@@ -368,11 +366,11 @@ namespace quda
   void *device_comms_pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
 
-//#ifdef NVSHMEM_COMMS
-//   return shmem_malloc_(func, file, line, size);
-//#else
+    //#ifdef NVSHMEM_COMMS
+    //   return shmem_malloc_(func, file, line, size);
+    //#else
     return device_pinned_malloc_(func, file, line, align2MiB(size));
-//#endif
+    //#endif
   }
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -390,15 +388,15 @@ namespace quda
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
- 
+
 #ifndef USE_QDPJIT
-    // Regular 
+    // Regular
     hipError_t err = hipFree(ptr);
     if (err != hipSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
 #else
     // QDPJIT version
     // It will barf if it goes wrong
-    QDP::QDP_get_global_cache().signoffViaPtr( ptr );
+    QDP::QDP_get_global_cache().signoffViaPtr(ptr);
 #endif
 
     track_free(DEVICE, ptr);
@@ -483,11 +481,11 @@ namespace quda
    */
   void device_comms_pinned_free_(const char *func, const char *file, int line, void *ptr)
   {
-// #ifdef NVSHMEM_COMMS
-//    shmem_free_(func, file, line, ptr);
-// #else
-      device_pinned_free_(func, file, line, ptr);
-// #endif
+    // #ifdef NVSHMEM_COMMS
+    //    shmem_free_(func, file, line, ptr);
+    // #else
+    device_pinned_free_(func, file, line, ptr);
+    // #endif
   }
 
   void printPeakMemUsage()
@@ -495,7 +493,7 @@ namespace quda
     printfQuda("Device memory used = %.1f MiB\n", max_total_bytes[DEVICE] / (double)(1 << 20));
     printfQuda("Pinned device memory used = %.1f MiB\n", max_total_bytes[DEVICE_PINNED] / (double)(1 << 20));
     printfQuda("Managed memory used = %.1f MiB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
-//    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
+    //    printfQuda("Shmem memory used = %.1f MiB\n", max_total_bytes[SHMEM] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MiB\n", max_total_pinned_bytes / (double)(1 << 20));
     printfQuda("Total host memory used >= %.1f MiB\n", max_total_host_bytes / (double)(1 << 20));
   }
@@ -518,23 +516,23 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr)
   {
-     hipPointerAttribute_t attr;
-     hipError_t error = hipPointerGetAttributes(&attr, ptr);
+    hipPointerAttribute_t attr;
+    hipError_t error = hipPointerGetAttributes(&attr, ptr);
 
-     // hipReturnInvalidValue is not an error here it means that 
-     // hipPointerGetAttrributes was passed a pointer not knwon to hip
-     // This is therefore assumed to be a host pointer, and attr is
-     // appropriately filled out
-     if( error != hipSuccess && error != hipErrorInvalidValue ) {
-       errorQuda("hipPointerGetAttributes returned error: %s\n", hipGetErrorString(error));
-     }
- 
-     switch (attr.memoryType) {
-       case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION;
-       case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION;
-       case hipMemoryTypeArray: return QUDA_CUDA_FIELD_LOCATION;
-       case hipMemoryTypeUnified: return QUDA_CUDA_FIELD_LOCATION; ///< Not used currently
-       default: errorQuda("Unknown memory type %d\n", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
+    // hipReturnInvalidValue is not an error here it means that
+    // hipPointerGetAttrributes was passed a pointer not knwon to hip
+    // This is therefore assumed to be a host pointer, and attr is
+    // appropriately filled out
+    if (error != hipSuccess && error != hipErrorInvalidValue) {
+      errorQuda("hipPointerGetAttributes returned error: %s\n", hipGetErrorString(error));
+    }
+
+    switch (attr.memoryType) {
+    case hipMemoryTypeHost: return QUDA_CPU_FIELD_LOCATION;
+    case hipMemoryTypeDevice: return QUDA_CUDA_FIELD_LOCATION;
+    case hipMemoryTypeArray: return QUDA_CUDA_FIELD_LOCATION;
+    case hipMemoryTypeUnified: return QUDA_CUDA_FIELD_LOCATION; ///< Not used currently
+    default: errorQuda("Unknown memory type %d\n", attr.memoryType); return QUDA_INVALID_FIELD_LOCATION;
     }
   }
 

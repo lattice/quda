@@ -5,7 +5,6 @@
 namespace quda
 {
 
-
   // pre-declaration of vector_load that we wish to specialize
   template <bool> struct vector_load_impl;
 

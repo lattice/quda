@@ -5,8 +5,8 @@
 #include <hipfft.h>
 
 using FFTPlanHandle = hipfftHandle;
-#define FFT_FORWARD     HIPFFT_FORWARD
-#define FFT_INVERSE     HIPFFT_BACKWARD
+#define FFT_FORWARD HIPFFT_FORWARD
+#define FFT_INVERSE HIPFFT_BACKWARD
 
 #ifndef GPU_GAUGE_ALG
 #define HIPFFT_SAFE_CALL(call)
@@ -31,22 +31,19 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &, int4, int, QudaPrecision)
   errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
 }
 
-inline void FFTDestroyPlan(FFTPlanHandle &)
-{
-  errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled");
-}
-
+inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("CPU_GAUGE_ALG is disabled so FFTs are also disabled"); }
 
 #else
 
 /*-------------------------------------------------------------------------------*/
-#define HIPFFT_SAFE_CALL( call) {                                      \
-    hipfftResult err = call;                                         \
-    if ( HIPFFT_SUCCESS != err ) {                                     \
-      fprintf(stderr, "HIPFFT error in file '%s' in line %i.\n",   \
-              __FILE__, __LINE__);                                \
-      exit(EXIT_FAILURE);                                         \
-    } }
+#define HIPFFT_SAFE_CALL(call)                                                                                         \
+  {                                                                                                                    \
+    hipfftResult err = call;                                                                                           \
+    if (HIPFFT_SUCCESS != err) {                                                                                       \
+      fprintf(stderr, "HIPFFT error in file '%s' in line %i.\n", __FILE__, __LINE__);                                  \
+      exit(EXIT_FAILURE);                                                                                              \
+    }                                                                                                                  \
+  }
 /*-------------------------------------------------------------------------------*/
 
 /**
@@ -58,7 +55,8 @@ inline void FFTDestroyPlan(FFTPlanHandle &)
  * @param[out] data_out, pointer to the complex output data (in GPU memory)
  * @param[in] direction, the transform direction: HIPFFT_FORWARD or HIPFFT_BACKWARD
  */
-inline void ApplyFFT(FFTPlanHandle &plan, float2 *data_in, float2 *data_out, int direction){
+inline void ApplyFFT(FFTPlanHandle &plan, float2 *data_in, float2 *data_out, int direction)
+{
   HIPFFT_SAFE_CALL(hipfftExecC2C(plan, (hipfftComplex *)data_in, (hipfftComplex *)data_out, direction));
 }
 
@@ -70,16 +68,17 @@ as specified by direction parameter
  * @param[out] data_out, pointer to the complex output data (in GPU memory)
  * @param[in] direction, the transform direction: HIPFFT_FORWARD or HIPFFT_BACKWARD
  */
-inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, int direction){
+inline void ApplyFFT(FFTPlanHandle &plan, double2 *data_in, double2 *data_out, int direction)
+{
   HIPFFT_SAFE_CALL(hipfftExecZ2Z(plan, (hipfftDoubleComplex *)data_in, (hipfftDoubleComplex *)data_out, direction));
 }
-
 
 /**
  * @brief Creates a CUFFT plan supporting 4D (1D+3D) data layouts for complex-to-complex
  * @param[out] plan, CUFFT plan
  * @param[in] size, int4 with lattice size dimensions, (.x,.y,.z,.w) -> (Nx, Ny, Nz, Nt)
- * @param[in] dim, 1 for 1D plan along the temporal direction with batch size Nx*Ny*Nz, 3 for 3D plan along Nx, Ny and Nz with batch size Nt
+ * @param[in] dim, 1 for 1D plan along the temporal direction with batch size Nx*Ny*Nz, 3 for 3D plan along Nx, Ny and
+ * Nz with batch size Nt
  * @param[in] precision The precision of the computation
  */
 
@@ -87,18 +86,14 @@ inline void SetPlanFFTMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecisio
 {
   auto type = precision == QUDA_DOUBLE_PRECISION ? HIPFFT_Z2Z : HIPFFT_C2C;
   switch (dim) {
-  case 1:
-  {
-    int n[1] = { size.w };
+  case 1: {
+    int n[1] = {size.w};
     HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 1, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y * size.z));
-  }
-  break;
-  case 3:
-  {
-    int n[3] = { size.x, size.y, size.z };
+  } break;
+  case 3: {
+    int n[3] = {size.x, size.y, size.z};
     HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 3, n, NULL, 1, 0, NULL, 1, 0, type, size.w));
-  }
-  break;
+  } break;
   }
 }
 
@@ -113,25 +108,17 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
 {
   auto type = precision == QUDA_DOUBLE_PRECISION ? HIPFFT_Z2Z : HIPFFT_C2C;
   switch (dim) {
-  case 0:
-  {
-    int n[2] = { size.w, size.z };
+  case 0: {
+    int n[2] = {size.w, size.z};
     HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.x * size.y));
-  }
-  break;
-  case 1:
-  {
-    int n[2] = { size.x, size.y };
+  } break;
+  case 1: {
+    int n[2] = {size.x, size.y};
     HIPFFT_SAFE_CALL(hipfftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, type, size.z * size.w));
-  }
-  break;
+  } break;
   }
 }
 
-
-
-inline void FFTDestroyPlan( FFTPlanHandle &plan) {
-   HIPFFT_SAFE_CALL(hipfftDestroy(plan));
-}
+inline void FFTDestroyPlan(FFTPlanHandle &plan) { HIPFFT_SAFE_CALL(hipfftDestroy(plan)); }
 
 #endif

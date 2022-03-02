@@ -10,7 +10,6 @@
    warp- and block-level reductions, using the CUB library
  */
 
-
 using namespace quda;
 
 #include <hipcub/hipcub.hpp>
@@ -77,11 +76,10 @@ namespace quda
        @return The block-wide reduced value
      */
     template <typename T, typename reducer_t, typename param_t>
-    __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r,
-                                   const param_t &)
+    __device__ inline T operator()(const T &value_, bool async, int batch, bool all, const reducer_t &r, const param_t &)
     {
       using block_reduce_t = hipcub::BlockReduce<T, param_t::block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                                              param_t::block_size_y, param_t::block_size_z >;
+                                                 param_t::block_size_y, param_t::block_size_z>;
       __shared__ typename block_reduce_t::TempStorage storage[param_t::batch_size];
       block_reduce_t block_reduce(storage[batch]);
       if (!async) __syncthreads(); // only synchronize if we are not pipelining

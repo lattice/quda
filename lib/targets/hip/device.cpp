@@ -8,9 +8,7 @@ static hipDeviceProp_t deviceProp;
 static hipStream_t *streams;
 static const int Nstream = 9;
 
-#define CHECK_HIP_ERROR(func)						\
-  target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
-
+#define CHECK_HIP_ERROR(func) target::hip::set_runtime_error(func, #func, __func__, __FILE__, __STRINGIFY__(__LINE__));
 
 namespace quda
 {
@@ -21,34 +19,30 @@ namespace quda
     static bool initialized = false;
 
     void init(int dev)
-    {      
+    {
       if (initialized) return;
       initialized = true;
       printfQuda("*** HIP BACKEND ***\n");
 
-      int driver_version=0;
+      int driver_version = 0;
       CHECK_HIP_ERROR(hipDriverGetVersion(&driver_version));
       printfQuda("HIP Driver version = %d\n", driver_version);
 
-      int runtime_version=0;
+      int runtime_version = 0;
       CHECK_HIP_ERROR(hipRuntimeGetVersion(&runtime_version));
       printfQuda("HIP Runtime version = %d\n", runtime_version);
 
       for (int i = 0; i < get_device_count(); i++) {
         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, i));
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-	  printfQuda("Found device %d: %s\n", i, deviceProp.name); }
+        if (getVerbosity() >= QUDA_SUMMARIZE) { printfQuda("Found device %d: %s\n", i, deviceProp.name); }
       }
 
-      
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("Using device %d: %s\n", dev, deviceProp.name);
-      }
-      
+      if (getVerbosity() >= QUDA_SUMMARIZE) { printfQuda("Using device %d: %s\n", dev, deviceProp.name); }
+
       CHECK_HIP_ERROR(hipSetDevice(dev));
 
       CHECK_HIP_ERROR(hipDeviceSetCacheConfig(hipFuncCachePreferL1));
-      //hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
+      // hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
       CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProp, dev));
     }
 
@@ -61,8 +55,7 @@ namespace quda
       }
       return device_count;
     }
-    
-    
+
     void create_context()
     {
       streams = new hipStream_t[Nstream];
@@ -70,17 +63,17 @@ namespace quda
       int greatestPriority;
       int leastPriority;
       CHECK_HIP_ERROR(hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority));
-      for (int i=0; i<Nstream-1; i++) {
+      for (int i = 0; i < Nstream - 1; i++) {
         CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority));
       }
-      CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[Nstream-1], hipStreamDefault, leastPriority));
+      CHECK_HIP_ERROR(hipStreamCreateWithPriority(&streams[Nstream - 1], hipStreamDefault, leastPriority));
     }
 
     void destroy()
     {
       if (streams) {
-        for (int i=0; i<Nstream; i++) CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
-        delete []streams;
+        for (int i = 0; i < Nstream; i++) CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
+        delete[] streams;
         streams = nullptr;
       }
 
@@ -91,10 +84,7 @@ namespace quda
       }
     }
 
-    hipStream_t get_cuda_stream(const qudaStream_t &stream)
-    {
-      return streams[stream.idx];
-    }
+    hipStream_t get_cuda_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
 
     qudaStream_t get_stream(unsigned int i)
     {
@@ -102,7 +92,7 @@ namespace quda
       qudaStream_t stream;
       stream.idx = i;
       return stream;
-      //return qudaStream_t(i);
+      // return qudaStream_t(i);
       // return streams[i];
     }
 
@@ -111,14 +101,11 @@ namespace quda
       qudaStream_t stream;
       stream.idx = Nstream - 1;
       return stream;
-      //return qudaStream_t(Nstream - 1);
-      //return streams[Nstream - 1];
+      // return qudaStream_t(Nstream - 1);
+      // return streams[Nstream - 1];
     }
 
-    unsigned int get_default_stream_idx()
-    {
-      return Nstream - 1;
-    }
+    unsigned int get_default_stream_idx() { return Nstream - 1; }
 
     bool managed_memory_supported()
     {
@@ -144,53 +131,43 @@ namespace quda
 #else
     size_t max_default_shared_memory() { return 32000; }
 
-    size_t max_dynamic_shared_memory()
-    {
-      return 32000;
-    }
+    size_t max_dynamic_shared_memory() { return 32000; }
 #endif
 
-    unsigned int max_threads_per_block() { 
-	return deviceProp.maxThreadsPerBlock; 
-    }
+    unsigned int max_threads_per_block() { return deviceProp.maxThreadsPerBlock; }
 
     unsigned int max_threads_per_processor() { return deviceProp.maxThreadsPerMultiProcessor; }
 
-    unsigned int max_threads_per_block_dim(int i) { 
-	    return deviceProp.maxThreadsDim[i];
-    }
+    unsigned int max_threads_per_block_dim(int i) { return deviceProp.maxThreadsDim[i]; }
 
     unsigned int max_grid_size(int i) { return deviceProp.maxGridSize[i]; }
 
     unsigned int processor_count() { return deviceProp.multiProcessorCount; }
 
-    unsigned int max_blocks_per_processor()
-    {
-	    return 32;
-    }
+    unsigned int max_blocks_per_processor() { return 32; }
 
-    namespace profile {
+    namespace profile
+    {
 
       void start()
       {
-	// FIXME: HIP PROFILER DEPRECATED
+        // FIXME: HIP PROFILER DEPRECATED
       }
 
       void stop()
       {
-	// FIXME: HIP PROFILER DEPRECARED
+        // FIXME: HIP PROFILER DEPRECARED
       }
 
     } // namespace profile
 
   } // namespace device
 
-  namespace target { 
-    namespace hip { 
-       hipStream_t get_cuda_stream(const qudaStream_t &stream)
-       {
-          return streams[stream.idx];
-       }
-     } // namespace hip
-   } // namespace target
+  namespace target
+  {
+    namespace hip
+    {
+      hipStream_t get_cuda_stream(const qudaStream_t &stream) { return streams[stream.idx]; }
+    } // namespace hip
+  }   // namespace target
 } // namespace quda

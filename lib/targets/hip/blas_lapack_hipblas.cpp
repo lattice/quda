@@ -31,7 +31,8 @@ namespace quda
         if (!hipblas_init) {
 #ifdef NATIVE_LAPACK_LIB
           hipblasStatus_t error = hipblasCreate(&handle);
-          if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("hipblasCreate failed with error %d", error);
+          if (error != HIPBLAS_STATUS_SUCCESS)
+            errorQuda("hipblasCreate failed with error %d", error);
           else
             printfQuda("hipblasCreated successfully\n");
           hipblas_init = true;
@@ -349,25 +350,25 @@ namespace quda
         if (blas_param.data_type == QUDA_BLAS_DATATYPE_Z) {
 
           typedef hipblasDoubleComplex Z;
-	  const std::complex<double> al = static_cast<const std::complex<double>>( blas_param.alpha );
-          const std::complex<double> be = static_cast<const std::complex<double>>( blas_param.beta );
+          const std::complex<double> al = static_cast<const std::complex<double>>(blas_param.alpha);
+          const std::complex<double> be = static_cast<const std::complex<double>>(blas_param.beta);
 
-	  const Z alpha( al.real(), al.imag() );
-	  const Z beta(  be.real(), be.imag() );
+          const Z alpha(al.real(), al.imag());
+          const Z beta(be.real(), be.imag());
 
           hipblasStatus_t error;
           if (batch > 1) {
             error = hipblasZgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+                                               &alpha, (Z *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                               (Z *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                               (Z *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != HIPBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASZGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = hipblasZgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
+                                 (Z *)A_d + blas_param.a_offset, blas_param.lda, (Z *)B_d + blas_param.b_offset,
+                                 blas_param.ldb, &beta, (Z *)C_d + blas_param.c_offset, blas_param.ldc);
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASZGEMM, error code = %d\n", error);
           }
@@ -375,25 +376,25 @@ namespace quda
 
           typedef hipblasComplex C;
 
-          const std::complex<float> al = static_cast<const std::complex<float>>( blas_param.alpha );
-          const std::complex<float> be = static_cast<const std::complex<float>>( blas_param.beta );
+          const std::complex<float> al = static_cast<const std::complex<float>>(blas_param.alpha);
+          const std::complex<float> be = static_cast<const std::complex<float>>(blas_param.beta);
 
-          const C alpha( al.real(), al.imag() );
-          const C beta(  be.real(), be.imag() );
+          const C alpha(al.real(), al.imag());
+          const C beta(be.real(), be.imag());
 
           hipblasStatus_t error;
           if (batch > 1) {
             error = hipblasCgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+                                               &alpha, (C *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                               (C *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                               (C *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != HIPBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASCGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = hipblasCgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
+                                 (C *)A_d + blas_param.a_offset, blas_param.lda, (C *)B_d + blas_param.b_offset,
+                                 blas_param.ldb, &beta, (C *)C_d + blas_param.c_offset, blas_param.ldc);
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASCGEMMBatched, error code = %d\n", error);
           }
@@ -407,16 +408,16 @@ namespace quda
           hipblasStatus_t error;
           if (batch > 1) {
             error = hipblasDgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+                                               &alpha, (D *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                               (D *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                               (D *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != HIPBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASDGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = hipblasDgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
+                                 (D *)A_d + blas_param.a_offset, blas_param.lda, (D *)B_d + blas_param.b_offset,
+                                 blas_param.ldb, &beta, (D *)C_d + blas_param.c_offset, blas_param.ldc);
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASDGEMMBatched, error code = %d\n", error);
           }
@@ -430,16 +431,16 @@ namespace quda
           hipblasStatus_t error;
           if (batch > 1) {
             error = hipblasSgemmStridedBatched(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k,
-                                              &alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
-                                              (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
-                                              (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
+                                               &alpha, (S *)A_d + blas_param.a_offset, blas_param.lda, a_stride,
+                                               (S *)B_d + blas_param.b_offset, blas_param.ldb, b_stride, &beta,
+                                               (S *)C_d + blas_param.c_offset, blas_param.ldc, c_stride, batch);
 
             if (error != HIPBLAS_STATUS_SUCCESS)
               errorQuda("\nError in cuBLASSGEMMStridedBatched, error code = %d\n", error);
           } else {
             error = hipblasSgemm(handle, trans_a, trans_b, blas_param.m, blas_param.n, blas_param.k, &alpha,
-                                (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
-                                blas_param.ldb, &beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
+                                 (S *)A_d + blas_param.a_offset, blas_param.lda, (S *)B_d + blas_param.b_offset,
+                                 blas_param.ldb, &beta, (S *)C_d + blas_param.c_offset, blas_param.ldc);
 
             if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError in cuBLASSGEMMBatched, error code = %d\n", error);
           }

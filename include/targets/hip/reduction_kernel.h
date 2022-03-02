@@ -2,7 +2,8 @@
 #include <target_device.h>
 #include <reduce_helper.h>
 
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This class is derived from the arg class that the functor
@@ -39,7 +40,7 @@ namespace quda {
   __forceinline__ __device__ void Reduction2D_impl(const Arg &arg)
   {
     using reduce_t = typename Transformer<Arg>::reduce_t;
-	  using reducer_t = typename Transformer<Arg>::reducer_t;
+    using reducer_t = typename Transformer<Arg>::reducer_t;
     Transformer<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -49,10 +50,10 @@ namespace quda {
 
     while (idx < arg.threads.x) {
       value = t(value, idx, j);
-      if (grid_stride) 
-				idx += blockDim.x * gridDim.x; 
-			else 
-				break;
+      if (grid_stride)
+        idx += blockDim.x * gridDim.x;
+      else
+        break;
     }
 
     // perform final inter-block reduction and write out result
@@ -72,8 +73,8 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> 
-  __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) Reduction2D(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void>
+    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) Reduction2D(Arg arg)
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -91,12 +92,11 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> 
-    __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) Reduction2D()
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
+    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) Reduction2D()
   {
     Reduction2D_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }
-
 
   /**
      @brief MultiReduction_impl is the implementation of the generic
@@ -117,7 +117,7 @@ namespace quda {
   __forceinline__ __device__ void MultiReduction_impl(const Arg &arg)
   {
     using reduce_t = typename Functor<Arg>::reduce_t;
-	  using reducer_t = typename Functor<Arg>::reducer_t;
+    using reducer_t = typename Functor<Arg>::reducer_t;
     Functor<Arg> t(arg);
 
     auto idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -140,7 +140,6 @@ namespace quda {
     reduce<Arg::block_size_x, Arg::block_size_y>(arg, t, value, j);
   }
 
-
   /**
      @brief MultiReduction is the entry point of the generic
      multi-reduction kernel.  This is the specialization where the
@@ -154,8 +153,8 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void> 
-  __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) ) MultiReduction(Arg arg)
+  __global__ std::enable_if_t<device::use_kernel_arg<Arg>(), void>
+    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) MultiReduction(Arg arg)
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(arg);
   }
@@ -173,8 +172,8 @@ namespace quda {
      @param[in] arg Kernel argument
    */
   template <template <typename> class Functor, typename Arg, bool grid_stride = true>
-    __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void> 
-    __launch_bounds__( std::max( device::warp_size(), (Arg::block_size_x * Arg::block_size_y) ) )  MultiReduction()
+  __global__ std::enable_if_t<!device::use_kernel_arg<Arg>(), void>
+    __launch_bounds__(std::max(device::warp_size(), (Arg::block_size_x * Arg::block_size_y))) MultiReduction()
   {
     MultiReduction_impl<Functor, Arg, grid_stride>(device::get_arg<Arg>());
   }

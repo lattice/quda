@@ -236,7 +236,7 @@ namespace quda
     }
 #else
     // QDPJIT version -- barfs internally if it fails
-     QDP::QDP_get_global_cache().addDeviceStatic( &ptr , size , true );
+    QDP::QDP_get_global_cache().addDeviceStatic(&ptr, size, true);
 #endif
 
     if (is_prefetch_enabled()) qudaMemPrefetchAsync(ptr, size, QUDA_CUDA_FIELD_LOCATION, device::get_default_stream());
@@ -431,7 +431,7 @@ namespace quda
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
 #else
     // QDPJIT: Barfs if it fails internally
-    QDP::QDP_get_global_cache().signoffViaPtr( ptr ); 
+    QDP::QDP_get_global_cache().signoffViaPtr(ptr);
 #endif
 
     track_free(DEVICE, ptr);
