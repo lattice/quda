@@ -1,4 +1,3 @@
-#include <quda_arch.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 
