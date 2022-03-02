@@ -191,10 +191,10 @@ int main(int argc, char **argv)
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
              param.qcharge - q_charge_check);
 
-  // For the QUDA sUN tests, we perform all measurements. The user may specify
-  // which measurements they wish to perform/omit using the QudaGaugeObservableParam
-  // struct, and whether or not to perform suN projection at each measurement step.
-  // We recommend that users perfrom suN prjection.
+  // The user may specify which measurements they wish to perform/omit
+  // using the QudaGaugeObservableParam struct, and whether or not to
+  // perform suN projection at each measurement step. We recommend that
+  // users perfrom suN projection.
   // A unique observable param struct is constructed for each measurement.
   
   // Gauge Smearing Routines
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
   case 0: {
     // APE
     QudaGaugeObservableParam *ape_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
       ape_obs_param[i] = newQudaGaugeObservableParam();
       ape_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       ape_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
@@ -223,7 +223,7 @@ int main(int argc, char **argv)
   case 1: {
     // STOUT
     QudaGaugeObservableParam *stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
       stout_obs_param[i] = newQudaGaugeObservableParam();
       stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
   case 2: {
     // Over-Improved STOUT
     QudaGaugeObservableParam *oi_stout_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
-    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+    for (int i=0; i<smear_steps/measurement_interval+1; i++) {
       oi_stout_obs_param[i] = newQudaGaugeObservableParam();
       oi_stout_obs_param[i].compute_plaquette = QUDA_BOOLEAN_FALSE;
       oi_stout_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
