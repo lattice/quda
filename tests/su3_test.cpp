@@ -230,16 +230,27 @@ int main(int argc, char **argv)
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
     break;
-  case 3:
+  case 3: {
     // Wilson Flow
+    QudaGaugeObservableParam *wf_obs_param = new QudaGaugeObservableParam[wflow_steps/measurement_interval+1];
+    // For the QUDA test, we perform all measurements. The use may specify here
+    // which measurements they wish to perform/omit.    
+    for (int i=0; i<wflow_steps/measurement_interval+1; i++) {
+      wf_obs_param[i] = newQudaGaugeObservableParam();
+      wf_obs_param[i].compute_plaquette = QUDA_BOOLEAN_TRUE;
+      wf_obs_param[i].compute_qcharge = QUDA_BOOLEAN_TRUE;
+      wf_obs_param[i].su_project = QUDA_BOOLEAN_FALSE;      
+    }
+    
     // Start the timer
     time0 = -((double)clock());
-    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type);
+    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type, wf_obs_param);
     // stop the timer
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Wilson Flow = %g secs\n", time0);
     break;
+  }
   default: errorQuda("Undefined test type %d given", test_type);
   }
 

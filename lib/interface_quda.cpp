@@ -5440,20 +5440,22 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+/*
 void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type)
 {
-    // creating an empty array of QudaGaugeObservableParam
-    QudaGaugeObservableParam* param = new QudaGaugeObservableParam[n_steps/meas_interval+1];
-    for (unsigned int i=0;i<n_steps+1; i++){ // initializing for all 'i'
-      param[i] = newQudaGaugeObservableParam();
-      param[i].compute_plaquette = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      param[i].compute_qcharge = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; 
-    }
-    performWFlownStep_param(n_steps, step_size, meas_interval, wflow_type, param);
-    delete[] param;
+  // creating an empty array of QudaGaugeObservableParam
+  QudaGaugeObservableParam* param = new QudaGaugeObservableParam[n_steps/meas_interval+1];
+  for (unsigned int i=0;i<n_steps/meas_interval+1; i++){ // initializing for all 'i'
+    param[i] = newQudaGaugeObservableParam();
+    param[i].compute_plaquette = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    param[i].compute_qcharge = getVerbosity() >= QUDA_SUMMARIZE ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE; 
+  }
+  performWFlownStep_param(n_steps, step_size, meas_interval, wflow_type, param);
+  delete[] param;
 }
+*/
 
-void performWFlownStep_param(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
+void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
 QudaGaugeObservableParam *param)
 {
   pushOutputPrefix("performWFlownStep: ");
@@ -5473,15 +5475,18 @@ QudaGaugeObservableParam *param)
 
   GaugeField *in = gaugeSmeared;
   GaugeField *out = gaugeAux;
+
+  // The nth measurement to take
+  int measurement_n = 0;
   
-  gaugeObservables(*in, param[0], profileWFlow);
+  gaugeObservables(*in, param[measurement_n], profileWFlow);
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
     printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param[0].plaquette[0], param[0].energy[0], param[0].energy[1],
                param[0].energy[2], param[0].qcharge);
   }
-
+  
   for (unsigned int i = 0; i < n_steps; i++) {
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
     // https://arxiv.org/abs/1006.4518v3
@@ -5490,11 +5495,14 @@ QudaGaugeObservableParam *param)
 
     WFlowStep(*out, *gaugeTemp, *in, step_size, wflow_type);
     profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
-    if ((i + 1) % meas_interval == 0){ 
-      gaugeObservables(*out, param[i+1], profileWFlow);
+    if ((i + 1) % meas_interval == 0){
+      measurement_n++; // increment measurements.
+      gaugeObservables(*out, param[measurement_n], profileWFlow);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param[i+1].plaquette[0], param[i+1].energy[0],
-                   param[i+1].energy[1], param[i+1].energy[2], param[i+1].qcharge);
+        printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1),
+		   param[measurement_n].plaquette[0], param[measurement_n].energy[0],
+                   param[measurement_n].energy[1], param[measurement_n].energy[2],
+		   param[measurement_n].qcharge);
       }
     }
   }

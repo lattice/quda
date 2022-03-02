@@ -1536,7 +1536,7 @@ extern "C" {
    * @param meas_interval Measure the Q charge every Nth step
    */
   void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
-
+  
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
@@ -1546,15 +1546,9 @@ extern "C" {
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
    */
-  void performWFlownStep_param(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
-  QudaGaugeObservableParam *param);
-
-  /**
-   * overload of performWFlownStep_param, 
-   * but without passing a pointer to QudaGaugeObservableParam
-   */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
-
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type,
+			 QudaGaugeObservableParam *param);
+  
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
    * smeared gauge field is presently loaded (in gaugeSmeared) the
