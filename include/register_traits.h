@@ -7,7 +7,6 @@
  *
  */
 
-// #include <quda_define.h>
 #include <quda_internal.h>
 #include <complex_quda.h>
 #include <target_device.h>

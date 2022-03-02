@@ -3,6 +3,7 @@
 
 #include <enum_quda.h>
 #include <quda.h>
+
 /**
  * @file    quda_milc_interface.h
  *
