@@ -269,36 +269,7 @@ int Communicator::comm_query(MsgHandle *mh)
   return query;
 }
 
-void Communicator::comm_allreduce(double *data)
-{
-  if (!comm_deterministic_reduce()) {
-    double recvbuf;
-    MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
-    *data = recvbuf;
-  } else {
-    const size_t n = comm_size();
-    double *recv_buf = (double *)safe_malloc(n * sizeof(double));
-    MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
-    *data = deterministic_reduce(recv_buf, n);
-    host_free(recv_buf);
-  }
-}
-
-void Communicator::comm_allreduce_max(double *data)
-{
-  double recvbuf;
-  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-  *data = recvbuf;
-}
-
-void Communicator::comm_allreduce_min(double *data)
-{
-  double recvbuf;
-  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
-  *data = recvbuf;
-}
-
-void Communicator::comm_allreduce_array(double *data, size_t size)
+void Communicator::comm_allreduce_sum_array(double *data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
     double *recvbuf = new double[size];
@@ -338,19 +309,19 @@ void Communicator::comm_allreduce_min_array(double *data, size_t size)
   delete[] recvbuf;
 }
 
-void Communicator::comm_allreduce_int(int *data)
+void Communicator::comm_allreduce_int(int &data)
 {
   int recvbuf;
   MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
-  *data = recvbuf;
+  data = recvbuf;
 }
 
-void Communicator::comm_allreduce_xor(uint64_t *data)
+void Communicator::comm_allreduce_xor(uint64_t &data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
   uint64_t recvbuf;
-  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_HANDLE));
-  *data = recvbuf;
+  MPI_CHECK(MPI_Allreduce(&data, &recvbuf, 1, MPI_UNSIGNED_LONG, MPI_BXOR, MPI_COMM_HANDLE));
+  data = recvbuf;
 }
 
 /**  broadcast from rank 0 */

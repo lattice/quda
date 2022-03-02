@@ -79,21 +79,15 @@ void Communicator::comm_wait(MsgHandle *) { }
 
 int Communicator::comm_query(MsgHandle *) { return 1; }
 
-void Communicator::comm_allreduce(double *) { }
-
-void Communicator::comm_allreduce_max(double *) { }
-
-void Communicator::comm_allreduce_min(double *) { }
-
-void Communicator::comm_allreduce_array(double *, size_t) { }
+void Communicator::comm_allreduce_sum_array(double *, size_t) { }
 
 void Communicator::comm_allreduce_max_array(double *, size_t) { }
 
 void Communicator::comm_allreduce_min_array(double *, size_t) { }
 
-void Communicator::comm_allreduce_int(int *) { }
+void Communicator::comm_allreduce_int(int &) { }
 
-void Communicator::comm_allreduce_xor(uint64_t *) { }
+void Communicator::comm_allreduce_xor(uint64_t &) { }
 
 void Communicator::comm_broadcast(void *, size_t) { }
 

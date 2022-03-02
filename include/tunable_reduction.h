@@ -20,33 +20,21 @@ namespace quda
      comm reducer for doing summation inter-process reduction
   */
   template <typename T> struct comm_reduce_sum {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
+    void operator()(std::vector<T> &v) { comm_allreduce_sum(v); }
   };
 
   /**
      comm reducer for doing max inter-process reduction
   */
   template <typename T> struct comm_reduce_max {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_max_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
+    void operator()(std::vector<T> &v) { comm_allreduce_max(v); }
   };
 
   /**
      comm reducer for doing min inter-process reduction
   */
   template <typename T> struct comm_reduce_min {
-    // FIXME - this will break when we have non-double reduction types, e.g., double-double on the host
-    void operator()(std::vector<T> &v)
-    {
-      comm_allreduce_min_array(reinterpret_cast<double *>(v.data()), v.size() * sizeof(T) / sizeof(double));
-    }
+    void operator()(std::vector<T> &v) { comm_allreduce_min(v); }
   };
 
   /**

@@ -297,25 +297,7 @@ void Communicator::comm_wait(MsgHandle *mh) { QMP_CHECK(QMP_wait(mh->handle)); }
 
 int Communicator::comm_query(MsgHandle *mh) { return (QMP_is_complete(mh->handle) == QMP_TRUE); }
 
-void Communicator::comm_allreduce(double *data)
-{
-  if (!comm_deterministic_reduce()) {
-    QMP_CHECK(QMP_comm_sum_double(QMP_COMM_HANDLE, data));
-  } else {
-    // we need to break out of QMP for the deterministic floating point reductions
-    const size_t n = comm_size();
-    double *recv_buf = (double *)safe_malloc(n * sizeof(double));
-    MPI_CHECK(MPI_Allgather(data, 1, MPI_DOUBLE, recv_buf, 1, MPI_DOUBLE, MPI_COMM_HANDLE));
-    *data = deterministic_reduce(recv_buf, n);
-    host_free(recv_buf);
-  }
-}
-
-void Communicator::comm_allreduce_max(double *data) { QMP_CHECK(QMP_comm_max_double(QMP_COMM_HANDLE, data)); }
-
-void Communicator::comm_allreduce_min(double *data) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data)); }
-
-void Communicator::comm_allreduce_array(double *data, size_t size)
+void Communicator::comm_allreduce_sum_array(double *data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
     QMP_CHECK(QMP_comm_sum_double_array(QMP_COMM_HANDLE, data, size));
@@ -347,12 +329,12 @@ void Communicator::comm_allreduce_min_array(double *data, size_t size)
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_comm_min_double(QMP_COMM_HANDLE, data + i)); }
 }
 
-void Communicator::comm_allreduce_int(int *data) { QMP_CHECK(QMP_comm_sum_int(QMP_COMM_HANDLE, data)); }
+void Communicator::comm_allreduce_int(int &data) { QMP_CHECK(QMP_comm_sum_int(QMP_COMM_HANDLE, &data)); }
 
-void Communicator::comm_allreduce_xor(uint64_t *data)
+void Communicator::comm_allreduce_xor(uint64_t &data)
 {
   if (sizeof(uint64_t) != sizeof(unsigned long)) errorQuda("unsigned long is not 64-bit");
-  QMP_CHECK(QMP_comm_xor_ulong(QMP_COMM_HANDLE, reinterpret_cast<unsigned long *>(data)));
+  QMP_CHECK(QMP_comm_xor_ulong(QMP_COMM_HANDLE, reinterpret_cast<unsigned long *>(&data)));
 }
 
 void Communicator::comm_broadcast(void *data, size_t nbytes)

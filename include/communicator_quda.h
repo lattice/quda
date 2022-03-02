@@ -325,7 +325,7 @@ struct Communicator {
       for (int dim = 0; dim < 4; dim++)
         for (int dir = 0; dir < 2; dir++) p2p += (int)comm_peer2peer_enabled(dir, dim);
 
-      comm_allreduce_int(&p2p);
+      comm_allreduce_int(p2p);
       init = true;
       p2p_global = p2p > 0 ? true : false;
     }
@@ -646,21 +646,6 @@ struct Communicator {
 
   void commGlobalReductionPop() { globalReduce.pop(); }
 
-  void reduceMaxDouble(double &max)
-  {
-    if (commGlobalReduction()) comm_allreduce_max(&max);
-  }
-
-  void reduceDouble(double &sum)
-  {
-    if (commGlobalReduction()) comm_allreduce(&sum);
-  }
-
-  void reduceDoubleArray(double *sum, const int len)
-  {
-    if (commGlobalReduction()) comm_allreduce_array(sum, len);
-  }
-
   bool commAsyncReduction() { return asyncReduce; }
 
   void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
@@ -753,21 +738,15 @@ struct Communicator {
     return std::accumulate(array, array + n, 0.0);
   }
 
-  void comm_allreduce(double *data);
-
-  void comm_allreduce_max(double *data);
-
-  void comm_allreduce_min(double *data);
-
-  void comm_allreduce_array(double *data, size_t size);
+  void comm_allreduce_sum_array(double *data, size_t size);
 
   void comm_allreduce_max_array(double *data, size_t size);
 
   void comm_allreduce_min_array(double *data, size_t size);
 
-  void comm_allreduce_int(int *data);
+  void comm_allreduce_int(int &data);
 
-  void comm_allreduce_xor(uint64_t *data);
+  void comm_allreduce_xor(uint64_t &data);
 
   /**  broadcast from rank 0 */
   void comm_broadcast(void *data, size_t nbytes);

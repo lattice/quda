@@ -637,7 +637,7 @@ namespace quda {
     void reDotProduct(double *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      double *result_tmp = new double[x.size() * y.size()];
+      std::vector<double> result_tmp(x.size() * y.size());
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       if (x.size() == 1) {
@@ -647,7 +647,7 @@ namespace quda {
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
-        multiReduce_recurse<multiDot, multiDot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+        multiReduce_recurse<multiDot, multiDot>(result_tmp.data(), x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x[0]->Precision() == y[0]->Precision()) {
 
         double *result_trans = new double[x.size() * y.size()];
@@ -670,14 +670,13 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiDot, multiDot, double>(result_tmp, x, y, false);
+        TransposeTune<multiDot, multiDot, double>(result_tmp.data(), x, y, false);
       } else {
-        TileSizeTune<multiDot, multiDot, double>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiDot, multiDot, double>(result_tmp.data(), x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = x.size() * y.size();
-      reduceDoubleArray(result_tmp, Nreduce);
+      comm_allreduce_sum(result_tmp);
 
       // multiReduce_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
@@ -686,14 +685,12 @@ namespace quda {
       const unsigned int ylen = y.size();
       for (unsigned int j = 0; j < xlen; j++)
         for (unsigned int i = 0; i < ylen; i++) result[j * ylen + i] = result_tmp[i * xlen + j];
-
-      delete[] result_tmp;
     }
 
     void cDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
     {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      Complex *result_tmp = new Complex[x.size() * y.size()];
+      std::vector<Complex> result_tmp(x.size() * y.size());
       for (unsigned int i = 0; i < x.size() * y.size(); i++) result_tmp[i] = 0.0;
 
       if (x.size() == 1) {
@@ -703,7 +700,7 @@ namespace quda {
 
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
-        multiReduce_recurse<multiCdot, multiCdot>(result_tmp, x, y, x, x, 0, 0, false, max_tile_size);
+        multiReduce_recurse<multiCdot, multiCdot>(result_tmp.data(), x, y, x, x, 0, 0, false, max_tile_size);
       } else if (y.size() == 1 && x[0]->Precision() == y[0]->Precision()) {
 
         Complex *result_trans = new Complex[x.size() * y.size()];
@@ -726,14 +723,13 @@ namespace quda {
         delete[] result_trans;
 
       } else if (x[0]->Precision() == y[0]->Precision()) {
-        TransposeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, false);
+        TransposeTune<multiCdot, multiCdot, Complex>(result_tmp.data(), x, y, false);
       } else {
-        TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, false);
+        TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp.data(), x, y, x, x, false);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray((double*)result_tmp, Nreduce);
+      comm_allreduce_sum(result_tmp);
 
       // multiReduce_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
@@ -743,8 +739,6 @@ namespace quda {
       for (unsigned int j = 0; j < xlen; j++)
         for (unsigned int i = 0; i < ylen; i++)
           result[j*ylen+i] = result_tmp[i*xlen + j];
-
-      delete[] result_tmp;
     }
 
     void hDotProduct(Complex *result, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y)
@@ -752,14 +746,13 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block dot product on non-square inputs");
 
-      Complex* result_tmp = new Complex[x.size()*y.size()];
+      std::vector<Complex> result_tmp(x.size()*y.size());
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, false); // last false is b/c L2 norm
+      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp.data(), x, y, x, x, true, false); // last false is b/c L2 norm
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray((double*)result_tmp, Nreduce); // FIXME - could optimize this for Hermiticity as well
+      comm_allreduce_sum(result_tmp); // FIXME - could optimize this for Hermiticity as well
 
       // Switch from col-major to row-major
       const unsigned int xlen = x.size();
@@ -769,8 +762,6 @@ namespace quda {
           result[j*ylen+i] = result_tmp[i*xlen + j];
           result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
 	}
-
-      delete[] result_tmp;
     }
 
     // for (p, Ap) norms in CG which are Hermitian.
@@ -779,14 +770,13 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (x.size() != y.size()) errorQuda("Cannot call Hermitian block A-norm dot product on non-square inputs");
 
-      Complex* result_tmp = new Complex[x.size()*y.size()];
+      std::vector<Complex> result_tmp(x.size()*y.size());
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp, x, y, x, x, true, true); // last true is b/c A norm
+      TileSizeTune<multiCdot, multiCdot, Complex>(result_tmp.data(), x, y, x, x, true, true); // last true is b/c A norm
 
       // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = 2*x.size()*y.size();
-      reduceDoubleArray((double*)result_tmp, Nreduce); // FIXME - could optimize this for Hermiticity as well
+      comm_allreduce_sum(result_tmp);
 
       // Switch from col-major to row-major
       const unsigned int xlen = x.size();
@@ -797,7 +787,6 @@ namespace quda {
           result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
         }
 
-      delete[] result_tmp;
     }
 
     // takes the outer product of inner products between and y and copies y into z
