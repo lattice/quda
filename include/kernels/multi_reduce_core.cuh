@@ -98,6 +98,9 @@ namespace quda
       constexpr MultiReduce_(const Arg &arg) : arg(arg) {}
       static constexpr const char *filename() { return KERNEL_FILE; }
 
+      // overload comm_reduce to defer until the entire "tile" is complete
+      template <typename U> static inline void comm_reduce(U &a) { }
+
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int tid, int, int k) const
       {
         unsigned int parity = tid >= arg.length_cb ? 1 : 0;

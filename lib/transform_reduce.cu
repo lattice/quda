@@ -6,16 +6,6 @@
 namespace quda
 {
 
-  /**
-     Trait that returns the correct comm reduce class for a given reducer
-   */
-  template <typename reducer> struct get_comm_reducer_t { };
-  template <> struct get_comm_reducer_t<plus<double>> { using type = comm_reduce_sum<double>; };
-  template <> struct get_comm_reducer_t<maximum<double>> { using type = comm_reduce_max<double>; };
-  template <> struct get_comm_reducer_t<maximum<float>> { using type = comm_reduce_max<float>; };
-  template <> struct get_comm_reducer_t<minimum<double>> { using type = comm_reduce_min<double>; };
-  template <> struct get_comm_reducer_t<minimum<float>> { using type = comm_reduce_min<float>; };
-
   template <typename reducer, typename T, typename count_t, typename transformer>
   class TransformReduce : TunableMultiReduction<1>
   {
@@ -50,7 +40,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Arg arg(v, n_items, h);
-      launch<transform_reducer, reduce_t, typename get_comm_reducer_t<reducer>::type, true>(result, tp, stream, arg);
+      launch<transform_reducer, true>(result, tp, stream, arg);
     }
 
     long long bytes() const { return v.size() * n_items * sizeof(T); }

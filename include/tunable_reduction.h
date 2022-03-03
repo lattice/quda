@@ -10,34 +10,6 @@ namespace quda
 {
 
   /**
-     Dummy comm reducer where no inter-process reduction is done
-  */
-  template <typename T> struct comm_reduce_null {
-    void operator()(std::vector<T> &) { }
-  };
-
-  /**
-     comm reducer for doing summation inter-process reduction
-  */
-  template <typename T> struct comm_reduce_sum {
-    void operator()(std::vector<T> &v) { comm_allreduce_sum(v); }
-  };
-
-  /**
-     comm reducer for doing max inter-process reduction
-  */
-  template <typename T> struct comm_reduce_max {
-    void operator()(std::vector<T> &v) { comm_allreduce_max(v); }
-  };
-
-  /**
-     comm reducer for doing min inter-process reduction
-  */
-  template <typename T> struct comm_reduce_min {
-    void operator()(std::vector<T> &v) { comm_allreduce_min(v); }
-  };
-
-  /**
      @brief This derived tunable class is for reduction kernels, and
      partners the Reduction2D kernel.  The x threads will
      typically correspond to the checkerboarded volume.  Each thread
@@ -81,7 +53,7 @@ namespace quda
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       arg.launch_error = launch<device::max_reduce_block_size<block_size_y>(), Functor>(arg, tp, stream);
@@ -89,17 +61,17 @@ namespace quda
       if (!commAsyncReduction()) {
         std::vector<T> result_(1);
         arg.complete(result_, stream);
-        if (!activeTuning() && commGlobalReduction()) CommReducer()(result_);
+        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
         result = result_[0];
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       std::vector<T> result_(1);
       result_[0] = Reduction2D_host<Functor, Arg>(arg);
-      if (!activeTuning() && commGlobalReduction()) CommReducer()(result_);
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result_);
       result = result_[0];
     }
 
@@ -111,14 +83,13 @@ namespace quda
        @param[in] arg Kernel argument struct
        @param[in] param Constant kernel meta data
      */
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host = false, typename Arg>
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
     void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else if constexpr (enable_host) {
-        launch_host<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_host<Functor>(result, tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
       }
@@ -224,7 +195,7 @@ namespace quda
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_device(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (n_batch_block_max > Arg::max_n_batch_block)
@@ -233,11 +204,11 @@ namespace quda
 
       if (!commAsyncReduction()) {
         arg.complete(result, stream);
-        if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
+        if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
       }
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>, typename Arg>
+    template <template <typename> class Functor, typename T, typename Arg>
     void launch_host(std::vector<T> &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       if (n_batch_block_max > Arg::max_n_batch_block)
@@ -251,17 +222,16 @@ namespace quda
       auto value = MultiReduction_host<Functor, Arg>(arg);
 
       for (int j = 0; j < (int)arg.threads.z; j++) result[j] = value[j];
-      if (!activeTuning() && commGlobalReduction()) CommReducer()(result);
+      if (!activeTuning() && commGlobalReduction()) Functor<Arg>::comm_reduce(result);
     }
 
-    template <template <typename> class Functor, typename T, typename CommReducer = comm_reduce_sum<T>,
-              bool enable_host = false, typename Arg>
-    void launch(std::vector<T> &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    template <template <typename> class Functor, bool enable_host = false, typename T, typename Arg>
+    void launch(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
     {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
-        launch_device<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_device<Functor>(result, tp, stream, arg);
       } else if constexpr (enable_host) {
-        launch_host<Functor, T, CommReducer>(result, tp, stream, arg);
+        launch_host<Functor>(result, tp, stream, arg);
       } else {
         errorQuda("CPU not supported yet");
       }

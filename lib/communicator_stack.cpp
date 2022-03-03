@@ -180,6 +180,11 @@ template<> void comm_allreduce_sum<std::vector<double>>(std::vector<double> &a)
   comm_allreduce_sum_array(a.data(), a.size());
 }
 
+template<> void comm_allreduce_sum<std::vector<double2>>(std::vector<double2> &a)
+{
+  comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 2 * a.size());
+}
+
 template<> void comm_allreduce_sum<std::vector<std::complex<double>>>(std::vector<std::complex<double>> &a)
 {
   comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 2 * a.size());

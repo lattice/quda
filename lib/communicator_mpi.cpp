@@ -301,13 +301,13 @@ void Communicator::comm_allreduce_min_array(double *data, size_t size)
 {
   std::vector<double> recvbuf(size);
   MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
-  memcpy(data, recvbuf, size * sizeof(double));
+  memcpy(data, recvbuf.data(), size * sizeof(double));
 }
 
 void Communicator::comm_allreduce_int(int &data)
 {
   int recvbuf;
-  MPI_CHECK(MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
+  MPI_CHECK(MPI_Allreduce(&data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_HANDLE));
   data = recvbuf;
 }
 
