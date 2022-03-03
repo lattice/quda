@@ -5353,9 +5353,9 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval,
 
   // The nth measurement to take
   int measurement_n = 0;
-  
+
+  gaugeObservablesQuda(&param[measurement_n]);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    gaugeObservablesQuda(&param[measurement_n]);
     printfQuda("Q charge at step %03d = %+.16e\n", 0, param[measurement_n].qcharge);
   }
   
@@ -5403,8 +5403,8 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval,
     profileSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0) {
       measurement_n++;
+      gaugeObservablesQuda(&param[measurement_n]);
       if(getVerbosity() >= QUDA_SUMMARIZE) {
-	gaugeObservablesQuda(&param[measurement_n]);
 	printfQuda("Q charge at step %03d = %+.16e\n", i + 1, param[measurement_n].qcharge);
       }
     }
