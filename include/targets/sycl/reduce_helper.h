@@ -104,7 +104,8 @@ namespace quda
       if (launch_error == QUDA_ERROR_UNINITIALIZED) errorQuda("No reduction kernel appears to have been launched");
       auto event = reducer::get_event();
       qudaEventRecord(event, stream);
-      while (!qudaEventQuery(event)) { }
+      //while (!qudaEventQuery(event)) { }
+      qudaEventSynchronize(event);
       //auto q = device::get_target_stream(stream);
       //q.wait();
 
@@ -144,8 +145,9 @@ namespace quda
       = std::min(Arg::max_n_batch_block, device::max_block_size() / (block_size_x * block_size_y));
     using BlockReduce = BlockReduce<T, block_size_x, block_size_y, n_batch_block, true>;
     //__shared__ bool isLastBlockDone[n_batch_block];
-    auto glmem = sycl::ext::oneapi::group_local_memory<bool[n_batch_block]>(getGroup());
-    bool *isLastBlockDone = *glmem.get();
+    auto glmem = sycl::ext::oneapi::group_local_memory_for_overwrite<bool[n_batch_block]>(getGroup());
+    //bool *isLastBlockDone = *glmem.get();
+    auto &isLastBlockDone = *glmem;
 
     T aggregate = BlockReduce(target::thread_idx().z).Reduce(in, r);
 

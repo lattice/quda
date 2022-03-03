@@ -45,41 +45,6 @@ inline void FFTDestroyPlan(FFTPlanHandle &) { errorQuda("GPU_GAUGE_ALG is disabl
 
 #else
 
-#if 0
-/**
-   @brief Helper function for decoding cuFFT return codes
-*/
-static const char *cufftGetErrorEnum(cufftResult error)
-{
-  switch (error) {
-  case CUFFT_SUCCESS: return "CUFFT_SUCCESS";
-  case CUFFT_INVALID_PLAN: return "CUFFT_INVALID_PLAN";
-  case CUFFT_ALLOC_FAILED: return "CUFFT_ALLOC_FAILED";
-  case CUFFT_INVALID_TYPE: return "CUFFT_INVALID_TYPE";
-  case CUFFT_INVALID_VALUE: return "CUFFT_INVALID_VALUE";
-  case CUFFT_INTERNAL_ERROR: return "CUFFT_INTERNAL_ERROR";
-  case CUFFT_EXEC_FAILED: return "CUFFT_EXEC_FAILED";
-  case CUFFT_SETUP_FAILED: return "CUFFT_SETUP_FAILED";
-  case CUFFT_INVALID_SIZE: return "CUFFT_INVALID_SIZE";
-  case CUFFT_UNALIGNED_DATA: return "CUFFT_UNALIGNED_DATA";
-  case CUFFT_INCOMPLETE_PARAMETER_LIST: return "CUFFT_INCOMPLETE_PARAMETER_LIST";
-  case CUFFT_INVALID_DEVICE: return "CUFFT_INVALID_DEVICE";
-  case CUFFT_PARSE_ERROR: return "CUFFT_PARSE_ERROR";
-  case CUFFT_NO_WORKSPACE: return "CUFFT_NO_WORKSPACE";
-  case CUFFT_NOT_IMPLEMENTED: return "CUFFT_NOT_IMPLEMENTED";
-  case CUFFT_LICENSE_ERROR: return "CUFFT_LICENSE_ERROR";
-  case CUFFT_NOT_SUPPORTED: return "CUFFT_NOT_SUPPORTED";
-  default: return "<unknown error>";
-  }
-}
-
-#define CUFFT_SAFE_CALL(call)                                                                                          \
-  {                                                                                                                    \
-    cufftResult err = call;                                                                                            \
-    if (CUFFT_SUCCESS != err) { errorQuda("CUFFT error %s", cufftGetErrorEnum(err)); }                                 \
-  }
-#endif
-
 /**
  * @brief Call MKL to perform a single-precision complex-to-complex
  * transform plan in the transform direction as specified by direction
@@ -176,15 +141,17 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
       plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.x * size.y);
       plan.s->set_value(config_param::FWD_DISTANCE, distance);
       plan.s->set_value(config_param::BWD_DISTANCE, distance);
+      plan.s->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
       plan.s->commit(q);
     } else {
       auto q = device::defaultQueue();
       MKL_LONG distance = size.x * size.y;
-      plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
-      //plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});
+      //plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.x, size.y});
+      plan.s = new std::remove_pointer_t<decltype(plan.s)>({size.y, size.x});
       plan.s->set_value(config_param::NUMBER_OF_TRANSFORMS, size.w * size.z);
       plan.s->set_value(config_param::FWD_DISTANCE, distance);
       plan.s->set_value(config_param::BWD_DISTANCE, distance);
+      plan.s->set_value(config_param::BACKWARD_SCALE, (1.0/distance));
       plan.s->commit(q);
     }
   } else {
@@ -208,9 +175,11 @@ inline void SetPlanFFT2DMany(FFTPlanHandle &plan, int4 size, int dim, QudaPrecis
 
 inline void FFTDestroyPlan(FFTPlanHandle &plan) {
   if(plan.isDouble) {
-    plan.d->~descriptor();
+    //plan.d->~descriptor();
+    delete plan.d;
   } else {
-    plan.s->~descriptor();
+    //plan.s->~descriptor();
+    delete plan.s;
   }
 }
 

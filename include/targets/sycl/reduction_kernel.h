@@ -3,7 +3,7 @@
 #include <reduce_helper.h>
 #include <timer.h>
 
-//#define HIGH_LEVEL_REDUCTIONS
+#define HIGH_LEVEL_REDUCTIONS
 
 namespace quda {
 
