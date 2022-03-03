@@ -30,6 +30,8 @@ namespace backward
 } // namespace backward
 #endif
 
+namespace quda {
+
 struct Topology_s {
   int ndim;
   int dims[QUDA_MAX_DIM];
@@ -474,7 +476,7 @@ struct Communicator {
         int excluded_device;
         while (blacklist_list >> excluded_device) {
           // check this is a valid device
-          if (excluded_device < 0 || excluded_device >= quda::device::get_device_count()) {
+          if (excluded_device < 0 || excluded_device >= device::get_device_count()) {
             errorQuda("Cannot blacklist invalid GPU device ordinal %d", excluded_device);
           }
 
@@ -520,7 +522,7 @@ struct Communicator {
     comm_gather_hostname(hostname_recv_buf);
 
     if (gpuid < 0) {
-      int device_count = quda::device::get_device_count();
+      int device_count = device::get_device_count();
       if (device_count == 0) { errorQuda("No devices found"); }
 
       // We initialize gpuid if it's still negative.
@@ -689,7 +691,7 @@ struct Communicator {
   int comm_rank_from_coords(const int *coords)
   {
     Topology *topo = comm_default_topology();
-    return ::comm_rank_from_coords(topo, coords);
+    return ::quda::comm_rank_from_coords(topo, coords);
   }
 
   /**
@@ -758,9 +760,11 @@ struct Communicator {
   static int comm_rank_global();
 };
 
-constexpr quda::CommKey default_comm_key = {1, 1, 1, 1};
+constexpr CommKey default_comm_key = {1, 1, 1, 1};
 
-void push_communicator(const quda::CommKey &split_key);
+void push_communicator(const CommKey &split_key);
 
 /** @brief These routine broadcast the data according to the default communicator */
 void comm_broadcast_global(void *data, size_t nbytes);
+
+}

@@ -12,6 +12,8 @@
     }                                                                                                                  \
   } while (0)
 
+namespace quda {
+
 struct MsgHandle_s {
   /**
      The persistant MPI communicator handle that is created with
@@ -58,10 +60,9 @@ Communicator::Communicator(Communicator &other, const int *comm_split) : globalR
 
   constexpr int nDim = 4;
 
-  quda::CommKey comm_dims_split;
-
-  quda::CommKey comm_key_split;
-  quda::CommKey comm_color_split;
+  CommKey comm_dims_split;
+  CommKey comm_key_split;
+  CommKey comm_color_split;
 
   for (int d = 0; d < nDim; d++) {
     assert(other.comm_dim(d) % comm_split[d] == 0);
@@ -272,41 +273,35 @@ int Communicator::comm_query(MsgHandle *mh)
 void Communicator::comm_allreduce_sum_array(double *data, size_t size)
 {
   if (!comm_deterministic_reduce()) {
-    double *recvbuf = new double[size];
-    MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
-    memcpy(data, recvbuf, size * sizeof(double));
-    delete[] recvbuf;
+    std::vector<double> recvbuf(size);
+    MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_SUM, MPI_COMM_HANDLE));
+    memcpy(data, recvbuf.data(), size * sizeof(double));
   } else {
     size_t n = comm_size();
-    double *recv_buf = new double[size * n];
-    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
+    std::vector<double> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf.data(), size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
-    double *recv_trans = new double[size * n];
+    std::vector<double> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
       for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
     }
 
-    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans + i * n, n); }
-
-    delete[] recv_buf;
-    delete[] recv_trans;
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
   }
 }
 
 void Communicator::comm_allreduce_max_array(double *data, size_t size)
 {
-  double *recvbuf = new double[size];
-  MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
-  memcpy(data, recvbuf, size * sizeof(double));
-  delete[] recvbuf;
+  std::vector<double> recvbuf(size);
+  MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MAX, MPI_COMM_HANDLE));
+  memcpy(data, recvbuf.data(), size * sizeof(double));
 }
 
 void Communicator::comm_allreduce_min_array(double *data, size_t size)
 {
-  double *recvbuf = new double[size];
-  MPI_CHECK(MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
+  std::vector<double> recvbuf(size);
+  MPI_CHECK(MPI_Allreduce(data, recvbuf.data(), size, MPI_DOUBLE, MPI_MIN, MPI_COMM_HANDLE));
   memcpy(data, recvbuf, size * sizeof(double));
-  delete[] recvbuf;
 }
 
 void Communicator::comm_allreduce_int(int &data)
@@ -339,4 +334,6 @@ int Communicator::comm_rank_global()
   int rank;
   MPI_CHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
   return rank;
+}
+
 }

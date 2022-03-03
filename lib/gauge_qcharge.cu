@@ -31,7 +31,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-      std::vector<double> result(3);
+      array<double, 3> result;
       if (density) {
         QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
         launch<qCharge>(result, tp, stream, arg);

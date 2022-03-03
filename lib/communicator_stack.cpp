@@ -1,13 +1,15 @@
 #include <communicator_quda.h>
 #include <map>
-#include <array>
+#include <array.h>
 #include <lattice_field.h>
+
+namespace quda {
 
 int Communicator::gpuid = -1;
 
-static std::map<quda::CommKey, Communicator> communicator_stack;
+static std::map<CommKey, Communicator> communicator_stack;
 
-static quda::CommKey current_key = {-1, -1, -1, -1};
+static CommKey current_key = {-1, -1, -1, -1};
 
 void init_communicator_stack(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data,
                              bool user_set_comm_handle, void *user_comm)
@@ -35,7 +37,7 @@ Communicator &get_current_communicator()
   return search->second;
 }
 
-void push_communicator(const quda::CommKey &split_key)
+void push_communicator(const CommKey &split_key)
 {
   if (comm_nvshmem_enabled())
     errorQuda(
@@ -46,7 +48,7 @@ void push_communicator(const quda::CommKey &split_key)
                                std::forward_as_tuple(get_default_communicator(), split_key.data()));
   }
 
-  quda::LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
+  LatticeField::freeGhostBuffer(); // Destroy the (IPC) Comm buffers with the old communicator.
 
   current_key = split_key;
 }
@@ -168,17 +170,71 @@ void comm_wait(MsgHandle *mh) { get_current_communicator().comm_wait(mh); }
 
 int comm_query(MsgHandle *mh) { return get_current_communicator().comm_query(mh); }
 
-void comm_allreduce(double *data) { get_current_communicator().comm_allreduce(data); }
+void comm_allreduce_sum_array(double *data, size_t size)
+{
+  get_current_communicator().comm_allreduce_sum_array(data, size);
+}
 
-void comm_allreduce_max(double *data) { get_current_communicator().comm_allreduce_max(data); }
+template<> void comm_allreduce_sum<std::vector<double>>(std::vector<double> &a)
+{
+  comm_allreduce_sum_array(a.data(), a.size());
+}
 
-void comm_allreduce_min(double *data) { get_current_communicator().comm_allreduce_min(data); }
+template<> void comm_allreduce_sum<std::vector<std::complex<double>>>(std::vector<std::complex<double>> &a)
+{
+  comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 2 * a.size());
+}
 
-void comm_allreduce_array(double *data, size_t size) { get_current_communicator().comm_allreduce_array(data, size); }
+template<> void comm_allreduce_sum<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+{
+  comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 2 * a.size());
+}
+
+template<> void comm_allreduce_sum<std::vector<array<double, 3>>>(std::vector<array<double, 3>> &a)
+{
+  comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 3 * a.size());
+}
+
+template<> void comm_allreduce_sum<std::vector<array<double, 4>>>(std::vector<array<double, 4>> &a)
+{
+  comm_allreduce_sum_array(reinterpret_cast<double*>(a.data()), 4 * a.size());
+}
+
+template<> void comm_allreduce_sum<double>(double &a)
+{
+  comm_allreduce_sum_array(&a, 1);
+}
 
 void comm_allreduce_max_array(double *data, size_t size)
 {
   get_current_communicator().comm_allreduce_max_array(data, size);
+}
+
+template<> void comm_allreduce_max<double>(double &a) { comm_allreduce_max_array(&a, 1); }
+
+template<> void comm_allreduce_max<float>(float &a)
+{
+  double a_ = a;
+  comm_allreduce_max_array(&a_, 1);
+  a = a_;
+}
+
+template<> void comm_allreduce_max<std::vector<double>>(std::vector<double> &a)
+{
+  comm_allreduce_max_array(a.data(), a.size());
+}
+
+template<> void comm_allreduce_max<std::vector<float>>(std::vector<float> &a)
+{
+  std::vector<double>  a_(a.size());
+  for (unsigned int i = 0; i < a.size(); i++) a_[i] = a[i];
+  comm_allreduce_max_array(a_.data(), a_.size());
+  for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
+}
+
+template<> void comm_allreduce_max<std::vector<array<double, 2>>>(std::vector<array<double, 2>> &a)
+{
+  comm_allreduce_max_array(reinterpret_cast<double*>(a.data()), 2 * a.size());
 }
 
 void comm_allreduce_min_array(double *data, size_t size)
@@ -186,9 +242,22 @@ void comm_allreduce_min_array(double *data, size_t size)
   get_current_communicator().comm_allreduce_min_array(data, size);
 }
 
-void comm_allreduce_int(int *data) { get_current_communicator().comm_allreduce_int(data); }
+template<> void comm_allreduce_min<std::vector<double>>(std::vector<double> &a)
+{
+  comm_allreduce_min_array(a.data(), a.size());
+}
 
-void comm_allreduce_xor(uint64_t *data) { get_current_communicator().comm_allreduce_xor(data); }
+template<> void comm_allreduce_min<std::vector<float>>(std::vector<float> &a)
+{
+  std::vector<double>  a_(a.size());
+  for (unsigned int i = 0; i < a.size(); i++) a_[i] = a[i];
+  comm_allreduce_min_array(a_.data(), a_.size());
+  for (unsigned int i = 0; i < a.size(); i++) a[i] = a_[i];
+}
+
+void comm_allreduce_int(int &data) { get_current_communicator().comm_allreduce_int(data); }
+
+void comm_allreduce_xor(uint64_t &data) { get_current_communicator().comm_allreduce_xor(data); }
 
 void comm_broadcast(void *data, size_t nbytes) { get_current_communicator().comm_broadcast(data, nbytes); }
 
@@ -197,12 +266,6 @@ void comm_broadcast_global(void *data, size_t nbytes) { get_default_communicator
 void comm_barrier(void) { get_current_communicator().comm_barrier(); }
 
 void comm_abort_(int status) { Communicator::comm_abort_(status); };
-
-void reduceMaxDouble(double &max) { get_current_communicator().reduceMaxDouble(max); }
-
-void reduceDouble(double &sum) { get_current_communicator().reduceDouble(sum); }
-
-void reduceDoubleArray(double *max, const int len) { get_current_communicator().reduceDoubleArray(max, len); }
 
 int commDim(int dim) { return get_current_communicator().commDim(dim); }
 
@@ -225,3 +288,5 @@ bool commAsyncReduction() { return get_current_communicator().commAsyncReduction
 void commAsyncReductionSet(bool global_reduce) { get_current_communicator().commAsyncReductionSet(global_reduce); }
 
 int get_enable_p2p_max_access_rank() { return get_current_communicator().enable_p2p_max_access_rank; }
+
+}

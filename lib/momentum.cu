@@ -56,7 +56,7 @@ namespace quda {
     count++;
   }
 
-  void forceRecord(std::vector<double> &force, double dt, const char *fname)
+  void forceRecord(array<double, 2> &force, double dt, const char *fname)
   {
     if (comm_rank()==0) {
       force_stream << fname << "\t" << std::setprecision(5) << force[0] << "\t"
@@ -107,15 +107,14 @@ namespace quda {
     const GaugeField &force;
     GaugeField &mom;
     double coeff;
-    std::vector<double> force_max;
+    array<double, 2> force_max;
 
   public:
     UpdateMom(const GaugeField &force, GaugeField &mom, double coeff, const char *fname) :
       TunableReduction2D(mom),
       force(force),
       mom(mom),
-      coeff(coeff),
-      force_max(2)
+      coeff(coeff)
     {
       apply(device::get_default_stream());
       if (forceMonitor()) forceRecord(force_max, coeff, fname);
@@ -125,7 +124,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       UpdateMomArg<Float, nColor, recon> arg(mom, coeff, force);
-      launch<MomUpdate, double, comm_reduce_max<double>>(force_max, tp, stream, arg);
+      launch<MomUpdate, array<double, 2>, comm_reduce_max<array<double, 2>>>(force_max, tp, stream, arg);
     }
 
     void preTune() { mom.backup();}

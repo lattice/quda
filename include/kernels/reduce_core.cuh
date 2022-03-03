@@ -497,7 +497,7 @@ namespace quda
       __device__ __host__ void pre()
       {
         aux[0] = 0;
-        aux[0] = 0;
+        aux[1] = 0;
       }
 
       template <typename T> __device__ __host__ void operator()(reduce_t &, T &x, T &y, T &z, T &, T &)

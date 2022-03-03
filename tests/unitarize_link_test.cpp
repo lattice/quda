@@ -47,7 +47,7 @@ TEST(unitarization, verify) {
                            unittol, cpu_prec);
 
 #ifdef MULTI_GPU
-  comm_allreduce_int(&res);
+  comm_allreduce_int(res);
   res /= comm_size();
 #endif
 
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
   int num_failures = unitarize_link_test(test_rc);
   int num_procs = 1;
 #ifdef MULTI_GPU
-  comm_allreduce_int(&num_failures);
+  comm_allreduce_int(num_failures);
   num_procs = comm_size();
 #endif
 

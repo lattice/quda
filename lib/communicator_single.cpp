@@ -7,6 +7,8 @@
 
 #include <communicator_quda.h>
 
+namespace quda {
+
 Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data, bool, void *)
 {
   comm_init(nDim, commDims, rank_from_coords, map_data);
@@ -17,10 +19,9 @@ Communicator::Communicator(Communicator &other, const int *comm_split) : globalR
 {
   constexpr int nDim = 4;
 
-  quda::CommKey comm_dims_split;
-
-  quda::CommKey comm_key_split;
-  quda::CommKey comm_color_split;
+  CommKey comm_dims_split;
+  CommKey comm_key_split;
+  CommKey comm_color_split;
 
   for (int d = 0; d < nDim; d++) {
     assert(other.comm_dim(d) % comm_split[d] == 0);
@@ -96,3 +97,5 @@ void Communicator::comm_barrier(void) { }
 void Communicator::comm_abort_(int status) { exit(status); }
 
 int Communicator::comm_rank_global() { return 0; }
+
+}

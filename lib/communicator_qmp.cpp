@@ -1,6 +1,15 @@
 #include <communicator_quda.h>
 #include <mpi_comm_handle.h>
 
+// While we can emulate an all-gather using QMP reductions, this
+// scales horribly as the number of nodes increases, so for
+// performance we just call MPI directly
+#define USE_MPI_GATHER
+
+#ifdef USE_MPI_GATHER
+#include <mpi.h>
+#endif
+
 #define QMP_CHECK(qmp_call)                                                                                            \
   do {                                                                                                                 \
     QMP_status_t status = qmp_call;                                                                                    \
@@ -19,19 +28,12 @@
     }                                                                                                                  \
   } while (0)
 
+namespace quda {
+
 struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
 };
-
-// While we can emulate an all-gather using QMP reductions, this
-// scales horribly as the number of nodes increases, so for
-// performance we just call MPI directly
-#define USE_MPI_GATHER
-
-#ifdef USE_MPI_GATHER
-#include <mpi.h>
-#endif
 
 Communicator::Communicator(int nDim, const int *commDims, QudaCommsMap rank_from_coords, void *map_data,
                            bool user_set_comm_handle_, void *user_comm)
@@ -67,10 +69,9 @@ Communicator::Communicator(Communicator &other, const int *comm_split) : globalR
 
   constexpr int nDim = 4;
 
-  quda::CommKey comm_dims_split;
-
-  quda::CommKey comm_key_split;
-  quda::CommKey comm_color_split;
+  CommKey comm_dims_split;
+  CommKey comm_key_split;
+  CommKey comm_color_split;
 
   for (int d = 0; d < nDim; d++) {
     assert(other.comm_dim(d) % comm_split[d] == 0);
@@ -304,18 +305,15 @@ void Communicator::comm_allreduce_sum_array(double *data, size_t size)
   } else {
     // we need to break out of QMP for the deterministic floating point reductions
     size_t n = comm_size();
-    double *recv_buf = new double[size * n];
-    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf, size, MPI_DOUBLE, MPI_COMM_HANDLE));
+    std::vector<double> recv_buf(size * n);
+    MPI_CHECK(MPI_Allgather(data, size, MPI_DOUBLE, recv_buf.data(), size, MPI_DOUBLE, MPI_COMM_HANDLE));
 
-    double *recv_trans = new double[size * n];
+    std::vector<double> recv_trans(size * n);
     for (size_t i = 0; i < n; i++) {
       for (size_t j = 0; j < size; j++) { recv_trans[j * n + i] = recv_buf[i * size + j]; }
     }
 
-    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans + i * n, n); }
-
-    delete[] recv_buf;
-    delete[] recv_trans;
+    for (size_t i = 0; i < size; i++) { data[i] = deterministic_reduce(recv_trans.data() + i * n, n); }
   }
 }
 
@@ -347,3 +345,5 @@ void Communicator::comm_barrier(void) { QMP_CHECK(QMP_comm_barrier(QMP_COMM_HAND
 void Communicator::comm_abort_(int status) { QMP_abort(status); }
 
 int Communicator::comm_rank_global() { return QMP_get_node_number(); }
+
+}
