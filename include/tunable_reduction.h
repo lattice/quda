@@ -49,8 +49,8 @@ namespace quda
         return launch<block_size_x - device::warp_size(), Functor>(arg, tp, stream);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
-        return QUDA_ERROR;
       }
+      return QUDA_ERROR;
     }
 
     template <template <typename> class Functor, typename T, typename Arg>
@@ -191,8 +191,8 @@ namespace quda
         return launch<block_size_x / 2, Functor>(arg, tp, stream);
       } else {
         errorQuda("Unexpected block size %d", tp.block.x);
-        return QUDA_ERROR;
       }
+      return QUDA_ERROR;
     }
 
     template <template <typename> class Functor, typename T, typename Arg>
