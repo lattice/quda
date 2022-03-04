@@ -67,7 +67,7 @@ namespace quda
     }
 
     template <template <typename> class Functor, typename T, typename Arg>
-    void launch_host(T &result, const TuneParam &tp, const qudaStream_t &stream, Arg &arg)
+    void launch_host(T &result, const TuneParam &, const qudaStream_t &, Arg &arg)
     {
       std::vector<T> result_(1);
       result_[0] = Reduction2D_host<Functor, Arg>(arg);

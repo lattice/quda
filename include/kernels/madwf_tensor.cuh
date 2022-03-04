@@ -69,7 +69,7 @@ namespace quda
       static constexpr const char *filename() { return KERNEL_FILE; }
 
       // overload comm_reduce to prevent any global reduction
-      static inline void comm_reduce(std::vector<reduce_t> &a) { }
+      static inline void comm_reduce(std::vector<reduce_t> &) { }
 
       __device__ __host__ inline reduce_t operator()(reduce_t &sum, int x_cb, int parity, int batch_idx)
       {
